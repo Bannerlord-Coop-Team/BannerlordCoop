@@ -4,6 +4,8 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.AcceptMirror;
+using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMaterials;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Players;
@@ -271,14 +273,16 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
         });
 
-        var clientTriggered = Assert.Single(Client.InternalMessages.GetMessages<VillageCraftingIssueQuestAcceptTriggered>());
-        Assert.True(clientTriggered.RequestedItemAmount > 0);
+        var clientTriggered = Assert.Single(Client.InternalMessages.GetMessages<QuestTypeQuestSolutionAcceptTriggered>());
+        var clientFields = GenericAcceptFieldsSerializer.Deserialize<VillageNeedsCraftingMaterialsAcceptFields>(clientTriggered.FieldsBytes);
+        Assert.True(clientFields.RequestedItemAmount > 0);
 
-        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingIssueQuestAccepted>());
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
         Assert.Equal(fixture.HeroId, accepted.OwnerId);
         Assert.Equal("player-A", accepted.OwnerControllerId);
-        Assert.NotEqual(clientTriggered.RequestedItemAmount, accepted.RequestedItemAmount);
-        Assert.NotEqual(clientTriggered.RewardGold, accepted.RewardGold);
+        var acceptedFields = GenericAcceptFieldsSerializer.Deserialize<VillageNeedsCraftingMaterialsAcceptFields>(accepted.FieldsBytes);
+        Assert.NotEqual(clientFields.RequestedItemAmount, acceptedFields.RequestedItemAmount);
+        Assert.NotEqual(clientFields.RewardGold, acceptedFields.RewardGold);
 
         foreach (var instance in AllInstances)
         {
@@ -286,8 +290,8 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
-                Assert.Equal(accepted.RequestedItemAmount, quest._requestedItemAmount);
-                Assert.Equal(accepted.RewardGold, quest.RewardGold);
+                Assert.Equal(acceptedFields.RequestedItemAmount, quest._requestedItemAmount);
+                Assert.Equal(acceptedFields.RewardGold, quest.RewardGold);
             });
         }
 
@@ -303,7 +307,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
-    public void RequestVillageCraftingIssueAcceptQuest_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer()
+    public void RequestQuestTypeAcceptQuest_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer()
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture.HeroId);
@@ -323,13 +327,13 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(IssueGenerationRegistry.TryGetGeneration(owner, out generation));
-            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestVillageCraftingIssueAcceptQuest(fixture.HeroId, generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
         });
 
-        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingIssueQuestAccepted>());
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
         Assert.Equal(fixture.HeroId, accepted.OwnerId);
         Assert.Equal("player-A", accepted.OwnerControllerId);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingIssueAcceptRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
 
         Server.Call(() =>
         {
@@ -342,15 +346,15 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer, new RequestVillageCraftingIssueAcceptQuest(fixture.HeroId, generation));
+            Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
         });
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingIssueQuestAccepted>());
-        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingIssueAcceptRejected>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
         Assert.Equal(fixture.HeroId, rejected.OwnerId);
 
-        Assert.Single(OtherClient.InternalMessages.GetMessages<NetworkVillageCraftingIssueAcceptRejected>());
-        Assert.Empty(Client.InternalMessages.GetMessages<NetworkVillageCraftingIssueAcceptRejected>());
+        Assert.Single(OtherClient.InternalMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Assert.Empty(Client.InternalMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
 
         foreach (var client in TestEnvironment.Clients)
         {
@@ -365,18 +369,173 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
-    public void RequestVillageCraftingIssueAcceptQuest_FromUnregisteredRequester_IsRejectedWithoutMutatingTheIssue()
+    public void RequestQuestTypeAcceptQuest_FromUnregisteredRequester_IsRejectedWithoutMutatingTheIssue()
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture.HeroId);
 
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestVillageCraftingIssueAcceptQuest(fixture.HeroId, 0));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, 0));
         });
 
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingIssueQuestAccepted>());
-        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingIssueAcceptRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Assert.Equal(fixture.HeroId, rejected.OwnerId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(owner.Issue.IsOngoingWithoutQuest);
+            Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out _));
+        });
+    }
+
+    [Fact]
+    public void RequestQuestTypeAcceptAlternative_MirrorsTheCapturedVanillaStateToEveryPeer()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+
+        var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+            }
+            owner.Issue.StartIssueWithAlternativeSolution();
+        });
+
+        var clientTriggered = Assert.Single(Client.InternalMessages.GetMessages<QuestTypeAlternativeAcceptTriggered>());
+        var clientState = GenericAcceptFieldsSerializer.Deserialize<AlternativeSolutionVanillaState>(clientTriggered.FieldsBytes);
+        Assert.NotEqual(default, clientState.ReturnTime);
+
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+        Assert.Equal(fixture.HeroId, accepted.OwnerId);
+        Assert.Equal("player-A", accepted.OwnerControllerId);
+        var acceptedState = GenericAcceptFieldsSerializer.Deserialize<AlternativeSolutionVanillaState>(accepted.FieldsBytes);
+        Assert.Equal(clientState.ReturnTime, acceptedState.ReturnTime);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(owner.Issue.IsSolvingWithAlternative);
+                Assert.Equal(acceptedState.ReturnTime, owner.Issue.AlternativeSolutionReturnTimeForTroops);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.Equal("player-A", ownerControllerId);
+            Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
+        });
+    }
+
+    [Fact]
+    public void RequestQuestTypeAcceptAlternative_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+
+        var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+            Assert.True(playerManager.AddPlayer(new Player("player-B", "", "", "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        TestEnvironment.ConnectRegisteredPlayer(OtherClient, "player-B");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+            }
+            owner.Issue.StartIssueWithAlternativeSolution();
+        });
+
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+        Assert.Equal(fixture.HeroId, accepted.OwnerId);
+        Assert.Equal("player-A", accepted.OwnerControllerId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+
+        var generation = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(IssueGenerationRegistry.TryGetGeneration(owner, out generation));
+            Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer,
+                new RequestQuestTypeAcceptAlternative(fixture.HeroId, generation, default, System.Array.Empty<byte>()));
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Assert.Equal(fixture.HeroId, rejected.OwnerId);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(owner.Issue.IsSolvingWithAlternative);
+                Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+                Assert.Equal("player-A", ownerControllerId);
+            });
+        }
+    }
+
+    [Fact]
+    public void RequestQuestTypeAcceptAlternative_FromUnregisteredRequester_IsRejectedWithoutMutatingTheIssue()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
+                new RequestQuestTypeAcceptAlternative(fixture.HeroId, 0, default, System.Array.Empty<byte>()));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
         Assert.Equal(fixture.HeroId, rejected.OwnerId);
 
         Server.Call(() =>

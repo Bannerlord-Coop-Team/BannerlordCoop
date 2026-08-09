@@ -6,6 +6,7 @@ using GameInterface.Services.Issues.Generic.CreationCapture;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
+using ProtoBuf;
 using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -18,21 +19,28 @@ namespace GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMat
 using Issue = VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue;
 using Quest = VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest;
 
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct VillageNeedsCraftingMaterialsAcceptFields
+{
+    [ProtoMember(1)]
+    public readonly int RequestedItemAmount;
+    [ProtoMember(2)]
+    public readonly int RewardGold;
+
+    public VillageNeedsCraftingMaterialsAcceptFields(int requestedItemAmount, int rewardGold)
+    {
+        RequestedItemAmount = requestedItemAmount;
+        RewardGold = rewardGold;
+    }
+}
+
 [QuestTypeModule]
 internal static class VillageNeedsCraftingMaterialsQuestType
 {
     private static readonly FieldInfo RequestedItemField = AccessTools.Field(typeof(Issue), "_requestedItem");
     private static readonly FieldInfo RequestedItemAmountField = AccessTools.Field(typeof(Quest), "_requestedItemAmount");
     private static readonly FieldInfo RewardGoldField = AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold));
-    private static readonly FieldInfo PlayerAcceptedQuestLogField = AccessTools.Field(typeof(Quest), "_playerAcceptedQuestLog");
     private static readonly FieldInfo JournalLogRangeField = AccessTools.Field(typeof(JournalLog), nameof(JournalLog.Range));
-
-    private static readonly Type IssueStateEnumType = AccessTools.Inner(typeof(IssueBase), "IssueState");
-    private static readonly FieldInfo IssueStateField = AccessTools.Field(typeof(IssueBase), "_issueState");
-    private static readonly object SolvingWithAlternativeSolutionStateValue =
-        Enum.Parse(IssueStateEnumType, "SolvingWithAlternativeSolution");
-    private static readonly PropertyInfo IsTriedToSolveBeforeProperty =
-        AccessTools.Property(typeof(IssueBase), nameof(IssueBase.IsTriedToSolveBefore));
 
     private static void RejectAcceptanceCore(Hero owner)
     {
@@ -45,7 +53,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         }
     }
 
-    private sealed class QuestSolutionAcceptMirrorStrategy : IRaceArbitratedAcceptMirrorStrategy<(int RequestedItemAmount, int RewardGold)>
+    private sealed class QuestSolutionAcceptMirrorStrategy : IRaceArbitratedAcceptMirrorStrategy<VillageNeedsCraftingMaterialsAcceptFields>
     {
         public void ReplayQuestAccepted(Hero owner)
         {
@@ -57,16 +65,16 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             }
         }
 
-        public bool TryCaptureQuestFields(Hero owner, out (int RequestedItemAmount, int RewardGold) fields)
+        public bool TryCaptureQuestFields(Hero owner, out VillageNeedsCraftingMaterialsAcceptFields fields)
         {
             fields = default;
             if (owner?.Issue?.IssueQuest is not Quest quest) return false;
 
-            fields = (quest._requestedItemAmount, quest.RewardGold);
+            fields = new VillageNeedsCraftingMaterialsAcceptFields(quest._requestedItemAmount, quest.RewardGold);
             return true;
         }
 
-        public void MirrorQuestAccepted(Hero owner, (int RequestedItemAmount, int RewardGold) fields)
+        public void MirrorQuestAccepted(Hero owner, VillageNeedsCraftingMaterialsAcceptFields fields)
         {
             if (owner?.Issue is not Issue) return;
 
@@ -82,7 +90,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
                 RequestedItemAmountField.SetValue(quest, fields.RequestedItemAmount);
                 RewardGoldField.SetValue(quest, fields.RewardGold);
 
-                if (PlayerAcceptedQuestLogField.GetValue(quest) is JournalLog log)
+                if (quest._playerAcceptedQuestLog is JournalLog log)
                 {
                     JournalLogRangeField.SetValue(log, fields.RequestedItemAmount);
                 }
@@ -100,8 +108,8 @@ internal static class VillageNeedsCraftingMaterialsQuestType
 
             using (new AllowedThread())
             {
-                IssueStateField.SetValue(issue, SolvingWithAlternativeSolutionStateValue);
-                IsTriedToSolveBeforeProperty.SetValue(issue, true);
+                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                issue.IsTriedToSolveBefore = true;
                 AlternativeSolutionVanillaStateSync.Apply(issue, state);
             }
         }
@@ -112,7 +120,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
     private static readonly ICreationCaptureStrategy<Issue, ItemObject> CreationCaptureStrategy =
         new FieldForceCreationCapture<Issue, ItemObject>(RequestedItemField, owner => new Issue(owner));
 
-    private static readonly IRaceArbitratedAcceptMirrorStrategy<(int RequestedItemAmount, int RewardGold)> QuestSolutionAcceptMirror =
+    private static readonly IRaceArbitratedAcceptMirrorStrategy<VillageNeedsCraftingMaterialsAcceptFields> QuestSolutionAcceptMirror =
         new QuestSolutionAcceptMirrorStrategy();
 
     private static readonly IAlternativeAcceptMirrorStrategy<AlternativeSolutionVanillaState> AlternativeAcceptMirror =
@@ -120,7 +128,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
 
     public static readonly CreationCaptureRunner<Issue, ItemObject> CreationCapture = new(CreationCaptureStrategy);
 
-    public static readonly RaceArbitratedAcceptMirrorHandler<(int RequestedItemAmount, int RewardGold)> QuestSolutionAccept =
+    public static readonly RaceArbitratedAcceptMirrorHandler<VillageNeedsCraftingMaterialsAcceptFields> QuestSolutionAccept =
         new(QuestSolutionAcceptMirror);
 
     public static readonly AlternativeAcceptMirrorHandler<AlternativeSolutionVanillaState> AlternativeAccept = new(AlternativeAcceptMirror);
@@ -134,8 +142,8 @@ internal static class VillageNeedsCraftingMaterialsQuestType
     {
         if (!QuestSolutionAccept.TryCaptureQuestFields(issueOwner, out var fields)) return;
 
-        MessageBroker.Instance.Publish(issueOwner,
-            new VillageCraftingIssueQuestAcceptTriggered(issueOwner, controllerId, fields.RequestedItemAmount, fields.RewardGold));
+        var bytes = GenericAcceptFieldsSerializer.Serialize(fields);
+        MessageBroker.Instance.Publish(issueOwner, new QuestTypeQuestSolutionAcceptTriggered(issueOwner, controllerId, bytes));
     }
 
     private static void OnGenuineAlternativeAccept(Hero issueOwner, string controllerId)
@@ -143,7 +151,8 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         if (issueOwner?.Issue is not Issue issue) return;
 
         var state = AlternativeSolutionVanillaStateSync.Capture(issue);
-        MessageBroker.Instance.Publish(issue, new VillageCraftingIssueAlternativeAcceptTriggered(issueOwner, controllerId, state));
+        var bytes = GenericAcceptFieldsSerializer.Serialize(state);
+        MessageBroker.Instance.Publish(issue, new QuestTypeAlternativeAcceptTriggered(issueOwner, controllerId, bytes));
     }
 
     public static bool TryTriggerOwnedAlternativeSolutionCompletion(Hero owner) =>

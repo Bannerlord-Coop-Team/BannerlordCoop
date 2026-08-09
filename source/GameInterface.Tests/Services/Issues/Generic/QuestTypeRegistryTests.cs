@@ -1,3 +1,4 @@
+using Common.Util;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.CreationCapture;
@@ -112,7 +113,7 @@ public class QuestTypeRegistryTests : IDisposable
 
         Assert.Null(descriptor.GetCreationCapture<string>());
         Assert.Null(descriptor.GetQuestSolutionAcceptMirror<int>());
-        Assert.Null(descriptor.GetAlternativeAcceptMirror<Unit>());
+        Assert.Null(descriptor.GetAlternativeAcceptMirror<string>());
     }
 
     private class DummyFieldHolder
@@ -150,6 +151,112 @@ public class QuestTypeRegistryTests : IDisposable
         Assert.Null(withoutTriggers.OnGenuineQuestSolutionAccept);
         Assert.Null(withoutTriggers.OnGenuineAlternativeAccept);
         Assert.Null(withoutTriggers.OnGenuineCreation);
+    }
+
+    private sealed class FakeQuestSolutionStrategy : IRaceArbitratedAcceptMirrorStrategy<int>
+    {
+        public bool ReplayCalled;
+        public int? MirroredValue;
+        public bool RejectCalled;
+        public bool CaptureSucceeds = true;
+        public int CaptureValue = 42;
+
+        public void ReplayQuestAccepted(Hero owner) => ReplayCalled = true;
+        public bool TryCaptureQuestFields(Hero owner, out int fields) { fields = CaptureValue; return CaptureSucceeds; }
+        public void MirrorQuestAccepted(Hero owner, int fields) => MirroredValue = fields;
+        public void RejectAcceptance(Hero owner) => RejectCalled = true;
+    }
+
+    private sealed class FakeAlternativeStrategy : IAlternativeAcceptMirrorStrategy<int>
+    {
+        public int? MirroredValue;
+        public bool RejectCalled;
+
+        public void MirrorAlternativeAccepted(Hero owner, int payload) => MirroredValue = payload;
+        public void RejectAcceptance(Hero owner) => RejectCalled = true;
+    }
+
+    [Fact]
+    public void WithQuestSolutionAccept_WiresTheByteBlobDelegatesThroughToTheStrategy()
+    {
+        var strategy = new FakeQuestSolutionStrategy();
+        var descriptor = QuestDescriptorBuilder.For<FakeIssueA, FakeQuestA>("FakeA")
+            .WithQuestSolutionAccept(strategy)
+            .Build();
+        var owner = ObjectHelper.SkipConstructor<Hero>();
+
+        var (accepted, fieldsBytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => true);
+
+        Assert.True(accepted);
+        Assert.True(strategy.ReplayCalled);
+        Assert.NotNull(fieldsBytes);
+
+        descriptor.MirrorQuestSolutionAcceptBytes(owner, fieldsBytes);
+        Assert.Equal(strategy.CaptureValue, strategy.MirroredValue);
+
+        descriptor.RejectQuestSolutionAccept(owner);
+        Assert.True(strategy.RejectCalled);
+    }
+
+    [Fact]
+    public void TryArbitrateQuestSolutionAcceptBytes_CaptureFails_RejectsAndReturnsFalse()
+    {
+        var strategy = new FakeQuestSolutionStrategy { CaptureSucceeds = false };
+        var descriptor = QuestDescriptorBuilder.For<FakeIssueA, FakeQuestA>("FakeA")
+            .WithQuestSolutionAccept(strategy)
+            .Build();
+        var owner = ObjectHelper.SkipConstructor<Hero>();
+
+        var (accepted, fieldsBytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => true);
+
+        Assert.False(accepted);
+        Assert.Null(fieldsBytes);
+        Assert.True(strategy.RejectCalled);
+    }
+
+    [Fact]
+    public void TryArbitrateQuestSolutionAcceptBytes_CanAcceptReturnsFalse_NeverReplaysOrCaptures()
+    {
+        var strategy = new FakeQuestSolutionStrategy();
+        var descriptor = QuestDescriptorBuilder.For<FakeIssueA, FakeQuestA>("FakeA")
+            .WithQuestSolutionAccept(strategy)
+            .Build();
+        var owner = ObjectHelper.SkipConstructor<Hero>();
+
+        var (accepted, fieldsBytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => false);
+
+        Assert.False(accepted);
+        Assert.Null(fieldsBytes);
+        Assert.False(strategy.ReplayCalled);
+    }
+
+    [Fact]
+    public void WithAlternativeAccept_WiresTheByteBlobDelegatesThroughToTheStrategy()
+    {
+        var strategy = new FakeAlternativeStrategy();
+        var descriptor = QuestDescriptorBuilder.For<FakeIssueA, FakeQuestA>("FakeA")
+            .WithAlternativeAccept(strategy)
+            .Build();
+        var owner = ObjectHelper.SkipConstructor<Hero>();
+        var payloadBytes = GenericAcceptFieldsSerializer.Serialize(99);
+
+        descriptor.MirrorAlternativeAcceptBytes(owner, payloadBytes);
+        Assert.Equal(99, strategy.MirroredValue);
+
+        descriptor.RejectAlternativeAccept(owner);
+        Assert.True(strategy.RejectCalled);
+    }
+
+    [Fact]
+    public void AcceptByteBlobDelegates_AreNull_WhenNeverWired()
+    {
+        var descriptor = QuestDescriptorBuilder.For<FakeIssueB, FakeQuestB>("FakeB").Build();
+
+        Assert.Null(descriptor.TryArbitrateQuestSolutionAcceptBytes);
+        Assert.Null(descriptor.MirrorQuestSolutionAcceptBytes);
+        Assert.Null(descriptor.RejectQuestSolutionAccept);
+        Assert.Null(descriptor.MirrorAlternativeAcceptBytes);
+        Assert.Null(descriptor.RejectAlternativeAccept);
     }
 }
 

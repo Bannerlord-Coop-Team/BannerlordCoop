@@ -7,10 +7,6 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Patches;
 
-// Gates the payout CONSEQUENCE, not the due-date field: an earlier design pinned
-// AlternativeSolutionReturnTimeForTroops to Never on non-owner mirrors, but TransferSaveState reships the
-// server's own live state on every (re)connect, which would permanently overwrite the true owner's real due
-// date - a worse, permanent soft-lock. Never touch that field here; gate the consequence call instead.
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAlternativeSolution))]
 internal class VillageNeedsToolsAlternativeSolutionOwnershipGatePatch
 {

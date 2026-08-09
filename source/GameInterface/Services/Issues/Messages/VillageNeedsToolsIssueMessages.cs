@@ -1,7 +1,5 @@
 using Common.Messaging;
-using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Messages;
@@ -16,30 +14,6 @@ public readonly struct VillageIssueCreated : IEvent
     }
 }
 
-public readonly struct VillageIssueQuestAcceptTriggered : IEvent
-{
-    public readonly Hero Owner;
-    public readonly string ControllerId;
-
-    public VillageIssueQuestAcceptTriggered(Hero owner, string controllerId)
-    {
-        Owner = owner;
-        ControllerId = controllerId;
-    }
-}
-
-public readonly struct VillageIssueAlternativeAcceptTriggered : IEvent
-{
-    public readonly Hero Owner;
-    public readonly string ControllerId;
-
-    public VillageIssueAlternativeAcceptTriggered(Hero owner, string controllerId)
-    {
-        Owner = owner;
-        ControllerId = controllerId;
-    }
-}
-
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkVillageIssueCreated : IServerToClientCommand
 {
@@ -47,7 +21,6 @@ public readonly struct NetworkVillageIssueCreated : IServerToClientCommand
     public readonly string OwnerId;
     [ProtoMember(2)]
     public readonly string RequestedItemId;
-    /// <summary>Null when the village pays in gold instead of goods.</summary>
     [ProtoMember(3)]
     public readonly string ExchangeItemId;
     [ProtoMember(4)]
@@ -75,80 +48,5 @@ public readonly struct NetworkVillageIssueCreated : IServerToClientCommand
         NumberOfExchangeItem = numberOfExchangeItem;
         Payment = payment;
         Generation = generation;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public readonly struct RequestVillageIssueAcceptQuest : ICommand
-{
-    [ProtoMember(1)]
-    public readonly string OwnerId;
-    [ProtoMember(2)]
-    public readonly int Generation;
-
-    public RequestVillageIssueAcceptQuest(string ownerId, int generation)
-    {
-        OwnerId = ownerId;
-        Generation = generation;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageIssueQuestAccepted : IServerToClientCommand
-{
-    [ProtoMember(1)]
-    public readonly string OwnerId;
-    [ProtoMember(2)]
-    public readonly string OwnerControllerId;
-
-    public NetworkVillageIssueQuestAccepted(string ownerId, string ownerControllerId)
-    {
-        OwnerId = ownerId;
-        OwnerControllerId = ownerControllerId;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public readonly struct RequestVillageIssueAcceptAlternative : ICommand
-{
-    [ProtoMember(1)]
-    public readonly string OwnerId;
-    [ProtoMember(2)]
-    public readonly int Generation;
-    [ProtoMember(3)]
-    public readonly TroopRosterData SentTroops;
-
-    public RequestVillageIssueAcceptAlternative(string ownerId, int generation, TroopRosterData sentTroops)
-    {
-        OwnerId = ownerId;
-        Generation = generation;
-        SentTroops = sentTroops;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageIssueAlternativeAccepted : IServerToClientCommand
-{
-    [ProtoMember(1)]
-    public readonly string OwnerId;
-    [ProtoMember(2)]
-    public readonly string OwnerControllerId;
-
-    public NetworkVillageIssueAlternativeAccepted(string ownerId, string ownerControllerId)
-    {
-        OwnerId = ownerId;
-        OwnerControllerId = ownerControllerId;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageIssueAcceptRejected : IServerToClientCommand
-{
-    [ProtoMember(1)]
-    public readonly string OwnerId;
-
-    public NetworkVillageIssueAcceptRejected(string ownerId)
-    {
-        OwnerId = ownerId;
     }
 }

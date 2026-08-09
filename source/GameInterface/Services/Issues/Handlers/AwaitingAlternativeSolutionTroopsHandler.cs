@@ -52,53 +52,46 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        var data = payload.What;
-        var packed = troopRosterInterface.PackTroopRosterData(data.Troops);
-        network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDeposit(data.OwnerControllerId, packed));
+        var packed = troopRosterInterface.PackTroopRosterData(payload.What.Troops);
+        network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDeposit(packed));
     }
 
     private void Handle_RequestAwaitingAlternativeSolutionTroopsDeposit(MessagePayload<RequestAwaitingAlternativeSolutionTroopsDeposit> payload)
     {
         if (ModInformation.IsClient) return;
 
-        var data = payload.What;
-        if (!IsFromRegisteredPeer(payload.Who) || !playerManager.TryGetPlayer(data.OwnerControllerId, out _))
+        if (payload.Who is not NetPeer requester || !playerManager.TryGetPlayer(requester, out var player))
         {
-            Logger.Error("Rejecting {Message} for unrecognized/unregistered owner {Owner}",
-                nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), data.OwnerControllerId);
+            Logger.Error("Rejecting {Message} from an unregistered/unknown requester", nameof(RequestAwaitingAlternativeSolutionTroopsDeposit));
             return;
         }
 
         var roster = TroopRoster.CreateDummyTroopRoster();
-        foreach (var element in troopRosterInterface.UnpackTroopRosterData(data.Troops))
+        foreach (var element in troopRosterInterface.UnpackTroopRosterData(payload.What.Troops))
         {
             roster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
         }
 
-        AwaitingAlternativeSolutionTroopsRegistry.Deposit(data.OwnerControllerId, roster);
+        AwaitingAlternativeSolutionTroopsRegistry.Deposit(player.ControllerId, roster);
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDrainedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDrainedLocally> payload)
     {
         if (ModInformation.IsServer) return;
 
-        network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDrain(payload.What.OwnerControllerId));
+        network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDrain());
     }
 
     private void Handle_RequestAwaitingAlternativeSolutionTroopsDrain(MessagePayload<RequestAwaitingAlternativeSolutionTroopsDrain> payload)
     {
         if (ModInformation.IsClient) return;
 
-        var ownerControllerId = payload.What.OwnerControllerId;
-        if (!IsFromRegisteredPeer(payload.Who) || !playerManager.TryGetPlayer(ownerControllerId, out _))
+        if (payload.Who is not NetPeer requester || !playerManager.TryGetPlayer(requester, out var player))
         {
-            Logger.Error("Rejecting {Message} for unrecognized/unregistered owner {Owner}",
-                nameof(RequestAwaitingAlternativeSolutionTroopsDrain), ownerControllerId);
+            Logger.Error("Rejecting {Message} from an unregistered/unknown requester", nameof(RequestAwaitingAlternativeSolutionTroopsDrain));
             return;
         }
 
-        AwaitingAlternativeSolutionTroopsRegistry.Clear(ownerControllerId);
+        AwaitingAlternativeSolutionTroopsRegistry.Clear(player.ControllerId);
     }
-
-    private bool IsFromRegisteredPeer(object who) => who is NetPeer peer && playerManager.TryGetPlayer(peer, out _);
 }

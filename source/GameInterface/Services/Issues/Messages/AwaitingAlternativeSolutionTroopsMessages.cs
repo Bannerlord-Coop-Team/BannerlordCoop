@@ -5,8 +5,6 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Messages;
 
-// --- Local events ---
-
 public readonly struct AwaitingAlternativeSolutionTroopsDepositedLocally : IEvent
 {
     public readonly string OwnerControllerId;
@@ -29,19 +27,14 @@ public readonly struct AwaitingAlternativeSolutionTroopsDrainedLocally : IEvent
     }
 }
 
-// --- Networked messages (client -> server only) ---
-
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestAwaitingAlternativeSolutionTroopsDeposit : ICommand
 {
     [ProtoMember(1)]
-    public readonly string OwnerControllerId;
-    [ProtoMember(2)]
     public readonly TroopRosterData Troops;
 
-    public RequestAwaitingAlternativeSolutionTroopsDeposit(string ownerControllerId, TroopRosterData troops)
+    public RequestAwaitingAlternativeSolutionTroopsDeposit(TroopRosterData troops)
     {
-        OwnerControllerId = ownerControllerId;
         Troops = troops;
     }
 }
@@ -49,11 +42,4 @@ public readonly struct RequestAwaitingAlternativeSolutionTroopsDeposit : IComman
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestAwaitingAlternativeSolutionTroopsDrain : ICommand
 {
-    [ProtoMember(1)]
-    public readonly string OwnerControllerId;
-
-    public RequestAwaitingAlternativeSolutionTroopsDrain(string ownerControllerId)
-    {
-        OwnerControllerId = ownerControllerId;
-    }
 }

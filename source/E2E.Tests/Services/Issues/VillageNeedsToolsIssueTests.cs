@@ -64,7 +64,6 @@ public class VillageNeedsToolsIssueTests : IDisposable
                 {
                     settlement.SetSettlementComponent(village);
                     village.Bound = settlement;
-                    // >= the real ctor's 300 threshold, so it always takes the gold-payment branch.
                     village.Hearth = 650f;
                     hero.StayingInSettlement = settlement;
                     ItemValueProperty.SetValue(item, itemValue);
@@ -234,7 +233,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
-    public void RequestVillageIssueAcceptQuest_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer()
+    public void RequestGenericIssueAcceptQuest_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer()
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnServer(fixture);
@@ -253,13 +252,13 @@ public class VillageNeedsToolsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(IssueGenerationRegistry.TryGetGeneration(owner, out generation));
-            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId, generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestGenericIssueAcceptQuest(fixture.HeroId, generation));
         });
 
-        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueQuestAccepted>());
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkGenericIssueQuestAccepted>());
         Assert.Equal(fixture.HeroId, accepted.OwnerId);
         Assert.Equal("player-A", accepted.OwnerControllerId);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueAcceptRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkGenericIssueAcceptRejected>());
 
         Server.Call(() =>
         {
@@ -272,15 +271,15 @@ public class VillageNeedsToolsIssueTests : IDisposable
 
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId, generation));
+            Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer, new RequestGenericIssueAcceptQuest(fixture.HeroId, generation));
         });
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueQuestAccepted>());
-        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueAcceptRejected>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkGenericIssueQuestAccepted>());
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkGenericIssueAcceptRejected>());
         Assert.Equal(fixture.HeroId, rejected.OwnerId);
 
-        Assert.Single(OtherClient.InternalMessages.GetMessages<NetworkVillageIssueAcceptRejected>());
-        Assert.Empty(Client.InternalMessages.GetMessages<NetworkVillageIssueAcceptRejected>());
+        Assert.Single(OtherClient.InternalMessages.GetMessages<NetworkGenericIssueAcceptRejected>());
+        Assert.Empty(Client.InternalMessages.GetMessages<NetworkGenericIssueAcceptRejected>());
 
         foreach (var client in TestEnvironment.Clients)
         {
@@ -296,18 +295,18 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
-    public void RequestVillageIssueAcceptQuest_FromUnregisteredRequester_IsRejectedWithoutMutatingTheIssue()
+    public void RequestGenericIssueAcceptQuest_FromUnregisteredRequester_IsRejectedWithoutMutatingTheIssue()
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnServer(fixture);
 
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId, 0));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestGenericIssueAcceptQuest(fixture.HeroId, 0));
         });
 
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueQuestAccepted>());
-        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueAcceptRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkGenericIssueQuestAccepted>());
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkGenericIssueAcceptRejected>());
         Assert.Equal(fixture.HeroId, rejected.OwnerId);
 
         Server.Call(() =>
@@ -492,7 +491,6 @@ public class VillageNeedsToolsIssueTests : IDisposable
                     village.Bound = settlement;
                     village.Hearth = 650f;
                     hero.StayingInSettlement = settlement;
-                    // IssueBase.IssueSettlement returns null unless the owner IsNotable.
                     hero.Occupation = Occupation.RuralNotable;
                     ItemValueProperty.SetValue(item, 40);
                     companion.ChangeState(Hero.CharacterStates.Disabled);
@@ -519,8 +517,6 @@ public class VillageNeedsToolsIssueTests : IDisposable
         });
     }
 
-    // This harness never runs a live VillageNeedsToolsIssueBehavior, so its RegisterEvents/OnHourlyTick wiring
-    // never fires here - invoked directly by reflection instead.
     private static readonly MethodInfo OnHourlyTickMethod =
         AccessTools.Method(typeof(VillageNeedsToolsAlternativeSolutionCompletionPatches), "OnHourlyTick");
 
@@ -530,10 +526,18 @@ public class VillageNeedsToolsIssueTests : IDisposable
         var fixture = SetupVillageOwnerWithCompanion();
         CreateIssueOnServer(fixture);
 
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+            }
+
             var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("player-A", "", "", "", "")));
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
         Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
@@ -572,6 +576,12 @@ public class VillageNeedsToolsIssueTests : IDisposable
 
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            owner.Issue.AlternativeSolutionReturnTimeForTroops = default;
+        });
+
+        Server.Call(() =>
+        {
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, request);
         });
 
@@ -584,7 +594,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
-    public void RequestVillageIssueAcceptAlternative_ClampsClaimedTroopsToTheRequesterSRealPartyRoster()
+    public void RequestGenericIssueAcceptAlternative_ClampsClaimedTroopsToTheRequesterSRealPartyRoster()
     {
         var fixture = SetupVillageOwnerWithCompanion();
         CreateIssueOnServer(fixture);

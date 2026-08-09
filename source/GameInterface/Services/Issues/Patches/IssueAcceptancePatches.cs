@@ -1,6 +1,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
@@ -21,7 +22,7 @@ internal class IssueQuestAcceptancePatch
         if (!GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(issueOwner?.Issue)) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        MessageBroker.Instance.Publish(issueOwner, new VillageIssueQuestAcceptTriggered(issueOwner, controllerIdProvider?.ControllerId));
+        MessageBroker.Instance.Publish(issueOwner, new GenericIssueQuestAcceptTriggered(issueOwner, controllerIdProvider?.ControllerId));
     }
 }
 
@@ -36,6 +37,7 @@ internal class IssueWithAlternativeSolutionAcceptancePatch
         if (!GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(__instance)) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        MessageBroker.Instance.Publish(__instance, new VillageIssueAlternativeAcceptTriggered(__instance.IssueOwner, controllerIdProvider?.ControllerId));
+        var state = AlternativeSolutionVanillaStateSync.Capture(__instance);
+        MessageBroker.Instance.Publish(__instance, new GenericIssueAlternativeAcceptTriggered(__instance.IssueOwner, controllerIdProvider?.ControllerId, state));
     }
 }

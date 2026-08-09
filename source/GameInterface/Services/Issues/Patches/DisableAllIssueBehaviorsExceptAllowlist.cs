@@ -11,65 +11,21 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Patches;
 
-/// <summary>
-/// Table-driven allowlist: every issue-type <see cref="CampaignBehaviorBase"/> (detected generically as any
-/// concrete <see cref="CampaignBehaviorBase"/> subclass with a nested type deriving <see cref="IssueBase"/>,
-/// across the <c>TaleWorlds.CampaignSystem</c> and <c>SandBox</c> assemblies) has its own
-/// <c>RegisterEvents</c> forced to a no-op, except the types in <see cref="Allowlist"/>.
-/// </summary>
 [HarmonyPatch(typeof(IssuesCampaignBehavior))]
 internal class DisableAllIssueBehaviorsExceptAllowlist
 {
     private static readonly ILogger Logger = LogManager.GetLogger<DisableAllIssueBehaviorsExceptAllowlist>();
 
-    // These targets aren't known at compile time, so they can't use [HarmonyPatch(typeof(...))] directly.
     private static readonly Harmony DynamicHarmony = new Harmony("GameInterface.Issues.DisableAllIssueBehaviorsExceptAllowlist");
 
     private static readonly string[] ScannedAssemblyNames = { "TaleWorlds.CampaignSystem", "SandBox" };
 
-    /// <summary>Issue-type behaviors vetted and allowed to actually generate/offer their issue in co-op.</summary>
     internal static readonly HashSet<Type> Allowlist = new HashSet<Type>
     {
         typeof(VillageNeedsToolsIssueBehavior),
         typeof(VillageNeedsCraftingMaterialsIssueBehavior),
-        typeof(LordNeedsHorsesIssueBehavior),
-        typeof(CapturedByBountyHuntersIssueBehavior),
-        typeof(ArmyNeedsSuppliesIssueBehavior),
-        typeof(LandlordTrainingForRetainersIssueBehavior),
-        typeof(GangLeaderNeedsRecruitsIssueBehavior),
-        typeof(LadysKnightOutIssueBehavior),
-        typeof(ScoutEnemyGarrisonsIssueBehavior),
-        typeof(LandLordNeedsManualLaborersIssueBehavior),
-        typeof(HeadmanVillageNeedsDraughtAnimalsIssueBehavior),
-        typeof(BettingFraudIssueBehavior),
-        typeof(GangLeaderNeedsSpecialWeaponsIssueBehavior),
-        typeof(LordNeedsGarrisonTroopsIssueQuestBehavior),
-        typeof(NearbyBanditBaseIssueBehavior),
-        typeof(LandLordTheArtOfTheTradeIssueBehavior),
-        typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior),
-        typeof(SandBox.Issues.ProdigalSonIssueBehavior),
-        typeof(SandBox.Issues.TheSpyPartyIssueQuestBehavior),
-        typeof(HeadmanNeedsGrainIssueBehavior),
-        typeof(HeadmanNeedsToDeliverAHerdIssueBehavior),
-        typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior),
-        typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior),
-        typeof(SmugglersIssueBehavior),
-        typeof(ArtisanOverpricedGoodsIssueBehavior),
-        typeof(RevenueFarmingIssueBehavior),
-        typeof(LordsNeedsTutorIssueBehavior),
-        typeof(CaravanAmbushIssueBehavior),
-        typeof(GangLeaderNeedsWeaponsIssueQuestBehavior),
-        typeof(MerchantArmyOfPoachersIssueBehavior),
-        typeof(LandLordCompanyOfTroubleIssueBehavior),
-        typeof(EscortMerchantCaravanIssueBehavior),
-        typeof(TheConquestOfSettlementIssueBehavior),
-        typeof(RaidAnEnemyTerritoryIssueBehavior),
-        typeof(SandBox.Issues.RivalGangMovingInIssueBehavior),
-        typeof(LordWantsRivalCapturedIssueBehavior),
-        typeof(SandBox.Issues.SnareTheWealthyIssueBehavior),
     };
 
-    /// <summary>True if <paramref name="issue"/>'s concrete type is the nested Issue type of one of the <see cref="Allowlist"/> behaviors.</summary>
     internal static bool IsAllowlisted(IssueBase issue)
     {
         return issue != null && issue.GetType().DeclaringType is Type declaringType && Allowlist.Contains(declaringType);
@@ -130,13 +86,6 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         VerifyAllowlistIntegrity();
     }
 
-    /// <summary>
-    /// Safeguard against a recurring bug (e96018702, 479f810e7, and a 12-type sweep): a type added to
-    /// <see cref="Allowlist"/> can still be silently blocked by a leftover standalone "Disable&lt;Type&gt;IssueBehavior"
-    /// patch elsewhere in the codebase, predating this allowlist, that this class's own loop skips patching over
-    /// (it assumes nothing else is blocking allowlisted types). Asks Harmony directly whether any allowlisted
-    /// type's RegisterEvents still carries a prefix - it never should - and fails loudly if so.
-    /// </summary>
     private static void VerifyAllowlistIntegrity()
     {
         var offenders = new List<string>();
