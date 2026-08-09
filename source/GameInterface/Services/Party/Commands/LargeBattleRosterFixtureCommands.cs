@@ -52,10 +52,10 @@ internal static class LargeBattleRosterFixtureCommands
         if (args.Count != 2
             || !int.TryParse(args[1], out int addedTroops)
             || addedTroops < 1
-            || addedTroops > 500)
+            || addedTroops > 5000)
         {
             return "Usage: coop.debug.mobileparty.battle_roster_boost_begin " +
-                   "<partyId> <troops:1-500>";
+                   "<partyId> <troops:1-5000>";
         }
         if (boostFixture != null)
             return "A battle-roster boost fixture is already pending restoration.";
