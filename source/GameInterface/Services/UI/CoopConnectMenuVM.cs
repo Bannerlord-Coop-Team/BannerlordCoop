@@ -490,5 +490,4 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         messageBroker.Publish(this, new JoinSessionListing(listingId));
     }
-
 }
