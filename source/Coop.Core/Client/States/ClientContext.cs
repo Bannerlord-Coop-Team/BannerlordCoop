@@ -33,39 +33,6 @@ public class ClientContext
         IHeroInterface heroInterface,
         IRegistryManager registryManager,
         IPlayerManager playerManager,
-        IMapTimeTrackerInterface mapTimeTrackerInterface)
-        : this(
-            messageBroker,
-            network,
-            gameInterface,
-            gameStateInterface,
-            loadingInterface,
-            controllerIdProvider,
-            coopFinalizer,
-            moduleInfoProvider,
-            heroInterface,
-            registryManager,
-            playerManager,
-            mapTimeTrackerInterface,
-            null,
-            null,
-            null,
-            null)
-    {
-    }
-
-    public ClientContext(
-        IMessageBroker messageBroker,
-        INetwork network,
-        IGameInterface gameInterface,
-        IGameStateInterface gameStateInterface,
-        ILoadingInterface loadingInterface,
-        IControllerIdProvider controllerIdProvider,
-        ICoopFinalizer coopFinalizer,
-        IModuleInfoProvider moduleInfoProvider,
-        IHeroInterface heroInterface,
-        IRegistryManager registryManager,
-        IPlayerManager playerManager,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
         INetworkConfig networkConfig,
         ISessionTransportTargetSource transportTargetSource,

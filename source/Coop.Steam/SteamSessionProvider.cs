@@ -71,12 +71,12 @@ public sealed class SteamSessionProvider : ISessionProvider
             new SteamDatagramTransportAdapter(new SteamNetworkingTunnelTransport(), GetUserSteamId),
             () => new SteamDatagramTransportAdapter(new SteamNetworkingTunnelTransport(), GetUserSteamId));
 
-        return new SteamSessionProviderRuntime(
+        return new SessionProviderRuntime(
             advertiser,
             tunnelHost,
             joinListener,
             advertiser,
-            ImmediateSessionServerReadiness.Instance,
+            Common.Network.Session.ImmediateSessionServerReadiness.Instance,
             new SteamTransportTargetSource(gameServer: false),
             missionTransport,
             tunnelHost,
@@ -98,10 +98,10 @@ public sealed class SteamSessionProvider : ISessionProvider
             () => SteamGameServerBoot.GameServerSteamId);
         var tunnelHost = new ProviderTunnelHost(tunnelTransport);
 
-        return new SteamSessionProviderRuntime(
+        return new SessionProviderRuntime(
             advertiser,
             tunnelHost,
-            UnavailableSessionMembership.Instance,
+            UnavailableSessionServices.Instance,
             advertiser,
             new SteamGameServerReadiness(),
             new SteamTransportTargetSource(gameServer: true),
@@ -155,84 +155,4 @@ public sealed class SteamSessionProvider : ISessionProvider
         }
     }
 
-    private sealed class ImmediateSessionServerReadiness : ISessionServerReadiness
-    {
-        public static readonly ImmediateSessionServerReadiness Instance =
-            new ImmediateSessionServerReadiness();
-
-        public bool IsReady => true;
-
-        public event Action Ready
-        {
-            add { }
-            remove { }
-        }
-    }
-
-    private sealed class UnavailableSessionMembership : ISessionMembership
-    {
-        public static readonly UnavailableSessionMembership Instance =
-            new UnavailableSessionMembership();
-
-        public bool IsInSession => false;
-        public SessionListingId ListingId => default;
-        public void JoinSession(SessionListingId listingId) { }
-        public void LeaveSession() { }
-    }
-
-    private sealed class SteamSessionProviderRuntime : ISessionProviderRuntime
-    {
-        private readonly IDisposable tunnelTransport;
-        private readonly IDisposable lobbyApi;
-        private bool disposed;
-
-        public SteamSessionProviderRuntime(
-            ISessionAdvertiser advertiser,
-            ISessionTunnelHost tunnelHost,
-            ISessionMembership membership,
-            ISessionAdvertisementOwner advertisementOwner,
-            ISessionServerReadiness serverReadiness,
-            ISessionTransportTargetSource transportTargetSource,
-            IMissionPeerTransport missionTransport,
-            IAuthenticatedPeerIdentityResolver peerIdentityResolver,
-            IPeerIdentityPublisher peerIdentityPublisher,
-            IDisposable tunnelTransport,
-            IDisposable lobbyApi)
-        {
-            Advertiser = advertiser;
-            TunnelHost = tunnelHost;
-            Membership = membership;
-            AdvertisementOwner = advertisementOwner;
-            ServerReadiness = serverReadiness;
-            TransportTargetSource = transportTargetSource;
-            MissionTransport = missionTransport;
-            PeerIdentityResolver = peerIdentityResolver;
-            PeerIdentityPublisher = peerIdentityPublisher;
-            this.tunnelTransport = tunnelTransport;
-            this.lobbyApi = lobbyApi;
-        }
-
-        public ISessionAdvertiser Advertiser { get; }
-        public ISessionTunnelHost TunnelHost { get; }
-        public ISessionMembership Membership { get; }
-        public ISessionAdvertisementOwner AdvertisementOwner { get; }
-        public ISessionServerReadiness ServerReadiness { get; }
-        public ISessionTransportTargetSource TransportTargetSource { get; }
-        public IMissionPeerTransport MissionTransport { get; }
-        public IAuthenticatedPeerIdentityResolver PeerIdentityResolver { get; }
-        public IPeerIdentityPublisher PeerIdentityPublisher { get; }
-
-        public void Dispose()
-        {
-            if (disposed) return;
-            disposed = true;
-
-            MissionTransport.Dispose();
-            Advertiser.Dispose();
-            TunnelHost.Dispose();
-            PeerIdentityPublisher.Dispose();
-            tunnelTransport.Dispose();
-            lobbyApi.Dispose();
-        }
-    }
 }

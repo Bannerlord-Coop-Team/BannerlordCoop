@@ -50,22 +50,6 @@ public static class ServerLaunchArguments
         int ownerProcessId,
         string password,
         ServerVisibility visibility,
-        string peerIdentityBridgeName)
-        => BuildManagedServerArguments(
-            moduleIds,
-            saveName,
-            ownerProcessId,
-            password,
-            visibility,
-            peerIdentityBridgeName,
-            null);
-
-    public static string BuildManagedServerArguments(
-        IReadOnlyList<string> moduleIds,
-        string saveName,
-        int ownerProcessId,
-        string password,
-        ServerVisibility visibility,
         string peerIdentityBridgeName,
         string sessionProvider)
     {
@@ -140,22 +124,7 @@ public static class ServerLaunchArguments
             out ownerProcessId,
             out password,
             out visibility,
-            out _);
-
-    public static bool TryParse(
-        IReadOnlyList<string> args,
-        out string saveName,
-        out int ownerProcessId,
-        out string password,
-        out ServerVisibility visibility,
-        out string peerIdentityBridgeName)
-        => TryParse(
-            args,
-            out saveName,
-            out ownerProcessId,
-            out password,
-            out visibility,
-            out peerIdentityBridgeName,
+            out _,
             out _);
 
     public static bool TryParse(

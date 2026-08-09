@@ -36,44 +36,6 @@ public class ConnectionContext
         IAttachmentIdMapper attachmentIdMapper,
         IExistingPlayerSender existingPlayerSender,
         IServerOptionsProvider serverOptionsProvider,
-        IJoinCampaignBaselineSender joinCampaignBaselineSender)
-        : this(
-            messageBroker,
-            network,
-            moduleValidator,
-            moduleInfoProvider,
-            playerManager,
-            playerPartyRestorer,
-            objectManager,
-            heroInterface,
-            coopSessionProvider,
-            saveInterface,
-            connectionMessageQueue,
-            coalescer,
-            attachmentIdMapper,
-            existingPlayerSender,
-            serverOptionsProvider,
-            joinCampaignBaselineSender,
-            null)
-    {
-    }
-
-    public ConnectionContext(
-        IMessageBroker messageBroker,
-        INetwork network,
-        IModuleValidator moduleValidator,
-        IModuleInfoProvider moduleInfoProvider,
-        IPlayerManager playerManager,
-        IPlayerPartyRestorer playerPartyRestorer,
-        IObjectManager objectManager,
-        IHeroInterface heroInterface,
-        ICoopSessionProvider coopSessionProvider,
-        ISaveInterface saveInterface,
-        IConnectionMessageQueue connectionMessageQueue,
-        ISendCoalescer coalescer,
-        IAttachmentIdMapper attachmentIdMapper,
-        IExistingPlayerSender existingPlayerSender,
-        IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
         IAuthenticatedPeerIdentityResolver peerIdentityResolver)
     {

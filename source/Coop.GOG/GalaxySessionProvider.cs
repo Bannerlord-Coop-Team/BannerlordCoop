@@ -113,12 +113,12 @@ public sealed class GalaxySessionProvider : ISessionProvider
             new GalaxyDatagramTransport(sdk),
             () => new GalaxyDatagramTransport(sdk));
 
-        return new GalaxySessionProviderRuntime(
+        return new SessionProviderRuntime(
             advertiser,
             tunnelHost,
             joinListener,
             advertiser,
-            ImmediateServerReadiness.Instance,
+            ImmediateSessionServerReadiness.Instance,
             new GalaxyTransportTargetSource(sdk),
             missionTransport,
             tunnelHost,
@@ -133,16 +133,16 @@ public sealed class GalaxySessionProvider : ISessionProvider
 
         var advertiser = new GalaxyLobbyAdvertiser(
             sdk,
-            UnavailableSessionMembership.Instance,
+            UnavailableSessionServices.Instance,
             options.Visibility,
             dedicatedServer: true);
         var tunnelTransport = new GalaxyDatagramTransport(sdk);
         var tunnelHost = new ProviderTunnelHost(tunnelTransport);
 
-        return new GalaxySessionProviderRuntime(
+        return new SessionProviderRuntime(
             advertiser,
             tunnelHost,
-            UnavailableSessionMembership.Instance,
+            UnavailableSessionServices.Instance,
             advertiser,
             new GalaxyGameServerReadiness(),
             new GalaxyTransportTargetSource(sdk),
@@ -192,76 +192,4 @@ public sealed class GalaxySessionProvider : ISessionProvider
         }
     }
 
-    private sealed class ImmediateServerReadiness : ISessionServerReadiness
-    {
-        public static readonly ImmediateServerReadiness Instance = new ImmediateServerReadiness();
-        public bool IsReady => true;
-
-        public event Action Ready
-        {
-            add { }
-            remove { }
-        }
-    }
-
-    private sealed class UnavailableSessionMembership : ISessionMembership
-    {
-        public static readonly UnavailableSessionMembership Instance = new UnavailableSessionMembership();
-        public bool IsInSession => false;
-        public SessionListingId ListingId => default;
-        public void JoinSession(SessionListingId listingId) { }
-        public void LeaveSession() { }
-    }
-
-    private sealed class GalaxySessionProviderRuntime : ISessionProviderRuntime
-    {
-        private readonly IDisposable tunnelTransport;
-        private bool disposed;
-
-        public GalaxySessionProviderRuntime(
-            ISessionAdvertiser advertiser,
-            ISessionTunnelHost tunnelHost,
-            ISessionMembership membership,
-            ISessionAdvertisementOwner advertisementOwner,
-            ISessionServerReadiness serverReadiness,
-            ISessionTransportTargetSource transportTargetSource,
-            IMissionPeerTransport missionTransport,
-            IAuthenticatedPeerIdentityResolver peerIdentityResolver,
-            IPeerIdentityPublisher peerIdentityPublisher,
-            IDisposable tunnelTransport)
-        {
-            Advertiser = advertiser;
-            TunnelHost = tunnelHost;
-            Membership = membership;
-            AdvertisementOwner = advertisementOwner;
-            ServerReadiness = serverReadiness;
-            TransportTargetSource = transportTargetSource;
-            MissionTransport = missionTransport;
-            PeerIdentityResolver = peerIdentityResolver;
-            PeerIdentityPublisher = peerIdentityPublisher;
-            this.tunnelTransport = tunnelTransport;
-        }
-
-        public ISessionAdvertiser Advertiser { get; }
-        public ISessionTunnelHost TunnelHost { get; }
-        public ISessionMembership Membership { get; }
-        public ISessionAdvertisementOwner AdvertisementOwner { get; }
-        public ISessionServerReadiness ServerReadiness { get; }
-        public ISessionTransportTargetSource TransportTargetSource { get; }
-        public IMissionPeerTransport MissionTransport { get; }
-        public IAuthenticatedPeerIdentityResolver PeerIdentityResolver { get; }
-        public IPeerIdentityPublisher PeerIdentityPublisher { get; }
-
-        public void Dispose()
-        {
-            if (disposed) return;
-            disposed = true;
-
-            MissionTransport.Dispose();
-            Advertiser.Dispose();
-            TunnelHost.Dispose();
-            PeerIdentityPublisher.Dispose();
-            tunnelTransport.Dispose();
-        }
-    }
 }

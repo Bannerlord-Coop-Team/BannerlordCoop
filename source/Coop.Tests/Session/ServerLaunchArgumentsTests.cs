@@ -110,7 +110,7 @@ public class ServerLaunchArgumentsTests
         };
 
         Assert.True(ServerLaunchArguments.TryParse(
-            args, out _, out _, out _, out _, out var parsedBridgeName));
+            args, out _, out _, out _, out _, out var parsedBridgeName, out _));
         Assert.Equal(bridgeName, parsedBridgeName);
     }
 
@@ -180,7 +180,7 @@ public class ServerLaunchArgumentsTests
         };
 
         Assert.False(ServerLaunchArguments.TryParse(
-            args, out _, out _, out _, out _, out var parsedBridgeName));
+            args, out _, out _, out _, out _, out var parsedBridgeName, out _));
         Assert.Equal(string.Empty, parsedBridgeName);
     }
 
@@ -195,7 +195,7 @@ public class ServerLaunchArgumentsTests
         };
 
         Assert.False(ServerLaunchArguments.TryParse(
-            args, out _, out _, out _, out _, out var parsedBridgeName));
+            args, out _, out _, out _, out _, out var parsedBridgeName, out _));
         Assert.Equal(string.Empty, parsedBridgeName);
     }
 
@@ -349,7 +349,8 @@ public class ServerLaunchArgumentsTests
             42,
             string.Empty,
             ServerVisibility.Public,
-            bridgeName);
+            bridgeName,
+            null);
 
         Assert.EndsWith(
             $"{ServerLaunchArguments.PeerIdentityBridgeArgument} {bridgeName}",
@@ -382,6 +383,7 @@ public class ServerLaunchArgumentsTests
             42,
             string.Empty,
             ServerVisibility.Public,
-            "unrelated-pipe"));
+            "unrelated-pipe",
+            null));
     }
 }

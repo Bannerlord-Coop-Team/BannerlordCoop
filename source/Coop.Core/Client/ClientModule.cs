@@ -13,6 +13,7 @@ using Coop.Core.Common.Session;
 using GameInterface.Policies;
 using LiteNetLib;
 using Missions;
+using System;
 
 namespace Coop.Core.Client;
 
@@ -63,7 +64,31 @@ public class ClientModule : CommonModule
                 };
 
                 if (provider == null)
-                    return new DirectSessionProviderRuntime(isServer, options.PeerIdentityBridgeName);
+                {
+                    var advertiser = new NoopSessionAdvertiser();
+                    var tunnelHost = new NoopSessionTunnelHost();
+                    var peerIdentityResolver = (IAuthenticatedPeerIdentityResolver)tunnelHost;
+                    var providerResources = Array.Empty<IDisposable>();
+                    if (isServer && PeerIdentityBridgeName.IsValid(options.PeerIdentityBridgeName))
+                    {
+                        var bridgeResolver = new NamedPipePeerIdentityResolver(options.PeerIdentityBridgeName);
+                        peerIdentityResolver = bridgeResolver;
+                        providerResources = new IDisposable[] { bridgeResolver };
+                    }
+
+                    var unavailable = UnavailableSessionServices.Instance;
+                    return new SessionProviderRuntime(
+                        advertiser,
+                        tunnelHost,
+                        unavailable,
+                        unavailable,
+                        unavailable,
+                        unavailable,
+                        new NoopMissionPeerTransport(),
+                        peerIdentityResolver,
+                        NoopPeerIdentityPublisher.Instance,
+                        providerResources);
+                }
 
                 if (isServer)
                 {
