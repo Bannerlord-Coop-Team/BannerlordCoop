@@ -1,6 +1,9 @@
 using Common.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 namespace Common.Tests;
 
@@ -85,6 +88,19 @@ public sealed class UpdateableListTests
         list.UpdateAll(TimeSpan.Zero);
 
         Assert.Equal(new[] { "high", "low" }, updated);
+    }
+
+    [Fact]
+    public void Logger_IsNotHeldInAStaticField()
+    {
+        // Shape, not behaviour: the failure needs the game's module loader, which no test host has. A static
+        // field would resolve the logger before the mod installs its binding redirects and kill startup.
+        FieldInfo[] loggerFields = typeof(UpdateableList)
+            .GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            .Where(field => typeof(ILogger).IsAssignableFrom(field.FieldType))
+            .ToArray();
+
+        Assert.Empty(loggerFields);
     }
 
     /// <summary>Two types, because the throttle keys on the entry's type name.</summary>
