@@ -6,6 +6,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -105,5 +106,23 @@ internal class CompanionsCampaignBehaviorPatches
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Add a check to allow stuck companions to become fugitive if they didn't properly get released.
+    /// This is primarily for older saves where some players would have companions stuck as prisoners.
+    /// </summary>
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior.DailyTick))]
+    [HarmonyPostfix]
+    public static void DailyTickPostfix()
+    {
+        foreach (Hero hero in Hero.AllAliveHeroes)
+        {
+            if (hero.IsWanderer && hero.CompanionOf != null && hero.IsPrisoner && hero.PartyBelongedToAsPrisoner == null)
+            {
+                MakeHeroFugitiveAction.Apply(hero, true);
+                break;
+            }
+        }
     }
 }

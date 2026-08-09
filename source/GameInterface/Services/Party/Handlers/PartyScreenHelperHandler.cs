@@ -12,6 +12,7 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using Helpers;
 using LiteNetLib;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -134,16 +135,28 @@ internal class PartyScreenHelperHandler : IHandler
     private void Handle_GarrisonDonated(MessagePayload<GarrisonDonated> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.CurrentSettlement, out var currentSettlementId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.LeftMemberRoster, out var leftMemberRosterId)) return;
+        var troops = new List<DonateTroop>();
 
-        var message = new DonateToGarrison(currentSettlementId, leftMemberRosterId);
+        for (int i = 0; i < obj.What.LeftMemberRoster.Count; i++)
+        {
+            var element = obj.What.LeftMemberRoster.GetElementCopyAtIndex(i);
+
+            if (!objectManager.TryGetIdWithLogging(element.Character, out var characterId))
+                continue;
+
+            troops.Add(new DonateTroop(
+                characterId,
+                element.Number));
+        }
+
+        var message = new DonateToGarrison(currentSettlementId, troops);
+
         network.SendAll(message);
     }
 
     private void Handle_DonateToGarrison(MessagePayload<DonateToGarrison> obj)
     {
         if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftMemberRosterId, out var leftMemberRoster)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -153,13 +166,23 @@ internal class PartyScreenHelperHandler : IHandler
                 currentSettlement.AddGarrisonParty();
                 garrisonParty = currentSettlement.Town.GarrisonParty;
             }
-            for (int i = 0; i < leftMemberRoster.Count; i++)
+            foreach (var troop in obj.What.Troops)
             {
-                TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
-                garrisonParty.AddElementToMemberRoster(elementCopyAtIndex.Character, elementCopyAtIndex.Number, false);
-                if (elementCopyAtIndex.Character.IsHero)
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(
+                    troop.CharacterId,
+                    out var character))
+                    continue;
+
+                garrisonParty.AddElementToMemberRoster(
+                    character,
+                    troop.Count,
+                    false);
+
+                if (character.IsHero)
                 {
-                    EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                    EnterSettlementAction.ApplyForCharacterOnly(
+                        character.HeroObject,
+                        currentSettlement);
                 }
             }
         });

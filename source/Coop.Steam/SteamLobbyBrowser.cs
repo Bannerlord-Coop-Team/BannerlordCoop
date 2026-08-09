@@ -1,4 +1,4 @@
-using Common.Network.Session;
+﻿using Common.Network.Session;
 using System;
 using System.Collections.Generic;
 
@@ -146,7 +146,8 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
 
     private IReadOnlyList<SteamLobbySummary> BuildSummaries(IReadOnlyList<ulong> lobbyIds)
     {
-        var summaries = new List<SteamLobbySummary>();
+        uint serverTime = lobbyApi.ServerRealTime;
+        var candidates = new List<LobbyCandidate>();
         foreach (var lobbyId in lobbyIds)
         {
             if (!LobbyDataCodec.TryDecodeVisibility(
@@ -171,6 +172,14 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
                 continue;
             }
 
+            bool hasValidLease = LobbyDataCodec.TryDecodeAdvertisementExpiry(
+                lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.AdvertisementExpiresAtKey),
+                out uint expiresAt);
+            if (serverTime != 0 && hasValidLease && expiresAt <= serverTime)
+            {
+                continue;
+            }
+
             int.TryParse(lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.VersionKey), out var protocolVersion);
             var passwordRequired = lobbyApi.GetLobbyData(
                 lobbyId, LobbyDataCodec.PasswordRequiredKey) == "1";
@@ -178,15 +187,40 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
                 out var connectedPlayers);
             connectedPlayers = Math.Max(0, connectedPlayers);
 
-            summaries.Add(new SteamLobbySummary
+            candidates.Add(new LobbyCandidate(
+                serverSteamId,
+                hasValidLease,
+                expiresAt,
+                new SteamLobbySummary
+                {
+                    LobbyId = lobbyId,
+                    OwnerName = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.OwnerNameKey),
+                    ProtocolVersion = protocolVersion,
+                    ModVersion = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.ModVersionKey),
+                    PasswordRequired = passwordRequired,
+                    ConnectedPlayers = connectedPlayers,
+                }));
+        }
+
+        var latestExpiryByServer = new Dictionary<ulong, uint>();
+        foreach (var candidate in candidates)
+        {
+            if (!candidate.HasValidLease) continue;
+            if (!latestExpiryByServer.TryGetValue(candidate.ServerSteamId, out uint latestExpiry) ||
+                candidate.ExpiresAt > latestExpiry)
             {
-                LobbyId = lobbyId,
-                OwnerName = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.OwnerNameKey),
-                ProtocolVersion = protocolVersion,
-                ModVersion = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.ModVersionKey),
-                PasswordRequired = passwordRequired,
-                ConnectedPlayers = connectedPlayers,
-            });
+                latestExpiryByServer[candidate.ServerSteamId] = candidate.ExpiresAt;
+            }
+        }
+
+        var summaries = new List<SteamLobbySummary>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            if (!candidate.HasValidLease ||
+                candidate.ExpiresAt == latestExpiryByServer[candidate.ServerSteamId])
+            {
+                summaries.Add(candidate.Summary);
+            }
         }
 
         return summaries;
@@ -213,6 +247,26 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         public LobbyRequest(Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted)
         {
             OnCompleted = onCompleted;
+        }
+    }
+
+    private sealed class LobbyCandidate
+    {
+        public readonly ulong ServerSteamId;
+        public readonly bool HasValidLease;
+        public readonly uint ExpiresAt;
+        public readonly SteamLobbySummary Summary;
+
+        public LobbyCandidate(
+            ulong serverSteamId,
+            bool hasValidLease,
+            uint expiresAt,
+            SteamLobbySummary summary)
+        {
+            ServerSteamId = serverSteamId;
+            HasValidLease = hasValidLease;
+            ExpiresAt = expiresAt;
+            Summary = summary;
         }
     }
 }
