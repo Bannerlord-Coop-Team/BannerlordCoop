@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Data;
@@ -31,7 +31,7 @@ namespace GameInterface.Services.Kingdoms
         bool TryCreateVoteData(DecisionItemBaseVM decisionItem, out KingdomDecisionVoteData voteData, bool isFinal = false);
         bool TryPublishVote(DecisionOptionVM decisionOption);
         bool TryPublishFinalVote(DecisionItemBaseVM decisionItem);
-        void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem);
+        void CloseDecisionItem(DecisionItemBaseVM decisionItem);
         bool ShouldSuppressLocalDecision(KingdomDecision decision);
         bool ShouldDisableResolveDecision(KingdomDecision decision);
         bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
@@ -172,7 +172,7 @@ namespace GameInterface.Services.Kingdoms
             if (decisionItem == null || decisionItem._currentSelectedOption == null) return false;
             if (HasLocalPlayerSubmittedVote(decisionItem.KingdomDecisionMaker?._decision))
             {
-                MarkLocalVoteSubmitted(decisionItem);
+                CloseDecisionItem(decisionItem);
                 return true;
             }
 
@@ -188,11 +188,11 @@ namespace GameInterface.Services.Kingdoms
             {
                 LocalSubmittedDecisions.Add(decisionItem.KingdomDecisionMaker._decision);
             }
-            MarkLocalVoteSubmitted(decisionItem);
+            CloseDecisionItem(decisionItem);
             return true;
         }
 
-        public void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem)
+        public void CloseDecisionItem(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null) return;
 
