@@ -70,6 +70,7 @@ namespace GameInterface.Services.Heroes
             // TODO add all fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Culture)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._power)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._powerModifier)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroDeveloper)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroTraits)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroPerks)));

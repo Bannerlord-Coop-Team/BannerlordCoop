@@ -18,4 +18,16 @@ public class TournamentTabInputPatchesTests
             expected,
             TournamentTabInputPatches.ShouldSuppress(isTab, isCoopTournamentMissionActive));
     }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void ShouldRunScoreboardTick_BlocksEntireScoreboardDuringCoopTournament(
+        bool isCoopTournamentMissionActive,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            TournamentScoreboardInputPatches.ShouldRunScoreboardTick(isCoopTournamentMissionActive));
+    }
 }

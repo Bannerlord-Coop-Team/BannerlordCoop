@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using Serilog;
@@ -22,22 +23,28 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerPartyRestorer>();
 
     private readonly IObjectManager objectManager;
+    private readonly IAutoRegistryFactory autoRegistryFactory;
     private readonly Func<IEnumerable<MobileParty>> getParties;
-    private readonly Func<Hero, MobileParty> createParty;
+    private readonly Func<Hero, MobileParty> createRecoveryParty;
+    private readonly Action<MobileParty> removeRecoveryParty;
 
-    public PlayerPartyRestorer(IObjectManager objectManager)
-        : this(objectManager, () => MobileParty.All, CreateReplacementParty)
+    public PlayerPartyRestorer(IObjectManager objectManager, IAutoRegistryFactory autoRegistryFactory)
+        : this(objectManager, autoRegistryFactory, () => MobileParty.All, CreateRecoveryParty, RemoveParty)
     {
     }
 
     internal PlayerPartyRestorer(
         IObjectManager objectManager,
+        IAutoRegistryFactory autoRegistryFactory,
         Func<IEnumerable<MobileParty>> getParties,
-        Func<Hero, MobileParty> createParty)
+        Func<Hero, MobileParty> createRecoveryParty,
+        Action<MobileParty> removeRecoveryParty)
     {
         this.objectManager = objectManager;
+        this.autoRegistryFactory = autoRegistryFactory;
         this.getParties = getParties;
-        this.createParty = createParty;
+        this.createRecoveryParty = createRecoveryParty;
+        this.removeRecoveryParty = removeRecoveryParty;
     }
 
     public bool TryRestore(Player player, out Player restoredPlayer)
@@ -80,9 +87,10 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             }
         }
 
+        string partyId;
         if (party == null)
         {
-            party = createParty(hero);
+            party = createRecoveryParty(hero);
             if (party == null)
             {
                 Logger.Error(
@@ -93,13 +101,18 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             }
 
             Logger.Warning(
-                "Created replacement party {PartyId} for controller {ControllerId} hero {HeroId}",
+                "Created recovery party {PartyId} for controller {ControllerId} hero {HeroId}",
                 party.StringId,
                 player.ControllerId,
                 player.HeroId);
-        }
 
-        if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return false;
+            if (!TryRegisterRecoveryParty(player, party, out partyId))
+                return false;
+        }
+        else if (!objectManager.TryGetIdWithLogging(party, out partyId))
+        {
+            return false;
+        }
 
         Restore(hero, party);
 
@@ -116,6 +129,61 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         }
 
         return true;
+    }
+
+    private bool TryRegisterRecoveryParty(Player player, MobileParty party, out string partyId)
+    {
+        partyId = null;
+
+        try
+        {
+            var registeredPartyId = string.Empty;
+            var registered = objectManager.RunRegistrationTransaction(() =>
+            {
+                autoRegistryFactory.RegisterAll();
+                return objectManager.TryGetIdWithLogging(party, out registeredPartyId);
+            });
+
+            partyId = registeredPartyId;
+            if (registered)
+                return true;
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Cannot restore player {ControllerId} hero {HeroId}: failed to register recovery party {PartyId}",
+                player.ControllerId,
+                player.HeroId,
+                party.StringId);
+            RemoveFailedRecoveryParty(player, party);
+            return false;
+        }
+
+        Logger.Error(
+            "Cannot restore player {ControllerId} hero {HeroId}: recovery party {PartyId} was not registered",
+            player.ControllerId,
+            player.HeroId,
+            party.StringId);
+        RemoveFailedRecoveryParty(player, party);
+        return false;
+    }
+
+    private void RemoveFailedRecoveryParty(Player player, MobileParty party)
+    {
+        try
+        {
+            removeRecoveryParty(party);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Failed to remove recovery party {PartyId} after restoration failed for controller {ControllerId} hero {HeroId}",
+                party.StringId,
+                player.ControllerId,
+                player.HeroId);
+        }
     }
 
     public void Restore(Hero hero, MobileParty party)
@@ -171,7 +239,7 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         return party.PartyComponent.MobileParty == party;
     }
 
-    private static MobileParty CreateReplacementParty(Hero hero)
+    private static MobileParty CreateRecoveryParty(Hero hero)
     {
         var position = hero.GetCampaignPosition();
         if (!position.IsValid() && hero.LastKnownClosestSettlement != null)
@@ -182,5 +250,10 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         var party = MobileParty.CreateParty($"{hero.StringId}_recovered_{Guid.NewGuid():N}", component);
         party.InitializeMobilePartyAtPosition(position);
         return party;
+    }
+
+    private static void RemoveParty(MobileParty party)
+    {
+        party.RemoveParty();
     }
 }
