@@ -36,24 +36,24 @@ public class CoopConnectionUIMovieTests
     }
 
     [Fact]
-    public void SteamLobbyPagination_BindsVisibilityNavigationAndPageText()
+    public void SessionPagination_BindsVisibilityNavigationAndPageText()
     {
         var document = XDocument.Load(FindMoviePath());
         var controls = FindById(document, "LobbyPaginationControls");
 
-        Assert.Equal("@IsSteamLobbyPaginationVisible", controls.Attribute("IsVisible")?.Value);
+        Assert.Equal("@IsSessionPaginationVisible", controls.Attribute("IsVisible")?.Value);
 
         var previous = FindById(document, "PreviousLobbyPageButton");
-        Assert.Equal("@IsPreviousSteamLobbyPageDisabled", previous.Attribute("IsDisabled")?.Value);
-        Assert.Equal("ActionPreviousSteamLobbyPage", previous.Attribute("Command.Click")?.Value);
+        Assert.Equal("@IsPreviousSessionPageDisabled", previous.Attribute("IsDisabled")?.Value);
+        Assert.Equal("ActionPreviousSessionPage", previous.Attribute("Command.Click")?.Value);
         Assert.Equal("@PreviousPageButtonText", previous.Attribute("Parameter.Text")?.Value);
 
         var indicator = FindById(document, "LobbyPageIndicator");
-        Assert.Equal("@SteamLobbyPageText", indicator.Attribute("Text")?.Value);
+        Assert.Equal("@SessionPageText", indicator.Attribute("Text")?.Value);
 
         var next = FindById(document, "NextLobbyPageButton");
-        Assert.Equal("@IsNextSteamLobbyPageDisabled", next.Attribute("IsDisabled")?.Value);
-        Assert.Equal("ActionNextSteamLobbyPage", next.Attribute("Command.Click")?.Value);
+        Assert.Equal("@IsNextSessionPageDisabled", next.Attribute("IsDisabled")?.Value);
+        Assert.Equal("ActionNextSessionPage", next.Attribute("Command.Click")?.Value);
         Assert.Equal("@NextPageButtonText", next.Attribute("Parameter.Text")?.Value);
 
         Assert.Equal("334", FindById(document, "LobbyListContainer")

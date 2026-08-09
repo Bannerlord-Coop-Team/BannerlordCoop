@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network.Session;
 using Serilog;
 using Steamworks;
 using System;
@@ -27,9 +28,14 @@ public static class SteamBoot
     // Created before any session container exists, so it lives here rather than in DI.
     public static SteamTunnelJoinEndpointPreparer TunnelPreparer { get; private set; }
 
-    public static bool TryStart(IMessageBroker messageBroker, string commandLine)
+    public static SteamSessionProvider SessionProvider { get; private set; }
+
+    public static bool TryStart(
+        IMessageBroker messageBroker,
+        string commandLine,
+        ISessionJoinRequestGate joinRequestGate)
     {
-        if (JoinListener != null) return true;
+        if (SessionProvider != null) return true;
 
         bool available;
         try
@@ -45,7 +51,7 @@ public static class SteamBoot
 
         if (!available) return false;
 
-        CreateServices(messageBroker, commandLine);
+        CreateServices(messageBroker, commandLine, joinRequestGate);
         return true;
     }
 
@@ -69,13 +75,20 @@ public static class SteamBoot
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void CreateServices(IMessageBroker messageBroker, string commandLine)
+    private static void CreateServices(
+        IMessageBroker messageBroker,
+        string commandLine,
+        ISessionJoinRequestGate joinRequestGate)
     {
         var lobbyApi = new SteamLobbyApi();
-        JoinListener = new SteamJoinListener(messageBroker, lobbyApi);
+        JoinListener = new SteamJoinListener(messageBroker, lobbyApi, joinRequestGate);
         LobbyBrowser = new SteamLobbyBrowser(lobbyApi);
-        Common.Network.Session.SessionDiscovery.SteamLobbyBrowser = LobbyBrowser;
         TunnelPreparer = new SteamTunnelJoinEndpointPreparer();
+        SessionProvider = new SteamSessionProvider(
+            JoinListener,
+            LobbyBrowser,
+            TunnelPreparer,
+            gameServer: false);
         JoinListener.ProcessLaunchArguments(commandLine);
     }
 }

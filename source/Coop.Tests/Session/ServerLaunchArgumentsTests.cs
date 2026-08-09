@@ -1,6 +1,7 @@
 ﻿using Common.Network;
 using Common.Network.Session;
 using Coop.Core.Common.Session;
+using System;
 using Xunit;
 
 namespace Coop.Tests.Session;
@@ -94,6 +95,57 @@ public class ServerLaunchArgumentsTests
         Assert.True(ServerLaunchArguments.TryParse(
             args, out _, out _, out _, out var visibility));
         Assert.Equal(ServerVisibility.Public, visibility);
+    }
+
+    [Fact]
+    public void TryParse_FindsPeerIdentityBridgeName()
+    {
+        string bridgeName = PeerIdentityBridgeName.Create();
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.PeerIdentityBridgeArgument,
+            bridgeName,
+        };
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out var parsedBridgeName));
+        Assert.Equal(bridgeName, parsedBridgeName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("bannerlordcoop-peer-identity-not-a-guid")]
+    [InlineData("unrelated-pipe")]
+    public void TryParse_RejectsInvalidPeerIdentityBridgeName(string bridgeName)
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.PeerIdentityBridgeArgument,
+            bridgeName,
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out var parsedBridgeName));
+        Assert.Equal(string.Empty, parsedBridgeName);
+    }
+
+    [Fact]
+    public void TryParse_RejectsPeerIdentityBridgeWithoutValue()
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.PeerIdentityBridgeArgument,
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out var parsedBridgeName));
+        Assert.Equal(string.Empty, parsedBridgeName);
     }
 
     [Theory]
@@ -233,5 +285,35 @@ public class ServerLaunchArgumentsTests
             new[] { "Native", "Coop" }, "My Save", 42, string.Empty);
 
         Assert.DoesNotContain(ServerLaunchArguments.PasswordArgument, built);
+    }
+
+    [Fact]
+    public void BuildManagedServerArguments_AppendsPeerIdentityBridgeName()
+    {
+        string bridgeName = PeerIdentityBridgeName.Create();
+
+        var built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" },
+            "My Save",
+            42,
+            string.Empty,
+            ServerVisibility.Public,
+            bridgeName);
+
+        Assert.EndsWith(
+            $"{ServerLaunchArguments.PeerIdentityBridgeArgument} {bridgeName}",
+            built);
+    }
+
+    [Fact]
+    public void BuildManagedServerArguments_RejectsInvalidPeerIdentityBridgeName()
+    {
+        Assert.Throws<ArgumentException>(() => ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" },
+            "My Save",
+            42,
+            string.Empty,
+            ServerVisibility.Public,
+            "unrelated-pipe"));
     }
 }

@@ -1,19 +1,26 @@
 ﻿using Common.Messaging;
+using Common.Network.Session;
 using ProtoBuf;
 
 namespace Coop.Core.Common.Session.Messages;
 
 /// <summary>
-/// Identifies the Steam lobby owned by the authoritative server.
+/// Identifies the provider listing owned by the authoritative server.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkSessionLobbyChanged : IEvent
 {
     [ProtoMember(1)]
-    public readonly ulong LobbyId;
+    public readonly string Provider;
 
-    public NetworkSessionLobbyChanged(ulong lobbyId)
+    [ProtoMember(2)]
+    public readonly string ListingId;
+
+    public NetworkSessionLobbyChanged(SessionListingId listingId)
     {
-        LobbyId = lobbyId;
+        Provider = listingId.Provider;
+        ListingId = listingId.Value;
     }
+
+    public SessionListingId ToListingId() => new SessionListingId(Provider, ListingId);
 }

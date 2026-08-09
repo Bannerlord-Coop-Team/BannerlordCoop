@@ -30,6 +30,8 @@ public class NetworkConfig : INetworkConfig
 
     public string P2PToken => throw new NotImplementedException();
 
+    public string PeerIdentityBridgeName { get; set; } = string.Empty;
+
     public int MaxPacketsInQueue => 10000;
 
     // Resume threshold is well below the pause threshold so a chronically slow peer drains its backlog

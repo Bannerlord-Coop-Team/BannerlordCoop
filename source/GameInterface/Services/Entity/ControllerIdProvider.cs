@@ -1,9 +1,8 @@
 ﻿using Common.Logging;
-using Serilog;
+using Common.Network.Session;
 using System;
 using System.Linq;
 using TaleWorlds.Engine;
-using TaleWorlds.PlatformService;
 
 namespace GameInterface.Services.Entity;
 
@@ -11,13 +10,13 @@ public interface IControllerIdProvider
 {
     string ControllerId { get; }
     void SetControllerId(string controllerId);
-    void SetControllerAsPlatformId();
+    void SetControllerAsPlatformIdentity(PlatformIdentity identity);
+    void SetControllerAsLocalId();
     void SetControllerFromProgramArgs();
 }
 
 public class ControllerIdProvider : IControllerIdProvider
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ControllerIdProvider>();
     private readonly IControllerIdStore controllerIdStore;
 
     public string ControllerId { get; private set; }
@@ -45,30 +44,21 @@ public class ControllerIdProvider : IControllerIdProvider
         }
         catch(Exception)
         {
-            SetAsDefault();
+            SetControllerAsLocalId();
         }        
     }
 
-    public void SetControllerAsPlatformId()
+    public void SetControllerAsPlatformIdentity(PlatformIdentity identity)
     {
-        SetControllerAsPlatformId(PlatformServices.ProviderName, PlatformServices.UserId);
+        if (!identity.IsValid || !identity.IsStorefrontIdentity)
+            throw new ArgumentException("A valid storefront transport identity is required", nameof(identity));
+
+        ControllerId = identity.ControllerId;
     }
 
-    internal void SetControllerAsPlatformId(string providerName, string platformUserId)
+    public void SetControllerAsLocalId()
     {
-        string provider = NormalizeProviderName(providerName);
-
-        if (IsUsablePlatformId(platformUserId))
-        {
-            ControllerId = provider + ":" + platformUserId.Trim();
-            return;
-        }
-
-        string installationId = controllerIdStore.GetOrCreateId();
-        ControllerId = provider + ":local:" + installationId;
-        Logger.Warning(
-            "Platform {Provider} returned no usable user id; using persistent installation id",
-            provider);
+        ControllerId = "local:" + controllerIdStore.GetOrCreateId();
     }
 
     public void SetControllerId(string controllerId)
@@ -76,28 +66,4 @@ public class ControllerIdProvider : IControllerIdProvider
         ControllerId = controllerId;
     }
 
-    public void SetAsDefault()
-    {
-        ControllerId = "DefaultId";
-    }
-
-    private static string NormalizeProviderName(string providerName)
-    {
-        if (string.IsNullOrWhiteSpace(providerName)) return "unknown";
-
-        string normalized = new string(providerName
-            .Where(char.IsLetterOrDigit)
-            .Select(char.ToLowerInvariant)
-            .ToArray());
-
-        return string.IsNullOrEmpty(normalized) ? "unknown" : normalized;
-    }
-
-    private static bool IsUsablePlatformId(string platformUserId)
-    {
-        if (string.IsNullOrWhiteSpace(platformUserId)) return false;
-
-        string trimmed = platformUserId.Trim();
-        return !ulong.TryParse(trimmed, out ulong numericId) || numericId != 0;
-    }
 }

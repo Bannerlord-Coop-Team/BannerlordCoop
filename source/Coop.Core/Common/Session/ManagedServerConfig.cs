@@ -27,6 +27,9 @@ public static class ManagedServerConfig
     /// <summary>Optional connection password supplied on the server command line.</summary>
     public static string Password { get; set; } = string.Empty;
 
-    /// <summary>Who can discover this server through Steam.</summary>
+    /// <summary>Ephemeral local IPC name used to bind player-owned provider tunnels.</summary>
+    public static string PeerIdentityBridgeName { get; set; } = string.Empty;
+
+    /// <summary>Who can discover this server through the active storefront.</summary>
     public static ServerVisibility Visibility { get; set; } = ServerVisibility.Public;
 }

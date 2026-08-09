@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
@@ -12,6 +13,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
+using System.Net;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
@@ -33,6 +35,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly IExistingPlayerSender existingPlayerSender;
+    private readonly IAuthenticatedPeerIdentityResolver peerIdentityResolver;
 
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
@@ -42,7 +45,8 @@ public class ResolveCharacterState : ConnectionStateBase
         IPlayerPartyRestorer playerPartyRestorer,
         IObjectManager objectManager,
         IModuleInfoProvider moduleInfoProvider,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        IAuthenticatedPeerIdentityResolver peerIdentityResolver = null)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -53,6 +57,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
         this.existingPlayerSender = existingPlayerSender;
+        this.peerIdentityResolver = peerIdentityResolver;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -128,6 +133,16 @@ public class ResolveCharacterState : ConnectionStateBase
 
     private void ResolveCharacter(NetPeer peer, string controllerId)
     {
+        if (!IdentityClaimMatchesTransport(peer, controllerId))
+        {
+            Logger.Error(
+                "Connection supplied controller id {ControllerId} that does not match its authenticated transport identity; disconnecting peer {Peer}",
+                controllerId,
+                peer.Id);
+            peer.Disconnect();
+            return;
+        }
+
         if (!ConnectionLogic.TrySetControllerId(controllerId))
         {
             Logger.Error("Connection supplied an invalid or changed controller id; disconnecting peer {Peer}", peer.Id);
@@ -195,6 +210,23 @@ public class ResolveCharacterState : ConnectionStateBase
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));
         ConnectionLogic.CreateCharacter();
+    }
+
+    private bool IdentityClaimMatchesTransport(NetPeer peer, string controllerId)
+    {
+        var endpoint = new IPEndPoint(peer.Address, peer.Port);
+        if (peerIdentityResolver != null &&
+            peerIdentityResolver.TryGetIdentity(endpoint, out var authenticatedIdentity))
+        {
+            return authenticatedIdentity.IsValid &&
+                string.Equals(
+                    controllerId,
+                    authenticatedIdentity.ControllerId,
+                    StringComparison.Ordinal);
+        }
+
+        return !PlatformIdentity.TryParseControllerId(controllerId, out var claimedIdentity) ||
+            !claimedIdentity.IsStorefrontIdentity;
     }
 
     public override void CreateCharacter()

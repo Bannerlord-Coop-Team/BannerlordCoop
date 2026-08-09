@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Entity;
 using System;
+using Common.Network.Session;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,8 +13,7 @@ public class ControllerIdProviderTests
     [Theory]
     [InlineData("GOG", "12345", "gog:12345")]
     [InlineData("Steam", "12345", "steam:12345")]
-    [InlineData("Epic Games", "account-id", "epicgames:account-id")]
-    public void SetControllerAsPlatformId_NamespacesPlatformIdentity(
+    public void SetControllerAsPlatformIdentity_UsesAuthenticatedProviderNamespace(
         string providerName,
         string platformUserId,
         string expected)
@@ -21,36 +21,52 @@ public class ControllerIdProviderTests
         var store = new TestControllerIdStore("unused");
         var provider = new ControllerIdProvider(store);
 
-        provider.SetControllerAsPlatformId(providerName, platformUserId);
+        provider.SetControllerAsPlatformIdentity(new PlatformIdentity(providerName, platformUserId));
 
         Assert.Equal(expected, provider.ControllerId);
         Assert.Equal(0, store.CallCount);
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("0")]
-    [InlineData("000")]
-    public void SetControllerAsPlatformId_InvalidPlatformIdUsesPersistentFallback(string platformUserId)
+    [InlineData("local", "installation-id")]
+    [InlineData("epic", "account-id")]
+    [InlineData("gog", "")]
+    [InlineData("", "12345")]
+    public void SetControllerAsPlatformIdentity_RejectsNonStorefrontOrIncompleteIdentity(
+        string providerName,
+        string platformUserId)
     {
         var store = new TestControllerIdStore("installation-id");
         var provider = new ControllerIdProvider(store);
 
-        provider.SetControllerAsPlatformId("GOG", platformUserId);
+        Assert.Throws<ArgumentException>(() => provider.SetControllerAsPlatformIdentity(
+            new PlatformIdentity(providerName, platformUserId)));
 
-        Assert.Equal("gog:local:installation-id", provider.ControllerId);
+        Assert.Null(provider.ControllerId);
+        Assert.Equal(0, store.CallCount);
+    }
+
+    [Fact]
+    public void SetControllerAsLocalId_UsesPersistentSeparateNamespace()
+    {
+        var store = new TestControllerIdStore("installation-id");
+        var provider = new ControllerIdProvider(store);
+
+        provider.SetControllerAsLocalId();
+
+        Assert.Equal("local:installation-id", provider.ControllerId);
         Assert.Equal(1, store.CallCount);
     }
 
     [Fact]
-    public void SetControllerAsPlatformId_NullPlatformIdUsesPersistentFallback()
+    public void SetControllerFromProgramArgs_WithoutDebugOverrideUsesPersistentLocalNamespace()
     {
         var store = new TestControllerIdStore("installation-id");
         var provider = new ControllerIdProvider(store);
 
-        provider.SetControllerAsPlatformId("GOG", null!);
+        provider.SetControllerFromProgramArgs();
 
-        Assert.Equal("gog:local:installation-id", provider.ControllerId);
+        Assert.Equal("local:installation-id", provider.ControllerId);
         Assert.Equal(1, store.CallCount);
     }
 

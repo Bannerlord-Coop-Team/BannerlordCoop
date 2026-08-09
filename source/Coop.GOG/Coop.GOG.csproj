@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>10</LangVersion>
+    <Platforms>x64</Platforms>
+    <GalaxySdkPath>$(MSBuildThisFileDirectory)..\..\mb2\bin\Win64_Shipping_Client\GalaxyCSharp.dll</GalaxySdkPath>
+    <GalaxySdkAvailable Condition="'$(GalaxySdkAvailable)' == '' and Exists('$(GalaxySdkPath)')">true</GalaxySdkAvailable>
+    <GalaxySdkAvailable Condition="'$(GalaxySdkAvailable)' == ''">false</GalaxySdkAvailable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Coop.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(GalaxySdkAvailable)' == 'true'">
+    <Compile Remove="GalaxySdkUnavailable.cs" />
+    <Reference Include="GalaxyCSharp">
+      <HintPath>$(GalaxySdkPath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(GalaxySdkAvailable)' != 'true'">
+    <Compile Remove="GalaxyGameServerBoot.cs" />
+    <Compile Remove="GalaxySdk.cs" />
+  </ItemGroup>
+
+  <Target Name="ReportUnavailableGalaxySdk"
+          BeforeTargets="CoreCompile"
+          Condition="'$(GalaxySdkAvailable)' != 'true'">
+    <Message Importance="high"
+             Text="GalaxyCSharp.dll is unavailable; compiling Coop.GOG without runtime Galaxy SDK bindings." />
+  </Target>
+
+</Project>

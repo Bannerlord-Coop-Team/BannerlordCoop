@@ -61,6 +61,8 @@
       <Project>{442B73F2-B103-4EF6-8B4B-A2F36F169515}</Project>
       <Name>Coop.Core</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Coop.GOG\Coop.GOG.csproj" />
+    <ProjectReference Include="..\Coop.Steam\Coop.Steam.csproj" />
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">
       <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
       <Name>GameInterface</Name>

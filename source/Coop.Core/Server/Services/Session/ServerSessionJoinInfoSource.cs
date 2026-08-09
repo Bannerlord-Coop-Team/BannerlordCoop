@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Network;
 using Common.Network.Session;
-using Coop.Steam;
 
 namespace Coop.Core.Server.Services.Session;
 
@@ -12,19 +11,24 @@ namespace Coop.Core.Server.Services.Session;
 public class ServerSessionJoinInfoSource : ISessionJoinInfoSource
 {
     private readonly INetworkConfig networkConfig;
+    private readonly ISessionTransportTargetSource transportTargetSource;
 
-    public ServerSessionJoinInfoSource(INetworkConfig networkConfig)
+    public ServerSessionJoinInfoSource(
+        INetworkConfig networkConfig,
+        ISessionTransportTargetSource transportTargetSource)
     {
         this.networkConfig = networkConfig;
+        this.transportTargetSource = transportTargetSource;
     }
 
     public SessionJoinInfo Get()
     {
         return new SessionJoinInfo
         {
-            Address = SteamGameServerBoot.PublicIp,
+            Address = transportTargetSource.PublicAddress,
             Port = networkConfig.Port,
-            ServerSteamId = SteamGameServerBoot.GameServerSteamId,
+            TunnelTarget = transportTargetSource.TunnelTarget,
+            DedicatedServer = true,
             ModVersion = ModInformation.BuildVersion,
             PasswordRequired = !string.IsNullOrEmpty(networkConfig.Token),
         };

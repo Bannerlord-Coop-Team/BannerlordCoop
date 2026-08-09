@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using System;
 
 namespace Coop.Steam;
@@ -10,7 +10,7 @@ namespace Coop.Steam;
 /// </summary>
 public class GameServerCallbackPump : IUpdateable
 {
-    public int Priority => UpdatePriority.MainLoop.SteamCallbacks;
+    public int Priority => UpdatePriority.MainLoop.PlatformCallbacks;
 
     public void Update(TimeSpan frameTime) => SteamGameServerBoot.RunCallbacks();
 }

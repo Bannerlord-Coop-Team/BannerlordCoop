@@ -12,12 +12,14 @@ namespace Coop.Steam;
 /// the Steam link finishes connecting in the background while the client's connect retries
 /// and the join watchdog bound the wait.
 /// </summary>
-public class SteamTunnelJoinEndpointPreparer : IJoinEndpointPreparer
+public class SteamTunnelJoinEndpointPreparer : ITunnelJoinEndpointPreparer
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamTunnelJoinEndpointPreparer>();
 
     private readonly object gate = new object();
-    private SteamTunnelClient tunnel;
+    private ProviderTunnelClient tunnel;
+
+    public string Provider => SteamSessionProvider.ProviderId;
 
     public Task<SessionJoinInfo> PrepareAsync(SessionJoinInfo info)
     {
@@ -25,11 +27,16 @@ public class SteamTunnelJoinEndpointPreparer : IJoinEndpointPreparer
         {
             TearDownLocked();
 
-            SteamTunnelClient client = null;
+            if (!string.Equals(info.TunnelTarget.Provider, Provider, StringComparison.Ordinal))
+                return Task.FromResult(info);
+
+            ProviderTunnelClient client = null;
             try
             {
-                client = new SteamTunnelClient(new SteamNetworkingTunnelTransport());
-                client.Start(info.HostSteamId);
+                client = new ProviderTunnelClient(new SteamDatagramTransportAdapter(
+                    new SteamNetworkingTunnelTransport(),
+                    () => Steamworks.SteamUser.GetSteamID().m_SteamID));
+                client.Start(info.TunnelTarget);
             }
             catch (Exception ex)
             {
@@ -45,7 +52,13 @@ public class SteamTunnelJoinEndpointPreparer : IJoinEndpointPreparer
                 Version = info.Version,
                 Address = "127.0.0.1",
                 Port = client.LocalPort,
-                HostSteamId = info.HostSteamId,
+                TunnelTarget = info.TunnelTarget,
+                DedicatedServer = info.DedicatedServer,
+                ModVersion = info.ModVersion,
+                PasswordRequired = info.PasswordRequired,
+                ConnectedPlayers = info.ConnectedPlayers,
+                Discoverable = info.Discoverable,
+                Password = info.Password,
                 Tunneled = true,
             });
         }

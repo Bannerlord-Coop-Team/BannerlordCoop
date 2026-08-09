@@ -25,12 +25,6 @@ public class TunnelAdvertisementTests
 
         public void Stop() => Listening = false;
 
-        public bool TryGetRemoteSteamId(System.Net.IPEndPoint serverPeerEndpoint, out ulong steamId)
-        {
-            steamId = 0;
-            return false;
-        }
-
         public void Dispose()
         {
         }
@@ -51,46 +45,64 @@ public class TunnelAdvertisementTests
     public void LoopbackSession_StartsTunnelAndKeepsTunnelVersion(string address)
     {
         var host = new FakeTunnelHost();
-        var info = new SessionJoinInfo { Port = 4200 };
+        var info = new SessionJoinInfo
+        {
+            Port = 4200,
+            TunnelTarget = new PlatformIdentity("gog", "42"),
+        };
 
         TunnelAdvertisement.StartAndStamp(host, Config(address), info);
 
         Assert.Equal(4200, host.StartedPort);
-        Assert.Equal(SessionJoinInfo.CurrentVersion, info.Version);
+        Assert.True(info.HasTunnelTarget);
     }
 
     [Fact]
     public void RemoteSession_NeverStartsTunnelAndAdvertisesDirectOnly()
     {
         var host = new FakeTunnelHost();
-        var info = new SessionJoinInfo { Address = "203.0.113.7", Port = 4200 };
+        var info = new SessionJoinInfo
+        {
+            Address = "203.0.113.7",
+            Port = 4200,
+            TunnelTarget = new PlatformIdentity("gog", "42"),
+        };
 
         TunnelAdvertisement.StartAndStamp(host, Config("203.0.113.7"), info);
 
         Assert.Null(host.StartedPort);
-        Assert.True(info.Version < SessionJoinInfo.MinTunnelVersion);
+        Assert.False(info.HasTunnelTarget);
     }
 
     [Fact]
     public void TunneledJoiner_NeverStartsTunnelDespiteLoopbackAddress()
     {
         var host = new FakeTunnelHost();
-        var info = new SessionJoinInfo { Port = 4200 };
+        var info = new SessionJoinInfo
+        {
+            Port = 4200,
+            TunnelTarget = new PlatformIdentity("steam", "42"),
+        };
 
         TunnelAdvertisement.StartAndStamp(host, Config("127.0.0.1", tunneled: true), info);
 
         Assert.Null(host.StartedPort);
-        Assert.True(info.Version < SessionJoinInfo.MinTunnelVersion);
+        Assert.False(info.HasTunnelTarget);
     }
 
     [Fact]
     public void FailedTunnelStart_IsCaughtAndAdvertisesDirectOnly()
     {
         var host = new FakeTunnelHost { StartThrows = true };
-        var info = new SessionJoinInfo { Address = "203.0.113.7", Port = 4200 };
+        var info = new SessionJoinInfo
+        {
+            Address = "203.0.113.7",
+            Port = 4200,
+            TunnelTarget = new PlatformIdentity("steam", "42"),
+        };
 
         TunnelAdvertisement.StartAndStamp(host, Config("localhost"), info);
 
-        Assert.True(info.Version < SessionJoinInfo.MinTunnelVersion);
+        Assert.False(info.HasTunnelTarget);
     }
 }

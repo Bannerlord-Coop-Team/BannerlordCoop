@@ -194,6 +194,9 @@
     <Reference Include="TaleWorlds.ObjectSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.PlatformService">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.SaveSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
@@ -208,6 +211,7 @@
     <Compile Include="CrashReporting\CrashDiagnostics.cs" />
     <Compile Include="LiveTesting\LiveTestControlServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
+    <Compile Include="PlatformSessionIntegrationBoot.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -224,6 +228,12 @@
     <ProjectReference Include="..\Coop.Core\Coop.Core.csproj">
       <Project>{442b73f2-b103-4ef6-8b4b-a2f36f169515}</Project>
       <Name>Coop.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Coop.GOG\Coop.GOG.csproj">
+      <Name>Coop.GOG</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Coop.Steam\Coop.Steam.csproj">
+      <Name>Coop.Steam</Name>
     </ProjectReference>
     <ProjectReference Include="..\Coop.CrashReporter\Coop.CrashReporter.csproj">
       <Project>{8D983480-E9ED-4850-AB2B-E089109AC1DF}</Project>

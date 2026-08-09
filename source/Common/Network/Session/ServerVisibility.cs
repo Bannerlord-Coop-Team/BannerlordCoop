@@ -1,6 +1,6 @@
-namespace Common.Network.Session;
+﻿namespace Common.Network.Session;
 
-/// <summary>Who can discover a standalone server through its Steam lobby.</summary>
+/// <summary>Who can discover a server through the active storefront.</summary>
 public enum ServerVisibility
 {
     Public,

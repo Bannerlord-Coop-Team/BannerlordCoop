@@ -117,9 +117,9 @@
                   </Children>
                 </ListPanel>
 
-                <!-- Browsable standalone-server Steam lobbies. -->
+                <!-- Browsable sessions from the active storefront. -->
                 <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                           IsVisible="@IsSteamLobbiesTabVisible"
+                           IsVisible="@IsSessionBrowserTabVisible"
                            StackLayout.LayoutMethod="VerticalTopToBottom">
                   <Children>
                     <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="64"
@@ -128,10 +128,10 @@
                         <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                                     Brush="Clan.TabControl.Text" Brush.FontSize="34"
                                     Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center"
-                                    Text="@SteamLobbiesHeaderText"/>
+                                    Text="@SessionBrowserHeaderText"/>
                         <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="150" HeightSizePolicy="Fixed" SuggestedHeight="58"
-                                         VerticalAlignment="Center" IsDisabled="@IsRefreshSteamLobbiesDisabled"
-                                         Command.Click="ActionRefreshSteamLobbies" Parameter.Text="@RefreshButtonText"/>
+                                         VerticalAlignment="Center" IsDisabled="@IsRefreshSessionsDisabled"
+                                         Command.Click="ActionRefreshSessions" Parameter.Text="@RefreshButtonText"/>
                       </Children>
                     </ListPanel>
 
@@ -146,27 +146,27 @@
                                      VerticalAlignment="Center" Brush="SaveLoad.Search.Button"
                                      UpdateChildrenStates="true">
                           <Children>
-                            <EditableTextWidget Id="SteamLobbyHostSearchInput" UpdateChildrenStates="true"
+                            <EditableTextWidget Id="SessionHostSearchInput" UpdateChildrenStates="true"
                                                 WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                                                 MarginLeft="12" MarginRight="12" MarginTop="8" MarginBottom="8"
                                                 Brush="SaveLoad.Search.InputText" Brush.FontSize="24"
-                                                Text="@SteamLobbyHostSearchText"
+                                                Text="@SessionHostSearchText"
                                                 DefaultSearchText="@HostSearchPlaceholderText"
                                                 KeyboardInfoText="@HostSearchLabelText" MaxLength="128"/>
                           </Children>
                         </BrushWidget>
                         <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="150" HeightSizePolicy="Fixed" SuggestedHeight="58"
                                          VerticalAlignment="Center" MarginLeft="12"
-                                         IsDisabled="@IsSearchSteamLobbiesDisabled"
-                                         Command.Click="ActionSearchSteamLobbies" Parameter.Text="@SearchButtonText"/>
+                                         IsDisabled="@IsSearchSessionsDisabled"
+                                         Command.Click="ActionSearchSessions" Parameter.Text="@SearchButtonText"/>
                       </Children>
                     </ListPanel>
 
                     <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52"
-                                IsVisible="@IsSteamLobbyStatusVisible" Brush="Clan.TabControl.Text"
+                                IsVisible="@IsSessionStatusVisible" Brush="Clan.TabControl.Text"
                                 Brush.FontSize="24" Brush.FontColor="#B8B8B8FF"
                                 Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                Text="@SteamLobbyStatusText"/>
+                                Text="@SessionStatusText"/>
 
                     <Widget Id="LobbyColumnHeaders" WidthSizePolicy="Fixed" SuggestedWidth="900"
                             HeightSizePolicy="Fixed" SuggestedHeight="42">
@@ -200,7 +200,7 @@
                             <Widget Id="LobbyClipRect" WidthSizePolicy="StretchToParent"
                                     HeightSizePolicy="StretchToParent" ClipContents="true">
                               <Children>
-                                <NavigatableListPanel Id="LobbyList" DataSource="{SteamLobbies}"
+                                <NavigatableListPanel Id="LobbyList" DataSource="{Sessions}"
                                                       WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                                                       StackLayout.LayoutMethod="VerticalTopToBottom">
                                   <ItemTemplate>
@@ -278,22 +278,22 @@
 
                     <ListPanel Id="LobbyPaginationControls" WidthSizePolicy="Fixed" SuggestedWidth="900"
                                HeightSizePolicy="Fixed" SuggestedHeight="64" MarginTop="10"
-                               IsVisible="@IsSteamLobbyPaginationVisible"
+                               IsVisible="@IsSessionPaginationVisible"
                                StackLayout.LayoutMethod="HorizontalLeftToRight">
                       <Children>
                         <Standard.Button Id="PreviousLobbyPageButton" WidthSizePolicy="Fixed" SuggestedWidth="180"
                                          HeightSizePolicy="Fixed" SuggestedHeight="58" VerticalAlignment="Center"
-                                         IsDisabled="@IsPreviousSteamLobbyPageDisabled"
-                                         Command.Click="ActionPreviousSteamLobbyPage"
+                                         IsDisabled="@IsPreviousSessionPageDisabled"
+                                         Command.Click="ActionPreviousSessionPage"
                                          Parameter.Text="@PreviousPageButtonText"/>
                         <TextWidget Id="LobbyPageIndicator" WidthSizePolicy="StretchToParent"
                                     HeightSizePolicy="StretchToParent" Brush="Clan.TabControl.Text"
                                     Brush.FontSize="24" Brush.TextHorizontalAlignment="Center"
-                                    Brush.TextVerticalAlignment="Center" Text="@SteamLobbyPageText"/>
+                                    Brush.TextVerticalAlignment="Center" Text="@SessionPageText"/>
                         <Standard.Button Id="NextLobbyPageButton" WidthSizePolicy="Fixed" SuggestedWidth="180"
                                          HeightSizePolicy="Fixed" SuggestedHeight="58" VerticalAlignment="Center"
-                                         IsDisabled="@IsNextSteamLobbyPageDisabled"
-                                         Command.Click="ActionNextSteamLobbyPage"
+                                         IsDisabled="@IsNextSessionPageDisabled"
+                                         Command.Click="ActionNextSessionPage"
                                          Parameter.Text="@NextPageButtonText"/>
                       </Children>
                     </ListPanel>

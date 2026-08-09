@@ -1,5 +1,7 @@
-﻿using Coop.Core.Client.Services.Session;
+﻿using Common.Network.Session;
+using Coop.Core.Client.Services.Session;
 using Coop.Core.Common.Configuration;
+using Moq;
 using Xunit;
 
 namespace Coop.Tests.Client.Services.Session;
@@ -11,12 +13,18 @@ public class ConfiguredSessionJoinInfoSourceTests
     [InlineData("Secret", true)]
     public void Get_AdvertisesOnlyWhetherPasswordIsRequired(string password, bool expected)
     {
-        var source = new ConfiguredSessionJoinInfoSource(new NetworkConfig { Token = password });
+        var transportTargetSource = new Mock<ISessionTransportTargetSource>();
+        transportTargetSource.SetupGet(value => value.TunnelTarget)
+            .Returns(new PlatformIdentity("gog", "player"));
+        var source = new ConfiguredSessionJoinInfoSource(
+            new NetworkConfig { Token = password },
+            transportTargetSource.Object);
 
         var info = source.Get();
 
         Assert.Equal(Common.ModInformation.BuildVersion, info.ModVersion);
         Assert.Equal(expected, info.PasswordRequired);
         Assert.Null(info.Password);
+        Assert.Equal(new PlatformIdentity("gog", "player"), info.TunnelTarget);
     }
 }

@@ -13,7 +13,7 @@ public interface IMovementTrafficBudget
     void Clear();
 }
 
-/// <summary>Per-route token bucket that leaves most of Steam's minimum send rate available to reliable traffic.</summary>
+/// <summary>Per-route token bucket that reserves most provider bandwidth for reliable traffic.</summary>
 public sealed class MovementTrafficBudget : IMovementTrafficBudget
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MovementTrafficBudget>();

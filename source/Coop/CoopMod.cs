@@ -103,13 +103,15 @@ namespace Coop
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
             if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName,
-                out var ownerProcessId, out var serverPassword, out var serverVisibility))
+                out var ownerProcessId, out var serverPassword, out var serverVisibility,
+                out var peerIdentityBridgeName))
             {
                 ManagedServerConfig.SaveName = managedSaveName;
                 ManagedServerConfig.OwnerProcessId = ownerProcessId;
             }
             ManagedServerConfig.Password = serverPassword;
             ManagedServerConfig.Visibility = serverVisibility;
+            ManagedServerConfig.PeerIdentityBridgeName = peerIdentityBridgeName;
 
             SetupLogging();
             InitializeCrashReporting();
@@ -531,12 +533,13 @@ namespace Coop
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
 #endif
+            PlatformSessionIntegrationBoot.Dispose();
             base.OnSubModuleUnloaded();
         }
 
         private bool m_IsFirstTick = true;
         private bool _autoStarted = false;
-        private bool steamBootAttempted = false;
+        private bool sessionProviderBootAttempted = false;
         protected override void OnApplicationTick(float dt)
         {
             if(m_IsFirstTick)
@@ -555,14 +558,13 @@ namespace Coop
             TryShowUnsupportedModuleWarning(isAtMainMenu);
             TryShowCrashReportingConsent(isAtMainMenu);
 
-            // Boot Steam services once the main menu is up, so a +connect_lobby launch resolves while joining is possible.
-            if (!steamBootAttempted && isAtMainMenu)
+            // Boot the active storefront once the main menu can accept a provider join request.
+            if (!sessionProviderBootAttempted && isAtMainMenu)
             {
-                steamBootAttempted = true;
-                var steamPump = SteamIntegrationBoot.TryStartWithCallbackPump(
-                    isServer, Utilities.GetFullCommandLineString());
-                // The standalone server has no game frame of its own to dispatch its game-server callbacks.
-                if (steamPump != null) Updateables.Add(steamPump);
+                sessionProviderBootAttempted = true;
+                var providerPump = PlatformSessionIntegrationBoot.TryStart(
+                    isServer, Utilities.GetFullCommandLineString(), Coop);
+                if (providerPump != null) Updateables.Add(providerPump);
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);

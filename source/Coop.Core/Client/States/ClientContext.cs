@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Coop.Core.Common;
 using GameInterface;
 using GameInterface.Registry;
@@ -33,6 +34,43 @@ public class ClientContext
         IRegistryManager registryManager,
         IPlayerManager playerManager,
         IMapTimeTrackerInterface mapTimeTrackerInterface)
+        : this(
+            messageBroker,
+            network,
+            gameInterface,
+            gameStateInterface,
+            loadingInterface,
+            controllerIdProvider,
+            coopFinalizer,
+            moduleInfoProvider,
+            heroInterface,
+            registryManager,
+            playerManager,
+            mapTimeTrackerInterface,
+            null,
+            null,
+            null,
+            null)
+    {
+    }
+
+    public ClientContext(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IGameInterface gameInterface,
+        IGameStateInterface gameStateInterface,
+        ILoadingInterface loadingInterface,
+        IControllerIdProvider controllerIdProvider,
+        ICoopFinalizer coopFinalizer,
+        IModuleInfoProvider moduleInfoProvider,
+        IHeroInterface heroInterface,
+        IRegistryManager registryManager,
+        IPlayerManager playerManager,
+        IMapTimeTrackerInterface mapTimeTrackerInterface,
+        INetworkConfig networkConfig,
+        ISessionTransportTargetSource transportTargetSource,
+        IPeerIdentityPublisher peerIdentityPublisher,
+        ILocalPeerEndpointSource localPeerEndpointSource)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -46,6 +84,10 @@ public class ClientContext
         RegistryManager = registryManager;
         PlayerManager = playerManager;
         MapTimeTrackerInterface = mapTimeTrackerInterface;
+        NetworkConfig = networkConfig;
+        TransportTargetSource = transportTargetSource;
+        PeerIdentityPublisher = peerIdentityPublisher;
+        LocalPeerEndpointSource = localPeerEndpointSource;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -60,4 +102,8 @@ public class ClientContext
     public IRegistryManager RegistryManager { get; }
     public IPlayerManager PlayerManager { get; }
     public IMapTimeTrackerInterface MapTimeTrackerInterface { get; }
+    public INetworkConfig NetworkConfig { get; }
+    public ISessionTransportTargetSource TransportTargetSource { get; }
+    public IPeerIdentityPublisher PeerIdentityPublisher { get; }
+    public ILocalPeerEndpointSource LocalPeerEndpointSource { get; }
 }

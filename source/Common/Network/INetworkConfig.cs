@@ -10,8 +10,9 @@ public interface INetworkConfig
     int Port { get; }
     string Token { get; }
     string P2PToken { get; }
+    string PeerIdentityBridgeName { get; }
     /// <summary>
-    /// True when the session is reached through a local tunnel pump (Steam P2P) instead of
+    /// True when the session is reached through a local provider tunnel instead of
     /// a direct address. Tunneled peers cannot NAT-punch each other, so mission traffic
     /// stays on the server relay.
     /// </summary>

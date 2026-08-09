@@ -18,10 +18,11 @@ public static class ServerLaunchArguments
     public const string OwnerArgument = "/coopowner";
     public const string PasswordArgument = "/cooppassword";
     public const string VisibilityArgument = "/coopvisibility";
+    public const string PeerIdentityBridgeArgument = "/coopidentitybridge";
 
     /// <summary>
     /// Builds a fresh server command line with mode, active modules, save, owner PID, and optional
-    /// password because a Steam-launched client command line lacks the engine module token.
+    /// password because a storefront-launched client command line can lack the engine module token.
     /// </summary>
     public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName,
         int ownerProcessId)
@@ -33,11 +34,33 @@ public static class ServerLaunchArguments
 
     public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName,
         int ownerProcessId, string password, ServerVisibility visibility)
+        => BuildManagedServerArguments(
+            moduleIds,
+            saveName,
+            ownerProcessId,
+            password,
+            visibility,
+            null);
+
+    public static string BuildManagedServerArguments(
+        IReadOnlyList<string> moduleIds,
+        string saveName,
+        int ownerProcessId,
+        string password,
+        ServerVisibility visibility,
+        string peerIdentityBridgeName)
     {
         if (saveName == null) throw new ArgumentNullException(nameof(saveName));
         if (moduleIds == null) throw new ArgumentNullException(nameof(moduleIds));
         if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
             throw new ArgumentOutOfRangeException(nameof(visibility));
+        if (!string.IsNullOrEmpty(peerIdentityBridgeName) &&
+            !PeerIdentityBridgeName.IsValid(peerIdentityBridgeName))
+        {
+            throw new ArgumentException(
+                "A valid peer identity bridge name is required",
+                nameof(peerIdentityBridgeName));
+        }
 
         var tokens = new List<string>
         {
@@ -56,6 +79,12 @@ public static class ServerLaunchArguments
         {
             tokens.Add(PasswordArgument);
             tokens.Add(password);
+        }
+
+        if (!string.IsNullOrEmpty(peerIdentityBridgeName))
+        {
+            tokens.Add(PeerIdentityBridgeArgument);
+            tokens.Add(peerIdentityBridgeName);
         }
 
         return string.Join(" ", tokens.Select(QuoteArgument));
@@ -78,12 +107,29 @@ public static class ServerLaunchArguments
 
     public static bool TryParse(IReadOnlyList<string> args, out string saveName, out int ownerProcessId,
         out string password, out ServerVisibility visibility)
+        => TryParse(
+            args,
+            out saveName,
+            out ownerProcessId,
+            out password,
+            out visibility,
+            out _);
+
+    public static bool TryParse(
+        IReadOnlyList<string> args,
+        out string saveName,
+        out int ownerProcessId,
+        out string password,
+        out ServerVisibility visibility,
+        out string peerIdentityBridgeName)
     {
         saveName = null;
         ownerProcessId = 0;
         password = string.Empty;
         visibility = ServerVisibility.Public;
+        peerIdentityBridgeName = string.Empty;
         bool visibilityValid = true;
+        bool peerIdentityBridgeValid = true;
 
         for (int i = 0; i < args.Count; i++)
         {
@@ -108,6 +154,15 @@ public static class ServerLaunchArguments
                     visibilityValid = false;
                 }
             }
+            else if (IsToken(args[i], PeerIdentityBridgeArgument))
+            {
+                if (i + 1 >= args.Count ||
+                    !PeerIdentityBridgeName.IsValid(peerIdentityBridgeName = args[++i]))
+                {
+                    peerIdentityBridgeName = string.Empty;
+                    peerIdentityBridgeValid = false;
+                }
+            }
         }
 
         if (!ConnectionPassword.IsValid(password))
@@ -116,7 +171,7 @@ public static class ServerLaunchArguments
             return false;
         }
 
-        return saveName != null && visibilityValid;
+        return saveName != null && visibilityValid && peerIdentityBridgeValid;
     }
 
     /// <summary>

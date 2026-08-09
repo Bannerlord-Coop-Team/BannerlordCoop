@@ -6,7 +6,6 @@ using Common.Network.Session;
 using Coop.Core.Common.Session.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Session.Messages;
-using Coop.Steam;
 using Serilog;
 using System;
 using System.Threading;
@@ -14,11 +13,10 @@ using System.Threading;
 namespace Coop.Core.Server.Services.Session;
 
 /// <summary>
-/// Starts the server's tunnel and configured Steam lobby after both network binding and anonymous
-/// Steam logon complete, with bounded retries for transient startup failures. Discovery visibility
-/// changes who sees the lobby, not whether the server participates in Steam networking.
+/// Starts the server's tunnel and provider listing after both network binding and provider
+/// readiness, with bounded retries for transient startup failures.
 /// </summary>
-public class ServerSessionAdvertisementHandler : IDisposable
+public class ServerSessionAdvertisementHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerSessionAdvertisementHandler>();
     private const int MaxStartRetries = 3;
@@ -27,7 +25,8 @@ public class ServerSessionAdvertisementHandler : IDisposable
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly ISessionAdvertiser advertiser;
-    private readonly ISteamLobbyOwner lobbyOwner;
+    private readonly ISessionAdvertisementOwner advertisementOwner;
+    private readonly ISessionServerReadiness serverReadiness;
     private readonly ISessionTunnelHost tunnelHost;
     private readonly ISessionJoinInfoSource joinInfoSource;
     private readonly INetworkConfig networkConfig;
@@ -44,7 +43,8 @@ public class ServerSessionAdvertisementHandler : IDisposable
         IMessageBroker messageBroker,
         INetwork network,
         ISessionAdvertiser advertiser,
-        ISteamLobbyOwner lobbyOwner,
+        ISessionAdvertisementOwner advertisementOwner,
+        ISessionServerReadiness serverReadiness,
         ISessionTunnelHost tunnelHost,
         ISessionJoinInfoSource joinInfoSource,
         INetworkConfig networkConfig)
@@ -52,7 +52,8 @@ public class ServerSessionAdvertisementHandler : IDisposable
         this.messageBroker = messageBroker;
         this.network = network;
         this.advertiser = advertiser;
-        this.lobbyOwner = lobbyOwner;
+        this.advertisementOwner = advertisementOwner;
+        this.serverReadiness = serverReadiness;
         this.tunnelHost = tunnelHost;
         this.joinInfoSource = joinInfoSource;
         this.networkConfig = networkConfig;
@@ -60,8 +61,8 @@ public class ServerSessionAdvertisementHandler : IDisposable
         messageBroker.Subscribe<ServerListening>(Handle_ServerListening);
         messageBroker.Subscribe<ConnectedPlayersChanged>(Handle_ConnectedPlayersChanged);
         messageBroker.Subscribe<PlayerConnected>(Handle_PlayerConnected);
-        lobbyOwner.LobbyChanged += Handle_LobbyChanged;
-        SteamGameServerBoot.LoggedOn += OnGameServerLoggedOn;
+        advertisementOwner.ListingChanged += Handle_ListingChanged;
+        serverReadiness.Ready += Handle_ServerReady;
     }
 
     private void Handle_ServerListening(MessagePayload<ServerListening> _)
@@ -70,7 +71,7 @@ public class ServerSessionAdvertisementHandler : IDisposable
         TryStartAdvertising();
     }
 
-    private void OnGameServerLoggedOn() => TryStartAdvertising();
+    private void Handle_ServerReady() => TryStartAdvertising();
 
     private void Handle_ConnectedPlayersChanged(MessagePayload<ConnectedPlayersChanged> payload)
     {
@@ -80,21 +81,21 @@ public class ServerSessionAdvertisementHandler : IDisposable
 
     private void Handle_PlayerConnected(MessagePayload<PlayerConnected> payload)
     {
-        if (lobbyOwner.LobbyId == 0) return;
+        if (!advertisementOwner.ListingId.IsValid) return;
 
-        network.Send(payload.What.PlayerPeer, new NetworkSessionLobbyChanged(lobbyOwner.LobbyId));
+        network.Send(payload.What.PlayerPeer, new NetworkSessionLobbyChanged(advertisementOwner.ListingId));
     }
 
-    private void Handle_LobbyChanged(ulong lobbyId)
+    private void Handle_ListingChanged(SessionListingId listingId)
     {
-        if (lobbyId == 0) return;
+        if (!listingId.IsValid) return;
 
-        network.SendAll(new NetworkSessionLobbyChanged(lobbyId));
+        network.SendAll(new NetworkSessionLobbyChanged(listingId));
     }
 
     private void TryStartAdvertising()
     {
-        if (disposed || advertised || starting || !listening || !SteamGameServerBoot.IsLoggedOn) return;
+        if (disposed || advertised || starting || !listening || !serverReadiness.IsReady) return;
         starting = true;
 
         GameThread.RunSafe(StartAdvertising, context: "ServerAdvertiseSession");
@@ -113,7 +114,7 @@ public class ServerSessionAdvertisementHandler : IDisposable
         catch (Exception ex)
         {
             starting = false;
-            Logger.Error(ex, "Could not start the standalone Steam advertisement");
+            Logger.Error(ex, "Could not start the standalone provider advertisement");
             ScheduleRetry();
         }
     }
@@ -142,7 +143,7 @@ public class ServerSessionAdvertisementHandler : IDisposable
         startRetryCount++;
         CancelRetry();
         retryTimer = new Timer(_ => GameThread.RunSafe(TryStartAdvertising,
-            context: "RetryServerSteamAdvertisement"), null, StartRetryDelay, Timeout.InfiniteTimeSpan);
+            context: "RetryServerProviderAdvertisement"), null, StartRetryDelay, Timeout.InfiniteTimeSpan);
     }
 
     private void CancelRetry()
@@ -158,8 +159,8 @@ public class ServerSessionAdvertisementHandler : IDisposable
         messageBroker.Unsubscribe<ServerListening>(Handle_ServerListening);
         messageBroker.Unsubscribe<ConnectedPlayersChanged>(Handle_ConnectedPlayersChanged);
         messageBroker.Unsubscribe<PlayerConnected>(Handle_PlayerConnected);
-        lobbyOwner.LobbyChanged -= Handle_LobbyChanged;
-        SteamGameServerBoot.LoggedOn -= OnGameServerLoggedOn;
+        advertisementOwner.ListingChanged -= Handle_ListingChanged;
+        serverReadiness.Ready -= Handle_ServerReady;
 
         GameThread.RunSafe(() =>
         {

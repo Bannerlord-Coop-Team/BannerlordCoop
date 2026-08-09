@@ -17,12 +17,10 @@ using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
-using Coop.Steam;
 using GameInterface.Policies;
 using GameInterface.Services.Missions;
 using LiteNetLib;
 using Missions;
-using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Server;
 
@@ -71,21 +69,10 @@ public class ServerModule : CommonModule
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
-        // The standalone server logs into Steam itself and advertises with the host-selected lobby
-        // visibility, so eligible players can join without port forwarding while the owner never
-        // plays. Same guard as ClientModule: only touch Steam types when the boot probe found Steam.
-        if (SessionDiscovery.SteamAvailable)
-        {
-            RegisterSteamSessionServices(builder);
-        }
-        else
-        {
-            builder.RegisterType<NoopSessionAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
-            builder.RegisterType<NoopSessionTunnelHost>()
-                .As<ISessionTunnelHost>()
-                .As<ISessionTunnelIdentityResolver>()
-                .InstancePerLifetimeScope();
-        }
+        Client.ClientModule.RegisterSessionProviderRuntime(builder, isServer: true);
+        builder.RegisterType<ServerSessionJoinInfoSource>()
+            .As<ISessionJoinInfoSource>()
+            .InstancePerLifetimeScope();
 
         builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
 
@@ -93,42 +80,4 @@ public class ServerModule : CommonModule
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
     }
 
-    // Non-inlined so referencing the Steam tunnel transport (its layout embeds Steamworks value
-    // types) never pulls Steamworks.NET into Load's JIT on a non-Steam install.
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void RegisterSteamSessionServices(ContainerBuilder builder)
-    {
-        builder.RegisterType<SteamLobbyApi>()
-            .As<ISteamLobbyApi>()
-            .As<ISteamPublicLobbyApi>()
-            .InstancePerLifetimeScope();
-        builder.RegisterType<SteamLobbyLeaseRenewer>()
-            .As<ISteamLobbyLeaseRenewer>()
-            .InstancePerDependency();
-        // Debug servers remain joinable through steam but are excluded from the public discovery
-        // Release builds continue to use the configured visibility.
-        builder.Register(context =>
-            {
-                var visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
-
-#if DEBUG
-                visibility = ServerVisibility.None;
-#endif
-
-                return new SteamPublicLobbyAdvertiser(
-                    context.Resolve<ISteamPublicLobbyApi>(),
-                    visibility,
-                    context.Resolve<ISteamLobbyLeaseRenewer>());
-            })
-            .As<ISessionAdvertiser>()
-            .As<ISteamLobbyOwner>()
-            .InstancePerLifetimeScope();
-        builder.RegisterType<SteamGameServerNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
-        builder.RegisterType<SteamTunnelHost>()
-            .As<ISessionTunnelHost>()
-            .As<ISessionTunnelIdentityResolver>()
-            .InstancePerLifetimeScope();
-        builder.RegisterType<ServerSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
-        builder.RegisterType<ServerSessionAdvertisementHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
-    }
 }

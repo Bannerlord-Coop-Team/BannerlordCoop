@@ -1,22 +1,29 @@
-﻿namespace Common.Network.Session;
+﻿using System;
+using System.Collections.Generic;
 
-/// <summary>
-/// Process-wide discovery capabilities, probed once at mod load.
-/// </summary>
+namespace Common.Network.Session;
+
+/// <summary>Process-wide provider capabilities selected once at mod load.</summary>
 public static class SessionDiscovery
 {
-    public static bool SteamAvailable { get; set; }
+    public static ISessionProvider ClientProvider { get; set; }
+    public static ISessionProvider ServerProvider { get; set; }
 
-    public static ISteamLobbyBrowser SteamLobbyBrowser { get; set; } = UnavailableSteamLobbyBrowser.Instance;
+    public static bool ProviderAvailable => ClientProvider != null;
 
-    /// <summary>Empty browser used when Steam is unavailable.</summary>
-    private sealed class UnavailableSteamLobbyBrowser : ISteamLobbyBrowser
+    public static ISessionBrowser Browser => ClientProvider?.Browser ?? UnavailableSessionBrowser.Instance;
+
+    private sealed class UnavailableSessionBrowser : ISessionBrowser
     {
-        public static readonly UnavailableSteamLobbyBrowser Instance = new UnavailableSteamLobbyBrowser();
+        public static readonly UnavailableSessionBrowser Instance = new UnavailableSessionBrowser();
 
-        public void RequestLobbies(System.Action<System.Collections.Generic.IReadOnlyList<SteamLobbySummary>, string> onCompleted)
+        public string Provider => string.Empty;
+        public string DisplayName => string.Empty;
+        public bool IsAvailable => false;
+
+        public void RequestSessions(Action<IReadOnlyList<SessionListing>, string> onCompleted)
         {
-            onCompleted(System.Array.Empty<SteamLobbySummary>(), "Steam is unavailable");
+            onCompleted(Array.Empty<SessionListing>(), "Platform session discovery is unavailable");
         }
     }
 }

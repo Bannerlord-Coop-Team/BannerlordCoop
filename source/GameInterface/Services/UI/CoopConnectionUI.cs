@@ -6,12 +6,12 @@ namespace GameInterface.Services.UI;
 
 public class CoopConnectionUI : ScreenBase
 {
-    private const string SteamLobbyHostSearchInputId = "SteamLobbyHostSearchInput";
+    private const string SessionHostSearchInputId = "SessionHostSearchInput";
 
     private CoopConnectMenuVM _dataSource;
     private GauntletLayer _gauntletLayer;
     private GauntletMovieIdentifier _gauntletMovie;
-    private bool _focusSteamLobbyHostSearchOnNextFrame;
+    private bool _focusSessionHostSearchOnNextFrame;
 
     protected override void OnInitialize()
     {
@@ -24,7 +24,7 @@ public class CoopConnectionUI : ScreenBase
         AddLayer(_gauntletLayer);
         _gauntletLayer.InputRestrictions.SetInputRestrictions();
         _gauntletMovie = _gauntletLayer.LoadMovie("CoopConnectionUIMovie", _dataSource);
-        _dataSource.SteamLobbiesTabActivated += QueueSteamLobbyHostSearchFocus;
+        _dataSource.SessionBrowserTabActivated += QueueSessionHostSearchFocus;
     }
 
     protected override void OnActivate()
@@ -43,19 +43,19 @@ public class CoopConnectionUI : ScreenBase
     protected override void OnFrameTick(float dt)
     {
         base.OnFrameTick(dt);
-        if (!_focusSteamLobbyHostSearchOnNextFrame) return;
+        if (!_focusSessionHostSearchOnNextFrame) return;
 
-        _focusSteamLobbyHostSearchOnNextFrame = false;
-        FocusSteamLobbyHostSearch();
+        _focusSessionHostSearchOnNextFrame = false;
+        FocusSessionHostSearch();
     }
 
     protected override void OnFinalize()
     {
-        // A Steam lobby search can complete after this screen is popped. Dispose first so the
+        // A provider search can complete after this screen is popped. Dispose first so the
         // view model rejects that late callback before any bound collections are torn down.
         if (_dataSource != null)
         {
-            _dataSource.SteamLobbiesTabActivated -= QueueSteamLobbyHostSearchFocus;
+            _dataSource.SessionBrowserTabActivated -= QueueSessionHostSearchFocus;
         }
         _dataSource?.Dispose();
         base.OnFinalize();
@@ -65,20 +65,20 @@ public class CoopConnectionUI : ScreenBase
         _gauntletLayer = null;
     }
 
-    private void QueueSteamLobbyHostSearchFocus()
+    private void QueueSessionHostSearchFocus()
     {
-        _focusSteamLobbyHostSearchOnNextFrame = true;
+        _focusSessionHostSearchOnNextFrame = true;
     }
 
-    private void FocusSteamLobbyHostSearch()
+    private void FocusSessionHostSearch()
     {
-        if (_dataSource?.SelectedTab?.Id != CoopConnectMenuVM.SteamLobbiesTabId) return;
+        if (_dataSource?.SelectedTab?.Id != CoopConnectMenuVM.SessionBrowserTabId) return;
 
         var eventManager = _gauntletLayer?.UIContext?.EventManager;
         if (eventManager == null || eventManager.IsControllerActive) return;
 
         var searchInput = _gauntletMovie?.Movie?.RootWidget?
-            .FindChild(SteamLobbyHostSearchInputId, includeAllChildren: true) as EditableTextWidget;
+            .FindChild(SessionHostSearchInputId, includeAllChildren: true) as EditableTextWidget;
         if (searchInput != null)
         {
             eventManager.FocusedWidget = searchInput;

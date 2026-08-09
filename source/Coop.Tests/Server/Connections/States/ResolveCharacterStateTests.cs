@@ -1,11 +1,14 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
+using Common.Network.Session;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -14,6 +17,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -372,16 +376,151 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void NetworkClientValidate_BindsControllerIdToConnection()
+        public void NetworkClientValidate_DirectLocalIdentityBindsControllerIdToConnection()
         {
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
             currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
                 playerPeer,
-                new NetworkClientValidate("gog:local:installation-id")));
+                new NetworkClientValidate("local:installation-id")));
 
-            Assert.Equal("gog:local:installation-id", connectionLogic.ControllerId);
+            Assert.Equal("local:installation-id", connectionLogic.ControllerId);
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
+        }
+
+        [Theory]
+        [InlineData("steam", "76561198000000001")]
+        [InlineData("gog", "123456789")]
+        public void NetworkClientValidate_AuthenticatedTransportIdentityBindsMatchingControllerId(
+            string providerName,
+            string platformUserId)
+        {
+            var authenticatedIdentity = new PlatformIdentity(providerName, platformUserId);
+            var identityResolver = CreateIdentityResolver(authenticatedIdentity);
+            var currentState = CreateState(identityResolver.Object);
+
+            try
+            {
+                currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                    playerPeer,
+                    new NetworkClientValidate(authenticatedIdentity.ControllerId)));
+
+                Assert.Equal(authenticatedIdentity.ControllerId, connectionLogic.ControllerId);
+                Assert.IsType<CreateCharacterState>(connectionLogic.State);
+            }
+            finally
+            {
+                currentState.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData("steam", "76561198000000001", "76561198000000002")]
+        [InlineData("gog", "123456789", "987654321")]
+        public void NetworkClientValidate_RejectsSpoofedStorefrontUserId(
+            string providerName,
+            string authenticatedUserId,
+            string claimedUserId)
+        {
+            var identityResolver = CreateIdentityResolver(
+                new PlatformIdentity(providerName, authenticatedUserId));
+            var currentState = CreateState(identityResolver.Object);
+
+            try
+            {
+                currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                    playerPeer,
+                    new NetworkClientValidate(new PlatformIdentity(providerName, claimedUserId).ControllerId)));
+
+                Assert.Null(connectionLogic.ControllerId);
+                Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+                serverComponent.Container.Resolve<Mock<IPlayerManager>>().Verify(
+                    manager => manager.TryGetPlayer(It.IsAny<string>(), out It.Ref<Player>.IsAny),
+                    Times.Never);
+            }
+            finally
+            {
+                currentState.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData("steam", "gog")]
+        [InlineData("gog", "steam")]
+        public void NetworkClientValidate_RejectsOtherStorefrontWithSameNumericId(
+            string authenticatedProvider,
+            string claimedProvider)
+        {
+            const string platformUserId = "123456789";
+            var identityResolver = CreateIdentityResolver(
+                new PlatformIdentity(authenticatedProvider, platformUserId));
+            var currentState = CreateState(identityResolver.Object);
+
+            try
+            {
+                currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                    playerPeer,
+                    new NetworkClientValidate(
+                        new PlatformIdentity(claimedProvider, platformUserId).ControllerId)));
+
+                Assert.Null(connectionLogic.ControllerId);
+                Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+            }
+            finally
+            {
+                currentState.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData("steam:76561198000000001")]
+        [InlineData("gog:123456789")]
+        public void NetworkClientValidate_RejectsUnauthenticatedStorefrontClaim(string controllerId)
+        {
+            var identityResolver = new Mock<IAuthenticatedPeerIdentityResolver>();
+            var currentState = CreateState(identityResolver.Object);
+
+            try
+            {
+                currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                    playerPeer,
+                    new NetworkClientValidate(controllerId)));
+
+                Assert.Null(connectionLogic.ControllerId);
+                Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+            }
+            finally
+            {
+                currentState.Dispose();
+            }
+        }
+
+        private Mock<IAuthenticatedPeerIdentityResolver> CreateIdentityResolver(
+            PlatformIdentity authenticatedIdentity)
+        {
+            var resolver = new Mock<IAuthenticatedPeerIdentityResolver>();
+            resolver
+                .Setup(candidate => candidate.TryGetIdentity(
+                    It.Is<IPEndPoint>(endpoint =>
+                        endpoint.Address.Equals(playerPeer.Address) && endpoint.Port == playerPeer.Port),
+                    out authenticatedIdentity))
+                .Returns(true);
+            return resolver;
+        }
+
+        private ResolveCharacterState CreateState(IAuthenticatedPeerIdentityResolver identityResolver)
+        {
+            return new ResolveCharacterState(
+                connectionLogic,
+                serverComponent.Container.Resolve<IMessageBroker>(),
+                serverComponent.Container.Resolve<INetwork>(),
+                serverComponent.Container.Resolve<IModuleValidator>(),
+                serverComponent.Container.Resolve<IPlayerManager>(),
+                serverComponent.Container.Resolve<IPlayerPartyRestorer>(),
+                serverComponent.Container.Resolve<IObjectManager>(),
+                serverComponent.Container.Resolve<IModuleInfoProvider>(),
+                serverComponent.Container.Resolve<IExistingPlayerSender>(),
+                identityResolver);
         }
     }
 }

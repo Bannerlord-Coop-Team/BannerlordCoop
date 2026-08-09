@@ -13,12 +13,13 @@ namespace Coop.Steam;
 /// Lives outside any session container because invites arrive at the main menu, before a
 /// session exists.
 /// </summary>
-public class SteamJoinListener : IDisposable, ISteamLobbyMembership
+public class SteamJoinListener : IDisposable, ISessionMembership
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamJoinListener>();
 
     private readonly IMessageBroker messageBroker;
     private readonly ISteamLobbyApi lobbyApi;
+    private readonly ISessionJoinRequestGate joinRequestGate;
 
     private bool joinInFlight;
     private bool resolveJoinInfoAfterEnter;
@@ -27,18 +28,26 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
     private ulong activeLobbyId;
     private ulong activeLobbyAdvertiserId;
 
-    public ulong LobbyId => activeLobbyId;
-    public bool IsInLobby => activeLobbyId != 0;
+    public SessionListingId ListingId => activeLobbyId == 0
+        ? default
+        : new SessionListingId(
+            SteamSessionProvider.ProviderId,
+            activeLobbyId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    public bool IsInSession => activeLobbyId != 0;
 
-    public SteamJoinListener(IMessageBroker messageBroker, ISteamLobbyApi lobbyApi)
+    public SteamJoinListener(
+        IMessageBroker messageBroker,
+        ISteamLobbyApi lobbyApi,
+        ISessionJoinRequestGate joinRequestGate)
     {
         this.messageBroker = messageBroker;
         this.lobbyApi = lobbyApi;
+        this.joinRequestGate = joinRequestGate ?? throw new ArgumentNullException(nameof(joinRequestGate));
 
         lobbyApi.LobbyJoinRequested += OnLobbyJoinRequested;
         lobbyApi.ConnectStringReceived += OnConnectStringReceived;
 
-        messageBroker.Subscribe<JoinSteamLobby>(Handle);
+        messageBroker.Subscribe<JoinSessionListing>(Handle);
         messageBroker.Subscribe<SessionJoinAbandoned>(Handle);
     }
 
@@ -60,16 +69,16 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
         }
     }
 
-    private void Handle(MessagePayload<JoinSteamLobby> payload)
+    private void Handle(MessagePayload<JoinSessionListing> payload)
     {
-        OnLobbyJoinRequested(payload.What.LobbyId);
+        BeginListingJoin(payload.What.ListingId, resolveJoinInfo: true);
     }
 
     private void Handle(MessagePayload<SessionJoinAbandoned> payload)
     {
         // Keeping the membership would hold one of the host's lobby slots and make the
         // next join request for the same lobby a no-op; give it up so retries start fresh.
-        LeaveSessionLobby();
+        LeaveSession();
     }
 
     private void OnConnectStringReceived(string connectString)
@@ -84,14 +93,24 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
         BeginLobbyJoin(lobbyId, resolveJoinInfo: true);
     }
 
-    public void JoinSessionLobby(ulong lobbyId)
+    public void JoinSession(SessionListingId listingId) =>
+        BeginListingJoin(listingId, resolveJoinInfo: false);
+
+    private void BeginListingJoin(SessionListingId listingId, bool resolveJoinInfo)
     {
-        BeginLobbyJoin(lobbyId, resolveJoinInfo: false);
+        if (!string.Equals(listingId.Provider, SteamSessionProvider.ProviderId, StringComparison.Ordinal) ||
+            !ulong.TryParse(listingId.Value, out ulong lobbyId))
+        {
+            return;
+        }
+
+        BeginLobbyJoin(lobbyId, resolveJoinInfo);
     }
 
     private void BeginLobbyJoin(ulong lobbyId, bool resolveJoinInfo)
     {
         if (lobbyId == 0) return;
+        if (resolveJoinInfo && !joinRequestGate.CanStartJoin()) return;
 
         if (activeLobbyId == lobbyId)
         {
@@ -191,18 +210,10 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
     {
         try
         {
-            bool decoded = LobbyDataCodec.TryDecode(key => lobbyApi.GetLobbyData(lobbyId, key), out var info, out var error);
-
-            // A standalone server advertises its own game-server identity to tunnel to; otherwise the
-            // lobby owner runs the tunnel. Either is only readable while still a member of the lobby.
-            if (decoded && info.HasServerSteamId)
-            {
-                info.HostSteamId = info.ServerSteamId;
-            }
-            else if (decoded && info.Version >= SessionJoinInfo.MinTunnelVersion)
-            {
-                info.HostSteamId = lobbyApi.GetLobbyOwner(lobbyId);
-            }
+            bool decoded = SessionListingDataCodec.TryDecode(
+                key => lobbyApi.GetLobbyData(lobbyId, key),
+                out var info,
+                out var error);
 
             if (!decoded)
             {
@@ -211,7 +222,16 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
                 return;
             }
 
-            if (!info.HasAddress && !info.HasHostSteamId)
+            if (info.HasTunnelTarget &&
+                !string.Equals(info.TunnelTarget.Provider, SteamSessionProvider.ProviderId, StringComparison.Ordinal))
+            {
+                LeaveActiveLobby();
+                messageBroker.Publish(this, new SessionJoinFailed(
+                    "The Steam lobby advertised a different networking provider"));
+                return;
+            }
+
+            if (!info.HasAddress && !info.HasTunnelTarget)
             {
                 LeaveActiveLobby();
                 messageBroker.Publish(this, new SessionJoinFailed(
@@ -232,7 +252,7 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
         }
     }
 
-    public void LeaveSessionLobby()
+    public void LeaveSession()
     {
         leaveWhenJoinCompletes = joinInFlight;
         LeaveActiveLobby();
@@ -286,8 +306,8 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
 
     public void Dispose()
     {
-        LeaveSessionLobby();
-        messageBroker.Unsubscribe<JoinSteamLobby>(Handle);
+        LeaveSession();
+        messageBroker.Unsubscribe<JoinSessionListing>(Handle);
         messageBroker.Unsubscribe<SessionJoinAbandoned>(Handle);
         lobbyApi.LobbyJoinRequested -= OnLobbyJoinRequested;
         lobbyApi.ConnectStringReceived -= OnConnectStringReceived;

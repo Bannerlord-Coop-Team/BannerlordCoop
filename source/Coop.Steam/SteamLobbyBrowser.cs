@@ -1,6 +1,7 @@
 ﻿using Common.Network.Session;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Coop.Steam;
 
@@ -8,7 +9,7 @@ namespace Coop.Steam;
 /// Unions public search results with same-app friend lobbies and converts them into
 /// display-safe standalone-server summaries.
 /// </summary>
-public class SteamLobbyBrowser : ISteamLobbyBrowser
+public class SteamLobbyBrowser : ISessionBrowser
 {
     private readonly ISteamPublicLobbyApi lobbyApi;
     private bool requestInFlight;
@@ -19,11 +20,15 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         this.lobbyApi = lobbyApi;
     }
 
-    public void RequestLobbies(Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted)
+    public string Provider => "steam";
+    public string DisplayName => "Steam";
+    public bool IsAvailable => true;
+
+    public void RequestSessions(Action<IReadOnlyList<SessionListing>, string> onCompleted)
     {
         if (requestInFlight)
         {
-            onCompleted(Array.Empty<SteamLobbySummary>(), "A Steam lobby search is already in progress");
+            onCompleted(Array.Empty<SessionListing>(), "A Steam lobby search is already in progress");
             return;
         }
 
@@ -56,7 +61,7 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         }
         catch (Exception)
         {
-            FinishRequest(request, Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
+            FinishRequest(request, Array.Empty<SessionListing>(), "Could not retrieve Steam lobbies");
         }
     }
 
@@ -66,7 +71,7 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
 
         if (!success)
         {
-            FinishRequest(request, Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
+            FinishRequest(request, Array.Empty<SessionListing>(), "Could not retrieve Steam lobbies");
             return;
         }
 
@@ -130,28 +135,28 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
             if (request.LoadedFriendLobbyIds.Contains(lobbyId) && seenLobbyIds.Add(lobbyId)) lobbyIds.Add(lobbyId);
         }
 
-        IReadOnlyList<SteamLobbySummary> summaries;
+        IReadOnlyList<SessionListing> summaries;
         try
         {
             summaries = BuildSummaries(lobbyIds);
         }
         catch (Exception)
         {
-            FinishRequest(request, Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
+            FinishRequest(request, Array.Empty<SessionListing>(), "Could not retrieve Steam lobbies");
             return;
         }
 
         FinishRequest(request, summaries, null);
     }
 
-    private IReadOnlyList<SteamLobbySummary> BuildSummaries(IReadOnlyList<ulong> lobbyIds)
+    private IReadOnlyList<SessionListing> BuildSummaries(IReadOnlyList<ulong> lobbyIds)
     {
         uint serverTime = lobbyApi.ServerRealTime;
         var candidates = new List<LobbyCandidate>();
         foreach (var lobbyId in lobbyIds)
         {
-            if (!LobbyDataCodec.TryDecodeVisibility(
-                    lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.VisibilityKey),
+            if (!SessionListingDataCodec.TryDecodeVisibility(
+                    lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.VisibilityKey),
                     out var visibility) ||
                 visibility == ServerVisibility.None)
             {
@@ -159,31 +164,35 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
             }
 
             if (!string.Equals(
-                lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.LobbyTypeKey),
-                LobbyDataCodec.StandaloneLobbyType,
+                lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.ListingTypeKey),
+                SessionListingDataCodec.DedicatedListingType,
                 StringComparison.Ordinal))
             {
                 continue;
             }
 
-            if (!ulong.TryParse(lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.ServerSteamIdKey),
+            if (!string.Equals(
+                    lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.TunnelProviderKey),
+                    Provider,
+                    StringComparison.Ordinal) ||
+                !ulong.TryParse(lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.TunnelPeerIdKey),
                 out var serverSteamId) || serverSteamId == 0)
             {
                 continue;
             }
 
-            bool hasValidLease = LobbyDataCodec.TryDecodeAdvertisementExpiry(
-                lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.AdvertisementExpiresAtKey),
+            bool hasValidLease = SessionListingDataCodec.TryDecodeAdvertisementExpiry(
+                lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.AdvertisementExpiresAtKey),
                 out uint expiresAt);
             if (serverTime != 0 && hasValidLease && expiresAt <= serverTime)
             {
                 continue;
             }
 
-            int.TryParse(lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.VersionKey), out var protocolVersion);
+            int.TryParse(lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.VersionKey), out var protocolVersion);
             var passwordRequired = lobbyApi.GetLobbyData(
-                lobbyId, LobbyDataCodec.PasswordRequiredKey) == "1";
-            int.TryParse(lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.ConnectedPlayersKey),
+                lobbyId, SessionListingDataCodec.PasswordRequiredKey) == "1";
+            int.TryParse(lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.ConnectedPlayersKey),
                 out var connectedPlayers);
             connectedPlayers = Math.Max(0, connectedPlayers);
 
@@ -191,12 +200,12 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
                 serverSteamId,
                 hasValidLease,
                 expiresAt,
-                new SteamLobbySummary
+                new SessionListing
                 {
-                    LobbyId = lobbyId,
-                    OwnerName = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.OwnerNameKey),
+                    Id = new SessionListingId("steam", lobbyId.ToString(CultureInfo.InvariantCulture)),
+                    OwnerName = lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.OwnerNameKey),
                     ProtocolVersion = protocolVersion,
-                    ModVersion = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.ModVersionKey),
+                    ModVersion = lobbyApi.GetLobbyData(lobbyId, SessionListingDataCodec.ModVersionKey),
                     PasswordRequired = passwordRequired,
                     ConnectedPlayers = connectedPlayers,
                 }));
@@ -213,7 +222,7 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
             }
         }
 
-        var summaries = new List<SteamLobbySummary>(candidates.Count);
+        var summaries = new List<SessionListing>(candidates.Count);
         foreach (var candidate in candidates)
         {
             if (!candidate.HasValidLease ||
@@ -226,7 +235,7 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         return summaries;
     }
 
-    private void FinishRequest(LobbyRequest request, IReadOnlyList<SteamLobbySummary> summaries, string error)
+    private void FinishRequest(LobbyRequest request, IReadOnlyList<SessionListing> summaries, string error)
     {
         if (!ReferenceEquals(activeRequest, request)) return;
 
@@ -237,14 +246,14 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
 
     private sealed class LobbyRequest
     {
-        public readonly Action<IReadOnlyList<SteamLobbySummary>, string> OnCompleted;
+        public readonly Action<IReadOnlyList<SessionListing>, string> OnCompleted;
         public readonly List<ulong> PublicLobbyIds = new List<ulong>();
         public readonly List<ulong> FriendLobbyIds = new List<ulong>();
         public readonly HashSet<ulong> SeenFriendLobbyIds = new HashSet<ulong>();
         public readonly HashSet<ulong> PendingFriendLobbyIds = new HashSet<ulong>();
         public readonly HashSet<ulong> LoadedFriendLobbyIds = new HashSet<ulong>();
 
-        public LobbyRequest(Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted)
+        public LobbyRequest(Action<IReadOnlyList<SessionListing>, string> onCompleted)
         {
             OnCompleted = onCompleted;
         }
@@ -255,13 +264,13 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         public readonly ulong ServerSteamId;
         public readonly bool HasValidLease;
         public readonly uint ExpiresAt;
-        public readonly SteamLobbySummary Summary;
+        public readonly SessionListing Summary;
 
         public LobbyCandidate(
             ulong serverSteamId,
             bool hasValidLease,
             uint expiresAt,
-            SteamLobbySummary summary)
+            SessionListing summary)
         {
             ServerSteamId = serverSteamId;
             HasValidLease = hasValidLease;

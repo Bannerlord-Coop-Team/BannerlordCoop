@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
@@ -65,7 +66,11 @@ public class ValidateModuleState : ClientStateBase
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer,
         IGameStateInterface gameStateInterface,
-        IModuleInfoProvider moduleInfoProvider) : base(logic)
+        IModuleInfoProvider moduleInfoProvider,
+        INetworkConfig networkConfig = null,
+        ISessionTransportTargetSource transportTargetSource = null,
+        IPeerIdentityPublisher peerIdentityPublisher = null,
+        ILocalPeerEndpointSource localPeerEndpointSource = null) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -78,11 +83,36 @@ public class ValidateModuleState : ClientStateBase
 
         try
         {
+            PlatformIdentity transportIdentity = transportTargetSource?.TunnelTarget ?? default;
+            if (!string.IsNullOrEmpty(networkConfig?.PeerIdentityBridgeName))
+            {
+                if (!transportIdentity.IsValid ||
+                    peerIdentityPublisher?.IsAvailable != true ||
+                    localPeerEndpointSource?.LocalPeerEndpoint == null ||
+                    !peerIdentityPublisher.TryRegister(
+                        localPeerEndpointSource.LocalPeerEndpoint,
+                        transportIdentity))
+                {
+                    throw new InvalidOperationException(
+                        "The authoritative server could not bind the local provider identity");
+                }
+
+                controllerIdProvider.SetControllerAsPlatformIdentity(transportIdentity);
+            }
+            else
+            {
 #if DEBUG
-            controllerIdProvider.SetControllerFromProgramArgs();
+                if (networkConfig?.IsTunneled == true)
+                    controllerIdProvider.SetControllerAsPlatformIdentity(transportIdentity);
+                else
+                    controllerIdProvider.SetControllerFromProgramArgs();
 #else
-            controllerIdProvider.SetControllerAsPlatformId();
+                if (networkConfig?.IsTunneled == true)
+                    controllerIdProvider.SetControllerAsPlatformIdentity(transportIdentity);
+                else
+                    controllerIdProvider.SetControllerAsLocalId();
 #endif
+            }
         }
         catch (Exception ex)
         {

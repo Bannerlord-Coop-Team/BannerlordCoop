@@ -12,7 +12,7 @@ namespace GameInterface.Services.UI.Patches;
 
 /// <summary>
 /// Adds "Invite Friends" as the second campaign-map escape-menu item for clients
-/// in the session's Steam lobby.
+/// in the active storefront session.
 /// </summary>
 [HarmonyPatch(typeof(MapScreen), "GetEscapeMenuItems")]
 internal class EscapeMenuInviteFriendsPatch

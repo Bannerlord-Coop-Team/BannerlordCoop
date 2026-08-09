@@ -16,28 +16,28 @@ using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI;
 
-/// <summary>View model for direct connection and public standalone Steam-lobby discovery.</summary>
+/// <summary>View model for direct connection and the active storefront's session browser.</summary>
 public class CoopConnectMenuVM : ViewModel, IDisposable
 {
     public const string DirectTabId = "direct";
-    public const string SteamLobbiesTabId = "steam_lobbies";
-    public const int SteamLobbyPageSize = 4;
+    public const string SessionBrowserTabId = "provider_sessions";
+    public const int SessionPageSize = 4;
 
-    public event Action SteamLobbiesTabActivated;
+    public event Action SessionBrowserTabActivated;
 
-    private readonly ISteamLobbyBrowser steamLobbyBrowser;
+    private readonly ISessionBrowser sessionBrowser;
     private readonly IMessageBroker messageBroker;
-    private readonly List<SteamLobbyListItemVM> discoveredSteamLobbies = new();
+    private readonly List<SessionListingListItemVM> discoveredSessions = new();
 
     private CoopConnectionTabVM selectedTab;
-    private string steamLobbyHostSearchText = string.Empty;
-    private string steamLobbyStatusText = string.Empty;
-    private bool isRefreshingSteamLobbies;
+    private string sessionHostSearchText = string.Empty;
+    private string sessionStatusText = string.Empty;
+    private bool isRefreshingSessions;
     private bool disposed;
     private int lobbyRequestGeneration;
-    private int filteredSteamLobbyCount;
-    private long filteredSteamLobbyPlayerCount;
-    private int steamLobbyPageIndex;
+    private int filteredSessionCount;
+    private long filteredSessionPlayerCount;
+    private int sessionPageIndex;
 
     public string JoinButtonText => "Join";
     public string RefreshButtonText => "Refresh";
@@ -50,14 +50,14 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string CreditsButtonText => "Credits";
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
-    public string SteamLobbiesHeaderText =>
-        $"Hosted Steam Servers ({filteredSteamLobbyCount} servers; " +
-        $"{filteredSteamLobbyPlayerCount} players)";
-    public string SteamLobbyPageText => $"Page {CurrentSteamLobbyPage} of {SteamLobbyPageCount}";
-    public int CurrentSteamLobbyPage => filteredSteamLobbyCount == 0 ? 0 : steamLobbyPageIndex + 1;
-    public int SteamLobbyPageCount => filteredSteamLobbyCount == 0
+    public string SessionBrowserHeaderText =>
+        $"Hosted {sessionBrowser?.DisplayName} Servers ({filteredSessionCount} servers; " +
+        $"{filteredSessionPlayerCount} players)";
+    public string SessionPageText => $"Page {CurrentSessionPage} of {SessionPageCount}";
+    public int CurrentSessionPage => filteredSessionCount == 0 ? 0 : sessionPageIndex + 1;
+    public int SessionPageCount => filteredSessionCount == 0
         ? 0
-        : ((filteredSteamLobbyCount - 1) / SteamLobbyPageSize) + 1;
+        : ((filteredSessionCount - 1) / SessionPageSize) + 1;
     public string HostSearchLabelText => "Host Name";
     public string HostSearchPlaceholderText => "Type a host name...";
     public string HostColumnText => "Host Name";
@@ -85,21 +85,25 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string connectPassword = "";
 
     public CoopConnectMenuVM()
-        : this(SessionDiscovery.SteamLobbyBrowser, MessageBroker.Instance)
+        : this(SessionDiscovery.Browser, MessageBroker.Instance)
     {
     }
 
-    public CoopConnectMenuVM(ISteamLobbyBrowser steamLobbyBrowser, IMessageBroker messageBroker)
+    public CoopConnectMenuVM(ISessionBrowser sessionBrowser, IMessageBroker messageBroker)
     {
-        this.steamLobbyBrowser = steamLobbyBrowser;
+        this.sessionBrowser = sessionBrowser;
         this.messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
 
-        Tabs = new MBBindingList<CoopConnectionTabVM>
+        Tabs = new MBBindingList<CoopConnectionTabVM>();
+        Tabs.Add(new CoopConnectionTabVM(DirectTabId, "Direct", SelectTab));
+        if (sessionBrowser?.IsAvailable == true)
         {
-            new CoopConnectionTabVM(DirectTabId, "Direct", SelectTab),
-            new CoopConnectionTabVM(SteamLobbiesTabId, "Steam Lobbies", SelectTab),
-        };
-        SteamLobbies = new MBBindingList<SteamLobbyListItemVM>();
+            Tabs.Add(new CoopConnectionTabVM(
+                SessionBrowserTabId,
+                sessionBrowser.DisplayName + " Lobbies",
+                SelectTab));
+        }
+        Sessions = new MBBindingList<SessionListingListItemVM>();
 
         SelectTab(Tabs[0]);
     }
@@ -108,23 +112,23 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public MBBindingList<CoopConnectionTabVM> Tabs { get; }
 
     [DataSourceProperty]
-    public MBBindingList<SteamLobbyListItemVM> SteamLobbies { get; }
+    public MBBindingList<SessionListingListItemVM> Sessions { get; }
 
     [DataSourceProperty]
-    public string SteamLobbyHostSearchText
+    public string SessionHostSearchText
     {
-        get => steamLobbyHostSearchText;
+        get => sessionHostSearchText;
         set
         {
             value ??= string.Empty;
-            if (steamLobbyHostSearchText == value) return;
+            if (sessionHostSearchText == value) return;
 
-            steamLobbyHostSearchText = value;
-            OnPropertyChanged(nameof(SteamLobbyHostSearchText));
+            sessionHostSearchText = value;
+            OnPropertyChanged(nameof(SessionHostSearchText));
 
-            if (!disposed && !IsRefreshingSteamLobbies)
+            if (!disposed && !IsRefreshingSessions)
             {
-                ApplySteamLobbyHostFilter(resetPage: true);
+                ApplySessionHostFilter(resetPage: true);
             }
         }
     }
@@ -140,7 +144,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             selectedTab = value;
             OnPropertyChanged(nameof(SelectedTab));
             OnPropertyChanged(nameof(IsDirectTabVisible));
-            OnPropertyChanged(nameof(IsSteamLobbiesTabVisible));
+            OnPropertyChanged(nameof(IsSessionBrowserTabVisible));
         }
     }
 
@@ -148,58 +152,58 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public bool IsDirectTabVisible => SelectedTab?.Id == DirectTabId;
 
     [DataSourceProperty]
-    public bool IsSteamLobbiesTabVisible => SelectedTab?.Id == SteamLobbiesTabId;
+    public bool IsSessionBrowserTabVisible => SelectedTab?.Id == SessionBrowserTabId;
 
     [DataSourceProperty]
-    public bool IsRefreshingSteamLobbies
+    public bool IsRefreshingSessions
     {
-        get => isRefreshingSteamLobbies;
+        get => isRefreshingSessions;
         private set
         {
-            if (isRefreshingSteamLobbies == value) return;
+            if (isRefreshingSessions == value) return;
 
-            isRefreshingSteamLobbies = value;
-            OnPropertyChanged(nameof(IsRefreshingSteamLobbies));
-            OnPropertyChanged(nameof(IsRefreshSteamLobbiesDisabled));
-            OnPropertyChanged(nameof(IsSearchSteamLobbiesDisabled));
-            OnPropertyChanged(nameof(IsPreviousSteamLobbyPageDisabled));
-            OnPropertyChanged(nameof(IsNextSteamLobbyPageDisabled));
+            isRefreshingSessions = value;
+            OnPropertyChanged(nameof(IsRefreshingSessions));
+            OnPropertyChanged(nameof(IsRefreshSessionsDisabled));
+            OnPropertyChanged(nameof(IsSearchSessionsDisabled));
+            OnPropertyChanged(nameof(IsPreviousSessionPageDisabled));
+            OnPropertyChanged(nameof(IsNextSessionPageDisabled));
         }
     }
 
     [DataSourceProperty]
-    public bool IsRefreshSteamLobbiesDisabled => steamLobbyBrowser == null || IsRefreshingSteamLobbies;
+    public bool IsRefreshSessionsDisabled => sessionBrowser?.IsAvailable != true || IsRefreshingSessions;
 
     [DataSourceProperty]
-    public bool IsSearchSteamLobbiesDisabled => IsRefreshingSteamLobbies;
+    public bool IsSearchSessionsDisabled => IsRefreshingSessions;
 
     [DataSourceProperty]
-    public bool IsSteamLobbyPaginationVisible => SteamLobbyPageCount > 1;
+    public bool IsSessionPaginationVisible => SessionPageCount > 1;
 
     [DataSourceProperty]
-    public bool IsPreviousSteamLobbyPageDisabled => IsRefreshingSteamLobbies || steamLobbyPageIndex == 0;
+    public bool IsPreviousSessionPageDisabled => IsRefreshingSessions || sessionPageIndex == 0;
 
     [DataSourceProperty]
-    public bool IsNextSteamLobbyPageDisabled => IsRefreshingSteamLobbies ||
-        steamLobbyPageIndex >= SteamLobbyPageCount - 1;
+    public bool IsNextSessionPageDisabled => IsRefreshingSessions ||
+        sessionPageIndex >= SessionPageCount - 1;
 
     [DataSourceProperty]
-    public string SteamLobbyStatusText
+    public string SessionStatusText
     {
-        get => steamLobbyStatusText;
+        get => sessionStatusText;
         private set
         {
             value ??= string.Empty;
-            if (steamLobbyStatusText == value) return;
+            if (sessionStatusText == value) return;
 
-            steamLobbyStatusText = value;
-            OnPropertyChanged(nameof(SteamLobbyStatusText));
-            OnPropertyChanged(nameof(IsSteamLobbyStatusVisible));
+            sessionStatusText = value;
+            OnPropertyChanged(nameof(SessionStatusText));
+            OnPropertyChanged(nameof(IsSessionStatusVisible));
         }
     }
 
     [DataSourceProperty]
-    public bool IsSteamLobbyStatusVisible => !string.IsNullOrEmpty(SteamLobbyStatusText);
+    public bool IsSessionStatusVisible => !string.IsNullOrEmpty(SessionStatusText);
 
     [DataSourceProperty]
     public string Ip
@@ -241,56 +245,56 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
-    public void ActionRefreshSteamLobbies()
+    public void ActionRefreshSessions()
     {
-        if (disposed || IsRefreshingSteamLobbies) return;
+        if (disposed || IsRefreshingSessions) return;
 
-        discoveredSteamLobbies.Clear();
-        ClearSteamLobbyDisplay();
+        discoveredSessions.Clear();
+        ClearSessionDisplay();
 
-        if (steamLobbyBrowser == null)
+        if (sessionBrowser?.IsAvailable != true)
         {
-            SteamLobbyStatusText = "Steam lobby discovery is unavailable.";
+            SessionStatusText = "Storefront session discovery is unavailable.";
             return;
         }
 
         int generation = ++lobbyRequestGeneration;
-        IsRefreshingSteamLobbies = true;
-        SteamLobbyStatusText = "Searching for hosted Steam lobbies...";
+        IsRefreshingSessions = true;
+        SessionStatusText = $"Searching for hosted {sessionBrowser.DisplayName} lobbies...";
 
         try
         {
-            steamLobbyBrowser.RequestLobbies(
+            sessionBrowser.RequestSessions(
                 (lobbies, error) => CompleteLobbyRefresh(generation, lobbies, error));
         }
         catch (Exception ex)
         {
-            CompleteLobbyRefresh(generation, Array.Empty<SteamLobbySummary>(),
-                $"Could not search Steam lobbies: {ex.Message}");
+            CompleteLobbyRefresh(generation, Array.Empty<SessionListing>(),
+                $"Could not search {sessionBrowser.DisplayName} lobbies: {ex.Message}");
         }
     }
 
-    public void ActionSearchSteamLobbies()
+    public void ActionSearchSessions()
     {
-        if (disposed || IsRefreshingSteamLobbies) return;
+        if (disposed || IsRefreshingSessions) return;
 
-        ApplySteamLobbyHostFilter(resetPage: true);
+        ApplySessionHostFilter(resetPage: true);
     }
 
-    public void ActionPreviousSteamLobbyPage()
+    public void ActionPreviousSessionPage()
     {
-        if (disposed || IsPreviousSteamLobbyPageDisabled) return;
+        if (disposed || IsPreviousSessionPageDisabled) return;
 
-        steamLobbyPageIndex--;
-        ApplySteamLobbyHostFilter(resetPage: false);
+        sessionPageIndex--;
+        ApplySessionHostFilter(resetPage: false);
     }
 
-    public void ActionNextSteamLobbyPage()
+    public void ActionNextSessionPage()
     {
-        if (disposed || IsNextSteamLobbyPageDisabled) return;
+        if (disposed || IsNextSessionPageDisabled) return;
 
-        steamLobbyPageIndex++;
-        ApplySteamLobbyHostFilter(resetPage: false);
+        sessionPageIndex++;
+        ApplySessionHostFilter(resetPage: false);
     }
 
     public void ActionConnect()
@@ -310,8 +314,6 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         try
         {
-            bool steamInvites = SessionDiscovery.SteamAvailable && IsLoopbackAddress(connectIP);
-
             IPAddress ip;
 
             if (IPAddress.TryParse(connectIP, out var enteredIp))
@@ -330,7 +332,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                 }
             }
 
-            messageBroker.Publish(this, new AttemptJoin(ip, port, connectPassword, steamInvites));
+            messageBroker.Publish(this, new AttemptJoin(ip, port, connectPassword));
         }
         catch (Exception ex)
         {
@@ -360,9 +362,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         disposed = true;
         lobbyRequestGeneration++;
-        IsRefreshingSteamLobbies = false;
-        discoveredSteamLobbies.Clear();
-        ClearSteamLobbyDisplay();
+        IsRefreshingSessions = false;
+        discoveredSessions.Clear();
+        ClearSessionDisplay();
     }
 
     private void SelectTab(CoopConnectionTabVM tab)
@@ -377,123 +379,116 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         SelectedTab = tab;
         SelectedTab.IsSelected = true;
 
-        if (SelectedTab.Id == SteamLobbiesTabId)
+        if (SelectedTab.Id == SessionBrowserTabId)
         {
-            SteamLobbiesTabActivated?.Invoke();
-            ActionRefreshSteamLobbies();
+            SessionBrowserTabActivated?.Invoke();
+            ActionRefreshSessions();
         }
     }
 
     private void CompleteLobbyRefresh(
         int generation,
-        IReadOnlyList<SteamLobbySummary> lobbies,
+        IReadOnlyList<SessionListing> lobbies,
         string error)
     {
         if (disposed || generation != lobbyRequestGeneration) return;
 
-        IsRefreshingSteamLobbies = false;
+        IsRefreshingSessions = false;
 
         if (!string.IsNullOrWhiteSpace(error))
         {
-            ClearSteamLobbyDisplay();
-            SteamLobbyStatusText = error;
+            ClearSessionDisplay();
+            SessionStatusText = error;
             return;
         }
 
-        lobbies ??= Array.Empty<SteamLobbySummary>();
+        lobbies ??= Array.Empty<SessionListing>();
 
         foreach (var lobby in lobbies)
         {
-            if (lobby.LobbyId == 0) continue;
+            if (!lobby.Id.IsValid ||
+                !string.Equals(lobby.Id.Provider, sessionBrowser.Provider, StringComparison.Ordinal))
+            {
+                continue;
+            }
 
-            discoveredSteamLobbies.Add(new SteamLobbyListItemVM(
-                lobby.LobbyId,
-                lobby.OwnerName,
-                lobby.ConnectedPlayers,
-                lobby.ProtocolVersion,
-                lobby.ModVersion,
-                lobby.PasswordRequired,
-                lobby.IsCompatible,
-                RequestSteamLobbyJoin));
+            discoveredSessions.Add(new SessionListingListItemVM(
+                lobby,
+                RequestSessionJoin));
         }
 
-        ApplySteamLobbyHostFilter(resetPage: true);
+        ApplySessionHostFilter(resetPage: true);
     }
 
-    private void ApplySteamLobbyHostFilter(bool resetPage)
+    private void ApplySessionHostFilter(bool resetPage)
     {
-        string searchText = SteamLobbyHostSearchText.Trim();
-        var filteredLobbies = discoveredSteamLobbies
+        string searchText = SessionHostSearchText.Trim();
+        var filteredLobbies = discoveredSessions
             .Where(lobby => searchText.Length == 0 ||
                 lobby.HostText.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
             .ToList();
 
-        filteredSteamLobbyCount = filteredLobbies.Count;
-        filteredSteamLobbyPlayerCount = filteredLobbies.Sum(
+        filteredSessionCount = filteredLobbies.Count;
+        filteredSessionPlayerCount = filteredLobbies.Sum(
             lobby => (long)lobby.ConnectedPlayers);
         if (resetPage)
         {
-            steamLobbyPageIndex = 0;
+            sessionPageIndex = 0;
         }
         else
         {
-            steamLobbyPageIndex = Math.Min(steamLobbyPageIndex, Math.Max(0, SteamLobbyPageCount - 1));
+            sessionPageIndex = Math.Min(sessionPageIndex, Math.Max(0, SessionPageCount - 1));
         }
 
-        SteamLobbies.Clear();
+        Sessions.Clear();
         foreach (var lobby in filteredLobbies
-            .Skip(steamLobbyPageIndex * SteamLobbyPageSize)
-            .Take(SteamLobbyPageSize))
+            .Skip(sessionPageIndex * SessionPageSize)
+            .Take(SessionPageSize))
         {
-            SteamLobbies.Add(lobby);
+            Sessions.Add(lobby);
         }
 
-        NotifySteamLobbyDisplayChanged();
+        NotifySessionDisplayChanged();
 
-        if (filteredSteamLobbyCount > 0)
+        if (filteredSessionCount > 0)
         {
-            SteamLobbyStatusText = string.Empty;
+            SessionStatusText = string.Empty;
         }
-        else if (discoveredSteamLobbies.Count == 0)
+        else if (discoveredSessions.Count == 0)
         {
-            SteamLobbyStatusText = "No hosted Steam lobbies were found.";
+            SessionStatusText = $"No hosted {sessionBrowser.DisplayName} lobbies were found.";
         }
         else
         {
-            SteamLobbyStatusText = $"No hosts match '{searchText}'.";
+            SessionStatusText = $"No hosts match '{searchText}'.";
         }
     }
 
-    private void ClearSteamLobbyDisplay()
+    private void ClearSessionDisplay()
     {
-        filteredSteamLobbyCount = 0;
-        filteredSteamLobbyPlayerCount = 0;
-        steamLobbyPageIndex = 0;
-        SteamLobbies.Clear();
-        NotifySteamLobbyDisplayChanged();
+        filteredSessionCount = 0;
+        filteredSessionPlayerCount = 0;
+        sessionPageIndex = 0;
+        Sessions.Clear();
+        NotifySessionDisplayChanged();
     }
 
-    private void NotifySteamLobbyDisplayChanged()
+    private void NotifySessionDisplayChanged()
     {
-        OnPropertyChanged(nameof(SteamLobbiesHeaderText));
-        OnPropertyChanged(nameof(SteamLobbyPageText));
-        OnPropertyChanged(nameof(CurrentSteamLobbyPage));
-        OnPropertyChanged(nameof(SteamLobbyPageCount));
-        OnPropertyChanged(nameof(IsSteamLobbyPaginationVisible));
-        OnPropertyChanged(nameof(IsPreviousSteamLobbyPageDisabled));
-        OnPropertyChanged(nameof(IsNextSteamLobbyPageDisabled));
+        OnPropertyChanged(nameof(SessionBrowserHeaderText));
+        OnPropertyChanged(nameof(SessionPageText));
+        OnPropertyChanged(nameof(CurrentSessionPage));
+        OnPropertyChanged(nameof(SessionPageCount));
+        OnPropertyChanged(nameof(IsSessionPaginationVisible));
+        OnPropertyChanged(nameof(IsPreviousSessionPageDisabled));
+        OnPropertyChanged(nameof(IsNextSessionPageDisabled));
     }
 
-    private void RequestSteamLobbyJoin(ulong lobbyId)
+    private void RequestSessionJoin(SessionListingId listingId)
     {
-        if (disposed || lobbyId == 0) return;
+        if (disposed || !listingId.IsValid) return;
 
-        messageBroker.Publish(this, new JoinSteamLobby(lobbyId));
+        messageBroker.Publish(this, new JoinSessionListing(listingId));
     }
 
-    private static bool IsLoopbackAddress(string address)
-    {
-        return string.Equals(address, "localhost", StringComparison.OrdinalIgnoreCase) ||
-            (IPAddress.TryParse(address, out var ip) && IPAddress.IsLoopback(ip));
-    }
 }

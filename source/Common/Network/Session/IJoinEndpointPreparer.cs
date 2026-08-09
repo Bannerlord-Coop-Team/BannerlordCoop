@@ -11,3 +11,10 @@ public interface IJoinEndpointPreparer
 {
     Task<SessionJoinInfo> PrepareAsync(SessionJoinInfo info);
 }
+
+/// <summary>Provider tunnel preparer with an explicit process-lifetime teardown hook.</summary>
+public interface ITunnelJoinEndpointPreparer : IJoinEndpointPreparer
+{
+    string Provider { get; }
+    void TearDown();
+}

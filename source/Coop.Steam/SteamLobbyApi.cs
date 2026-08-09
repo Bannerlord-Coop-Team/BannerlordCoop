@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Network.Session;
 using Serilog;
 using Steamworks;
 using System;
@@ -253,19 +254,23 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
 
         SteamMatchmaking.AddRequestLobbyListDistanceFilter(ELobbyDistanceFilter.k_ELobbyDistanceFilterWorldwide);
         SteamMatchmaking.AddRequestLobbyListStringFilter(
-            LobbyDataCodec.LobbyTypeKey,
-            LobbyDataCodec.StandaloneLobbyType,
+            SessionListingDataCodec.ListingTypeKey,
+            SessionListingDataCodec.DedicatedListingType,
+            ELobbyComparison.k_ELobbyComparisonEqual);
+        SteamMatchmaking.AddRequestLobbyListStringFilter(
+            SessionListingDataCodec.TunnelProviderKey,
+            SteamSessionProvider.ProviderId,
             ELobbyComparison.k_ELobbyComparisonEqual);
         SteamMatchmaking.AddRequestLobbyListResultCountFilter(SteamLobbyListQueryPlan.MaxResultsPerQuery);
 
         if (!activeLobbyListRange.IsUnfiltered)
         {
             SteamMatchmaking.AddRequestLobbyListStringFilter(
-                LobbyDataCodec.ServerSteamIdKey,
+                SessionListingDataCodec.TunnelPeerIdKey,
                 activeLobbyListRange.Minimum.ToString(CultureInfo.InvariantCulture),
                 ELobbyComparison.k_ELobbyComparisonEqualToOrGreaterThan);
             SteamMatchmaking.AddRequestLobbyListStringFilter(
-                LobbyDataCodec.ServerSteamIdKey,
+                SessionListingDataCodec.TunnelPeerIdKey,
                 activeLobbyListRange.Maximum.ToString(CultureInfo.InvariantCulture),
                 ELobbyComparison.k_ELobbyComparisonEqualToOrLessThan);
         }
@@ -372,7 +377,7 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
             {
                 ulong lobbyId = SteamMatchmaking.GetLobbyByIndex((int)i).m_SteamID;
                 string serverSteamIdText = SteamMatchmaking.GetLobbyData(
-                    new CSteamID(lobbyId), LobbyDataCodec.ServerSteamIdKey);
+                    new CSteamID(lobbyId), SessionListingDataCodec.TunnelPeerIdKey);
                 ulong.TryParse(serverSteamIdText, out ulong serverSteamId);
                 if (!activeLobbyListRange.IsUnfiltered &&
                     !activeLobbyListRange.Contains(serverSteamId))

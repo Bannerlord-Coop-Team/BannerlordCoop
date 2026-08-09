@@ -33,9 +33,7 @@ public static class TunnelAdvertisement
 
         if (!tunnelHost.IsListening)
         {
-            // Advertise as a pre-tunnel lobby so joiners use the address instead of
-            // connecting to a tunnel that isn't there.
-            info.Version = SessionJoinInfo.MinTunnelVersion - 1;
+            info.TunnelTarget = default;
         }
     }
 
@@ -48,8 +46,8 @@ public static class TunnelAdvertisement
 
 /// <summary>
 /// Hosts the joiner-facing end of a session tunnel on the hosting player's client: remote
-/// peers connect through a relay transport (a Steam P2P listen socket; no-op for plain
-/// direct-IP hosting) and their datagrams are forwarded to the local server port.
+/// peers connect through a provider transport and their datagrams are forwarded to the
+/// local server port.
 /// </summary>
 public interface ISessionTunnelHost : IDisposable
 {
@@ -67,8 +65,8 @@ public interface ISessionTunnelHost : IDisposable
     void Stop();
 }
 
-/// <summary>Optional authenticated-identity capability for session tunnel hosts.</summary>
-public interface ISessionTunnelIdentityResolver
+/// <summary>Resolves the provider-authenticated identity behind a loopback tunnel endpoint.</summary>
+public interface IAuthenticatedPeerIdentityResolver
 {
-    bool TryGetRemoteSteamId(IPEndPoint serverPeerEndpoint, out ulong steamId);
+    bool TryGetIdentity(IPEndPoint serverPeerEndpoint, out PlatformIdentity identity);
 }

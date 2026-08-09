@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -118,7 +118,7 @@ public class ModuleValidator : IModuleValidator
         var serverGameModule = serverModules.FirstOrDefault(module => module.IsOfficial);
         var clientGameModule = clientModules.FirstOrDefault(module => module.IsOfficial);
 
-        // checkChangeSet: false — a dedicated-server distribution and the Steam
+        // checkChangeSet: false because a dedicated-server distribution and a storefront
         // client are different builds (changesets) of the same game version.
         if (!serverGameModule.Version.IsSame(clientGameModule.Version, false))
         {

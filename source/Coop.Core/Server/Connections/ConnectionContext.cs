@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Network.Session;
 using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
@@ -36,6 +37,45 @@ public class ConnectionContext
         IExistingPlayerSender existingPlayerSender,
         IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender)
+        : this(
+            messageBroker,
+            network,
+            moduleValidator,
+            moduleInfoProvider,
+            playerManager,
+            playerPartyRestorer,
+            objectManager,
+            heroInterface,
+            coopSessionProvider,
+            saveInterface,
+            connectionMessageQueue,
+            coalescer,
+            attachmentIdMapper,
+            existingPlayerSender,
+            serverOptionsProvider,
+            joinCampaignBaselineSender,
+            null)
+    {
+    }
+
+    public ConnectionContext(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IModuleValidator moduleValidator,
+        IModuleInfoProvider moduleInfoProvider,
+        IPlayerManager playerManager,
+        IPlayerPartyRestorer playerPartyRestorer,
+        IObjectManager objectManager,
+        IHeroInterface heroInterface,
+        ICoopSessionProvider coopSessionProvider,
+        ISaveInterface saveInterface,
+        IConnectionMessageQueue connectionMessageQueue,
+        ISendCoalescer coalescer,
+        IAttachmentIdMapper attachmentIdMapper,
+        IExistingPlayerSender existingPlayerSender,
+        IServerOptionsProvider serverOptionsProvider,
+        IJoinCampaignBaselineSender joinCampaignBaselineSender,
+        IAuthenticatedPeerIdentityResolver peerIdentityResolver)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -53,6 +93,7 @@ public class ConnectionContext
         ExistingPlayerSender = existingPlayerSender;
         ServerOptionsProvider = serverOptionsProvider;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
+        PeerIdentityResolver = peerIdentityResolver;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -71,4 +112,5 @@ public class ConnectionContext
     public IExistingPlayerSender ExistingPlayerSender { get; }
     public IServerOptionsProvider ServerOptionsProvider { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
+    public IAuthenticatedPeerIdentityResolver PeerIdentityResolver { get; }
 }

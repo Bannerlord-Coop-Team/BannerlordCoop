@@ -13,7 +13,7 @@ namespace GameInterface.Services.GameState;
 public static class ManagedServerLauncher
 {
     /// <summary>
-    /// The Bannerlord engine executable. Under Steam the current process is the launcher that
+    /// The Bannerlord engine executable. In storefront builds the current process can be the launcher that
     /// hosts the engine, so this resolves Bannerlord.exe from the same bin directory rather than
     /// re-launching the launcher (which would just show its menu, not boot the game).
     /// </summary>

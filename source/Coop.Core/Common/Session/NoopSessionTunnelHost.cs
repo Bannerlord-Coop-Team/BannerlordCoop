@@ -4,10 +4,10 @@ using System.Net;
 namespace Coop.Core.Common.Session;
 
 /// <summary>
-/// Tunnel host for sessions without a relay transport (no Steam): direct-IP joiners dial
+/// Tunnel host for sessions without a provider relay: direct-IP joiners dial
 /// the server themselves.
 /// </summary>
-public class NoopSessionTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolver
+public class NoopSessionTunnelHost : ISessionTunnelHost, IAuthenticatedPeerIdentityResolver
 {
     public bool IsListening => false;
 
@@ -17,9 +17,9 @@ public class NoopSessionTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityR
     {
     }
 
-    public bool TryGetRemoteSteamId(IPEndPoint serverPeerEndpoint, out ulong steamId)
+    public bool TryGetIdentity(IPEndPoint serverPeerEndpoint, out PlatformIdentity identity)
     {
-        steamId = 0;
+        identity = default;
         return false;
     }
 

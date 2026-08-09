@@ -1,5 +1,6 @@
 ﻿using Common.Network;
 using Common.Network.Messages;
+using Common.Network.Session;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Tests.Utils;
@@ -151,7 +152,9 @@ public class ConnectionMessageQueueTests
     {
         var peer = Connect();
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var packet = MessagePacket.Create(new NetworkSessionLobbyChanged(123), serializer);
+        var packet = MessagePacket.Create(
+            new NetworkSessionLobbyChanged(new SessionListingId("gog", "123")),
+            serializer);
 
         Assert.False(queue.TryHandleBroadcast(peer, packet));
     }
