@@ -20,8 +20,10 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Localization;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Kingdoms.Commands;
@@ -32,6 +34,7 @@ namespace GameInterface.Services.Kingdoms.Commands;
 public class KingdomDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomDebugCommand>();
+    private static readonly List<KingdomDecisionMapNotification> TransferNoticeFixture = new List<KingdomDecisionMapNotification>();
 
     private enum CollectionTarget
     {
@@ -121,6 +124,63 @@ public class KingdomDebugCommand
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out voteManager);
+    }
+
+    [CommandLineArgumentFunction("stage_transfer_notice_fixture", "coop.debug.kingdom")]
+    public static string StageTransferNoticeFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.stage_transfer_notice_fixture <kingdomId> <proposerClanId> <policyId> <count>";
+
+        if (!ModInformation.IsServer) return "This command can only be run on the server.";
+        if (args.Count != 4) return usage;
+        if (Campaign.Current == null) return "No campaign is loaded.";
+        if (TransferNoticeFixture.Count != 0) return "A transfer-notice fixture is already staged.";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
+        if (!objectManager.TryGetObject(args[1], out Clan proposerClan)) return $"Clan with ID: '{args[1]}' not found";
+        if (!objectManager.TryGetObject(args[2], out PolicyObject policy)) return $"Policy with ID: '{args[2]}' not found";
+        if (proposerClan.Kingdom != kingdom) return $"Clan '{args[1]}' does not belong to kingdom '{args[0]}'.";
+        if (!int.TryParse(args[3], out int count) || count < 1 || count > 10) return "Count must be between 1 and 10.";
+
+        var informationManager = Campaign.Current.CampaignInformationManager;
+        int originalCount = informationManager._mapNotices.Count;
+        for (int i = 0; i < count; i++)
+        {
+            var decision = new KingdomPolicyDecision(proposerClan, policy, isInvertedDecision: false);
+            var notice = new KingdomDecisionMapNotification(
+                kingdom,
+                decision,
+                new TextObject($"Transfer notice fixture {i + 1} for {kingdom.Name}"));
+
+            informationManager.NewMapNoticeAdded(notice);
+            TransferNoticeFixture.Add(notice);
+        }
+
+        return $"Transfer-notice fixture staged: original={originalCount}, staged={TransferNoticeFixture.Count}, total={informationManager._mapNotices.Count}.";
+    }
+
+    [CommandLineArgumentFunction("transfer_notice_state", "coop.debug.kingdom")]
+    public static string TransferNoticeState(List<string> args)
+    {
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.transfer_notice_state";
+        if (Campaign.Current == null) return "No campaign is loaded.";
+
+        var mapNotices = Campaign.Current.CampaignInformationManager._mapNotices;
+        int kingdomDecisionCount = mapNotices.Count(notice => notice is KingdomDecisionMapNotification);
+        return $"Transfer notice state: total={mapNotices.Count}, kingdomDecisions={kingdomDecisionCount}, stagedHere={TransferNoticeFixture.Count}.";
+    }
+
+    [CommandLineArgumentFunction("restore_transfer_notice_fixture", "coop.debug.kingdom")]
+    public static string RestoreTransferNoticeFixture(List<string> args)
+    {
+        if (!ModInformation.IsServer) return "This command can only be run on the server.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.restore_transfer_notice_fixture";
+        if (Campaign.Current == null) return "No campaign is loaded.";
+
+        var mapNotices = Campaign.Current.CampaignInformationManager._mapNotices;
+        int removed = TransferNoticeFixture.Count(mapNotices.Remove);
+        TransferNoticeFixture.Clear();
+        return $"Transfer-notice fixture restored: removed={removed}, total={mapNotices.Count}.";
     }
 
     // coop.debug.kingdom.create Derthert Vlandia_Reborn
