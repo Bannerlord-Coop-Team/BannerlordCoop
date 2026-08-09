@@ -2,9 +2,6 @@
 using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Heroes.Extensions;
-#if DEBUG
-using GameInterface.Services.MapEvents.Commands;
-#endif
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -598,12 +595,6 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     if (canBecomePrisoner && !playerPartyEscaped)
                     {
                         MBList<KeyValuePair<MapEventParty, float>> captureChances = hero.IsWounded ? woundedCaptureChances : healthyCaptureChances;
-#if DEBUG
-                        captureChances = CaptureOutcomeFixtureCommands.ApplyGuaranteedCapture(
-                            hero,
-                            mapEvent,
-                            captureChances);
-#endif
 
                         if (captureChances.Count > 0)
                         {
