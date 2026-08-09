@@ -20,11 +20,7 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
 
     private static readonly string[] ScannedAssemblyNames = { "TaleWorlds.CampaignSystem", "SandBox" };
 
-    internal static readonly HashSet<Type> Allowlist = new HashSet<Type>
-    {
-        typeof(VillageNeedsToolsIssueBehavior),
-        typeof(VillageNeedsCraftingMaterialsIssueBehavior),
-    };
+    internal static readonly HashSet<Type> Allowlist = new HashSet<Type>();
 
     internal static bool IsAllowlisted(IssueBase issue)
     {

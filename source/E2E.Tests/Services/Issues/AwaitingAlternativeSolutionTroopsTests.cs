@@ -84,20 +84,31 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         return new VillageFixture(heroId, villageId, settlementId, itemId, companionHeroId);
     }
 
-    private void CreateIssueOnServer(VillageFixture fixture)
+    private void CreateIssueOnBothPeers(VillageFixture fixture)
     {
-        Server.Call(() =>
+        var generation = 0;
+        foreach (var instance in new[] { Server, Client })
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(fixture.ItemId, out var requestedItem));
+            var isServer = instance == Server;
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(fixture.ItemId, out var requestedItem));
 
-            var pid = new PotentialIssueData(
-                (in PotentialIssueData _, Hero h) => new VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue(h, requestedItem),
-                typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue),
-                IssueBase.IssueFrequency.VeryCommon);
+                var pid = new PotentialIssueData(
+                    (in PotentialIssueData _, Hero h) => new VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue(h, requestedItem),
+                    typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue),
+                    IssueBase.IssueFrequency.VeryCommon);
 
-            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in pid, owner));
-        });
+                using (new AllowedThread())
+                {
+                    Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in pid, owner));
+                }
+
+                if (isServer) generation = IssueGenerationRegistry.Bump(owner);
+                else IssueGenerationRegistry.SetGeneration(owner, generation);
+            });
+        }
     }
 
     private sealed class TestDataStore : IDataStore
@@ -134,7 +145,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         int depositedManCount = 0;
 
         var fixture = SetupVillageOwner();
-        CreateIssueOnServer(fixture);
+        CreateIssueOnBothPeers(fixture);
 
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
@@ -269,7 +280,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         var controllerId = "player-A-" + Guid.NewGuid();
 
         var fixture = SetupVillageOwner();
-        CreateIssueOnServer(fixture);
+        CreateIssueOnBothPeers(fixture);
 
         Server.Call(() =>
         {
