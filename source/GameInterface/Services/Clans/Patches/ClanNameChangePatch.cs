@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
 using HarmonyLib;
 using Serilog;
@@ -17,6 +18,8 @@ public class ClanNameChangePatch
     [HarmonyPrefix]
     public static bool ChangeClanNamePrefix(Clan __instance, TextObject name, TextObject informalName)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
         var message = new ChangeClanName(__instance, name, informalName);
         MessageBroker.Instance.Publish(__instance, message);
 
