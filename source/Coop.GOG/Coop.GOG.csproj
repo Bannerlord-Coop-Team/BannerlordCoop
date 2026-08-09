@@ -35,6 +35,8 @@
   <Target Name="ReportUnavailableGalaxySdk"
           BeforeTargets="CoreCompile"
           Condition="'$(GalaxySdkAvailable)' != 'true'">
+    <Error Condition="'$(RequireGalaxySdk)' == 'true'"
+           Text="GalaxyCSharp.dll is required for release builds; refresh the Bannerlord build inputs before packaging." />
     <Message Importance="high"
              Text="GalaxyCSharp.dll is unavailable; compiling Coop.GOG without runtime Galaxy SDK bindings." />
   </Target>

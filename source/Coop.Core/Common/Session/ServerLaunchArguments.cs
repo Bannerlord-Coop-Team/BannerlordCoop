@@ -19,6 +19,7 @@ public static class ServerLaunchArguments
     public const string PasswordArgument = "/cooppassword";
     public const string VisibilityArgument = "/coopvisibility";
     public const string PeerIdentityBridgeArgument = "/coopidentitybridge";
+    public const string SessionProviderArgument = "/coopprovider";
 
     /// <summary>
     /// Builds a fresh server command line with mode, active modules, save, owner PID, and optional
@@ -40,6 +41,7 @@ public static class ServerLaunchArguments
             ownerProcessId,
             password,
             visibility,
+            null,
             null);
 
     public static string BuildManagedServerArguments(
@@ -49,6 +51,23 @@ public static class ServerLaunchArguments
         string password,
         ServerVisibility visibility,
         string peerIdentityBridgeName)
+        => BuildManagedServerArguments(
+            moduleIds,
+            saveName,
+            ownerProcessId,
+            password,
+            visibility,
+            peerIdentityBridgeName,
+            null);
+
+    public static string BuildManagedServerArguments(
+        IReadOnlyList<string> moduleIds,
+        string saveName,
+        int ownerProcessId,
+        string password,
+        ServerVisibility visibility,
+        string peerIdentityBridgeName,
+        string sessionProvider)
     {
         if (saveName == null) throw new ArgumentNullException(nameof(saveName));
         if (moduleIds == null) throw new ArgumentNullException(nameof(moduleIds));
@@ -61,6 +80,8 @@ public static class ServerLaunchArguments
                 "A valid peer identity bridge name is required",
                 nameof(peerIdentityBridgeName));
         }
+        if (!IsValidSessionProvider(sessionProvider))
+            throw new ArgumentException("A valid session provider is required", nameof(sessionProvider));
 
         var tokens = new List<string>
         {
@@ -85,6 +106,12 @@ public static class ServerLaunchArguments
         {
             tokens.Add(PeerIdentityBridgeArgument);
             tokens.Add(peerIdentityBridgeName);
+        }
+
+        if (!string.IsNullOrEmpty(sessionProvider))
+        {
+            tokens.Add(SessionProviderArgument);
+            tokens.Add(sessionProvider);
         }
 
         return string.Join(" ", tokens.Select(QuoteArgument));
@@ -122,14 +149,33 @@ public static class ServerLaunchArguments
         out string password,
         out ServerVisibility visibility,
         out string peerIdentityBridgeName)
+        => TryParse(
+            args,
+            out saveName,
+            out ownerProcessId,
+            out password,
+            out visibility,
+            out peerIdentityBridgeName,
+            out _);
+
+    public static bool TryParse(
+        IReadOnlyList<string> args,
+        out string saveName,
+        out int ownerProcessId,
+        out string password,
+        out ServerVisibility visibility,
+        out string peerIdentityBridgeName,
+        out string sessionProvider)
     {
         saveName = null;
         ownerProcessId = 0;
         password = string.Empty;
         visibility = ServerVisibility.Public;
         peerIdentityBridgeName = string.Empty;
+        sessionProvider = string.Empty;
         bool visibilityValid = true;
         bool peerIdentityBridgeValid = true;
+        bool sessionProviderValid = true;
 
         for (int i = 0; i < args.Count; i++)
         {
@@ -163,6 +209,16 @@ public static class ServerLaunchArguments
                     peerIdentityBridgeValid = false;
                 }
             }
+            else if (IsToken(args[i], SessionProviderArgument))
+            {
+                if (i + 1 >= args.Count ||
+                    !IsValidSessionProvider(sessionProvider = args[++i]) ||
+                    string.IsNullOrEmpty(sessionProvider))
+                {
+                    sessionProvider = string.Empty;
+                    sessionProviderValid = false;
+                }
+            }
         }
 
         if (!ConnectionPassword.IsValid(password))
@@ -171,7 +227,7 @@ public static class ServerLaunchArguments
             return false;
         }
 
-        return saveName != null && visibilityValid && peerIdentityBridgeValid;
+        return saveName != null && visibilityValid && peerIdentityBridgeValid && sessionProviderValid;
     }
 
     /// <summary>
@@ -213,6 +269,10 @@ public static class ServerLaunchArguments
     }
 
     private static bool IsToken(string arg, string token) => string.Equals(arg, token, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsValidSessionProvider(string provider) =>
+        string.IsNullOrEmpty(provider) ||
+        (provider.Length <= 32 && provider.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_'));
 
     private static string FormatVisibility(ServerVisibility visibility) => visibility switch
     {

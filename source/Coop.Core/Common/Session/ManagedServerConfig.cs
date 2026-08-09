@@ -30,6 +30,9 @@ public static class ManagedServerConfig
     /// <summary>Ephemeral local IPC name used to bind player-owned provider tunnels.</summary>
     public static string PeerIdentityBridgeName { get; set; } = string.Empty;
 
+    /// <summary>Explicit session provider selected by the process that launched this server.</summary>
+    public static string SessionProvider { get; set; } = string.Empty;
+
     /// <summary>Who can discover this server through the active storefront.</summary>
     public static ServerVisibility Visibility { get; set; } = ServerVisibility.Public;
 }

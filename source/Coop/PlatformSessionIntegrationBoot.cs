@@ -22,12 +22,15 @@ namespace Coop
         public static IUpdateable TryStart(
             bool isServerProcess,
             string commandLine,
-            ISessionJoinRequestGate joinRequestGate)
+            ISessionJoinRequestGate joinRequestGate,
+            string serverProvider)
         {
             if (started) return null;
             started = true;
 
-            string providerName = PlatformServices.ProviderName;
+            string providerName = isServerProcess && !string.IsNullOrEmpty(serverProvider)
+                ? serverProvider
+                : PlatformServices.ProviderName;
             try
             {
                 provider = isServerProcess

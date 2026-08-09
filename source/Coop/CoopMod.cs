@@ -104,7 +104,7 @@ namespace Coop
             // name apart; the managed-server arguments need real Windows arg parsing.
             if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName,
                 out var ownerProcessId, out var serverPassword, out var serverVisibility,
-                out var peerIdentityBridgeName))
+                out var peerIdentityBridgeName, out var sessionProvider))
             {
                 ManagedServerConfig.SaveName = managedSaveName;
                 ManagedServerConfig.OwnerProcessId = ownerProcessId;
@@ -112,6 +112,7 @@ namespace Coop
             ManagedServerConfig.Password = serverPassword;
             ManagedServerConfig.Visibility = serverVisibility;
             ManagedServerConfig.PeerIdentityBridgeName = peerIdentityBridgeName;
+            ManagedServerConfig.SessionProvider = sessionProvider;
 
             SetupLogging();
             InitializeCrashReporting();
@@ -563,7 +564,10 @@ namespace Coop
             {
                 sessionProviderBootAttempted = true;
                 var providerPump = PlatformSessionIntegrationBoot.TryStart(
-                    isServer, Utilities.GetFullCommandLineString(), Coop);
+                    isServer,
+                    Utilities.GetFullCommandLineString(),
+                    Coop,
+                    ManagedServerConfig.SessionProvider);
                 if (providerPump != null) Updateables.Add(providerPump);
             }
 

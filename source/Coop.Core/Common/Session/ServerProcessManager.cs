@@ -48,7 +48,8 @@ public class ServerProcessManager : IDisposable
         string saveName,
         string password,
         ServerVisibility visibility,
-        string peerIdentityBridgeName = null)
+        string peerIdentityBridgeName = null,
+        string sessionProvider = null)
     {
         lock (stateLock)
         {
@@ -65,7 +66,8 @@ public class ServerProcessManager : IDisposable
                 currentProcess.Id,
                 password,
                 visibility,
-                peerIdentityBridgeName);
+                peerIdentityBridgeName,
+                sessionProvider);
 
             // The arguments may contain the hosted-server password, so never write them to a log.
             Logger.Information("Spawning co-op server for save '{SaveName}': {Exe}", saveName, exePath);

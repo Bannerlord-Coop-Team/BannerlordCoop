@@ -166,6 +166,9 @@ namespace Coop.Core
             string peerIdentityBridgeName = playerOwnsProviderTunnel
                 ? PeerIdentityBridgeName.Create()
                 : string.Empty;
+            string serverSessionProvider = playerOwnsProviderTunnel
+                ? "direct"
+                : SessionDiscovery.ClientProvider.Provider;
 
             try
             {
@@ -173,7 +176,8 @@ namespace Coop.Core
                     obj.What.SaveName,
                     password,
                     visibility,
-                    peerIdentityBridgeName);
+                    peerIdentityBridgeName,
+                    serverSessionProvider);
             }
             catch (Exception ex)
             {

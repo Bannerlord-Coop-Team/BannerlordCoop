@@ -114,6 +114,57 @@ public class ServerLaunchArgumentsTests
         Assert.Equal(bridgeName, parsedBridgeName);
     }
 
+    [Fact]
+    public void TryParse_FindsSessionProvider()
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.SessionProviderArgument,
+            "gog",
+        };
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out _, out var sessionProvider));
+        Assert.Equal("gog", sessionProvider);
+    }
+
+    [Fact]
+    public void TryParse_RejectsSessionProviderWithoutValue()
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.SessionProviderArgument,
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out _, out var sessionProvider));
+        Assert.Equal(string.Empty, sessionProvider);
+    }
+
+    [Theory]
+    [InlineData("steam")]
+    [InlineData("gog")]
+    [InlineData("direct")]
+    public void BuildAndParse_PreservesSupportedSessionProvider(string sessionProvider)
+    {
+        string built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" },
+            "Campaign",
+            42,
+            string.Empty,
+            ServerVisibility.Public,
+            null,
+            sessionProvider);
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            built.Split(' '), out _, out _, out _, out _, out _, out var parsedProvider));
+        Assert.Equal(sessionProvider, parsedProvider);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("bannerlordcoop-peer-identity-not-a-guid")]
@@ -302,6 +353,23 @@ public class ServerLaunchArgumentsTests
 
         Assert.EndsWith(
             $"{ServerLaunchArguments.PeerIdentityBridgeArgument} {bridgeName}",
+            built);
+    }
+
+    [Fact]
+    public void BuildManagedServerArguments_AppendsSessionProvider()
+    {
+        var built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" },
+            "My Save",
+            42,
+            string.Empty,
+            ServerVisibility.Public,
+            null,
+            "steam");
+
+        Assert.EndsWith(
+            $"{ServerLaunchArguments.SessionProviderArgument} steam",
             built);
     }
 
