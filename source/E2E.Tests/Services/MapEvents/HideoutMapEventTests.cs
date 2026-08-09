@@ -1,8 +1,11 @@
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Barters;
+using GameInterface.Services.Hideouts.Handlers;
 using GameInterface.Services.Hideouts.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
@@ -11,6 +14,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using GameInterface.Services.Villages.Interfaces;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -283,7 +287,21 @@ public class HideoutMapEventTests : MapEventTestBase
             settlement.Hideout._nextPossibleAttackTime = new CampaignTime(-1);
         });
 
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId!, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(banditTroopId!, out var banditTroop));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(banditParties[0].PartyId, out var firstBanditParty));
+            using (new AllowedThread())
+            {
+                settlement.Hideout._nextPossibleAttackTime = new CampaignTime(-1);
+                firstBanditParty.MemberRoster.AddToCounts(banditTroop, 1);
+            }
+        });
+
+        SetHideoutPreparationTimeout(client, TimeSpan.FromMilliseconds(100));
         Server.NetworkSentMessages.Clear();
+        client.NetworkSentMessages.Clear();
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
@@ -292,10 +310,21 @@ public class HideoutMapEventTests : MapEventTestBase
             using (new BarterPlayerContext(playerHero, playerParty))
                 new HideoutCampaignBehavior().OnTroopRosterManageDone(null, isDirectAssault: false);
             Assert.Equal(
-                maximumMissionBandits,
+                maximumMissionBandits + 1,
                 settlement.Parties.Where(party => party.IsBandit)
                     .Sum(party => party.MemberRoster.TotalHealthyCount));
+            Assert.True(settlement.Hideout.NextPossibleAttackTime.IsPast);
         }, new[] { AccessTools.Method(typeof(HideoutCampaignBehavior), "OnTroopRosterManageDone") });
+
+        var failedAttemptRequests = client.NetworkSentMessages
+            .GetMessages<NetworkHideoutCampaignConsequenceRequested>()
+            .ToList();
+        Assert.Single(
+            failedAttemptRequests,
+            message => message.Consequence == HideoutCampaignConsequence.PrepareMission);
+        Assert.DoesNotContain(
+            failedAttemptRequests,
+            message => message.Consequence == HideoutCampaignConsequence.SetAttackCooldown);
 
         var preparationMessages = Server.NetworkSentMessages.Messages;
         var preparationReplyIndex = preparationMessages.FindIndex(
@@ -304,6 +333,50 @@ public class HideoutMapEventTests : MapEventTestBase
             message => message is NetworkTroopRosterElementBatch);
         Assert.True(finalRosterDeltaIndex >= 0);
         Assert.True(finalRosterDeltaIndex < preparationReplyIndex);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId!, out var settlement));
+            Assert.True(settlement.Hideout.NextPossibleAttackTime.IsPast);
+            Assert.Equal(
+                maximumMissionBandits,
+                settlement.Parties.Where(party => party.IsBandit).Sum(party => party.MemberRoster.TotalHealthyCount));
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId!, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(banditTroopId!, out var banditTroop));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(banditParties[0].PartyId, out var firstBanditParty));
+            using (new AllowedThread())
+                firstBanditParty.MemberRoster.AddToCounts(banditTroop, -1);
+            Campaign.Current.MapTimeTracker.Tick(CampaignTime.SecondsInMinute * CampaignTime.MinutesInHour);
+            Assert.Equal(
+                maximumMissionBandits,
+                settlement.Parties.Where(party => party.IsBandit)
+                    .Sum(party => party.MemberRoster.TotalHealthyCount));
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId!, out var settlement));
+            using (new BarterPlayerContext(playerHero, playerParty))
+                new HideoutCampaignBehavior().OnTroopRosterManageDone(null, isDirectAssault: false);
+            Assert.Equal(expectedNextAttackTime, settlement.Hideout.NextPossibleAttackTime);
+        }, new[] { AccessTools.Method(typeof(HideoutCampaignBehavior), "OnTroopRosterManageDone") });
+
+        var successfulAttemptRequests = client.NetworkSentMessages
+            .GetMessages<NetworkHideoutCampaignConsequenceRequested>()
+            .ToList();
+        Assert.Equal(
+            2,
+            successfulAttemptRequests.Count(
+                message => message.Consequence == HideoutCampaignConsequence.PrepareMission));
+        Assert.Single(
+            successfulAttemptRequests,
+            message => message.Consequence == HideoutCampaignConsequence.SetAttackCooldown);
 
         Server.Call(() =>
         {
@@ -355,6 +428,7 @@ public class HideoutMapEventTests : MapEventTestBase
         string? settlementId = null;
         string? banditTroopId = null;
         var banditParties = new List<string>();
+        var expectedNextAttackTime = CampaignTime.Zero;
 
         Server.Call(() =>
         {
@@ -401,6 +475,7 @@ public class HideoutMapEventTests : MapEventTestBase
 
             Assert.True(hideout.IsInfested);
             Assert.True(hideout.NextPossibleAttackTime.IsPast);
+            expectedNextAttackTime = CampaignTime.Now + Campaign.Current.Models.HideoutModel.HideoutHiddenDuration;
             Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
         });
 
@@ -439,22 +514,33 @@ public class HideoutMapEventTests : MapEventTestBase
                     .Sum(party => party.MemberRoster.TotalHealthyCount));
         }, new[] { AccessTools.Method(typeof(HideoutCampaignBehavior), "OnTroopRosterManageDone") });
 
+        var requests = client.NetworkSentMessages
+            .GetMessages<NetworkHideoutCampaignConsequenceRequested>()
+            .ToList();
+        var request = Assert.Single(
+            requests,
+            message => message.Consequence == HideoutCampaignConsequence.PrepareDirectAssaultMission);
+        var cooldownRequest = Assert.Single(
+            requests,
+            message => message.Consequence == HideoutCampaignConsequence.SetAttackCooldown);
+        var replies = Server.NetworkSentMessages
+            .GetMessages<NetworkHideoutCampaignConsequenceResolved>()
+            .ToList();
+        var reply = Assert.Single(replies, message => message.RequestId == request.RequestId);
+        Assert.Equal(request.RequestId, reply.RequestId);
+        Assert.True(reply.Accepted);
+        Assert.Equal(25, reply.ExpectedHealthyDefenderCount);
+        Assert.True(Assert.Single(replies, message => message.RequestId == cooldownRequest.RequestId).Accepted);
+
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId!, out var settlement));
+            Assert.Equal(expectedNextAttackTime, settlement.Hideout.NextPossibleAttackTime);
             Assert.Equal(
                 25,
                 settlement.Parties.Where(party => party.IsBandit)
                     .Sum(party => party.MemberRoster.TotalHealthyCount));
         });
-
-        var request = Assert.Single(
-            client.NetworkSentMessages.GetMessages<NetworkHideoutCampaignConsequenceRequested>(),
-            message => message.Consequence == HideoutCampaignConsequence.PrepareDirectAssaultMission);
-        var reply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkHideoutCampaignConsequenceResolved>());
-        Assert.Equal(request.RequestId, reply.RequestId);
-        Assert.True(reply.Accepted);
-        Assert.Equal(25, reply.ExpectedHealthyDefenderCount);
 
         var messages = Server.NetworkSentMessages.Messages;
         var replyIndex = messages.FindIndex(message => message is NetworkHideoutCampaignConsequenceResolved);
@@ -603,5 +689,21 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
             Assert.Same(mapEvent, leaderParty.MapEvent);
         }, MapEventDisabledMethods);
+    }
+
+    private static void SetHideoutPreparationTimeout(EnvironmentInstance instance, TimeSpan timeout)
+    {
+        instance.Call(() =>
+        {
+            var config = new Mock<INetworkConfig>();
+            config.SetupGet(x => x.ObjectCreationTimeout).Returns(timeout);
+
+            var coordinator = instance.Resolve<HideoutCampaignConsequencesHandler>();
+            var configurationField = AccessTools.Field(
+                typeof(HideoutCampaignConsequencesHandler),
+                "configuration");
+            Assert.NotNull(configurationField);
+            configurationField.SetValue(coordinator, config.Object);
+        });
     }
 }

@@ -69,7 +69,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
     /// </summary>
     internal bool RequestMissionPreparationBlocking(Settlement settlement, bool isDirectAssault)
     {
-        if (!ModInformation.IsClient || settlement?.IsHideout != true ||
+        if (ModInformation.IsServer || settlement?.IsHideout != true ||
             !objectManager.TryGetIdWithLogging(settlement, out var settlementId))
             return false;
 
@@ -120,7 +120,42 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                 return false;
             }
 
-            return true;
+            // Commit the cooldown only after this client has the authoritative defender roster.
+            var commitRequestId = Guid.NewGuid().ToString();
+            var commit = new PendingPreparation();
+            pendingPreparations[commitRequestId] = commit;
+            try
+            {
+                network.SendAll(new NetworkHideoutCampaignConsequenceRequested(
+                    settlementId,
+                    HideoutCampaignConsequence.SetAttackCooldown,
+                    commitRequestId));
+
+                var commitDeadline = DateTime.UtcNow + configuration.ObjectCreationTimeout;
+                if (!GameThread.WaitWhilePumping(() => commit.Completed.IsSet, commitDeadline))
+                {
+                    Logger.Warning(
+                        "Timed out waiting for authoritative hideout cooldown confirmation after roster parity; continuing mission startup. SettlementId={SettlementId}, RequestId={RequestId}",
+                        settlementId,
+                        commitRequestId);
+                    return true;
+                }
+
+                if (!commit.Accepted)
+                {
+                    Logger.Warning(
+                        "Server rejected hideout cooldown commit. SettlementId={SettlementId}, RequestId={RequestId}",
+                        settlementId,
+                        commitRequestId);
+                    return false;
+                }
+
+                return true;
+            }
+            finally
+            {
+                pendingPreparations.TryRemove(commitRequestId, out _);
+            }
         }
         finally
         {
@@ -211,8 +246,6 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                     return ConsequenceResult.Rejected;
                 }
 
-                settlement.Hideout.SetNextPossibleAttackTime(
-                    Campaign.Current.Models.HideoutModel.HideoutHiddenDuration);
                 FlushDefenderRosters(settlement);
                 return ConsequenceResult.AcceptedWith(GetHealthyDefenderCount(settlement));
 

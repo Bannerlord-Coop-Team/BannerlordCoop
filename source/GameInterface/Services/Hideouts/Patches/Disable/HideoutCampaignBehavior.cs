@@ -7,7 +7,9 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -50,6 +52,36 @@ internal class HideoutCampaignBehaviorPatch
         }
 
         return coordinator.RequestMissionPreparationBlocking(settlement, isDirectAssault);
+    }
+
+    [HarmonyPatch("OnTroopRosterManageDone")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> OnTroopRosterManageDoneTranspiler(
+        IEnumerable<CodeInstruction> instructions)
+    {
+        var setNextPossibleAttackTime = AccessTools.Method(
+            typeof(Hideout),
+            nameof(Hideout.SetNextPossibleAttackTime));
+        var setNextPossibleAttackTimeOnServer = AccessTools.Method(
+            typeof(HideoutCampaignBehaviorPatch),
+            nameof(SetNextPossibleAttackTimeOnServer));
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(setNextPossibleAttackTime))
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = setNextPossibleAttackTimeOnServer;
+            }
+
+            yield return instruction;
+        }
+    }
+
+    private static void SetNextPossibleAttackTimeOnServer(Hideout hideout, CampaignTime duration)
+    {
+        if (ModInformation.IsServer)
+            hideout.SetNextPossibleAttackTime(duration);
     }
 
     [HarmonyPatch("hideout_send_troops_result_failure_on_init")]
