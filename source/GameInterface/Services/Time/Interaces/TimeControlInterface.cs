@@ -13,6 +13,17 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Interaces;
 
+public interface IAutomaticPauseLease
+{
+    bool AppliedPause { get; }
+    bool IsActive { get; }
+
+    /// <summary>
+    /// Releases this owner when policies permit it. A false result keeps the lease active for retry.
+    /// </summary>
+    bool TryRelease(out TimeControlEnum? restoredMode);
+}
+
 public interface ITimeControlInterface : IGameAbstraction
 {
     void AddUnpausePolicy(Func<bool> policy);
@@ -21,20 +32,9 @@ public interface ITimeControlInterface : IGameAbstraction
     void RemoveFastForwardPolicy(Func<bool> policy);
     bool CanSetTimeControl(TimeControlEnum timeMode);
     TimeControlEnum GetTimeControl();
-    bool ServerTryCreatePause(out TimeControlEnum previousMode, out long pauseToken);
-    AutomaticPauseRestoreResult ServerTryRestoreTimeControl(
-        long pauseToken,
-        out TimeControlEnum restoredMode);
+    IAutomaticPauseLease ServerAcquireAutomaticPause(Func<bool> unpausePolicy = null);
     void ClientSetTimeControl(TimeControlEnum newMode);
     void ServerSetTimeControl(TimeControlEnum timeMode);
-}
-
-public enum AutomaticPauseRestoreResult
-{
-    Stale,
-    StillPaused,
-    Blocked,
-    Restored,
 }
 
 internal class TimeControlInterface : ITimeControlInterface
@@ -46,9 +46,8 @@ internal class TimeControlInterface : ITimeControlInterface
     private readonly List<WeakDelegate> fastForwardPolicies = new List<WeakDelegate>();
     private readonly INetwork network;
     private readonly object timeControlLock = new object();
-    private readonly HashSet<long> automaticPauseTokens = new HashSet<long>();
+    private readonly HashSet<AutomaticPauseLease> automaticPauseLeases = new HashSet<AutomaticPauseLease>();
     private TimeControlEnum? automaticPauseResumeMode;
-    private long nextAutomaticPauseToken;
 
     public TimeControlInterface(ITimeControlModeConverter modeConverter, INetwork network)
     {
@@ -72,7 +71,10 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <param name="policy">Function to check if unpausing is allowed. True is allowed and false is NOT allowed</param>
     public void AddUnpausePolicy(Func<bool> policy)
     {
-        unpausePolicies.Add(policy);
+        lock (timeControlLock)
+        {
+            unpausePolicies.Add(policy);
+        }
     }
 
     /// <summary>
@@ -81,7 +83,10 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <param name="policy">Policy to remove</param>
     public void RemoveUnpausePolicy(Func<bool> policy)
     {
-        unpausePolicies.Remove(policy);
+        lock (timeControlLock)
+        {
+            unpausePolicies.Remove(policy);
+        }
     }
 
     /// <summary>
@@ -90,7 +95,10 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <param name="policy">Function to check if fast-forwarding is allowed. True is allowed and false is NOT allowed</param>
     public void AddFastForwardPolicy(Func<bool> policy)
     {
-        fastForwardPolicies.Add(policy);
+        lock (timeControlLock)
+        {
+            fastForwardPolicies.Add(policy);
+        }
     }
 
     /// <summary>
@@ -99,7 +107,10 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <param name="policy">Policy to remove</param>
     public void RemoveFastForwardPolicy(Func<bool> policy)
     {
-        fastForwardPolicies.Remove(policy);
+        lock (timeControlLock)
+        {
+            fastForwardPolicies.Remove(policy);
+        }
     }
 
     public bool CanSetTimeControl(TimeControlEnum timeMode)
@@ -116,29 +127,33 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <returns>The highest mode the policies permit for the request</returns>
     internal TimeControlEnum LimitTimeControl(TimeControlEnum requestedMode)
     {
-        if (requestedMode != TimeControlEnum.Pause &&
-            TryGetDisallowingPolicy(unpausePolicies, out var unpausePolicy))
+        lock (timeControlLock)
         {
-            Logger.Information(
-                "Time control request {RequestedMode} limited to {EffectiveMode} by {Policy}",
-                requestedMode,
-                TimeControlEnum.Pause,
-                unpausePolicy);
-            return TimeControlEnum.Pause;
-        }
+            if (requestedMode != TimeControlEnum.Pause &&
+                (TryGetDisallowingPolicy(unpausePolicies, out var unpausePolicy) ||
+                 TryGetDisallowingAutomaticPausePolicy(out unpausePolicy)))
+            {
+                Logger.Information(
+                    "Time control request {RequestedMode} limited to {EffectiveMode} by {Policy}",
+                    requestedMode,
+                    TimeControlEnum.Pause,
+                    unpausePolicy);
+                return TimeControlEnum.Pause;
+            }
 
-        if (requestedMode == TimeControlEnum.Play_2x &&
-            TryGetDisallowingPolicy(fastForwardPolicies, out var fastForwardPolicy))
-        {
-            Logger.Information(
-                "Time control request {RequestedMode} limited to {EffectiveMode} by {Policy}",
-                requestedMode,
-                TimeControlEnum.Play_1x,
-                fastForwardPolicy);
-            return TimeControlEnum.Play_1x;
-        }
+            if (requestedMode == TimeControlEnum.Play_2x &&
+                TryGetDisallowingPolicy(fastForwardPolicies, out var fastForwardPolicy))
+            {
+                Logger.Information(
+                    "Time control request {RequestedMode} limited to {EffectiveMode} by {Policy}",
+                    requestedMode,
+                    TimeControlEnum.Play_1x,
+                    fastForwardPolicy);
+                return TimeControlEnum.Play_1x;
+            }
 
-        return requestedMode;
+            return requestedMode;
+        }
     }
 
     /// <summary>
@@ -168,6 +183,22 @@ internal class TimeControlInterface : ITimeControlInterface
         return false;
     }
 
+    private bool TryGetDisallowingAutomaticPausePolicy(out string policyName)
+    {
+        foreach (var pauseLease in automaticPauseLeases)
+        {
+            var policy = pauseLease.UnpausePolicy;
+            if (policy == null || policy())
+                continue;
+
+            policyName = $"{policy.Method.DeclaringType?.Name}.{policy.Method.Name}";
+            return true;
+        }
+
+        policyName = null;
+        return false;
+    }
+
 
     /// <summary>
     /// This should only run server side
@@ -184,89 +215,110 @@ internal class TimeControlInterface : ITimeControlInterface
         lock (timeControlLock)
         {
             var effectiveMode = LimitTimeControl(timeMode);
-            if (timeMode == TimeControlEnum.Pause || effectiveMode != TimeControlEnum.Pause)
+            if (timeMode == TimeControlEnum.Pause)
             {
-                InvalidateAutomaticPauses();
+                InvalidateAutomaticPauses(preserveUnpauseGuards: true);
+            }
+            else if (effectiveMode != TimeControlEnum.Pause)
+            {
+                InvalidateAutomaticPauses(preserveUnpauseGuards: false);
             }
 
             ApplyServerTimeControl(timeMode, effectiveMode);
         }
     }
 
-    public bool ServerTryCreatePause(out TimeControlEnum previousMode, out long pauseToken)
+    public IAutomaticPauseLease ServerAcquireAutomaticPause(Func<bool> unpausePolicy = null)
     {
         lock (timeControlLock)
         {
-            bool isFirstAutomaticPause = automaticPauseTokens.Count == 0;
-            previousMode = isFirstAutomaticPause
-                ? GetTimeControl()
-                : automaticPauseResumeMode.Value;
-            pauseToken = default;
+            bool isFirstAutomaticPause = automaticPauseLeases.Count == 0;
+            var previousMode = isFirstAutomaticPause ? GetTimeControl() : TimeControlEnum.Pause;
+            bool applyPause = isFirstAutomaticPause && previousMode != TimeControlEnum.Pause;
+            var pauseLease = new AutomaticPauseLease(this, applyPause, unpausePolicy);
+            automaticPauseLeases.Add(pauseLease);
 
-            if (isFirstAutomaticPause && previousMode == TimeControlEnum.Pause)
+            if (!applyPause)
             {
-                return false;
-            }
-
-            pauseToken = ++nextAutomaticPauseToken;
-            automaticPauseTokens.Add(pauseToken);
-
-            if (!isFirstAutomaticPause)
-            {
-                return true;
+                return pauseLease;
             }
 
             automaticPauseResumeMode = previousMode;
             try
             {
                 ApplyServerTimeControl(TimeControlEnum.Pause, TimeControlEnum.Pause);
-                return true;
+                return pauseLease;
             }
             catch
             {
-                automaticPauseTokens.Remove(pauseToken);
+                CompleteAutomaticPauseLease(pauseLease);
                 automaticPauseResumeMode = null;
                 throw;
             }
         }
     }
 
-    public AutomaticPauseRestoreResult ServerTryRestoreTimeControl(
-        long pauseToken,
-        out TimeControlEnum restoredMode)
+    private bool TryReleaseAutomaticPause(
+        AutomaticPauseLease pauseLease,
+        out TimeControlEnum? restoredMode)
     {
         lock (timeControlLock)
         {
-            restoredMode = TimeControlEnum.Pause;
-            if (!automaticPauseTokens.Contains(pauseToken))
+            restoredMode = null;
+            if (!automaticPauseLeases.Contains(pauseLease))
             {
-                return AutomaticPauseRestoreResult.Stale;
+                return true;
             }
 
-            if (automaticPauseTokens.Count > 1)
+            if (automaticPauseLeases.Count > 1)
             {
-                automaticPauseTokens.Remove(pauseToken);
-                return AutomaticPauseRestoreResult.StillPaused;
+                CompleteAutomaticPauseLease(pauseLease);
+                return true;
+            }
+
+            if (!automaticPauseResumeMode.HasValue)
+            {
+                CompleteAutomaticPauseLease(pauseLease);
+                return true;
             }
 
             var requestedMode = automaticPauseResumeMode.Value;
             var effectiveMode = LimitTimeControl(requestedMode);
             if (effectiveMode == TimeControlEnum.Pause)
             {
-                return AutomaticPauseRestoreResult.Blocked;
+                return false;
             }
 
-            automaticPauseTokens.Remove(pauseToken);
+            CompleteAutomaticPauseLease(pauseLease);
             automaticPauseResumeMode = null;
             restoredMode = effectiveMode;
             ApplyServerTimeControl(requestedMode, effectiveMode);
-            return AutomaticPauseRestoreResult.Restored;
+            return true;
         }
     }
 
-    private void InvalidateAutomaticPauses()
+    private bool IsAutomaticPauseActive(AutomaticPauseLease pauseLease)
     {
-        automaticPauseTokens.Clear();
+        lock (timeControlLock)
+        {
+            return automaticPauseLeases.Contains(pauseLease);
+        }
+    }
+
+    private void CompleteAutomaticPauseLease(AutomaticPauseLease pauseLease)
+    {
+        automaticPauseLeases.Remove(pauseLease);
+    }
+
+    private void InvalidateAutomaticPauses(bool preserveUnpauseGuards)
+    {
+        automaticPauseLeases.RemoveWhere(pauseLease =>
+        {
+            if (preserveUnpauseGuards && pauseLease.UnpausePolicy != null)
+                return false;
+
+            return true;
+        });
         automaticPauseResumeMode = null;
     }
 
@@ -285,5 +337,28 @@ internal class TimeControlInterface : ITimeControlInterface
         network.SendAll(new NetworkChangeTimeControlMode(effectiveMode));
 
         ClientSetTimeControl(effectiveMode);
+    }
+
+    private sealed class AutomaticPauseLease : IAutomaticPauseLease
+    {
+        private readonly TimeControlInterface timeControlInterface;
+        public readonly Func<bool> UnpausePolicy;
+
+        public AutomaticPauseLease(
+            TimeControlInterface timeControlInterface,
+            bool appliedPause,
+            Func<bool> unpausePolicy)
+        {
+            this.timeControlInterface = timeControlInterface;
+            AppliedPause = appliedPause;
+            UnpausePolicy = unpausePolicy;
+        }
+
+        public bool AppliedPause { get; }
+
+        public bool IsActive => timeControlInterface.IsAutomaticPauseActive(this);
+
+        public bool TryRelease(out TimeControlEnum? restoredMode) =>
+            timeControlInterface.TryReleaseAutomaticPause(this, out restoredMode);
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network.Messages;
 using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -26,7 +27,7 @@ internal class PlayerOccupancyPauseHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ITimeControlInterface timeControlInterface;
-    private long? occupancyPauseToken;
+    private IAutomaticPauseLease occupancyPauseLease;
 
     public PlayerOccupancyPauseHandler(
         IMessageBroker messageBroker,
@@ -40,11 +41,13 @@ internal class PlayerOccupancyPauseHandler : IHandler
         this.timeControlInterface = timeControlInterface;
 
         messageBroker.Subscribe<PartyOccupancyChanged>(Handle_PartyOccupancyChanged);
+        messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyOccupancyChanged>(Handle_PartyOccupancyChanged);
+        messageBroker.Unsubscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
     }
 
     private void Handle_PartyOccupancyChanged(MessagePayload<PartyOccupancyChanged> payload)
@@ -52,6 +55,21 @@ internal class PlayerOccupancyPauseHandler : IHandler
         if (ModInformation.IsClient)
             return;
 
+        ReevaluateOccupancy(payload.What.MobileParty?.StringId ?? "<null>");
+    }
+
+    private void Handle_PlayerConnectionStateChanged(MessagePayload<PlayerConnectionStateChanged> payload)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        GameThread.RunSafe(
+            () => ReevaluateOccupancy("player connection state changed"),
+            context: nameof(PlayerOccupancyPauseHandler));
+    }
+
+    private void ReevaluateOccupancy(string trigger)
+    {
         bool allPlayersOccupied = AllPlayersOccupied();
         if (allPlayersOccupied && !ModConfigProvider.ModOptions.AutoPauseEnabled)
             return;
@@ -63,15 +81,15 @@ internal class PlayerOccupancyPauseHandler : IHandler
         if (appliedMode.Value == TimeControlEnum.Pause)
         {
             Logger.Information(
-                "Pausing campaign because every connected player is occupied: triggerParty={TriggerParty} players={@Players}",
-                payload.What.MobileParty?.StringId ?? "<null>",
+                "Pausing campaign because every connected player is occupied: trigger={Trigger} players={@Players}",
+                trigger,
                 DescribeConnectedPlayers());
         }
         else
         {
             Logger.Information(
-                "Restoring campaign time after a player became free: triggerParty={TriggerParty} mode={Mode}",
-                payload.What.MobileParty?.StringId ?? "<null>",
+                "Restoring campaign time after a player became free: trigger={Trigger} mode={Mode}",
+                trigger,
                 appliedMode.Value);
         }
     }
@@ -80,31 +98,26 @@ internal class PlayerOccupancyPauseHandler : IHandler
     {
         if (allPlayersOccupied)
         {
-            if (occupancyPauseToken.HasValue)
-                return null;
+            if (occupancyPauseLease != null)
+            {
+                if (occupancyPauseLease.IsActive)
+                    return null;
 
-            if (!timeControlInterface.ServerTryCreatePause(
-                    out _,
-                    out var pauseToken))
-                return null;
+                occupancyPauseLease = null;
+            }
 
-            occupancyPauseToken = pauseToken;
-            return TimeControlEnum.Pause;
+            occupancyPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
+            return occupancyPauseLease.AppliedPause ? TimeControlEnum.Pause : (TimeControlEnum?)null;
         }
 
-        if (!occupancyPauseToken.HasValue)
+        if (occupancyPauseLease == null)
             return null;
 
-        var result = timeControlInterface.ServerTryRestoreTimeControl(
-                occupancyPauseToken.Value,
-                out var restoredMode);
-        if (result == AutomaticPauseRestoreResult.Blocked)
+        if (!occupancyPauseLease.TryRelease(out var restoredMode))
             return null;
 
-        occupancyPauseToken = null;
-        return result == AutomaticPauseRestoreResult.Restored
-            ? restoredMode
-            : (TimeControlEnum?)null;
+        occupancyPauseLease = null;
+        return restoredMode;
     }
 
     private string[] DescribeConnectedPlayers()
