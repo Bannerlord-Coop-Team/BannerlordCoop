@@ -42,12 +42,13 @@ internal static class FollowPartyFixtureCommands
                 party.IsLordParty &&
                 !party.IsPlayerParty() &&
                 IsAvailableOnMap(party) &&
+                party.DefaultBehavior == AiBehavior.PatrolAroundPoint &&
                 party.IsCurrentlyAtSea == playerParty.IsCurrentlyAtSea &&
                 objectManager.TryGetId(party, out _))
             .OrderBy(party => party.Position.DistanceSquared(playerParty.Position))
             .FirstOrDefault();
         if (targetParty == null)
-            return "No eligible registered AI lord party is available for the follow fixture.";
+            return "No eligible patrolling registered AI lord party is available for the follow fixture.";
         if (!behaviorSnapshot.TryCreate(playerParty, out PartyBehaviorUpdateData playerState) ||
             !behaviorSnapshot.TryCreate(targetParty, out PartyBehaviorUpdateData targetState))
             return "Unable to capture the original movement state for both fixture parties.";
