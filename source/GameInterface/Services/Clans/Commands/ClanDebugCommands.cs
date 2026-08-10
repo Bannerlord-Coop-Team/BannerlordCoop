@@ -72,7 +72,21 @@ namespace GameInterface.Services.GameDebug.Commands
             return $"CLAN_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is ClanState} " +
                 $"topScreen={clanScreen != null} dataSource={clanScreen?._dataSource != null} " +
                 $"parties={clanScreen?._dataSource?.ClanParties?._parties?.Count ?? -1} " +
+                $"partiesSelected={clanScreen?._dataSource?.IsPartiesSelected ?? false} " +
                 $"mainHero={Hero.MainHero?.StringId ?? "none"}";
+        }
+
+        [CommandLineArgumentFunction("select_parties", "coop.debug.clan")]
+        public static string SelectParties(List<string> args)
+        {
+            if (!ModInformation.IsClient) return "Command can only be run on a client.";
+            if (args.Count != 0) return "Usage: coop.debug.clan.select_parties";
+
+            var clanScreen = ScreenManager.TopScreen as GauntletClanScreen;
+            if (clanScreen?._dataSource == null) return "The Clan screen is unavailable.";
+
+            clanScreen._dataSource.SetSelectedCategory(1);
+            return $"CLAN_PARTIES_SELECTED parties={clanScreen._dataSource.ClanParties?._parties?.Count ?? -1}";
         }
 
         [CommandLineArgumentFunction("wage_state", "coop.debug.clan")]
