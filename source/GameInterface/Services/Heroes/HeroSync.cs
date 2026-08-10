@@ -65,7 +65,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Father)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Mother)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Spouse)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.IsReady)));
+            // MBObjectBase.IsReady is process-local object-registration readiness, not campaign state.
 
             // TODO add all fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Culture)));
