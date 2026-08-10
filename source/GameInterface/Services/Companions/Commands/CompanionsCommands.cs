@@ -887,11 +887,11 @@ internal class CompanionsCommands
             int playerGold = pendingRescueFixture?.PlayerHero.Gold ?? -1;
 
             if (joinCount != 0 || partyCount != 0 || fixturePartyCount != 0 ||
-                pendingRescueFixture != null &&
-                (memberCount != pendingRescueFixture.OriginalMemberCount ||
-                 companionCount != pendingRescueFixture.OriginalCompanionCount ||
-                 warPartyCount != pendingRescueFixture.OriginalWarPartyCount ||
-                 pendingRescueFixture.PlayerHero.Gold != pendingRescueFixture.OriginalPlayerGold))
+                (pendingRescueFixture != null &&
+                 (memberCount != pendingRescueFixture.OriginalMemberCount ||
+                  companionCount != pendingRescueFixture.OriginalCompanionCount ||
+                  warPartyCount != pendingRescueFixture.OriginalWarPartyCount ||
+                  pendingRescueFixture.PlayerHero.Gold != pendingRescueFixture.OriginalPlayerGold)))
             {
                 return $"RESCUE_FIXTURE_RESTORE_FAILED join={joinCount} lead={partyCount} " +
                     $"fixtureParties={fixturePartyCount} members={memberCount} " +
