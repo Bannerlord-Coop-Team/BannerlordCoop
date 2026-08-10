@@ -4,6 +4,7 @@ using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Tournaments;
+using GameInterface.Services.Time.UI;
 using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
@@ -50,6 +51,9 @@ public class MissionModule : Module
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
             .InstancePerDependency();
+        builder.RegisterType<MovementRateController>()
+            .As<IMovementRateController>()
+            .InstancePerDependency();
         builder.RegisterType<BattleAgentSpawnBatchCodec>()
             .As<IBattleAgentSpawnBatchCodec>()
             .InstancePerDependency();
@@ -58,6 +62,10 @@ public class MissionModule : Module
             .InstancePerLifetimeScope()
             .AutoActivate();
         builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
+        builder.RegisterType<MissionMapTimeView>()
+            .AsSelf()
+            .As<ILocationMissionBehavior>()
+            .InstancePerDependency();
 
         // MissionContext mirrors the server's instance membership and must live for the whole client
         // session (it subscribes to the MissionPeer* messages over the campaign connection), so it is a

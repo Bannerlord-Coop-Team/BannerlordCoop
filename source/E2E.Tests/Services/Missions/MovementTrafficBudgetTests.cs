@@ -32,11 +32,12 @@ public sealed class MovementTrafficBudgetTests
         var network = new Mock<IBattleNetwork>();
         var compressor = new SizedPacketCompressor();
         var budget = new MovementTrafficBudget(bytesPerSecond: 30, burstBytes: 30);
-        var sender = new MovementBatchSender(network.Object, compressor, budget);
+        var sender = new MovementBatchSender(network.Object, compressor, () => budget);
         var sent = new List<(Guid Id, int Value)>();
         Guid[] ids = CreateIds(10);
 
         MovementSendResult first = sender.Send(
+            "receiver",
             new[] { CreateBatch(ids, valueOffset: 0) },
             legacyBatch: null,
             maxPayloadBytes: 1000,
@@ -47,6 +48,7 @@ public sealed class MovementTrafficBudgetTests
 
         sender.BeginFrame(1f);
         MovementSendResult second = sender.Send(
+            "receiver",
             new[] { CreateBatch(ids, valueOffset: 100) },
             legacyBatch: null,
             maxPayloadBytes: 1000,
@@ -64,7 +66,7 @@ public sealed class MovementTrafficBudgetTests
         var network = new Mock<IBattleNetwork>();
         var compressor = new SizedPacketCompressor();
         var budget = new MovementTrafficBudget(bytesPerSecond: 100, burstBytes: 100);
-        var sender = new MovementBatchSender(network.Object, compressor, budget);
+        var sender = new MovementBatchSender(network.Object, compressor, () => budget);
         Guid[] ids = CreateIds(1000);
         var sentIds = new HashSet<Guid>();
 
@@ -72,6 +74,7 @@ public sealed class MovementTrafficBudgetTests
         {
             if (cycle > 0) sender.BeginFrame(1f);
             sender.Send(
+                "receiver",
                 new[] { CreateBatch(ids, valueOffset: cycle * 1000) },
                 legacyBatch: null,
                 maxPayloadBytes: 1000,
@@ -89,12 +92,13 @@ public sealed class MovementTrafficBudgetTests
         var network = new Mock<IBattleNetwork>();
         var compressor = new SizedPacketCompressor();
         var budget = new MovementTrafficBudget(bytesPerSecond: 10, burstBytes: 10);
-        var sender = new MovementBatchSender(network.Object, compressor, budget);
+        var sender = new MovementBatchSender(network.Object, compressor, () => budget);
         Guid firstId = Guid.NewGuid();
         Guid secondId = Guid.NewGuid();
         var sentIds = new List<Guid>();
 
         sender.Send(
+            "receiver",
             new[]
             {
                 CreateCompactBatch("first", firstId, 1),
@@ -107,6 +111,7 @@ public sealed class MovementTrafficBudgetTests
 
         sender.BeginFrame(1f);
         sender.Send(
+            "receiver",
             new[]
             {
                 CreateCompactBatch("first", firstId, 3),
@@ -118,6 +123,49 @@ public sealed class MovementTrafficBudgetTests
             (id, value) => sentIds.Add(id));
 
         Assert.Equal(new[] { firstId, secondId }, sentIds);
+    }
+
+    [Fact]
+    public void Sender_TracksBudgetAndFairnessPerRecipient()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var compressor = new SizedPacketCompressor();
+        var budgets = new Queue<IMovementTrafficBudget>(new[]
+        {
+            new MovementTrafficBudget(bytesPerSecond: 10, burstBytes: 10),
+            new MovementTrafficBudget(bytesPerSecond: 100, burstBytes: 100),
+        });
+        var sender = new MovementBatchSender(
+            network.Object,
+            compressor,
+            () => budgets.Dequeue());
+        Guid[] ids = CreateIds(10);
+
+        MovementSendResult slow = sender.Send(
+            "slow",
+            new[] { CreateBatch(ids, valueOffset: 0) },
+            legacyBatch: null,
+            maxPayloadBytes: 1000,
+            CreatePacket,
+            onSent: null);
+        MovementSendResult fast = sender.Send(
+            "fast",
+            new[] { CreateBatch(ids, valueOffset: 0) },
+            legacyBatch: null,
+            maxPayloadBytes: 1000,
+            CreatePacket,
+            onSent: null);
+
+        Assert.Equal(1, slow.SentCount);
+        Assert.Equal(9, slow.DeferredCount);
+        Assert.Equal(10, fast.SentCount);
+        Assert.Equal(0, fast.DeferredCount);
+        network.Verify(
+            value => value.Send("slow", It.IsAny<IPacket>(), It.IsAny<byte[]>()),
+            Times.Once);
+        network.Verify(
+            value => value.Send("fast", It.IsAny<IPacket>(), It.IsAny<byte[]>()),
+            Times.AtLeastOnce);
     }
 
     private static Guid[] CreateIds(int count)

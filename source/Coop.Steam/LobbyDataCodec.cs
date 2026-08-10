@@ -1,6 +1,7 @@
 ﻿using Common.Network.Session;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Coop.Steam;
 
@@ -19,6 +20,7 @@ public static class LobbyDataCodec
     public const string ConnectedPlayersKey = "coop_connected_players";
     public const string LobbyTypeKey = "coop_lobby_type";
     public const string VisibilityKey = "coop_visibility";
+    public const string AdvertisementExpiresAtKey = "coop_advertisement_expires_at";
     public const string StandaloneLobbyType = "standalone";
     public const string HiddenStandaloneLobbyType = "standalone_hidden";
     public const string PlayerLobbyType = "player";
@@ -58,6 +60,12 @@ public static class LobbyDataCodec
         visibility = ServerVisibility.None;
         return false;
     }
+
+    public static string EncodeAdvertisementExpiry(uint expiresAt)
+        => expiresAt.ToString(CultureInfo.InvariantCulture);
+
+    public static bool TryDecodeAdvertisementExpiry(string value, out uint expiresAt)
+        => uint.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out expiresAt);
 
     public static IReadOnlyDictionary<string, string> Encode(SessionJoinInfo info)
     {

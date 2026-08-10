@@ -69,4 +69,44 @@ public class AutoRegistryRemapTests
         Assert.True(objectManager.TryGetObject<object>("Object_lord_1_8", out var found));
         Assert.Same(attachment, found);
     }
+
+    [Fact]
+    public void RegisterAllObjects_RepeatedRefreshRetainsExistingIdsAndAddsNewObjects()
+    {
+        var objectManager = new ObjectManager(Mock.Of<ILogger>());
+        var existing = new object();
+        var added = new object();
+        var registry = new TestRegistry(objectManager);
+        registry.ToRegister.Add(("existing_1", existing));
+        registry.RegisterAllObjects();
+
+        Assert.True(objectManager.TryGetId(existing, out var originalId));
+
+        registry.ToRegister.Add(("added_2", added));
+        registry.RegisterAllObjects();
+
+        Assert.True(objectManager.TryGetId(existing, out var refreshedId));
+        Assert.Equal(originalId, refreshedId);
+        Assert.True(objectManager.TryGetObject<object>("Object_added_2", out var found));
+        Assert.Same(added, found);
+        Assert.True(objectManager.AddNewObject(new object(), out var generatedId));
+        Assert.Equal("Object_5", generatedId);
+    }
+
+    [Fact]
+    public void RegisterAllObjects_DifferentObjectWithDuplicateIdRemainsUnregistered()
+    {
+        var objectManager = new ObjectManager(Mock.Of<ILogger>());
+        var registered = new object();
+        var colliding = new object();
+        var registry = new TestRegistry(objectManager);
+        registry.ToRegister.Add(("shared", registered));
+        registry.ToRegister.Add(("shared", colliding));
+
+        registry.RegisterAllObjects();
+
+        Assert.True(objectManager.TryGetObject<object>("Object_shared", out var found));
+        Assert.Same(registered, found);
+        Assert.False(objectManager.TryGetId(colliding, out _));
+    }
 }

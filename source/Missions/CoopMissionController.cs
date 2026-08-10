@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using Missions.Agents.Handlers;
 using Missions.Battles;
 #if DEBUG
 using Missions.Diagnostics;
@@ -32,16 +33,21 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     protected readonly IObjectManager objectManager;
     protected readonly ICoopMissionComponent coopMissionComponent;
 
+    internal IAgentMovementHandler AgentMovementHandler =>
+        coopMissionComponent.AgentMovementHandler;
+
     protected CoopMissionController(
         IBattleNetwork network,
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ICoopMissionComponent coopMissionComponent)
+        ICoopMissionComponent coopMissionComponent,
+        MovementCadenceProfile movementCadenceProfile)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
+        coopMissionComponent.AgentMovementHandler.Configure(movementCadenceProfile);
 
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);

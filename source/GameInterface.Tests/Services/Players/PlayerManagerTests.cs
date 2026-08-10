@@ -223,6 +223,80 @@ public class PlayerManagerTests
         Assert.Same(current, resolved);
     }
 
+    [Fact]
+    public void ReplacePlayer_CurrentRegistration_UpdatesControllerAndPeerAtomically()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var registered = new Player(ControllerId, "Hero", "StaleParty", "Clan", "Character");
+        var replacement = new Player(ControllerId, "Hero", "RecoveredParty", "Clan", "Character");
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(registered));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.True(playerManager.ReplacePlayer(registered, replacement));
+
+        Assert.True(playerManager.TryGetPlayer(ControllerId, out var byController));
+        Assert.Same(replacement, byController);
+        Assert.True(playerManager.TryGetPlayer(peer, out var byPeer));
+        Assert.Same(replacement, byPeer);
+        Assert.Same(replacement, Assert.Single(playerManager.Players));
+    }
+
+    [Fact]
+    public void ReplacePlayer_ChangedParty_ReplacesControlledObjectMarker()
+    {
+        var staleParty = ObjectHelper.SkipConstructor<MobileParty>();
+        var recoveredParty = ObjectHelper.SkipConstructor<MobileParty>();
+        var playerManager = CreatePlayerManager(out var objectManager);
+        var registered = new Player(ControllerId, string.Empty, "StaleParty", string.Empty, string.Empty);
+        var replacement = new Player(ControllerId, string.Empty, "RecoveredParty", string.Empty, string.Empty);
+        MobileParty resolvedStaleParty = staleParty;
+        MobileParty resolvedRecoveredParty = recoveredParty;
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging("StaleParty", out resolvedStaleParty))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObject("StaleParty", out resolvedStaleParty))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging("RecoveredParty", out resolvedRecoveredParty))
+            .Returns(true);
+
+        var playerObjects = GetPlayerObjects();
+        try
+        {
+            Assert.True(playerManager.AddPlayer(registered));
+            Assert.True(playerManager.Contains(staleParty));
+
+            Assert.True(playerManager.ReplacePlayer(registered, replacement));
+
+            Assert.False(playerManager.Contains(staleParty));
+            Assert.True(playerManager.Contains(recoveredParty));
+        }
+        finally
+        {
+            playerObjects.Remove(staleParty);
+            playerObjects.Remove(recoveredParty);
+        }
+    }
+
+    [Fact]
+    public void ReplacePlayer_SupersededRegistration_LeavesCurrentRegistrationIntact()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var superseded = new Player(ControllerId, "OldHero", string.Empty, string.Empty, string.Empty);
+        var current = new Player(ControllerId, "CurrentHero", string.Empty, string.Empty, string.Empty);
+        var replacement = new Player(ControllerId, "ReplacementHero", string.Empty, string.Empty, string.Empty);
+
+        Assert.True(playerManager.AddPlayer(superseded));
+        Assert.True(playerManager.RemovePlayer(superseded));
+        Assert.True(playerManager.AddPlayer(current));
+
+        Assert.False(playerManager.ReplacePlayer(superseded, replacement));
+        Assert.Same(current, Assert.Single(playerManager.Players));
+    }
+
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
             .Field(typeof(PlayerManager), "PlayerObjects")
