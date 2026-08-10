@@ -91,6 +91,10 @@ public class CreateCharacterState : ConnectionStateBase
         var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
         network.SendAllBut(netPeer, message);
 
+        // Run authoritative setup only after existing clients can create the referenced hero graph. Follow-up
+        // messages use the same reliable-ordered channel; the joining peer is still dropping pre-snapshot deltas.
+        heroInterface.SetupServerHero(hero);
+
         // Respond with ids for the creating client
         network.SendImmediate(netPeer, new NetworkHeroRecieved(player));
 

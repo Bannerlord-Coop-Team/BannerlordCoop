@@ -116,6 +116,36 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void NetworkTransferNewHero_AnnouncesBeforeAuthoritativeServerSetup()
+        {
+            // Arrange
+            var hero = SetupUnpackedHero();
+            var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
+            var creationWasSentBeforeSetup = false;
+            var joiningPeerWasAnsweredBeforeSetup = false;
+            heroInterfaceMock
+                .Setup(h => h.SetupServerHero(hero))
+                .Callback(() =>
+                {
+                    creationWasSentBeforeSetup = serverComponent.TestNetwork.SentNetworkMessages
+                        .TryGetValue(differentPeer.Id, out var messages) &&
+                        messages.OfType<NetworkNewPlayerHeroCreated>().Any();
+                    joiningPeerWasAnsweredBeforeSetup = serverComponent.TestNetwork.ImmediateSends.Any();
+                });
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            // Act
+            var payload = new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+            currentState.Handle_NetworkTransferNewHero(payload);
+
+            // Assert
+            Assert.True(creationWasSentBeforeSetup);
+            Assert.False(joiningPeerWasAnsweredBeforeSetup);
+            heroInterfaceMock.Verify(h => h.SetupServerHero(hero), Times.Once);
+        }
+
+        [Fact]
         public void NetworkTransferNewHero_ReplaysExistingPlayersToJoiner_ExceptItselfAndHost()
         {
             // Arrange — a pre-existing client, the host, and the joiner's own player are all in the registry.
@@ -205,7 +235,7 @@ namespace Coop.Tests.Server.Connections.States
         /// <param name="registerCharacterObject">
         /// When false, the hero's CharacterObject is left unregistered so TryCreatePlayer fails to resolve its id.
         /// </param>
-        private void SetupUnpackedHero(bool registerCharacterObject = true)
+        private Hero SetupUnpackedHero(bool registerCharacterObject = true)
         {
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
@@ -233,6 +263,8 @@ namespace Coop.Tests.Server.Connections.States
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
                 .Returns(true);
+
+            return hero;
         }
     }
 }
