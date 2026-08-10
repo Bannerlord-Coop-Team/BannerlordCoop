@@ -28,10 +28,33 @@ namespace GameInterface.Utils
 
         private static Dictionary<Type, Dictionary<string, FieldInfo>> fieldInfoCache = new Dictionary<Type, Dictionary<string, FieldInfo>>();
         private static Dictionary<Type, Dictionary<string, PropertyInfo>> propertyInfoCache = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+        private static readonly Lazy<MethodBase[]> declaredMethodTargets = new Lazy<MethodBase[]>(() => SelectTargetMethods(false));
+        private static readonly Lazy<MethodBase[]> declaredMemberTargets = new Lazy<MethodBase[]>(() => SelectTargetMethods(true));
 
         public static IEnumerable<MethodBase> TargetMethods()
         {
-            return AccessTools.GetDeclaredMethods(typeof(TInstance));
+            return declaredMethodTargets.Value;
+        }
+
+        public static IEnumerable<MethodBase> TranspilerTargets(bool includeConstructors)
+        {
+            return includeConstructors ? declaredMemberTargets.Value : declaredMethodTargets.Value;
+        }
+
+        private static MethodBase[] SelectTargetMethods(bool includeConstructors)
+        {
+            IEnumerable<MethodBase> candidates = AccessTools.GetDeclaredMethods(typeof(TInstance))
+                .Where(method => !method.IsAbstract)
+                .Cast<MethodBase>();
+
+            if (includeConstructors)
+            {
+                candidates = AccessTools.GetDeclaredConstructors(typeof(TInstance))
+                    .Cast<MethodBase>()
+                    .Concat(candidates);
+            }
+
+            return GenericPatchHelpers.SelectTranspilerTargets(candidates, typeof(TPatch)).ToArray();
         }
 
         #region ListTranspiler
@@ -1438,6 +1461,110 @@ namespace GameInterface.Utils
 
     public class GenericPatchHelpers
     {
+        /// <summary>
+        /// Drops only empty, null-return, and numeric constant-return stubs unless a declared transpiler changes their composed
+        /// instruction stream. Other methods remain targets because the existing detour can be a required
+        /// JIT anti-inlining boundary even when this patch class does not rewrite that method's own IL.
+        /// </summary>
+        public static IEnumerable<MethodBase> SelectTranspilerTargets(IEnumerable<MethodBase> candidates, Type patchType)
+        {
+            if (candidates == null) throw new ArgumentNullException(nameof(candidates));
+            if (patchType == null) throw new ArgumentNullException(nameof(patchType));
+
+            var transpilers = AccessTools.GetDeclaredMethods(patchType)
+                .Where(method => method.GetCustomAttributes(typeof(HarmonyTranspiler), false).Any())
+                .ToArray();
+
+            foreach (var candidate in candidates.Where(candidate => candidate != null && !candidate.IsAbstract).Distinct())
+            {
+                if (!IsTrivialStub(candidate) ||
+                    transpilers.Any(transpiler => ChangesInstructions(candidate, transpiler)))
+                {
+                    yield return candidate;
+                }
+            }
+        }
+
+        private static bool IsTrivialStub(MethodBase candidate)
+        {
+            try
+            {
+                var instructions = PatchProcessor.GetCurrentInstructions(candidate)
+                    .Where(instruction => instruction.opcode != OpCodes.Nop)
+                    .ToArray();
+
+                if (instructions.Length == 1)
+                    return instructions[0].opcode == OpCodes.Ret;
+
+                if (instructions.Length != 2 || instructions[1].opcode != OpCodes.Ret)
+                    return false;
+
+                var opcode = instructions[0].opcode;
+                return opcode == OpCodes.Ldnull ||
+                    opcode == OpCodes.Ldc_I4_M1 ||
+                    opcode == OpCodes.Ldc_I4_0 ||
+                    opcode == OpCodes.Ldc_I4_1 ||
+                    opcode == OpCodes.Ldc_I4_2 ||
+                    opcode == OpCodes.Ldc_I4_3 ||
+                    opcode == OpCodes.Ldc_I4_4 ||
+                    opcode == OpCodes.Ldc_I4_5 ||
+                    opcode == OpCodes.Ldc_I4_6 ||
+                    opcode == OpCodes.Ldc_I4_7 ||
+                    opcode == OpCodes.Ldc_I4_8 ||
+                    opcode == OpCodes.Ldc_I4_S ||
+                    opcode == OpCodes.Ldc_I4 ||
+                    opcode == OpCodes.Ldc_I8 ||
+                    opcode == OpCodes.Ldc_R4 ||
+                    opcode == OpCodes.Ldc_R8;
+            }
+            catch
+            {
+                // Inspection failures preserve the existing target.
+                return false;
+            }
+        }
+
+        private static bool ChangesInstructions(MethodBase candidate, MethodInfo transpiler)
+        {
+            try
+            {
+                var parameters = transpiler.GetParameters();
+                if (!transpiler.IsStatic || parameters.Length != 1 ||
+                    !parameters[0].ParameterType.IsAssignableFrom(typeof(List<CodeInstruction>)))
+                {
+                    return true;
+                }
+
+                // AutoSync is installed after the static GameInterface patches, so classify the
+                // same composed instruction stream that Harmony will pass to this transpiler.
+                var instructions = PatchProcessor.GetCurrentInstructions(candidate);
+                var originalOpcodes = instructions.Select(instruction => instruction.opcode).ToArray();
+                var originalOperands = instructions.Select(instruction => instruction.operand).ToArray();
+
+                var result = transpiler.Invoke(null, new object[] { instructions }) as IEnumerable<CodeInstruction>;
+                if (result == null) return true;
+
+                var transpiled = result.ToArray();
+                if (transpiled.Length != originalOpcodes.Length) return true;
+
+                for (var i = 0; i < transpiled.Length; i++)
+                {
+                    if (transpiled[i].opcode != originalOpcodes[i] ||
+                        !Equals(transpiled[i].operand, originalOperands[i]))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            catch
+            {
+                // Preserve the existing target when its IL cannot be inspected safely.
+                return true;
+            }
+        }
+
         public static ConcurrentDictionary<FieldInfo, MethodInfo> FieldInterceptCache = new ConcurrentDictionary<FieldInfo, MethodInfo>();
         public static ConcurrentDictionary<MemberInfo, MethodInfo> CollectionAddInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
         public static ConcurrentDictionary<MemberInfo, MethodInfo> CollectionRemoveInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();

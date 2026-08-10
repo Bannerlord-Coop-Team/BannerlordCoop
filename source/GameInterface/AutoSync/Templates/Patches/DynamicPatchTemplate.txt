@@ -28,15 +28,10 @@ public class {{PatchClassName}} : GenericPatches<{{PatchClassName}}, {{Declaring
 {
     private readonly static ILogger Logger = LogManager.GetLogger<{{PatchClassName}}>();
 
-    private static IEnumerable<MethodBase> TargetMethods()
+    private new static IEnumerable<MethodBase> TargetMethods()
     {
         {{~ if IncludeDeclaredMethods ~}}
-        foreach (var ctor in AccessTools.GetDeclaredConstructors(typeof({{DeclaringType}})))
-        {
-            yield return ctor;
-        }
-
-        foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})).Where(m => !m.IsAbstract))
+        foreach (var method in GenericPatches<{{PatchClassName}}, {{DeclaringType}}>.TranspilerTargets(true))
         {
             yield return method;
         }
@@ -45,6 +40,10 @@ public class {{PatchClassName}} : GenericPatches<{{PatchClassName}}, {{Declaring
         yield return AccessTools.Method(typeof({{targetMethod.DeclaringType}}), "{{targetMethod.Name}}");
         {{~ end ~}}
     }
+
+    [HarmonyPrepare]
+    private static bool Prepare() => TargetMethods().Any();
+
     {{~ for transpiler in Transpilers ~}}
     {{ transpiler }}
     {{~ end ~}}

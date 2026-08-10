@@ -1,5 +1,7 @@
 ﻿using GameInterface.AutoSync.Templates;
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -11,6 +13,31 @@ public class TemplateRenderTests
     public TemplateRenderTests(ITestOutputHelper output)
     {
         this.output = output;
+    }
+
+    [Fact]
+    public void Dynamic_patch_uses_narrowed_automatic_targets_and_preserves_explicit_targets()
+    {
+        var explicitTarget = typeof(string).GetMethod(nameof(string.Trim), Type.EmptyTypes)!;
+        var result = RenderDynamicPatch(true, new[] { explicitTarget });
+
+        Assert.Contains(
+            "GenericPatches<TestType_DynamicPatches, TestType>.TranspilerTargets(true)",
+            result);
+        Assert.Contains("[HarmonyPrepare]", result);
+        Assert.Contains("private static bool Prepare() => TargetMethods().Any();", result);
+        Assert.Contains("yield return AccessTools.Method(typeof(System.String), \"Trim\");", result);
+    }
+
+    [Fact]
+    public void Categorized_dynamic_patch_uses_only_its_explicit_targets()
+    {
+        var explicitTarget = typeof(string).GetMethod(nameof(string.Trim), Type.EmptyTypes)!;
+        var result = RenderDynamicPatch(false, new[] { explicitTarget });
+
+        Assert.DoesNotContain("TranspilerTargets(true)", result);
+        Assert.Contains("yield return AccessTools.Method(typeof(System.String), \"Trim\");", result);
+        Assert.Contains("[HarmonyPrepare]", result);
     }
 
     [Fact(Skip = "Need regeneration")]
@@ -153,6 +180,24 @@ public class TemplateRenderTests
             ChangeMessageType = "ChangeArrayFieldMessage"
         });
         SnapshotAssert.Equals(result);
+    }
+
+    private static string RenderDynamicPatch(bool includeDeclaredMethods, MethodInfo[] targetMethods)
+    {
+        return TemplateParser.Parse("Patches.DynamicPatchTemplate", new
+        {
+            Libraries = Array.Empty<string>(),
+            DeclaringType = "TestType",
+            PatchClassName = "TestType_DynamicPatches",
+            PatchCategory = includeDeclaredMethods ? null : "TestCategory",
+            IncludeDeclaredMethods = includeDeclaredMethods,
+            TargetMethods = targetMethods,
+            Prefixes = Array.Empty<string>(),
+            Transpilers = new[]
+            {
+                "[HarmonyTranspiler] private static IEnumerable<CodeInstruction> Test(IEnumerable<CodeInstruction> instructions) => instructions;"
+            }
+        });
     }
 
 }

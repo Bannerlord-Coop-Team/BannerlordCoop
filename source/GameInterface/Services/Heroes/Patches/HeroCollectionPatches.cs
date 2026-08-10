@@ -2,6 +2,7 @@
 using GameInterface.Utils;
 using HarmonyLib;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
@@ -15,9 +16,9 @@ namespace GameInterface.Services.Heroes.Patches;
 [HarmonyPatch]
 internal class HeroCollectionPatches : GenericPatches<HeroCollectionPatches, Hero>
 {
-    private static IEnumerable<MethodBase> TargetMethods()
+    private new static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
+        foreach (var method in GenericPatches<HeroCollectionPatches, Hero>.TargetMethods())
         {
             yield return method;
         }
@@ -32,6 +33,9 @@ internal class HeroCollectionPatches : GenericPatches<HeroCollectionPatches, Her
         // (see AlleyPatches / AlleyHandler), so it is not collection-synced here.
         //yield return AccessTools.Method(typeof(TroopRosterHandler), nameof(TroopRosterHandler.HandleOnRecruitmentDone));
     }
+
+    [HarmonyPrepare]
+    private static bool Prepare() => TargetMethods().Any();
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> VolunteerTranspiler(IEnumerable<CodeInstruction> instructions)
