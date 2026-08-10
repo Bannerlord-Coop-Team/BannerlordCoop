@@ -127,6 +127,12 @@ namespace GameInterface.Services.Settlements.Handlers
         }
 
         /// <summary>Client side: surface a refused gift, which the kingdom screen has already closed.</summary>
+        /// <remarks>
+        /// Marshalled onto the game thread. This handler runs on the network poll thread, and
+        /// <c>InformationManager.DisplayMessage</c> touches the UI message queue - calling it from the poller
+        /// races the main loop, which is the same class of bug as reading Campaign state off-thread in
+        /// <see cref="ProcessGiftRequest"/>.
+        /// </remarks>
         private void Handle(MessagePayload<NetworkSettlementGiftRejected> obj)
         {
             if (!ModInformation.IsClient) return;
@@ -134,7 +140,9 @@ namespace GameInterface.Services.Settlements.Handlers
             var reason = obj.What.Reason;
             if (string.IsNullOrWhiteSpace(reason)) reason = "The settlement could not be given.";
 
-            InformationManager.DisplayMessage(new InformationMessage(reason));
+            GameThread.RunSafe(
+                () => InformationManager.DisplayMessage(new InformationMessage(reason)),
+                context: nameof(NetworkSettlementGiftRejected));
         }
 
         /// <summary>
@@ -179,17 +187,31 @@ namespace GameInterface.Services.Settlements.Handlers
                 return false;
             }
 
-            // Ownership, and nothing else - this mirrors vanilla exactly. KingdomSettlementVM.ExecuteAnnex
-            // opens the gift popup only when settlement.OwnerClan.Leader == Hero.MainHero, and offers the
-            // ANNEX action (which costs influence) to everyone else; _onGrantFief is invoked nowhere else.
-            // So a kingdom ruler cannot gift a vassal's fief - that is an annex, not a gift - and a vassal
-            // CAN gift their own. Requiring ownership also closes the replay hole: once the gift lands the
-            // giver no longer owns the fief, so a stale duplicate request finds a different owner and is
-            // refused, instead of moving the settlement a second time.
+            // Ownership AND rulership, because vanilla gates the gift twice, in sequence:
+            //
+            //   KingdomSettlementVM.ExecuteAnnex   settlement.OwnerClan.Leader == Hero.MainHero
+            //                                      -> _onGrantFief, else the ANNEX action (costs influence)
+            //   KingdomManagementVM.OnGrantFief    Kingdom.Leader == Hero.MainHero
+            //                                      -> GiftFief.OpenWith(settlement)
+            //                                      else "give this settlement back to your kingdom"
+            //                                           (RelinquishSettlementOwnership - a different action)
+            //
+            // So an owner who does not rule never reaches the gift popup at all; they are offered relinquish
+            // instead. Checking ownership alone let a vassal perform a transfer vanilla does not offer them.
+            //
+            // Ownership is still required, and still closes the replay hole: once the gift lands the giver no
+            // longer owns the fief, so a stale duplicate request finds a different owner and is refused rather
+            // than moving the settlement a second time.
             var kingdom = ownerClan.Kingdom;
             if (ownerClan.Leader != requestingHero)
             {
                 reason = "the requester does not own the settlement";
+                return false;
+            }
+
+            if (kingdom == null || kingdom.Leader != requestingHero)
+            {
+                reason = "the requester does not rule the kingdom";
                 return false;
             }
 

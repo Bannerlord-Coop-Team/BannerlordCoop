@@ -120,6 +120,57 @@ public class SettlementGiftTests : MapEventTestBase
         Assert.False(string.IsNullOrWhiteSpace(rejection.Reason));
     }
 
+    /// <summary>
+    /// An owner who does not rule the kingdom is refused: vanilla never offers them the gift popup.
+    /// </summary>
+    /// <remarks>
+    /// The gift is gated TWICE, in sequence, and an earlier version of this handler only mirrored the first:
+    ///
+    ///   KingdomSettlementVM.ExecuteAnnex  settlement.OwnerClan.Leader == Hero.MainHero -> _onGrantFief
+    ///   KingdomManagementVM.OnGrantFief   Kingdom.Leader == Hero.MainHero -> GiftFief.OpenWith(settlement)
+    ///
+    /// A vassal who owns a fief fails the second gate and is offered "give this settlement back to your
+    /// kingdom" - RelinquishSettlementOwnership, which returns it to the realm rather than handing it to a
+    /// hero of the giver's choosing. Accepting the request here would have let a client perform a transfer
+    /// the game does not offer, and no other test catches it: the fixture's giver rules the kingdom, so
+    /// every other case passes under both rules.
+    /// </remarks>
+    [Fact]
+    public void ServerGift_FromAnOwnerWhoDoesNotRuleTheKingdom_IsRefused()
+    {
+        var fixture = CreateGiftFixture();
+
+        // Hand the throne to the recipient. The requester still OWNS the fief - only rulership moves, so
+        // this isolates the second gate from the first.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.ReceiverHeroId, out var receiver));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.GiverHeroId, out var giver));
+
+            using (new AllowedThread())
+            {
+                settlement.OwnerClan.Kingdom._rulingClan = receiver.Clan;
+            }
+
+            Assert.Same(giver.Clan, settlement.OwnerClan);
+        });
+
+        SendGiftRequest(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.GiverHeroId, out var giver));
+
+            // Refused: the fief has not moved.
+            Assert.Same(giver.Clan, settlement.OwnerClan);
+        });
+
+        var rejection = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkSettlementGiftRejected>());
+        Assert.False(string.IsNullOrWhiteSpace(rejection.Reason));
+    }
+
     [Fact]
     public void ServerGift_RepeatedAfterTheFiefMoved_DoesNotTransferItASecondTime()
     {
