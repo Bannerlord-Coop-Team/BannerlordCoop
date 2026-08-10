@@ -428,20 +428,50 @@ public class WarAndPeaceReproductionFixtureCommands
             dailyTributeDurationInDays: 30,
             applyResults: true,
             isProposedByOpponent: false);
-        kingdomInterface.AddDecision(
-            activeFixture.Aserai,
-            aiDecision,
-            ignoreInfluenceCost: true,
-            randomFloat: 0f,
-            applyInfluenceCost: false);
+        List<Clan> aiSupporters = aiDecision.DetermineSupporters()
+            .Select(supporter => supporter.Clan)
+            .Where(clan => clan != null)
+            .Distinct()
+            .ToList();
+        if (aiSupporters.Count == 0)
+        {
+            return "Aserai has no eligible clan supporters for the real peace election.";
+        }
+
+        Dictionary<Clan, float> originalInfluence = aiSupporters
+            .ToDictionary(clan => clan, clan => clan.Influence);
+        try
+        {
+            // A zero-influence electorate gives vanilla's stable 0-0 tie, whose first candidate is Yes.
+            foreach (Clan supporterClan in aiSupporters)
+            {
+                ChangeClanInfluenceAction.Apply(supporterClan, -supporterClan.Influence);
+            }
+            kingdomInterface.AddDecision(
+                activeFixture.Aserai,
+                aiDecision,
+                ignoreInfluenceCost: true,
+                randomFloat: 0f,
+                applyInfluenceCost: false);
+        }
+        finally
+        {
+            foreach (KeyValuePair<Clan, float> entry in originalInfluence)
+            {
+                ChangeClanInfluenceAction.Apply(entry.Key, entry.Value - entry.Key.Influence);
+            }
+        }
 
         bool aiDecisionPending = activeFixture.Aserai.UnresolvedDecisions.Contains(aiDecision);
+        bool influenceRestored = originalInfluence.All(entry =>
+            Math.Abs(entry.Key.Influence - entry.Value) <= 0.001f);
         MakePeaceKingdomDecision inboundOffer = activeFixture.Kingdom.UnresolvedDecisions
             .OfType<MakePeaceKingdomDecision>()
             .FirstOrDefault(decision => decision._isProposedByOpponent &&
                                         decision.FactionToMakePeaceWith == activeFixture.Aserai);
         return $"WAR_PEACE_FIXTURE_AI_PEACE_STAGED chosenPeace={Bool(inboundOffer != null)} " +
                $"aiDecisionPending={Bool(aiDecisionPending)} " +
+               $"aiSupporterCount={aiSupporters.Count} influenceRestored={Bool(influenceRestored)} " +
                $"warWithAserai={Bool(AreAtWar(activeFixture.Kingdom, activeFixture.Aserai))} " +
                $"inboundOffer={Bool(inboundOffer != null)}";
     }
