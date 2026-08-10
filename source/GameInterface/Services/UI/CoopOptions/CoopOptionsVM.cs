@@ -1,6 +1,7 @@
 using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.UI.CoopOptions.Providers;
+using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
 using GameInterface.Services.UI.Donate;
@@ -15,7 +16,8 @@ public class CoopOptionsVM : ViewModel
     private static readonly ICoopOptionsTabProvider[] TabDefinitions =
     {
         new KillFeedOptionsTabProvider(),
-        new MapTimeOptionsTabProvider()
+        new MapTimeOptionsTabProvider(),
+        new ChatOptionsTabProvider()
     };
 
     private readonly ICoopOptionsStore optionsStore;
@@ -121,6 +123,9 @@ public class CoopOptionsVM : ViewModel
     [DataSourceProperty]
     public CoopOptionsTabVM MapTimeTab {get; set;}
 
+    [DataSourceProperty]
+    public CoopOptionsTabVM ChatTab {get; set;}
+
     // Binding each panel to the specific tab object from the root VM
     private void InitializeTabs(CoopOptionsData options)
     {
@@ -136,6 +141,10 @@ public class CoopOptionsVM : ViewModel
             else if (tab.Id == MapTimeOptionsTabProvider.TabId)
             {
                 MapTimeTab = tab;   
+            }
+            else if (tab.Id == ChatOptionsTabProvider.TabId)
+            {
+                ChatTab = tab;
             }
         }
 

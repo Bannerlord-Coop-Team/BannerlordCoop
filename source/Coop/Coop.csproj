@@ -206,6 +206,7 @@
     <Compile Include="BootPatches.cs" />
     <Compile Include="CoopMod.cs" />
     <Compile Include="CrashReporting\CrashDiagnostics.cs" />
+    <Compile Include="CrashReporting\GameBinariesDirectory.cs" />
     <Compile Include="LiveTesting\LiveTestControlServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -260,7 +261,7 @@
     <ModName>Coop</ModName>
     <MainClass>CoopMod</MainClass>
     <ModVersion>v$(CoopVersion)</ModVersion>
-    <GameVersion>v1.4.7</GameVersion>
+    <GameVersion>v1.4.8</GameVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />
 </Project>
