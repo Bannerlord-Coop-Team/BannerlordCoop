@@ -95,14 +95,17 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(fixture.ItemId, out var requestedItem));
 
-                var pid = new PotentialIssueData(
-                    (in PotentialIssueData _, Hero h) => new VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue(h, requestedItem),
-                    typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue),
-                    IssueBase.IssueFrequency.VeryCommon);
-
-                using (new AllowedThread())
+                if (owner.Issue == null)
                 {
-                    Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in pid, owner));
+                    var pid = new PotentialIssueData(
+                        (in PotentialIssueData _, Hero h) => new VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue(h, requestedItem),
+                        typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue),
+                        IssueBase.IssueFrequency.VeryCommon);
+
+                    using (new AllowedThread())
+                    {
+                        Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in pid, owner));
+                    }
                 }
 
                 if (isServer) generation = IssueGenerationRegistry.Bump(owner);
