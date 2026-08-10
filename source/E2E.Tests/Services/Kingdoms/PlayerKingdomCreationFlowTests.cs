@@ -1556,7 +1556,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var decisionItem = new DecisionItemBaseVM(decision, () => { });
             var detachedOutcome = new KingdomPolicyDecision.PolicyDecisionOutcome(shouldBeEnforced: true);
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
-                ((KingdomPolicyDecision.PolicyDecisionOutcome)candidate.Option).ShouldDecisionBeEnforced);
+                candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
+                outcome.ShouldDecisionBeEnforced);
             option.Option = detachedOutcome;
             option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
             decisionItem._currentSelectedOption = option;
