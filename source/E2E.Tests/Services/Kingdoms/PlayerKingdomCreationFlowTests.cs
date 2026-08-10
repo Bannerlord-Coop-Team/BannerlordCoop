@@ -1519,6 +1519,71 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void KingdomDecisionFinalVote_RecoversAndPublishesEquivalentPolicyOutcome()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        string policyId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+            PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
+            policyId = policy.StringId;
+            kingdom.AddDecision(new KingdomPolicyDecision(proposerClan, policy, false));
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+            DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
+            var detachedOutcome = new KingdomPolicyDecision.PolicyDecisionOutcome(shouldBeEnforced: true);
+            var option = new DecisionOptionVM(
+                detachedOutcome,
+                decision,
+                decisionItem.KingdomDecisionMaker,
+                _ => { },
+                _ => { });
+            option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
+            decisionItem._currentSelectedOption = option;
+
+            Assert.DoesNotContain(detachedOutcome, decisionItem.KingdomDecisionMaker._possibleOutcomes);
+            Assert.True(GetVoteManager(client).TryPublishFinalVote(decisionItem));
+            Assert.False(decisionItem.IsActive);
+        });
+
+        NetworkRequestKingdomDecisionVote request = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
+        Assert.True(request.VoteData.IsFinal);
+        Assert.Equal(0, request.VoteData.OutcomeIndex);
+        Assert.Contains("ShouldDecisionBeEnforced=True", request.VoteData.OutcomeKey);
+
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId
+                       && message.DecisionIndex == 0
+                       && message.OutcomeIndex == 0
+                       && message.IsPlayerDecision);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            PolicyObject policy = PolicyObject.All.Single(candidate => candidate.StringId == policyId);
+            Assert.Empty(kingdom.UnresolvedDecisions);
+            Assert.Contains(policy, kingdom.ActivePolicies);
+        });
+    }
+
+    [Fact]
     public void PlayerKingdomCreatedNotification_RelinksClientClanWhenFieldSyncHasNotArrived()
     {
         var player = CreateSyncedPlayerContext();
