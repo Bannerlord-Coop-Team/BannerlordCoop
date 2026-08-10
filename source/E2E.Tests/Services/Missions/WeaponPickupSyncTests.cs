@@ -1,6 +1,10 @@
 ﻿using Common;
+using Common.Messaging;
+using Common.PacketHandlers;
+using Common.Serialization;
 using Common.Util;
 using GameInterface;
+using GameInterface.Surrogates;
 using HarmonyLib;
 using Missions;
 using Missions.Agents.Handlers;
@@ -11,7 +15,6 @@ using Missions.Tournaments;
 using Missions.Tournaments.Messages;
 using ProtoBuf;
 using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -30,34 +33,47 @@ public class WeaponPickupSyncTests
     private static bool wieldRanInsideAllowedThread;
 
     [Fact]
-    public void ReplicatedPickup_CarriesPostPickupWieldState()
+    public void ReplicatedPickup_RoundTripsCompleteMessage()
     {
+        new SurrogateCollection();
+
         var equipment = new AgentEquipmentData(
             EquipmentIndex.Weapon0,
             EquipmentIndex.Weapon2,
             0);
+        var itemModifier = new ItemModifier
+        {
+            Damage = 10,
+        };
+        var banner = new Banner();
+        var agentId = System.Guid.NewGuid();
         var message = new NetworkWeaponPickedup(
-            System.Guid.NewGuid(),
+            agentId,
             EquipmentIndex.Weapon2,
-            null,
-            null,
-            null,
+            "ItemObject_test_weapon",
+            itemModifier,
+            banner,
             equipment);
         PropertyInfo? property = typeof(NetworkWeaponPickedup).GetProperty(
             nameof(NetworkWeaponPickedup.CurrentEquipment));
         Assert.NotNull(property);
         ProtoMemberAttribute? member = property.GetCustomAttribute<ProtoMemberAttribute>();
         Assert.NotNull(member);
-        using var stream = new MemoryStream();
-        Serializer.Serialize(stream, message.CurrentEquipment);
-        stream.Position = 0;
 
-        AgentEquipmentData received = Serializer.Deserialize<AgentEquipmentData>(stream);
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        MessagePacket packet = MessagePacket.Create(message, serializer);
+        var received = Assert.IsType<NetworkWeaponPickedup>(
+            serializer.Deserialize<IMessage>(packet.Data));
 
         Assert.Equal(6, member.Tag);
-        Assert.Equal((int)EquipmentIndex.Weapon0, received.MainHandIndex);
-        Assert.Equal((int)EquipmentIndex.Weapon2, received.OffHandIndex);
-        Assert.Equal(0, received.MainHandUsageIndex);
+        Assert.Equal(agentId, received.AgentId);
+        Assert.Equal(EquipmentIndex.Weapon2, received.EquipmentIndex);
+        Assert.Equal("ItemObject_test_weapon", received.ItemObjectId);
+        Assert.Equal(itemModifier.Damage, received.ItemModifier.Damage);
+        Assert.Equal(banner.Serialize(), received.Banner.Serialize());
+        Assert.Equal((int)EquipmentIndex.Weapon0, received.CurrentEquipment.MainHandIndex);
+        Assert.Equal((int)EquipmentIndex.Weapon2, received.CurrentEquipment.OffHandIndex);
+        Assert.Equal(0, received.CurrentEquipment.MainHandUsageIndex);
     }
 
     [Fact]

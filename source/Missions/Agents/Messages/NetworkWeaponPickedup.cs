@@ -18,7 +18,7 @@ namespace Missions.Agents.Messages
         [ProtoMember(2)]
         public EquipmentIndex EquipmentIndex { get; }
         [ProtoMember(3)]
-        public ItemObject ItemObject { get; }
+        public string ItemObjectId { get; }
 
         [ProtoMember(4)]
         public ItemModifier ItemModifier { get; }
@@ -32,14 +32,14 @@ namespace Missions.Agents.Messages
         public NetworkWeaponPickedup(
             Guid agentId, 
             EquipmentIndex equipmentIndex, 
-            ItemObject weaponObject, 
+            string itemObjectId,
             ItemModifier itemModifier, 
             Banner banner,
             AgentEquipmentData currentEquipment)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
-            ItemObject = weaponObject;
+            ItemObjectId = itemObjectId;
             ItemModifier = itemModifier;
             Banner = banner;
             CurrentEquipment = currentEquipment;

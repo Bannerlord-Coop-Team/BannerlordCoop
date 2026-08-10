@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.ObjectManager;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Serilog;
@@ -23,15 +24,18 @@ namespace Missions.Agents.Handlers
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly IBattleNetwork network;
         readonly IMessageBroker messageBroker;
+        readonly IObjectManager objectManager;
         readonly static ILogger Logger = LogManager.GetLogger<WeaponPickupHandler>();
         public WeaponPickupHandler(
             INetworkAgentRegistry networkAgentRegistry,
             IBattleNetwork network,
-            IMessageBroker messageBroker)
+            IMessageBroker messageBroker,
+            IObjectManager objectManager)
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.network = network;
             this.messageBroker = messageBroker;
+            this.objectManager = objectManager;
 
             messageBroker.Subscribe<WeaponPickedup>(WeaponPickupSend);
             messageBroker.Subscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
@@ -61,10 +65,13 @@ namespace Missions.Agents.Handlers
                 return;
             }
 
+            if (!objectManager.TryGetIdWithLogging(payload.WeaponObject, out var itemObjectId))
+                return;
+
             NetworkWeaponPickedup message = new NetworkWeaponPickedup(
                 agentInfo.AgentId,
                 payload.EquipmentIndex,
-                payload.WeaponObject,
+                itemObjectId,
                 payload.WeaponModifier,
                 payload.Banner,
                 payload.CurrentEquipment);
@@ -84,8 +91,11 @@ namespace Missions.Agents.Handlers
                 Agent agent = agentInfo.Agent;
                 if (agent == null || agent.Mission != Mission.Current || !agent.IsActive()) return;
 
+                if (!objectManager.TryGetObjectWithLogging<ItemObject>(obj.What.ItemObjectId, out var itemObject))
+                    return;
+
                 MissionWeapon missionWeapon = new MissionWeapon(
-                    obj.What.ItemObject,
+                    itemObject,
                     obj.What.ItemModifier,
                     obj.What.Banner);
                 ApplyWeaponPickup(
