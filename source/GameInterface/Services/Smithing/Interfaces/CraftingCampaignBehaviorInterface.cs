@@ -130,9 +130,22 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
             weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
         }
 
-        // Implement CraftingCampaignBehavior.SpendMaterials(weaponDesign) here as it needs the party roster, MainParty on server won't be correct
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
         int[] smithingCostsForWeaponDesign = Campaign.Current.Models.SmithingModel.GetSmithingCostsForWeaponDesign(weaponDesign);
+
+        // Reject crafted weapons with materials that no longer exist
+        for (int i = 8; i >= 0; i--)
+        {
+            if (smithingCostsForWeaponDesign[i] >= 0) continue;
+            var material = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i);
+            if (itemRoster.GetItemNumber(material) + smithingCostsForWeaponDesign[i] < 0)
+            {
+                Logger.Warning($"Rejecting crafted weapon of template {weaponDesign.Template.StringId} due to a lack of {material.StringId}.");
+                return craftingBehavior.GetHeroCraftingStamina(craftingHero);
+            }
+        }
+
+        // Implement CraftingCampaignBehavior.SpendMaterials(weaponDesign) here as it needs the party roster, MainParty on server won't be correct
         for (int i = 8; i >= 0; i--)
         {
             if (smithingCostsForWeaponDesign[i] != 0)

@@ -151,7 +151,19 @@ internal class SmithingVMsHandler : IHandler
                     return;
                 }
 
-                CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
+                // Keep the player on the order they picked. Selecting a different order switches the crafting template
+                var craftingOrders = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders;
+                var activeOrder = currentWeaponDesignVM?.ActiveCraftingOrder?.CraftingOrder;
+
+                if (activeOrder != null && craftingOrders?.Any(x => x.CraftingOrder == activeOrder && x.IsEnabled) == true)
+                {
+                    // Current order survived change, don't change current selection
+                    currentWeaponDesignVM?.RefreshValues();
+                    return;
+                }
+
+                // Unavoidable switch because the order is no longer available
+                CraftingOrderItemVM craftingOrderItemVM = craftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
                 if (craftingOrderItemVM != null)
                 {
                     currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);
