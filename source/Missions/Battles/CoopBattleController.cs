@@ -97,7 +97,12 @@ public class CoopBattleController : CoopMissionController
         IGuardedHitWindow guardedHitWindow,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec)
-        : base(network, messageBroker, objectManager, coopMissionComponent)
+        : base(
+            network,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            Missions.Agents.Handlers.MovementCadenceProfile.Battle)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
         var casualties = new CasualtyAttributionMap();

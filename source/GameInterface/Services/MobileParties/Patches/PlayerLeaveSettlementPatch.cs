@@ -23,6 +23,7 @@ internal class PlayerLeaveSettlementPatch
         typeof(PlayerTownVisitCampaignBehavior).GetMethod("game_menu_settlement_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Static),
         typeof(EncounterGameMenuBehavior).GetMethod("game_menu_castle_outside_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(EncounterGameMenuBehavior).GetMethod("army_encounter_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
+        typeof(HideoutCampaignBehavior).GetMethod("game_menu_hideout_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
     };
 
     private static bool Prefix() => RequestLeave();

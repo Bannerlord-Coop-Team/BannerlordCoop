@@ -56,13 +56,16 @@ internal class FormPlayerClanCaravanHandler : IHandler
 
     private void Handle_NetworkFormPlayerClanCaravan(MessagePayload<NetworkFormPlayerClanCaravan> obj)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CaravanLeaderId, out var caravanLeader)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
 
-            LeaveSettlementAction.ApplyForCharacterOnly(caravanLeader);
+            if (caravanLeader.CurrentSettlement != null)
+            {
+                LeaveSettlementAction.ApplyForCharacterOnly(caravanLeader);
+            }
             PartyTemplateObject randomCaravanTemplate = CaravanHelper.GetRandomCaravanTemplate(currentSettlement.Culture, obj.What.IsElite, !obj.What.ShouldCreateConvoy);
             CaravanPartyComponent.CreateCaravanParty(mainHero, currentSettlement, randomCaravanTemplate, false, caravanLeader, null, obj.What.IsElite);
             GiveGoldAction.ApplyForCharacterToSettlement(mainHero, currentSettlement, obj.What.GoldCost, false);
@@ -76,10 +79,20 @@ internal class FormPlayerClanCaravanHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!TryGetCaravanConversationsBehavior(out var caravanConversationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CaravanLeaderId, out var caravanLeader)) return;
 
             // No need to check current mission and if character in mission, vanilla already implements these checks
-            Campaign.Current.GetCampaignBehavior<CaravanConversationsCampaignBehavior>().FadeOutSelectedCaravanCompanionInMission(caravanLeader.CharacterObject);
+            caravanConversationsBehavior.FadeOutSelectedCaravanCompanionInMission(caravanLeader.CharacterObject);
         });
+    }
+
+    private bool TryGetCaravanConversationsBehavior(out CaravanConversationsCampaignBehavior caravanConversationsBehavior)
+    {
+        caravanConversationsBehavior = Campaign.Current?.GetCampaignBehavior<CaravanConversationsCampaignBehavior>();
+        if (caravanConversationsBehavior != null) return true;
+
+        Logger.Debug("Skipping caravan conversation update because the campaign behavior is unavailable.");
+        return false;
     }
 }

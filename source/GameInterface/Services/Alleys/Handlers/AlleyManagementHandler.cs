@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -50,11 +51,13 @@ internal class AlleyManagementHandler : IHandler
         messageBroker.Subscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
         messageBroker.Subscribe<ChangeAlleyOverseerRequested>(Handle_ChangeAlleyOverseerRequested);
         messageBroker.Subscribe<SetAlleyGarrisonRequested>(Handle_SetAlleyGarrisonRequested);
+        messageBroker.Subscribe<RecruitAlleyTroopsRequested>(Handle_RecruitAlleyTroopsRequested);
 
         messageBroker.Subscribe<RequestAcquireAlley>(Handle_RequestAcquireAlley);
         messageBroker.Subscribe<RequestAbandonAlley>(Handle_RequestAbandonAlley);
         messageBroker.Subscribe<RequestChangeAlleyOverseer>(Handle_RequestChangeAlleyOverseer);
         messageBroker.Subscribe<RequestSetAlleyGarrison>(Handle_RequestSetAlleyGarrison);
+        messageBroker.Subscribe<RequestRecruitAlleyTroops>(Handle_RequestRecruitAlleyTroops);
 
         messageBroker.Subscribe<NetworkAlleyManagementUpdated>(Handle_NetworkAlleyManagementUpdated);
         messageBroker.Subscribe<NetworkAlleyManagementRemoved>(Handle_NetworkAlleyManagementRemoved);
@@ -66,11 +69,13 @@ internal class AlleyManagementHandler : IHandler
         messageBroker.Unsubscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
         messageBroker.Unsubscribe<ChangeAlleyOverseerRequested>(Handle_ChangeAlleyOverseerRequested);
         messageBroker.Unsubscribe<SetAlleyGarrisonRequested>(Handle_SetAlleyGarrisonRequested);
+        messageBroker.Unsubscribe<RecruitAlleyTroopsRequested>(Handle_RecruitAlleyTroopsRequested);
 
         messageBroker.Unsubscribe<RequestAcquireAlley>(Handle_RequestAcquireAlley);
         messageBroker.Unsubscribe<RequestAbandonAlley>(Handle_RequestAbandonAlley);
         messageBroker.Unsubscribe<RequestChangeAlleyOverseer>(Handle_RequestChangeAlleyOverseer);
         messageBroker.Unsubscribe<RequestSetAlleyGarrison>(Handle_RequestSetAlleyGarrison);
+        messageBroker.Unsubscribe<RequestRecruitAlleyTroops>(Handle_RequestRecruitAlleyTroops);
 
         messageBroker.Unsubscribe<NetworkAlleyManagementUpdated>(Handle_NetworkAlleyManagementUpdated);
         messageBroker.Unsubscribe<NetworkAlleyManagementRemoved>(Handle_NetworkAlleyManagementRemoved);
@@ -113,6 +118,16 @@ internal class AlleyManagementHandler : IHandler
         network.SendAll(new RequestSetAlleyGarrison(alleyId, AlleyGarrisonData.ToData(payload.What.NewGarrison, objectManager)));
     }
 
+    private void Handle_RecruitAlleyTroopsRequested(MessagePayload<RecruitAlleyTroopsRequested> payload)
+    {
+        if (ModInformation.IsServer) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
+
+        network.SendAll(new RequestRecruitAlleyTroops(
+            alleyId,
+            AlleyGarrisonData.ToData(payload.What.Troops, objectManager)));
+    }
+
     // --- Network requests (server, authoritative) ---
 
     private void Handle_RequestAcquireAlley(MessagePayload<RequestAcquireAlley> payload)
@@ -126,7 +141,7 @@ internal class AlleyManagementHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OverseerId, out var overseer)) return;
 
-            var garrison = data.Garrison ?? new TroopRosterElementData[0];
+            var garrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
 
             // The take-over is authoritative: the alley is owned by the acquiring player (owner) and
             // run by the chosen clan member (overseer). The garrison + overseer are stored, the overseer
@@ -138,7 +153,8 @@ internal class AlleyManagementHandler : IHandler
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
             TeleportOverseerToAlley(overseer, alley);
 
-            network.SendAll(new NetworkAlleyManagementUpdated(data.AlleyId, data.OverseerId, garrison));
+            if (sessionInterface.TryGetManagementData(data.AlleyId, out var stored))
+                BroadcastManagementUpdate(data.AlleyId, stored);
         });
     }
 
@@ -211,7 +227,8 @@ internal class AlleyManagementHandler : IHandler
             sessionInterface.SetManagementData(data.AlleyId, data.NewOverseerId, garrison);
             TeleportOverseerToAlley(newOverseer, alley);
 
-            network.SendAll(new NetworkAlleyManagementUpdated(data.AlleyId, data.NewOverseerId, garrison));
+            if (sessionInterface.TryGetManagementData(data.AlleyId, out var updated))
+                BroadcastManagementUpdate(data.AlleyId, updated);
         });
     }
 
@@ -224,14 +241,63 @@ internal class AlleyManagementHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out _)) return;
 
-            var newGarrison = data.Garrison ?? new TroopRosterElementData[0];
+            var newGarrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
             // The alley party screen already moved the troops between the owner's party and the alley
             // roster, and that party-roster change replicates through the existing party-screen sync, so
             // the server only records the new garrison snapshot (for persistence and abandon-return).
             sessionInterface.TryGetManagementData(data.AlleyId, out var stored);
             sessionInterface.SetManagementData(data.AlleyId, stored?.OverseerId, newGarrison);
 
-            network.SendAll(new NetworkAlleyManagementUpdated(data.AlleyId, stored?.OverseerId, newGarrison));
+            if (sessionInterface.TryGetManagementData(data.AlleyId, out var updated))
+                BroadcastManagementUpdate(data.AlleyId, updated);
+        });
+    }
+
+    private void Handle_RequestRecruitAlleyTroops(MessagePayload<RequestRecruitAlleyTroops> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            if (!sessionInterface.TryGetManagementData(data.AlleyId, out var managementData)) return;
+            var lastRecruitTime = new CampaignTime(managementData.LastRecruitTimeTicks);
+            if (lastRecruitTime.ElapsedDaysUntilNow <= CampaignTime.DaysInWeek) return;
+
+            var ownerParty = alley.Owner?.PartyBelongedTo;
+            if (ownerParty == null)
+            {
+                Logger.Error("Could not recruit alley troops: owner of {AlleyId} has no party", data.AlleyId);
+                return;
+            }
+
+            var recruits = new List<(CharacterObject character, int count)>();
+            var uniqueCharacters = new HashSet<CharacterObject>();
+            foreach (var troop in data.Troops ?? Array.Empty<TroopRosterElementData>())
+            {
+                if (troop.Number <= 0 || troop.WoundedNumber != 0 || troop.Xp != 0) return;
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(troop.CharacterId, out var character)) return;
+                if (character.IsHero || !uniqueCharacters.Add(character)) return;
+                recruits.Add((character, troop.Number));
+            }
+            if (recruits.Count == 0) return;
+
+            foreach (var recruit in recruits)
+            {
+                ownerParty.MemberRoster.AddToCounts(
+                    recruit.character,
+                    recruit.count,
+                    false,
+                    0,
+                    0,
+                    true,
+                    -1);
+            }
+
+            sessionInterface.SetLastRecruitTimeTicks(data.AlleyId, CampaignTime.Now.NumTicks);
+            if (sessionInterface.TryGetManagementData(data.AlleyId, out var updated))
+                BroadcastManagementUpdate(data.AlleyId, updated);
         });
     }
 
@@ -258,8 +324,21 @@ internal class AlleyManagementHandler : IHandler
             Hero overseer = null;
             if (data.OverseerId != null) objectManager.TryGetObjectWithLogging(data.OverseerId, out overseer);
 
-            behaviorInterface.AddOrUpdatePlayerAlleyData(alley, overseer, AlleyGarrisonData.FromData(data.Garrison, objectManager));
+            behaviorInterface.AddOrUpdatePlayerAlleyData(
+                alley,
+                overseer,
+                AlleyGarrisonData.FromData(data.Garrison, objectManager),
+                new CampaignTime(data.LastRecruitTimeTicks));
         });
+    }
+
+    private void BroadcastManagementUpdate(string alleyId, AlleyManagementData data)
+    {
+        network.SendAll(new NetworkAlleyManagementUpdated(
+            alleyId,
+            data.OverseerId,
+            data.Garrison,
+            data.LastRecruitTimeTicks));
     }
 
     private void Handle_NetworkAlleyManagementRemoved(MessagePayload<NetworkAlleyManagementRemoved> payload)
@@ -321,7 +400,7 @@ internal class AlleyManagementHandler : IHandler
     /// </summary>
     private TroopRosterElementData[] SwapOverseerInGarrison(TroopRosterElementData[] garrison, string oldOverseerId, string newOverseerId)
     {
-        var list = new List<TroopRosterElementData>(garrison ?? new TroopRosterElementData[0]);
+        var list = new List<TroopRosterElementData>(garrison ?? Array.Empty<TroopRosterElementData>());
 
         if (TryGetHeroCharacterId(oldOverseerId, out var oldCharId))
             list.RemoveAll(e => e.CharacterId == oldCharId);

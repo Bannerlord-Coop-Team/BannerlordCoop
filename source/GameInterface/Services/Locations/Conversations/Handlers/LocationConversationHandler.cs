@@ -169,9 +169,11 @@ internal class LocationConversationHandler : IHandler
             return;
         }
 
-        if (tracker.TryEndEngagement(peer, out var npcKey))
-            BroadcastNpcRelease(npcKey);
-        EndPlayerWaitingInteraction(peer);
+        GameThread.RunSafe(() =>
+        {
+            tracker.TryEndEngagement(peer, out _);
+            EndPlayerWaitingInteraction(peer);
+        }, context: nameof(NetworkLocationConversationEnded));
     }
 
     /// <summary>[Server] A player disconnected: release the NPC held for them, if any.</summary>
