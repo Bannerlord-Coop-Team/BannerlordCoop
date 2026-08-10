@@ -211,7 +211,8 @@ public class WarAndPeaceReproductionFixtureCommands
             return "The Kingdom screen is already open.";
         }
 
-        Game.Current.GameStateManager.PushState(new KingdomState(aserai), 0);
+        Game.Current.GameStateManager.PushState(
+            Game.Current.GameStateManager.CreateState<KingdomState>(aserai), 0);
         return "WAR_PEACE_FIXTURE_WAR_SCREEN_OPENING";
     }
 
@@ -478,7 +479,8 @@ public class WarAndPeaceReproductionFixtureCommands
             return "The Kingdom screen is already open.";
         }
 
-        Game.Current.GameStateManager.PushState(new KingdomState(offer), 0);
+        Game.Current.GameStateManager.PushState(
+            Game.Current.GameStateManager.CreateState<KingdomState>(offer), 0);
         return "WAR_PEACE_FIXTURE_INBOUND_PEACE_OPENING";
     }
 
