@@ -2,12 +2,35 @@
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Kingdoms.Patches;
 
 [HarmonyPatch]
 internal class KingdomElectionPatches
 {
+    [HarmonyPatch(typeof(KingdomDecision), nameof(KingdomDecision.NarrowDownCandidates))]
+    [HarmonyPrefix]
+    private static bool NarrowDownCandidatesPrefix(KingdomDecision __instance, ref MBList<DecisionOutcome> __result)
+    {
+        if (__instance is not SettlementClaimantDecision claimantDecision) return true;
+        if (!ContainerProvider.TryResolve<ISettlementClaimantSnapshotRegistry>(out var snapshotRegistry)) return true;
+        if (!snapshotRegistry.TryCreateOutcomes(claimantDecision, out MBList<DecisionOutcome> outcomes)) return true;
+
+        __result = outcomes;
+        return false;
+    }
+
+    [HarmonyPatch(typeof(KingdomDecision), nameof(KingdomDecision.NarrowDownCandidates))]
+    [HarmonyPostfix]
+    private static void NarrowDownCandidatesPostfix(KingdomDecision __instance, MBList<DecisionOutcome> __result)
+    {
+        if (__instance is not SettlementClaimantDecision claimantDecision) return;
+        if (!ContainerProvider.TryResolve<ISettlementClaimantSnapshotRegistry>(out var snapshotRegistry)) return;
+
+        snapshotRegistry.Capture(claimantDecision, __result);
+    }
+
     [HarmonyPatch(typeof(KingdomElection), nameof(KingdomElection.OnPlayerSupport))]
     [HarmonyPrefix]
     private static bool Prefix(KingdomElection __instance, DecisionOutcome decisionOutcome, Supporter.SupportWeights supportWeight)

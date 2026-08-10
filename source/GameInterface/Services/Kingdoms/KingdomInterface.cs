@@ -32,6 +32,8 @@ internal class KingdomInterface : IKingdomInterface
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient)
         {
+            if (kingdomDecision is SettlementClaimantDecision) return false;
+
             float clientRandomNumber = AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: false);
             MessageBroker.Instance.Publish(kingdom,
                 new DecisionAdded(kingdom, kingdomDecision, ignoreInfluenceCost, clientRandomNumber));

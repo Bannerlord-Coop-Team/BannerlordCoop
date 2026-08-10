@@ -3,6 +3,7 @@ using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using Serilog;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -18,7 +19,12 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
         [Fact]
         public void SerializeSettlementClaimantDecision()
         {
-            SettlementClaimantDecisionData settlementClaimantDecisionData = new SettlementClaimantDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "Settlement1","Hero1", "Clan1");
+            var candidates = new List<SettlementClaimantCandidateData>
+            {
+                new SettlementClaimantCandidateData("Clan2", 20.5f),
+                new SettlementClaimantCandidateData("Clan3", 10.25f),
+            };
+            SettlementClaimantDecisionData settlementClaimantDecisionData = new SettlementClaimantDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "Settlement1", "Hero1", "Clan1", candidates);
             KingdomDecisionData kingdomDecisionDerivedData = settlementClaimantDecisionData;
             MemoryStream memoryStream = new MemoryStream();
             Serializer.Serialize(memoryStream, kingdomDecisionDerivedData);
@@ -35,6 +41,18 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(settlementClaimantDecisionData.SettlementId, deserializedObj.SettlementId);
             Assert.Equal(settlementClaimantDecisionData.CapturerHeroId, deserializedObj.CapturerHeroId);
             Assert.Equal(settlementClaimantDecisionData.ClanToExcludeId, deserializedObj.ClanToExcludeId);
+            Assert.Collection(
+                deserializedObj.Candidates,
+                candidate =>
+                {
+                    Assert.Equal("Clan2", candidate.ClanId);
+                    Assert.Equal(20.5f, candidate.InitialMerit);
+                },
+                candidate =>
+                {
+                    Assert.Equal("Clan3", candidate.ClanId);
+                    Assert.Equal(10.25f, candidate.InitialMerit);
+                });
         }
 
         [Fact]
@@ -66,11 +84,18 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             kingdom.StringId = "Kingdom";
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             settlement.StringId = "Settlement";
+            Clan candidateClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
+            candidateClan.StringId = "CandidateClan";
             objectManager.AddExisting(proposerClan.StringId, proposerClan);
             objectManager.AddExisting(kingdom.StringId, kingdom);
             objectManager.AddExisting(settlement.StringId, settlement);
+            objectManager.AddExisting(candidateClan.StringId, candidateClan);
+            var candidates = new List<SettlementClaimantCandidateData>
+            {
+                new SettlementClaimantCandidateData(candidateClan.StringId, 42f),
+            };
             SettlementClaimantDecisionData data = new SettlementClaimantDecisionData(
-                proposerClan.StringId, kingdom.StringId, 10, true, true, true, settlement.StringId, null, null);
+                proposerClan.StringId, kingdom.StringId, 10, true, true, true, settlement.StringId, null, null, candidates);
 
             // Deserialization: null optional ids must reconstruct the decision, not drop it.
             Assert.True(data.TryGetKingdomDecision(objectManager, out var kingdomDecision));
@@ -81,12 +106,17 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Same(settlement, decision.Settlement);
 
             // Serialization: converting back must not throw on the null fields and must keep them null.
-            KingdomDecisionData roundTrippedData = new KingdomDecisionDataConverter(objectManager).Convert(decision);
+            var snapshotRegistry = new SettlementClaimantSnapshotRegistry(objectManager);
+            Assert.True(snapshotRegistry.TryRegister(decision, candidates));
+            KingdomDecisionData roundTrippedData = new KingdomDecisionDataConverter(objectManager, snapshotRegistry).Convert(decision);
             Assert.True(roundTrippedData is SettlementClaimantDecisionData);
             SettlementClaimantDecisionData roundTripped = (SettlementClaimantDecisionData)roundTrippedData;
             Assert.Null(roundTripped.CapturerHeroId);
             Assert.Null(roundTripped.ClanToExcludeId);
             Assert.Equal(settlement.StringId, roundTripped.SettlementId);
+            SettlementClaimantCandidateData candidate = Assert.Single(roundTripped.Candidates);
+            Assert.Equal(candidateClan.StringId, candidate.ClanId);
+            Assert.Equal(42f, candidate.InitialMerit);
         }
     }
 }

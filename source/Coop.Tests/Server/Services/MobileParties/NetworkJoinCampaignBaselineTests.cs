@@ -4,6 +4,7 @@ using Common.Serialization;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Surrogates;
 using System;
@@ -96,6 +97,42 @@ public class NetworkJoinCampaignBaselineTests
         {
             Assert.Equal(signal, RoundTrip(new NetworkJoinSync(signal)).Signal);
         }
+    }
+
+    [Fact]
+    public void ReplayComplete_RoundTripsSettlementClaimantSnapshots()
+    {
+        var expected = new NetworkJoinSync(
+            JoinSyncSignal.ReplayComplete,
+            new[]
+            {
+                new SettlementClaimantDecisionSnapshotData(
+                    "kingdom",
+                    2,
+                    new[]
+                    {
+                        new SettlementClaimantCandidateData("second", 22.5f),
+                        new SettlementClaimantCandidateData("first", 11.25f),
+                    }),
+            });
+
+        NetworkJoinSync received = RoundTrip(expected);
+
+        SettlementClaimantDecisionSnapshotData snapshot = Assert.Single(received.ClaimantSnapshots);
+        Assert.Equal("kingdom", snapshot.KingdomId);
+        Assert.Equal(2, snapshot.DecisionIndex);
+        Assert.Collection(
+            snapshot.Candidates,
+            candidate =>
+            {
+                Assert.Equal("second", candidate.ClanId);
+                Assert.Equal(22.5f, candidate.InitialMerit);
+            },
+            candidate =>
+            {
+                Assert.Equal("first", candidate.ClanId);
+                Assert.Equal(11.25f, candidate.InitialMerit);
+            });
     }
 
     private T RoundTrip<T>(T message) where T : IMessage

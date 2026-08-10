@@ -5,10 +5,10 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using GameInterface.Registry.Auto;
 using Helpers;
 using Serilog;
 using System;
@@ -36,6 +36,7 @@ public class KingdomHandler : IHandler
     private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly IKingdomInterface kingdomInterface;
     private readonly IKingdomCreator kingdomCreator;
+    private readonly ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry;
 
     public KingdomHandler(
         IMessageBroker messageBroker,
@@ -44,7 +45,8 @@ public class KingdomHandler : IHandler
         IKingdomDecisionVoteManager decisionVoteManager,
         IKingdomMembershipState kingdomMembershipState,
         IKingdomInterface kingdomInterface,
-        IKingdomCreator kingdomCreator)
+        IKingdomCreator kingdomCreator,
+        ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -53,6 +55,7 @@ public class KingdomHandler : IHandler
         this.kingdomMembershipState = kingdomMembershipState;
         this.kingdomInterface = kingdomInterface;
         this.kingdomCreator = kingdomCreator;
+        this.settlementClaimantSnapshotRegistry = settlementClaimantSnapshotRegistry;
         messageBroker.Subscribe<AddDecision>(HandleAddDecision);
         messageBroker.Subscribe<RemoveDecision>(HandleRemoveDecision);
         messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
@@ -493,6 +496,11 @@ public class KingdomHandler : IHandler
     {
         var payload = obj.What;
 
+        RunKingdomMutation(() => ApplyAddDecision(payload));
+    }
+
+    private void ApplyAddDecision(AddDecision payload)
+    {
         if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
         {
             Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
@@ -502,6 +510,15 @@ public class KingdomHandler : IHandler
         if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
         {
             Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
+            return;
+        }
+
+        if (ModInformation.IsClient &&
+            kingdomDecision is SettlementClaimantDecision claimantDecision &&
+            payload.Data is SettlementClaimantDecisionData claimantData &&
+            !settlementClaimantSnapshotRegistry.TryRegister(claimantDecision, claimantData.Candidates))
+        {
+            Logger.Warning("Settlement claimant decision snapshot could not be registered.");
             return;
         }
 

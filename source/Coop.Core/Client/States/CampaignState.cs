@@ -8,9 +8,12 @@ using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
+using System;
 using System.Globalization;
 
 namespace Coop.Core.Client.States;
@@ -26,6 +29,7 @@ public class CampaignState : ClientStateBase
     private readonly ICoopFinalizer coopFinalizer;
     private readonly INetwork network;
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
+    private readonly ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry;
     private readonly bool waitingForJoinCatchUp;
     private bool replayAppliedQueued;
     private volatile bool baselineResponseExpected;
@@ -45,7 +49,8 @@ public class CampaignState : ClientStateBase
         ILoadingInterface loadingInterface,
         IGameStateInterface gameStateInterface,
         ICoopFinalizer coopFinalizer,
-        IMapTimeTrackerInterface mapTimeTrackerInterface) : base(logic)
+        IMapTimeTrackerInterface mapTimeTrackerInterface,
+        ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.loadingInterface = loadingInterface;
@@ -53,6 +58,7 @@ public class CampaignState : ClientStateBase
         this.coopFinalizer = coopFinalizer;
         this.network = network;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
+        this.settlementClaimantSnapshotRegistry = settlementClaimantSnapshotRegistry;
         waitingForJoinCatchUp = logic.State is LoadingState;
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -99,6 +105,9 @@ public class CampaignState : ClientStateBase
             GameThread.RunSafe(() =>
             {
                 if (ReferenceEquals(Logic.State, this) == false) return;
+                var claimantSnapshots = obj.What.ClaimantSnapshots ??
+                    Array.Empty<SettlementClaimantDecisionSnapshotData>();
+                if (!settlementClaimantSnapshotRegistry.TryApplyJoinSnapshots(claimantSnapshots)) return;
 
                 baselineResponseExpected = true;
                 SendJoinSignal(JoinSyncSignal.ReplayApplied);

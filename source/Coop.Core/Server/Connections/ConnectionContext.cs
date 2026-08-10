@@ -5,6 +5,7 @@ using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
@@ -35,7 +36,8 @@ public class ConnectionContext
         IAttachmentIdMapper attachmentIdMapper,
         IExistingPlayerSender existingPlayerSender,
         IServerOptionsProvider serverOptionsProvider,
-        IJoinCampaignBaselineSender joinCampaignBaselineSender)
+        IJoinCampaignBaselineSender joinCampaignBaselineSender,
+        ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -53,6 +55,7 @@ public class ConnectionContext
         ExistingPlayerSender = existingPlayerSender;
         ServerOptionsProvider = serverOptionsProvider;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
+        SettlementClaimantSnapshotRegistry = settlementClaimantSnapshotRegistry;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -71,4 +74,5 @@ public class ConnectionContext
     public IExistingPlayerSender ExistingPlayerSender { get; }
     public IServerOptionsProvider ServerOptionsProvider { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
+    public ISettlementClaimantSnapshotRegistry SettlementClaimantSnapshotRegistry { get; }
 }

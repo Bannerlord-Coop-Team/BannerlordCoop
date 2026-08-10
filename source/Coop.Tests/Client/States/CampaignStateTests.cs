@@ -8,10 +8,13 @@ using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using Moq;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
@@ -22,6 +25,7 @@ public class CampaignStateTests
 {
     private readonly IClientLogic clientLogic;
     private readonly ClientTestComponent clientComponent;
+    private readonly Mock<ISettlementClaimantSnapshotRegistry> snapshotRegistry;
 
     private TestMessageBroker TestMessageBroker => clientComponent.TestMessageBroker;
     public CampaignStateTests(ITestOutputHelper output)
@@ -29,6 +33,7 @@ public class CampaignStateTests
         clientComponent = new ClientTestComponent(output);
         var container = clientComponent.Container;
         clientLogic = container.Resolve<IClientLogic>()!;
+        snapshotRegistry = container.Resolve<Mock<ISettlementClaimantSnapshotRegistry>>();
     }
 
     [Fact(Skip = "Mission state not implemented and may be removed")]
@@ -199,6 +204,37 @@ public class CampaignStateTests
         loadingInterface.Verify(m => m.SetLoadingMessage(
             "Loading Host Campaign",
             "Finishing synchronization..."), Times.Once);
+    }
+
+    [Fact]
+    public void ReplayComplete_HydrationFailureDoesNotAcknowledgeReplay()
+    {
+        clientComponent.TestNetwork.CreatePeer();
+        _ = clientLogic.SetState<LoadingState>();
+        _ = clientLogic.SetState<CampaignState>();
+        snapshotRegistry
+            .Setup(registry => registry.TryApplyJoinSnapshots(
+                It.IsAny<IReadOnlyList<SettlementClaimantDecisionSnapshotData>>()))
+            .Returns(false);
+        var snapshots = new[]
+        {
+            new SettlementClaimantDecisionSnapshotData(
+                "kingdom",
+                1,
+                new[] { new SettlementClaimantCandidateData("clan", 15f) }),
+        };
+
+        TestMessageBroker.Publish(
+            this,
+            new NetworkJoinSync(JoinSyncSignal.ReplayComplete, snapshots));
+        DrainGameThread();
+
+        Assert.Equal(0, JoinSignalCount(JoinSyncSignal.ReplayApplied));
+        snapshotRegistry.Verify(
+            registry => registry.TryApplyJoinSnapshots(
+                It.Is<IReadOnlyList<SettlementClaimantDecisionSnapshotData>>(
+                    value => value.Count == 1 && value[0].KingdomId == "kingdom")),
+            Times.Once);
     }
 
     [Theory]

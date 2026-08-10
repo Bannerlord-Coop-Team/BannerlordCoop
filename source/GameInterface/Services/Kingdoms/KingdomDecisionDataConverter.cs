@@ -13,10 +13,14 @@ namespace GameInterface.Services.Kingdoms
     internal class KingdomDecisionDataConverter : IKingdomDecisionDataConverter
     {
         private readonly IObjectManager objectManager;
+        private readonly ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry;
         private readonly Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>> supportedConversions;
-        public KingdomDecisionDataConverter(IObjectManager objectManager)
+        public KingdomDecisionDataConverter(
+            IObjectManager objectManager,
+            ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry)
         {
             this.objectManager = objectManager;
+            this.settlementClaimantSnapshotRegistry = settlementClaimantSnapshotRegistry;
             supportedConversions = new Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>>()
             {
                 { typeof(DeclareWarDecision), ConvertDeclareWarDecision },
@@ -110,8 +114,25 @@ namespace GameInterface.Services.Kingdoms
             SettlementClaimantDecision settlementClaimantDecision = decision as SettlementClaimantDecision;
             if (settlementClaimantDecision != null)
             {
+                if (!settlementClaimantSnapshotRegistry.TryGetSnapshot(settlementClaimantDecision, out var candidates))
+                {
+                    throw new InvalidOperationException("Settlement claimant candidates were not captured before serialization.");
+                }
+
+                var candidateData = new List<SettlementClaimantCandidateData>(candidates.Count);
+                foreach (SettlementClaimantCandidate candidate in candidates)
+                {
+                    string clanId = GetId(candidate.Clan);
+                    if (string.IsNullOrWhiteSpace(clanId))
+                    {
+                        throw new InvalidOperationException("Settlement claimant candidate clan was not registered.");
+                    }
+
+                    candidateData.Add(new SettlementClaimantCandidateData(clanId, candidate.InitialMerit));
+                }
+
                 return new SettlementClaimantDecisionData(GetId(settlementClaimantDecision.ProposerClan), GetId(settlementClaimantDecision.Kingdom),
-                    settlementClaimantDecision.TriggerTime._numTicks, settlementClaimantDecision.IsEnforced, settlementClaimantDecision.NotifyPlayer, settlementClaimantDecision.PlayerExamined, GetId(settlementClaimantDecision.Settlement), GetOptionalId(settlementClaimantDecision._capturerHero), GetOptionalId(settlementClaimantDecision.ClanToExclude));
+                    settlementClaimantDecision.TriggerTime._numTicks, settlementClaimantDecision.IsEnforced, settlementClaimantDecision.NotifyPlayer, settlementClaimantDecision.PlayerExamined, GetId(settlementClaimantDecision.Settlement), GetOptionalId(settlementClaimantDecision._capturerHero), GetOptionalId(settlementClaimantDecision.ClanToExclude), candidateData);
             }
             else
             {

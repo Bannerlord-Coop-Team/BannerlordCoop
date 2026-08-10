@@ -1,4 +1,4 @@
-using GameInterface.Services.Kingdoms.Data;
+﻿using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Reflection;
@@ -70,6 +70,8 @@ namespace GameInterface.Services.Kingdoms
                     outcome = possibleOutcome;
                     return true;
                 }
+
+                return false;
             }
 
             if (voteData.OutcomeIndex < 0 || voteData.OutcomeIndex >= election._possibleOutcomes.Count) return false;

@@ -6,6 +6,7 @@ using GameInterface.Registry;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Players;
 using GameInterface.Services.Time.Interfaces;
@@ -32,7 +33,8 @@ public class ClientContext
         IHeroInterface heroInterface,
         IRegistryManager registryManager,
         IPlayerManager playerManager,
-        IMapTimeTrackerInterface mapTimeTrackerInterface)
+        IMapTimeTrackerInterface mapTimeTrackerInterface,
+        ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -46,6 +48,7 @@ public class ClientContext
         RegistryManager = registryManager;
         PlayerManager = playerManager;
         MapTimeTrackerInterface = mapTimeTrackerInterface;
+        SettlementClaimantSnapshotRegistry = settlementClaimantSnapshotRegistry;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -60,4 +63,5 @@ public class ClientContext
     public IRegistryManager RegistryManager { get; }
     public IPlayerManager PlayerManager { get; }
     public IMapTimeTrackerInterface MapTimeTrackerInterface { get; }
+    public ISettlementClaimantSnapshotRegistry SettlementClaimantSnapshotRegistry { get; }
 }

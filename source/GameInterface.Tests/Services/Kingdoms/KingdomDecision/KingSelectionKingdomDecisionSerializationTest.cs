@@ -55,7 +55,8 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Null(decision._clanToExclude);
 
             // Serialization: converting back must not throw on the null field and must keep it null.
-            KingdomDecisionData roundTrippedData = new KingdomDecisionDataConverter(objectManager).Convert(decision);
+            var snapshotRegistry = new SettlementClaimantSnapshotRegistry(objectManager);
+            KingdomDecisionData roundTrippedData = new KingdomDecisionDataConverter(objectManager, snapshotRegistry).Convert(decision);
             Assert.True(roundTrippedData is KingSelectionKingdomDecisionData);
             KingSelectionKingdomDecisionData roundTripped = (KingSelectionKingdomDecisionData)roundTrippedData;
             Assert.Null(roundTripped.ClanToExcludeId);

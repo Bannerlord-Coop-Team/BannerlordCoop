@@ -1,17 +1,27 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Handlers;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Moq;
+using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 using Xunit;
+using KingdomDecisionType = TaleWorlds.CampaignSystem.Election.KingdomDecision;
 
 namespace GameInterface.Tests.Services.Kingdoms;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class KingdomHandlerTests
 {
     [Fact]
@@ -128,6 +138,87 @@ public class KingdomHandlerTests
         Assert.Null(reason);
     }
 
+    [Fact]
+    public void ClientSettlementClaimantDecision_RegistersAuthoritativeSnapshotBeforeApplying()
+    {
+        var objectManager = new ObjectManager(new LoggerConfiguration().CreateLogger());
+        Kingdom kingdom = RegisterObject<Kingdom>(objectManager, "kingdom");
+        Clan proposerClan = RegisterObject<Clan>(objectManager, "proposer");
+        Settlement settlement = RegisterObject<Settlement>(objectManager, "settlement");
+        Clan firstClan = RegisterObject<Clan>(objectManager, "first");
+        Clan secondClan = RegisterObject<Clan>(objectManager, "second");
+        var candidates = new List<SettlementClaimantCandidateData>
+        {
+            new SettlementClaimantCandidateData(secondClan.StringId, 15f),
+            new SettlementClaimantCandidateData(firstClan.StringId, 90f),
+        };
+        var data = new SettlementClaimantDecisionData(
+            proposerClan.StringId, kingdom.StringId, 1, false, true, false,
+            settlement.StringId, null, null, candidates);
+        var snapshotRegistry = new SettlementClaimantSnapshotRegistry(objectManager);
+        SettlementClaimantDecision? appliedDecision = null;
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        kingdomInterface
+            .Setup(value => value.RunAddDecision(kingdom, It.IsAny<KingdomDecisionType>(), false, 0.5f))
+            .Callback<Kingdom, KingdomDecisionType, bool, float>((_, decision, _, _) =>
+            {
+                appliedDecision = Assert.IsType<SettlementClaimantDecision>(decision);
+            });
+        KingdomHandler handler = CreateHandler(objectManager, kingdomInterface.Object, snapshotRegistry);
+        bool wasServer = ModInformation.IsServer;
+
+        try
+        {
+            ModInformation.IsServer = false;
+            ApplyAddDecision(handler, new AddDecision(kingdom.StringId, data, false, 0.5f));
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+
+        Assert.NotNull(appliedDecision);
+        Assert.True(snapshotRegistry.TryCreateOutcomes(appliedDecision, out MBList<DecisionOutcome> outcomes));
+        Assert.Collection(
+            outcomes,
+            outcome => AssertClaimantOutcome(outcome, secondClan, 15f),
+            outcome => AssertClaimantOutcome(outcome, firstClan, 90f));
+    }
+
+    [Fact]
+    public void ClientSettlementClaimantDecision_WithMissingCandidate_DoesNotApply()
+    {
+        var objectManager = new ObjectManager(new LoggerConfiguration().CreateLogger());
+        Kingdom kingdom = RegisterObject<Kingdom>(objectManager, "kingdom");
+        Clan proposerClan = RegisterObject<Clan>(objectManager, "proposer");
+        Settlement settlement = RegisterObject<Settlement>(objectManager, "settlement");
+        var candidates = new List<SettlementClaimantCandidateData>
+        {
+            new SettlementClaimantCandidateData("missing", 15f),
+        };
+        var data = new SettlementClaimantDecisionData(
+            proposerClan.StringId, kingdom.StringId, 1, false, true, false,
+            settlement.StringId, null, null, candidates);
+        var snapshotRegistry = new SettlementClaimantSnapshotRegistry(objectManager);
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        KingdomHandler handler = CreateHandler(objectManager, kingdomInterface.Object, snapshotRegistry);
+        bool wasServer = ModInformation.IsServer;
+
+        try
+        {
+            ModInformation.IsServer = false;
+            ApplyAddDecision(handler, new AddDecision(kingdom.StringId, data, false, 0.5f));
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+
+        kingdomInterface.Verify(
+            value => value.RunAddDecision(It.IsAny<Kingdom>(), It.IsAny<KingdomDecisionType>(), It.IsAny<bool>(), It.IsAny<float>()),
+            Times.Never);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -150,7 +241,10 @@ public class KingdomHandlerTests
         Assert.Equal("kingdom name was empty", reason);
     }
     
-    private static KingdomHandler CreateHandler(IObjectManager objectManager)
+    private static KingdomHandler CreateHandler(
+        IObjectManager objectManager,
+        IKingdomInterface? kingdomInterface = null,
+        ISettlementClaimantSnapshotRegistry? settlementClaimantSnapshotRegistry = null)
     {
         return new KingdomHandler(
             new Mock<IMessageBroker>().Object,
@@ -158,8 +252,9 @@ public class KingdomHandlerTests
             new Mock<IPlayerManager>().Object,
             new Mock<IKingdomDecisionVoteManager>().Object,
             new Mock<IKingdomMembershipState>().Object,
-            new Mock<IKingdomInterface>().Object,
-            new Mock<IKingdomCreator>().Object);
+            kingdomInterface ?? new Mock<IKingdomInterface>().Object,
+            new Mock<IKingdomCreator>().Object,
+            settlementClaimantSnapshotRegistry ?? new Mock<ISettlementClaimantSnapshotRegistry>().Object);
     }
 
     private static bool TryGetCulture(KingdomHandler handler, string cultureId, out CultureObject culture)
@@ -170,5 +265,29 @@ public class KingdomHandlerTests
         bool result = (bool)(methodInfo.Invoke(handler, args) ?? false);
         culture = (CultureObject)args[1];
         return result;
+    }
+
+    private static void ApplyAddDecision(KingdomHandler handler, AddDecision payload)
+    {
+        MethodInfo methodInfo = typeof(KingdomHandler).GetMethod("ApplyAddDecision", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new NullReferenceException("ApplyAddDecision method was not found.");
+        methodInfo.Invoke(handler, new object[] { payload });
+    }
+
+    private static T RegisterObject<T>(ObjectManager objectManager, string id) where T : class
+    {
+        T value = ObjectHelper.SkipConstructor<T>();
+        PropertyInfo stringIdProperty = typeof(T).GetProperty(nameof(Clan.StringId))
+            ?? throw new NullReferenceException($"{typeof(T).Name}.{nameof(Clan.StringId)} property was not found.");
+        stringIdProperty.SetValue(value, id);
+        objectManager.AddExisting(id, value);
+        return value;
+    }
+
+    private static void AssertClaimantOutcome(DecisionOutcome outcome, Clan clan, float merit)
+    {
+        var claimantOutcome = Assert.IsType<SettlementClaimantDecision.ClanAsDecisionOutcome>(outcome);
+        Assert.Same(clan, claimantOutcome.Clan);
+        Assert.Equal(merit, claimantOutcome.InitialMerit);
     }
 }

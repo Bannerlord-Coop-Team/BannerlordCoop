@@ -112,6 +112,44 @@ public class KingdomNetworkMessageSerializationTest
     }
 
     [Fact]
+    public void NetworkAddDecision_RoundTripsSettlementClaimantCandidates()
+    {
+        var candidates = new List<SettlementClaimantCandidateData>
+        {
+            new SettlementClaimantCandidateData("Clan_Player12", 88.5f),
+            new SettlementClaimantCandidateData("clan_empire_south_4", 41.25f),
+        };
+        var decisionData = new SettlementClaimantDecisionData(
+            "clan_empire_south_1",
+            "Kingdom_empire_s",
+            123,
+            false,
+            true,
+            false,
+            "Settlement_town_ES1",
+            null,
+            null,
+            candidates);
+        var original = new NetworkAddDecision("Kingdom_empire_s", decisionData, false, 0.5f);
+
+        NetworkAddDecision copy = RoundTrip(original);
+
+        var copiedDecision = Assert.IsType<SettlementClaimantDecisionData>(copy.Data);
+        Assert.Collection(
+            copiedDecision.Candidates,
+            candidate =>
+            {
+                Assert.Equal("Clan_Player12", candidate.ClanId);
+                Assert.Equal(88.5f, candidate.InitialMerit);
+            },
+            candidate =>
+            {
+                Assert.Equal("clan_empire_south_4", candidate.ClanId);
+                Assert.Equal(41.25f, candidate.InitialMerit);
+            });
+    }
+
+    [Fact]
     public void NetworkRequestChangeKingdomName_RoundTrips()
     {
         var original = new NetworkRequestChangeKingdomName(

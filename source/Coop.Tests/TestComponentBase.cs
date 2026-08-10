@@ -14,6 +14,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties.Data;
@@ -35,6 +36,7 @@ using GameInterface.Services.Villages.Interfaces;
 using Moq;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using Xunit.Abstractions;
 using IGameInterface = GameInterface.IGameInterface;
 using GameInterface.Services.CampaignService.Interfaces;
@@ -89,6 +91,7 @@ internal abstract class TestComponentBase
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreationSettlementTracker>().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
+        RegisterSettlementClaimantSnapshotRegistryMock(builder);
         builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
 
         RegisterMock<ILogger>(builder);
@@ -157,6 +160,17 @@ internal abstract class TestComponentBase
         mock.Setup(m => m.Players).Returns(Array.Empty<Player>());
         builder.RegisterInstance(mock).AsSelf().SingleInstance();
         builder.RegisterInstance(mock.Object).As<IPlayerManager>().SingleInstance();
+    }
+
+    private static void RegisterSettlementClaimantSnapshotRegistryMock(ContainerBuilder builder)
+    {
+        var mock = new Mock<ISettlementClaimantSnapshotRegistry>();
+        var snapshots = Array.Empty<SettlementClaimantDecisionSnapshotData>();
+        mock.Setup(m => m.TryCreateJoinSnapshots(out snapshots)).Returns(true);
+        mock.Setup(m => m.TryApplyJoinSnapshots(
+            It.IsAny<IReadOnlyList<SettlementClaimantDecisionSnapshotData>>())).Returns(true);
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<ISettlementClaimantSnapshotRegistry>().SingleInstance();
     }
 
     private IContainer SetupContainerProvider(ContainerBuilder builder)

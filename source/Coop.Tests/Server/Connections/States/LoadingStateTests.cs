@@ -11,6 +11,8 @@ using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.MobileParties.Data;
 using LiteNetLib;
 using Moq;
@@ -29,6 +31,7 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
         private readonly Mock<IJoinCampaignBaselineSender> baselineSender;
+        private readonly Mock<ISettlementClaimantSnapshotRegistry> snapshotRegistry;
 
         public LoadingStateTests(ITestOutputHelper output)
         {
@@ -42,6 +45,7 @@ namespace Coop.Tests.Server.Connections.States
             differentPeer = network.CreatePeer();
             connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
             baselineSender = container.Resolve<Mock<IJoinCampaignBaselineSender>>();
+            snapshotRegistry = container.Resolve<Mock<ISettlementClaimantSnapshotRegistry>>();
 
             differentPeer.SetId(playerPeer.Id + 1);
         }
@@ -149,6 +153,33 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void ReplayComplete_CarriesExportedSettlementClaimantSnapshots()
+        {
+            var snapshots = new[]
+            {
+                new SettlementClaimantDecisionSnapshotData(
+                    "kingdom",
+                    1,
+                    new[] { new SettlementClaimantCandidateData("clan", 15f) }),
+            };
+            snapshotRegistry
+                .Setup(registry => registry.TryCreateJoinSnapshots(out snapshots))
+                .Returns(true);
+            var state = connectionLogic.SetState<LoadingState>();
+
+            StartReplay(state);
+
+            NetworkJoinSync replayComplete = Assert.Single(
+                serverComponent.TestNetwork
+                    .GetPeerMessagesFromType<NetworkJoinSync>(playerPeer),
+                message => message.Signal == JoinSyncSignal.ReplayComplete);
+            SettlementClaimantDecisionSnapshotData snapshot = Assert.Single(replayComplete.ClaimantSnapshots);
+            Assert.Equal("kingdom", snapshot.KingdomId);
+            Assert.Equal(1, snapshot.DecisionIndex);
+            Assert.Equal("clan", Assert.Single(snapshot.Candidates).ClanId);
+        }
+
+        [Fact]
         public void ReplayReplyDuringMarkerSend_IsAccepted()
         {
             var connectionLogicMock = new Mock<IConnectionLogic>();
@@ -162,7 +193,8 @@ namespace Coop.Tests.Server.Connections.States
                 networkMock.Object,
                 baselineSender.Object,
                 new Mock<IConnectionMessageQueue>().Object,
-                new Mock<ISendCoalescer>().Object);
+                new Mock<ISendCoalescer>().Object,
+                snapshotRegistry.Object);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
             networkMock
                 .Setup(network => network.SendImmediate(playerPeer, It.IsAny<IMessage>()))

@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.ObjectManager;
 using ProtoBuf;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -8,6 +9,22 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
+    [ProtoContract(SkipConstructor = true)]
+    public class SettlementClaimantCandidateData
+    {
+        [ProtoMember(1)]
+        public string ClanId { get; }
+
+        [ProtoMember(2)]
+        public float InitialMerit { get; }
+
+        public SettlementClaimantCandidateData(string clanId, float initialMerit)
+        {
+            ClanId = clanId;
+            InitialMerit = initialMerit;
+        }
+    }
+
     /// <summary>
     /// Class for serializing <see cref="SettlementClaimantDecision"> class.
     /// </summary>
@@ -24,12 +41,26 @@ namespace GameInterface.Services.Kingdoms.Data
         public string CapturerHeroId { get; }
         [ProtoMember(3)]
         public string ClanToExcludeId { get; }
+        [ProtoMember(4)]
+        public List<SettlementClaimantCandidateData> Candidates { get; }
 
-        public SettlementClaimantDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string settlementId, string capturerHeroId, string clanToExcludeId) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
+        public SettlementClaimantDecisionData(
+            string proposedClanId,
+            string kingdomId,
+            long triggerTime,
+            bool isEnforced,
+            bool notifyPlayer,
+            bool playerExamined,
+            string settlementId,
+            string capturerHeroId,
+            string clanToExcludeId,
+            List<SettlementClaimantCandidateData> candidates)
+            : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
         {
             SettlementId = settlementId;
             CapturerHeroId = capturerHeroId;
             ClanToExcludeId = clanToExcludeId;
+            Candidates = candidates;
         }
 
         /// <inheritdoc/>

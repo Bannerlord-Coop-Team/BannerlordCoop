@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties;
+using GameInterface.Services.Kingdoms;
 using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.States;
@@ -30,6 +31,7 @@ public class LoadingState : ConnectionStateBase
     private readonly IJoinCampaignBaselineSender campaignBaselineSender;
     private readonly IConnectionMessageQueue connectionMessageQueue;
     private readonly ISendCoalescer coalescer;
+    private readonly ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry;
     private volatile JoinPhase phase;
     private int initialBaselinesSent;
 
@@ -39,7 +41,8 @@ public class LoadingState : ConnectionStateBase
         INetwork network,
         IJoinCampaignBaselineSender campaignBaselineSender,
         IConnectionMessageQueue connectionMessageQueue,
-        ISendCoalescer coalescer)
+        ISendCoalescer coalescer,
+        ISettlementClaimantSnapshotRegistry settlementClaimantSnapshotRegistry)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -47,6 +50,7 @@ public class LoadingState : ConnectionStateBase
         this.campaignBaselineSender = campaignBaselineSender;
         this.connectionMessageQueue = connectionMessageQueue;
         this.coalescer = coalescer;
+        this.settlementClaimantSnapshotRegistry = settlementClaimantSnapshotRegistry;
 
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         messageBroker.Subscribe<NetworkJoinSync>(JoinSyncHandler);
@@ -81,8 +85,12 @@ public class LoadingState : ConnectionStateBase
 
             messageBroker.Publish(this, new PlayerCampaignEntered(peer));
             connectionMessageQueue.Flush(peer);
+            if (!settlementClaimantSnapshotRegistry.TryCreateJoinSnapshots(out var claimantSnapshots)) return;
+
             phase = JoinPhase.WaitingForReplayApplied;
-            network.SendImmediate(peer, new NetworkJoinSync(JoinSyncSignal.ReplayComplete));
+            network.SendImmediate(
+                peer,
+                new NetworkJoinSync(JoinSyncSignal.ReplayComplete, claimantSnapshots));
         }, context: nameof(PlayerCampaignEnteredHandler));
     }
 

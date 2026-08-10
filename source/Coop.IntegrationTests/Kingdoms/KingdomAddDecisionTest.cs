@@ -60,6 +60,36 @@ namespace Coop.IntegrationTests.Kingdoms
             Assert.Equal(0, client1.InternalMessages.GetMessageCount<AddDecision>());
             Assert.Equal(1, TestEnvironment.Clients.Skip(1).First().InternalMessages.GetMessageCount<AddDecision>());
         }
+
+        [Fact]
+        public void ClientKingdom_SettlementClaimantDecision_IsRejected()
+        {
+            var client = TestEnvironment.Clients.First();
+            var server = TestEnvironment.Server;
+            var data = new SettlementClaimantDecisionData(
+                "proposer",
+                "kingdom1",
+                0,
+                false,
+                true,
+                false,
+                "settlement",
+                string.Empty,
+                string.Empty,
+                new List<SettlementClaimantCandidateData>());
+
+            server.SimulateMessage(
+                client.NetPeer,
+                new NetworkAddDecision("kingdom1", data, false, 0.5f));
+
+            Assert.Equal(0, server.InternalMessages.GetMessageCount<AddDecision>());
+            Assert.Equal(0, server.NetworkSentMessages.GetMessageCount<NetworkAddDecision>());
+            foreach (EnvironmentInstance otherClient in TestEnvironment.Clients)
+            {
+                Assert.Equal(0, otherClient.InternalMessages.GetMessageCount<AddDecision>());
+            }
+        }
+
         private static KingdomDecision CreateDecision(EnvironmentInstance instance)
         {
             instance.CreateRegisteredObject<Clan>("clan1");

@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
+using System;
 
 namespace Coop.Core.Server.Connections.Messages;
 
@@ -23,5 +25,14 @@ public readonly struct NetworkJoinSync : IMessage
     [ProtoMember(1)]
     public readonly JoinSyncSignal Signal;
 
-    public NetworkJoinSync(JoinSyncSignal signal) => Signal = signal;
+    [ProtoMember(2)]
+    public readonly SettlementClaimantDecisionSnapshotData[] ClaimantSnapshots;
+
+    public NetworkJoinSync(
+        JoinSyncSignal signal,
+        SettlementClaimantDecisionSnapshotData[] claimantSnapshots = null)
+    {
+        Signal = signal;
+        ClaimantSnapshots = claimantSnapshots ?? Array.Empty<SettlementClaimantDecisionSnapshotData>();
+    }
 }
