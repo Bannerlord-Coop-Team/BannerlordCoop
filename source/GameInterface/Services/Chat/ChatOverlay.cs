@@ -18,7 +18,7 @@ namespace GameInterface.Services.Chat;
 internal sealed class ChatOverlay : GlobalLayer, IDisposable
 {
     private const string InputWidgetId = "CoopChatMessageInput";
-    private const int LayerOrder = 0;
+    private const int LayerOrder = 1;
 
     private readonly ChatVM dataSource;
     private readonly Action refreshParticipants;
@@ -77,14 +77,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (ShouldCaptureCloseInput(
                 isInputFocused,
                 Input.IsKeyPressed(InputKey.Escape),
-                Input.IsKeyPressed(InputKey.ControllerRRight),
-                Input.IsKeyPressed(InputKey.ControllerLOption)))
+                Input.IsKeyPressed(InputKey.ControllerRRight)))
             FocusInput();
 
         if (ShouldCloseInput(
                 Input.IsKeyReleased(InputKey.Escape),
                 Input.IsKeyReleased(InputKey.ControllerRRight),
-                Input.IsKeyReleased(InputKey.ControllerLOption)))
+                Input.IsKeyPressed(InputKey.ControllerLOption)))
         {
             CloseInput();
             return;
@@ -277,19 +276,18 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     internal static bool ShouldCloseInput(
         bool escapeReleased,
         bool controllerCancelReleased,
-        bool controllerToggleReleased)
+        bool controllerTogglePressed)
     {
-        return escapeReleased || controllerCancelReleased || controllerToggleReleased;
+        return escapeReleased || controllerCancelReleased || controllerTogglePressed;
     }
 
     internal static bool ShouldCaptureCloseInput(
         bool inputFocused,
         bool escapePressed,
-        bool controllerCancelPressed,
-        bool controllerTogglePressed)
+        bool controllerCancelPressed)
     {
         return !inputFocused &&
-               (escapePressed || controllerCancelPressed || controllerTogglePressed);
+               (escapePressed || controllerCancelPressed);
     }
 
     internal static bool ShouldSendInput(

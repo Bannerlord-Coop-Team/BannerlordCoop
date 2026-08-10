@@ -58,35 +58,32 @@ public class ChatOverlayTests
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]
     [InlineData(false, false, true)]
-    public void CloseInput_UsesCloseKeyRelease(
+    public void CloseInput_UsesCancelReleaseAndTogglePress(
         bool escapeReleased,
         bool controllerCancelReleased,
-        bool controllerToggleReleased)
+        bool controllerTogglePressed)
     {
         Assert.True(ChatOverlay.ShouldCloseInput(
             escapeReleased,
             controllerCancelReleased,
-            controllerToggleReleased));
+            controllerTogglePressed));
     }
 
     [Theory]
-    [InlineData(false, true, false, false, true)]
-    [InlineData(false, false, true, false, true)]
-    [InlineData(false, false, false, true, true)]
-    [InlineData(true, true, false, false, false)]
-    [InlineData(false, false, false, false, false)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, true, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, false, false)]
     public void CloseKeyPress_CapturesPassiveChatUntilRelease(
         bool inputFocused,
         bool escapePressed,
         bool controllerCancelPressed,
-        bool controllerTogglePressed,
         bool expected)
     {
         Assert.Equal(expected, ChatOverlay.ShouldCaptureCloseInput(
             inputFocused,
             escapePressed,
-            controllerCancelPressed,
-            controllerTogglePressed));
+            controllerCancelPressed));
     }
 
     [Theory]
