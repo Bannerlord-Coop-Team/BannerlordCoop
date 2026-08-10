@@ -1,4 +1,7 @@
-﻿using Missions.Agents.Packets;
+﻿using Common.Logging;
+using Missions.Agents.Packets;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -55,6 +58,8 @@ public interface IAgentPositionInterpolator
 /// </summary>
 public class AgentPositionInterpolator : IAgentPositionInterpolator
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AgentPositionInterpolator>();
+
     // Snap only when the replicated owner is far enough away that local locomotion has clearly diverged.
     private const float RiderSnapDistance = 6f;
     private const float MountSnapDistance = 12f;
@@ -68,10 +73,18 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
         new Dictionary<Agent, long>();
+    private readonly INetworkAgentRegistry agentRegistry;
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
     private long updateSequence;
+
+    public AgentPositionInterpolator() : this(null) { }
+
+    internal AgentPositionInterpolator(INetworkAgentRegistry agentRegistry)
+    {
+        this.agentRegistry = agentRegistry;
+    }
 
     public void SetRiderTarget(Agent agent, AgentData data)
     {
@@ -245,6 +258,12 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         elapsed += dt;
         if (_targets.Count == 0) return;
 
+        int trackedBefore = _targets.Count;
+        int staleTargets = 0;
+        float oldestStaleAge = 0f;
+        Agent oldestStaleAgent = null;
+        TargetFrame oldestStaleTarget = default;
+
         foreach (var pair in _targets)
         {
             Agent agent = pair.Key;
@@ -257,9 +276,17 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             }
 
             // A stale target (owner stopped reporting) expires instead of pinning the puppet to an old position.
-            if (elapsed - pair.Value.UpdatedAt > StaleTargetSeconds)
+            float targetAge = elapsed - pair.Value.UpdatedAt;
+            if (targetAge > StaleTargetSeconds)
             {
                 _evict.Add(agent);
+                staleTargets++;
+                if (oldestStaleAgent == null || targetAge > oldestStaleAge)
+                {
+                    oldestStaleAge = targetAge;
+                    oldestStaleAgent = agent;
+                    oldestStaleTarget = pair.Value;
+                }
                 continue;
             }
 
@@ -279,6 +306,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             pair.Value.AgentState.Apply(agent);
         }
 
+        if (staleTargets > 0)
+            LogStaleTargets(staleTargets, trackedBefore, oldestStaleAge, oldestStaleAgent, oldestStaleTarget);
+
         if (_evict.Count > 0)
         {
             foreach (Agent agent in _evict)
@@ -288,6 +318,51 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             }
             _evict.Clear();
         }
+    }
+
+    private void LogStaleTargets(
+        int staleTargets,
+        int trackedBefore,
+        float oldestAge,
+        Agent sampleAgent,
+        TargetFrame sampleTarget)
+    {
+        Guid agentId = Guid.Empty;
+        string authority = null;
+        string movementScope = null;
+        ushort movementId = 0;
+        if (agentRegistry != null && agentRegistry.TryGetAgentInfo(sampleAgent, out var info))
+        {
+            agentId = info.AgentId;
+            authority = info.CurrentAuthority;
+            movementScope = info.MovementScopeId;
+            movementId = info.MovementId;
+        }
+
+        Logger.Warning(
+            "[BattleDesync] Expired {StaleTargets} active movement target(s): trackedBefore={TrackedBefore} " +
+            "oldestAge={OldestAge:0.000}s sampleAgentId={AgentId} sampleAuthority={Authority} " +
+            "sampleMovementIdentity={MovementScope}/{MovementId} sampleIndex={AgentIndex} sampleName={AgentName} " +
+            "sampleHealth={Health:0.0} sampleController={Controller} sampleAiControlled={AiControlled} " +
+            "sampleSpeed={Speed:0.00} sampleDistance={Distance:0.00} samplePosition={Position} " +
+            "sampleTarget={Target} sampleSequence={Sequence}",
+            staleTargets,
+            trackedBefore,
+            oldestAge,
+            agentId,
+            authority,
+            movementScope,
+            movementId,
+            sampleAgent.Index,
+            sampleAgent.Name,
+            sampleAgent.Health,
+            sampleAgent.Controller,
+            sampleAgent.IsAIControlled,
+            sampleAgent.GetRealGlobalVelocity().AsVec2.Length,
+            sampleAgent.Position.Distance(sampleTarget.Position),
+            sampleAgent.Position,
+            sampleTarget.Position,
+            sampleTarget.UpdateSequence);
     }
 
     private static void MoveTowardTarget(Agent agent, TargetFrame target)

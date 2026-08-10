@@ -60,14 +60,26 @@ public class PuppetDeathApplier : IPuppetDeathApplier
 
     private void Handle_NetworkBattleAgentDied(MessagePayload<NetworkBattleAgentDied> payload)
     {
-        Logger.Information("[DeathDiag] Received death broadcast for agent {AgentId}", payload.What.AgentId);
+        Logger.Information(
+            "[BattleDeath] Received death broadcast: agentId={AgentId} wounded={Wounded} " +
+            "affectorAgentId={AffectorAgentId} damage={Damage} deathAction={DeathAction}",
+            payload.What.AgentId,
+            payload.What.Wounded,
+            payload.What.AffectorAgentId,
+            payload.What.InflictedDamage,
+            payload.What.DeathAction);
 
         GameThread.RunSafe(() =>
         {
             if (!TryApplyDeath(payload.What))
             {
                 pendingDeaths[payload.What.AgentId] = payload.What;
-                Logger.Information("[DeathDiag] Deferring death of {AgentId} until its puppet registers", payload.What.AgentId);
+                string reason = Mission.Current == null ? "mission-unavailable" : "puppet-unregistered";
+                Logger.Information(
+                    "[BattleDeath] Deferring death: agentId={AgentId} reason={Reason} pendingDeaths={PendingDeaths}",
+                    payload.What.AgentId,
+                    reason,
+                    pendingDeaths.Count);
             }
         });
     }
@@ -88,12 +100,24 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     {
         var registry = coopMissionComponent.AgentRegistry;
         if (!registry.TryGetAgentInfo(death.AgentId, out var info)) return false;
-        if (Mission.Current == null) return false;
+        Mission mission = Mission.Current;
+        if (mission == null) return false;
 
         Agent agent = info.Agent;
-        Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", death.AgentId, agent != null, agent?.Health ?? -1f);
-        if (agent != null && agent.Health > 0)
+        int agentIndex = agent?.Index ?? -1;
+        float healthBefore = agent?.Health ?? -1f;
+        float healthAfter = healthBefore;
+        bool activeBefore = agent?.IsActive() ?? false;
+        bool activeAfter = activeBefore;
+        object mortalityBefore = null;
+        object mortalityAfter = null;
+        bool disableDying = mission.DisableDying;
+        MissionMode missionMode = mission.Mode;
+        int appliedDamage = death.InflictedDamage;
+        bool appliedDeath = agent != null && healthBefore > 0f;
+        if (appliedDeath)
         {
+            mortalityBefore = agent.CurrentMortalityState;
             Agent mount = agent.MountAgent;
             LogMountState("before", agent, mount);
 
@@ -109,6 +133,7 @@ public class PuppetDeathApplier : IPuppetDeathApplier
                 ? CreateReplicatedKillingBlow(blow, death.DeathAction)
                 : default;
             blow.InflictedDamage = Math.Max(blow.InflictedDamage, (int)Math.Ceiling(agent.Health));
+            appliedDamage = blow.InflictedDamage;
             var agentState = death.Wounded ? AgentState.Unconscious : AgentState.Killed;
 
             BattleSpawnGate.RunWithReplicatedDeath(
@@ -126,11 +151,93 @@ public class PuppetDeathApplier : IPuppetDeathApplier
 
             puppetMountStateRepairer.RepairAfterRiderDeath(mount);
             LogMountState("after", agent, mount);
+
+            healthAfter = agent.Health;
+            activeAfter = agent.IsActive();
+            mortalityAfter = agent.CurrentMortalityState;
         }
 
         // Deregister after the game-thread kill. Removing on the poll thread before the queued apply would
         // make the registry lookup fail and leave the puppet alive but unregistered.
-        registry.RemoveAgent(death.AgentId);
+        bool deregistered = registry.RemoveAgent(death.AgentId);
+        if (agent == null)
+        {
+            Logger.Warning(
+                "[BattleDeath] Registered death target has no native puppet: agentId={AgentId} " +
+                "authority={Authority} movementIdentity={Scope}/{MovementId} deregistered={Deregistered}",
+                death.AgentId,
+                info.CurrentAuthority,
+                info.MovementScopeId,
+                info.MovementId,
+                deregistered);
+        }
+        else if (appliedDeath)
+        {
+            Logger.Information(
+                "[BattleDeath] Applied replicated death: agentId={AgentId} authority={Authority} " +
+                "agentIndex={AgentIndex} wounded={Wounded} affectorAgentId={AffectorAgentId} " +
+                "damage={Damage} deathAction={DeathAction} healthBefore={HealthBefore:0.0} " +
+                "healthAfter={HealthAfter:0.0} activeBefore={ActiveBefore} activeAfter={ActiveAfter} " +
+                "mortalityBefore={MortalityBefore} mortalityAfter={MortalityAfter} " +
+                "disableDying={DisableDying} missionMode={MissionMode} deregistered={Deregistered}",
+                death.AgentId,
+                info.CurrentAuthority,
+                agentIndex,
+                death.Wounded,
+                death.AffectorAgentId,
+                appliedDamage,
+                death.DeathAction,
+                healthBefore,
+                healthAfter,
+                activeBefore,
+                activeAfter,
+                mortalityBefore,
+                mortalityAfter,
+                disableDying,
+                missionMode,
+                deregistered);
+            if (activeAfter && healthAfter > 0f)
+            {
+                Logger.Error(
+                    "[BattleDeath] Replicated death did not kill puppet: agentId={AgentId} " +
+                    "authority={Authority} agentIndex={AgentIndex} healthBefore={HealthBefore:0.0} " +
+                    "healthAfter={HealthAfter:0.0} activeAfter={ActiveAfter} " +
+                    "mortalityBefore={MortalityBefore} mortalityAfter={MortalityAfter} " +
+                    "disableDying={DisableDying} missionMode={MissionMode}",
+                    death.AgentId,
+                    info.CurrentAuthority,
+                    agentIndex,
+                    healthBefore,
+                    healthAfter,
+                    activeAfter,
+                    mortalityBefore,
+                    mortalityAfter,
+                    disableDying,
+                    missionMode);
+            }
+        }
+        else
+        {
+            Logger.Information(
+                "[BattleDeath] Puppet was already nonliving when its death arrived: agentId={AgentId} " +
+                "authority={Authority} agentIndex={AgentIndex} health={Health:0.0} active={Active} " +
+                "deregistered={Deregistered}",
+                death.AgentId,
+                info.CurrentAuthority,
+                agentIndex,
+                healthBefore,
+                activeBefore,
+                deregistered);
+        }
+
+        if (!deregistered)
+        {
+            Logger.Warning(
+                "[BattleDeath] Failed to deregister puppet after death replay: agentId={AgentId} " +
+                "authority={Authority}",
+                death.AgentId,
+                info.CurrentAuthority);
+        }
         casualties.Forget(death.AgentId);
         return true;
     }

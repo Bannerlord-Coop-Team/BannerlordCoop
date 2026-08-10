@@ -236,7 +236,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
-    private readonly AgentPositionInterpolator _interpolator = new AgentPositionInterpolator();
+    private readonly AgentPositionInterpolator _interpolator;
     public IAgentPositionInterpolator Interpolator => _interpolator;
 
     // Masterless-horse movement receive side. Owned here (registered/removed with this handler) so both
@@ -284,6 +284,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.visualActionAccessor = visualActionAccessor;
         this.movementRateController = movementRateController;
         this.missionContext = missionContext;
+        _interpolator = new AgentPositionInterpolator(agentRegistry);
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
         this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);

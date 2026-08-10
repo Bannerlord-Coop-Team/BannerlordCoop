@@ -136,6 +136,13 @@ public sealed class MovementRateController : IMovementRateController
     private const int ReceiverCapHeartbeatMilliseconds = 1000;
     private const int HealthyWindowsBeforeIncrease = 4;
 
+    internal enum MovementReceiveHealth
+    {
+        Healthy,
+        Degraded,
+        Severe,
+    }
+
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
@@ -167,6 +174,9 @@ public sealed class MovementRateController : IMovementRateController
     private string localReason = "location-fixed";
     private string reason = "location-fixed";
     private long receiverCapSequence;
+    private MovementReceiveHealth reportedReceiveHealth = MovementReceiveHealth.Healthy;
+
+    internal MovementReceiveHealth ReportedReceiveHealth => reportedReceiveHealth;
 
     private float reportElapsed;
     private float frameElapsed;
@@ -835,7 +845,7 @@ public sealed class MovementRateController : IMovementRateController
         priorityOnlyPolls = 0;
     }
 
-    private static void LogReport(MovementRateSnapshot snapshot)
+    private void LogReport(MovementRateSnapshot snapshot)
     {
         Logger.Information(
             "[MovementRate] profile={Profile} bulkHz={BulkHz} priorityHz={PriorityHz} " +
@@ -866,5 +876,68 @@ public sealed class MovementRateController : IMovementRateController
             snapshot.BulkPollsPerSecond,
             snapshot.PriorityOnlyPollsPerSecond,
             snapshot.Reason);
+
+        LogReceiveHealthTransition(snapshot);
+    }
+
+    private void LogReceiveHealthTransition(MovementRateSnapshot snapshot)
+    {
+        if (snapshot.Profile != MovementCadenceProfile.Battle)
+        {
+            reportedReceiveHealth = MovementReceiveHealth.Healthy;
+            return;
+        }
+
+        MovementReceiveHealth next = ClassifyReceiveHealth(snapshot);
+        if (next == reportedReceiveHealth) return;
+
+        string previous = reportedReceiveHealth.ToString().ToLowerInvariant();
+        string current = next.ToString().ToLowerInvariant();
+        reportedReceiveHealth = next;
+
+        const string message =
+            "[BattleDesync] Movement receive health changed from {PreviousState} to {State}: " +
+            "queueMs={QueueMs:0.00} applyMsPerSecond={ApplyMs:0.00} fps={Fps:0.0} " +
+            "receiverCapHz={ReceiverCapHz} bulkHz={BulkHz} agents={ActiveAgents} localAgents={LocalAgents}";
+        if (next == MovementReceiveHealth.Healthy)
+        {
+            Logger.Information(
+                message,
+                previous,
+                current,
+                snapshot.MaximumReceiverQueueMilliseconds,
+                snapshot.ReceiverApplyMillisecondsPerSecond,
+                snapshot.FramesPerSecond,
+                snapshot.AdvertisedReceiverCapHz,
+                snapshot.BulkHz,
+                snapshot.ActiveAgents,
+                snapshot.LocallyControlledAgents);
+            return;
+        }
+
+        Logger.Warning(
+            message,
+            previous,
+            current,
+            snapshot.MaximumReceiverQueueMilliseconds,
+            snapshot.ReceiverApplyMillisecondsPerSecond,
+            snapshot.FramesPerSecond,
+            snapshot.AdvertisedReceiverCapHz,
+            snapshot.BulkHz,
+            snapshot.ActiveAgents,
+            snapshot.LocallyControlledAgents);
+    }
+
+    private static MovementReceiveHealth ClassifyReceiveHealth(MovementRateSnapshot snapshot)
+    {
+        int receiverCap = CalculateReceiverCap(
+            snapshot.FramesPerSecond,
+            snapshot.ReceiverApplyMillisecondsPerSecond,
+            snapshot.MaximumReceiverQueueMilliseconds);
+        if (receiverCap <= 10)
+            return MovementReceiveHealth.Severe;
+        if (receiverCap <= 20)
+            return MovementReceiveHealth.Degraded;
+        return MovementReceiveHealth.Healthy;
     }
 }
