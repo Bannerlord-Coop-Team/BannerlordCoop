@@ -118,6 +118,17 @@ namespace Coop.LiveTesting
 
             return ExecuteOnGameThread(request, () =>
             {
+                if (command.Equals("coop.debug.connection.join", StringComparison.Ordinal))
+                {
+                    return Success(request.Id, new
+                    {
+                        name = command,
+                        arguments,
+                        found = true,
+                        output = CoopMod.JoinFromMainMenu(arguments),
+                    });
+                }
+
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
                     return Failure(
