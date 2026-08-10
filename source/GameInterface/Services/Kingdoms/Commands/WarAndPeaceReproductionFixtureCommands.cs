@@ -505,6 +505,34 @@ public class WarAndPeaceReproductionFixtureCommands
         return "WAR_PEACE_FIXTURE_INBOUND_PEACE_OPENING";
     }
 
+    [CommandLineArgumentFunction("war_peace_fixture_confirm_peace", "coop.debug.kingdom")]
+    public static string ConfirmInboundPeaceOffer(List<string> args)
+    {
+        if (ModInformation.IsServer) return "This command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.war_peace_fixture_confirm_peace";
+
+        var decisions = (ScreenManager.TopScreen as GauntletKingdomScreen)?.DataSource?.Decision;
+        var inquiry = decisions?._queryData;
+        if (inquiry?.AffirmativeAction == null || !inquiry.IsAffirmativeOptionShown)
+        {
+            return "The inbound peace confirmation inquiry is not ready.";
+        }
+        if (!TaleWorlds.Library.InformationManager.IsAnyInquiryActive())
+        {
+            return "The inbound peace confirmation inquiry is not active.";
+        }
+
+        inquiry.AffirmativeAction();
+        TaleWorlds.Library.InformationManager.HideInquiry();
+        DecisionItemBaseVM decisionItem = decisions.CurrentDecision;
+        bool expectedDecision = decisionItem?.KingdomDecisionMaker?._decision is MakePeaceKingdomDecision peace &&
+                                peace._isProposedByOpponent &&
+                                peace.FactionToMakePeaceWith?.StringId == AseraiKingdomId;
+        return expectedDecision && decisionItem.IsActive
+            ? "WAR_PEACE_FIXTURE_INBOUND_PEACE_CONFIRMED"
+            : "The inbound peace decision did not become active.";
+    }
+
     [CommandLineArgumentFunction("war_peace_fixture_select_peace_no", "coop.debug.kingdom")]
     public static string SelectPeaceNo(List<string> args)
     {
@@ -542,7 +570,10 @@ public class WarAndPeaceReproductionFixtureCommands
             .Where(decision => decision._isProposedByOpponent && decision.FactionToMakePeaceWith == aserai)
             .ToArray();
         DeclareWarDecision warDecision = warDecisions.FirstOrDefault();
-        DecisionItemBaseVM decisionItem = GetCurrentDecisionItem();
+        var decisions = (ScreenManager.TopScreen as GauntletKingdomScreen)?.DataSource?.Decision;
+        DecisionItemBaseVM decisionItem = decisions?.CurrentDecision;
+        bool decisionInquiryActive = decisions?._queryData?.AffirmativeAction != null &&
+                                     TaleWorlds.Library.InformationManager.IsAnyInquiryActive();
         bool selectedWarYes = decisionItem?._currentSelectedOption?.Option is
             DeclareWarDecision.DeclareWarDecisionOutcome { ShouldWarBeDeclared: true };
         bool selectedPeaceNo = decisionItem?._currentSelectedOption?.Option is
@@ -563,6 +594,7 @@ public class WarAndPeaceReproductionFixtureCommands
                $"eligiblePlayerClan={Bool(eligiblePlayerClan)} " +
                $"inboundPeaceOffer={Bool(peaceOffers.Length != 0)} inboundPeaceOfferCount={peaceOffers.Length} " +
                $"screenActive={Bool(ScreenManager.TopScreen is GauntletKingdomScreen)} " +
+               $"decisionInquiryActive={Bool(decisionInquiryActive)} " +
                $"warActionAvailable={Bool(warAction != null)} warActionEnabled={Bool(warAction?.IsEnabled ?? false)} " +
                $"decisionActive={Bool(decisionItem?.IsActive ?? false)} canEnd={Bool(decisionItem?.CanEndDecision ?? false)} " +
                $"finalSelectionDone={Bool(decisionItem?._finalSelectionDone ?? false)} " +
