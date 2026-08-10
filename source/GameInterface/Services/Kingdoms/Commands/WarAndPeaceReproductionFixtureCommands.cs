@@ -237,11 +237,13 @@ public class WarAndPeaceReproductionFixtureCommands
             return $"WAR_PEACE_FIXTURE_WAR_ACTION_DISABLED hint={warAction.Hint?.HintText?.ToString() ?? "none"}";
         }
 
+        string actionName = warAction.Name;
         warAction.ExecuteAction();
         DecisionItemBaseVM decisionItem = GetCurrentDecisionItem();
         bool expectedDecision = decisionItem?.KingdomDecisionMaker?._decision is DeclareWarDecision decision &&
                                 decision.FactionToDeclareWarOn == aserai;
-        return $"WAR_PEACE_FIXTURE_WAR_ACTION_EXECUTED decisionOpen={Bool(expectedDecision)}";
+        return $"WAR_PEACE_FIXTURE_WAR_ACTION_EXECUTED actionName={actionName} " +
+               $"decisionOpen={Bool(expectedDecision)}";
     }
 
     [CommandLineArgumentFunction("war_peace_fixture_select_war_yes", "coop.debug.kingdom")]
@@ -414,43 +416,32 @@ public class WarAndPeaceReproductionFixtureCommands
         {
             return "Aserai has no ruling clan to propose peace.";
         }
+        if (!ContainerProvider.TryResolve(out IKingdomInterface kingdomInterface))
+        {
+            return "Unable to resolve the kingdom interface for the real Aserai peace election.";
+        }
+
         var aiDecision = new MakePeaceKingdomDecision(
             activeFixture.Aserai.RulingClan,
             activeFixture.Kingdom,
-            dailyTributeToBePaid: 0,
-            dailyTributeDurationInDays: 0,
+            dailyTributeToBePaid: -1,
+            dailyTributeDurationInDays: 30,
             applyResults: true,
             isProposedByOpponent: false);
-        var election = new CoopKingdomElection(aiDecision, randomFloat: 0f);
-        election.SetupPlayerVoteElection();
-        if (election.IsCancelled)
-        {
-            return "The real Aserai peace election was cancelled during setup.";
-        }
+        kingdomInterface.AddDecision(
+            activeFixture.Aserai,
+            aiDecision,
+            ignoreInfluenceCost: true,
+            randomFloat: 0f,
+            applyInfluenceCost: false);
 
-        int yesOutcomeIndex = election._possibleOutcomes.FindIndex(outcome =>
-            outcome is MakePeaceKingdomDecision.MakePeaceDecisionOutcome { ShouldPeaceBeDeclared: true });
-        if (yesOutcomeIndex < 0)
-        {
-            return "The real Aserai peace election has no Yes outcome.";
-        }
-        foreach (Supporter supporter in aiDecision.DetermineSupporters())
-        {
-            election.ApplyClanVote(
-                supporter.Clan,
-                yesOutcomeIndex,
-                Supporter.SupportWeights.FullyPush,
-                isAbstain: false);
-        }
-
-        DecisionOutcome chosenOutcome = election.ResolveWithCurrentVotes();
-        bool chosePeace = chosenOutcome is
-            MakePeaceKingdomDecision.MakePeaceDecisionOutcome { ShouldPeaceBeDeclared: true };
+        bool aiDecisionPending = activeFixture.Aserai.UnresolvedDecisions.Contains(aiDecision);
         MakePeaceKingdomDecision inboundOffer = activeFixture.Kingdom.UnresolvedDecisions
             .OfType<MakePeaceKingdomDecision>()
             .FirstOrDefault(decision => decision._isProposedByOpponent &&
                                         decision.FactionToMakePeaceWith == activeFixture.Aserai);
-        return $"WAR_PEACE_FIXTURE_AI_PEACE_STAGED chosenPeace={Bool(chosePeace)} " +
+        return $"WAR_PEACE_FIXTURE_AI_PEACE_STAGED chosenPeace={Bool(inboundOffer != null)} " +
+               $"aiDecisionPending={Bool(aiDecisionPending)} " +
                $"warWithAserai={Bool(AreAtWar(activeFixture.Kingdom, activeFixture.Aserai))} " +
                $"inboundOffer={Bool(inboundOffer != null)}";
     }
@@ -527,6 +518,10 @@ public class WarAndPeaceReproductionFixtureCommands
         bool selectedPeaceNo = decisionItem?._currentSelectedOption?.Option is
             MakePeaceKingdomDecision.MakePeaceDecisionOutcome { ShouldPeaceBeDeclared: false };
         bool warDecisionCancelled = warDecision?.ShouldBeCancelled() ?? false;
+        bool eligiblePlayerClan = ContainerProvider.TryResolve(out IKingdomDecisionVoteManager voteManager) &&
+                                  kingdom.RulingClan != null &&
+                                  voteManager.HasEligiblePlayerClan(
+                                      new DeclareWarDecision(kingdom.RulingClan, aserai));
         KingdomDiplomacyVM diplomacy = (ScreenManager.TopScreen as GauntletKingdomScreen)?.DataSource?.Diplomacy;
         KingdomDiplomacyProposalActionItemVM warAction = ModInformation.IsClient && diplomacy != null
             ? FindWarProposalAction(diplomacy, aserai)
@@ -535,6 +530,7 @@ public class WarAndPeaceReproductionFixtureCommands
                $"kingdom={kingdom.StringId} atWar={Bool(AreAtWar(kingdom, aserai))} " +
                $"warDecision={Bool(warDecision != null)} warDecisionCount={warDecisions.Length} " +
                $"warDecisionShouldBeCancelled={Bool(warDecisionCancelled)} " +
+               $"eligiblePlayerClan={Bool(eligiblePlayerClan)} " +
                $"inboundPeaceOffer={Bool(peaceOffers.Length != 0)} inboundPeaceOfferCount={peaceOffers.Length} " +
                $"screenActive={Bool(ScreenManager.TopScreen is GauntletKingdomScreen)} " +
                $"warActionAvailable={Bool(warAction != null)} warActionEnabled={Bool(warAction?.IsEnabled ?? false)} " +
