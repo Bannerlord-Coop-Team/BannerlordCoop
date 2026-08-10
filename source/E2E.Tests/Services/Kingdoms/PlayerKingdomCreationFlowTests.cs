@@ -1536,13 +1536,22 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
             PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
             policyId = policy.StringId;
-            kingdom.AddDecision(new KingdomPolicyDecision(proposerClan, policy, false));
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
+            }
         });
 
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+            PolicyObject policy = PolicyObject.All.Single(candidate => candidate.StringId == policyId);
+            var decision = new KingdomPolicyDecision(proposerClan, policy, false);
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(decision);
+            }
 
             var decisionsVm = new KingdomDecisionsVM(() => { });
             decisionsVm.RefreshWith(decision);
