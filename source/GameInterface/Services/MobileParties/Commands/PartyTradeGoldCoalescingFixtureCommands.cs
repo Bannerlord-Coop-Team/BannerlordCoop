@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -139,12 +140,26 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
         if (!objectManager.TryGetObject(args[0], out MobileParty party))
             return $"Mobile party '{args[0]}' was not found.";
 
-        return $"side={(ModInformation.IsServer ? "server" : "client")}|networkId={args[0]}|" +
+        string side = ModInformation.IsServer ? "server" : "client";
+        string output = $"side={side}|networkId={args[0]}|" +
             $"party={party.StringId}|name={Clean(party.Name?.ToString())}|" +
             $"nonLord={FormatBool(!party.IsLordParty)}|active={FormatBool(party.IsActive)}|" +
             $"gold={party.PartyTradeGold}|x={party.Position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
             $"y={party.Position.Y.ToString("R", CultureInfo.InvariantCulture)}|" +
             $"settlement={party.CurrentSettlement?.StringId ?? "none"}";
+        return WithStructuredResult(output, new
+        {
+            side,
+            networkId = args[0],
+            party = party.StringId,
+            name = Clean(party.Name?.ToString()),
+            nonLord = !party.IsLordParty,
+            active = party.IsActive,
+            gold = party.PartyTradeGold,
+            x = party.Position.X,
+            y = party.Position.Y,
+            settlement = party.CurrentSettlement?.StringId ?? "none",
+        });
     }
 
     [CommandLineArgumentFunction("trade_gold_coalescing_focus", "coop.debug.mobileparty")]
@@ -162,8 +177,16 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
             return $"Mobile party '{args[0]}' is not available on the campaign map.";
 
         party.Party.SetAsCameraFollowParty();
-        return $"focused=true|networkId={args[0]}|party={party.StringId}|" +
+        string output = $"focused=true|networkId={args[0]}|party={party.StringId}|" +
             $"name={Clean(party.Name?.ToString())}|gold={party.PartyTradeGold}";
+        return WithStructuredResult(output, new
+        {
+            focused = true,
+            networkId = args[0],
+            party = party.StringId,
+            name = Clean(party.Name?.ToString()),
+            gold = party.PartyTradeGold,
+        });
     }
 
     [CommandLineArgumentFunction("trade_gold_coalescing_restore", "coop.debug.mobileparty")]
@@ -202,7 +225,7 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
             return "Restoration is not complete. " + FormatFixture("restoring", fixture, snapshot);
         }
 
-        string result = FormatFixture("restored", fixture, snapshot) + "|verified=true";
+        string result = FormatFixture("restored", fixture, snapshot, verified: true);
         fixture.Coalescer.StopDebugTrace();
         fixture = null;
         return result;
@@ -274,25 +297,79 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
         string networkId,
         Settlement anchor)
     {
-        return $"phase={phase}|networkId={networkId}|party={party.StringId}|" +
-            $"name={Clean(party.Name?.ToString())}|anchor={anchor.StringId}|" +
-            $"distance={party.Position.Distance(anchor.Position).ToString("R", CultureInfo.InvariantCulture)}|" +
-            $"nonLord={FormatBool(!party.IsLordParty)}|registered=true|active={FormatBool(party.IsActive)}|" +
-            $"gold={party.PartyTradeGold}|x={party.Position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
-            $"y={party.Position.Y.ToString("R", CultureInfo.InvariantCulture)}";
+        string output = FormatPartyText(phase, party, networkId, anchor);
+        return WithStructuredResult(output, new
+        {
+            phase,
+            networkId,
+            party = party.StringId,
+            name = Clean(party.Name?.ToString()),
+            anchor = anchor.StringId,
+            distance = party.Position.Distance(anchor.Position),
+            nonLord = !party.IsLordParty,
+            registered = true,
+            active = party.IsActive,
+            gold = party.PartyTradeGold,
+            x = party.Position.X,
+            y = party.Position.Y,
+        });
     }
 
     private static string FormatFixture(
         string phase,
         FixtureState state,
-        SendCoalescer.DebugTraceSnapshot snapshot)
+        SendCoalescer.DebugTraceSnapshot snapshot,
+        bool verified = false)
     {
-        return FormatParty(phase, state.Party, state.NetworkId, state.Anchor) +
+        string output = FormatPartyText(phase, state.Party, state.NetworkId, state.Anchor) +
             $"|original={state.Original}|first={state.First}|second={state.Second}|final={state.Final}|" +
             $"current={state.Party.PartyTradeGold}|enqueued={snapshot.Enqueued}|" +
             $"merged={snapshot.Merged}|sent={snapshot.Sent}|pending={FormatBool(snapshot.Pending)}|" +
-            $"triggered={FormatBool(state.Triggered)}|restoreAttempted={FormatBool(state.RestoreAttempted)}";
+            $"triggered={FormatBool(state.Triggered)}|restoreAttempted={FormatBool(state.RestoreAttempted)}" +
+            (verified ? "|verified=true" : string.Empty);
+        return WithStructuredResult(output, new
+        {
+            phase,
+            networkId = state.NetworkId,
+            party = state.Party.StringId,
+            name = Clean(state.Party.Name?.ToString()),
+            anchor = state.Anchor.StringId,
+            distance = state.Party.Position.Distance(state.Anchor.Position),
+            nonLord = !state.Party.IsLordParty,
+            registered = true,
+            active = state.Party.IsActive,
+            gold = state.Party.PartyTradeGold,
+            x = state.Party.Position.X,
+            y = state.Party.Position.Y,
+            original = state.Original,
+            first = state.First,
+            second = state.Second,
+            final = state.Final,
+            current = state.Party.PartyTradeGold,
+            enqueued = snapshot.Enqueued,
+            merged = snapshot.Merged,
+            sent = snapshot.Sent,
+            pending = snapshot.Pending,
+            triggered = state.Triggered,
+            restoreAttempted = state.RestoreAttempted,
+            verified,
+        });
     }
+
+    private static string FormatPartyText(
+        string phase,
+        MobileParty party,
+        string networkId,
+        Settlement anchor) =>
+        $"phase={phase}|networkId={networkId}|party={party.StringId}|" +
+        $"name={Clean(party.Name?.ToString())}|anchor={anchor.StringId}|" +
+        $"distance={party.Position.Distance(anchor.Position).ToString("R", CultureInfo.InvariantCulture)}|" +
+        $"nonLord={FormatBool(!party.IsLordParty)}|registered=true|active={FormatBool(party.IsActive)}|" +
+        $"gold={party.PartyTradeGold}|x={party.Position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
+        $"y={party.Position.Y.ToString("R", CultureInfo.InvariantCulture)}";
+
+    private static string WithStructuredResult(string output, object structuredResult) =>
+        output + Environment.NewLine + "LIVE_TEST_JSON=" + JsonSerializer.Serialize(structuredResult);
 
     private static string Clean(string value) =>
         string.IsNullOrEmpty(value) ? "unnamed" : value.Replace('|', '/');
