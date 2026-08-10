@@ -805,10 +805,40 @@ internal class CompanionsCommands
             completion.LeftMemberRoster.GetTroopCount(companion.CharacterObject) != 1)
             return "The captured rescue party completion does not match the requested companion.";
 
+        var conversationManager = Campaign.Current?.ConversationManager;
+        if (conversationManager?.IsConversationInProgress == true &&
+            Hero.OneToOneConversationHero != companion)
+            return "Another hero's conversation is active.";
+        if (conversationManager?.IsConversationInProgress == true)
+            conversationManager.EndConversation();
+
+        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+        if (conversationManager?.IsConversationInProgress == true ||
+            mapState?.MapConversationActive == true)
+            return "The rescue fixture conversation did not close.";
+
         StopRescuePartyScreenObservation();
         lastRescuePartyScreenCompletion = null;
         MessageBroker.Instance.Publish(typeof(CompanionsCommands), completion);
-        return $"RESCUE_LEAD_PARTY_REQUEST_REPLAYED hero={args[0]}";
+        return $"RESCUE_LEAD_PARTY_REQUEST_REPLAYED hero={args[0]} conversationClosed=True";
+    }
+
+    [CommandLineArgumentFunction("rescue_fixture_conversation_state", "coop.debug.companions")]
+    public static string RescueFixtureConversationStateCommand(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.companions.rescue_fixture_conversation_state <heroId>";
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (args.Count != 1) return usage;
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(args[0], out Hero companion)) return $"Hero '{args[0]}' not found.";
+
+        var conversationManager = Campaign.Current?.ConversationManager;
+        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+        bool conversationActive = conversationManager?.IsConversationInProgress == true;
+        bool mapConversationActive = mapState?.MapConversationActive == true;
+        bool conversationHeroMatched = Hero.OneToOneConversationHero == companion;
+        return $"RESCUE_CONVERSATION_STATE hero={args[0]} active={conversationActive} " +
+            $"mapActive={mapConversationActive} heroMatched={conversationHeroMatched}";
     }
 
     [CommandLineArgumentFunction("rescue_fixture_state", "coop.debug.companions")]
