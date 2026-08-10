@@ -2,6 +2,7 @@
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
+using GameInterface.Services.Time.UI;
 using Missions;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
@@ -342,6 +343,7 @@ public class TournamentMissionRulesTests
             typeof(MissionOptionsComponent),
             typeof(HighlightsController),
             typeof(SandboxHighlightsController),
+            typeof(MissionMapTimeView),
             typeof(CoopTournamentController)
         }, CoopTournamentLauncher.BehaviorOrder);
     }

@@ -94,18 +94,28 @@ public class ConversationPartyTrackerTests
         Assert.False(tracker.IsEmpty);
     }
 
+    // Replaces TryEndEngagement_SharedParty_ReleasesOnlyAfterLastPlayer, which asserted that two
+    // players could hold the same party at once. Sharing existed so simultaneous ATTACKERS converged
+    // on one MapEvent, but every server-side conversation outcome is authorised only as "this peer
+    // holds an engagement with this party", so a shared hold also let two players each apply the same
+    // one-shot result - two recruiters persuading one lord, both paying, the lord defecting twice.
+    // Attackers still converge: the holder starts the battle and the contender's retry joins that
+    // MapEvent through the attackerInMapEvent/defenderInMapEvent branch in ConversationRequestHandler.
     [Fact]
-    public void TryEndEngagement_SharedParty_ReleasesOnlyAfterLastPlayer()
+    public void TryBeginEngagement_PartyHeldByAnotherPlayer_IsRejectedUntilReleased()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: false);
-        Assert.True(tracker.TryBeginEngagement(secondPlayer, "player2", "lord1", wasAiDisabled: true));
-        Assert.True(tracker.IsEngagerParty("lord1", "player2"));
 
+        Assert.False(tracker.TryBeginEngagement(secondPlayer, "player2", "lord1", wasAiDisabled: true));
+        Assert.False(tracker.IsEngagerParty("lord1", "player2"));
+        Assert.True(tracker.IsEngagerParty("lord1", "player1"));
+
+        // The holder releasing frees the party outright - there is no second holder to wait for.
         tracker.TryEndEngagement(firstPlayer, out _, out _, out var releaseAfterFirst);
-        Assert.False(releaseAfterFirst);
-        Assert.True(tracker.TryGetEngagement("lord1", out var remaining));
-        Assert.False(remaining.WasAiDisabled);
+        Assert.True(releaseAfterFirst);
+        Assert.True(tracker.IsEmpty);
 
+        Assert.True(tracker.TryBeginEngagement(secondPlayer, "player2", "lord1", wasAiDisabled: true));
         tracker.TryEndEngagement(secondPlayer, out _, out _, out var releaseAfterSecond);
         Assert.True(releaseAfterSecond);
         Assert.True(tracker.IsEmpty);

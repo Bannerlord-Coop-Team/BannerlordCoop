@@ -55,6 +55,8 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
         messageBroker.Subscribe<NetworkAddDecision>(HandleNetworkAddDecision);
+        messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
+        messageBroker.Subscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
     }
 
     private void HandleNetworkRequestCreateKingdom(MessagePayload<NetworkRequestCreateKingdom> obj)
@@ -82,6 +84,15 @@ public class ServerKingdomHandler : IHandler
         }
 
         messageBroker.Publish(this, new CreateKingdom(payload.ControllerId, payload.KingdomName, payload.CultureId));
+    }
+
+    private void HandleNetworkRequestChangeKingdomName(MessagePayload<NetworkRequestChangeKingdomName> obj)
+    {
+        if (obj.Who is not NetPeer peer) return;
+        if (!playerManager.TryGetPlayer(peer, out var player)) return;
+
+        var payload = obj.What;
+        messageBroker.Publish(this, new ChangeKingdomName(player.ControllerId, payload.KingdomId, payload.Name));
     }
 
     private void HandleLocalPlayerKingdomCreated(MessagePayload<PlayerKingdomCreated> obj)
@@ -113,6 +124,14 @@ public class ServerKingdomHandler : IHandler
             settlementId,
             payload.CultureId);
         network.SendAll(message);
+    }
+
+    private void HandleLocalKingdomNameChanged(MessagePayload<KingdomNameChanged> obj)
+    {
+        var payload = obj.What;
+        
+        // Broadcasts the notification to all clients
+        network.SendAll(new NetworkKingdomNameChanged(payload.KingdomId));
     }
 
     private static bool TryCreatePendingSettlementRestore(
@@ -293,6 +312,8 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
+        messageBroker.Unsubscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
+        messageBroker.Unsubscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
     }
 
     private readonly struct PendingSettlementRestore

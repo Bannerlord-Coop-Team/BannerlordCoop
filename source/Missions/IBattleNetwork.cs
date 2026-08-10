@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 
@@ -15,6 +15,8 @@ public interface IBattleNetwork
     void Start();
     void Stop();
     void Send(string controllerId, IPacket packet);
+    /// <summary>Send an already serialized packet to one mission controller.</summary>
+    void Send(string controllerId, IPacket packet, byte[] serializedPacket);
     void SendAll(IPacket packet);
     /// <summary>Broadcast an already serialized packet without repeating size-test serialization.</summary>
     void SendAll(IPacket packet, byte[] serializedPacket);
@@ -22,6 +24,8 @@ public interface IBattleNetwork
     void Send(string controllerId, IMessage message);
     void SendAll(IMessage message);
     void SendAllBut(string controllerId, IMessage message);
+    /// <summary>Largest inner unreliable payload safe for one controller's direct or relay route.</summary>
+    int GetMaxUnreliablePayloadBytes(string controllerId);
     /// <summary>Largest inner unreliable payload safe for every current viable direct or relay route.</summary>
     int GetMaxUnreliablePayloadBytes();
 }

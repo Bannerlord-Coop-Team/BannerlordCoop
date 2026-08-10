@@ -31,7 +31,7 @@ namespace GameInterface.Services.HeroDevelopers.Patches
                 hero.PartyBelongedTo.MemberRoster.UpdateVersion();
 
                 // Publish message to update roster version on clients
-                var message = new UpdateRosterVersionAfterPerkActivation(hero.PartyBelongedTo.MemberRoster);
+                var message = new UpdateRosterVersionAfterPerkChange(hero.PartyBelongedTo.MemberRoster);
                 MessageBroker.Instance.Publish(__instance, message);
             }
 

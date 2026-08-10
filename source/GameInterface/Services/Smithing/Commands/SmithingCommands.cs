@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -89,6 +90,35 @@ internal class SmithingCommands
             return result;
         }
         return "Hero not found.";
+    }
+
+    /// <summary>
+    /// Unlock all crafting pieces on a client
+    /// OpenPart is patched to already update CoopSession and persist across sessions
+    /// </summary>
+    [CommandLineArgumentFunction("unlockallcraftingpieces", "coop.debug.crafting")]
+    public static string UnlockAllCraftingPiecesCommand(List<string> strings)
+    {
+        if (ModInformation.IsServer)
+            return "Command can only be run on a client.";
+
+        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+            return "Cheats are currently disabled on clients. Enable in mod-config.";
+
+        var craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+        if (craftingCampaignBehavior == null)
+            return "Unable to get crafting campaign behavior.";
+
+        foreach (var craftingTemplate in CraftingTemplate.All)
+        {
+            foreach (var craftingPiece in craftingTemplate.Pieces)
+            {
+                // Turn off notification, otherwise unlocking client gets hundreds of notifications
+                craftingCampaignBehavior.OpenPart(craftingPiece, craftingTemplate, false);
+            }
+        }
+
+        return "All crafting pieces unlocked.";
     }
 
     /// <summary>
@@ -200,6 +230,31 @@ internal class SmithingCommands
             return result;
         }
         return "Town not found.";
+    }
+
+    /// <summary>
+    /// View crafting stamina of all heroes in party on client and all heroes on server
+    /// </summary>
+    [CommandLineArgumentFunction("stamina", "coop.debug.crafting")]
+    public static string ViewCraftingStaminaCommand(List<string> strings)
+    {
+        StringBuilder stringBuilder = new StringBuilder();
+        CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+
+        foreach (var heroCraftingRecord in craftingCampaignBehavior._heroCraftingRecords)
+        {
+            if (ModInformation.IsServer || heroCraftingRecord.Key.PartyBelongedTo == Hero.MainHero.PartyBelongedTo)
+            {
+                stringBuilder.AppendLine($"{heroCraftingRecord.Key.Name} ({heroCraftingRecord.Key.StringId}): {heroCraftingRecord.Value.CraftingStamina}");
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "No hero crafting stamina data was found.";
     }
 
     /// <summary>

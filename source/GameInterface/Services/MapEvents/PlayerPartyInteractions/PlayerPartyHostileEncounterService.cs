@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Logging;
-using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents;
@@ -26,18 +25,15 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
 
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
 
     public PlayerPartyHostileEncounterService(
         IObjectManager objectManager,
         INetwork network,
-        IMessageBroker messageBroker,
         IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.network = network;
-        this.messageBroker = messageBroker;
         this.playerManager = playerManager;
     }
 
@@ -139,7 +135,7 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
                 TakePrisonerAction.Apply(initiatorParty, responderHero);
             }
 
-            PvpEncounterCloseSender.Send(network, messageBroker, this, new[] { initiatorPartyId, responderPartyId }, responderPartyId);
+            PvpEncounterCloseSender.Send(network, new[] { initiatorPartyId, responderPartyId }, responderPartyId);
             return true;
         }
         catch (Exception e)
