@@ -641,11 +641,9 @@ internal class CompanionsCommands
                 throw new InvalidOperationException("generated heroes were not registered.");
 
             AddCompanionAction.Apply(playerClan, joinCompanion);
-            AddHeroToPartyAction.Apply(joinCompanion, playerParty, true);
             TakePrisonerAction.Apply(captorSettlement.Party, joinCompanion);
 
             AddCompanionAction.Apply(playerClan, partyCompanion);
-            AddHeroToPartyAction.Apply(partyCompanion, playerParty, true);
             int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
             if (partyCompanion.Gold < partyGoldLowerThreshold)
                 GiveGoldAction.ApplyBetweenCharacters(
@@ -659,6 +657,8 @@ internal class CompanionsCommands
                 joinCompanion.PartyBelongedToAsPrisoner != captorSettlement.Party ||
                 partyCompanion.PartyBelongedToAsPrisoner != captorSettlement.Party)
                 throw new InvalidOperationException("TakePrisonerAction did not establish the expected captivity state.");
+            if (playerHero.IsPrisoner || playerParty.MemberRoster.TotalManCount != originalMemberCount)
+                throw new InvalidOperationException("fixture captivity changed the registered player party.");
 
             pendingRescueFixture = new CompanionRescueFixture(
                 player.ControllerId,
@@ -699,7 +699,9 @@ internal class CompanionsCommands
             return $"Hero '{args[0]}' is not held as a prisoner.";
         if (companion.Clan != Clan.PlayerClan)
             return $"Hero '{args[0]}' is not a companion of the local player's clan.";
-        if (PlayerEncounter.Current != null) return "A player encounter is already active.";
+        bool clearedEncounter = PlayerEncounter.Current != null;
+        if (clearedEncounter)
+            Campaign.Current.PlayerEncounter = null;
         if (Campaign.Current.ConversationManager.IsConversationInProgress)
             return "A conversation is already active.";
 
@@ -714,7 +716,7 @@ internal class CompanionsCommands
                 throw new InvalidOperationException("the live conversation did not select the fixture companion.");
 
             return $"RESCUE_CONVERSATION_OPEN hero={args[0]} context={Campaign.Current.CurrentConversationContext} " +
-                "conversationHeroMatched=True";
+                $"conversationHeroMatched=True clearedEncounter={clearedEncounter}";
         }
         catch (Exception exception)
         {
