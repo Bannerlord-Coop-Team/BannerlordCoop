@@ -24,11 +24,14 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
@@ -569,11 +572,25 @@ public class WarAndPeaceReproductionFixtureCommands
             .OfType<MakePeaceKingdomDecision>()
             .Where(decision => decision._isProposedByOpponent && decision.FactionToMakePeaceWith == aserai)
             .ToArray();
+        MakePeaceKingdomDecision peaceOffer = peaceOffers.FirstOrDefault();
         DeclareWarDecision warDecision = warDecisions.FirstOrDefault();
         var decisions = (ScreenManager.TopScreen as GauntletKingdomScreen)?.DataSource?.Decision;
         DecisionItemBaseVM decisionItem = decisions?.CurrentDecision;
-        bool decisionInquiryActive = decisions?._queryData?.AffirmativeAction != null &&
-                                     TaleWorlds.Library.InformationManager.IsAnyInquiryActive();
+        bool queryDataPresent = decisions?._queryData?.AffirmativeAction != null;
+        bool anyInquiryActive = TaleWorlds.Library.InformationManager.IsAnyInquiryActive();
+        bool decisionInquiryActive = queryDataPresent && anyInquiryActive;
+        bool mapActionEnabled = false;
+        string mapActionDisabledReason = "not-client";
+        if (ModInformation.IsClient)
+        {
+            mapActionEnabled = CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out TextObject disabledReason);
+            mapActionDisabledReason = mapActionEnabled ? "none" : ToToken(disabledReason?.ToString());
+        }
+        IKingdomDecisionVoteManager inboundVoteManager = null;
+        bool localDecisionSuppressionChecked = ModInformation.IsClient && peaceOffer != null &&
+                                               KingdomDecisionsVMPatches.TryGetVoteManager(out inboundVoteManager);
+        bool localDecisionSuppressed = localDecisionSuppressionChecked &&
+                                       inboundVoteManager.ShouldSuppressLocalDecision(peaceOffer);
         bool selectedWarYes = decisionItem?._currentSelectedOption?.Option is
             DeclareWarDecision.DeclareWarDecisionOutcome { ShouldWarBeDeclared: true };
         bool selectedPeaceNo = decisionItem?._currentSelectedOption?.Option is
@@ -593,8 +610,20 @@ public class WarAndPeaceReproductionFixtureCommands
                $"warDecisionShouldBeCancelled={Bool(warDecisionCancelled)} " +
                $"eligiblePlayerClan={Bool(eligiblePlayerClan)} " +
                $"inboundPeaceOffer={Bool(peaceOffers.Length != 0)} inboundPeaceOfferCount={peaceOffers.Length} " +
+               $"offerShouldBeCancelled={Bool(peaceOffer?.ShouldBeCancelled() ?? false)} " +
+               $"offerIsPlayerParticipant={Bool(peaceOffer?.IsPlayerParticipant ?? false)} " +
+               $"localDecisionSuppressionChecked={Bool(localDecisionSuppressionChecked)} " +
+               $"localDecisionSuppressed={Bool(localDecisionSuppressed)} " +
                $"screenActive={Bool(ScreenManager.TopScreen is GauntletKingdomScreen)} " +
-               $"decisionInquiryActive={Bool(decisionInquiryActive)} " +
+               $"queryDataPresent={Bool(queryDataPresent)} anyInquiryActive={Bool(anyInquiryActive)} " +
+               $"decisionInquiryActive={Bool(decisionInquiryActive)} mapActionEnabled={Bool(mapActionEnabled)} " +
+               $"mapActionDisabledReason={mapActionDisabledReason} " +
+               $"mainHeroPrisoner={Bool(ModInformation.IsClient && Hero.MainHero?.IsPrisoner == true)} " +
+               $"mainPartyRaft={Bool(ModInformation.IsClient && MobileParty.MainParty?.IsInRaftState == true)} " +
+               $"campaignMissionActive={Bool(ModInformation.IsClient && CampaignMission.Current != null)} " +
+               $"playerEncounterActive={Bool(ModInformation.IsClient && PlayerEncounter.Current != null)} " +
+               $"playerSiegeActive={Bool(ModInformation.IsClient && PlayerSiege.PlayerSiegeEvent != null)} " +
+               $"mainPartyMapEvent={Bool(ModInformation.IsClient && MobileParty.MainParty?.MapEvent != null)} " +
                $"warActionAvailable={Bool(warAction != null)} warActionEnabled={Bool(warAction?.IsEnabled ?? false)} " +
                $"decisionActive={Bool(decisionItem?.IsActive ?? false)} canEnd={Bool(decisionItem?.CanEndDecision ?? false)} " +
                $"finalSelectionDone={Bool(decisionItem?._finalSelectionDone ?? false)} " +
@@ -1044,6 +1073,13 @@ public class WarAndPeaceReproductionFixtureCommands
     private static string Bool(bool value)
     {
         return value ? "true" : "false";
+    }
+
+    private static string ToToken(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "unknown";
+
+        return value.Replace(' ', '_').Replace('\r', '_').Replace('\n', '_');
     }
 
     private sealed class WarAndPeaceFixture
