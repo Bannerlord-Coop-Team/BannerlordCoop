@@ -85,10 +85,6 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         }
     }
 
-    // CounterOfferHero is deliberately NOT force-written in ConstructReplicated: IssueManager.CreateNewIssue
-    // calls AfterIssueCreation() AFTER the factory returns, which independently re-derives it - forcing it
-    // beforehand would be silently overwritten. It's force-written instead via ConstructAndRegisterReplicated's
-    // afterRegistered hook below, the opposite order from every other creation-capture type in this project.
     private sealed class CreationCaptureStrategyImpl
         : ICreationCaptureStrategy<Issue, (Settlement IssueHideout, int RandomForStolenTradeGood, Hero CounterOfferHero)>
     {
@@ -157,8 +153,6 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
                 StolenTradeGoodAmountField.SetValue(quest, fields.StolenTradeGoodAmount);
                 StolenTradeGoodPriceField.SetValue(quest, fields.StolenTradeGoodPrice);
                 RewardGoldField.SetValue(quest, fields.RewardGold);
-                // Force the authoritative value - the real ctor independently re-derives its own from a live
-                // Town.GetItemPrice read, which would otherwise silently diverge from the accepted terms.
                 CounterOfferGoldField.SetValue(quest, fields.CounterOfferGold);
             }
         }

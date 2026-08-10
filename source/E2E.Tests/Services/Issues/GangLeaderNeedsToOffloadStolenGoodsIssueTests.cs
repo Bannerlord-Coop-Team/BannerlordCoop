@@ -48,8 +48,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         TestEnvironment.Dispose();
     }
 
-    // GameInterface's ChangeRelationActionPatches routes ApplyPlayerRelation through this internal, non-visible
-    // [ThreadStatic] field instead of Hero.MainHero; set via reflection so consequences that change relations don't NRE.
     private static readonly FieldInfo ResolvedMainHeroField =
         AccessTools.Field(Type.GetType("GameInterface.Services.Heroes.Patches.ResolvedMainHeroContext, GameInterface"), "ResolvedMainHero");
 
@@ -64,8 +62,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     private static readonly PropertyInfo TradeItemPriceFactorModelProperty =
         AccessTools.Property(typeof(GameModels), nameof(GameModels.TradeItemPriceFactorModel));
 
-    // Only the server's Town is built via the real TownBuilder (initializes _marketData); every other peer's
-    // copy is a bare placeholder with _marketData still null, which NREs the moment GetItemPrice reaches it.
     private static readonly FieldInfo TownMarketDataField =
         AccessTools.Field(typeof(Town), "_marketData");
 
@@ -125,8 +121,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                     hero.Occupation = Occupation.GangLeader;
                     Campaign.Current.MainParty = ownerParty;
 
-                    // Test Heroes get a fresh Clan but no Leader; DefaultDiplomacyModel redirects relation
-                    // changes to Clan.Leader, which would otherwise NRE.
                     hero.Clan.SetLeader(hero);
                     counterOfferHero.Clan.SetLeader(counterOfferHero);
 
@@ -135,8 +129,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                         TradeItemPriceFactorModelProperty.SetValue(Campaign.Current.Models, new StubTradeItemPriceFactorModel());
                     }
 
-                    // The Quest ctor unconditionally looks up an already-registered "hideout_place" GameMenu,
-                    // normally registered by SandBox's own menu code, which this harness never runs.
                     if (Campaign.Current.GameMenuManager.GetGameMenu("hideout_place") == null)
                     {
                         var hideoutMenu = new GameMenu("hideout_place");
@@ -146,8 +138,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
                     issueHideoutSettlement.SetSettlementComponent(issueHideout);
 
-                    // IssueStayAliveConditions() requires the hideout to be genuinely infested (>= the density
-                    // model's minimum bandit party count), re-validated server-side on every accept request.
                     var requiredBanditParties = System.Math.Max(1,
                         Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt);
                     for (var i = 0; i < requiredBanditParties; i++)
@@ -165,8 +155,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                     }
                     Assert.True(issueHideout.IsInfested);
 
-                    // The only notable in the owner's settlement, and a merchant, so AfterIssueCreation's real
-                    // FirstOrDefault pick deterministically resolves to this hero on every peer.
                     counterOfferHero.Occupation = Occupation.Merchant;
                     ownerSettlement.AddHeroWithoutParty(counterOfferHero);
                     counterOfferHero.StayingInSettlement = ownerSettlement;
@@ -177,8 +165,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                     stolenGood.ItemCategory = stolenGoodCategory;
                     Assert.True(instance.ObjectManager.AddExisting(StolenGoodId, stolenGood));
 
-                    // The real vanilla StolenTradeGood lookup goes through MBObjectManager, a separate registry
-                    // from this project's own IObjectManager - needs its own direct registration.
                     stolenGood.StringId = StolenGoodId;
                     MBObjectManager.Instance.RegisterObject(stolenGood);
 
@@ -529,8 +515,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             using (new AllowedThread()) { ItemValueProperty.SetValue(item, 150); }
         });
 
-        // StartIssueWithAlternativeSolution reads AlternativeSolutionHero, derived from an initially-empty
-        // AlternativeSolutionSentTroops - a hero must be added first or GetAlternativeSolutionSkill NREs.
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
@@ -566,7 +550,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             });
         }
 
-        // Price drift AFTER the freeze must NOT move the frozen values.
         foreach (var instance in AllInstances)
         {
             instance.Call(() =>

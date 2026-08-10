@@ -5,8 +5,6 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Patches;
 
-// IsSettlementBusy (Issue- and Quest-level) is deliberately NOT gated here - it's a read-only query that
-// answers consistently off the already-synced hideout reference for every peer.
 [HarmonyPatch(typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest))]
 internal class GangLeaderNeedsToOffloadStolenGoodsOwnershipGatePatches
 {
