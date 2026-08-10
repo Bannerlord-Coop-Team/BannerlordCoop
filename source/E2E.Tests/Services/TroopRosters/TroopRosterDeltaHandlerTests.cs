@@ -348,7 +348,6 @@ namespace E2E.Tests.Services.TroopRosters
                 Assert.Equal(0, received.Xp);
             }
 
-
             Server.NetworkSentMessages.Clear();
             foreach (var client in Clients) client.InternalMessages.Clear();
             Server.Call(() =>
