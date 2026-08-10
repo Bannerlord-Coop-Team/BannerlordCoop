@@ -120,6 +120,18 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
+                    if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
+                    {
+                        string output = Coop.JoinFixtureCommands.Start(arguments);
+                        return Success(request.Id, new
+                        {
+                            name = command,
+                            arguments,
+                            found = true,
+                            output,
+                        });
+                    }
+
                     return Failure(
                         request.Id,
                         "session_not_ready",
