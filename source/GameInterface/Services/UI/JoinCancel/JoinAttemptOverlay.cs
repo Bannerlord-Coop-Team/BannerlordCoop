@@ -5,10 +5,8 @@ using TaleWorlds.ScreenSystem;
 namespace GameInterface.Services.UI.JoinCancel;
 
 /// <summary>
-/// The cancel affordance a coop join attempt shows while it is in flight. The art and status text
-/// behind it are the engine's own loading window, driven through
-/// <see cref="Interfaces.ILoadingInterface"/>. Both methods touch Gauntlet state and must be
-/// called on the game thread.
+/// The cancel affordance a coop join attempt shows while it is in flight, over the engine's own
+/// loading window. Both methods touch Gauntlet state and must be called on the game thread.
 /// </summary>
 public interface IJoinAttemptOverlay : IGameAbstraction
 {

@@ -81,6 +81,7 @@ public class MainMenuState : ClientStateBase
     internal void Handle_NetworkConnected(MessagePayload<NetworkConnected> obj)
     {
         connected = true;
+        shown = false;
 
         using (GameThread.ActivateCancellation(CancellationToken.None))
         {
@@ -88,11 +89,11 @@ public class MainMenuState : ClientStateBase
         }
 
         loadingInterface.ShowLoadingScreen(
-            JoinAttemptPresentation.JoiningTitle,
+            joinAttempt.Title,
             "Applying patches...");
         gameInterface.PatchAll();
         loadingInterface.SetLoadingMessage(
-            JoinAttemptPresentation.JoiningTitle,
+            joinAttempt.Title,
             "Validating modules...");
         Logic.ValidateModules();
     }
@@ -123,7 +124,6 @@ public class MainMenuState : ClientStateBase
                 messageBroker.Publish(this, new SessionJoinAbandoned());
             }
 
-            // Before the screen comes down, so a throw above leaves the button up to press again.
             coopFinalizer.Finalize(closeText: null);
 
             HideJoinAttempt();
@@ -142,6 +142,9 @@ public class MainMenuState : ClientStateBase
 
         GameThread.RunSafe(() =>
         {
+            // A hide that ran while this was queued cannot take down a layer that is not up yet.
+            if (!shown) return;
+
             loadingInterface.ShowLoadingScreen(joinAttempt.Title, joinAttempt.Description);
             try
             {
@@ -158,6 +161,8 @@ public class MainMenuState : ClientStateBase
     private void HideJoinAttempt()
     {
         if (!shown) return;
+
+        shown = false;
 
         using (GameThread.ActivateCancellation(CancellationToken.None))
         {

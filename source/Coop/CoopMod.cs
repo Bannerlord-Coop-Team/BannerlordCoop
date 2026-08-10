@@ -454,9 +454,10 @@ namespace Coop
                         {
                             Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         }
-                        else
+                        else if (!Coop.StartAsClient())
                         {
-                            Coop.StartAsClient();
+                            InformationManager.DisplayMessage(new InformationMessage(
+                                CoopartiveMultiplayerExperience.StartRefusedNotice));
                         }
                     },
                     () => { return (false, new TextObject("")); }

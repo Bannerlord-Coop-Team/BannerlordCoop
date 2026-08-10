@@ -52,7 +52,7 @@ namespace Coop.Core
         // A spawned server has to load the whole campaign save before it binds its port.
         public static readonly TimeSpan HostedServerStartTimeout = TimeSpan.FromMinutes(5);
 
-        private const string StartRefusedNotice =
+        public const string StartRefusedNotice =
             "Another co-op session is still starting; try joining again shortly";
         private const string HostClientStartFailedNotice =
             "Could not start the co-op client; the standalone server remains open until you close it";
@@ -342,10 +342,9 @@ namespace Coop.Core
 
             try
             {
+                // A refusal leaves the process-wide tunnel and lobby to the start still in flight.
                 if (!StartAsClient(configuration, intent: JoinIntent.PlayerSteam))
                 {
-                    joinEndpointPreparer.TearDownActiveTunnel();
-                    messageBroker.Publish(this, new SessionJoinAbandoned());
                     InformationManager.DisplayMessage(new InformationMessage(StartRefusedNotice));
                     return;
                 }

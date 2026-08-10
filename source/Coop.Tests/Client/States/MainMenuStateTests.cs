@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.Messaging;
+using Common.Network.Session.Messages;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
@@ -23,9 +24,11 @@ namespace Coop.Tests.Client.States
         private readonly Mock<ILoadingInterface> loadingInterfaceMock;
         private readonly Mock<IJoinAttemptOverlay> overlayMock;
         private readonly JoinAttemptPresentation joinAttempt;
+        private readonly ITestOutputHelper output;
 
         public MainMenuStateTests(ITestOutputHelper output)
         {
+            this.output = output;
             clientComponent = new ClientTestComponent(output);
             var container = clientComponent.Container;
 
@@ -112,6 +115,33 @@ namespace Coop.Tests.Client.States
             overlayMock.Verify(x => x.Hide(), Times.AtLeastOnce);
             loadingInterfaceMock.Verify(x => x.HideLoadingScreen(), Times.AtLeastOnce);
             Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Fact]
+        public void CancelJoinAttempt_OnASteamJoin_AbandonsTheLobby()
+        {
+            var steamComponent = new ClientTestComponent(output, JoinIntent.PlayerSteam);
+            var steamLogic = steamComponent.Container.Resolve<IClientLogic>()!;
+            var state = steamLogic.SetState<MainMenuState>();
+            steamLogic.Connect();
+            DrainGameThread();
+            steamComponent.TestMessageBroker.Messages.Clear();
+
+            state.Handle_CancelJoinAttempt(Payload(new CancelJoinAttempt()));
+            DrainGameThread();
+
+            Assert.Single(steamComponent.TestMessageBroker.GetMessagesFromType<SessionJoinAbandoned>());
+        }
+
+        [Fact]
+        public void CancelJoinAttempt_OnADirectJoin_LeavesTheLobbyAlone()
+        {
+            var state = StartDialing();
+
+            state.Handle_CancelJoinAttempt(Payload(new CancelJoinAttempt()));
+            DrainGameThread();
+
+            Assert.Empty(clientComponent.TestMessageBroker.GetMessagesFromType<SessionJoinAbandoned>());
         }
 
         [Fact]

@@ -8,9 +8,7 @@ namespace Coop.Core.Common.Session;
 /// </summary>
 public sealed class JoinAttemptPresentation
 {
-    // Matches the title the post-connect states keep using, so a successful attempt advances the
-    // description without the heading changing under the player.
-    internal const string JoiningTitle = "Connecting to Coop Server";
+    private const string JoiningTitle = "Connecting to Coop Server";
     private const string HostingTitle = "Hosting Coop Server";
     private const string PlayerCancelLabel = "Cancel";
     private const string PlayerCancelledNotice = "Connection attempt cancelled";
