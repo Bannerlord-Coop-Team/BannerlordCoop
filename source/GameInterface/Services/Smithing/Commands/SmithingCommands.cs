@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -89,6 +90,35 @@ internal class SmithingCommands
             return result;
         }
         return "Hero not found.";
+    }
+
+    /// <summary>
+    /// Unlock all crafting pieces on a client
+    /// OpenPart is patched to already update CoopSession and persist across sessions
+    /// </summary>
+    [CommandLineArgumentFunction("unlockallcraftingpieces", "coop.debug.crafting")]
+    public static string UnlockAllCraftingPiecesCommand(List<string> strings)
+    {
+        if (ModInformation.IsServer)
+            return "Command can only be run on a client.";
+
+        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+            return "Cheats are currently disabled on clients. Enable in mod-config.";
+
+        var craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+        if (craftingCampaignBehavior == null)
+            return "Unable to get crafting campaign behavior.";
+
+        foreach (var craftingTemplate in CraftingTemplate.All)
+        {
+            foreach (var craftingPiece in craftingTemplate.Pieces)
+            {
+                // Turn off notification, otherwise unlocking client gets hundreds of notifications
+                craftingCampaignBehavior.OpenPart(craftingPiece, craftingTemplate, false);
+            }
+        }
+
+        return "All crafting pieces unlocked.";
     }
 
     /// <summary>
