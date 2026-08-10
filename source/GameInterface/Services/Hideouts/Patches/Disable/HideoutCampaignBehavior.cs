@@ -1,10 +1,15 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Hideouts.Handlers;
 using GameInterface.Services.Hideouts.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using Serilog;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -17,6 +22,8 @@ namespace GameInterface.Services.Hideouts.Patches.Disable;
 [HarmonyPatch(typeof(HideoutCampaignBehavior))]
 internal class HideoutCampaignBehaviorPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<HideoutCampaignBehaviorPatch>();
+
     [HarmonyPatch(nameof(HideoutCampaignBehavior.ArrangeHideoutTroopCountsForMission))]
     [HarmonyPrefix]
     private static bool ArrangeHideoutTroopCountsForMission()
@@ -26,9 +33,55 @@ internal class HideoutCampaignBehaviorPatch
 
     [HarmonyPatch("OnTroopRosterManageDone")]
     [HarmonyPrefix]
-    private static void OnTroopRosterManageDone()
+    private static bool OnTroopRosterManageDone(bool isDirectAssault)
     {
-        PublishConsequence(HideoutCampaignConsequence.PrepareMission);
+        if (ModInformation.IsServer)
+            return true;
+
+        var settlement = Settlement.CurrentSettlement;
+        if (settlement?.IsHideout != true)
+        {
+            Logger.Error("Cannot prepare hideout mission because the current settlement is not a hideout");
+            return false;
+        }
+
+        if (!ContainerProvider.TryResolve<HideoutCampaignConsequencesHandler>(out var coordinator))
+        {
+            Logger.Error("Unable to resolve hideout mission preparation coordinator");
+            return false;
+        }
+
+        return coordinator.RequestMissionPreparationBlocking(settlement, isDirectAssault);
+    }
+
+    [HarmonyPatch("OnTroopRosterManageDone")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> OnTroopRosterManageDoneTranspiler(
+        IEnumerable<CodeInstruction> instructions)
+    {
+        var setNextPossibleAttackTime = AccessTools.Method(
+            typeof(Hideout),
+            nameof(Hideout.SetNextPossibleAttackTime));
+        var setNextPossibleAttackTimeOnServer = AccessTools.Method(
+            typeof(HideoutCampaignBehaviorPatch),
+            nameof(SetNextPossibleAttackTimeOnServer));
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(setNextPossibleAttackTime))
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = setNextPossibleAttackTimeOnServer;
+            }
+
+            yield return instruction;
+        }
+    }
+
+    private static void SetNextPossibleAttackTimeOnServer(Hideout hideout, CampaignTime duration)
+    {
+        if (ModInformation.IsServer)
+            hideout.SetNextPossibleAttackTime(duration);
     }
 
     [HarmonyPatch("hideout_send_troops_result_failure_on_init")]
