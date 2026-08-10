@@ -611,7 +611,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         Send(controllerId, packet, movementPacketCompressor.Serialize(packet));
     }
 
-    private void Send(string controllerId, IPacket packet, byte[] data)
+    public void Send(string controllerId, IPacket packet, byte[] data)
     {
         // Send directly to direct peer
         if (missionContext.TryGetPeer(controllerId, out var peer))
@@ -657,31 +657,38 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     // Peer-reported MTUs can be optimistic, so cap nonfragmentable sends at a conservative ceiling.
     internal const int SafeSinglePacketBytes = 1000;
 
-    public int GetMaxUnreliablePayloadBytes()
+    public int GetMaxUnreliablePayloadBytes(string controllerId)
     {
-        int maxPayloadBytes = SafeSinglePacketBytes;
-        bool hasRoute = false;
-        bool hasViableRoute = false;
+        if (string.IsNullOrEmpty(controllerId)) return 0;
+
+        if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
+        {
+            return Math.Min(
+                SafeSinglePacketBytes,
+                Math.Max(0, peer.GetMaxSinglePacketSize(DeliveryMethod.Unreliable)));
+        }
+
         string currentInstanceId;
         lock (peerGate)
         {
             currentInstanceId = instanceId;
         }
 
+        return Math.Min(
+            SafeSinglePacketBytes,
+            Math.Max(0, GetMaxRelayPayloadBytes(currentInstanceId, controllerId)));
+    }
+
+    public int GetMaxUnreliablePayloadBytes()
+    {
+        int maxPayloadBytes = SafeSinglePacketBytes;
+        bool hasRoute = false;
+        bool hasViableRoute = false;
+
         foreach (string controllerId in missionContext.ControllersInMission)
         {
             hasRoute = true;
-            int routePayloadBytes;
-            if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
-            {
-                routePayloadBytes =
-                    Math.Max(0, peer.GetMaxSinglePacketSize(DeliveryMethod.Unreliable));
-            }
-            else
-            {
-                routePayloadBytes =
-                    GetMaxRelayPayloadBytes(currentInstanceId, controllerId);
-            }
+            int routePayloadBytes = GetMaxUnreliablePayloadBytes(controllerId);
 
             if (routePayloadBytes <= 0) continue;
 

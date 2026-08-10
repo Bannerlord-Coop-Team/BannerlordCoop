@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -37,7 +37,12 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent)
-        : base(network, messageBroker, objectManager, coopMissionComponent)
+        : base(
+            network,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            Missions.Agents.Handlers.MovementCadenceProfile.Location)
     {
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;

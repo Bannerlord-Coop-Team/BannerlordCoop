@@ -51,6 +51,9 @@ public class MissionModule : Module
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
             .InstancePerDependency();
+        builder.RegisterType<MovementRateController>()
+            .As<IMovementRateController>()
+            .InstancePerDependency();
         builder.RegisterType<BattleAgentSpawnBatchCodec>()
             .As<IBattleAgentSpawnBatchCodec>()
             .InstancePerDependency();

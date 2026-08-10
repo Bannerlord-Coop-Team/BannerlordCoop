@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
@@ -65,11 +65,13 @@ internal class BattleSimulationStartPatch
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return true;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId))
-            return true;
+            return false;
+        if (!objectManager.TryGetId(MobileParty.MainParty, out var attackerPartyId))
+            return false;
 
         // Block until the server accepts/rejects. The menu stays open during the wait (the consequence is frozen
         // mid-call). On reject, skip the native consequence so nothing opens and the menu stays.
-        if (!coordinator.RequestBlocking(BattleStartMode.Simulation, mapEventId, null))
+        if (!coordinator.RequestBlocking(BattleStartMode.Simulation, mapEventId, attackerPartyId))
             return false;
 
         // Accepted: become the pacer before the scoreboard opens, then let the native consequence open it.

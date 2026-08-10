@@ -4,6 +4,7 @@ using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Services.SiegeEvents;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -11,6 +12,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
+    [Collection(nameof(CampaignCurrentCollection))]
     public class HideoutSerializationTest
     {
         IContainer container;
