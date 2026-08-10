@@ -255,6 +255,15 @@
     <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <GalaxySdkPath Condition="'$(GalaxySdkPath)' == ''">$(MSBuildProjectDirectory)\..\..\mb2\bin\Win64_Shipping_Client\GalaxyCSharp.dll</GalaxySdkPath>
+  </PropertyGroup>
+  <Target Name="RequireGalaxySdkForPlayableBuild"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(GalaxySdkPath)') or ('$(GalaxySdkAvailable)' != '' and '$(GalaxySdkAvailable)' != 'true')"
+           Text="GalaxyCSharp.dll and Galaxy SDK bindings are required for a playable Coop build. Refresh the Bannerlord build inputs or create the mb2 Windows junction before building." />
+  </Target>
   <Target Name="CopyCrashReporterToOutput" AfterTargets="Build" BeforeTargets="DeployToGame">
     <PropertyGroup>
       <CrashReporterOutputPath>$(MSBuildProjectDirectory)\..\Coop.CrashReporter\bin\$(Configuration)\Coop.CrashReporter.exe</CrashReporterOutputPath>
