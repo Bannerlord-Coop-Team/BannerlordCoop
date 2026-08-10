@@ -144,11 +144,7 @@ public class TownDebugCommand
             return $"ID: '{args[0]}' not found";
         }
 
-        var activeGarrisons = MobileParty.All
-            .Where(party => party.IsActive &&
-                            party.PartyComponent is GarrisonPartyComponent component &&
-                            component.Settlement?.Town == town)
-            .ToList();
+        var activeGarrisons = GetActiveGarrisons(town);
         var backlink = town.GarrisonPartyComponent;
         string backlinkId = "null";
         if (backlink != null)
@@ -167,6 +163,34 @@ public class TownDebugCommand
                $"backlinkComponent={backlinkId} backlinkParty={backlink?.MobileParty?.StringId ?? "null"} " +
                $"activeGarrisonCount={activeGarrisons.Count} activeGarrisonParties={activeParties} " +
                $"backlinkMatchesActive={backlinkMatchesActive}";
+    }
+
+    [CommandLineArgumentFunction("focus_garrison", "coop.debug.town")]
+    public static string FocusGarrison(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.town.focus_garrison <townId>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject(args[0], out Town town))
+        {
+            return $"ID: '{args[0]}' not found";
+        }
+
+        var activeGarrisons = GetActiveGarrisons(town);
+        if (activeGarrisons.Count != 1)
+        {
+            return $"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}";
+        }
+
+        activeGarrisons[0].Party.SetAsCameraFollowParty();
+        return $"Following {activeGarrisons[0].StringId} at {town.Name} on the campaign map";
     }
 
     [CommandLineArgumentFunction("apply_garrison_lifecycle", "coop.debug.town")]
@@ -192,11 +216,7 @@ public class TownDebugCommand
             return $"ID: '{args[0]}' not found";
         }
 
-        var activeGarrisons = MobileParty.All
-            .Where(party => party.IsActive &&
-                            party.PartyComponent is GarrisonPartyComponent component &&
-                            component.Settlement?.Town == town)
-            .ToList();
+        var activeGarrisons = GetActiveGarrisons(town);
         if (activeGarrisons.Count != 1)
         {
             return $"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}";
@@ -226,6 +246,15 @@ public class TownDebugCommand
 
         return $"Applied {args[1].ToLowerInvariant()} to {activeGarrisons[0].StringId}; " +
                GarrisonBacklink(new List<string> { args[0] });
+    }
+
+    private static List<MobileParty> GetActiveGarrisons(Town town)
+    {
+        return MobileParty.All
+            .Where(party => party.IsActive &&
+                            party.PartyComponent is GarrisonPartyComponent component &&
+                            component.Settlement?.Town == town)
+            .ToList();
     }
 
     // coop.debug.town.list_buildings <townId>
