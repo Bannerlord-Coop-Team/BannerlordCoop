@@ -653,8 +653,8 @@ namespace Coop
                     else
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as client...");
-                        Coop.StartAsClient();
-                        Logger.Information("[AutoConnect] StartAsClient() completed");
+                        bool started = Coop.StartAsClient();
+                        Logger.Information("[AutoConnect] StartAsClient() returned {Started}", started);
                     }
                 }
                 catch (Exception ex)
