@@ -4,6 +4,7 @@ using HarmonyLib;
 using Serilog;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
@@ -24,7 +25,13 @@ internal class PartiesThinkPatch
     [HarmonyPrefix]
     private static bool PartiesThinkPrefix(Campaign __instance, ref float dt)
     {
-        if (ModInformation.IsClient) return false;
+        if (ModInformation.IsClient)
+        {
+            if (MobileParty.MainParty.DefaultBehavior == AiBehavior.EscortParty)
+                MobileParty.MainParty.Ai.Tick(dt);
+
+            return false;
+        }
 
         if (delay.IsCompleted == false) return false;
 
