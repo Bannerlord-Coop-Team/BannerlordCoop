@@ -51,7 +51,7 @@ namespace Coop.Tests.Server.Services.Save
                 new WorkshopPlayerData(new()),
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
-                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new()),
+                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new()),
                 new TradePlayerData(new(), new(), new()),
                 new InventoryPlayerData(new(), new()));
 
@@ -93,7 +93,7 @@ namespace Coop.Tests.Server.Services.Save
                 new WorkshopPlayerData(new()),
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
-                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new()),
+                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new()),
                 new TradePlayerData(new(), new(), new()),
                 new InventoryPlayerData(new(), new()));
 
