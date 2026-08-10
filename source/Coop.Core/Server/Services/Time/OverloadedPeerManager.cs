@@ -32,6 +32,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private readonly IConnectionMessageQueue connectionMessageQueue;
 
     private TimeControlEnum? originalSpeed;
+    private long? automaticPauseToken;
     private volatile NetPeer[] cachedOverloadedPeers = Array.Empty<NetPeer>();
     private readonly Dictionary<NetPeer, DateTime> joinCatchUpStartedUtc = new Dictionary<NetPeer, DateTime>();
 
@@ -183,17 +184,26 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
     private void PauseTime(NetPeer[] overloadedPeers, DateTime utcNow, string notification)
     {
-        originalSpeed = timeControlInterface.GetTimeControl();
         cachedOverloadedPeers = overloadedPeers;
         pauseStartedUtc = utcNow;
         lastPauseDepthLogUtc = utcNow;
+
+        if (timeControlInterface.ServerTryCreatePause(out var previousSpeed, out var pauseToken))
+        {
+            originalSpeed = previousSpeed;
+            automaticPauseToken = pauseToken;
+        }
+        else
+        {
+            originalSpeed = timeControlInterface.GetTimeControl();
+            automaticPauseToken = null;
+        }
 
         Logger.Information(
             "Pausing campaign time for {PeerCount} peer(s): {PeerQueues}",
             overloadedPeers.Length,
             DescribePeerQueues(overloadedPeers));
 
-        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
         NotifyAll(notification);
     }
 
@@ -201,16 +211,48 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     {
         if (!originalSpeed.HasValue) return;
 
-        var resumeSpeed = originalSpeed.Value;
-        originalSpeed = null;
         cachedOverloadedPeers = Array.Empty<NetPeer>();   // clear first so the policy allows it
 
-        Logger.Information(
-            "Resuming campaign time after {Seconds:0.0}s catch-up pause",
-            (utcNow - pauseStartedUtc).TotalSeconds);
+        if (!automaticPauseToken.HasValue)
+        {
+            CompleteCatchUpPauseWithoutRestore(utcNow);
+            return;
+        }
 
-        timeControlInterface.ServerSetTimeControl(resumeSpeed);
-        NotifyAll("All clients synchronized. Resuming...");
+        var result = timeControlInterface.ServerTryRestoreTimeControl(
+            automaticPauseToken.Value,
+            out var restoredMode);
+        if (result == AutomaticPauseRestoreResult.Blocked)
+        {
+            return;
+        }
+
+        originalSpeed = null;
+        automaticPauseToken = null;
+        if (result == AutomaticPauseRestoreResult.Restored)
+        {
+            Logger.Information(
+                "Resuming campaign time after {Seconds:0.0}s catch-up pause: mode={Mode}",
+                (utcNow - pauseStartedUtc).TotalSeconds,
+                restoredMode);
+            NotifyAll("All clients synchronized. Resuming...");
+            return;
+        }
+
+        Logger.Information(
+            "Catch-up pause ended after {Seconds:0.0}s; campaign time remains paused",
+            (utcNow - pauseStartedUtc).TotalSeconds);
+        NotifyAll("All clients synchronized.");
+    }
+
+    private void CompleteCatchUpPauseWithoutRestore(DateTime utcNow)
+    {
+        originalSpeed = null;
+        automaticPauseToken = null;
+        Logger.Information(
+            "Catch-up pause ended after {Seconds:0.0}s; campaign time remains paused",
+            (utcNow - pauseStartedUtc).TotalSeconds);
+        NotifyAll("All clients synchronized.");
     }
 
     /// <summary>

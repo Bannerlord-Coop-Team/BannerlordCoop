@@ -21,8 +21,20 @@ public interface ITimeControlInterface : IGameAbstraction
     void RemoveFastForwardPolicy(Func<bool> policy);
     bool CanSetTimeControl(TimeControlEnum timeMode);
     TimeControlEnum GetTimeControl();
+    bool ServerTryCreatePause(out TimeControlEnum previousMode, out long pauseToken);
+    AutomaticPauseRestoreResult ServerTryRestoreTimeControl(
+        long pauseToken,
+        out TimeControlEnum restoredMode);
     void ClientSetTimeControl(TimeControlEnum newMode);
     void ServerSetTimeControl(TimeControlEnum timeMode);
+}
+
+public enum AutomaticPauseRestoreResult
+{
+    Stale,
+    StillPaused,
+    Blocked,
+    Restored,
 }
 
 internal class TimeControlInterface : ITimeControlInterface
@@ -33,6 +45,10 @@ internal class TimeControlInterface : ITimeControlInterface
     private readonly List<WeakDelegate> unpausePolicies = new List<WeakDelegate>();
     private readonly List<WeakDelegate> fastForwardPolicies = new List<WeakDelegate>();
     private readonly INetwork network;
+    private readonly object timeControlLock = new object();
+    private readonly HashSet<long> automaticPauseTokens = new HashSet<long>();
+    private TimeControlEnum? automaticPauseResumeMode;
+    private long nextAutomaticPauseToken;
 
     public TimeControlInterface(ITimeControlModeConverter modeConverter, INetwork network)
     {
@@ -165,20 +181,109 @@ internal class TimeControlInterface : ITimeControlInterface
             return;
         }
 
+        lock (timeControlLock)
+        {
+            var effectiveMode = LimitTimeControl(timeMode);
+            if (timeMode == TimeControlEnum.Pause || effectiveMode != TimeControlEnum.Pause)
+            {
+                InvalidateAutomaticPauses();
+            }
+
+            ApplyServerTimeControl(timeMode, effectiveMode);
+        }
+    }
+
+    public bool ServerTryCreatePause(out TimeControlEnum previousMode, out long pauseToken)
+    {
+        lock (timeControlLock)
+        {
+            bool isFirstAutomaticPause = automaticPauseTokens.Count == 0;
+            previousMode = isFirstAutomaticPause
+                ? GetTimeControl()
+                : automaticPauseResumeMode.Value;
+            pauseToken = default;
+
+            if (isFirstAutomaticPause && previousMode == TimeControlEnum.Pause)
+            {
+                return false;
+            }
+
+            pauseToken = ++nextAutomaticPauseToken;
+            automaticPauseTokens.Add(pauseToken);
+
+            if (!isFirstAutomaticPause)
+            {
+                return true;
+            }
+
+            automaticPauseResumeMode = previousMode;
+            try
+            {
+                ApplyServerTimeControl(TimeControlEnum.Pause, TimeControlEnum.Pause);
+                return true;
+            }
+            catch
+            {
+                automaticPauseTokens.Remove(pauseToken);
+                automaticPauseResumeMode = null;
+                throw;
+            }
+        }
+    }
+
+    public AutomaticPauseRestoreResult ServerTryRestoreTimeControl(
+        long pauseToken,
+        out TimeControlEnum restoredMode)
+    {
+        lock (timeControlLock)
+        {
+            restoredMode = TimeControlEnum.Pause;
+            if (!automaticPauseTokens.Contains(pauseToken))
+            {
+                return AutomaticPauseRestoreResult.Stale;
+            }
+
+            if (automaticPauseTokens.Count > 1)
+            {
+                automaticPauseTokens.Remove(pauseToken);
+                return AutomaticPauseRestoreResult.StillPaused;
+            }
+
+            var requestedMode = automaticPauseResumeMode.Value;
+            var effectiveMode = LimitTimeControl(requestedMode);
+            if (effectiveMode == TimeControlEnum.Pause)
+            {
+                return AutomaticPauseRestoreResult.Blocked;
+            }
+
+            automaticPauseTokens.Remove(pauseToken);
+            automaticPauseResumeMode = null;
+            restoredMode = effectiveMode;
+            ApplyServerTimeControl(requestedMode, effectiveMode);
+            return AutomaticPauseRestoreResult.Restored;
+        }
+    }
+
+    private void InvalidateAutomaticPauses()
+    {
+        automaticPauseTokens.Clear();
+        automaticPauseResumeMode = null;
+    }
+
+    private void ApplyServerTimeControl(TimeControlEnum requestedMode, TimeControlEnum effectiveMode)
+    {
         var currentMode = Campaign.Current == null
-            ? "<unavailable>"
-            : GetTimeControl().ToString();
-        var requestedMode = timeMode;
-        timeMode = LimitTimeControl(timeMode);
+            ? (TimeControlEnum?)null
+            : GetTimeControl();
 
         Logger.Information(
             "Applying server time control: current={CurrentMode} requested={RequestedMode} effective={EffectiveMode}",
-            currentMode,
+            currentMode?.ToString() ?? "<unavailable>",
             requestedMode,
-            timeMode);
+            effectiveMode);
 
-        network.SendAll(new NetworkChangeTimeControlMode(timeMode));
+        network.SendAll(new NetworkChangeTimeControlMode(effectiveMode));
 
-        ClientSetTimeControl(timeMode);
+        ClientSetTimeControl(effectiveMode);
     }
 }

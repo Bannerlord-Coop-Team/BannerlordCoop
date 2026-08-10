@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Configuration;
@@ -15,11 +15,8 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MapEvents.Handlers;
 
 /// <summary>
-/// [Server] Pauses the campaign once every player is "occupied" — in a map event OR a settlement — so time stops
-/// when nobody is free on the map. Driven by <see cref="PartyOccupancyChanged"/>, which the setter postfixes
-/// (<see cref="MobileParties.Patches.PartyOccupancyPatches"/>) raise whenever any party's map-event or settlement
-/// membership changes. There is no unpause here (that is left to the players / other policies); it only sends the
-/// pause when the occupancy condition becomes true.
+/// [Server] Pauses the campaign once every player is "occupied" in a map event or settlement, then restores the
+/// speed this handler paused when a player becomes free on the campaign map.
 /// </summary>
 internal class PlayerOccupancyPauseHandler : IHandler
 {
@@ -29,6 +26,7 @@ internal class PlayerOccupancyPauseHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ITimeControlInterface timeControlInterface;
+    private long? occupancyPauseToken;
 
     public PlayerOccupancyPauseHandler(
         IMessageBroker messageBroker,
@@ -51,18 +49,62 @@ internal class PlayerOccupancyPauseHandler : IHandler
 
     private void Handle_PartyOccupancyChanged(MessagePayload<PartyOccupancyChanged> payload)
     {
-        if (ModInformation.IsClient || !ModConfigProvider.ModOptions.AutoPauseEnabled)
+        if (ModInformation.IsClient)
             return;
 
-        if (!AllPlayersOccupied())
+        bool allPlayersOccupied = AllPlayersOccupied();
+        if (allPlayersOccupied && !ModConfigProvider.ModOptions.AutoPauseEnabled)
             return;
 
-        Logger.Information(
-            "Pausing campaign because every connected player is occupied: triggerParty={TriggerParty} players={@Players}",
-            payload.What.MobileParty?.StringId ?? "<null>",
-            DescribeConnectedPlayers());
+        var appliedMode = UpdateOccupancyTimeControl(allPlayersOccupied);
+        if (!appliedMode.HasValue)
+            return;
 
-        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+        if (appliedMode.Value == TimeControlEnum.Pause)
+        {
+            Logger.Information(
+                "Pausing campaign because every connected player is occupied: triggerParty={TriggerParty} players={@Players}",
+                payload.What.MobileParty?.StringId ?? "<null>",
+                DescribeConnectedPlayers());
+        }
+        else
+        {
+            Logger.Information(
+                "Restoring campaign time after a player became free: triggerParty={TriggerParty} mode={Mode}",
+                payload.What.MobileParty?.StringId ?? "<null>",
+                appliedMode.Value);
+        }
+    }
+
+    internal TimeControlEnum? UpdateOccupancyTimeControl(bool allPlayersOccupied)
+    {
+        if (allPlayersOccupied)
+        {
+            if (occupancyPauseToken.HasValue)
+                return null;
+
+            if (!timeControlInterface.ServerTryCreatePause(
+                    out _,
+                    out var pauseToken))
+                return null;
+
+            occupancyPauseToken = pauseToken;
+            return TimeControlEnum.Pause;
+        }
+
+        if (!occupancyPauseToken.HasValue)
+            return null;
+
+        var result = timeControlInterface.ServerTryRestoreTimeControl(
+                occupancyPauseToken.Value,
+                out var restoredMode);
+        if (result == AutomaticPauseRestoreResult.Blocked)
+            return null;
+
+        occupancyPauseToken = null;
+        return result == AutomaticPauseRestoreResult.Restored
+            ? restoredMode
+            : (TimeControlEnum?)null;
     }
 
     private string[] DescribeConnectedPlayers()
