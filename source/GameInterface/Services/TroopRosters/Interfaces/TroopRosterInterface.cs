@@ -201,8 +201,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
                     finalWounded < 0 ||
                     finalWounded > finalNumber ||
                     finalXp < 0 ||
-                    finalXp > int.MaxValue ||
-                    (finalNumber == 0 && finalXp != 0))
+                    finalXp > int.MaxValue)
                 {
                     Logger.Warning(
                         "Rejected troop roster delta for {CharacterId}: current=({CurrentNumber},{CurrentWounded},{CurrentXp}) delta=({NumberDelta},{WoundedDelta},{XpDelta})",
