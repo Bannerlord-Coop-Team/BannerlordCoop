@@ -399,6 +399,7 @@ internal class SettlementCommands
         sb.AppendLine($"LastThreatTime:  '{settlement.LastThreatTime}'");
         sb.AppendLine($"CurrentSiegeState:   '{settlement.CurrentSiegeState}'");
         sb.AppendLine($"Militia :   '{settlement.Militia}'");
+        sb.AppendLine($"OwnerClanId: '{settlement.OwnerClan?.StringId ?? "none"}'");
         sb.AppendLine($"LastVisitTimeOfOwner  :   '{settlement.LastVisitTimeOfOwner}'");
         //sb.AppendLine($"ClaimedBy   :   '{settlement.ClaimedBy}'");
         //sb.AppendLine($"ClaimValue    :   '{settlement.ClaimValue}'");
