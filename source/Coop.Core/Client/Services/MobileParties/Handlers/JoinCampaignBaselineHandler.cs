@@ -18,17 +18,20 @@ public sealed class JoinCampaignBaselineHandler : IHandler
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
     private readonly ITimeControlInterface timeControlInterface;
+    private readonly IPlayerPartyTroopXpBaselineApplier troopXpBaselineApplier;
 
     public JoinCampaignBaselineHandler(
         IMessageBroker messageBroker,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
         IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        IPlayerPartyTroopXpBaselineApplier troopXpBaselineApplier)
     {
         this.messageBroker = messageBroker;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
         this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
         this.timeControlInterface = timeControlInterface;
+        this.troopXpBaselineApplier = troopXpBaselineApplier;
 
         messageBroker.Subscribe<NetworkJoinCampaignBaseline>(Handle);
     }
@@ -50,7 +53,8 @@ public sealed class JoinCampaignBaselineHandler : IHandler
                     {
                         timeControlInterface.ClientSetTimeControl(baseline.TimeControlMode);
                         mapTimeTrackerInterface.ApplyCampaignJoinBaseline(baseline.ServerTicks);
-                    });
+                    }) &&
+                troopXpBaselineApplier.TryApply(baseline.TroopXpBaselines);
 
             messageBroker.Publish(this, new JoinCampaignBaselineApplied(success));
         }, context: nameof(JoinCampaignBaselineHandler));

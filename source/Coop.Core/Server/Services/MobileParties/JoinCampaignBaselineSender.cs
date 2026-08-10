@@ -27,17 +27,20 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
     private readonly ITimeControlInterface timeControlInterface;
+    private readonly IPlayerPartyTroopXpBaselineProvider troopXpBaselineProvider;
 
     public JoinCampaignBaselineSender(
         INetwork network,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
         IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        IPlayerPartyTroopXpBaselineProvider troopXpBaselineProvider)
     {
         this.network = network;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
         this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
         this.timeControlInterface = timeControlInterface;
+        this.troopXpBaselineProvider = troopXpBaselineProvider;
     }
 
     public void Send(NetPeer peer)
@@ -55,6 +58,7 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
         var liveParties = new HashSet<MobileParty>(parties);
         var liveSettlements = new HashSet<Settlement>(settlements);
         var partyStates = new MobilePartyJoinState[parties.Count];
+        TroopRosterXpBaseline[] troopXpBaselines = Array.Empty<TroopRosterXpBaseline>();
         bool isComplete = true;
         for (int i = 0; i < parties.Count; i++)
         {
@@ -80,7 +84,17 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
             partyStates[i] = state;
         }
 
-        if (isComplete == false) partyStates = Array.Empty<MobilePartyJoinState>();
+        if (isComplete && !troopXpBaselineProvider.TryCapture(peer, out troopXpBaselines))
+        {
+            Logger.Warning("Could not capture the joining player's troop XP baseline");
+            isComplete = false;
+        }
+
+        if (isComplete == false)
+        {
+            partyStates = Array.Empty<MobilePartyJoinState>();
+            troopXpBaselines = Array.Empty<TroopRosterXpBaseline>();
+        }
 
         network.SendImmediate(
             peer,
@@ -88,6 +102,7 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
                 serverTicks,
                 timeControlInterface.GetTimeControl(),
                 partyStates,
-                isComplete));
+                isComplete,
+                troopXpBaselines));
     }
 }

@@ -51,6 +51,9 @@ public class ServerModule : CommonModule
         builder.RegisterType<JoinCampaignBaselineSender>()
             .As<IJoinCampaignBaselineSender>()
             .InstancePerDependency();
+        builder.RegisterType<PlayerPartyTroopXpBaselineProvider>()
+            .As<IPlayerPartyTroopXpBaselineProvider>()
+            .InstancePerDependency();
 
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.

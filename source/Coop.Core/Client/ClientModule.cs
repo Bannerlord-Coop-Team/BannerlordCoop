@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Session;
 using Common.PacketHandlers;
 using Coop.Core.Client.Policies;
+using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Client.Services.Session;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
@@ -32,6 +33,9 @@ public class ClientModule : CommonModule
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyTroopXpBaselineApplier>()
+            .As<IPlayerPartyTroopXpBaselineApplier>()
+            .InstancePerDependency();
 
         // Policies
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

@@ -7,11 +7,13 @@ using Common.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
+using GameInterface.Services.Players;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.TroopRosters.Coalescing;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -34,6 +36,8 @@ internal class TroopRosterDeltaHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterDeltaHandler>();
     private const string ElementBatchChannel = "TroopRosterElementBatch";
+    private const string ControllerElementBatchChannel = "TroopRosterElementBatch.Controller";
+    private const string ObserverElementBatchChannel = "TroopRosterElementBatch.Observer";
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -41,6 +45,7 @@ internal class TroopRosterDeltaHandler : IHandler
     private readonly ISendCoalescer coalescer;
     private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
     private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
+    private readonly IPlayerManager playerManager;
 
     public TroopRosterDeltaHandler(
         IMessageBroker messageBroker,
@@ -48,6 +53,7 @@ internal class TroopRosterDeltaHandler : IHandler
         INetwork network,
         IEncounterMenuConditionRefresher encounterMenuConditionRefresher,
         IPartyScreenRosterRefresher partyScreenRosterRefresher,
+        IPlayerManager playerManager,
         ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -56,6 +62,7 @@ internal class TroopRosterDeltaHandler : IHandler
         this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
         this.coalescer = coalescer;
         this.partyScreenRosterRefresher = partyScreenRosterRefresher;
+        this.playerManager = playerManager;
 
         // Authority send path: the roster patches publish these local events (server-only) with the server index.
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
@@ -105,7 +112,7 @@ internal class TroopRosterDeltaHandler : IHandler
             return;
         }
 
-        Enqueue(rosterId, characterId, operation);
+        EnqueueRegular(e.TroopRoster, rosterId, characterId, operation);
     }
 
     private void Handle_ElementNumberSet(MessagePayload<ElementNumberSet> payload)
@@ -128,7 +135,8 @@ internal class TroopRosterDeltaHandler : IHandler
     {
         var e = payload.What;
         if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
-        Enqueue(rosterId, characterId, TroopRosterElementOperation.SetXp(e.Number));
+        EnqueueRegular(e.TroopRoster, rosterId, characterId,
+            TroopRosterElementOperation.SetXp(e.Number));
     }
 
     private void Handle_ZeroCountsRemoved(MessagePayload<ZeroCountsRemoved> payload)
@@ -153,6 +161,96 @@ internal class TroopRosterDeltaHandler : IHandler
         var key = new CoalesceKey(ElementBatchChannel, rosterId, characterId);
         coalescer.Enqueue(key, new TroopRosterElementBatchPayload(rosterId, characterId, operation));
     }
+
+    private void EnqueueRegular(TroopRoster roster, string rosterId, string characterId,
+        TroopRosterElementOperation operation)
+    {
+        var mobileParty = roster.OwnerParty?.MobileParty;
+        if (mobileParty == null)
+        {
+            Enqueue(rosterId, characterId, operation);
+            return;
+        }
+
+        bool isAddCounts = operation.Kind == TroopRosterElementOperationKind.AddCounts;
+        if (!PlayerManager.TryGetControlledObjectInfo(mobileParty, out var controlled))
+        {
+            if (isAddCounts)
+            {
+                Enqueue(rosterId, characterId, WithoutXp(operation));
+            }
+
+            return;
+        }
+
+        if (!playerManager.TryGetPeer(controlled.ObjectControllerId, out var controllerPeer))
+        {
+            if (isAddCounts)
+            {
+                EnqueueRoute(rosterId, characterId, WithoutXp(operation),
+                    ObserverElementBatchChannel + ".Broadcast");
+            }
+
+            return;
+        }
+
+        string peerRoute = controllerPeer.Id + "." + RuntimeHelpers.GetHashCode(controllerPeer);
+        EnqueueToPeer(rosterId, characterId, operation,
+            ControllerElementBatchChannel + "." + peerRoute, controllerPeer);
+
+        if (isAddCounts)
+        {
+            EnqueueToAllBut(rosterId, characterId, WithoutXp(operation),
+                ObserverElementBatchChannel + "." + peerRoute, controllerPeer);
+        }
+    }
+
+    private void EnqueueRoute(string rosterId, string characterId,
+        TroopRosterElementOperation operation, string channel)
+    {
+        if (coalescer == null)
+        {
+            network.SendAll(CreateBatch(rosterId, characterId, operation));
+            return;
+        }
+
+        coalescer.Enqueue(new CoalesceKey(channel, rosterId, characterId),
+            new TroopRosterElementBatchPayload(rosterId, characterId, operation));
+    }
+
+    private void EnqueueToPeer(string rosterId, string characterId,
+        TroopRosterElementOperation operation, string channel, LiteNetLib.NetPeer peer)
+    {
+        if (coalescer == null)
+        {
+            network.Send(peer, CreateBatch(rosterId, characterId, operation));
+            return;
+        }
+
+        coalescer.EnqueueToPeer(new CoalesceKey(channel, rosterId, characterId),
+            new TroopRosterElementBatchPayload(rosterId, characterId, operation), peer);
+    }
+
+    private void EnqueueToAllBut(string rosterId, string characterId,
+        TroopRosterElementOperation operation, string channel, LiteNetLib.NetPeer excludedPeer)
+    {
+        if (coalescer == null)
+        {
+            network.SendAllBut(excludedPeer, CreateBatch(rosterId, characterId, operation));
+            return;
+        }
+
+        coalescer.EnqueueToAllBut(new CoalesceKey(channel, rosterId, characterId),
+            new TroopRosterElementBatchPayload(rosterId, characterId, operation), excludedPeer);
+    }
+
+    private static NetworkTroopRosterElementBatch CreateBatch(string rosterId, string characterId,
+        TroopRosterElementOperation operation) =>
+        new NetworkTroopRosterElementBatch(rosterId, characterId, new[] { operation });
+
+    private static TroopRosterElementOperation WithoutXp(TroopRosterElementOperation operation) =>
+        TroopRosterElementOperation.AddCounts(operation.Count, operation.WoundedCount, 0,
+            operation.RemoveDepleted);
 
     /// <summary>
     /// Resolves the roster id and the element's CharacterObject id. Every character, hero or basic troop, is

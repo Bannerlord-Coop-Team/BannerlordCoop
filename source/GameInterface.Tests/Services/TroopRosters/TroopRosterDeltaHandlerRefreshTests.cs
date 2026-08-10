@@ -4,6 +4,7 @@ using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Handlers;
 using GameInterface.Services.TroopRosters.Messages;
 using Moq;
@@ -47,7 +48,8 @@ public class TroopRosterDeltaHandlerRefreshTests
             objectManager.Object,
             new Mock<INetwork>().Object,
             refresher,
-            partyScreenRefresher);
+            partyScreenRefresher,
+            new Mock<IPlayerManager>().Object);
 
         Assert.NotNull(subscriber);
         subscriber!(new MessagePayload<NetworkTroopRosterElementBatch>(
