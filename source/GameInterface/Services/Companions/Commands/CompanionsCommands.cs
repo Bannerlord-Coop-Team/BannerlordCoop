@@ -630,6 +630,10 @@ internal class CompanionsCommands
         int originalMemberCount = playerParty.MemberRoster.TotalManCount;
         int originalCompanionCount = playerClan.Companions.Count();
         int originalWarPartyCount = playerClan.WarPartyComponents.Count;
+        var originalWarParties = playerClan.WarPartyComponents
+            .Select(component => component?.MobileParty)
+            .Where(party => party != null)
+            .ToArray();
         int originalPlayerGold = playerHero.Gold;
         var joinCompanion = CreateFixtureCompanion(template, captorSettlement, RescueJoinFixtureName);
         var partyCompanion = CreateFixtureCompanion(template, captorSettlement, RescuePartyFixtureName);
@@ -671,6 +675,7 @@ internal class CompanionsCommands
                 originalMemberCount,
                 originalCompanionCount,
                 originalWarPartyCount,
+                originalWarParties,
                 originalPlayerGold);
             StartRescueRequestObservation();
 
@@ -825,10 +830,7 @@ internal class CompanionsCommands
             return $"Hero '{args[2]}' not found.";
 
         var clan = joinCompanion.CompanionOf ?? partyCompanion.CompanionOf;
-        int fixturePartyCount = Campaign.Current.MobileParties.Count(party =>
-            party != playerParty &&
-            (party.LeaderHero == partyCompanion ||
-             party.StringId == partyCompanion.CharacterObject.StringId));
+        int fixturePartyCount = GetRescueFixtureParties(clan, playerParty, partyCompanion).Length;
 
         return $"RESCUE_FIXTURE_STATE party={args[0]} " +
             $"join.id={args[1]} join.count={playerParty.MemberRoster.GetTroopCount(joinCompanion.CharacterObject)} " +
@@ -866,16 +868,18 @@ internal class CompanionsCommands
         try
         {
             StopRescueRequestObservation();
+            foreach (var fixtureParty in GetRescueFixtureParties(
+                         playerClan, playerParty, partyCompanion))
+            {
+                DestroyPartyAction.Apply(null, fixtureParty);
+            }
             CleanupRescueFixtureHero(playerParty, joinCompanion);
             CleanupRescueFixtureHero(playerParty, partyCompanion);
             if (pendingRescueFixture != null)
                 RestoreHeroGold(pendingRescueFixture.PlayerHero, pendingRescueFixture.OriginalPlayerGold);
 
-            int fixturePartyCount = Campaign.Current.MobileParties.Count(party =>
-                party != playerParty &&
-                partyCompanion != null &&
-                (party.LeaderHero == partyCompanion ||
-                 party.StringId == partyCompanion.CharacterObject.StringId));
+            int fixturePartyCount = GetRescueFixtureParties(
+                playerClan, playerParty, partyCompanion).Length;
             int joinCount = joinCompanion == null
                 ? 0
                 : playerParty.MemberRoster.GetTroopCount(joinCompanion.CharacterObject);
@@ -1053,6 +1057,24 @@ internal class CompanionsCommands
             KillCharacterAction.ApplyByRemove(companion, false, true);
     }
 
+    private static MobileParty[] GetRescueFixtureParties(
+        Clan clan, MobileParty playerParty, Hero partyCompanion)
+    {
+        if (clan == null) return Array.Empty<MobileParty>();
+
+        var originalParties = pendingRescueFixture?.OriginalWarParties;
+        return clan.WarPartyComponents
+            .Select(component => component?.MobileParty)
+            .Where(party => party != null && party != playerParty &&
+                (originalParties != null
+                    ? !originalParties.Contains(party)
+                    : partyCompanion != null &&
+                      (party.LeaderHero == partyCompanion ||
+                       party.StringId == partyCompanion.CharacterObject.StringId)))
+            .Distinct()
+            .ToArray();
+    }
+
     private static FireCompanion CreateCleanupDismissalRequest(
         IObjectManager objectManager, Hero companion, string heroId)
     {
@@ -1195,6 +1217,7 @@ internal class CompanionsCommands
         public int OriginalMemberCount { get; }
         public int OriginalCompanionCount { get; }
         public int OriginalWarPartyCount { get; }
+        public HashSet<MobileParty> OriginalWarParties { get; }
         public int OriginalPlayerGold { get; }
 
         public CompanionRescueFixture(
@@ -1208,6 +1231,7 @@ internal class CompanionsCommands
             int originalMemberCount,
             int originalCompanionCount,
             int originalWarPartyCount,
+            IEnumerable<MobileParty> originalWarParties,
             int originalPlayerGold)
         {
             ControllerId = controllerId;
@@ -1220,6 +1244,7 @@ internal class CompanionsCommands
             OriginalMemberCount = originalMemberCount;
             OriginalCompanionCount = originalCompanionCount;
             OriginalWarPartyCount = originalWarPartyCount;
+            OriginalWarParties = new HashSet<MobileParty>(originalWarParties);
             OriginalPlayerGold = originalPlayerGold;
         }
     }
