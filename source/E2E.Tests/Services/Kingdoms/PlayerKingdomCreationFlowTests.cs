@@ -1553,9 +1553,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 kingdom._unresolvedDecisions.Add(decision);
             }
 
-            var decisionsVm = new KingdomDecisionsVM(() => { });
-            decisionsVm.RefreshWith(decision);
-            DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
+            var decisionItem = new DecisionItemBaseVM(decision, () => { });
             var detachedOutcome = new KingdomPolicyDecision.PolicyDecisionOutcome(shouldBeEnforced: true);
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
                 ((KingdomPolicyDecision.PolicyDecisionOutcome)candidate.Option).ShouldDecisionBeEnforced);
