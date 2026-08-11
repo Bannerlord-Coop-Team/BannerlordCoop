@@ -17,13 +17,30 @@ namespace GameInterface.Services.Settlements.Messages
         public string CapturerId { get; }
         [ProtoMember(4)]
         public int Detail { get; }
+        [ProtoMember(5)]
+        public string PreviousOwnerId { get; }
 
-        public NetworkChangeSettlementOwnership(string settlementId, string ownerId, string capturerId, int detail)
+        public NetworkChangeSettlementOwnership(string settlementId, string ownerId, string previousOwnerId, string capturerId, int detail)
         {
             SettlementId = settlementId;
             OwnerId = ownerId;
+            PreviousOwnerId = previousOwnerId;
             CapturerId = capturerId;
             Detail = detail;
         }
     }
+
+#if DEBUG
+    [ProtoContract(SkipConstructor = true)]
+    public record NetworkPrepareMissingSettlementOwnerFixture : ICommand
+    {
+        [ProtoMember(1)]
+        public string SettlementId { get; }
+
+        public NetworkPrepareMissingSettlementOwnerFixture(string settlementId)
+        {
+            SettlementId = settlementId;
+        }
+    }
+#endif
 }
