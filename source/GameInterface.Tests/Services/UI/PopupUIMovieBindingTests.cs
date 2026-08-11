@@ -1,5 +1,6 @@
 using GameInterface.Services.UI.Credits;
 using GameInterface.Services.UI.Donate;
+using GameInterface.Services.UI.JoinCancel;
 using System;
 using System.IO;
 using System.Linq;
@@ -21,6 +22,7 @@ public class PopupUIMovieBindingTests
     {
         { "DonatePopupUIMovie.xml", typeof(DonatePopupVM) },
         { "CreditsPopupUIMovie.xml", typeof(CreditsPopupVM) },
+        { "CoopJoinCancelOverlay.xml", typeof(JoinCancelVM) },
     };
 
     [Theory]
@@ -79,7 +81,7 @@ public class PopupUIMovieBindingTests
         }
     }
 
-    private static string FindMoviePath(string movieFile, [CallerFilePath] string sourceFile = "")
+    internal static string FindMoviePath(string movieFile, [CallerFilePath] string sourceFile = "")
     {
         var sourceDirectory = Path.GetDirectoryName(sourceFile);
         return Path.GetFullPath(Path.Combine(sourceDirectory!,
