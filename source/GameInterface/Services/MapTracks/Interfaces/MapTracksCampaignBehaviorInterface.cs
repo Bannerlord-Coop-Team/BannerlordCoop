@@ -71,9 +71,9 @@ public interface IMapTracksCampaignBehaviorInterface : IGameAbstraction
 
     /// <summary>
     /// Server method
-    /// Initialize a player's key in the dictionary
+    /// Initialize a player's key in the dictionary. Returns false when the player already had one.
     /// </summary>
-    void AddPlayerPartyKeys(string playerPartyId);
+    bool AddPlayerPartyKeys(string playerPartyId);
 
     /// <summary>
     /// Client method
@@ -303,11 +303,12 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         return false;
     }
 
-    public void AddPlayerPartyKeys(string playerPartyId)
+    public bool AddPlayerPartyKeys(string playerPartyId)
     {
-        if (playerDetectedTracks.ContainsKey(playerPartyId)) return;
+        if (playerDetectedTracks.ContainsKey(playerPartyId)) return false;
 
         playerDetectedTracks[playerPartyId] = new HashSet<Track>();
+        return true;
     }
 
     public void ApplyVisibleTrackChanges(MapTracksCampaignBehavior behavior, List<MapTrackData> visibleTrackChanges, bool isRemovingTracks)
