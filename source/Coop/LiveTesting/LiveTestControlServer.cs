@@ -15,11 +15,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ScreenSystem;
 
@@ -27,12 +29,31 @@ namespace Coop.LiveTesting
 {
     internal sealed class LiveTestControlServer : IDisposable
     {
+        private sealed class ScreenshotCapture
+        {
+            public ScreenshotCapture(string path)
+            {
+                Path = path;
+            }
+
+            public string Path { get; }
+
+            public long LastLength { get; set; } = -1;
+
+            public DateTime LastWriteUtc { get; set; } = DateTime.MinValue;
+
+            public int StableObservations { get; set; }
+        }
+
         private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
 
         private readonly string logFilePath;
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
+        private readonly object screenshotCaptureLock = new object();
+        private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
+            new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
         private int shutdownScheduled;
 
         public LiveTestControlServer(bool isServer, string logFilePath)
@@ -87,8 +108,12 @@ namespace Coop.LiveTesting
                         false);
                 case "command":
                     return HandleCommand(request);
+                case "command-catalog":
+                    return HandleCommandCatalog(request);
                 case "screenshot":
                     return HandleScreenshot(request);
+                case "screenshot-status":
+                    return HandleScreenshotStatus(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -155,6 +180,14 @@ namespace Coop.LiveTesting
             }, true);
         }
 
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () => Success(request.Id, new
+            {
+                commands = GetDebugCommandNames(),
+            }), false);
+        }
+
         private LiveTestResponse HandleScreenshot(LiveTestRequest request)
         {
             if (!TryReadString(request.Parameters, "path", out var requestedPath) ||
@@ -178,6 +211,7 @@ namespace Coop.LiveTesting
                 return Failure(request.Id, "invalid_parameters", exception.Message, false);
             }
 
+            string captureId = Guid.NewGuid().ToString("N");
             return ExecuteOnGameThread(request, () =>
             {
                 string directory = System.IO.Path.GetDirectoryName(screenshotPath);
@@ -191,13 +225,70 @@ namespace Coop.LiveTesting
                 }
 
                 Directory.CreateDirectory(directory);
+                lock (screenshotCaptureLock)
+                {
+                    screenshotCaptures[captureId] = new ScreenshotCapture(screenshotPath);
+                }
                 Utilities.TakeScreenshot(screenshotPath);
                 return Success(request.Id, new
                 {
+                    captureId,
                     path = screenshotPath,
                     captureRequested = true,
                 });
             }, true);
+        }
+
+        private LiveTestResponse HandleScreenshotStatus(LiveTestRequest request)
+        {
+            if (!TryReadString(request.Parameters, "captureId", out var captureId) ||
+                !Guid.TryParseExact(captureId, "N", out _))
+            {
+                return Failure(
+                    request.Id,
+                    "invalid_parameters",
+                    "Screenshot status requires a 32-character hexadecimal capture id.",
+                    false);
+            }
+
+            lock (screenshotCaptureLock)
+            {
+                if (!screenshotCaptures.TryGetValue(captureId, out var capture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' is not registered.",
+                        false);
+                }
+
+                bool exists = TryReadScreenshotState(
+                    capture.Path,
+                    out var length,
+                    out var lastWriteUtc,
+                    out var isBmp);
+                bool unchanged = exists &&
+                    capture.LastLength == length &&
+                    capture.LastWriteUtc == lastWriteUtc;
+                capture.StableObservations = unchanged
+                    ? capture.StableObservations + 1
+                    : 0;
+                capture.LastLength = length;
+                capture.LastWriteUtc = lastWriteUtc;
+                bool stable = exists && isBmp && capture.StableObservations >= 1;
+
+                return Success(request.Id, new
+                {
+                    captureId,
+                    path = capture.Path,
+                    complete = stable,
+                    exists,
+                    isBmp,
+                    stable,
+                    length,
+                    lastWriteUtc = exists ? lastWriteUtc.ToString("o") : null,
+                });
+            }
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)
@@ -389,6 +480,61 @@ namespace Coop.LiveTesting
                 PlatformId = processInfo.PlatformId,
                 RunToken = processInfo.RunToken,
             };
+        }
+
+        private static string[] GetDebugCommandNames()
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(assembly => assembly.GetTypesSafe())
+                .SelectMany(type => type.GetMethods(
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .SelectMany(method => method
+                    .GetCustomAttributesSafe(
+                        typeof(CommandLineFunctionality.CommandLineArgumentFunction),
+                        false)
+                    .OfType<CommandLineFunctionality.CommandLineArgumentFunction>())
+                .Select(attribute => attribute.GroupName + "." + attribute.Name)
+                .Where(command => command.StartsWith("coop.debug.", StringComparison.Ordinal))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(command => command, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static bool TryReadScreenshotState(
+            string path,
+            out long length,
+            out DateTime lastWriteUtc,
+            out bool isBmp)
+        {
+            length = 0;
+            lastWriteUtc = DateTime.MinValue;
+            isBmp = false;
+
+            try
+            {
+                var fileInfo = new FileInfo(path);
+                if (!fileInfo.Exists || fileInfo.Length < 2) return false;
+
+                length = fileInfo.Length;
+                lastWriteUtc = fileInfo.LastWriteTimeUtc;
+                using (var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete))
+                {
+                    isBmp = stream.ReadByte() == 'B' && stream.ReadByte() == 'M';
+                }
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         private static bool TryReadCommand(
