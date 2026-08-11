@@ -33,6 +33,9 @@ namespace Coop.LiveTesting
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
+        private readonly object screenshotLock = new object();
+        private readonly Dictionary<string, ScreenshotCapture> screenshots =
+            new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
         private int shutdownScheduled;
 
         public LiveTestControlServer(bool isServer, string logFilePath)
@@ -91,6 +94,8 @@ namespace Coop.LiveTesting
                     return HandleCommand(request);
                 case "screenshot":
                     return HandleScreenshot(request);
+                case "screenshot-status":
+                    return HandleScreenshotStatus(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -201,13 +206,98 @@ namespace Coop.LiveTesting
                 }
 
                 Directory.CreateDirectory(directory);
+                if (File.Exists(screenshotPath))
+                    File.Delete(screenshotPath);
+
+                string captureId = Guid.NewGuid().ToString("N");
                 Utilities.TakeScreenshot(screenshotPath);
+                lock (screenshotLock)
+                {
+                    screenshots[captureId] = new ScreenshotCapture(screenshotPath);
+                }
                 return Success(request.Id, new
                 {
+                    captureId,
                     path = screenshotPath,
                     captureRequested = true,
                 });
             }, true);
+        }
+
+        private LiveTestResponse HandleScreenshotStatus(LiveTestRequest request)
+        {
+            if (!TryReadString(request.Parameters, "captureId", out var captureId) ||
+                string.IsNullOrWhiteSpace(captureId))
+            {
+                return Failure(
+                    request.Id,
+                    "invalid_parameters",
+                    "Screenshot status requires a non-empty captureId.",
+                    false);
+            }
+
+            ScreenshotCapture capture;
+            lock (screenshotLock)
+            {
+                if (!screenshots.TryGetValue(captureId, out capture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' was not found.",
+                        false);
+                }
+            }
+
+            bool exists = File.Exists(capture.Path);
+            bool isBmp = false;
+            long length = 0;
+            DateTime? lastWriteUtc = null;
+            if (exists)
+            {
+                try
+                {
+                    var fileInfo = new FileInfo(capture.Path);
+                    length = fileInfo.Length;
+                    lastWriteUtc = fileInfo.LastWriteTimeUtc;
+                    using (var stream = new FileStream(
+                        capture.Path,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite | FileShare.Delete))
+                    {
+                        isBmp = stream.ReadByte() == 'B' && stream.ReadByte() == 'M';
+                    }
+                }
+                catch (IOException)
+                {
+                    exists = File.Exists(capture.Path);
+                }
+            }
+
+            bool stable;
+            lock (screenshotLock)
+            {
+                stable = exists &&
+                    isBmp &&
+                    length > 0 &&
+                    capture.LastLength == length &&
+                    capture.LastWriteUtc == lastWriteUtc;
+                capture.LastLength = length;
+                capture.LastWriteUtc = lastWriteUtc;
+            }
+
+            return Success(request.Id, new
+            {
+                captureId,
+                path = capture.Path,
+                exists,
+                isBmp,
+                stable,
+                complete = stable,
+                length,
+                lastWriteUtc = lastWriteUtc?.ToString("O"),
+            });
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)
@@ -482,6 +572,18 @@ namespace Coop.LiveTesting
                 char.IsLetterOrDigit(character) || character == '-' || character == '_')
                 ? runToken
                 : null;
+        }
+
+        private sealed class ScreenshotCapture
+        {
+            public string Path { get; }
+            public long LastLength { get; set; } = -1;
+            public DateTime? LastWriteUtc { get; set; }
+
+            public ScreenshotCapture(string path)
+            {
+                Path = path;
+            }
         }
     }
 }
