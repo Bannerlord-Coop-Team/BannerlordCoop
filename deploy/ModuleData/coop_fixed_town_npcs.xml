@@ -100,4 +100,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_f17d849f"
+    name="{=!}TEST"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EN2"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="HELLO"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_sturgia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.aserai_female_civil_hscarf_b" />
+        <equipment slot="Cape" id="Item.bearskin" />
+        <equipment slot="Body" id="Item.long_padded_robe" />
+        <equipment slot="Gloves" id="Item.lamellar_plate_gauntlets" />
+        <equipment slot="Leg" id="Item.empire_horseman_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
