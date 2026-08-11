@@ -5,9 +5,12 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Companions.Messages;
+using GameInterface.Services.Companions.Patches;
 using GameInterface.Services.TroopRosters.Messages;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Localization;
@@ -17,6 +20,7 @@ namespace E2E.Tests.Services.Companions;
 
 public class CompanionRescueSyncTests : IDisposable
 {
+    private static Hero oneToOneConversationHero;
     private readonly E2ETestEnvironment testEnvironment;
     private EnvironmentInstance Server => testEnvironment.Server;
     private IReadOnlyList<EnvironmentInstance> Clients => testEnvironment.Clients.ToList();
@@ -191,24 +195,64 @@ public class CompanionRescueSyncTests : IDisposable
     }
 
     [Fact]
-    public void JoinPartyRescue_WithStaleClan_ReturnsTerminalRejectionWithoutMutation()
+    public void JoinPartyRescue_WithStaleClan_UiCompletionReturnsRejectionWithoutRelease()
     {
         var context = CreateCaptiveCompanion();
         string staleClanId = testEnvironment.CreateRegisteredObject<Clan>();
         testEnvironment.FlushCoalescer();
         var requester = Clients[0];
-        string requestId = Guid.NewGuid().ToString("N");
+        requester.NetworkSentMessages.Clear();
+        var harmony = new Harmony($"{nameof(CompanionRescueSyncTests)}.{Guid.NewGuid():N}");
 
-        requester.Call(() => requester.Resolve<INetwork>().SendAll(
-            new DoCompanionJoinedPartyByRescue(
-                context.HeroId,
-                context.TargetPartyId,
-                requestId,
-                staleClanId,
-                context.CaptorPartyId)));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(context.HeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(staleClanId, out var staleClan));
+            companion._companionOf = staleClan;
+        });
+
+        try
+        {
+            requester.Call(() =>
+            {
+                Assert.True(requester.ObjectManager.TryGetObject<Hero>(context.HeroId, out var companion));
+                Assert.True(requester.ObjectManager.TryGetObject<MobileParty>(context.TargetPartyId, out var targetParty));
+                oneToOneConversationHero = companion;
+                var previousMainParty = Campaign.Current.MainParty;
+                Campaign.Current.MainParty = targetParty;
+                try
+                {
+                    harmony.Patch(
+                        AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero)),
+                        prefix: new HarmonyMethod(AccessTools.Method(
+                            typeof(CompanionRescueSyncTests), nameof(GetOneToOneConversationHeroPrefix))));
+                    var behavior = new CompanionRolesCampaignBehavior();
+
+                    Assert.False(CompanionRolesPatches
+                        .CompanionRescueAnswerOptionsJoinPartyConsequencePrefix(ref behavior));
+                    Assert.True(behavior._partyCreatedAfterRescueForCompanion);
+                    Assert.False(CompanionRolesPatches.EndRescueCompanionPrefix(ref behavior));
+                    Assert.False(behavior._partyCreatedAfterRescueForCompanion);
+                }
+                finally
+                {
+                    Campaign.Current.MainParty = previousMainParty;
+                }
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            oneToOneConversationHero = null;
+        }
+
+        var request = Assert.Single(requester.NetworkSentMessages
+            .OfType<DoCompanionJoinedPartyByRescue>());
+        Assert.Equal(context.ClanId, request.ExpectedClanId);
+        Assert.Empty(requester.NetworkSentMessages.OfType<RescueCompanion>());
 
         var completion = requester.InternalMessages.OfType<CompanionRescueCompleted>()
-            .Single(message => message.RequestId == requestId);
+            .Single(message => message.RequestId == request.RequestId);
         Assert.Equal(CompanionRescueCompletionStatus.Rejected, completion.Status);
         Assert.Contains("owning clan changed", completion.Error);
         Server.Call(() =>
@@ -219,6 +263,12 @@ public class CompanionRescueSyncTests : IDisposable
             Assert.Same(captor, companion.PartyBelongedToAsPrisoner);
         });
         Assert.Equal(0, GetTroopCount(Server, context.TargetPartyId, context.CharacterId));
+    }
+
+    private static bool GetOneToOneConversationHeroPrefix(ref Hero __result)
+    {
+        __result = oneToOneConversationHero;
+        return false;
     }
 
     private RescueContext CreateCaptiveCompanion()

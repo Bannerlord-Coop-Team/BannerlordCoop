@@ -9,6 +9,9 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Utils.Commands;
+#if DEBUG
+using Newtonsoft.Json;
+#endif
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -35,12 +38,15 @@ namespace GameInterface.Services.Companions.Commands;
 internal class CompanionsCommands
 {
     private const string RoleFixtureName = "Issue 2583 Role Companion";
+#if DEBUG
     private const string RescueJoinFixtureName = "Issue 2762 Join Rescue Companion";
     private const string RescuePartyFixtureName = "Issue 2762 Party Rescue Companion";
     private const string RescueCaptorSettlementId = "town_ES1";
+#endif
     private static readonly ILogger Logger = LogManager.GetLogger<CompanionsCommands>();
     private static CompanionRoleFixture pendingRoleFixture;
     private static CompanionDismissalFixture pendingDismissalFixture;
+#if DEBUG
     private static CompanionRescueFixture pendingRescueFixture;
     private static int rescueJoinRequestCount;
     private static int rescuePartyRequestCount;
@@ -48,6 +54,7 @@ internal class CompanionsCommands
     private static Action<MessagePayload<DoPartyScreenClosedFromRescuing>> rescuePartyRequestObserver;
     private static PartyScreenClosedFromRescuing? lastRescuePartyScreenCompletion;
     private static Action<MessagePayload<PartyScreenClosedFromRescuing>> rescuePartyScreenObserver;
+#endif
     private static CompanionDismissalCompleted? lastDismissalCompletion;
     private static DismissalEncounterObservation lastDismissalEncounterObservation;
     private static Action<MessagePayload<CompanionDismissalCompleted>> dismissalCompletionHandler;
@@ -601,6 +608,32 @@ internal class CompanionsCommands
             $"members={memberCount} companions={companionCount}";
     }
 
+#if DEBUG
+    [CommandLineArgumentFunction("rescue_fixture_baseline", "coop.debug.companions")]
+    public static string RescueFixtureBaselineCommand(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.companions.rescue_fixture_baseline <controllerId>";
+        var context = new CommandContext("rescue_fixture_baseline", usage, args);
+        if (!context.RequireServer(out var error)) return error;
+        if (!context.RequireArgCount(1, out error)) return error;
+        if (!TryResolvePlayer(args[0], out _, out _, out var player, out var playerHero,
+            out var playerClan, out var playerParty, out error))
+            return "Failed to read companion-rescue fixture baseline: " + error;
+
+        return "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            controllerId = player.ControllerId,
+            partyId = player.MobilePartyId,
+            memberCount = playerParty.MemberRoster.TotalManCount,
+            companionCount = playerClan.Companions.Count(),
+            warPartyCount = playerClan.WarPartyComponents.Count,
+            playerGold = playerHero.Gold,
+            fixtureActive = pendingRescueFixture != null ||
+                FindRescueFixtureHero(RescueJoinFixtureName) != null ||
+                FindRescueFixtureHero(RescuePartyFixtureName) != null,
+        });
+    }
+
     [CommandLineArgumentFunction("rescue_fixture_setup", "coop.debug.companions")]
     public static string RescueFixtureSetupCommand(List<string> args)
     {
@@ -674,9 +707,22 @@ internal class CompanionsCommands
                 originalPlayerGold);
             StartRescueRequestObservation();
 
-            return $"RESCUE_FIXTURE_READY controller={player.ControllerId} party={player.MobilePartyId} " +
+            string output = $"RESCUE_FIXTURE_READY controller={player.ControllerId} party={player.MobilePartyId} " +
                 $"join={joinCompanionId} lead={partyCompanionId} captor={captorPartyId} " +
                 $"members={originalMemberCount} companions={originalCompanionCount} warParties={originalWarPartyCount}";
+            string structuredResult = JsonConvert.SerializeObject(new
+            {
+                controllerId = player.ControllerId,
+                partyId = player.MobilePartyId,
+                joinHeroId = joinCompanionId,
+                leadHeroId = partyCompanionId,
+                captorPartyId,
+                originalMemberCount,
+                originalCompanionCount,
+                originalWarPartyCount,
+                originalPlayerGold,
+            });
+            return output + Environment.NewLine + "LIVE_TEST_JSON=" + structuredResult;
         }
         catch (Exception exception)
         {
@@ -857,7 +903,7 @@ internal class CompanionsCommands
         var clan = joinCompanion.CompanionOf ?? partyCompanion.CompanionOf;
         int fixturePartyCount = GetRescueFixtureParties(clan, playerParty, partyCompanion).Length;
 
-        return $"RESCUE_FIXTURE_STATE party={args[0]} " +
+        string output = $"RESCUE_FIXTURE_STATE party={args[0]} " +
             $"join.id={args[1]} join.count={playerParty.MemberRoster.GetTroopCount(joinCompanion.CharacterObject)} " +
             $"join.state={joinCompanion.HeroState} join.prisoner={joinCompanion.IsPrisoner} " +
             $"join.party={joinCompanion.PartyBelongedTo?.StringId ?? "none"} " +
@@ -870,6 +916,34 @@ internal class CompanionsCommands
             $"clanWarParties={clan?.WarPartyComponents.Count ?? -1} " +
             $"joinRequests={Volatile.Read(ref rescueJoinRequestCount)} " +
             $"leadRequests={Volatile.Read(ref rescuePartyRequestCount)}";
+        string structuredResult = JsonConvert.SerializeObject(new
+        {
+            partyId = args[0],
+            join = new
+            {
+                id = args[1],
+                count = playerParty.MemberRoster.GetTroopCount(joinCompanion.CharacterObject),
+                state = joinCompanion.HeroState.ToString(),
+                prisoner = joinCompanion.IsPrisoner,
+                party = joinCompanion.PartyBelongedTo?.StringId ?? "none",
+                captive = GetPartyBaseId(objectManager, joinCompanion.PartyBelongedToAsPrisoner),
+            },
+            lead = new
+            {
+                id = args[2],
+                count = playerParty.MemberRoster.GetTroopCount(partyCompanion.CharacterObject),
+                state = partyCompanion.HeroState.ToString(),
+                prisoner = partyCompanion.IsPrisoner,
+                party = partyCompanion.PartyBelongedTo?.StringId ?? "none",
+                captive = GetPartyBaseId(objectManager, partyCompanion.PartyBelongedToAsPrisoner),
+            },
+            fixtureParties = fixturePartyCount,
+            clanCompanions = clan?.Companions.Count() ?? -1,
+            clanWarParties = clan?.WarPartyComponents.Count ?? -1,
+            joinRequests = Volatile.Read(ref rescueJoinRequestCount),
+            leadRequests = Volatile.Read(ref rescuePartyRequestCount),
+        });
+        return output + Environment.NewLine + "LIVE_TEST_JSON=" + structuredResult;
     }
 
     [CommandLineArgumentFunction("rescue_fixture_restore", "coop.debug.companions")]
@@ -939,6 +1013,7 @@ internal class CompanionsCommands
             return "Failed to restore companion-rescue fixture: " + exception.Message;
         }
     }
+#endif
 
     [CommandLineArgumentFunction("open_party_screen", "coop.debug.companions")]
     public static string OpenPartyScreenCommand(List<string> args)
@@ -991,6 +1066,7 @@ internal class CompanionsCommands
             hero.Name?.ToString() == RoleFixtureName && hero.CompanionOf != null);
     }
 
+#if DEBUG
     private static Hero FindRescueFixtureHero(string name)
     {
         return Hero.AllAliveHeroes.FirstOrDefault(hero => hero.Name?.ToString() == name);
@@ -1096,6 +1172,7 @@ internal class CompanionsCommands
             .Distinct()
             .ToArray();
     }
+#endif
 
     private static FireCompanion CreateCleanupDismissalRequest(
         IObjectManager objectManager, Hero companion, string heroId)
@@ -1227,6 +1304,7 @@ internal class CompanionsCommands
         }
     }
 
+#if DEBUG
     private sealed class CompanionRescueFixture
     {
         public string ControllerId { get; }
@@ -1267,6 +1345,7 @@ internal class CompanionsCommands
             OriginalPlayerGold = originalPlayerGold;
         }
     }
+#endif
 
     private sealed class DismissalEncounterObservation
     {

@@ -80,6 +80,9 @@ internal class CompanionRolesPatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
+        // end_rescue_companion runs after this dialogue and must not send the legacy release too.
+        __instance._partyCreatedAfterRescueForCompanion = true;
+
         var message = new CompanionJoinedPartyByRescue(
             Hero.OneToOneConversationHero,
             MobileParty.MainParty);
@@ -115,7 +118,7 @@ internal class CompanionRolesPatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // Skip CompanionRescued when a party was created
+        // Skip CompanionRescued after a correlated join request or party creation.
         if (__instance._partyCreatedAfterRescueForCompanion)
         {
             __instance._partyCreatedAfterRescueForCompanion = false;
