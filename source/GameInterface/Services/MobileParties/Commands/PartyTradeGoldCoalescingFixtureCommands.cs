@@ -193,7 +193,14 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
         focusedParty = null;
         mapScreen.RemoveMapTooltip();
         focusedParty = party.Party;
-        RefreshFocusedPartyTooltip(mapScreen);
+        if (!TryGetFocusedPartyVisual(mapScreen, out var partyVisual))
+        {
+            focusedParty = null;
+            return "Mobile party visual is unavailable.";
+        }
+
+        mapScreen.OnHoverMapEntity(partyVisual);
+        mapScreen.CurrentVisualOfTooltip = partyVisual;
         string output = $"focused=true|networkId={args[0]}|party={party.StringId}|" +
             $"name={Clean(party.Name?.ToString())}|gold={party.PartyTradeGold}";
         return WithStructuredResult(output, new
