@@ -1,4 +1,4 @@
-using GameInterface.Services.Heroes.Patches;
+﻿using GameInterface.Services.Heroes.Patches;
 using System;
 using System.IO;
 using System.Linq;
@@ -12,6 +12,37 @@ namespace GameInterface.Tests.Services.Companions;
 public sealed class ConfiguredWandererDataTests
 {
     private const string HastedId = "coop_wanderer_hasted";
+    private const string MemberIdPrefix = "coop_wanderer_member";
+    private static readonly (string Id, string Name)[] MemberWanderers =
+    {
+        ("coop_wanderer_member1", "AnotherJoke"),
+        ("coop_wanderer_member2", "Curzek"),
+        ("coop_wanderer_member3", "ShotUp"),
+        ("coop_wanderer_member4", "Varek"),
+        ("coop_wanderer_member5", "Torven"),
+        ("coop_wanderer_member6", "Edran"),
+        ("coop_wanderer_member7", "Malrik"),
+        ("coop_wanderer_member8", "Jaska"),
+        ("coop_wanderer_member9", "Kaelor"),
+        ("coop_wanderer_member10", "Brenik"),
+        ("coop_wanderer_member11", "Orven"),
+        ("coop_wanderer_member12", "Tavren"),
+        ("coop_wanderer_member13", "Fenrik"),
+        ("coop_wanderer_member14", "Rovik"),
+        ("coop_wanderer_member15", "Selden"),
+    };
+
+    private static readonly string[] IntroductionPrefixes =
+    {
+        "prebackstory",
+        "backstory_a",
+        "backstory_b",
+        "backstory_c",
+        "response_1",
+        "response_2",
+        "backstory_d",
+        "generic_backstory",
+    };
 
     [Fact]
     public void ApplyConfiguredWandererName_UsesTemplateNameForFirstAndFullName()
@@ -79,17 +110,7 @@ public sealed class ConfiguredWandererDataTests
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.All(
-            new[]
-            {
-                "prebackstory",
-                "backstory_a",
-                "backstory_b",
-                "backstory_c",
-                "response_1",
-                "response_2",
-                "backstory_d",
-                "generic_backstory",
-            },
+            IntroductionPrefixes,
             prefix => Assert.Contains($"{prefix}.{HastedId}", introductionIds));
 
         XElement fixedNpcRoot = XDocument.Load(Path.Combine(moduleData, "coop_fixed_town_npcs.xml")).Root
@@ -113,6 +134,74 @@ public sealed class ConfiguredWandererDataTests
 
         AssertRegistration(registrations["coop_wanderers"], "NPCCharacters");
         AssertRegistration(registrations["coop_wanderer_strings"], "GameText");
+    }
+
+    [Fact]
+    public void MemberWanderers_AreRegisteredInRequestedOrderWithCompleteIntroductions()
+    {
+        string repositoryRoot = GetRepositoryRoot();
+        string moduleData = Path.Combine(repositoryRoot, "deploy", "ModuleData");
+
+        XElement wandererRoot = XDocument.Load(Path.Combine(moduleData, "coop_wanderers.xml")).Root
+            ?? throw new InvalidDataException("coop_wanderers.xml has no root element");
+        XElement[] memberWanderers = wandererRoot
+            .Elements("NPCCharacter")
+            .Where(character =>
+                character.Attribute("id")?.Value.StartsWith(MemberIdPrefix, StringComparison.Ordinal) == true)
+            .ToArray();
+
+        Assert.Equal(
+            MemberWanderers.Select(wanderer => wanderer.Id).ToArray(),
+            memberWanderers
+                .Select(wanderer => wanderer.Attribute("id")?.Value)
+                .ToArray());
+
+        XElement introductionRoot = XDocument.Load(Path.Combine(moduleData, "coop_wanderer_strings.xml")).Root
+            ?? throw new InvalidDataException("coop_wanderer_strings.xml has no root element");
+        var introductionIds = introductionRoot
+            .Elements("string")
+            .Select(text => text.Attribute("id")?.Value
+                ?? throw new InvalidDataException("Configured wanderer string has no id"))
+            .ToHashSet(StringComparer.Ordinal);
+
+        for (int index = 0; index < MemberWanderers.Length; index++)
+        {
+            (string id, string name) = MemberWanderers[index];
+            XElement wanderer = memberWanderers[index];
+
+            Assert.Equal($"{{=!}}{name}", wanderer.Attribute("name")?.Value);
+            Assert.Null(wanderer.Attribute("coop_temporary"));
+            Assert.Equal("true", wanderer.Attribute("is_template")?.Value);
+            Assert.Equal("false", wanderer.Attribute("is_hero")?.Value);
+            Assert.Equal("false", wanderer.Attribute("is_female")?.Value);
+            Assert.Equal("Culture.sturgia", wanderer.Attribute("culture")?.Value);
+            Assert.Equal("Wanderer", wanderer.Attribute("occupation")?.Value);
+            Assert.Equal("SkillSet.spc_wanderer_sturgia_4_skills", wanderer.Attribute("skill_template")?.Value);
+            Assert.StartsWith(HeroCreatorPatches.ConfiguredWandererPrefix, id, StringComparison.Ordinal);
+
+            var equipmentSets = wanderer.Element("Equipments")?
+                .Elements("EquipmentSet")
+                ?? Enumerable.Empty<XElement>();
+            Assert.Contains(
+                equipmentSets,
+                equipment => equipment.Attribute("id")?.Value == "npc_companion_equipment_template_sturgia" &&
+                             equipment.Attribute("equipmentType")?.Value == "Civilian");
+            Assert.Contains(
+                equipmentSets,
+                equipment => equipment.Attribute("id")?.Value == "npc_companion_equipment_template_sturgia" &&
+                             equipment.Attribute("equipmentType") == null);
+
+            Assert.All(
+                IntroductionPrefixes,
+                prefix => Assert.Contains($"{prefix}.{id}", introductionIds));
+        }
+
+        XElement fixedNpcRoot = XDocument.Load(Path.Combine(moduleData, "coop_fixed_town_npcs.xml")).Root
+            ?? throw new InvalidDataException("coop_fixed_town_npcs.xml has no root element");
+        XElement fixedAnotherJoke = fixedNpcRoot
+            .Elements("NPCCharacter")
+            .Single(character => character.Attribute("id")?.Value == "coop_fixed_npc_another_joke");
+        Assert.Equal("true", fixedAnotherJoke.Attribute("coop_enabled")?.Value);
     }
 
     private static void AssertRegistration(XElement registration, string expectedId)
