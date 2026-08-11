@@ -8,6 +8,7 @@ using Missions.Services.Network;
 using Moq;
 using System;
 using System.Threading;
+using TaleWorlds.Engine;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -699,6 +700,26 @@ public sealed class MovementRateControllerTests
         Assert.Equal(expected.ControllerId, actual.ControllerId);
         Assert.Equal(expected.MaximumBulkHz, actual.MaximumBulkHz);
         Assert.Equal(expected.Sequence, actual.Sequence);
+    }
+
+    [Fact]
+    public void PublicConstructor_WithoutNativeConfigUsesAdaptiveMaximum()
+    {
+        Assert.Null(EngineApplicationInterface.IConfig);
+        var network = new Mock<IBattleNetwork>();
+        var controllerIdProvider = new Mock<IControllerIdProvider>();
+        controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns("local");
+        var missionContext = new Mock<IMissionContext>();
+        missionContext.SetupGet(context => context.ControllersInMission)
+            .Returns(Array.Empty<string>());
+
+        using var controller = new MovementRateController(
+            network.Object,
+            new MessageBroker(),
+            controllerIdProvider.Object,
+            missionContext.Object);
+
+        Assert.Equal(60, controller.Snapshot.FrameLimitHz);
     }
 
     private sealed class RateControllerFixture : IDisposable

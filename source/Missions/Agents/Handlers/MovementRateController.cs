@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using TaleWorlds.Engine;
 using TaleWorlds.Engine.Options;
 
 namespace Missions.Agents.Handlers;
@@ -883,9 +884,15 @@ public sealed class MovementRateController : IMovementRateController
         return Math.Min(desired, NormalizeRate(effectiveFrameLimitHz));
     }
 
-    private static int ReadFrameLimitHz() =>
-        (int)Math.Round(NativeOptions.GetConfig(
+    private static int ReadFrameLimitHz()
+    {
+        // Headless hosts do not initialize native graphics config, so they use the adaptive maximum.
+        if (EngineApplicationInterface.IConfig == null)
+            return MaximumAdaptiveHz;
+
+        return (int)Math.Round(NativeOptions.GetConfig(
             NativeOptions.NativeOptionsType.FrameLimiter));
+    }
 
     private void UpdateFrameLimit()
     {
