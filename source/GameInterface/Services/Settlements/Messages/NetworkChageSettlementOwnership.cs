@@ -29,5 +29,4 @@ namespace GameInterface.Services.Settlements.Messages
             Detail = detail;
         }
     }
-
 }

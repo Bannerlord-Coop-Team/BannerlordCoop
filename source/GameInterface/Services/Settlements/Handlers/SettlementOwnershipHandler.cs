@@ -100,6 +100,5 @@ namespace GameInterface.Services.Settlements.Handlers
                 }
             }, context: nameof(NetworkChangeSettlementOwnership));
         }
-
     }
 }
