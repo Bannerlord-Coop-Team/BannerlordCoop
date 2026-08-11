@@ -25,6 +25,27 @@
     </SubModules>
     <Xmls>
         <XmlNode>
+            <XmlName id="NPCCharacters" path="coop_fixed_town_npcs" />
+            <IncludedGameTypes>
+                <GameType value="Campaign" />
+                <GameType value="CampaignStoryMode" />
+            </IncludedGameTypes>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="NPCCharacters" path="coop_wanderers" />
+            <IncludedGameTypes>
+                <GameType value="Campaign" />
+                <GameType value="CampaignStoryMode" />
+            </IncludedGameTypes>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="GameText" path="coop_wanderer_strings" />
+            <IncludedGameTypes>
+                <GameType value="Campaign" />
+                <GameType value="CampaignStoryMode" />
+            </IncludedGameTypes>
+        </XmlNode>
+        <XmlNode>
             <XmlName id="Items" path="tournament_spectator_throwables" />
             <IncludedGameTypes>
                 <GameType value="Campaign" />
