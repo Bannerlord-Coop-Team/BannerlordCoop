@@ -85,6 +85,8 @@ namespace Coop.LiveTesting
                         request,
                         () => CreateStatusResponse(request.Id),
                         false);
+                case "command-catalog":
+                    return HandleCommandCatalog(request);
                 case "command":
                     return HandleCommand(request);
                 case "screenshot":
@@ -141,6 +143,26 @@ namespace Coop.LiveTesting
                     output = result.Output,
                 });
             }, true);
+        }
+
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
+                {
+                    return Failure(
+                        request.Id,
+                        "session_not_ready",
+                        "The co-op session command dispatcher is not available yet.",
+                        false);
+                }
+
+                return Success(request.Id, new
+                {
+                    commands = dispatcher.GetCommandNames(),
+                });
+            }, false);
         }
 
         private LiveTestResponse HandleScreenshot(LiveTestRequest request)

@@ -101,7 +101,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
         foreach (var player in playerManager.Players)
         {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+            if (!TryGetSavedPlayerParty(player.MobilePartyId, out var party))
                 continue;
 
             var mapEvent = party.MapEvent;
@@ -116,6 +116,27 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
 
         return mapEvents.ToArray();
+    }
+
+    private bool TryGetSavedPlayerParty(string partyId, out MobileParty party)
+    {
+        if (objectManager.TryGetObject(partyId, out party))
+            return true;
+
+        var partyStringId = global::GameInterface.Services.ObjectManager.ObjectManager.Compact(
+            partyId,
+            typeof(MobileParty));
+        party = string.IsNullOrEmpty(partyStringId)
+            ? null
+            : Campaign.Current.CampaignObjectManager.MobileParties
+                .FirstOrDefault(candidate => candidate.StringId == partyStringId);
+        if (party == null)
+            return objectManager.TryGetObjectWithLogging(partyId, out party);
+
+        logger.Warning(
+            "Resolved saved player party {PartyId} from CampaignObjectManager because it was missing from the network object manager",
+            partyId);
+        return true;
     }
 
     private static bool TrySetReleasedPartySettlementObjective(

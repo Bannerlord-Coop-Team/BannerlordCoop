@@ -54,6 +54,35 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
+    public void FinalizePlayerMapEvents_UnregisteredPlayerPartyInCampaignObjectManager_FinalizesEvent()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-unregistered-player", heroId, mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var playerParty));
+            Assert.Contains(playerParty, Campaign.Current.CampaignObjectManager.MobileParties);
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+
+            Assert.True(playerParty.IsActive);
+            Assert.True(playerParty.IsVisible);
+            Assert.True(Server.ObjectManager.Remove(playerParty));
+            Assert.False(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out _));
+
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.Null(playerParty.Party.MapEventSide);
+            Assert.False(playerParty.IsActive);
+            Assert.False(playerParty.IsVisible);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void FinalizePlayerMapEvents_SharedOrphanPlayerEvent_FinalizesOnce()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
