@@ -454,9 +454,10 @@ namespace Coop
                         {
                             Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         }
-                        else
+                        else if (!Coop.StartAsClient())
                         {
-                            Coop.StartAsClient();
+                            InformationManager.DisplayMessage(new InformationMessage(
+                                CoopartiveMultiplayerExperience.StartRefusedNotice));
                         }
                     },
                     () => { return (false, new TextObject("")); }
@@ -653,8 +654,8 @@ namespace Coop
                     else
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as client...");
-                        Coop.StartAsClient();
-                        Logger.Information("[AutoConnect] StartAsClient() completed");
+                        bool started = Coop.StartAsClient();
+                        Logger.Information("[AutoConnect] StartAsClient() returned {Started}", started);
                     }
                 }
                 catch (Exception ex)

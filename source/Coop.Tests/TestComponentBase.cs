@@ -31,6 +31,7 @@ using Coop.Core.Server.Services.MobileParties;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI;
 using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.UI.JoinCancel;
 using GameInterface.Services.Villages.Interfaces;
 using Moq;
 using Serilog;
@@ -104,6 +105,7 @@ internal abstract class TestComponentBase
         RegisterMock<IMapTimeTrackerInterface>(builder);
         RegisterMock<IJoinCampaignBaselineSender>(builder);
         RegisterMock<ILoadingInterface>(builder);
+        RegisterMock<IJoinAttemptOverlay>(builder);
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMobilePartyInterface>(builder);
