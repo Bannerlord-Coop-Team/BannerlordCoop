@@ -215,6 +215,10 @@ namespace Coop.LiveTesting
             bool coopRunning = false;
             string coopState = null;
             int? registeredPlayers = null;
+            int? registeredPlayerCount = null;
+            int? connectedPlayerCount = null;
+            string[] registeredControllerIds = null;
+            string[] connectedControllerIds = null;
 
             if (campaignLoaded && ContainerProvider.TryResolve<ILogic>(out var logic))
             {
@@ -237,7 +241,22 @@ namespace Coop.LiveTesting
 
                 if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
                 {
-                    registeredPlayers = playerManager.Players.Count;
+                    var players = playerManager.Players
+                        .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
+                        .ToArray();
+                    registeredPlayers = players.Length;
+                    if (ModInformation.IsServer)
+                    {
+                        registeredPlayerCount = players.Length;
+                        registeredControllerIds = players
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedControllerIds = players
+                            .Where(playerManager.IsConnected)
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedPlayerCount = connectedControllerIds.Length;
+                    }
                 }
             }
 
@@ -294,6 +313,10 @@ namespace Coop.LiveTesting
                 coopRunning,
                 coopState,
                 registeredPlayers,
+                registeredPlayerCount,
+                connectedPlayerCount,
+                registeredControllerIds,
+                connectedControllerIds,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
