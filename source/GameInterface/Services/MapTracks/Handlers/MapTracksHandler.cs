@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MapTracks.Data;
 using GameInterface.Services.MapTracks.Interfaces;
 using GameInterface.Services.MapTracks.Messages;
 using GameInterface.Services.ObjectManager;

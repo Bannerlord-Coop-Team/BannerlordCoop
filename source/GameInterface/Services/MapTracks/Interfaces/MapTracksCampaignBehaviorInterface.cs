@@ -1,4 +1,6 @@
+using Common;
 using Common.Messaging;
+using GameInterface.Services.MapTracks.Data;
 using GameInterface.Services.MapTracks.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -44,6 +46,13 @@ public interface IMapTracksCampaignBehaviorInterface : IGameAbstraction
 
     /// <summary>
     /// Server method
+    /// Also save faction data for map tracks.
+    /// This isn't needed in vanilla as IsEnemy is normally stored in each track but this needs to be unique per player in coop
+    /// </summary>
+    void SyncTrackMapFactions(MapTracksCampaignBehavior behavior, IDataStore dataStore);
+
+    /// <summary>
+    /// Server method
     /// Detect visible tracks for a single player party, granting scouting xp based on argument
     /// </summary>
     List<MapTrackData> DetectTracksForPlayerParty(MapTracksCampaignBehavior behavior, MobileParty playerParty, bool grantScoutingXp = true);
@@ -86,6 +95,8 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
     // When tracks are dropped the original party is lost.
     // Keep track of the faction for computing IsEnemy on clients.
     private readonly Dictionary<Track, IFaction> trackMapFactions = new();
+
+    private const string TrackMapFactionsSaveKey = "Coop_TrackMapFactions";
 
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
@@ -181,6 +192,49 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
 
         behavior._allTracks.Add(track);
         behavior._trackLocator.UpdateLocator(track);
+    }
+
+    public void SyncTrackMapFactions(MapTracksCampaignBehavior behavior, IDataStore dataStore)
+    {
+        // Loaded on clients too. Load empty data, the server tracks map track faction data.
+        var savedTrackMapFactions = ModInformation.IsClient
+            ? new List<TrackMapFactionSaveData>()
+            : BuildTrackMapFactionSaveData(behavior);
+
+        dataStore.SyncData(TrackMapFactionsSaveKey, ref savedTrackMapFactions);
+
+        if (!dataStore.IsLoading) return;
+
+        trackMapFactions.Clear();
+
+        // Don't load data on clients
+        // Also return early if not on a save written before this record existed
+        if (ModInformation.IsClient || savedTrackMapFactions == null) return;
+
+        // Load valid map tracks back into trackMapFactions
+        foreach (var savedTrackMapFaction in savedTrackMapFactions)
+        {
+            if (savedTrackMapFaction?.Track == null || savedTrackMapFaction.MapFaction == null) continue;
+
+            // Skip expired tracks matching OnGameLoadFinished removing from _allTracks
+            if (savedTrackMapFaction.Track.IsExpired) continue;
+
+            trackMapFactions[savedTrackMapFaction.Track] = savedTrackMapFaction.MapFaction;
+        }
+    }
+
+    private List<TrackMapFactionSaveData> BuildTrackMapFactionSaveData(MapTracksCampaignBehavior behavior)
+    {
+        var savedTrackMapFactions = new List<TrackMapFactionSaveData>();
+
+        foreach (var track in behavior._allTracks)
+        {
+            if (!trackMapFactions.TryGetValue(track, out var mapFaction) || mapFaction == null) continue;
+
+            savedTrackMapFactions.Add(new TrackMapFactionSaveData(track, mapFaction));
+        }
+
+        return savedTrackMapFactions;
     }
 
     public List<MapTrackData> DetectTracksForPlayerParty(MapTracksCampaignBehavior behavior, MobileParty playerParty, bool grantScoutingXp = true)

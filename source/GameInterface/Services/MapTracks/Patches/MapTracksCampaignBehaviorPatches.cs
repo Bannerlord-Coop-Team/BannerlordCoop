@@ -76,4 +76,17 @@ internal class MapTracksCampaignBehaviorPatches
 
         return false;
     }
+
+    /// <summary>
+    /// Vanilla behavior already already saves _allTracks in it, need to add each track's source faction to that same record.
+    /// Without it a restart reloads every track without a faction.
+    /// </summary>
+    [HarmonyPatch(nameof(MapTracksCampaignBehavior.SyncData))]
+    [HarmonyPostfix]
+    public static void SyncDataPostfix(MapTracksCampaignBehavior __instance, IDataStore dataStore)
+    {
+        if (!ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface)) return;
+
+        mapTracksCampaignBehaviorInterface.SyncTrackMapFactions(__instance, dataStore);
+    }
 }

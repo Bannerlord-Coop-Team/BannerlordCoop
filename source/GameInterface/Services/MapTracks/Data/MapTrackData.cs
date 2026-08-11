@@ -1,7 +1,7 @@
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.MapTracks.Messages;
+namespace GameInterface.Services.MapTracks.Data;
 
 [ProtoContract(SkipConstructor = true)]
 public class MapTrackData
