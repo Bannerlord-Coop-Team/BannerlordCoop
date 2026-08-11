@@ -222,7 +222,7 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
             mapScreen.CurrentVisualOfTooltip = partyVisual;
 
         if (!TaleWorlds.Library.InformationManager.GetIsAnyTooltipActive())
-            mapScreen.OnHoverMapEntity(partyVisual);
+            partyVisual.OnHover();
     }
 
     internal static bool ShouldKeepFocusedPartyTooltip(MapScreen mapScreen) =>
