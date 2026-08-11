@@ -1,0 +1,47 @@
+<!--
+  FIXED-TOWN NPC FORM
+  ===================
+
+  1. Replace every ALL-CAPS placeholder.
+  2. Keep these prefixes: coop_fixed_npc_, {=!}, Culture., BodyProperty., Item.
+  3. Non-placeholder values are safe defaults. Change them only if the PDF says to.
+  4. To leave an armor slot empty, delete its entire <equipment ... /> line.
+-->
+<NPCCharacter
+  id="coop_fixed_npc_f17d849f"
+  name="{=!}TEST"
+  is_female="false"
+  culture="Culture.khuzait"
+
+  coop_settlement="town_V3"
+  coop_location="tavern"
+  coop_dialogue="Hello, this is a test"
+
+  default_group="Infantry"
+  level="1"
+  is_hero="false"
+  is_template="false"
+  occupation="Townsfolk"
+  is_hidden_encyclopedia="true"
+  coop_spawn_tag="npc_common"
+  coop_enabled="true">
+
+  <!-- APPEARANCE: choose one face template from the PDF guide. -->
+  <face>
+    <face_key_template value="BodyProperty.townsman_battania" />
+  </face>
+
+  <!-- Keep skills empty for this stationary townsfolk NPC. -->
+  <skills />
+
+  <!-- OUTFIT: choose each item from its matching PDF catalog section. -->
+  <Equipments>
+    <EquipmentRoster civilian="true">
+      <equipment slot="Head" id="Item.cervelliere_over_padded_cap" />
+      <equipment slot="Cape" id="Item.battania_scarf_a" />
+      <equipment slot="Body" id="Item.aserai_civil_b" />
+      <equipment slot="Gloves" id="Item.strapped_leather_bracers" />
+      <equipment slot="Leg" id="Item.ladys_shoe" />
+    </EquipmentRoster>
+  </Equipments>
+</NPCCharacter>
