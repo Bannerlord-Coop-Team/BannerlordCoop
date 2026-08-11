@@ -47,6 +47,7 @@ internal class TimeCommands
         return $"Time control set to {timeControlInterface.GetTimeControl()}";
     }
 
+#if DEBUG
     [CommandLineArgumentFunction("request_time_mode", "coop.debug")]
     public static string RequestTimeMode(List<string> strings)
     {
@@ -59,6 +60,7 @@ internal class TimeCommands
         MessageBroker.Instance.Publish(typeof(TimeCommands), new TimeSpeedChangedAttempted(timeMode));
         return $"Requested time control {timeMode}.";
     }
+#endif
 
     [CommandLineArgumentFunction("advance_time", "coop.debug")]
     public static string AdvanceTime(List<string> strings)

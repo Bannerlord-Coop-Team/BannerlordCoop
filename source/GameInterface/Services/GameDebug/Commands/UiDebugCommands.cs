@@ -95,6 +95,7 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         return "Cleared the local settlement encounter and returned to the campaign map.";
     }
 
+#if DEBUG
     [CommandLineArgumentFunction("map_click_offset", "coop.debug.ui")]
     public static string MapClickOffset(List<string> args)
     {
@@ -171,6 +172,7 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
             $"encounter={PlayerEncounter.EncounterSettlement?.StringId ?? "none"}|" +
             $"time={Campaign.Current.TimeControlMode}";
     }
+#endif
 
     [CommandLineArgumentFunction("switch_menu", "coop.debug.ui")]
     public static string SwitchMenu(List<string> args)

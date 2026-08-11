@@ -148,22 +148,32 @@ public class TimeControlInterfaceTests : IDisposable
         Assert.Equal(TimeControlEnum.Play_2x, timeControlInterface.LimitTimeControl(TimeControlEnum.Play_2x));
     }
 
+    [Theory]
+    [InlineData(TimeControlEnum.Play_1x)]
+    [InlineData(TimeControlEnum.Play_2x)]
+    public void AutomaticPause_WhenReleased_RestoresPreviousSpeed(TimeControlEnum previousSpeed)
+    {
+        var timeControlInterface = CreateTimeControlInterface();
+        timeControlInterface.ServerSetTimeControl(previousSpeed);
+
+        var pauseLease = timeControlInterface.ServerAcquireAutomaticPause();
+
+        Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
+        Assert.True(pauseLease.TryRelease());
+        Assert.Equal(previousSpeed, timeControlInterface.GetTimeControl());
+    }
+
     [Fact]
     public void AutomaticPauses_WhenOwnersOverlap_RestoreAfterLastOwnerReleases()
     {
         var timeControlInterface = CreateTimeControlInterface();
-
         var firstPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
         var secondPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
 
-        Assert.True(firstPauseLease.AppliedPause);
-        Assert.False(secondPauseLease.AppliedPause);
+        Assert.True(firstPauseLease.TryRelease());
         Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
-        Assert.True(firstPauseLease.TryRelease(out var firstRestoredMode));
-        Assert.Null(firstRestoredMode);
-        Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
-        Assert.True(secondPauseLease.TryRelease(out var secondRestoredMode));
-        Assert.Equal(TimeControlEnum.Play_1x, secondRestoredMode);
+
+        Assert.True(secondPauseLease.TryRelease());
         Assert.Equal(TimeControlEnum.Play_1x, timeControlInterface.GetTimeControl());
     }
 
@@ -171,73 +181,26 @@ public class TimeControlInterfaceTests : IDisposable
     public void AutomaticPause_WhenLeaseIsReleasedTwice_DoesNotReleaseAnotherOwner()
     {
         var timeControlInterface = CreateTimeControlInterface();
-
         var firstPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
         var secondPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
 
-        Assert.True(firstPauseLease.TryRelease(out var firstRestoredMode));
-        Assert.Null(firstRestoredMode);
-        Assert.True(firstPauseLease.TryRelease(out var repeatedRestoredMode));
-        Assert.Null(repeatedRestoredMode);
+        Assert.True(firstPauseLease.TryRelease());
+        Assert.True(firstPauseLease.TryRelease());
         Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
 
-        Assert.True(secondPauseLease.TryRelease(out var finalRestoredMode));
-        Assert.Equal(TimeControlEnum.Play_1x, finalRestoredMode);
+        Assert.True(secondPauseLease.TryRelease());
         Assert.Equal(TimeControlEnum.Play_1x, timeControlInterface.GetTimeControl());
     }
 
     [Fact]
-    public void GuardedAutomaticPause_WhenAnotherOwnerReleases_RestoresAfterGuardOwnerReleases()
-    {
-        var timeControlInterface = CreateTimeControlInterface();
-        var occupancyPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
-        var allowUnpause = false;
-        var guardedPauseLease = timeControlInterface.ServerAcquireAutomaticPause(() => allowUnpause);
-
-        Assert.True(occupancyPauseLease.TryRelease(out var occupancyRestoredMode));
-        Assert.Null(occupancyRestoredMode);
-        Assert.False(occupancyPauseLease.IsActive);
-        Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
-
-        allowUnpause = true;
-
-        Assert.True(guardedPauseLease.TryRelease(out var restoredMode));
-        Assert.Equal(TimeControlEnum.Play_1x, restoredMode);
-        Assert.Equal(TimeControlEnum.Play_1x, timeControlInterface.GetTimeControl());
-    }
-
-    [Fact]
-    public void AutomaticPause_WhenTimeWasAlreadyPaused_LeaseDoesNotRestoreTime()
+    public void AutomaticPause_WhenTimeWasAlreadyPaused_DoesNotResumeTime()
     {
         var timeControlInterface = CreateTimeControlInterface();
         timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
         var pauseLease = timeControlInterface.ServerAcquireAutomaticPause();
 
-        Assert.False(pauseLease.AppliedPause);
-        Assert.True(pauseLease.IsActive);
-        Assert.True(pauseLease.TryRelease(out var restoredMode));
-        Assert.Null(restoredMode);
-        Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
-    }
-
-    [Fact]
-    public void AutomaticPauseGuard_WhenManualPauseInvalidatesRestore_StillBlocksUnpause()
-    {
-        var timeControlInterface = CreateTimeControlInterface();
-        var allowUnpause = false;
-        var pauseLease = timeControlInterface.ServerAcquireAutomaticPause(() => allowUnpause);
-
-        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_2x);
-
-        Assert.True(pauseLease.IsActive);
-        Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
-
-        allowUnpause = true;
-
-        Assert.True(pauseLease.TryRelease(out var restoredMode));
-        Assert.Null(restoredMode);
+        Assert.True(pauseLease.TryRelease());
         Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
     }
 
@@ -249,9 +212,21 @@ public class TimeControlInterfaceTests : IDisposable
 
         timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
-        Assert.True(pauseLease.TryRelease(out var restoredMode));
-        Assert.Null(restoredMode);
+        Assert.True(pauseLease.TryRelease());
         Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
+    }
+
+    [Fact]
+    public void AutomaticPause_WhenExplicitSpeedIsAccepted_DoesNotOverrideItOnRelease()
+    {
+        var timeControlInterface = CreateTimeControlInterface();
+        var pauseLease = timeControlInterface.ServerAcquireAutomaticPause();
+
+        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_2x);
+
+        Assert.Equal(TimeControlEnum.Play_2x, timeControlInterface.GetTimeControl());
+        Assert.True(pauseLease.TryRelease());
+        Assert.Equal(TimeControlEnum.Play_2x, timeControlInterface.GetTimeControl());
     }
 
     [Fact]
@@ -262,18 +237,36 @@ public class TimeControlInterfaceTests : IDisposable
         Func<bool> policy = () => false;
         timeControlInterface.AddUnpausePolicy(policy);
 
-        Assert.False(pauseLease.TryRelease(out var blockedMode));
-        Assert.Null(blockedMode);
+        Assert.False(pauseLease.TryRelease());
+        Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
 
         timeControlInterface.RemoveUnpausePolicy(policy);
 
-        Assert.True(pauseLease.TryRelease(out var restoredMode));
-        Assert.Equal(TimeControlEnum.Play_1x, restoredMode);
+        Assert.True(pauseLease.TryRelease());
         Assert.Equal(TimeControlEnum.Play_1x, timeControlInterface.GetTimeControl());
     }
 
     [Fact]
-    public void AutomaticPause_WhenBlockedUnpauseIsRequested_KeepsOriginalRestoreMode()
+    public void AutomaticPauses_WhenFinalReleaseIsBlocked_RestoreAfterPolicyAllowsIt()
+    {
+        var timeControlInterface = CreateTimeControlInterface();
+        var firstPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
+        var secondPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
+        Func<bool> policy = () => false;
+        timeControlInterface.AddUnpausePolicy(policy);
+
+        Assert.True(firstPauseLease.TryRelease());
+        Assert.False(secondPauseLease.TryRelease());
+        Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
+
+        timeControlInterface.RemoveUnpausePolicy(policy);
+
+        Assert.True(secondPauseLease.TryRelease());
+        Assert.Equal(TimeControlEnum.Play_1x, timeControlInterface.GetTimeControl());
+    }
+
+    [Fact]
+    public void AutomaticPause_WhenBlockedSpeedIsRequested_KeepsOriginalRestoreMode()
     {
         var timeControlInterface = CreateTimeControlInterface();
         var pauseLease = timeControlInterface.ServerAcquireAutomaticPause();
@@ -281,10 +274,11 @@ public class TimeControlInterfaceTests : IDisposable
         timeControlInterface.AddUnpausePolicy(policy);
 
         timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_2x);
+        Assert.Equal(TimeControlEnum.Pause, timeControlInterface.GetTimeControl());
+
         timeControlInterface.RemoveUnpausePolicy(policy);
 
-        Assert.True(pauseLease.TryRelease(out var restoredMode));
-        Assert.Equal(TimeControlEnum.Play_1x, restoredMode);
+        Assert.True(pauseLease.TryRelease());
         Assert.Equal(TimeControlEnum.Play_1x, timeControlInterface.GetTimeControl());
     }
 

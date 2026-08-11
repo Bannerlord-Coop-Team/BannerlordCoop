@@ -20,6 +20,7 @@ namespace GameInterface.Services.Template.Commands;
 
 internal class SettlementCommands
 {
+#if DEBUG
     private static CastleTeleportSnapshot castleTeleportSnapshot;
 
     private sealed class CastleTeleportSnapshot
@@ -35,6 +36,7 @@ internal class SettlementCommands
             Position = position;
         }
     }
+#endif
 
     [CommandLineArgumentFunction("enter_random_castle", "coop.debug.settlements")]
     public static string EnterRandomCastle(List<string> strings)
@@ -56,6 +58,7 @@ internal class SettlementCommands
         return $"Requested settlement encounter with {castle.Name} ({castle.StringId}).";
     }
 
+#if DEBUG
     [CommandLineArgumentFunction("teleport_main_party_to_castle", "coop.debug.settlements")]
     public static string TeleportMainPartyToCastle(List<string> strings)
     {
@@ -157,6 +160,7 @@ internal class SettlementCommands
         snapshot = null;
         return false;
     }
+#endif
 
     [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
     public static string GetTownName(List<string> strings)

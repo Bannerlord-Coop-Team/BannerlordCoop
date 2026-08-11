@@ -2,7 +2,6 @@
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Tests.Stubs;
-using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
@@ -30,125 +29,55 @@ public class PlayerOccupancyPauseHandlerTests : IDisposable
         ModInformation.IsServer = wasServer;
     }
 
-    [Theory]
-    [InlineData(TimeControlEnum.Play_1x)]
-    [InlineData(TimeControlEnum.Play_2x)]
-    public void OccupancyPause_WhenPlayerBecomesFree_RestoresPreviousSpeed(TimeControlEnum previousSpeed)
+    [Fact]
+    public void OccupancyPause_WhenReevaluatedWhileStillOccupied_AcquiresOnce()
     {
         var timeControl = new Mock<ITimeControlInterface>();
-        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
-        pauseLeaseMock.SetupGet(lease => lease.AppliedPause).Returns(true);
-        timeControl.Setup(control => control.ServerAcquireAutomaticPause(null))
-            .Returns(pauseLeaseMock.Object);
-        TimeControlEnum? restoredSpeed = previousSpeed;
-        pauseLeaseMock.Setup(lease => lease.TryRelease(out restoredSpeed))
-            .Returns(true);
+        var pauseLease = new Mock<IAutomaticPauseLease>();
+        timeControl.Setup(control => control.ServerAcquireAutomaticPause())
+            .Returns(pauseLease.Object);
         var handler = CreateHandler(timeControl);
 
-        Assert.Equal(TimeControlEnum.Pause, handler.UpdateOccupancyTimeControl(true));
-        Assert.Equal(previousSpeed, handler.UpdateOccupancyTimeControl(false));
+        Assert.True(handler.UpdateOccupancyTimeControl(true));
+        Assert.False(handler.UpdateOccupancyTimeControl(true));
 
-        timeControl.Verify(control => control.ServerAcquireAutomaticPause(null), Times.Once);
-        pauseLeaseMock.Verify(lease => lease.TryRelease(out restoredSpeed), Times.Once);
+        timeControl.Verify(control => control.ServerAcquireAutomaticPause(), Times.Once);
     }
 
     [Fact]
-    public void OccupancyPause_WhenTimeWasAlreadyPaused_DoesNotResume()
+    public void OccupancyPause_WhenPlayerBecomesFree_ReleasesOnce()
     {
         var timeControl = new Mock<ITimeControlInterface>();
-        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
-        pauseLeaseMock.SetupGet(lease => lease.AppliedPause).Returns(false);
-        TimeControlEnum? restoredSpeed = null;
-        pauseLeaseMock.Setup(lease => lease.TryRelease(out restoredSpeed))
-            .Returns(true);
-        timeControl.Setup(control => control.ServerAcquireAutomaticPause(null))
-            .Returns(pauseLeaseMock.Object);
+        var pauseLease = new Mock<IAutomaticPauseLease>();
+        pauseLease.Setup(lease => lease.TryRelease()).Returns(true);
+        timeControl.Setup(control => control.ServerAcquireAutomaticPause())
+            .Returns(pauseLease.Object);
         var handler = CreateHandler(timeControl);
 
-        Assert.Null(handler.UpdateOccupancyTimeControl(true));
-        Assert.Null(handler.UpdateOccupancyTimeControl(false));
+        Assert.True(handler.UpdateOccupancyTimeControl(true));
+        Assert.True(handler.UpdateOccupancyTimeControl(false));
+        Assert.False(handler.UpdateOccupancyTimeControl(false));
 
-        timeControl.Verify(control => control.ServerAcquireAutomaticPause(null), Times.Once);
-        pauseLeaseMock.Verify(lease => lease.TryRelease(out restoredSpeed), Times.Once);
+        pauseLease.Verify(lease => lease.TryRelease(), Times.Once);
     }
 
     [Fact]
-    public void OccupancyPause_WhenTimeChangedWhileOccupied_DoesNotOverrideNewSpeed()
+    public void OccupancyPause_WhenReleaseIsBlocked_RetriesWithoutLosingOwnership()
     {
         var timeControl = new Mock<ITimeControlInterface>();
-        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
-        pauseLeaseMock.SetupGet(lease => lease.AppliedPause).Returns(true);
-        timeControl.Setup(control => control.ServerAcquireAutomaticPause(null))
-            .Returns(pauseLeaseMock.Object);
-        TimeControlEnum? restoredSpeed = null;
-        pauseLeaseMock.Setup(lease => lease.TryRelease(out restoredSpeed))
-            .Returns(true);
-        var handler = CreateHandler(timeControl);
-
-        Assert.Equal(TimeControlEnum.Pause, handler.UpdateOccupancyTimeControl(true));
-        Assert.Null(handler.UpdateOccupancyTimeControl(false));
-
-        pauseLeaseMock.Verify(lease => lease.TryRelease(out restoredSpeed), Times.Once);
-    }
-
-    [Fact]
-    public void OccupancyPause_WhenAnotherAutomaticPauseRemains_ReleasesItsOwnership()
-    {
-        var timeControl = new Mock<ITimeControlInterface>();
-        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
-        pauseLeaseMock.SetupGet(lease => lease.AppliedPause).Returns(true);
-        timeControl.Setup(control => control.ServerAcquireAutomaticPause(null))
-            .Returns(pauseLeaseMock.Object);
-        TimeControlEnum? restoredSpeed = null;
-        pauseLeaseMock.Setup(lease => lease.TryRelease(out restoredSpeed))
-            .Returns(true);
-        var handler = CreateHandler(timeControl);
-
-        Assert.Equal(TimeControlEnum.Pause, handler.UpdateOccupancyTimeControl(true));
-        Assert.Null(handler.UpdateOccupancyTimeControl(false));
-        Assert.Null(handler.UpdateOccupancyTimeControl(false));
-
-        pauseLeaseMock.Verify(lease => lease.TryRelease(out restoredSpeed), Times.Once);
-    }
-
-    [Fact]
-    public void OccupancyPause_WhenRestoreIsBlocked_RetriesWithoutLosingOwnership()
-    {
-        var timeControl = new Mock<ITimeControlInterface>();
-        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
-        pauseLeaseMock.SetupGet(lease => lease.AppliedPause).Returns(true);
-        timeControl.Setup(control => control.ServerAcquireAutomaticPause(null))
-            .Returns(pauseLeaseMock.Object);
-        TimeControlEnum? restoredSpeed = TimeControlEnum.Play_1x;
-        pauseLeaseMock.SetupSequence(lease => lease.TryRelease(out restoredSpeed))
+        var pauseLease = new Mock<IAutomaticPauseLease>();
+        pauseLease.SetupSequence(lease => lease.TryRelease())
             .Returns(false)
             .Returns(true);
+        timeControl.Setup(control => control.ServerAcquireAutomaticPause())
+            .Returns(pauseLease.Object);
         var handler = CreateHandler(timeControl);
 
-        Assert.Equal(TimeControlEnum.Pause, handler.UpdateOccupancyTimeControl(true));
-        Assert.Null(handler.UpdateOccupancyTimeControl(false));
-        Assert.Equal(TimeControlEnum.Play_1x, handler.UpdateOccupancyTimeControl(false));
-        pauseLeaseMock.Verify(lease => lease.TryRelease(out restoredSpeed), Times.Exactly(2));
-    }
+        Assert.True(handler.UpdateOccupancyTimeControl(true));
+        Assert.False(handler.UpdateOccupancyTimeControl(false));
+        Assert.True(handler.UpdateOccupancyTimeControl(false));
 
-    [Fact]
-    public void OccupancyPause_WhenPriorLeaseIsInactive_AcquiresFreshOwnership()
-    {
-        var timeControl = new Mock<ITimeControlInterface>();
-        var staleLease = new Mock<IAutomaticPauseLease>();
-        staleLease.SetupGet(lease => lease.AppliedPause).Returns(true);
-        staleLease.SetupGet(lease => lease.IsActive).Returns(false);
-        var freshLease = new Mock<IAutomaticPauseLease>();
-        freshLease.SetupGet(lease => lease.AppliedPause).Returns(true);
-        timeControl.SetupSequence(control => control.ServerAcquireAutomaticPause(null))
-            .Returns(staleLease.Object)
-            .Returns(freshLease.Object);
-        var handler = CreateHandler(timeControl);
-
-        Assert.Equal(TimeControlEnum.Pause, handler.UpdateOccupancyTimeControl(true));
-        Assert.Equal(TimeControlEnum.Pause, handler.UpdateOccupancyTimeControl(true));
-
-        timeControl.Verify(control => control.ServerAcquireAutomaticPause(null), Times.Exactly(2));
+        pauseLease.Verify(lease => lease.TryRelease(), Times.Exactly(2));
     }
 
     [Fact]
@@ -157,10 +86,8 @@ public class PlayerOccupancyPauseHandlerTests : IDisposable
         var broker = new StubMessageBroker();
         var timeControl = new Mock<ITimeControlInterface>();
         var pauseLease = new Mock<IAutomaticPauseLease>();
-        pauseLease.SetupGet(lease => lease.AppliedPause).Returns(true);
-        TimeControlEnum? restoredSpeed = TimeControlEnum.Play_1x;
-        pauseLease.Setup(lease => lease.TryRelease(out restoredSpeed)).Returns(true);
-        timeControl.Setup(control => control.ServerAcquireAutomaticPause(null)).Returns(pauseLease.Object);
+        pauseLease.Setup(lease => lease.TryRelease()).Returns(true);
+        timeControl.Setup(control => control.ServerAcquireAutomaticPause()).Returns(pauseLease.Object);
 
         var player = new Player("controller", string.Empty, "party", string.Empty, string.Empty);
         var playerManager = new Mock<IPlayerManager>();
@@ -176,12 +103,12 @@ public class PlayerOccupancyPauseHandlerTests : IDisposable
             objectManager.Object,
             playerManager.Object,
             timeControl.Object);
-        Assert.Equal(TimeControlEnum.Pause, handler.UpdateOccupancyTimeControl(true));
+        Assert.True(handler.UpdateOccupancyTimeControl(true));
 
         broker.Publish(this, new PlayerConnectionStateChanged());
         DrainGameThread();
 
-        pauseLease.Verify(lease => lease.TryRelease(out restoredSpeed), Times.Once);
+        pauseLease.Verify(lease => lease.TryRelease(), Times.Once);
     }
 
     private static void DrainGameThread() => GameThread.Run(() => { }, blocking: true);

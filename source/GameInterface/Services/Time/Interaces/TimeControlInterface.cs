@@ -15,13 +15,10 @@ namespace GameInterface.Services.Heroes.Interaces;
 
 public interface IAutomaticPauseLease
 {
-    bool AppliedPause { get; }
-    bool IsActive { get; }
-
     /// <summary>
     /// Releases this owner when policies permit it. A false result keeps the lease active for retry.
     /// </summary>
-    bool TryRelease(out TimeControlEnum? restoredMode);
+    bool TryRelease();
 }
 
 public interface ITimeControlInterface : IGameAbstraction
@@ -32,7 +29,7 @@ public interface ITimeControlInterface : IGameAbstraction
     void RemoveFastForwardPolicy(Func<bool> policy);
     bool CanSetTimeControl(TimeControlEnum timeMode);
     TimeControlEnum GetTimeControl();
-    IAutomaticPauseLease ServerAcquireAutomaticPause(Func<bool> unpausePolicy = null);
+    IAutomaticPauseLease ServerAcquireAutomaticPause();
     void ClientSetTimeControl(TimeControlEnum newMode);
     void ServerSetTimeControl(TimeControlEnum timeMode);
 }
@@ -130,8 +127,7 @@ internal class TimeControlInterface : ITimeControlInterface
         lock (timeControlLock)
         {
             if (requestedMode != TimeControlEnum.Pause &&
-                (TryGetDisallowingPolicy(unpausePolicies, out var unpausePolicy) ||
-                 TryGetDisallowingAutomaticPausePolicy(out unpausePolicy)))
+                TryGetDisallowingPolicy(unpausePolicies, out var unpausePolicy))
             {
                 Logger.Information(
                     "Time control request {RequestedMode} limited to {EffectiveMode} by {Policy}",
@@ -183,23 +179,6 @@ internal class TimeControlInterface : ITimeControlInterface
         return false;
     }
 
-    private bool TryGetDisallowingAutomaticPausePolicy(out string policyName)
-    {
-        foreach (var pauseLease in automaticPauseLeases)
-        {
-            var policy = pauseLease.UnpausePolicy;
-            if (policy == null || policy())
-                continue;
-
-            policyName = $"{policy.Method.DeclaringType?.Name}.{policy.Method.Name}";
-            return true;
-        }
-
-        policyName = null;
-        return false;
-    }
-
-
     /// <summary>
     /// This should only run server side
     /// </summary>
@@ -215,30 +194,25 @@ internal class TimeControlInterface : ITimeControlInterface
         lock (timeControlLock)
         {
             var effectiveMode = LimitTimeControl(timeMode);
-            if (timeMode == TimeControlEnum.Pause)
+            if (timeMode == TimeControlEnum.Pause || effectiveMode != TimeControlEnum.Pause)
             {
-                InvalidateAutomaticPauses(preserveUnpauseGuards: true);
-            }
-            else if (effectiveMode != TimeControlEnum.Pause)
-            {
-                InvalidateAutomaticPauses(preserveUnpauseGuards: false);
+                InvalidateAutomaticPauses();
             }
 
             ApplyServerTimeControl(timeMode, effectiveMode);
         }
     }
 
-    public IAutomaticPauseLease ServerAcquireAutomaticPause(Func<bool> unpausePolicy = null)
+    public IAutomaticPauseLease ServerAcquireAutomaticPause()
     {
         lock (timeControlLock)
         {
             bool isFirstAutomaticPause = automaticPauseLeases.Count == 0;
             var previousMode = isFirstAutomaticPause ? GetTimeControl() : TimeControlEnum.Pause;
-            bool applyPause = isFirstAutomaticPause && previousMode != TimeControlEnum.Pause;
-            var pauseLease = new AutomaticPauseLease(this, applyPause, unpausePolicy);
+            var pauseLease = new AutomaticPauseLease(this);
             automaticPauseLeases.Add(pauseLease);
 
-            if (!applyPause)
+            if (!isFirstAutomaticPause || previousMode == TimeControlEnum.Pause)
             {
                 return pauseLease;
             }
@@ -258,13 +232,10 @@ internal class TimeControlInterface : ITimeControlInterface
         }
     }
 
-    private bool TryReleaseAutomaticPause(
-        AutomaticPauseLease pauseLease,
-        out TimeControlEnum? restoredMode)
+    private bool TryReleaseAutomaticPause(AutomaticPauseLease pauseLease)
     {
         lock (timeControlLock)
         {
-            restoredMode = null;
             if (!automaticPauseLeases.Contains(pauseLease))
             {
                 return true;
@@ -291,17 +262,8 @@ internal class TimeControlInterface : ITimeControlInterface
 
             CompleteAutomaticPauseLease(pauseLease);
             automaticPauseResumeMode = null;
-            restoredMode = effectiveMode;
             ApplyServerTimeControl(requestedMode, effectiveMode);
             return true;
-        }
-    }
-
-    private bool IsAutomaticPauseActive(AutomaticPauseLease pauseLease)
-    {
-        lock (timeControlLock)
-        {
-            return automaticPauseLeases.Contains(pauseLease);
         }
     }
 
@@ -310,15 +272,9 @@ internal class TimeControlInterface : ITimeControlInterface
         automaticPauseLeases.Remove(pauseLease);
     }
 
-    private void InvalidateAutomaticPauses(bool preserveUnpauseGuards)
+    private void InvalidateAutomaticPauses()
     {
-        automaticPauseLeases.RemoveWhere(pauseLease =>
-        {
-            if (preserveUnpauseGuards && pauseLease.UnpausePolicy != null)
-                return false;
-
-            return true;
-        });
+        automaticPauseLeases.Clear();
         automaticPauseResumeMode = null;
     }
 
@@ -342,23 +298,12 @@ internal class TimeControlInterface : ITimeControlInterface
     private sealed class AutomaticPauseLease : IAutomaticPauseLease
     {
         private readonly TimeControlInterface timeControlInterface;
-        public readonly Func<bool> UnpausePolicy;
 
-        public AutomaticPauseLease(
-            TimeControlInterface timeControlInterface,
-            bool appliedPause,
-            Func<bool> unpausePolicy)
+        public AutomaticPauseLease(TimeControlInterface timeControlInterface)
         {
             this.timeControlInterface = timeControlInterface;
-            AppliedPause = appliedPause;
-            UnpausePolicy = unpausePolicy;
         }
 
-        public bool AppliedPause { get; }
-
-        public bool IsActive => timeControlInterface.IsAutomaticPauseActive(this);
-
-        public bool TryRelease(out TimeControlEnum? restoredMode) =>
-            timeControlInterface.TryReleaseAutomaticPause(this, out restoredMode);
+        public bool TryRelease() => timeControlInterface.TryReleaseAutomaticPause(this);
     }
 }
