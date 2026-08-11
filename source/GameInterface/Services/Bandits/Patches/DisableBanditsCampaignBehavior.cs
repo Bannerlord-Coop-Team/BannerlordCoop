@@ -19,13 +19,23 @@ internal class BanditSpawnCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void GetCurrentLimitForLootersPostfix(ref int __result)
     {
-        __result = (int)(__result * ModConfigProvider.ModOptions.MaximumLootersMultiplier);
+        // Use default if provided with a negative value
+        var multiplier = 1f;
+        if (ModConfigProvider.ModOptions.MaximumLootersMultiplier >= 0)
+            multiplier = ModConfigProvider.ModOptions.MaximumLootersMultiplier;
+
+        __result = (int)(__result * multiplier);
     }
 
     [HarmonyPatch(nameof(BanditSpawnCampaignBehavior._numberOfMaxBanditCountPerClanHideout), MethodType.Getter)]
     [HarmonyPostfix]
     public static void NumberOfMaxBanditCountPerClanHideoutGetterPostfix(ref int __result)
     {
-        __result = (int)(__result * ModConfigProvider.ModOptions.MaximumLootersMultiplier);
+        // Use default if provided with a negative value
+        var multiplier = 1f;
+        if (ModConfigProvider.ModOptions.MaximumLootersMultiplier >= 0)
+            multiplier = ModConfigProvider.ModOptions.MaximumLootersMultiplier;
+
+        __result = (int)(__result * multiplier);
     }
 }

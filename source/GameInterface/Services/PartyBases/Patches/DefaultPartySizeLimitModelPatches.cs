@@ -70,9 +70,14 @@ internal class DefaultPartySizeLimitModelPatches
         // Increase/decrease size of new bandit parties based on config
         if (party.IsBandit)
         {
-            foreach (var troopRosterElement in __result.data)
+            // Use default value if negative
+            var multiplier = 1f;
+            if (ModConfigProvider.ModOptions.LooterPartySizeMultiplier >= 0)
+                multiplier = ModConfigProvider.ModOptions.LooterPartySizeMultiplier;
+
+            foreach (var troopRosterElement in __result.GetTroopRoster())
             {
-                var newCharacterCount = (int)(troopRosterElement.Number * ModConfigProvider.ModOptions.LooterPartySizeMultiplier);
+                var newCharacterCount = (int)(troopRosterElement.Number * multiplier);
                 var numberToAdd = newCharacterCount - troopRosterElement.Number;
 
                 CharacterObject character = troopRosterElement.Character;
