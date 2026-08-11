@@ -20,7 +20,7 @@ public interface ICraftingCampaignBehaviorInterface : IGameAbstraction
 {
     int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement);
     int DoRefinement(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, Crafting.RefiningFormula formula);
-    int CreateCraftedWeaponInternal(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, CraftingTemplate craftingTemplate, ItemModifierGroup itemModifierGroup, WeaponDesignElement[] usedPieces, ItemModifier weaponModifier, CultureObject culture, bool isFreeMode, TextObject name, string weaponName, string nextCraftedItemI);
+    bool CreateCraftedWeaponInternal(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, CraftingTemplate craftingTemplate, ItemModifierGroup itemModifierGroup, WeaponDesignElement[] usedPieces, ItemModifier weaponModifier, CultureObject culture, bool isFreeMode, TextObject name, string weaponName, string nextCraftedItemI, out int newHeroCraftingStamina);
     ItemObject CreateAndRegisterCraftedItem(WeaponDesign weaponDesign, TextObject name, CultureObject culture, ItemModifierGroup itemModifierGroup, string craftedItemId);
     void AddCraftedItemToRoster(ItemRoster itemRoster, ItemModifier weaponModifier, ItemObject craftedItemObject);
     void DailyTickSettlement(CraftingCampaignBehavior craftingBehavior, Settlement settlement);
@@ -111,7 +111,7 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         return heroCraftingStamina;
     }
 
-    public int CreateCraftedWeaponInternal(
+    public bool CreateCraftedWeaponInternal(
         CraftingCampaignBehavior craftingBehavior,
         Hero craftingHero,
         CraftingTemplate craftingTemplate,
@@ -122,7 +122,8 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         bool isFreeMode,
         TextObject name,
         string weaponName,
-        string nextCraftedItemId)
+        string nextCraftedItemId,
+        out int newHeroCraftingStamina)
     {
         WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(weaponName), usedPieces);
         if (isFreeMode)
@@ -133,6 +134,8 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
         int[] smithingCostsForWeaponDesign = Campaign.Current.Models.SmithingModel.GetSmithingCostsForWeaponDesign(weaponDesign);
 
+        newHeroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
+
         // Reject crafted weapons with materials that no longer exist
         for (int i = 8; i >= 0; i--)
         {
@@ -141,7 +144,7 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
             if (itemRoster.GetItemNumber(material) + smithingCostsForWeaponDesign[i] < 0)
             {
                 Logger.Warning($"Rejecting crafted weapon of template {weaponDesign.Template.StringId} due to a lack of {material.StringId}.");
-                return craftingBehavior.GetHeroCraftingStamina(craftingHero);
+                return false;
             }
         }
 
@@ -157,12 +160,12 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         var craftedItemObject = CreateAndRegisterCraftedItem(weaponDesign, name, culture, itemModifierGroup, nextCraftedItemId);
 
         int energyCostForSmithing = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(craftedItemObject, craftingHero);
-        int newHeroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing;
+        newHeroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing;
         craftingBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina);
 
         CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);
 
-        return newHeroCraftingStamina;
+        return true;
     }
 
     public ItemObject CreateAndRegisterCraftedItem(WeaponDesign weaponDesign, TextObject name, CultureObject culture, ItemModifierGroup itemModifierGroup, string craftedItemId)

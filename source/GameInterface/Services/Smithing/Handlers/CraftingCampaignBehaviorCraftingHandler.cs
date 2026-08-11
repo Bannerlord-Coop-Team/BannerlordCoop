@@ -97,7 +97,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             // Get required objects using interface & objectManager
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
             // Replace original TaleWorlds implementation
@@ -140,7 +140,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             // Get required objects using interface & objectManager
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
             // Rebuild formula on server
@@ -209,7 +209,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
 
@@ -226,7 +226,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
             // Replace original TaleWorlds implementation
             string nextCraftedItemId = craftingCampaignBehavior.GetNextCraftedItemId();
-            var newHeroCraftingStamina = craftingCampaignBehaviorInterface.CreateCraftedWeaponInternal(
+            bool successfulCraftedItem = craftingCampaignBehaviorInterface.CreateCraftedWeaponInternal(
                 craftingCampaignBehavior,
                 craftingHero,
                 craftingTemplate,
@@ -237,7 +237,11 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 data.IsFreeMode,
                 data.Name,
                 data.WeaponName,
-                nextCraftedItemId);
+                nextCraftedItemId,
+                out var newHeroCraftingStamina);
+
+            // Return early to prevent clients from creating an item that was rejected on the server
+            if (!successfulCraftedItem) return;
 
             // Update stamina on clients
             network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
