@@ -18,14 +18,9 @@ namespace GameInterface.Services.Difficulties.Handlers;
 /// clients inherit them with the join-time save transfer and autosaves persist
 /// them — a client applying its own file would fight the server's world. A
 /// configured key overrides the loaded world on every boot; an absent key leaves
-/// the save's value alone. playerReceivedDamage is different twice over: it is
-/// engine config (BannerlordConfig), not save state, and the mod pushes the
-/// host's value to every client as a join-time ServerOption — on a HEADLESS host
-/// (BANNERLORD_USER_DIR set) the profile defaults it to VeryEasy, which would
-/// force quarter damage on every player, so unset there means Realistic. On a
-/// graphical host the player's own setting stays in charge unless configured.
-/// (Ported from the dedicated server's CampaignDifficulty, which owned this
-/// while the keys lived in server-config.json.)
+/// the save's value alone. playerReceivedDamage is engine config (BannerlordConfig),
+/// not save state, and the mod pushes the host's value to every client as a
+/// join-time ServerOption.
 /// </summary>
 internal class CampaignDifficultyHandler : IHandler
 {
@@ -65,14 +60,7 @@ internal class CampaignDifficultyHandler : IHandler
         DifficultyConfigData config = modConfig.Data.Difficulty ?? new DifficultyConfigData();
         var effective = new List<string>();
 
-        // Unset on a headless host still means Realistic — see the class summary.
-        DifficultyLevel? playerReceivedDamage = config.PlayerReceivedDamage;
-        if (playerReceivedDamage == null && IsHeadlessHost)
-        {
-            playerReceivedDamage = DifficultyLevel.Realistic;
-        }
-
-        ApplyOption("playerReceivedDamage", playerReceivedDamage, effective,
+        ApplyOption("playerReceivedDamage", config.PlayerReceivedDamage, effective,
             (CampaignOptions.Difficulty)BannerlordConfig.PlayerReceivedDamageDifficulty,
             v => BannerlordConfig.PlayerReceivedDamageDifficulty = (int)v);
         ApplyOption("playerTroopsReceivedDamage", config.PlayerTroopsReceivedDamage, effective,
@@ -101,11 +89,6 @@ internal class CampaignDifficultyHandler : IHandler
 
         Logger.Information("difficulty (effective): {Effective}", string.Join(" ", effective));
     }
-
-    /// <summary>Headless/container hosts set BANNERLORD_USER_DIR (the same marker
-    /// CoopSaveManager keys its data root on); graphical hosts never do.</summary>
-    private static bool IsHeadlessHost =>
-        string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR")) == false;
 
     /// <summary>By name, not ordinal — the game enum's numbering is not ours to rely on.</summary>
     private static CampaignOptions.Difficulty ToCampaign(DifficultyLevel level)

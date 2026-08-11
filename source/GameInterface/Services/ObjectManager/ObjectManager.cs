@@ -1,6 +1,7 @@
 ﻿using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.ObjectSystem;
 
@@ -58,6 +59,12 @@ public interface IObjectManager
     bool AddNewObject(object obj, out string newId);
 
     /// <summary>
+    /// Retains registrations made by <paramref name="registerAndValidate"/> only when it returns true.
+    /// Registrations added before a false result or exception are removed before control returns to the caller.
+    /// </summary>
+    bool RunRegistrationTransaction(Func<bool> registerAndValidate);
+
+    /// <summary>
     /// Removes an object from the <see cref="IObjectManager"/>
     /// </summary>
     /// <param name="obj">Object to remove</param>
@@ -101,6 +108,29 @@ public class ObjectManager : IObjectManager
     public ObjectManager(ILogger logger)
     {
         this.logger = logger;
+    }
+
+    public bool RunRegistrationTransaction(Func<bool> registerAndValidate)
+    {
+        if (registerAndValidate == null)
+            throw new ArgumentNullException(nameof(registerAndValidate));
+
+        lock (_gate)
+        {
+            var retainedIds = new HashSet<string>(idObjs.Keys, StringComparer.Ordinal);
+            var commit = false;
+
+            try
+            {
+                commit = registerAndValidate();
+                return commit;
+            }
+            finally
+            {
+                if (!commit)
+                    RollBackNewRegistrations(retainedIds);
+            }
+        }
     }
 
     public bool AddExisting(string id, object obj)
@@ -274,6 +304,18 @@ public class ObjectManager : IObjectManager
             if (objsIds.TryGetValue(obj, out var id) == false) return false;
 
             return idObjs.TryRemove(id, out _) && objsIds.Remove(obj);
+        }
+    }
+
+    private void RollBackNewRegistrations(ISet<string> retainedIds)
+    {
+        foreach (var entry in idObjs)
+        {
+            if (retainedIds.Contains(entry.Key))
+                continue;
+
+            if (idObjs.TryRemove(entry.Key, out var registeredObject))
+                objsIds.Remove(registeredObject);
         }
     }
 

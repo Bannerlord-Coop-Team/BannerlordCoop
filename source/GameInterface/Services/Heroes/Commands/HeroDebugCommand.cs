@@ -25,10 +25,10 @@ public class HeroDebugCommand
 
     // coop.debug.hero.list
     /// <summary>
-    /// Lists all the heroes
+    /// Lists heroes whose names start with the optional prefix
     /// </summary>
-    /// <param name="args">actually none are being used..</param>
-    /// <returns>strings of all the heroes</returns>
+    /// <param name="args">Optional case-insensitive hero name prefix</param>
+    /// <returns>Strings of the matching heroes</returns>
     [CommandLineArgumentFunction("list", "coop.debug.hero")]
     public static string ListHeroes(List<string> args)
     {
@@ -39,7 +39,9 @@ public class HeroDebugCommand
             return $"Unable to get {nameof(IObjectManager)}";
         }
 
-        foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes())
+        string namePrefix = args == null ? string.Empty : string.Join(" ", args).Trim();
+        foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes()
+                     .Where(hero => NameStartsWithPrefix(hero.Name?.ToString(), namePrefix)))
         {
             if (objectManager.TryGetId(hero, out var id))
             {
@@ -52,7 +54,15 @@ public class HeroDebugCommand
 
         }
 
-        return stringBuilder.ToString();
+        return stringBuilder.Length == 0 && string.IsNullOrEmpty(namePrefix) == false
+            ? $"No hero with a name starting with '{namePrefix}' was found."
+            : stringBuilder.ToString();
+    }
+
+    internal static bool NameStartsWithPrefix(string heroName, string prefix)
+    {
+        return string.IsNullOrEmpty(prefix) ||
+               heroName?.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) == true;
     }
 
     [CommandLineArgumentFunction("id", "coop.debug.hero")]
@@ -231,6 +241,36 @@ public class HeroDebugCommand
 
         return $"Set gold to {gold} for {heroes.Count} hero(es) named '{heroName}'";
     }
+
+    [CommandLineArgumentFunction("gold_state", "coop.debug.hero")]
+    public static string GoldState(List<string> args)
+    {
+        if (args.Count != 1) return "Usage: coop.debug.hero.gold_state <hero id>";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(args[0], out Hero hero))
+            return $"Hero with id {args[0]} not found.";
+
+        return $"HERO_GOLD_STATE hero={args[0]} gold={hero.Gold}";
+    }
+
+    [CommandLineArgumentFunction("set_gold_state", "coop.debug.hero")]
+    public static string SetGoldState(List<string> args)
+    {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_gold_state"))
+            return error;
+        if (args.Count != 2 || !int.TryParse(args[1], out int gold) || gold < 0)
+            return "Usage: coop.debug.hero.set_gold_state <hero id> <non-negative gold>";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(args[0], out Hero hero))
+            return $"Hero with id {args[0]} not found.";
+
+        int oldGold = hero.Gold;
+        hero.Gold = gold;
+        return $"HERO_GOLD_SET hero={args[0]} oldGold={oldGold} newGold={hero.Gold}";
+    }
+
     // coop.debug.hero.set_hitpoints
     /// <summary>
     /// Sets the hitpoints of a hero

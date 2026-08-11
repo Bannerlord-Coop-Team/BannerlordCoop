@@ -10,16 +10,9 @@ using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Party.Handlers;
 
-/// <summary>
-/// Relay for prisoner execution. Currently dormant: execution is disabled in coop
-/// (<see href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/2310">issue #2310</see>) —
-/// <see cref="Patches.PartyScreenLogicPatches"/> skips the native execute flow, so nothing publishes
-/// <see cref="HeroExecuted"/>. Kept for a future server-validated execution sync; the death cascade
-/// (clan/ruler succession, kingdom destruction) must be synced before rewiring this.
-/// </summary>
 internal class ExecuteTroopHandler : IHandler
 {
-    private static readonly ILogger logger = LogManager.GetLogger<ExecuteTroopHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<ExecuteTroopHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -35,32 +28,39 @@ internal class ExecuteTroopHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<HeroExecuted>(Handle_HeroExecuted);
-        messageBroker.Subscribe<ExecuteHero>(Handle_ExecuteHero);
+        messageBroker.Subscribe<NetworkExecuteHero>(Handle_NetworkExecuteHero);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<HeroExecuted>(Handle_HeroExecuted);
-        messageBroker.Unsubscribe<ExecuteHero>(Handle_ExecuteHero);
+        messageBroker.Unsubscribe<NetworkExecuteHero>(Handle_NetworkExecuteHero);
     }
 
     private void Handle_HeroExecuted(MessagePayload<HeroExecuted> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.ExecutedHero, out var executedHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Executor, out var executorId)) return;
-
-        var message = new ExecuteHero(executedHeroId, executorId);
-        network.SendAll(message);
-    }
-
-    private void Handle_ExecuteHero(MessagePayload<ExecuteHero> obj)
-    {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutedHeroId, out var executedHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutorId, out var executor)) return;
+        var data = obj.What;
 
         GameThread.RunSafe(() =>
         {
-            KillCharacterAction.ApplyByExecution(executedHero, executor, true, false);
+            if (!objectManager.TryGetIdWithLogging(obj.What.ExecutedHero, out var executedHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Executor, out var executorId)) return;
+
+            var message = new NetworkExecuteHero(executedHeroId, executorId, data.Detail, data.IsForced);
+            network.SendAll(message);
+        });
+    }
+
+    private void Handle_NetworkExecuteHero(MessagePayload<NetworkExecuteHero> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutedHeroId, out var executedHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutorId, out var executorHero)) return;
+
+            KillCharacterAction.ApplyInternal(executedHero, executorHero, data.Detail, true, data.IsForced);
         });
     }
 }
