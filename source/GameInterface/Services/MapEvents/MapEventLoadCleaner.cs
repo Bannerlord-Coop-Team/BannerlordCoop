@@ -1,8 +1,11 @@
-﻿using Serilog;
+﻿using Common.Messaging;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
+using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -20,15 +23,18 @@ public interface IMapEventLoadCleaner
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 {
     private readonly ILogger logger;
+    private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
 
     public MapEventLoadCleaner(
         ILogger logger,
+        IMessageBroker messageBroker,
         IPlayerManager playerManager,
         IObjectManager objectManager)
     {
         this.logger = logger;
+        this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
     }
@@ -57,11 +63,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 .Distinct()
                 .ToArray();
 
-            logger.Information(
-                "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
-                mapEvent.StringId,
-                mapEvent.InvolvedParties.Count());
-            mapEvent.FinalizeEvent();
+            FinalizeOrRepairEvent(mapEvent);
 
             foreach (var army in playerLedArmies)
             {
@@ -93,6 +95,30 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
     }
 
+    private void FinalizeOrRepairEvent(MapEvent mapEvent)
+    {
+        if (!mapEvent.IsFinalized)
+        {
+            logger.Information(
+                "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
+                mapEvent.StringId,
+                mapEvent.InvolvedParties.Count());
+            mapEvent.FinalizeEvent();
+            return;
+        }
+
+        logger.Warning(
+            "Detaching {PartyCount} parties from half-finalized loaded player map event {MapEventId}",
+            mapEvent.InvolvedParties.Count(),
+            mapEvent.StringId);
+        mapEvent.AttackerSide?.HandleMapEventEnd();
+        mapEvent.DefenderSide?.HandleMapEventEnd();
+        messageBroker.Publish(mapEvent, new MapEventFinalized(mapEvent));
+
+        if (objectManager.Contains(mapEvent))
+            messageBroker.Publish(mapEvent, new InstanceDestroyed<MapEvent>(mapEvent));
+    }
+
     private MapEvent[] GetLoadedPlayerMapEvents()
     {
         var mapEvents = Campaign.Current.MapEventManager.MapEvents
@@ -106,7 +132,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
             var mapEvent = party.MapEvent;
             if (mapEvent == null ||
-                mapEvent.IsFinalized ||
                 mapEvents.Any(candidate => ReferenceEquals(candidate, mapEvent)))
             {
                 continue;

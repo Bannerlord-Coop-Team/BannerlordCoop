@@ -237,6 +237,9 @@ namespace Coop.LiveTesting
             bool coopRunning = false;
             string coopState = null;
             int? registeredPlayers = null;
+            int? connectedPlayerCount = null;
+            string[] registeredControllerIds = Array.Empty<string>();
+            string[] connectedControllerIds = Array.Empty<string>();
 
             if (campaignLoaded && ContainerProvider.TryResolve<ILogic>(out var logic))
             {
@@ -260,6 +263,16 @@ namespace Coop.LiveTesting
                 if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
                 {
                     registeredPlayers = playerManager.Players.Count;
+                    registeredControllerIds = playerManager.Players
+                        .Select(player => player.ControllerId)
+                        .OrderBy(controllerId => controllerId, StringComparer.Ordinal)
+                        .ToArray();
+                    connectedControllerIds = playerManager.Players
+                        .Where(playerManager.IsConnected)
+                        .Select(player => player.ControllerId)
+                        .OrderBy(controllerId => controllerId, StringComparer.Ordinal)
+                        .ToArray();
+                    connectedPlayerCount = connectedControllerIds.Length;
                 }
             }
 
@@ -316,6 +329,10 @@ namespace Coop.LiveTesting
                 coopRunning,
                 coopState,
                 registeredPlayers,
+                registeredPlayerCount = registeredPlayers,
+                connectedPlayerCount,
+                registeredControllerIds,
+                connectedControllerIds,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });

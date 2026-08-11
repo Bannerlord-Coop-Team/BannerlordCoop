@@ -83,6 +83,42 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
+    public void FinalizePlayerMapEvents_HalfFinalizedOrphan_DetachesAndParksOfflineParty()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-half-finalized-player", heroId, mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var aiParty));
+
+            aiParty.PartyMoveMode = MoveModeType.Party;
+            aiParty.MoveTargetParty = playerParty;
+            aiParty.Ai.RethinkAtNextHourlyTick = false;
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+            mapEvent.State = MapEventState.WaitingRemoval;
+
+            Assert.True(mapEvent.IsFinalized);
+            Assert.Same(mapEvent, playerParty.MapEvent);
+            Assert.Same(mapEvent, aiParty.MapEvent);
+
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Null(playerParty.Party.MapEventSide);
+            Assert.Null(aiParty.Party.MapEventSide);
+            Assert.False(playerParty.IsActive);
+            Assert.False(playerParty.IsVisible);
+            Assert.Equal(MoveModeType.Hold, aiParty.PartyMoveMode);
+            Assert.Null(aiParty.MoveTargetParty);
+            Assert.True(aiParty.Ai.RethinkAtNextHourlyTick);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void FinalizePlayerMapEvents_SharedOrphanPlayerEvent_FinalizesOnce()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
