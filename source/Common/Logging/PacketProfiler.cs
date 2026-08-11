@@ -4,7 +4,9 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 
 namespace Common.Logging;
 
@@ -19,7 +21,7 @@ namespace Common.Logging;
 /// The accumulated stats are dumped on a fixed wall-clock interval. Only the server profiles traffic
 /// (see <see cref="ModInformation.IsServer"/>).
 /// </remarks>
-public sealed class PacketProfiler : IDisposable
+public sealed class PacketProfiler : IDisposable, IPacketProfileCapture
 {
     // A logger to dump the packet profile.
     private static readonly ILogger Logger = LogManager.GetLogger<PacketProfiler>();
@@ -28,6 +30,10 @@ public sealed class PacketProfiler : IDisposable
     private readonly Poller poller;
 
     private readonly ConcurrentDictionary<string, Stats> stats = new ConcurrentDictionary<string, Stats>();
+
+    private readonly object captureLock = new object();
+    private Capture capture;
+    private Timer captureTimer;
 
     /// <summary>
     /// Optional provider of a one-line live-state summary (e.g. per-peer reliable-queue depth and ping)
@@ -57,6 +63,152 @@ public sealed class PacketProfiler : IDisposable
         var packetName = GetPacketName(packet);
 
         stats.AddOrUpdate(packetName, _ => new Stats(1, byteSize), (_, existing) => existing.Add(byteSize));
+        RecordCapture(packetName, byteSize);
+    }
+
+    public bool TryStartCapture(
+        string packetName,
+        TimeSpan duration,
+        Action completion,
+        out PacketProfileCaptureSnapshot snapshot,
+        out string error)
+    {
+        snapshot = null;
+        error = null;
+        if (string.IsNullOrWhiteSpace(packetName))
+        {
+            error = "Packet name is required.";
+            return false;
+        }
+        if (duration <= TimeSpan.Zero)
+        {
+            error = "Capture duration must be positive.";
+            return false;
+        }
+
+        lock (captureLock)
+        {
+            if (capture != null && !capture.Completed)
+            {
+                error = $"Capture '{capture.CaptureId}' is already running.";
+                return false;
+            }
+
+            captureTimer?.Dispose();
+            long startedTimestamp = Stopwatch.GetTimestamp();
+            long durationTimestampTicks = (long)Math.Ceiling(duration.TotalSeconds * Stopwatch.Frequency);
+            var startedUtc = DateTimeOffset.UtcNow;
+            capture = new Capture(
+                Guid.NewGuid().ToString("N"),
+                packetName,
+                duration,
+                startedTimestamp,
+                startedTimestamp + durationTimestampTicks,
+                startedUtc,
+                completion);
+            captureTimer = new Timer(CompleteCaptureTimer, null, duration, Timeout.InfiniteTimeSpan);
+            snapshot = capture.CreateSnapshot(startedTimestamp);
+            return true;
+        }
+    }
+
+    public bool TryGetCapture(out PacketProfileCaptureSnapshot snapshot, out string error)
+    {
+        lock (captureLock)
+        {
+            if (capture == null)
+            {
+                snapshot = null;
+                error = "No packet-profile capture exists.";
+                return false;
+            }
+
+            snapshot = capture.CreateSnapshot(Stopwatch.GetTimestamp());
+            error = null;
+            return true;
+        }
+    }
+
+    public bool TryCancelCapture(out PacketProfileCaptureSnapshot snapshot, out string error)
+    {
+        Action completion;
+        lock (captureLock)
+        {
+            if (capture == null)
+            {
+                snapshot = null;
+                error = "No packet-profile capture exists.";
+                return false;
+            }
+
+            completion = CompleteCaptureLocked(Stopwatch.GetTimestamp(), cancelled: true);
+            snapshot = capture.CreateSnapshot(Stopwatch.GetTimestamp());
+            error = null;
+        }
+
+        InvokeCompletion(completion);
+        return true;
+    }
+
+    private void RecordCapture(string packetName, int byteSize)
+    {
+        Action completion = null;
+        lock (captureLock)
+        {
+            if (capture == null || capture.Completed)
+                return;
+
+            long now = Stopwatch.GetTimestamp();
+            if (now >= capture.EndTimestamp)
+            {
+                completion = CompleteCaptureLocked(now, cancelled: false);
+            }
+            else if (packetName == capture.PacketName)
+            {
+                capture.Record(byteSize);
+            }
+        }
+
+        InvokeCompletion(completion);
+    }
+
+    private void CompleteCaptureTimer(object state)
+    {
+        Action completion;
+        lock (captureLock)
+        {
+            completion = CompleteCaptureLocked(Stopwatch.GetTimestamp(), cancelled: false);
+        }
+
+        InvokeCompletion(completion);
+    }
+
+    private Action CompleteCaptureLocked(long completedTimestamp, bool cancelled)
+    {
+        if (capture == null || capture.Completed)
+            return null;
+
+        capture.Complete(completedTimestamp, DateTimeOffset.UtcNow, cancelled);
+        captureTimer?.Dispose();
+        captureTimer = null;
+        Action completion = capture.Completion;
+        capture.Completion = null;
+        return completion;
+    }
+
+    private static void InvokeCompletion(Action completion)
+    {
+        if (completion == null)
+            return;
+
+        try
+        {
+            completion();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Packet-profile capture completion callback failed");
+        }
     }
 
     // Dumps the accumulated stats and clears them for the next window.
@@ -145,6 +297,84 @@ public sealed class PacketProfiler : IDisposable
     public void Dispose()
     {
         poller.StopAndWait(TimeSpan.FromSeconds(5));
+        lock (captureLock)
+        {
+            captureTimer?.Dispose();
+            captureTimer = null;
+        }
+    }
+
+    private sealed class Capture
+    {
+        public string CaptureId { get; }
+        public string PacketName { get; }
+        public TimeSpan Duration { get; }
+        public long StartedTimestamp { get; }
+        public long EndTimestamp { get; }
+        public DateTimeOffset StartedUtc { get; }
+        public Action Completion { get; set; }
+        public long PacketsSent { get; private set; }
+        public long BytesSent { get; private set; }
+        public bool Completed { get; private set; }
+        public bool Cancelled { get; private set; }
+        public long CompletedTimestamp { get; private set; }
+        public DateTimeOffset? CompletedUtc { get; private set; }
+
+        public Capture(
+            string captureId,
+            string packetName,
+            TimeSpan duration,
+            long startedTimestamp,
+            long endTimestamp,
+            DateTimeOffset startedUtc,
+            Action completion)
+        {
+            CaptureId = captureId;
+            PacketName = packetName;
+            Duration = duration;
+            StartedTimestamp = startedTimestamp;
+            EndTimestamp = endTimestamp;
+            StartedUtc = startedUtc;
+            Completion = completion;
+        }
+
+        public void Record(int byteSize)
+        {
+            PacketsSent++;
+            BytesSent += byteSize;
+        }
+
+        public void Complete(long completedTimestamp, DateTimeOffset completedUtc, bool cancelled)
+        {
+            Completed = true;
+            Cancelled = cancelled;
+            CompletedTimestamp = completedTimestamp;
+            CompletedUtc = completedUtc;
+        }
+
+        public PacketProfileCaptureSnapshot CreateSnapshot(long now)
+        {
+            long elapsedTimestampTicks = Completed
+                ? Math.Min(CompletedTimestamp, EndTimestamp) - StartedTimestamp
+                : Math.Min(now, EndTimestamp) - StartedTimestamp;
+            long elapsedMilliseconds = (long)Math.Round(
+                elapsedTimestampTicks * 1000d / Stopwatch.Frequency,
+                MidpointRounding.AwayFromZero);
+            long durationMilliseconds = (long)Math.Round(Duration.TotalMilliseconds, MidpointRounding.AwayFromZero);
+
+            return new PacketProfileCaptureSnapshot(
+                CaptureId,
+                Completed ? Cancelled ? "cancelled" : "completed" : "running",
+                PacketName,
+                PacketsSent,
+                BytesSent,
+                durationMilliseconds,
+                elapsedMilliseconds,
+                StartedUtc,
+                StartedUtc + Duration,
+                CompletedUtc,
+                Cancelled);
+        }
     }
 
     // Running per-type totals: how many packets were sent and their combined serialized byte size.
