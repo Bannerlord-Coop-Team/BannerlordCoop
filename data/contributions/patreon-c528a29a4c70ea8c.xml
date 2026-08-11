@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<contribution reference="patreon-c528a29a4c70ea8c" version="1.0.0">
+  <name>TEST</name>
+  <description></description>
+  <parameters>
+    <parameter name="enabled" value="true" />
+    <parameter name="priority" value="normal" />
+  </parameters>
+</contribution>
