@@ -27,12 +27,17 @@ namespace Coop.LiveTesting
 {
     internal sealed class LiveTestControlServer : IDisposable
     {
+        private const int MaxTrackedScreenshotCaptures = 64;
+        private static readonly TimeSpan ScreenshotCaptureTimeout = TimeSpan.FromMinutes(5);
         private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
 
         private readonly string logFilePath;
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
+        private readonly object screenshotCapturesLock = new object();
+        private readonly Dictionary<string, ScreenshotCaptureState> screenshotCaptures =
+            new Dictionary<string, ScreenshotCaptureState>(StringComparer.Ordinal);
         private int shutdownScheduled;
 
         public LiveTestControlServer(bool isServer, string logFilePath)
@@ -89,6 +94,8 @@ namespace Coop.LiveTesting
                     return HandleCommand(request);
                 case "screenshot":
                     return HandleScreenshot(request);
+                case "screenshot-status":
+                    return HandleScreenshotStatus(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -179,13 +186,98 @@ namespace Coop.LiveTesting
                 }
 
                 Directory.CreateDirectory(directory);
-                Utilities.TakeScreenshot(screenshotPath);
+                if (File.Exists(screenshotPath))
+                {
+                    return Failure(
+                        request.Id,
+                        "screenshot_path_exists",
+                        "Screenshot path must not already exist.",
+                        false);
+                }
+
+                string captureId = Guid.NewGuid().ToString("N");
+                lock (screenshotCapturesLock)
+                {
+                    if (screenshotCaptures.Count >= MaxTrackedScreenshotCaptures)
+                    {
+                        DateTime now = DateTime.UtcNow;
+                        string removableCaptureId = screenshotCaptures
+                            .Where(pair => pair.Value.CanDiscard(now))
+                            .OrderBy(pair => pair.Value.RequestedAtUtc)
+                            .Select(pair => pair.Key)
+                            .FirstOrDefault();
+                        if (removableCaptureId == null)
+                        {
+                            return Failure(
+                                request.Id,
+                                "screenshot_capacity_reached",
+                                "Too many screenshot captures are still pending.",
+                                false);
+                        }
+                        screenshotCaptures.Remove(removableCaptureId);
+                    }
+                    screenshotCaptures.Add(captureId, new ScreenshotCaptureState(screenshotPath));
+                }
+
+                try
+                {
+                    Utilities.TakeScreenshot(screenshotPath);
+                }
+                catch
+                {
+                    lock (screenshotCapturesLock)
+                    {
+                        screenshotCaptures.Remove(captureId);
+                    }
+                    throw;
+                }
+
                 return Success(request.Id, new
                 {
+                    captureId,
                     path = screenshotPath,
                     captureRequested = true,
                 });
             }, true);
+        }
+
+        private LiveTestResponse HandleScreenshotStatus(LiveTestRequest request)
+        {
+            if (!TryReadString(request.Parameters, "captureId", out var captureId) ||
+                !Guid.TryParseExact(captureId, "N", out _))
+            {
+                return Failure(
+                    request.Id,
+                    "invalid_parameters",
+                    "Screenshot capture id must be a 32-character hexadecimal value.",
+                    false);
+            }
+
+            ScreenshotCaptureState capture;
+            lock (screenshotCapturesLock)
+            {
+                if (!screenshotCaptures.TryGetValue(captureId, out capture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' is not registered.",
+                        false);
+                }
+
+                ScreenshotCaptureObservation observation = capture.Observe();
+                return Success(request.Id, new
+                {
+                    captureId,
+                    path = capture.Path,
+                    complete = observation.Complete,
+                    exists = observation.Exists,
+                    isBmp = observation.IsBmp,
+                    stable = observation.Stable,
+                    length = observation.Length,
+                    lastWriteUtc = observation.LastWriteUtc,
+                });
+            }
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)
@@ -377,6 +469,129 @@ namespace Coop.LiveTesting
                 PlatformId = processInfo.PlatformId,
                 RunToken = processInfo.RunToken,
             };
+        }
+
+        private sealed class ScreenshotCaptureState
+        {
+            private DateTime? completedAtUtc;
+            private long? observedLength;
+            private DateTime? observedLastWriteUtc;
+
+            public ScreenshotCaptureState(string path)
+            {
+                Path = path;
+                RequestedAtUtc = DateTime.UtcNow;
+            }
+
+            public string Path { get; }
+
+            public DateTime RequestedAtUtc { get; }
+
+            public bool CanDiscard(DateTime now)
+            {
+                return completedAtUtc.HasValue || now - RequestedAtUtc >= ScreenshotCaptureTimeout;
+            }
+
+            public ScreenshotCaptureObservation Observe()
+            {
+                bool exists = File.Exists(Path);
+                long length = 0;
+                DateTime? lastWriteUtc = null;
+                bool isBmp = false;
+                if (exists)
+                {
+                    try
+                    {
+                        var file = new FileInfo(Path);
+                        length = file.Length;
+                        lastWriteUtc = file.LastWriteTimeUtc;
+                        isBmp = HasBitmapSignature(Path);
+                    }
+                    catch (IOException)
+                    {
+                        exists = false;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        exists = false;
+                    }
+                }
+
+                bool stable = exists &&
+                    isBmp &&
+                    length > 0 &&
+                    observedLength.HasValue &&
+                    observedLength.Value == length &&
+                    observedLastWriteUtc.HasValue &&
+                    lastWriteUtc.HasValue &&
+                    observedLastWriteUtc.Value == lastWriteUtc.Value;
+                bool validObservation = exists && isBmp && length > 0 && lastWriteUtc.HasValue;
+                observedLength = validObservation ? length : (long?)null;
+                observedLastWriteUtc = validObservation ? lastWriteUtc : null;
+                if (stable)
+                {
+                    completedAtUtc = DateTime.UtcNow;
+                }
+
+                return new ScreenshotCaptureObservation(
+                    exists,
+                    isBmp,
+                    stable,
+                    length,
+                    lastWriteUtc?.ToString("o"));
+            }
+
+            private static bool HasBitmapSignature(string path)
+            {
+                try
+                {
+                    using (var stream = new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite | FileShare.Delete))
+                    {
+                        return stream.ReadByte() == 'B' && stream.ReadByte() == 'M';
+                    }
+                }
+                catch (IOException)
+                {
+                    return false;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return false;
+                }
+            }
+        }
+
+        private sealed class ScreenshotCaptureObservation
+        {
+            public ScreenshotCaptureObservation(
+                bool exists,
+                bool isBmp,
+                bool stable,
+                long length,
+                string lastWriteUtc)
+            {
+                Exists = exists;
+                IsBmp = isBmp;
+                Stable = stable;
+                Length = length;
+                LastWriteUtc = lastWriteUtc;
+            }
+
+            public bool Complete => Exists && IsBmp && Stable;
+
+            public bool Exists { get; }
+
+            public bool IsBmp { get; }
+
+            public bool Stable { get; }
+
+            public long Length { get; }
+
+            public string LastWriteUtc { get; }
         }
 
         private static bool TryReadCommand(
