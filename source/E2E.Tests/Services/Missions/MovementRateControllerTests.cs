@@ -285,6 +285,358 @@ public sealed class MovementRateControllerTests
     }
 
     [Fact]
+    public void BattleProfile_StableThirtyFpsRecoversAfterTransientQueueOverload()
+    {
+        using var fixture = new RateControllerFixture(frameLimitHz: 30);
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        MovementRateSnapshot initial = fixture.Controller.Snapshot;
+        Assert.Equal(30, initial.FrameLimitHz);
+        Assert.Equal(30, initial.PerformanceCeilingHz);
+        Assert.Equal(30, initial.BulkHz);
+        Assert.Equal(30, initial.AdvertisedReceiverCapHz);
+
+        fixture.AdvanceWindow(
+            framesPerSecond: 30,
+            maximumReceiverQueueMilliseconds: 200d);
+        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 3; i++)
+            fixture.AdvanceWindow(framesPerSecond: 30);
+        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 30);
+
+        Assert.Equal(15, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal(15, fixture.Controller.Snapshot.AdvertisedReceiverCapHz);
+        Assert.Equal("battle-recovered", fixture.Controller.Snapshot.Reason);
+
+        foreach (int expectedRate in new[] { 20, 30 })
+        {
+            for (int i = 0; i < 4; i++)
+                fixture.AdvanceWindow(framesPerSecond: 30);
+
+            Assert.Equal(expectedRate, fixture.Controller.Snapshot.BulkHz);
+            Assert.Equal(expectedRate, fixture.Controller.Snapshot.AdvertisedReceiverCapHz);
+        }
+
+        for (int i = 0; i < 8; i++)
+            fixture.AdvanceWindow(framesPerSecond: 30);
+
+        Assert.Equal(30, fixture.Controller.Snapshot.FrameLimitHz);
+        Assert.Equal(30, fixture.Controller.Snapshot.PerformanceCeilingHz);
+        Assert.Equal(30, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal(30, fixture.Controller.Snapshot.AdvertisedReceiverCapHz);
+    }
+
+    [Fact]
+    public void BattleProfile_HighFpsSenderWorkAroundSixtyFiveMillisecondsRecoversToSixty()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(
+            framesPerSecond: 60,
+            maximumReceiverQueueMilliseconds: 200d);
+        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+
+        foreach (int expectedRate in new[] { 15, 20, 30, 40, 60 })
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                fixture.AdvanceWindow(
+                    framesPerSecond: 60,
+                    senderMilliseconds: 65d);
+            }
+
+            Assert.Equal(expectedRate, fixture.Controller.Snapshot.BulkHz);
+        }
+
+        MovementRateSnapshot recovered = fixture.Controller.Snapshot;
+        Assert.InRange(recovered.SenderMillisecondsPerSecond, 60d, 70d);
+        Assert.Equal(60, recovered.BulkHz);
+        Assert.Equal("battle-recovered", recovered.Reason);
+    }
+
+    [Fact]
+    public void BattleProfile_RecoverySettlesAtMeasuredDutyCeiling()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(
+            framesPerSecond: 60,
+            maximumReceiverQueueMilliseconds: 200d);
+        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+
+        foreach (int expectedRate in new[] { 15, 20, 30, 40 })
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                fixture.AdvanceWindow(
+                    framesPerSecond: 60,
+                    senderMilliseconds: 130d);
+            }
+
+            Assert.Equal(expectedRate, fixture.Controller.Snapshot.BulkHz);
+        }
+
+        for (int i = 0; i < 8; i++)
+        {
+            fixture.AdvanceWindow(
+                framesPerSecond: 60,
+                senderMilliseconds: 130d);
+        }
+
+        Assert.Equal(40, fixture.Controller.Snapshot.PerformanceCeilingHz);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal("battle-performance", fixture.Controller.Snapshot.Reason);
+    }
+
+    [Fact]
+    public void BattleProfile_RejectedSenderTierWaitsForLowerPerPollCost()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 110d);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 180d);
+        Assert.Equal(30, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 90d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 115d);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 180d);
+        Assert.Equal(30, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 90d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 12; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 115d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal("battle-recovered", fixture.Controller.Snapshot.Reason);
+    }
+
+    [Fact]
+    public void BattleProfile_RejectedFortyHzRetriesAfterBulkCostImproves()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 160d);
+        Assert.Equal(30, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+        {
+            fixture.AdvanceWindow(
+                framesPerSecond: 60,
+                senderMilliseconds: 102d,
+                prioritySenderMilliseconds: 15d);
+        }
+
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal("battle-recovered", fixture.Controller.Snapshot.Reason);
+    }
+
+    [Fact]
+    public void BattleProfile_RejectedNonHarmonicTierRequiresAnotherCostImprovement()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 160d);
+        Assert.Equal(30, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 210d);
+        Assert.Equal(20, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+        {
+            fixture.AdvanceWindow(
+                framesPerSecond: 60,
+                senderMilliseconds: 140d,
+                prioritySenderMilliseconds: 30d);
+        }
+        Assert.Equal(30, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(
+            framesPerSecond: 60,
+            senderMilliseconds: 180d,
+            prioritySenderMilliseconds: 30d);
+        Assert.Equal(20, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 12; i++)
+        {
+            fixture.AdvanceWindow(
+                framesPerSecond: 60,
+                senderMilliseconds: 140d,
+                prioritySenderMilliseconds: 30d);
+        }
+        Assert.Equal(20, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+        {
+            fixture.AdvanceWindow(
+                framesPerSecond: 60,
+                senderMilliseconds: 120d,
+                prioritySenderMilliseconds: 30d);
+        }
+        Assert.Equal(30, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(
+            framesPerSecond: 60,
+            senderMilliseconds: 180d,
+            prioritySenderMilliseconds: 30d);
+        Assert.Equal(20, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 12; i++)
+        {
+            fixture.AdvanceWindow(
+                framesPerSecond: 60,
+                senderMilliseconds: 120d,
+                prioritySenderMilliseconds: 30d);
+        }
+        Assert.Equal(20, fixture.Controller.Snapshot.BulkHz);
+    }
+
+    [Fact]
+    public void BattleProfile_FrameRateRecoveryCanRetryWithoutLowerBulkCost()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(framesPerSecond: 20, senderMilliseconds: 80d);
+        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+
+        foreach (int expectedRate in new[] { 15, 20, 30, 40 })
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                fixture.AdvanceWindow(
+                    framesPerSecond: 60,
+                    senderMilliseconds: fixture.Controller.Snapshot.BulkHz * 2d);
+            }
+
+            Assert.Equal(expectedRate, fixture.Controller.Snapshot.BulkHz);
+        }
+
+        fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 80d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+    }
+
+    [Fact]
+    public void BattleProfile_FrameRateRecoveryRetriesAfterConfirmationFailure()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 57, senderMilliseconds: 70d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 57, senderMilliseconds: 70d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 57, senderMilliseconds: 70d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 57, senderMilliseconds: 70d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 12; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+    }
+
+    [Fact]
+    public void BattleProfile_ReceiverApplyWorkKeepsConservativeCeiling()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(
+            framesPerSecond: 60,
+            receiverApplyMilliseconds: 200d);
+
+        Assert.Equal(10, fixture.Controller.Snapshot.PerformanceCeilingHz);
+        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal(10, fixture.Controller.Snapshot.AdvertisedReceiverCapHz);
+    }
+
+    [Fact]
+    public void BattleProfile_ReportsConfiguredFrameLimitAboveAdaptiveMaximum()
+    {
+        using var fixture = new RateControllerFixture(frameLimitHz: 360);
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        Assert.Equal(360, fixture.Controller.Snapshot.FrameLimitHz);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        for (int i = 0; i < 4; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60);
+
+        Assert.Equal(360, fixture.Controller.Snapshot.FrameLimitHz);
+        Assert.Equal(60, fixture.Controller.Snapshot.PerformanceCeilingHz);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+    }
+
+    [Fact]
+    public void BattleProfile_ActualFrameDropStillLowersRateBelowConfiguredLimit()
+    {
+        using var fixture = new RateControllerFixture(frameLimitHz: 60);
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(framesPerSecond: 30);
+
+        Assert.Equal(60, fixture.Controller.Snapshot.FrameLimitHz);
+        Assert.Equal(15, fixture.Controller.Snapshot.PerformanceCeilingHz);
+        Assert.Equal(15, fixture.Controller.Snapshot.BulkHz);
+    }
+
+    [Fact]
+    public void BattleProfile_PersistentReceiverQueueOverloadRemainsAtMinimumRate()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        for (int i = 0; i < 12; i++)
+        {
+            fixture.AdvanceWindow(
+                framesPerSecond: 60,
+                maximumReceiverQueueMilliseconds: 200d);
+
+            Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+            Assert.Equal(10, fixture.Controller.Snapshot.AdvertisedReceiverCapHz);
+            Assert.Equal(10, fixture.Controller.Snapshot.PerformanceCeilingHz);
+        }
+    }
+
+    [Fact]
     public void BattleProfile_ReceiverCapRecoveryUsesStepwiseHysteresis()
     {
         using var fixture = new RateControllerFixture();
@@ -365,6 +717,7 @@ public sealed class MovementRateControllerTests
         public RateControllerFixture(
             int remoteControllers = 0,
             bool enableHeartbeat = false,
+            int frameLimitHz = 60,
             Action<IMessage> onSendAll = null)
         {
             var network = new Mock<IBattleNetwork>();
@@ -400,6 +753,7 @@ public sealed class MovementRateControllerTests
                 missionContext.Object,
                 () => timestamp,
                 TimestampFrequency,
+                () => frameLimitHz,
                 enableHeartbeat);
         }
 
@@ -408,8 +762,40 @@ public sealed class MovementRateControllerTests
             timestamp += (long)(seconds * TimestampFrequency);
         }
 
-        public void AdvanceWindow(int framesPerSecond)
+        public void AdvanceWindow(
+            int framesPerSecond,
+            double senderMilliseconds = 0d,
+            double prioritySenderMilliseconds = 0d,
+            double receiverApplyMilliseconds = 0d,
+            double maximumReceiverQueueMilliseconds = 0d)
         {
+            if (senderMilliseconds > 0d)
+            {
+                int bulkReports = Controller.Snapshot.BulkHz;
+                for (int i = 0; i < bulkReports; i++)
+                {
+                    Controller.ReportSend(
+                        senderMilliseconds / bulkReports,
+                        new MovementTrafficFrame(0, 0, 0f),
+                        includesAuthoritativeAgents: true);
+                }
+            }
+            if (prioritySenderMilliseconds > 0d)
+            {
+                Controller.ReportSend(
+                    prioritySenderMilliseconds,
+                    new MovementTrafficFrame(0, 0, 0f),
+                    includesAuthoritativeAgents: false);
+            }
+            if (receiverApplyMilliseconds > 0d ||
+                maximumReceiverQueueMilliseconds > 0d)
+            {
+                Controller.ReportReceive(
+                    maximumReceiverQueueMilliseconds,
+                    receiverApplyMilliseconds,
+                    snapshots: 1);
+            }
+
             float dt = 1f / framesPerSecond;
             for (int i = 0; i <= framesPerSecond; i++)
             {

@@ -29,6 +29,7 @@ internal static class MovementDebugCommands
             $"profile={state.Profile}",
             $"bulkHz={state.BulkHz}",
             $"priorityHz={state.PriorityHz}",
+            $"frameLimitHz={state.FrameLimitHz}",
             $"performanceCeilingHz={state.PerformanceCeilingHz}",
             $"localAdaptiveHz={state.LocalAdaptiveHz}",
             $"receiverCapHz={state.AdvertisedReceiverCapHz}",
