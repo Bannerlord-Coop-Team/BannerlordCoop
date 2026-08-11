@@ -69,10 +69,10 @@ public class InitialServerState : ServerStateBase
 
         // Register all objects after main party is removed to keep order
         registryManager.RegisterAllGameObjects();
-        mapEventLoadCleaner.FinalizePlayerMapEvents();
 
         loadingInterface.SetLoadingMessage("Hosting Coop Server", "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
+        mapEventLoadCleaner.FinalizePlayerMapEvents();
 
         Logic.SetState<ServerRunningState>();
     }

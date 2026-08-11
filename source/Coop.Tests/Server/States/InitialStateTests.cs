@@ -54,7 +54,7 @@ namespace Coop.Tests.Server.States
         }
 
         [Fact]
-        public void CampaignReady_CleansLoadedMapEventsBetweenRegistrationAndLifetimePatching()
+        public void CampaignReady_PatchesLifetimesBeforeCleaningLoadedMapEvents()
         {
             var calls = new List<string>();
             var registryManager = serverComponent.Container.Resolve<Mock<IRegistryManager>>();
@@ -70,7 +70,7 @@ namespace Coop.Tests.Server.States
                 serverComponent.Container.Resolve<IServerLogic>().State);
             initialState.Handle_CampaignReady(new MessagePayload<CampaignReady>(null, new CampaignReady()));
 
-            Assert.Equal(new[] { "register", "clean", "patch" }, calls);
+            Assert.Equal(new[] { "register", "patch", "clean" }, calls);
         }
     }
 }

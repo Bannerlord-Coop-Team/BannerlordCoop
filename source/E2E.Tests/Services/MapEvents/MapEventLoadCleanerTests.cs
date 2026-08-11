@@ -1,5 +1,8 @@
 ﻿using GameInterface.Services.MapEvents;
+using Common.Messaging;
+using Coop.Core.Server.Services.Save.Messages;
 using E2E.Tests.Util;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -11,6 +14,84 @@ namespace E2E.Tests.Services.MapEvents;
 public class MapEventLoadCleanerTests : MapEventTestBase
 {
     public MapEventLoadCleanerTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void FinalizePlayerMapEvents_OrphanPlayerEvent_ReleasesAndParksOfflineParty()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-player", heroId, mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var aiParty));
+            Assert.DoesNotContain(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+
+            aiParty.PartyMoveMode = MoveModeType.Party;
+            aiParty.MoveTargetParty = playerParty;
+            aiParty.Ai.RethinkAtNextHourlyTick = false;
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+
+            Assert.True(playerParty.IsActive);
+            Assert.True(playerParty.IsVisible);
+            Assert.Same(mapEvent, playerParty.MapEvent);
+
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.Null(playerParty.Party.MapEventSide);
+            Assert.Null(aiParty.Party.MapEventSide);
+            Assert.False(playerParty.IsActive);
+            Assert.False(playerParty.IsVisible);
+            Assert.Equal(MoveModeType.Hold, aiParty.PartyMoveMode);
+            Assert.Null(aiParty.MoveTargetParty);
+            Assert.True(aiParty.Ai.RethinkAtNextHourlyTick);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void FinalizePlayerMapEvents_SharedOrphanPlayerEvent_FinalizesOnce()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        RegisterAsPlayerParty(
+            "attacking-player",
+            TestEnvironment.CreateRegisteredObject<Hero>(),
+            mapEventContext.AttackerPartyId);
+        RegisterAsPlayerParty(
+            "defending-player",
+            TestEnvironment.CreateRegisteredObject<Hero>(),
+            mapEventContext.DefenderPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            var messageBroker = Server.Resolve<IMessageBroker>();
+            var finalizedCount = 0;
+
+            void CountFinalization(MessagePayload<MapEventFinalized> payload)
+            {
+                if (ReferenceEquals(payload.What.MapEvent, mapEvent))
+                    finalizedCount++;
+            }
+
+            messageBroker.Subscribe<MapEventFinalized>(CountFinalization);
+            try
+            {
+                Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            }
+            finally
+            {
+                messageBroker.Unsubscribe<MapEventFinalized>(CountFinalization);
+            }
+
+            Assert.Equal(1, finalizedCount);
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+        }, MapEventDisabledMethods);
+    }
 
     [Fact]
     public void FinalizePlayerMapEvents_PlayerEvent_ReleasesPartiesAndDestroysReplicatedEvent()

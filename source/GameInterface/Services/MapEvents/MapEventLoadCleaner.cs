@@ -1,9 +1,12 @@
 ﻿using Serilog;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Helpers;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -17,10 +20,17 @@ public interface IMapEventLoadCleaner
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 {
     private readonly ILogger logger;
+    private readonly IPlayerManager playerManager;
+    private readonly IObjectManager objectManager;
 
-    public MapEventLoadCleaner(ILogger logger)
+    public MapEventLoadCleaner(
+        ILogger logger,
+        IPlayerManager playerManager,
+        IObjectManager objectManager)
     {
         this.logger = logger;
+        this.playerManager = playerManager;
+        this.objectManager = objectManager;
     }
 
     public void FinalizePlayerMapEvents()
@@ -28,9 +38,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (Campaign.Current?.MapEventManager == null)
             return;
 
-        var loadedPlayerMapEvents = Campaign.Current.MapEventManager.MapEvents
-            .Where(mapEvent => !mapEvent.IsFinalized && mapEvent.ContainsPlayerParty())
-            .ToArray();
+        var loadedPlayerMapEvents = GetLoadedPlayerMapEvents();
 
         foreach (var mapEvent in loadedPlayerMapEvents)
         {
@@ -83,6 +91,31 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 mobileParty.ResetNavigationToHold();
             }
         }
+    }
+
+    private MapEvent[] GetLoadedPlayerMapEvents()
+    {
+        var mapEvents = Campaign.Current.MapEventManager.MapEvents
+            .Where(mapEvent => !mapEvent.IsFinalized && mapEvent.ContainsPlayerParty())
+            .ToList();
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+                continue;
+
+            var mapEvent = party.MapEvent;
+            if (mapEvent == null ||
+                mapEvent.IsFinalized ||
+                mapEvents.Any(candidate => ReferenceEquals(candidate, mapEvent)))
+            {
+                continue;
+            }
+
+            mapEvents.Add(mapEvent);
+        }
+
+        return mapEvents.ToArray();
     }
 
     private static bool TrySetReleasedPartySettlementObjective(
