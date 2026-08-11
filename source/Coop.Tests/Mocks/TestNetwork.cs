@@ -20,6 +20,7 @@ public class TestNetwork : INetwork
     public readonly Dictionary<int, List<IMessage>> SentNetworkMessages = new Dictionary<int, List<IMessage>>();
     public readonly Dictionary<int, List<IPacket>> SentPackets = new Dictionary<int, List<IPacket>>();
     public readonly Dictionary<int, List<object>> SentPayloads = new Dictionary<int, List<object>>();
+    public readonly List<(NetPeer Peer, object Payload)> ImmediateSends = new List<(NetPeer Peer, object Payload)>();
     public readonly List<NetPeer> Peers = new List<NetPeer>();
     public int FlushPendingMessagesCalls { get; private set; }
     public Exception? FlushPendingMessagesException { get; set; }
@@ -89,9 +90,17 @@ public class TestNetwork : INetwork
         RecordPayload(netPeer, message);
     }
 
-    public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
+    public void SendImmediate(NetPeer netPeer, IPacket packet)
+    {
+        ImmediateSends.Add((netPeer, packet));
+        Send(netPeer, packet);
+    }
 
-    public void SendImmediate(NetPeer netPeer, IMessage message) => Send(netPeer, message);
+    public void SendImmediate(NetPeer netPeer, IMessage message)
+    {
+        ImmediateSends.Add((netPeer, message));
+        Send(netPeer, message);
+    }
 
     public void SendAll(IMessage message)
     {
@@ -133,6 +142,7 @@ public class TestNetwork : INetwork
         SentNetworkMessages.Clear();
         SentPackets.Clear();
         SentPayloads.Clear();
+        ImmediateSends.Clear();
         FlushPendingMessagesCalls = 0;
         FlushPendingMessagesException = null;
     }

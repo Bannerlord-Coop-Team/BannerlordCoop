@@ -34,7 +34,7 @@ public sealed class CoopTournamentCampaignBehavior : CampaignBehaviorBase
 
         starter.AddGameMenu(
             PreparationMenuId,
-            "{=coop_tournament_preparation_description}Coop tournaments are in BETA. It is recommended to make a save before starting a tournament.\n\nLords in tournament: {TOURNAMENT_LORD_COUNT}\n\nTournament prize: {TOURNAMENT_PRIZE}\n\nEnrolled competitors:\n{TOURNAMENT_PLAYERS}",
+            "{=coop_tournament_preparation_description}Lords in tournament: {TOURNAMENT_LORD_COUNT}\n\nTournament prize: {TOURNAMENT_PRIZE}\n\nEnrolled competitors:\n{TOURNAMENT_PLAYERS}",
             InitializePreparationMenu,
             GameMenu.MenuOverlayType.SettlementWithBoth,
             GameMenu.MenuFlags.None,
@@ -120,6 +120,30 @@ public sealed class CoopTournamentCampaignBehavior : CampaignBehaviorBase
 
     internal static bool IsSupportedTournament(TournamentGame tournamentGame)
         => tournamentGame?.GetType() == typeof(FightTournamentGame);
+
+    internal static string EnterTournamentAndGetMenuId()
+    {
+        if (!TryGetCurrentTournament(out var tournamentGame) ||
+            !IsSupportedTournament(tournamentGame) ||
+            !TryGetTownContext(out var townId, out var controller))
+        {
+            return TownArenaMenuId;
+        }
+
+        if (!controller.TryGetTownSession(townId, out var snapshot) || snapshot.IsCompleted)
+        {
+            controller.RequestJoin(townId, null, 0);
+            return PreparationMenuId;
+        }
+
+        if (snapshot.Phase != TournamentSessionPhase.Preparation)
+            return ActiveMenuId;
+
+        if (!IsLocalMissionMember(snapshot, controller.LocalControllerId))
+            controller.RequestJoin(townId, snapshot.SessionId, snapshot.Revision);
+
+        return PreparationMenuId;
+    }
 
     private static bool ArenaJoinCondition(MenuCallbackArgs args)
     {
@@ -239,15 +263,23 @@ public sealed class CoopTournamentCampaignBehavior : CampaignBehaviorBase
     private static bool LeavePreparationCondition(MenuCallbackArgs args)
     {
         args.optionLeaveType = GameMenuOption.LeaveType.Leave;
-        args.IsEnabled = TryGetTownContext(out var townId, out var controller) &&
+
+        args.IsEnabled = !TryGetTownContext(out var townId, out var controller) ||
+                         !controller.TryGetTownSession(townId, out _) ||
                          controller.CanLeavePreparation(townId);
         return true;
     }
 
     private static void LeavePreparationConsequence(MenuCallbackArgs args)
     {
-        if (TryGetTownContext(out var townId, out var controller))
+        if (TryGetTownContext(out var townId, out var controller) &&
+            controller.CanLeavePreparation(townId))
+        {
             controller.RequestLeavePreparation(townId);
+            return;
+        }
+
+        GameMenu.SwitchToMenu(TownCenterMenuId);
     }
 
     private static bool SpectateCondition(MenuCallbackArgs args)

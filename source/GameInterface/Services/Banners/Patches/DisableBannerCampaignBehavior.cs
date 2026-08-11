@@ -2,6 +2,7 @@
 using GameInterface.Services.Banners.Interfaces;
 using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
@@ -19,6 +20,24 @@ internal class DisableBannerCampaignBehavior
 [HarmonyPatch(typeof(BannerCampaignBehavior))]
 internal class BannerCampaignBehaviorPatches
 {
+    // Used to only allow OnNewGameCreated to run GiveBannersToHeroes.
+    // OnGameLoadFinishedEvent runs before players are registered, giving player clan heroes banners when loading a save.
+    // DailyTickHero already eventually gives heroes with invalid banners new ones, so this event isn't really needed.
+    [ThreadStatic]
+    public static bool IsCreatingNewGame;
+
+    [HarmonyPatch(nameof(BannerCampaignBehavior.OnNewGameCreated))]
+    [HarmonyPrefix]
+    public static void OnNewGameCreatedPrefix() => IsCreatingNewGame = true;
+
+    [HarmonyPatch(nameof(BannerCampaignBehavior.OnNewGameCreated))]
+    [HarmonyPostfix]
+    public static void OnNewGameCreatedPostfix() => IsCreatingNewGame = false;
+
+    [HarmonyPatch(nameof(BannerCampaignBehavior.GiveBannersToHeroes))]
+    [HarmonyPrefix]
+    public static bool GiveBannersToHeroesPrefix() => IsCreatingNewGame;
+
     [HarmonyPatch(nameof(BannerCampaignBehavior.DailyTickHero))]
     [HarmonyPrefix]
     public static bool DailyTickHeroPrefix(Hero hero)

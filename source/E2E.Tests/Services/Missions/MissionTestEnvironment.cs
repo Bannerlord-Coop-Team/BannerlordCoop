@@ -1,7 +1,8 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Messages;
@@ -49,6 +50,17 @@ public class MissionTestEnvironment : E2ETestEnvironment
     protected void SetControllerId(EnvironmentInstance instance, string controllerId)
     {
         instance.Call(() => instance.Resolve<IControllerIdProvider>().SetControllerId(controllerId));
+    }
+
+    protected static MockMission CreateMovementMission(
+        MissionEngineFixture fixture,
+        EnvironmentInstance instance)
+    {
+        MockMission mission = fixture.CreateMission(instance);
+        instance.Resolve<IMessageBroker>().Publish(
+            fixture,
+            new NetworkMissionPeerEntered("movement-receiver", "movement-test"));
+        return mission;
     }
 
     /// <summary>

@@ -10,6 +10,7 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using SandBox.View.Map.Managers;
@@ -41,17 +42,20 @@ internal class HeroInterface : IHeroInterface
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IPartyVisibilitySweep partyVisibilitySweep;
+    private readonly IPlayerPartyRestorer playerPartyRestorer;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
         IObjectManager objectManager,
-        IPartyVisibilitySweep partyVisibilitySweep)
+        IPartyVisibilitySweep partyVisibilitySweep,
+        IPlayerPartyRestorer playerPartyRestorer)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
         this.partyVisibilitySweep = partyVisibilitySweep;
+        this.playerPartyRestorer = playerPartyRestorer;
     }
 
     public byte[] PackageMainHero()
@@ -113,6 +117,8 @@ internal class HeroInterface : IHeroInterface
         if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty playerParty))
             return;
 
+        LogPlayerSwitchState("before", player, playerHero, playerParty);
+
         Campaign.Current.MainParty = playerParty;
         Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
 
@@ -121,8 +127,6 @@ internal class HeroInterface : IHeroInterface
         // This is needed because if the player is captured the PartyBelongedTo is null
         // Causing ChangePlayerCharacterAction to fail
         playerHero.PartyBelongedTo = playerParty;
-
-        Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
 
         // Vanilla's character change ejects a main hero from its settlement, which would pop the
         // reloaded party outside on this client only (the server's save keeps it inside); keep it
@@ -136,6 +140,8 @@ internal class HeroInterface : IHeroInterface
         {
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
         }
+
+        LogPlayerSwitchState("after", player, playerHero, playerParty);
 
         if (playerParty.CurrentSettlement != null || playerParty.BesiegerCamp != null)
         {
@@ -165,6 +171,49 @@ internal class HeroInterface : IHeroInterface
         // icons would stay revealed forever. Queued so it runs once the campaign state is entered
         // and the hero switched to above is the local main party.
         GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
+    }
+
+    private void LogPlayerSwitchState(
+        string phase,
+        Player player,
+        Hero playerHero,
+        MobileParty playerParty)
+    {
+        bool heroRegistered = objectManager.TryGetId(playerHero, out string registeredHeroId);
+        bool partyRegistered = objectManager.TryGetId(playerParty, out string registeredPartyId);
+        bool partyInCampaign = Campaign.Current?.MobileParties?.Contains(playerParty) == true;
+
+        Logger.Information(
+            "Player switch {Phase}: hero={HeroName} requestedHero={RequestedHeroId} " +
+            "registeredHero={RegisteredHeroId} heroRegistered={HeroRegistered} " +
+            "heroParty={HeroPartyId} requestedParty={RequestedPartyId} " +
+            "registeredParty={RegisteredPartyId} partyRegistered={PartyRegistered} " +
+            "mainHero={MainHeroId} mainParty={MainPartyId} inCampaign={PartyInCampaign} " +
+            "active={PartyActive} roster={RosterCount} mapEvent={MapEventId} " +
+            "settlement={SettlementId} moveMode={MoveMode} targetParty={TargetPartyId} " +
+            "targetSettlement={TargetSettlementId} moveTargetParty={MoveTargetPartyId} " +
+            "interactable={InteractableType}",
+            phase,
+            playerHero.Name?.ToString(),
+            player.HeroId,
+            heroRegistered ? registeredHeroId : "missing",
+            heroRegistered,
+            playerHero.PartyBelongedTo?.StringId,
+            player.MobilePartyId,
+            partyRegistered ? registeredPartyId : "missing",
+            partyRegistered,
+            Hero.MainHero?.StringId,
+            MobileParty.MainParty?.StringId,
+            partyInCampaign,
+            playerParty.IsActive,
+            playerParty.MemberRoster?.TotalManCount ?? -1,
+            playerParty.MapEvent?.StringId,
+            playerParty.CurrentSettlement?.StringId,
+            playerParty.PartyMoveMode,
+            playerParty.TargetParty?.StringId,
+            playerParty.TargetSettlement?.StringId,
+            playerParty.MoveTargetParty?.StringId,
+            playerParty.Ai?.AiBehaviorInteractable?.GetType().Name);
     }
 
     private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
@@ -211,7 +260,7 @@ internal class HeroInterface : IHeroInterface
 
         // Restore the roster before assignNetworkIds registers it. Otherwise the AllowedThread AddToCounts
         // patch sends a roster update before clients receive the hero creation message.
-        RestorePlayerMemberships(hero, party);
+        playerPartyRestorer.Restore(hero, party);
 
         // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
         // the next "PlayerN" from CampaignObjectType.MaxCreatedPostfixIndex, which is cached in OnItemAdded when an
@@ -241,18 +290,6 @@ internal class HeroInterface : IHeroInterface
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
         campaignObjectManager.AddClan(hero.Clan);
-    }
-
-    internal static void RestorePlayerMemberships(Hero hero, MobileParty party)
-    {
-        // PackageMainHero unregisters the player hero before packaging, so ClanBinaryPackage cannot store its
-        // network ID in the clan's hero and alive-lord caches.
-        if (!hero.Clan.Heroes.Contains(hero))
-            hero.Clan.OnLordAdded(hero);
-
-        // TroopRosterBinaryPackage excludes roster elements, so the imported party has an empty member roster.
-        if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
-            party.MemberRoster.AddToCounts(hero.CharacterObject, 1, insertAtFront: true);
     }
 
     /// <summary>

@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using GameInterface.AutoSync;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Moq;
 using System;
@@ -37,6 +38,7 @@ public class ContainerTest
 
             var gameInterface = module.Resolve<IGameInterface>();
             var AutoSyncPatcher = module.Resolve<AutoSyncPatcher>();
+            module.Resolve<IPlayerPartyRestorer>();
 
             gameInterface.PatchAll();
             gameInterface.UnpatchAll();

@@ -38,6 +38,7 @@ using System;
 using Xunit.Abstractions;
 using IGameInterface = GameInterface.IGameInterface;
 using GameInterface.Services.CampaignService.Interfaces;
+using GameInterface.Services.Chat;
 
 namespace Coop.Tests;
 
@@ -98,6 +99,7 @@ internal abstract class TestComponentBase
         RegisterMock<IRegistryManager>(builder);
         RegisterMock<IMapEventLoadCleaner>(builder);
         RegisterPlayerManagerMock(builder);
+        RegisterMock<IPlayerPartyRestorer>(builder);
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
@@ -114,6 +116,8 @@ internal abstract class TestComponentBase
         RegisterMock<IBattleTroopReserveBuilder>(builder);
         RegisterMock<IMapEventInitializationBarrier>(builder);
         RegisterMock<IConnectedPlayerCountService>(builder);
+        RegisterMock<IChatService>(builder);
+        RegisterMock<IChatPlayerNameResolver>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);

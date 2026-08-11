@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 
@@ -25,12 +25,11 @@ public sealed class ModConfigData
 }
 
 /// <summary>
-/// The "difficulty" block. Every key nullable: absent (or commented out in the
-/// template) keeps the save's own setting. The CampaignOptions values live IN
-/// the save, so joining clients inherit them with the join-time save transfer —
-/// playerReceivedDamage is the exception (engine config, pushed to clients as a
-/// join-time ServerOption; see CampaignDifficultyHandler for its headless-host
-/// default).
+/// The "difficulty" block. Properties remain nullable so malformed or unreadable
+/// input can fall back safely, while ModConfig activates or fills the documented
+/// values before a normal load. CampaignOptions values live IN the save, so joining
+/// clients inherit them with the join-time save transfer. PlayerReceivedDamage is
+/// engine config and is pushed to clients as a join-time ServerOption.
 /// </summary>
 public sealed class DifficultyConfigData
 {
@@ -95,8 +94,34 @@ public sealed class ModOptionsData
 
     public float? MaximumLootersMultiplier { get; set; }
 
+    public LordDefectionRetryMode? LordDefectionRetries { get; set; }
+  
+    public bool? EnableHeroExecutions { get; set; }
+
+    public bool? EnablePlayerClanMemberExecutions { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
+}
+
+/// <summary>
+/// How long a lord remembers refusing a recruitment attempt.
+/// </summary>
+/// <remarks>
+/// Vanilla keeps each attempt for one in-game year and blocks the lord until it expires. That
+/// bookkeeping is filled in only by the machine that ran the conversation, so co-op has to choose
+/// what a client's list means.
+/// </remarks>
+public enum LordDefectionRetryMode
+{
+    /// <summary>Vanilla: a refusal blocks that lord for one in-game year, then expires.</summary>
+    Vanilla,
+
+    /// <summary>A refusal blocks that lord for the rest of the session.</summary>
+    NeverExpire,
+
+    /// <summary>A refusal never blocks; the lord can be asked again straight away.</summary>
+    AlwaysRetry
 }
 
 public enum GoldFoodChangeMode

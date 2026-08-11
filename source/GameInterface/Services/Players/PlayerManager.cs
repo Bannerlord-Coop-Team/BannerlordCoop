@@ -28,6 +28,7 @@ public interface IPlayerManager
     /// <param name="player">The player to be added to the registry</param>
     /// <returns>if the player was added to the registry</returns>
     bool AddPlayer(Player player);
+    bool ReplacePlayer(Player registeredPlayer, Player replacementPlayer);
     bool TryGetPlayer(string controllerId, out Player player);
 
     /// <summary>
@@ -164,6 +165,43 @@ public class PlayerManager : IPlayerManager
         AddPlayerObject<Clan>(player.ControllerId, player.ClanId);
 
         return true;
+    }
+
+    public bool ReplacePlayer(Player registeredPlayer, Player replacementPlayer)
+    {
+        if (registeredPlayer == null || replacementPlayer == null ||
+            string.IsNullOrEmpty(registeredPlayer.ControllerId) ||
+            registeredPlayer.ControllerId != replacementPlayer.ControllerId)
+            return false;
+
+        lock (registrySync)
+        {
+            if (!_players.TryGetValue(registeredPlayer.ControllerId, out var current) ||
+                !ReferenceEquals(current, registeredPlayer))
+                return false;
+
+            _players[registeredPlayer.ControllerId] = replacementPlayer;
+
+            foreach (var peer in peerToPlayer
+                .Where(kvp => ReferenceEquals(kvp.Value, registeredPlayer))
+                .Select(kvp => kvp.Key).ToArray())
+            {
+                peerToPlayer[peer] = replacementPlayer;
+            }
+        }
+
+        ReplacePlayerObject<MobileParty>(registeredPlayer.ControllerId, registeredPlayer.MobilePartyId, replacementPlayer.MobilePartyId);
+        ReplacePlayerObject<Hero>(registeredPlayer.ControllerId, registeredPlayer.HeroId, replacementPlayer.HeroId);
+        ReplacePlayerObject<Clan>(registeredPlayer.ControllerId, registeredPlayer.ClanId, replacementPlayer.ClanId);
+        return true;
+    }
+
+    private void ReplacePlayerObject<T>(string controllerId, string oldId, string newId)
+    {
+        if (oldId == newId) return;
+
+        RemovePlayerObject<T>(oldId);
+        AddPlayerObject<T>(controllerId, newId);
     }
 
     private void AddPlayerObject<T>(string controllerId, string networkId)
