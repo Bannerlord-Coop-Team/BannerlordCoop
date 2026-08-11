@@ -88,6 +88,38 @@ public class WeaponPickupSyncTests
     }
 
     [Fact]
+    public void MissionModule_RegistersWeaponDropPatchCategory()
+    {
+        HarmonyPatchCategoryRegistration registration = Assert.Single(
+            MissionModule.CreatePatchCategoryRegistrations(),
+            candidate => candidate.Category == MissionModule.WeaponDropPatchCategory);
+        var harmony = new Harmony(
+            $"{nameof(MissionModule_RegistersWeaponDropPatchCategory)}.{System.Guid.NewGuid()}");
+        MethodInfo target = AccessTools.Method(
+            typeof(Agent),
+            nameof(Agent.DropItem),
+            new[] { typeof(EquipmentIndex), typeof(WeaponClass) });
+
+        try
+        {
+            registration.Apply(harmony);
+
+            Patches patches = Harmony.GetPatchInfo(target);
+            Patch patch = Assert.Single(
+                patches.Postfixes,
+                candidate => candidate.owner == harmony.Id);
+            Assert.Equal(typeof(AgentDropPatch), patch.PatchMethod.DeclaringType);
+        }
+        finally
+        {
+            harmony.Unpatch(
+                target,
+                HarmonyPatchType.All,
+                harmony.Id);
+        }
+    }
+
+    [Fact]
     public void MissionModule_RegistersWeaponPickupPatchCategory()
     {
         HarmonyPatchCategoryRegistration registration = Assert.Single(
