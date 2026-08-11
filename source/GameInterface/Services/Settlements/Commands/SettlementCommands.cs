@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -503,7 +504,8 @@ internal class SettlementCommands
 
         ChangeOwnerOfSettlementAction.ApplyBySiege(capturer, capturer, settlement);
 
-        return $"Captured {settlement.Name} by siege; new owner {capturer.Name} ({capturer.MapFaction?.Name})";
+        return $"Captured {settlement.Name} by siege; new owner {capturer.Name} ({capturer.MapFaction?.Name})" +
+               Environment.NewLine + FormatOwnerState(settlement);
     }
 
 #if DEBUG
@@ -563,7 +565,44 @@ internal class SettlementCommands
         if (settlement == null)
             return $"Settlement '{args[0]}' not found";
 
-        return $"{(ModInformation.IsServer ? "SERVER" : "CLIENT")} settlement={settlement.StringId} ownerClan={settlement.OwnerClan?.StringId ?? "null"} ownerLeader={settlement.OwnerClan?.Leader?.StringId ?? "null"}";
+        return FormatOwnerState(settlement);
+    }
+
+#if DEBUG
+    [CommandLineArgumentFunction("assert_owner", "coop.debug.settlements")]
+    public static string AssertOwner(List<string> args)
+    {
+        if (args.Count != 2)
+            return "Usage: coop.debug.settlements.assert_owner <Settlement name or id> <OwnerHero id|null>";
+
+        var settlement = Campaign.Current.CampaignObjectManager.Settlements
+            .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
+        if (settlement == null)
+            return $"Settlement '{args[0]}' not found";
+
+        var actualOwner = settlement.OwnerClan?.Leader?.StringId ?? "null";
+        if (actualOwner != args[1])
+            return $"Settlement '{settlement.StringId}' owner is '{actualOwner}', expected '{args[1]}'";
+
+        return FormatOwnerState(settlement);
+    }
+#endif
+
+    private static string FormatOwnerState(Settlement settlement)
+    {
+        var role = ModInformation.IsServer ? "SERVER" : "CLIENT";
+        var ownerClan = settlement.OwnerClan?.StringId;
+        var ownerLeader = settlement.OwnerClan?.Leader?.StringId;
+        var structuredState = JsonSerializer.Serialize(new
+        {
+            role,
+            settlement = settlement.StringId,
+            ownerClan,
+            ownerLeader,
+        });
+
+        return $"{role} settlement={settlement.StringId} ownerClan={ownerClan ?? "null"} ownerLeader={ownerLeader ?? "null"}" +
+               Environment.NewLine + $"LIVE_TEST_JSON={structuredState}";
     }
 
     // coop.debug.settlementcomponent.set_gold town_comp_ES3 401021
