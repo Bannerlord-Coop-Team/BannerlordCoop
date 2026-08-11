@@ -310,6 +310,131 @@ namespace E2E.Tests.Services.TroopRosters
         }
 
         [Fact]
+        public void SameClanCompanionParty_ClanPlayerReceivesXpAndObserversReceiveOnlyCounts()
+        {
+            var clanPlayer = Clients.First();
+            var observer = Clients.Last();
+            string playerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            string companionPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            string clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companionPartyId, out var companionParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+                playerParty.ActualClan = clan;
+                companionParty.ActualClan = clan;
+                Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                    new Player("clan-player", null, playerPartyId, clanId, null)));
+                Assert.False(companionParty.IsPlayerParty());
+                companionParty.MemberRoster.AddToCounts(character, 5, xpChange: 100);
+            });
+            TestEnvironment.ConnectRegisteredPlayer(clanPlayer, "clan-player");
+            FlushCoalescer();
+
+            clanPlayer.InternalMessages.Clear();
+            observer.InternalMessages.Clear();
+            Server.NetworkSentMessages.Clear();
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companionPartyId, out var companionParty));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+                companionParty.MemberRoster.SetElementXp(
+                    companionParty.MemberRoster.FindIndexOfTroop(character), 250);
+                companionParty.MemberRoster.AddToCounts(character, 1, xpChange: 75);
+            });
+            FlushCoalescer();
+
+            var playerOperations = clanPlayer.InternalMessages
+                .GetMessages<NetworkTroopRosterElementBatch>()
+                .SelectMany(batch => batch.Operations)
+                .ToArray();
+            Assert.Collection(playerOperations,
+                setXp =>
+                {
+                    Assert.Equal(TroopRosterElementOperationKind.SetXp, setXp.Kind);
+                    Assert.Equal(250, setXp.Xp);
+                },
+                addCounts =>
+                {
+                    Assert.Equal(TroopRosterElementOperationKind.AddCounts, addCounts.Kind);
+                    Assert.Equal(1, addCounts.Count);
+                    Assert.Equal(75, addCounts.Xp);
+                });
+
+            var observerOperation = Assert.Single(observer.InternalMessages
+                .GetMessages<NetworkTroopRosterElementBatch>()
+                .SelectMany(batch => batch.Operations));
+            Assert.Equal(TroopRosterElementOperationKind.AddCounts, observerOperation.Kind);
+            Assert.Equal(1, observerOperation.Count);
+            Assert.Equal(0, observerOperation.Xp);
+        }
+
+        [Fact]
+        public void SameClanCompanionParty_AllConnectedClanPlayersReceiveXp()
+        {
+            var firstPlayer = Clients.First();
+            var secondPlayer = Clients.Last();
+            string firstPlayerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            string secondPlayerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            string companionPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            string clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(firstPlayerPartyId, out var firstPlayerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(secondPlayerPartyId, out var secondPlayerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companionPartyId, out var companionParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+                firstPlayerParty.ActualClan = clan;
+                secondPlayerParty.ActualClan = clan;
+                companionParty.ActualClan = clan;
+                Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                    new Player("first-clan-player", null, firstPlayerPartyId, clanId, null)));
+                Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                    new Player("second-clan-player", null, secondPlayerPartyId, clanId, null)));
+                companionParty.MemberRoster.AddToCounts(character, 5);
+            });
+            TestEnvironment.ConnectRegisteredPlayer(firstPlayer, "first-clan-player");
+            TestEnvironment.ConnectRegisteredPlayer(secondPlayer, "second-clan-player");
+            FlushCoalescer();
+
+            foreach (var client in Clients) client.InternalMessages.Clear();
+            Server.NetworkSentMessages.Clear();
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companionPartyId, out var companionParty));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+                companionParty.MemberRoster.SetElementXp(
+                    companionParty.MemberRoster.FindIndexOfTroop(character), 250);
+                companionParty.MemberRoster.AddToCounts(character, 1, xpChange: 75);
+            });
+            FlushCoalescer();
+
+            foreach (var client in Clients)
+            {
+                var operations = client.InternalMessages
+                    .GetMessages<NetworkTroopRosterElementBatch>()
+                    .SelectMany(batch => batch.Operations)
+                    .ToArray();
+                Assert.Collection(operations,
+                    setXp =>
+                    {
+                        Assert.Equal(TroopRosterElementOperationKind.SetXp, setXp.Kind);
+                        Assert.Equal(250, setXp.Xp);
+                    },
+                    addCounts =>
+                    {
+                        Assert.Equal(TroopRosterElementOperationKind.AddCounts, addCounts.Kind);
+                        Assert.Equal(75, addCounts.Xp);
+                    });
+            }
+        }
+
+        [Fact]
         public void DisconnectedPlayerParty_ObserversReceiveCountsWithoutXp()
         {
             var (partyId, _) = CreatePlayerParty("disconnected", Clients.First(), connected: false);

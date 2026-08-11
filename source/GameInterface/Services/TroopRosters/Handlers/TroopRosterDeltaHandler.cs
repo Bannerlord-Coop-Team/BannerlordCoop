@@ -8,13 +8,17 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.TroopRosters.Coalescing;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
@@ -46,6 +50,7 @@ internal class TroopRosterDeltaHandler : IHandler
     private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
     private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
     private readonly IPlayerManager playerManager;
+    private readonly IPlayerTroopXpRelevance playerTroopXpRelevance;
 
     public TroopRosterDeltaHandler(
         IMessageBroker messageBroker,
@@ -54,6 +59,7 @@ internal class TroopRosterDeltaHandler : IHandler
         IEncounterMenuConditionRefresher encounterMenuConditionRefresher,
         IPartyScreenRosterRefresher partyScreenRosterRefresher,
         IPlayerManager playerManager,
+        IPlayerTroopXpRelevance playerTroopXpRelevance,
         ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -63,6 +69,7 @@ internal class TroopRosterDeltaHandler : IHandler
         this.coalescer = coalescer;
         this.partyScreenRosterRefresher = partyScreenRosterRefresher;
         this.playerManager = playerManager;
+        this.playerTroopXpRelevance = playerTroopXpRelevance;
 
         // Authority send path: the roster patches publish these local events (server-only) with the server index.
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
@@ -175,11 +182,7 @@ internal class TroopRosterDeltaHandler : IHandler
         bool isAddCounts = operation.Kind == TroopRosterElementOperationKind.AddCounts;
         if (!PlayerManager.TryGetControlledObjectInfo(mobileParty, out var controlled))
         {
-            if (isAddCounts)
-            {
-                Enqueue(rosterId, characterId, WithoutXp(operation));
-            }
-
+            EnqueueForClanRelevantPlayers(mobileParty, rosterId, characterId, operation, isAddCounts);
             return;
         }
 
@@ -194,7 +197,7 @@ internal class TroopRosterDeltaHandler : IHandler
             return;
         }
 
-        string peerRoute = controllerPeer.Id + "." + RuntimeHelpers.GetHashCode(controllerPeer);
+        string peerRoute = GetPeerRoute(controllerPeer);
         EnqueueToPeer(rosterId, characterId, operation,
             ControllerElementBatchChannel + "." + peerRoute, controllerPeer);
 
@@ -202,6 +205,56 @@ internal class TroopRosterDeltaHandler : IHandler
         {
             EnqueueToAllBut(rosterId, characterId, WithoutXp(operation),
                 ObserverElementBatchChannel + "." + peerRoute, controllerPeer);
+        }
+    }
+
+    private void EnqueueForClanRelevantPlayers(MobileParty mobileParty, string rosterId,
+        string characterId, TroopRosterElementOperation operation, bool isAddCounts)
+    {
+        var relevantPeers = playerTroopXpRelevance.GetConnectedPeers(mobileParty);
+        if (relevantPeers.Count == 0)
+        {
+            if (isAddCounts) Enqueue(rosterId, characterId, WithoutXp(operation));
+            return;
+        }
+
+        if (relevantPeers.Count == 1)
+        {
+            var relevantPeer = relevantPeers.First();
+            string peerRoute = GetPeerRoute(relevantPeer);
+            EnqueueToPeer(rosterId, characterId, operation,
+                ControllerElementBatchChannel + ".Clan." + peerRoute, relevantPeer);
+
+            if (isAddCounts)
+            {
+                EnqueueToAllBut(rosterId, characterId, WithoutXp(operation),
+                    ObserverElementBatchChannel + ".Clan." + peerRoute, relevantPeer);
+            }
+
+            return;
+        }
+
+        var relevantPeerSet = new HashSet<LiteNetLib.NetPeer>(relevantPeers);
+        foreach (var relevantPeer in relevantPeers)
+        {
+            string peerRoute = GetPeerRoute(relevantPeer);
+            EnqueueToPeer(rosterId, characterId, operation,
+                ControllerElementBatchChannel + ".Clan." + peerRoute, relevantPeer);
+        }
+
+        if (!isAddCounts) return;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!playerManager.TryGetPeer(player.ControllerId, out var observerPeer) ||
+                relevantPeerSet.Contains(observerPeer))
+            {
+                continue;
+            }
+
+            string peerRoute = GetPeerRoute(observerPeer);
+            EnqueueToPeer(rosterId, characterId, WithoutXp(operation),
+                ObserverElementBatchChannel + ".Clan." + peerRoute, observerPeer);
         }
     }
 
@@ -247,6 +300,9 @@ internal class TroopRosterDeltaHandler : IHandler
     private static NetworkTroopRosterElementBatch CreateBatch(string rosterId, string characterId,
         TroopRosterElementOperation operation) =>
         new NetworkTroopRosterElementBatch(rosterId, characterId, new[] { operation });
+
+    private static string GetPeerRoute(LiteNetLib.NetPeer peer) =>
+        peer.Id + "." + RuntimeHelpers.GetHashCode(peer);
 
     private static TroopRosterElementOperation WithoutXp(TroopRosterElementOperation operation) =>
         TroopRosterElementOperation.AddCounts(operation.Count, operation.WoundedCount, 0,

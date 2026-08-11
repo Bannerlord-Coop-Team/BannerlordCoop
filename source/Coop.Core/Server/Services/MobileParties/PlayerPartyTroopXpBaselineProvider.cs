@@ -1,6 +1,7 @@
 ﻿using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.MobileParties;
 
-/// <summary>Captures bounded regular-troop XP for the player behind a joining peer.</summary>
+/// <summary>Captures bounded regular-troop XP for a joining player and their clan parties.</summary>
 public interface IPlayerPartyTroopXpBaselineProvider
 {
     bool TryCapture(NetPeer peer, out TroopRosterXpBaseline[] baselines);
@@ -21,13 +22,16 @@ internal sealed class PlayerPartyTroopXpBaselineProvider : IPlayerPartyTroopXpBa
 {
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly IPlayerTroopXpRelevance playerTroopXpRelevance;
 
     public PlayerPartyTroopXpBaselineProvider(
         IObjectManager objectManager,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IPlayerTroopXpRelevance playerTroopXpRelevance)
     {
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.playerTroopXpRelevance = playerTroopXpRelevance;
     }
 
     public bool TryCapture(NetPeer peer, out TroopRosterXpBaseline[] baselines)
@@ -42,7 +46,26 @@ internal sealed class PlayerPartyTroopXpBaselineProvider : IPlayerPartyTroopXpBa
             return false;
         }
 
-        baselines = new[] { members, prisoners };
+        var captured = new List<TroopRosterXpBaseline> { members, prisoners };
+        foreach (var candidate in Campaign.Current.CampaignObjectManager.MobileParties)
+        {
+            if (candidate == null || !candidate.IsActive || ReferenceEquals(candidate, party) ||
+                !playerTroopXpRelevance.IsRelevant(candidate, player))
+            {
+                continue;
+            }
+
+            if (!TryCapture(candidate.MemberRoster, out var candidateMembers) ||
+                !TryCapture(candidate.PrisonRoster, out var candidatePrisoners))
+            {
+                return false;
+            }
+
+            captured.Add(candidateMembers);
+            captured.Add(candidatePrisoners);
+        }
+
+        baselines = captured.ToArray();
         return true;
     }
 

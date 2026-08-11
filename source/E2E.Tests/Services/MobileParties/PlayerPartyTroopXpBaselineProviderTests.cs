@@ -3,6 +3,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -63,6 +64,96 @@ public class PlayerPartyTroopXpBaselineProviderTests : SyncTestBase
                         candidate => candidate.CharacterId == Compact(prisonerId, typeof(CharacterObject)));
                     Assert.Equal(456, entry.Xp);
                 });
+        });
+    }
+
+    [Fact]
+    public void Capture_IncludesSameClanCompanionPartyButExcludesWorldAiAndOtherPlayerParties()
+    {
+        EnvironmentInstance joiningClient = Clients.First();
+        string playerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        string companionPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        string worldAiPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        string otherPlayerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        string playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        string worldClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        string memberId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string prisonerId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string companionMemberId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string companionPrisonerId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string excludedMemberId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companionPartyId, out var companionParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(worldAiPartyId, out var worldAiParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPlayerPartyId, out var otherPlayerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(worldClanId, out var worldClan));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(memberId, out var member));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(prisonerId, out var prisoner));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(companionMemberId, out var companionMember));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(companionPrisonerId, out var companionPrisoner));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(excludedMemberId, out var excludedMember));
+
+            playerParty.ActualClan = playerClan;
+            companionParty.ActualClan = playerClan;
+            otherPlayerParty.ActualClan = playerClan;
+            worldAiParty.ActualClan = worldClan;
+
+            playerParty.MemberRoster.AddToCounts(member, 3);
+            playerParty.PrisonRoster.AddToCounts(prisoner, 2);
+            companionParty.MemberRoster.AddToCounts(companionMember, 4);
+            companionParty.PrisonRoster.AddToCounts(companionPrisoner, 1);
+            worldAiParty.MemberRoster.AddToCounts(excludedMember, 5);
+            otherPlayerParty.MemberRoster.AddToCounts(excludedMember, 6);
+            SetFixtureXp(playerParty.MemberRoster, member, 123);
+            SetFixtureXp(playerParty.PrisonRoster, prisoner, 456);
+            SetFixtureXp(companionParty.MemberRoster, companionMember, 789);
+            SetFixtureXp(companionParty.PrisonRoster, companionPrisoner, 987);
+            SetFixtureXp(worldAiParty.MemberRoster, excludedMember, 111);
+            SetFixtureXp(otherPlayerParty.MemberRoster, excludedMember, 222);
+
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                new Player("joining-clan-player", null, playerPartyId, playerClanId, null)));
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                new Player("other-clan-player", null, otherPlayerPartyId, playerClanId, null)));
+            Assert.False(companionParty.IsPlayerParty());
+        });
+        TestEnvironment.ConnectRegisteredPlayer(joiningClient, "joining-clan-player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companionPartyId, out var companionParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(worldAiPartyId, out var worldAiParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPlayerPartyId, out var otherPlayerParty));
+            Assert.True(Server.ObjectManager.TryGetId(playerParty.MemberRoster, out var playerMemberRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(playerParty.PrisonRoster, out var playerPrisonRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(companionParty.MemberRoster, out var companionMemberRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(companionParty.PrisonRoster, out var companionPrisonRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(worldAiParty.MemberRoster, out var worldAiMemberRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(otherPlayerParty.MemberRoster, out var otherPlayerMemberRosterId));
+
+            var provider = Server.Resolve<IPlayerPartyTroopXpBaselineProvider>();
+            Assert.True(provider.TryCapture(joiningClient.NetPeer, out var baselines));
+            Assert.Equal(4, baselines.Length);
+            Assert.Equal(Compact(playerMemberRosterId, typeof(TroopRoster)), baselines[0].RosterId);
+            Assert.Equal(Compact(playerPrisonRosterId, typeof(TroopRoster)), baselines[1].RosterId);
+
+            var companionMembers = Assert.Single(baselines,
+                baseline => baseline.RosterId == Compact(companionMemberRosterId, typeof(TroopRoster)));
+            Assert.Equal(789, Assert.Single(companionMembers.Entries,
+                entry => entry.CharacterId == Compact(companionMemberId, typeof(CharacterObject))).Xp);
+            var companionPrisoners = Assert.Single(baselines,
+                baseline => baseline.RosterId == Compact(companionPrisonRosterId, typeof(TroopRoster)));
+            Assert.Equal(987, Assert.Single(companionPrisoners.Entries,
+                entry => entry.CharacterId == Compact(companionPrisonerId, typeof(CharacterObject))).Xp);
+            Assert.DoesNotContain(baselines,
+                baseline => baseline.RosterId == Compact(worldAiMemberRosterId, typeof(TroopRoster)));
+            Assert.DoesNotContain(baselines,
+                baseline => baseline.RosterId == Compact(otherPlayerMemberRosterId, typeof(TroopRoster)));
         });
     }
 
