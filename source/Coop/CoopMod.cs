@@ -725,12 +725,15 @@ namespace Coop
                 return "start must be run on a client.";
             }
 
-            if (CoopMod.Coop.Running)
+            if (ContainerProvider.TryResolve<Common.LogicStates.ILogic>(out _))
             {
-                return "Client is already running a co-op session.";
+                return "Client co-op connection is already starting or running.";
             }
 
-            CoopMod.Coop.StartAsClient();
+            if (!CoopMod.Coop.StartAsClient())
+            {
+                throw new InvalidOperationException("Client co-op connection start was refused.");
+            }
             return "Client co-op connection started.";
         }
     }
