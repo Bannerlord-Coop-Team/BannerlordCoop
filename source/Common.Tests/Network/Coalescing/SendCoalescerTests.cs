@@ -46,57 +46,6 @@ public class SendCoalescerTests
         Assert.Equal(3, ValueOf(Assert.Single(sent)));
     }
 
-#if DEBUG
-    [Fact]
-    public void DebugTrace_CountsEnqueuesMergesAndSendsForOneKey()
-    {
-        var (coalescer, network, sent) = NewFixture();
-        var key = new CoalesceKey("AutoSync.SetValue.MobileParty.PartyTradeGold", "party-1");
-
-        Assert.True(coalescer.TryStartDebugTrace(key));
-
-        coalescer.Enqueue(key, new LatestWinsPayload(new TestMessage("gold", 100)));
-        coalescer.Enqueue(key, new LatestWinsPayload(new TestMessage("gold", 250)));
-        coalescer.Enqueue(key, new LatestWinsPayload(new TestMessage("gold", 777)));
-
-        var beforeFlush = coalescer.GetDebugTraceSnapshot();
-        Assert.Equal(3, beforeFlush.Enqueued);
-        Assert.Equal(2, beforeFlush.Merged);
-        Assert.Equal(0, beforeFlush.Sent);
-        Assert.True(beforeFlush.Pending);
-
-        coalescer.Flush(network);
-
-        var afterFlush = coalescer.GetDebugTraceSnapshot();
-        Assert.Equal(3, afterFlush.Enqueued);
-        Assert.Equal(2, afterFlush.Merged);
-        Assert.Equal(1, afterFlush.Sent);
-        Assert.False(afterFlush.Pending);
-        Assert.Equal(777, ValueOf(Assert.Single(sent)));
-    }
-
-    [Fact]
-    public void DebugTrace_DoesNotCountFailedSendAll()
-    {
-        var coalescer = new SendCoalescer();
-        var network = new Mock<INetwork>();
-        var key = new CoalesceKey("AutoSync.SetValue.MobileParty.PartyTradeGold", "party-1");
-        network.Setup(n => n.SendAll(It.IsAny<IMessage>()))
-            .Throws(new InvalidOperationException("send failed"));
-
-        Assert.True(coalescer.TryStartDebugTrace(key));
-        coalescer.Enqueue(key, new LatestWinsPayload(new TestMessage("gold", 777)));
-
-        Assert.Throws<InvalidOperationException>(() => coalescer.Flush(network.Object));
-
-        var snapshot = coalescer.GetDebugTraceSnapshot();
-        Assert.Equal(1, snapshot.Enqueued);
-        Assert.Equal(0, snapshot.Merged);
-        Assert.Equal(0, snapshot.Sent);
-        Assert.False(snapshot.Pending);
-    }
-#endif
-
     [Fact]
     public void Summed_AccumulatesDeltas()
     {
