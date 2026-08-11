@@ -31,10 +31,15 @@ jobs:
     timeout-minutes: 30
     container:
       image: garrettluskey/bannerlordcoop:latest
+    outputs:
+      release_date: ${{ steps.release.outputs.release_date }}
+      file_name: ${{ steps.release.outputs.file_name }}
+      head_sha: ${{ steps.release.outputs.head_sha }}
+      base_sha: ${{ steps.release.outputs.base_sha }}
 
     steps:
       - name: Checkout development
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -47,7 +52,7 @@ jobs:
 
       - name: Find previous nightly commit
         id: previous
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           result-encoding: string
           script: |
@@ -136,19 +141,12 @@ jobs:
             base_sha=
           fi
 
-          mkdir -p artifact
           printf 'release_date=%s\nfile_name=%s\nhead_sha=%s\nbase_sha=%s\n' \
             "$release_date" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
 
-      - name: Package module
-        env:
-          RELEASE_DATE: ${{ steps.release.outputs.release_date }}
-          FILE_NAME: ${{ steps.release.outputs.file_name }}
-          HEAD_SHA: ${{ steps.release.outputs.head_sha }}
-          BASE_SHA: ${{ steps.release.outputs.base_sha }}
+      - name: Stage module
         run: |
           set -eu
-          apk add --no-cache 7zip >/dev/null
           module=release-stage/Coop
           binary="$module/bin/Win64_Shipping_Client"
           mkdir -p "$binary" "$module/GUI/Prefabs"
@@ -179,26 +177,174 @@ jobs:
             -e "s/\${game_version}/$game_version/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
 
+      - name: Upload unsigned module
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: unsigned-nightly-module-${{ steps.release.outputs.head_sha }}
+          path: release-stage/
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-and-package:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download unsigned module
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: unsigned-nightly-module-${{ needs.build.outputs.head_sha }}
+          path: release-stage
+
+      - name: Azure login
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign module binaries
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
+        with:
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.SIGNING_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}\release-stage\Coop\bin\Win64_Shipping_Client
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify signatures
+        shell: pwsh
+        run: |
+          $binaries = @(Get-ChildItem 'release-stage\Coop\bin\Win64_Shipping_Client\*' -Include '*.dll', '*.exe')
+          if ($binaries.Count -eq 0) { throw 'No module binaries found to verify' }
+          $invalid = @($binaries | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' })
+          foreach ($file in $invalid) {
+            Write-Host "Not validly signed: $($file.Name) ($((Get-AuthenticodeSignature $file.FullName).Status))"
+          }
+          if ($invalid.Count -gt 0) { throw "$($invalid.Count) of $($binaries.Count) binaries are not validly signed" }
+          Write-Host "Verified Authenticode signatures on $($binaries.Count) binaries"
+
+      - name: Package signed module
+        shell: bash
+        run: |
+          set -eu
+          mkdir transfer
           (cd release-stage && 7z a -t7z -m0=LZMA2 -mx=9 -ms=on \
-            "../artifact/$FILE_NAME" Coop >/dev/null)
-          release_size=$(stat -c %s "artifact/$FILE_NAME")
+            ../transfer/Coop.7z Coop >/dev/null)
+          release_size=$(stat -c %s transfer/Coop.7z)
           if [ "$release_size" -gt 8388608 ]; then
             echo "Release archive is $release_size bytes; the 8 MiB safety budget reserves 2 MiB below Discord's 10 MiB limit." >&2
             exit 1
           fi
+          test "$release_size" -gt 0
 
+      - name: Upload isolated signed client input
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: nightly-client-input-${{ needs.build.outputs.head_sha }}
+          path: transfer/Coop.7z
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-client-input:
+    needs: [build, sign-and-package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download isolated signed client input
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: nightly-client-input-${{ needs.build.outputs.head_sha }}
+          path: transfer
+
+      - name: Validate and describe signed client input
+        id: artifact
+        env:
+          RELEASE_DATE: ${{ needs.build.outputs.release_date }}
+          FILE_NAME: ${{ needs.build.outputs.file_name }}
+          HEAD_SHA: ${{ needs.build.outputs.head_sha }}
+          BASE_SHA: ${{ needs.build.outputs.base_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REF" = refs/heads/development
+          printf '%s' "$RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          printf '%s' "$HEAD_SHA" | grep -Eq '^[a-f0-9]{40}$'
           if [ -n "$BASE_SHA" ]; then
-            base_json="\"$BASE_SHA\""
-          else
-            base_json=null
+            printf '%s' "$BASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
           fi
-          archive_bytes=$(stat -c %s "artifact/$FILE_NAME")
-          archive_sha256=$(sha256sum "artifact/$FILE_NAME" | cut -d' ' -f1)
-          r2_key="nightly-client/Coop.7z"
-          printf '{"releaseDate":"%s","fileName":"%s","branch":"development","headSha":"%s","baseSha":%s,"serverInput":{"bucket":"%s","key":"%s","bytes":%s,"sha256":"%s"}}\n' \
-            "$RELEASE_DATE" "$FILE_NAME" "$HEAD_SHA" "$base_json" \
-            "$R2_PRIVATE_BUCKET" "$r2_key" "$archive_bytes" "$archive_sha256" \
-            > artifact/manifest.json
+          test "$R2_PRIVATE_BUCKET" = bannerlordcoop-build-inputs
+          test "$R2_PUBLIC_BUCKET" = bannerlordcoop-nightly-releases
+
+          test -d transfer
+          test ! -L transfer
+          entry_count=$(find transfer -mindepth 1 -maxdepth 1 -printf x | wc -c)
+          test "$entry_count" -eq 1
+          test -f transfer/Coop.7z
+          test ! -L transfer/Coop.7z
+
+          archive_bytes=$(stat -c %s transfer/Coop.7z)
+          test "$archive_bytes" -gt 0
+          test "$archive_bytes" -le 8388608
+          archive_sha256=$(sha256sum transfer/Coop.7z | awk '{print $1}')
+          printf '%s' "$archive_sha256" | grep -Eq '^[a-f0-9]{64}$'
+
+          mkdir artifact
+          mv transfer/Coop.7z "artifact/$FILE_NAME"
+          export ARCHIVE_BYTES="$archive_bytes"
+          export ARCHIVE_SHA256="$archive_sha256"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest = {
+              "releaseDate": os.environ["RELEASE_DATE"],
+              "fileName": os.environ["FILE_NAME"],
+              "branch": "development",
+              "headSha": os.environ["HEAD_SHA"],
+              "baseSha": os.environ["BASE_SHA"] or None,
+              "serverInput": {
+                  "bucket": os.environ["R2_PRIVATE_BUCKET"],
+                  "key": "nightly-client/Coop.7z",
+                  "bytes": int(os.environ["ARCHIVE_BYTES"]),
+                  "sha256": os.environ["ARCHIVE_SHA256"],
+              },
+          }
+          path = Path("artifact/manifest.json")
+          path.write_text(json.dumps(manifest, separators=(",", ":")) + "\n", encoding="utf-8")
+          if json.loads(path.read_text(encoding="utf-8")) != manifest:
+              raise SystemExit("trusted manifest identity validation failed")
+          PY
+          test "$(stat -c %s artifact/manifest.json)" -le 4096
+
+          printf 'archive_bytes=%s\n' "$archive_bytes" >> "$GITHUB_OUTPUT"
+          printf 'archive_sha256=%s\n' "$archive_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned R2 uploader
+        env:
+          PINNED_RCLONE_VERSION: 1.70.3
+          PINNED_RCLONE_ARCHIVE_SHA256: 7d69057e69385f6514a9684c7eaa424d972096b130284bb34dd967c4ed4f9dad
+        run: |
+          set -eu
+          archive="$RUNNER_TEMP/rclone.zip"
+          curl --fail --silent --show-error --location \
+            "https://downloads.rclone.org/v$PINNED_RCLONE_VERSION/rclone-v$PINNED_RCLONE_VERSION-linux-amd64.zip" \
+            --output "$archive"
+          echo "$PINNED_RCLONE_ARCHIVE_SHA256  $archive" | sha256sum -c -
+          unzip -q "$archive" -d "$RUNNER_TEMP"
+          install -m 0755 \
+            "$RUNNER_TEMP/rclone-v$PINNED_RCLONE_VERSION-linux-amd64/rclone" \
+            "$RUNNER_TEMP/rclone"
+          "$RUNNER_TEMP/rclone" version
 
       - name: Publish dedicated-server client input
         env:
@@ -207,24 +353,27 @@ jobs:
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          FILE_NAME: ${{ steps.release.outputs.file_name }}
-          HEAD_SHA: ${{ steps.release.outputs.head_sha }}
+          FILE_NAME: ${{ needs.build.outputs.file_name }}
+          ARCHIVE_BYTES: ${{ steps.artifact.outputs.archive_bytes }}
+          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
         run: |
           set -eu
-          apk add --no-cache rclone >/dev/null
           test -n "$R2_ACCOUNT_ID"
-          test -n "$R2_PRIVATE_BUCKET"
+          printf '%s' "$ARCHIVE_SHA256" | grep -Eq '^[a-f0-9]{64}$'
           export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           prefix=nightly-client
           archive="artifact/$FILE_NAME"
-          archive_bytes=$(stat -c %s "$archive")
+          test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
+          test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
 
           # The manifest is uploaded last and acts as the completed handoff marker.
-          rclone copyto "$archive" "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" \
+          "$RUNNER_TEMP/rclone" copyto "$archive" "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          remote_bytes=$(rclone lsl "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | awk '{print $1}')
-          test "$remote_bytes" = "$archive_bytes"
-          rclone copyto artifact/manifest.json "r2:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
+          remote_bytes=$("$RUNNER_TEMP/rclone" lsl "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | awk '{print $1}')
+          test "$remote_bytes" = "$ARCHIVE_BYTES"
+          remote_sha256=$("$RUNNER_TEMP/rclone" cat "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | sha256sum | awk '{print $1}')
+          test "$remote_sha256" = "$ARCHIVE_SHA256"
+          "$RUNNER_TEMP/rclone" copyto artifact/manifest.json "r2:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
       - name: Publish latest client to public R2
@@ -234,35 +383,59 @@ jobs:
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PUBLIC_ACCESS_KEY_ID }}
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PUBLIC_SECRET_ACCESS_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          RELEASE_DATE: ${{ steps.release.outputs.release_date }}
-          FILE_NAME: ${{ steps.release.outputs.file_name }}
-          HEAD_SHA: ${{ steps.release.outputs.head_sha }}
+          RELEASE_DATE: ${{ needs.build.outputs.release_date }}
+          FILE_NAME: ${{ needs.build.outputs.file_name }}
+          HEAD_SHA: ${{ needs.build.outputs.head_sha }}
+          ARCHIVE_BYTES: ${{ steps.artifact.outputs.archive_bytes }}
+          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
         run: |
           set -eu
-          apk add --no-cache rclone >/dev/null
           test -n "$R2_ACCOUNT_ID"
-          test -n "$R2_PUBLIC_BUCKET"
           export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           archive="artifact/$FILE_NAME"
-          archive_bytes=$(stat -c %s "$archive")
-          archive_sha256=$(sha256sum "$archive" | cut -d' ' -f1)
+          test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
+          test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
           built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          printf '{"version":1,"releaseDate":"%s","headSha":"%s","builtAt":"%s","client":{"fileName":"%s","bytes":%s,"sha256":"%s","publicUrl":"%s/nightly/Coop.7z"}}\n' \
-            "$RELEASE_DATE" "$HEAD_SHA" "$built_at" "$FILE_NAME" "$archive_bytes" \
-            "$archive_sha256" "$R2_PUBLIC_BASE_URL" > artifact/client-release.json
+          export BUILT_AT="$built_at"
+          export PUBLIC_URL="$R2_PUBLIC_BASE_URL/nightly/Coop.7z"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
 
-          rclone copyto "$archive" "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" \
+          manifest = {
+              "version": 1,
+              "releaseDate": os.environ["RELEASE_DATE"],
+              "headSha": os.environ["HEAD_SHA"],
+              "builtAt": os.environ["BUILT_AT"],
+              "client": {
+                  "fileName": os.environ["FILE_NAME"],
+                  "bytes": int(os.environ["ARCHIVE_BYTES"]),
+                  "sha256": os.environ["ARCHIVE_SHA256"],
+                  "publicUrl": os.environ["PUBLIC_URL"],
+              },
+          }
+          path = Path("artifact/client-release.json")
+          path.write_text(json.dumps(manifest, separators=(",", ":")) + "\n", encoding="utf-8")
+          if json.loads(path.read_text(encoding="utf-8")) != manifest:
+              raise SystemExit("public manifest validation failed")
+          PY
+          test "$(stat -c %s artifact/client-release.json)" -le 4096
+
+          "$RUNNER_TEMP/rclone" copyto "$archive" "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          remote_bytes=$(rclone lsl "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" | awk '{print $1}')
-          test "$remote_bytes" = "$archive_bytes"
+          remote_bytes=$("$RUNNER_TEMP/rclone" lsl "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" | awk '{print $1}')
+          test "$remote_bytes" = "$ARCHIVE_BYTES"
+          remote_sha256=$("$RUNNER_TEMP/rclone" cat "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" | sha256sum | awk '{print $1}')
+          test "$remote_sha256" = "$ARCHIVE_SHA256"
           # Publish the manifest last so installers never observe incomplete client bytes.
-          rclone copyto artifact/client-release.json "r2:$R2_PUBLIC_BUCKET/nightly/client.json" \
+          "$RUNNER_TEMP/rclone" copyto artifact/client-release.json "r2:$R2_PUBLIC_BUCKET/nightly/client.json" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
       - name: Upload nightly artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: nightly-release-${{ steps.release.outputs.release_date }}
+          name: nightly-release-${{ needs.build.outputs.release_date }}
           path: artifact/*
           compression-level: 0
           if-no-files-found: error
