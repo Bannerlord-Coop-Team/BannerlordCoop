@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
@@ -57,7 +58,8 @@ internal class DisbandPartyCampaignBehaviorPatches
                     party.SetMoveGoToSettlement(settlement, navigationType, isTargetingThePort);
                 }
             }
-            if (party.ActualClan.IsPlayerClan() && party.LeaderHero != null)
+
+            if (party.ActualClan.IsPlayerClan() && party.LeaderHero != null && !party.IsPlayerParty())
             {
                 party.RemovePartyLeader();
             }
