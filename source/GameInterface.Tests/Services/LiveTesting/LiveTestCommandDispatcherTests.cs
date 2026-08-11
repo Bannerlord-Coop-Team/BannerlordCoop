@@ -1,6 +1,8 @@
 ﻿using Common;
 using GameInterface.Services.LiveTesting;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
 using Xunit;
@@ -38,6 +40,18 @@ public class LiveTestCommandDispatcherTests
     public void EnsureReady_CollectsCommandFunctions()
     {
         Assert.True(new LiveTestCommandDispatcher().EnsureReady());
+    }
+
+    [Fact]
+    public void GetCommands_ReturnsSortedUniqueDebugCommandsOnly()
+    {
+        IReadOnlyList<string> commands = new LiveTestCommandDispatcher().GetCommands();
+
+        Assert.Contains(DebugCommand, commands);
+        Assert.DoesNotContain(NonDebugCommand, commands);
+        Assert.All(commands, command => Assert.StartsWith("coop.debug.", command));
+        Assert.Equal(commands.OrderBy(command => command, StringComparer.Ordinal), commands);
+        Assert.Equal(commands.Distinct(StringComparer.Ordinal), commands);
     }
 
     [Fact]
