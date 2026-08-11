@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
@@ -18,6 +19,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Party.Handlers;
 
@@ -29,18 +31,20 @@ internal class PartyScreenHelperHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly ISendCoalescer sendCoalescer;
 
     public PartyScreenHelperHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ITroopRosterInterface troopRosterInterface)
+        ITroopRosterInterface troopRosterInterface,
+        ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
-
+        this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NewClanPartyScreenClosed>(Handle_NewClanPartyScreenClosed);
         messageBroker.Subscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
         messageBroker.Subscribe<GarrisonDonated>(Handle_GarrisonDonated);
@@ -91,6 +95,13 @@ internal class PartyScreenHelperHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
 
+            // Don't create a party for a hero a player controls.
+            if (newLeaderHero.IsPlayerHero())
+            {
+                logger.Error($"Blocked clan party creation for player hero {newLeaderHero.Name}, {newLeaderHero.StringId}");
+                return;
+            }
+
             int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
             if (newLeaderHero.Gold < partyGoldLowerThreshold)
             {
@@ -109,6 +120,12 @@ internal class PartyScreenHelperHandler : IHandler
             {
                 mobileParty.PrisonRoster.Add(troopRosterElement);
                 //rightOwnerParty.PrisonRoster.AddToCounts(troopRosterElement2.Character, -troopRosterElement2.Number, false, -troopRosterElement2.WoundedNumber, -troopRosterElement2.Xp, true, -1);
+            }
+
+            // Flush troop roster to show actual member count on clients after refresh
+            if (objectManager.TryGetId(mobileParty.MemberRoster, out var rosterId))
+            {
+                sendCoalescer?.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
             }
 
             network.Send(obj.Who as NetPeer, new RefreshPartiesList());
