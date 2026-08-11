@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using HarmonyLib;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
@@ -17,12 +18,15 @@ namespace Missions.Agents.Patches
     {
         static void Postfix(SpawnedItemEntity spawnedItemEntity, EquipmentIndex weaponPickUpSlotIndex, Agent __instance)
         {
+            if (AllowedThread.IsThisThreadAllowed()) return;
+
             CoopTournamentController controller = Mission.Current?.GetMissionBehavior<CoopTournamentController>();
             if (controller?.IsSpectatorAgent(__instance) == true) return;
 
             MissionWeapon weapon = spawnedItemEntity.WeaponCopy;
             WeaponPickedup message = new WeaponPickedup(
                 __instance,
+                spawnedItemEntity,
                 weaponPickUpSlotIndex,
                 weapon.Item,
                 weapon.ItemModifier,

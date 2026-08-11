@@ -32,9 +32,27 @@ internal static class WeaponPickupDebugCommands
         public MissionWeapon OriginalWeapon { get; set; }
         public AgentEquipmentData OriginalEquipment { get; set; }
         public string ItemId { get; set; }
+        public Guid WorldItemId { get; set; }
         public SpawnedItemEntity DroppedItem { get; set; }
         public bool PickupAttempted { get; set; }
         public string Phase { get; set; }
+    }
+
+    private sealed class FixtureLifetimeBehavior : MissionBehavior
+    {
+        private readonly PickupFixture ownedFixture;
+
+        public FixtureLifetimeBehavior(PickupFixture ownedFixture)
+        {
+            this.ownedFixture = ownedFixture;
+        }
+
+        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
+
+        public override void OnRemoveBehavior()
+        {
+            ClearFixture(ownedFixture);
+        }
     }
 
     private sealed class AgentCameraBehavior : MissionBehavior
@@ -106,6 +124,8 @@ internal static class WeaponPickupDebugCommands
             return "WEAPON_PICKUP_DROP error=" + error;
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "WEAPON_PICKUP_DROP error=object-manager-unavailable";
+        if (!ContainerProvider.TryResolve<INetworkWorldItemRegistry>(out var worldItemRegistry))
+            return "WEAPON_PICKUP_DROP error=world-item-registry-unavailable";
 
         Agent agent = info.Agent;
         EquipmentIndex slot = agent.GetPrimaryWieldedItemIndex();
@@ -155,8 +175,29 @@ internal static class WeaponPickupDebugCommands
 
         newFixture.DroppedItem = droppedItem;
         newFixture.Phase = "dropped";
+        agent.Mission.AddMissionBehavior(new FixtureLifetimeBehavior(newFixture));
+        Guid worldItemId = worldItemRegistry.GetAll()
+            .Where(pair => ReferenceEquals(pair.Value, droppedItem))
+            .Select(pair => pair.Key)
+            .SingleOrDefault();
+        if (worldItemId == Guid.Empty)
+        {
+            droppedItem.OnUseStopped(agent, isSuccessful: true, (int)slot);
+            if (!IsPopulatedWeaponSlot(agent, slot))
+            {
+                MissionWeapon restoreWeapon = originalWeapon;
+                agent.EquipWeaponWithNewEntity(slot, ref restoreWeapon);
+            }
+            newFixture.OriginalEquipment.Apply(agent);
+            bool restored = IsPopulatedWeaponSlot(agent, slot) &&
+                GetItemId(objectManager, agent.Equipment[slot].Item) == itemId &&
+                IsDroppedItemInactive(droppedItem);
+            ClearFixture(newFixture);
+            return $"WEAPON_PICKUP_DROP error=world-item-unregistered restored={restored}";
+        }
+        newFixture.WorldItemId = worldItemId;
         return $"WEAPON_PICKUP_DROPPED agent={newFixture.AgentId:N} slot={(int)slot} " +
-            $"item={itemId} worldItemActive={!droppedItem.IsDeactivated}";
+            $"item={itemId} worldItem={worldItemId:N} worldItemActive={!droppedItem.IsDeactivated}";
     }
 
     [CommandLineArgumentFunction("fixture_pickup", "coop.debug.weapon_pickup")]
@@ -181,8 +222,27 @@ internal static class WeaponPickupDebugCommands
             return $"WEAPON_PICKUP_PICKUP error=local-item-mismatch expected={fixture.ItemId} actual={currentItem}";
 
         return $"WEAPON_PICKUP_PICKED agent={fixture.AgentId:N} slot={(int)fixture.Slot} " +
-            $"item={fixture.ItemId} main={(int)fixture.Agent.GetPrimaryWieldedItemIndex()} " +
+            $"item={fixture.ItemId} worldItem={fixture.WorldItemId:N} " +
+            $"main={(int)fixture.Agent.GetPrimaryWieldedItemIndex()} " +
             $"off={(int)fixture.Agent.GetOffhandWieldedItemIndex()}";
+    }
+
+    [CommandLineArgumentFunction("world_item_state", "coop.debug.weapon_pickup")]
+    public static string WorldItemState(List<string> args)
+    {
+        if (args.Count != 1 || !Guid.TryParse(args[0], out Guid worldItemId))
+            return "Usage: coop.debug.weapon_pickup.world_item_state <worldItemId>";
+        if (!ContainerProvider.TryResolve<INetworkWorldItemRegistry>(out var worldItemRegistry))
+            return "WEAPON_PICKUP_WORLD_ITEM error=registry-unavailable";
+        if (!worldItemRegistry.TryGet(worldItemId, out var worldItem))
+            return $"WEAPON_PICKUP_WORLD_ITEM id={worldItemId:N} registered=False";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "WEAPON_PICKUP_WORLD_ITEM error=object-manager-unavailable";
+
+        bool inactive = IsDroppedItemInactive(worldItem);
+        return $"WEAPON_PICKUP_WORLD_ITEM id={worldItemId:N} registered=True " +
+            $"active={!inactive} deactivated={worldItem.IsDeactivated} removed={worldItem.IsRemoved} " +
+            $"item={GetItemId(objectManager, worldItem.WeaponCopy.Item)}";
     }
 
     [CommandLineArgumentFunction("fixture_restore", "coop.debug.weapon_pickup")]
@@ -193,7 +253,11 @@ internal static class WeaponPickupDebugCommands
         if (fixture == null)
             return "WEAPON_PICKUP_RESTORED fixture=inactive";
         if (fixture.Agent == null || !fixture.Agent.IsActive() || fixture.Agent.Mission != Mission.Current)
-            return "WEAPON_PICKUP_RESTORE error=agent-unavailable";
+        {
+            PickupFixture unavailableFixture = fixture;
+            ClearFixture(unavailableFixture);
+            return "WEAPON_PICKUP_RESTORE error=agent-unavailable fixtureCleared=True";
+        }
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "WEAPON_PICKUP_RESTORE error=object-manager-unavailable";
 
@@ -227,7 +291,7 @@ internal static class WeaponPickupDebugCommands
         Guid agentId = currentFixture.AgentId;
         EquipmentIndex slot = currentFixture.Slot;
         string itemId = currentFixture.ItemId;
-        fixture = null;
+        ClearFixture(currentFixture);
         return $"WEAPON_PICKUP_RESTORED agent={agentId:N} slot={(int)slot} item={itemId} " +
             "worldItemInactive=True";
     }
@@ -437,6 +501,19 @@ internal static class WeaponPickupDebugCommands
 
         error = "world-item-removal-failed";
         return false;
+    }
+
+    private static void ClearFixture(PickupFixture fixtureToClear)
+    {
+        if (fixtureToClear == null) return;
+        if (ReferenceEquals(fixture, fixtureToClear))
+            fixture = null;
+        fixtureToClear.Agent = null;
+        fixtureToClear.DroppedItem = null;
+        fixtureToClear.OriginalWeapon = default;
+        fixtureToClear.OriginalEquipment = default;
+        fixtureToClear.ItemId = null;
+        fixtureToClear.WorldItemId = Guid.Empty;
     }
 
     private static void EnsureCameraBehavior(Mission mission)

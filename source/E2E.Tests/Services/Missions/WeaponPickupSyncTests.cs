@@ -17,6 +17,7 @@ using ProtoBuf;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -26,9 +27,9 @@ namespace E2E.Tests.Services.Missions;
 public class WeaponPickupSyncTests
 {
     private static readonly List<string> ApplyCalls = new();
-    private static EquipmentIndex equippedSlot;
+    private static EquipmentIndex pickedItemSlot;
     private static AgentEquipmentData appliedEquipment;
-    private static bool equipRanInsideAllowedThread;
+    private static bool pickupRanInsideAllowedThread;
     private static bool runtimeEquipmentRanInsideAllowedThread;
     private static bool wieldRanInsideAllowedThread;
 
@@ -47,9 +48,11 @@ public class WeaponPickupSyncTests
         };
         var banner = new Banner();
         var agentId = System.Guid.NewGuid();
+        var worldItemId = System.Guid.NewGuid();
         var message = new NetworkWeaponPickedup(
             agentId,
             EquipmentIndex.Weapon2,
+            worldItemId,
             "ItemObject_test_weapon",
             itemModifier,
             banner,
@@ -59,6 +62,12 @@ public class WeaponPickupSyncTests
         Assert.NotNull(property);
         ProtoMemberAttribute? member = property.GetCustomAttribute<ProtoMemberAttribute>();
         Assert.NotNull(member);
+        PropertyInfo? worldItemProperty = typeof(NetworkWeaponPickedup).GetProperty(
+            nameof(NetworkWeaponPickedup.WorldItemId));
+        Assert.NotNull(worldItemProperty);
+        ProtoMemberAttribute? worldItemMember =
+            worldItemProperty.GetCustomAttribute<ProtoMemberAttribute>();
+        Assert.NotNull(worldItemMember);
 
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(message, serializer);
@@ -66,8 +75,10 @@ public class WeaponPickupSyncTests
             serializer.Deserialize<IMessage>(packet.Data));
 
         Assert.Equal(6, member.Tag);
+        Assert.Equal(7, worldItemMember.Tag);
         Assert.Equal(agentId, received.AgentId);
         Assert.Equal(EquipmentIndex.Weapon2, received.EquipmentIndex);
+        Assert.Equal(worldItemId, received.WorldItemId);
         Assert.Equal("ItemObject_test_weapon", received.ItemObjectId);
         Assert.Equal(itemModifier.Damage, received.ItemModifier.Damage);
         Assert.Equal(banner.Serialize(), received.Banner.Serialize());
@@ -105,30 +116,95 @@ public class WeaponPickupSyncTests
     }
 
     [Fact]
-    public void ApplyWeaponPickup_EquipsShieldBeforeApplyingWieldState()
+    public void ApplyWeaponPickup_UsesWorldItemBeforeApplyingWieldState()
     {
-        var harmony = new Harmony($"{nameof(ApplyWeaponPickup_EquipsShieldBeforeApplyingWieldState)}.{System.Guid.NewGuid()}");
-        MethodInfo equip = AccessTools.Method(
-            typeof(Agent),
-            nameof(Agent.EquipWeaponWithNewEntity),
-            new[] { typeof(EquipmentIndex), typeof(MissionWeapon).MakeByRefType() });
+        var harmony = new Harmony($"{nameof(ApplyWeaponPickup_UsesWorldItemBeforeApplyingWieldState)}.{System.Guid.NewGuid()}");
+        MethodInfo pickup = AccessTools.Method(
+            typeof(WeaponPickupHandler),
+            "ApplyWorldItemPickup");
         MethodInfo wield = AccessTools.Method(
             typeof(AgentEquipmentData),
             nameof(AgentEquipmentData.Apply),
             new[] { typeof(Agent) });
 
         ApplyCalls.Clear();
-        equippedSlot = EquipmentIndex.None;
-        equipRanInsideAllowedThread = false;
+        pickedItemSlot = EquipmentIndex.None;
+        pickupRanInsideAllowedThread = false;
         wieldRanInsideAllowedThread = false;
 
         try
         {
             harmony.Patch(
-                equip,
+                AccessTools.Method(
+                    typeof(ScriptComponentBehavior),
+                    "CacheEditableFieldsForAllScriptComponents"),
                 prefix: new HarmonyMethod(AccessTools.Method(
                     typeof(WeaponPickupSyncTests),
-                    nameof(CaptureEquip))));
+                    nameof(SkipScriptComponentCache))));
+            harmony.Patch(
+                pickup,
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(WeaponPickupSyncTests),
+                    nameof(CapturePickup))));
+            harmony.Patch(
+                wield,
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(WeaponPickupSyncTests),
+                    nameof(CaptureWield))));
+
+            Agent agent = ObjectHelper.SkipConstructor<Agent>();
+            SpawnedItemEntity worldItem = ObjectHelper.SkipConstructor<SpawnedItemEntity>();
+            CoopAgentInfo agentInfo = CreateAgentInfo(agent);
+            MissionWeapon weapon = default;
+            var equipment = new AgentEquipmentData(
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.Weapon2,
+                0);
+
+            WeaponPickupHandler.ApplyWeaponPickup(
+                agentInfo,
+                worldItem,
+                EquipmentIndex.Weapon2,
+                ref weapon,
+                equipment);
+
+            Assert.Equal(new[] { "pickup", "wield" }, ApplyCalls);
+            Assert.Equal(EquipmentIndex.Weapon2, pickedItemSlot);
+            Assert.True(agentInfo.TryGetAuthoritativeEquipment(out AgentEquipmentData recorded));
+            Assert.Equal(equipment, recorded);
+            Assert.True(pickupRanInsideAllowedThread);
+            Assert.True(wieldRanInsideAllowedThread);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [Fact]
+    public void ApplyWeaponPickup_UsesDetachedWeaponWithoutStableWorldItemIdentity()
+    {
+        var harmony = new Harmony($"{nameof(ApplyWeaponPickup_UsesDetachedWeaponWithoutStableWorldItemIdentity)}.{System.Guid.NewGuid()}");
+        MethodInfo pickup = AccessTools.Method(
+            typeof(WeaponPickupHandler),
+            "ApplyDetachedWeaponPickup");
+        MethodInfo wield = AccessTools.Method(
+            typeof(AgentEquipmentData),
+            nameof(AgentEquipmentData.Apply),
+            new[] { typeof(Agent) });
+
+        ApplyCalls.Clear();
+        pickedItemSlot = EquipmentIndex.None;
+        pickupRanInsideAllowedThread = false;
+        wieldRanInsideAllowedThread = false;
+
+        try
+        {
+            harmony.Patch(
+                pickup,
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(WeaponPickupSyncTests),
+                    nameof(CaptureDetachedPickup))));
             harmony.Patch(
                 wield,
                 prefix: new HarmonyMethod(AccessTools.Method(
@@ -145,15 +221,16 @@ public class WeaponPickupSyncTests
 
             WeaponPickupHandler.ApplyWeaponPickup(
                 agentInfo,
+                null,
                 EquipmentIndex.Weapon2,
                 ref weapon,
                 equipment);
 
-            Assert.Equal(new[] { "equip", "wield" }, ApplyCalls);
-            Assert.Equal(EquipmentIndex.Weapon2, equippedSlot);
+            Assert.Equal(new[] { "pickup", "wield" }, ApplyCalls);
+            Assert.Equal(EquipmentIndex.Weapon2, pickedItemSlot);
             Assert.True(agentInfo.TryGetAuthoritativeEquipment(out AgentEquipmentData recorded));
             Assert.Equal(equipment, recorded);
-            Assert.True(equipRanInsideAllowedThread);
+            Assert.True(pickupRanInsideAllowedThread);
             Assert.True(wieldRanInsideAllowedThread);
         }
         finally
@@ -262,13 +339,24 @@ public class WeaponPickupSyncTests
             1);
     }
 
-    private static bool CaptureEquip(EquipmentIndex slotIndex)
+    private static bool CapturePickup(bool isSuccessful, int preferenceIndex)
     {
-        ApplyCalls.Add("equip");
-        equippedSlot = slotIndex;
-        equipRanInsideAllowedThread = AllowedThread.IsThisThreadAllowed();
+        ApplyCalls.Add("pickup");
+        Assert.True(isSuccessful);
+        pickedItemSlot = (EquipmentIndex)preferenceIndex;
+        pickupRanInsideAllowedThread = AllowedThread.IsThisThreadAllowed();
         return false;
     }
+
+    private static bool CaptureDetachedPickup(EquipmentIndex equipmentIndex)
+    {
+        ApplyCalls.Add("pickup");
+        pickedItemSlot = equipmentIndex;
+        pickupRanInsideAllowedThread = AllowedThread.IsThisThreadAllowed();
+        return false;
+    }
+
+    private static bool SkipScriptComponentCache() => false;
 
     private static bool CaptureRuntimeEquipment()
     {

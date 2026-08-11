@@ -11,6 +11,7 @@ namespace Missions.Agents.Messages
     public readonly struct WeaponPickedup : IEvent
     {
         public Agent Agent { get; }
+        public SpawnedItemEntity WorldItem { get; }
         public EquipmentIndex EquipmentIndex { get; }
         public ItemObject WeaponObject { get; }
         public ItemModifier WeaponModifier { get; }
@@ -18,7 +19,8 @@ namespace Missions.Agents.Messages
         public AgentEquipmentData CurrentEquipment { get; }
 
         public WeaponPickedup(
-            Agent agent, 
+            Agent agent,
+            SpawnedItemEntity worldItem,
             EquipmentIndex equipmentIndex, 
             ItemObject weaponObject, 
             ItemModifier itemModifier,
@@ -26,6 +28,7 @@ namespace Missions.Agents.Messages
             AgentEquipmentData currentEquipment)
         {
             Agent = agent;
+            WorldItem = worldItem;
             EquipmentIndex = equipmentIndex;
             WeaponObject = weaponObject;
             WeaponModifier = itemModifier;
