@@ -32,6 +32,8 @@ public class PlayerPartyTroopXpBaselineProviderTests : SyncTestBase
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(prisonerId, out var prisoner));
             party.MemberRoster.AddToCounts(member, 3);
             party.PrisonRoster.AddToCounts(prisoner, 2);
+            party.MemberRoster.GetTroopRoster();
+            party.PrisonRoster.GetTroopRoster();
             SetFixtureXp(party.MemberRoster, member, 123);
             SetFixtureXp(party.PrisonRoster, prisoner, 456);
             Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(

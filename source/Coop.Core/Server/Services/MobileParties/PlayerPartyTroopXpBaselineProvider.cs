@@ -52,8 +52,9 @@ internal sealed class PlayerPartyTroopXpBaselineProvider : IPlayerPartyTroopXpBa
         if (!objectManager.TryGetId(roster, out var rosterId)) return false;
 
         var entries = new List<TroopXpBaselineEntry>();
-        foreach (var element in roster.GetTroopRoster())
+        for (int index = 0; index < roster.Count; index++)
         {
+            TroopRosterElement element = roster.GetElementCopyAtIndex(index);
             CharacterObject character = element.Character;
             if (character == null || character.IsHero) continue;
             if (!objectManager.TryGetId(character, out var characterId)) return false;
