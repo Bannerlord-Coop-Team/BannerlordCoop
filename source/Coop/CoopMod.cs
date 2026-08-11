@@ -313,6 +313,17 @@ namespace Coop
                     startInfo.EnvironmentVariables["COOP_CRASH_BUILD"] = informationalVersion;
                     startInfo.EnvironmentVariables["COOP_CRASH_READY"] = readyEventName;
 
+                    string gameBinariesDirectory = GameBinariesDirectory.Resolve();
+                    if (gameBinariesDirectory == null)
+                    {
+                        Logger.Warning(
+                            "Game binaries directory could not be resolved; crash reports will not list installed game files");
+                    }
+                    else
+                    {
+                        startInfo.EnvironmentVariables["COOP_CRASH_GAME_BINARIES"] = gameBinariesDirectory;
+                    }
+
                     using (var ready = new EventWaitHandle(
                         false,
                         EventResetMode.AutoReset,
@@ -444,9 +455,10 @@ namespace Coop
                         {
                             Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         }
-                        else
+                        else if (!Coop.StartAsClient())
                         {
-                            Coop.StartAsClient();
+                            InformationManager.DisplayMessage(new InformationMessage(
+                                CoopartiveMultiplayerExperience.StartRefusedNotice));
                         }
                     },
                     () => { return (false, new TextObject("")); }
@@ -644,8 +656,8 @@ namespace Coop
                     else
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as client...");
-                        Coop.StartAsClient();
-                        Logger.Information("[AutoConnect] StartAsClient() completed");
+                        bool started = Coop.StartAsClient();
+                        Logger.Information("[AutoConnect] StartAsClient() returned {Started}", started);
                     }
                 }
                 catch (Exception ex)

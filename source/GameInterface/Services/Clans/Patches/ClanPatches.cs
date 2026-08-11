@@ -16,6 +16,16 @@ namespace GameInterface.Services.Clans.Patches;
 [HarmonyPatch(typeof(Clan))]
 internal class ClanPatches
 {
+    [HarmonyPatch(nameof(Clan.CreateSettlementRebelClan))]
+    [HarmonyPostfix]
+    internal static void CreateSettlementRebelClanPostfix(Clan __result)
+    {
+        if (ModInformation.IsServer)
+        {
+            MessageBroker.Instance.Publish(__result, new SettlementRebelClanInitialized(__result));
+        }
+    }
+
     [HarmonyPatch(nameof(Clan.PlayerClan))]
     [HarmonyPatch(MethodType.Getter)]
     [HarmonyPrefix]
