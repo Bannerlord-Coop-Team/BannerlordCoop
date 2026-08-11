@@ -14,7 +14,6 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using SandBox.View.Map.Managers;
-using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -83,7 +82,7 @@ internal class HeroInterface : IHeroInterface
         {
             try
             {
-                SetupNewHero(hero);
+                SetupNewHero(hero, restoreParty: true);
             }
             catch (Exception ex)
             {
@@ -114,7 +113,7 @@ internal class HeroInterface : IHeroInterface
                     assignNetworkIds(hero);
 
                     if (setupHero)
-                        SetupNewHero(hero);
+                        SetupNewHero(hero, restoreParty: false);
                 }
             }
             catch (Exception ex)
@@ -233,7 +232,7 @@ internal class HeroInterface : IHeroInterface
             playerParty.Ai?.AiBehaviorInteractable?.GetType().Name);
     }
 
-    private void SetupNewHero(Hero hero)
+    private void SetupNewHero(Hero hero, bool restoreParty)
     {
         var party = hero.PartyBelongedTo;
 
@@ -286,15 +285,11 @@ internal class HeroInterface : IHeroInterface
 
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
 
-        // On the server, the creation message is already ordered before these authoritative changes. The client
-        // runs this receive-side setup under AllowedThread.
-        playerPartyRestorer.Restore(hero, party);
-
-        // Package unpacking creates the visual under AllowedThread before the creation broadcast, so register
-        // that existing object under the party's final id.
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual != null)
-            objectManager.AddExisting($"{nameof(MobilePartyVisual)}_{party.StringId}", partyVisual);
+        // Clan membership is not replicated, but roster and leadership repairs are server-authoritative.
+        if (restoreParty)
+            playerPartyRestorer.Restore(hero, party);
+        else
+            playerPartyRestorer.RestoreClanMembership(hero);
     }
 
     /// <summary>

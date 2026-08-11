@@ -15,6 +15,7 @@ namespace GameInterface.Services.Players;
 public interface IPlayerPartyRestorer
 {
     bool TryRestore(Player player, out Player restoredPlayer);
+    void RestoreClanMembership(Hero hero);
     void Restore(Hero hero, MobileParty party);
 }
 
@@ -189,8 +190,7 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     public void Restore(Hero hero, MobileParty party)
     {
         // Transferred root references can be missing from clan, roster, and party-component state.
-        if (!hero.Clan.Heroes.Contains(hero))
-            hero.Clan.OnLordAdded(hero);
+        RestoreClanMembership(hero);
 
         if (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null)
         {
@@ -218,6 +218,12 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
 
         if (party.LeaderHero != hero)
             party.ChangePartyLeader(hero);
+    }
+
+    public void RestoreClanMembership(Hero hero)
+    {
+        if (!hero.Clan.Heroes.Contains(hero))
+            hero.Clan.OnLordAdded(hero);
     }
 
     private static bool IsReadyPlayerParty(MobileParty party, Hero hero)
