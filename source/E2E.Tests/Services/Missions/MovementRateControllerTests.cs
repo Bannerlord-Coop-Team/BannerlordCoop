@@ -294,8 +294,8 @@ public sealed class MovementRateControllerTests
         MovementRateSnapshot initial = fixture.Controller.Snapshot;
         Assert.Equal(30, initial.FrameLimitHz);
         Assert.Equal(30, initial.PerformanceCeilingHz);
-        Assert.Equal(30, initial.BulkHz);
-        Assert.Equal(30, initial.AdvertisedReceiverCapHz);
+        Assert.Equal(40, initial.BulkHz);
+        Assert.Equal(40, initial.AdvertisedReceiverCapHz);
 
         fixture.AdvanceWindow(
             framesPerSecond: 30,

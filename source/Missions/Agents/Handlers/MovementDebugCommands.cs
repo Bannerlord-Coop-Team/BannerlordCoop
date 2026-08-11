@@ -14,7 +14,7 @@ internal static class MovementDebugCommands
     {
         if (args.Count != 0)
             return "Usage: coop.debug.movement.state";
-        if (!TryGetHandler(out IAgentMovementHandler handler))
+        if (!TryGetHandler(out AgentMovementHandler handler))
             return "No active co-op mission movement handler.";
 
         MovementRateSnapshot state = handler.MovementRate;
@@ -51,6 +51,9 @@ internal static class MovementDebugCommands
             $"deferredAge={state.MaximumDeferredAgeSeconds.ToString("0.000", CultureInfo.InvariantCulture)}",
             $"bulkPolls={state.BulkPollsPerSecond}",
             $"priorityOnlyPolls={state.PriorityOnlyPollsPerSecond}",
+            $"initialConfiguredBulkHz={handler.InitialConfiguredBulkHz}",
+            $"syntheticReceivePressureActive={handler.SyntheticReceivePressureActive.ToString().ToLowerInvariant()}",
+            $"syntheticReceivePressureRemainingSeconds={handler.SyntheticReceivePressureRemainingSeconds.ToString("0.00", CultureInfo.InvariantCulture)}",
             $"reason={state.Reason}",
         });
     }
@@ -65,7 +68,7 @@ internal static class MovementDebugCommands
                 out int? rate,
                 out string error))
             return error;
-        if (!TryGetHandler(out IAgentMovementHandler handler))
+        if (!TryGetHandler(out AgentMovementHandler handler))
             return "No active co-op mission movement handler.";
         if (!handler.TrySetForcedBulkHz(rate, out error))
             return error;
@@ -87,7 +90,7 @@ internal static class MovementDebugCommands
         {
             return error;
         }
-        if (!TryGetHandler(out IAgentMovementHandler handler))
+        if (!TryGetHandler(out AgentMovementHandler handler))
             return "No active co-op mission movement handler.";
         if (!handler.TrySetForcedReceiverCapHz(rate, out error))
             return error;
@@ -97,11 +100,56 @@ internal static class MovementDebugCommands
             : "MOVEMENT_RECEIVER_CAP_AUTOMATIC";
     }
 
-    private static bool TryGetHandler(out IAgentMovementHandler handler)
+    [CommandLineArgumentFunction("simulate_receive_pressure", "coop.debug.movement")]
+    public static string SimulateReceivePressure(List<string> args)
+    {
+        if (args.Count != 4 ||
+            !float.TryParse(args[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float durationSeconds) ||
+            !double.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double queueMilliseconds) ||
+            !double.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double applyMilliseconds) ||
+            !int.TryParse(args[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int snapshots))
+        {
+            return "Usage: coop.debug.movement.simulate_receive_pressure <duration-seconds> <queue-ms> <apply-ms> <snapshots>";
+        }
+        if (!TryGetHandler(out AgentMovementHandler handler))
+            return "No active co-op mission movement handler.";
+        if (!handler.TrySetSyntheticReceivePressure(
+                durationSeconds,
+                queueMilliseconds,
+                applyMilliseconds,
+                snapshots,
+                out string error))
+        {
+            return error;
+        }
+
+        return string.Join(" ", new[]
+        {
+            "MOVEMENT_RECEIVE_PRESSURE_ACTIVE",
+            $"durationSeconds={durationSeconds.ToString("0.00", CultureInfo.InvariantCulture)}",
+            $"queueMilliseconds={queueMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}",
+            $"applyMilliseconds={applyMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}",
+            $"snapshots={snapshots}",
+        });
+    }
+
+    [CommandLineArgumentFunction("clear_receive_pressure", "coop.debug.movement")]
+    public static string ClearReceivePressure(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.movement.clear_receive_pressure";
+        if (!TryGetHandler(out AgentMovementHandler handler))
+            return "No active co-op mission movement handler.";
+
+        handler.ClearSyntheticReceivePressure();
+        return "MOVEMENT_RECEIVE_PRESSURE_CLEARED";
+    }
+
+    private static bool TryGetHandler(out AgentMovementHandler handler)
     {
         handler = Mission.Current?
             .GetMissionBehavior<CoopMissionController>()?
-            .AgentMovementHandler;
+            .AgentMovementHandler as AgentMovementHandler;
         return handler != null;
     }
 

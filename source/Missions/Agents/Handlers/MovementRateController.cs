@@ -320,9 +320,8 @@ public sealed class MovementRateController : IMovementRateController
                     localReason = "tournament-fixed";
                     break;
                 case MovementCadenceProfile.Battle:
-                    int startingBattleHz = Math.Min(
-                        40,
-                        NormalizeRate(effectiveFrameLimitHz));
+                    // Start every battle from the same baseline, then let measured windows adapt it.
+                    const int startingBattleHz = 40;
                     performanceCeilingHz = NormalizeRate(effectiveFrameLimitHz);
                     localAdaptiveHz = startingBattleHz;
                     automaticReceiverCapHz = startingBattleHz;
