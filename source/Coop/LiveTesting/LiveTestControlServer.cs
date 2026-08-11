@@ -15,11 +15,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ScreenSystem;
 
@@ -85,6 +87,8 @@ namespace Coop.LiveTesting
                         request,
                         () => CreateStatusResponse(request.Id),
                         false);
+                case "command-catalog":
+                    return HandleCommandCatalog(request);
                 case "command":
                     return HandleCommand(request);
                 case "screenshot":
@@ -98,6 +102,48 @@ namespace Coop.LiveTesting
                         $"Unknown live-test method '{request.Method}'.",
                         false);
             }
+        }
+
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher) ||
+                    !dispatcher.EnsureReady())
+                {
+                    return Failure(
+                        request.Id,
+                        "session_not_ready",
+                        "The co-op session command dispatcher is not available yet.",
+                        false);
+                }
+
+                var attributeType = typeof(CommandLineFunctionality.CommandLineArgumentFunction);
+                string commandAssemblyName = typeof(CommandLineFunctionality).Assembly.GetName().Name;
+                string[] commands = AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(assembly =>
+                        assembly.GetName().Name == commandAssemblyName ||
+                        assembly.GetReferencedAssemblies().Any(reference =>
+                            reference.Name == commandAssemblyName))
+                    .SelectMany(assembly => assembly.GetTypesSafe())
+                    .SelectMany(type => type.GetMethods(
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                    .SelectMany(method => (method.GetCustomAttributesSafe(attributeType, false) ??
+                        Array.Empty<object>())
+                        .OfType<CommandLineFunctionality.CommandLineArgumentFunction>())
+                    .Select(attribute => attribute.GroupName + "." + attribute.Name)
+                    .Where(command =>
+                        command.StartsWith("coop.debug.", StringComparison.Ordinal) &&
+                        CommandLineFunctionality.HasFunctionForCommand(command))
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(command => command, StringComparer.Ordinal)
+                    .ToArray();
+
+                return Success(request.Id, new
+                {
+                    commands,
+                });
+            }, false);
         }
 
         private LiveTestResponse HandleCommand(LiveTestRequest request)
