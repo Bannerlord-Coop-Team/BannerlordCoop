@@ -29,8 +29,8 @@ public class NetworkDespawnLocationAgents : IEvent
     public readonly Guid[] AgentIds = Array.Empty<Guid>();
     [ProtoMember(2)]
     public readonly byte[] Reasons = Array.Empty<byte>();
-    /// <summary>Per agent: the ObjectManager id of the location its roster entry moved to, or null
-    /// when the removal was not a passage move (death, plain removal).</summary>
+    /// <summary>Per agent: the ObjectManager id of the location its roster entry moved to, or an empty
+    /// string when the removal was not a passage move (death, plain removal).</summary>
     [ProtoMember(3)]
     public readonly string[] DestinationLocationIds = Array.Empty<string>();
 

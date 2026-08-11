@@ -175,7 +175,7 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
             {
                 ids[i] = pendingDespawns[i].agentId;
                 reasons[i] = (byte)pendingDespawns[i].reason;
-                destinations[i] = pendingDespawns[i].destinationLocationId;
+                destinations[i] = pendingDespawns[i].destinationLocationId ?? string.Empty;
             }
             pendingDespawns.Clear();
 
