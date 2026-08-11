@@ -149,7 +149,8 @@ public class CoopAgentOrigin : IAgentOriginBase
 
         var hero = _troop.HeroObject;
         if (hero.HeroState == Hero.CharacterStates.Dead) return;
-        if (!hero.IsControlledByThisInstance()) return;
+
+        if (!hero.IsHealthControlledByThisInstance()) return;
 
         hero.HitPoints = MathF.Max(1, MathF.Round(agentHealth));
     }
