@@ -48,4 +48,394 @@
       <EquipmentSet id="npc_companion_equipment_template_sturgia" />
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member1"
+    name="{=!}AnotherJoke"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member2"
+    name="{=!}Curzek"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member3"
+    name="{=!}ShotUp"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member4"
+    name="{=!}Varek"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member5"
+    name="{=!}Torven"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member6"
+    name="{=!}Edran"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member7"
+    name="{=!}Malrik"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member8"
+    name="{=!}Jaska"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member9"
+    name="{=!}Kaelor"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member10"
+    name="{=!}Brenik"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member11"
+    name="{=!}Orven"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member12"
+    name="{=!}Tavren"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member13"
+    name="{=!}Fenrik"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member14"
+    name="{=!}Rovik"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_member15"
+    name="{=!}Selden"
+    voice="ironic"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_sturgia_4_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet
+        id="npc_companion_equipment_template_sturgia"
+        equipmentType="Civilian" />
+      <EquipmentSet id="npc_companion_equipment_template_sturgia" />
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
