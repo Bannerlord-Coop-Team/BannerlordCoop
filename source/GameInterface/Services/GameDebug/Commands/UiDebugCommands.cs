@@ -55,6 +55,65 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         return "Called GameMenu.ExitToLast().";
     }
 
+    [CommandLineArgumentFunction("prepare_evidence_map", "coop.debug.ui")]
+    public static string PrepareEvidenceMap(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.prepare_evidence_map";
+
+        MapScreen mapScreen = MapScreen.Instance;
+        if (mapScreen == null)
+            return "Campaign map screen is unavailable.";
+
+        try
+        {
+            // Hide only the client presentation; keep the saved encounter and map event unchanged.
+            if (mapScreen.IsInMenu)
+            {
+                mapScreen._latestMenuContext = null;
+                mapScreen.ExitMenuContext();
+            }
+            mapScreen.RemoveEncounterOverlay();
+        }
+        catch (Exception ex)
+        {
+            return CommandHelpers.FormatException("Prepare evidence map", ex);
+        }
+
+        return GetEvidenceMapState(mapScreen);
+    }
+
+    [CommandLineArgumentFunction("evidence_map_state", "coop.debug.ui")]
+    public static string EvidenceMapState(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.evidence_map_state";
+
+        MapScreen mapScreen = MapScreen.Instance;
+        return mapScreen == null
+            ? "Campaign map screen is unavailable."
+            : GetEvidenceMapState(mapScreen);
+    }
+
+    private static string GetEvidenceMapState(MapScreen mapScreen)
+    {
+        var cameraView = mapScreen.MapCameraView;
+        string cameraFollowParty = Campaign.Current?.CameraFollowParty?.MobileParty?.StringId ?? "null";
+        return $"menuView={mapScreen.IsInMenu} " +
+               $"pendingMenuView={mapScreen._latestMenuContext != null} " +
+               $"encounterOverlay={mapScreen._encounterOverlay != null} " +
+               $"cameraFollowParty={cameraFollowParty} " +
+               $"animation={cameraView?.CameraAnimationInProgress} " +
+               $"fastMove={cameraView?._doFastCameraMovementToTarget} " +
+               $"loading={LoadingWindow.IsLoadingWindowActive}";
+    }
+
     [CommandLineArgumentFunction("leave_settlement_encounter", "coop.debug.ui")]
     public static string LeaveSettlementEncounter(List<string> args)
     {
