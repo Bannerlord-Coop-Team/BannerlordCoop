@@ -104,11 +104,23 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
     private static string GetEvidenceMapState(MapScreen mapScreen)
     {
         var cameraView = mapScreen.MapCameraView;
-        string cameraFollowParty = Campaign.Current?.CameraFollowParty?.MobileParty?.StringId ?? "null";
+        PartyBase cameraFollowParty = Campaign.Current?.CameraFollowParty;
+        string cameraFollowPartyId = cameraFollowParty?.MobileParty?.StringId ?? "null";
+        string cameraMode = cameraView?.CurrentCameraFollowMode.ToString() ?? "null";
+        bool followTargetReached = false;
+        if (cameraView != null && cameraFollowParty != null)
+        {
+            var followPosition = cameraFollowParty.MapEvent?.Position ?? cameraFollowParty.Position;
+            var targetDelta = followPosition.ToVec2() - cameraView._cameraTarget.AsVec2;
+            followTargetReached = targetDelta.LengthSquared < 0.0001f;
+        }
+
         return $"menuView={mapScreen.IsInMenu} " +
                $"pendingMenuView={mapScreen._latestMenuContext != null} " +
                $"encounterOverlay={mapScreen._encounterOverlay != null} " +
-               $"cameraFollowParty={cameraFollowParty} " +
+               $"cameraFollowParty={cameraFollowPartyId} " +
+               $"cameraMode={cameraMode} " +
+               $"followTargetReached={followTargetReached} " +
                $"animation={cameraView?.CameraAnimationInProgress} " +
                $"fastMove={cameraView?._doFastCameraMovementToTarget} " +
                $"loading={LoadingWindow.IsLoadingWindowActive}";

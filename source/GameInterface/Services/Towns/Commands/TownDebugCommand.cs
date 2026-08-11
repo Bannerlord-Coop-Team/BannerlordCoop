@@ -3,6 +3,7 @@ using Common;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Patches;
 using Helpers;
+using SandBox.View.Map;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -189,8 +190,18 @@ public class TownDebugCommand
             return $"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}";
         }
 
-        activeGarrisons[0].Party.SetAsCameraFollowParty();
-        return $"Following {activeGarrisons[0].StringId} at {town.Name} on the campaign map";
+        MapScreen mapScreen = MapScreen.Instance;
+        if (mapScreen?.MapCameraView == null)
+        {
+            return "Campaign map camera is unavailable";
+        }
+
+        MobileParty garrison = activeGarrisons[0];
+        var targetPosition = garrison.MapEvent?.Position ?? garrison.Position;
+        garrison.Party.SetAsCameraFollowParty();
+        mapScreen.MapCameraView.FastMoveCameraToPosition(targetPosition, mapScreen.IsInMenu);
+        mapScreen.MapCameraView.SetCameraMode(MapCameraView.CameraFollowMode.FollowParty);
+        return $"Following {garrison.StringId} at {town.Name} on the campaign map";
     }
 
     [CommandLineArgumentFunction("apply_garrison_lifecycle", "coop.debug.town")]
