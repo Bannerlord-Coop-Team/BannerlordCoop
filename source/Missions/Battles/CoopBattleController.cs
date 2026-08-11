@@ -13,6 +13,7 @@ using Missions.Messages;
 using Missions.Services.Network;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -81,6 +82,9 @@ public class CoopBattleController : CoopMissionController
     private readonly ISupplyProgressReporter supplyReporter;
     private readonly BattleTeamDiagnostics diagnostics = new BattleTeamDiagnostics();
 
+    // Answer BattleSpawnGate.HeroAgentAuthorityProbe for paths in GameInterface (e.g. HeroExtensions.IsHealthControlledByThisInstance)
+    private readonly Func<Hero, bool?> heroAgentAuthorityProbe;
+
     public CoopBattleController(
         IBattleNetwork network,
         INetwork relayNetwork,
@@ -97,7 +101,12 @@ public class CoopBattleController : CoopMissionController
         IGuardedHitWindow guardedHitWindow,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec)
-        : base(network, messageBroker, objectManager, coopMissionComponent)
+        : base(
+            network,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            Missions.Agents.Handlers.MovementCadenceProfile.Battle)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
         var casualties = new CasualtyAttributionMap();
@@ -140,6 +149,9 @@ public class CoopBattleController : CoopMissionController
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
 
+        heroAgentAuthorityProbe = ProbeHeroAgentAuthority;
+        BattleSpawnGate.HeroAgentAuthorityProbe = heroAgentAuthorityProbe;
+
         // Decode order clips during battle setup so the first issued order does not hitch.
         coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
@@ -162,6 +174,9 @@ public class CoopBattleController : CoopMissionController
         Deployment.Dispose();
         messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+
+        if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
+            BattleSpawnGate.HeroAgentAuthorityProbe = null;
 
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
@@ -301,6 +316,15 @@ public class CoopBattleController : CoopMissionController
             && (attackerFielded || defenderFielded)
             && (attackerFielded || attackerMissingReserveAccepted)
             && (defenderFielded || defenderMissingReserveAccepted);
+    }
+
+    // Compare current authority with controller id
+    private bool? ProbeHeroAgentAuthority(Hero hero)
+    {
+        if (!coopMissionComponent.AgentRegistry.TryGetHeroAgentInfo(hero, out var info))
+            return null;
+
+        return info.CurrentAuthority == Session.OwnControllerId;
     }
 
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)

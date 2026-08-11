@@ -1,10 +1,14 @@
 ﻿using Common.Util;
+using Common.Logging;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Locations;
+using System.IO;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Locations;
@@ -101,6 +105,56 @@ public class LocationCharacterListSyncTests : IDisposable
             var locationCharacter = Assert.Single(location.GetCharacterList());
             Assert.True(client.ObjectManager.TryGetId(locationCharacter.Character, out var clientCharacterId));
             Assert.Equal(characterId, clientCharacterId);
+        }
+    }
+
+    [Fact]
+    public void FixedTownNpcPopulation_SyncsAllClientsWithoutDuplicates()
+    {
+        var server = TestEnvironment.Server;
+        var locationId = TestEnvironment.CreateRegisteredObject<Location>();
+        var characterId = CreateSyncedCharacter();
+        string xmlPath = Path.Combine(Path.GetTempPath(), $"fixed-town-npcs-{Guid.NewGuid():N}.xml");
+
+        try
+        {
+            server.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject<Location>(locationId, out var location));
+
+                var locationComplex = new LocationComplex();
+                locationComplex._locations.Add("tavern", location);
+                var settlement = new Settlement(new TextObject("Test Town"), locationComplex, null);
+
+                File.WriteAllText(xmlPath, $@"
+<NPCCharacters>
+  <NPCCharacter id=""{characterId}"" coop_settlement=""{settlement.StringId}"" />
+</NPCCharacters>");
+
+                var logger = LogManager.GetLogger<FixedTownNpcService>();
+                var service = new FixedTownNpcService(
+                    logger,
+                    server.ObjectManager,
+                    () => xmlPath);
+
+                service.Populate(settlement);
+                service.Populate(settlement);
+
+                Assert.Single(location.GetCharacterList());
+            });
+
+            Assert.True(server.ObjectManager.TryGetObject<Location>(locationId, out var serverLocation));
+            Assert.Single(serverLocation.GetCharacterList());
+
+            foreach (var client in TestEnvironment.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Location>(locationId, out var location));
+                Assert.Single(location.GetCharacterList());
+            }
+        }
+        finally
+        {
+            try { File.Delete(xmlPath); } catch { }
         }
     }
 

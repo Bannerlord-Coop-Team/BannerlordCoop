@@ -39,11 +39,13 @@ internal class RemotePlayerHeroHandler : IHandler
         this.playerRegistry = playerRegistry;
 
         messageBroker.Subscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
+        messageBroker.Subscribe<NetworkPlayerRegistrationUpdated>(Handle_NetworkPlayerRegistrationUpdated);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
+        messageBroker.Unsubscribe<NetworkPlayerRegistrationUpdated>(Handle_NetworkPlayerRegistrationUpdated);
     }
 
     private void Handle_NetworkNewPlayerHeroCreated(MessagePayload<NetworkNewPlayerHeroCreated> payload)
@@ -69,5 +71,23 @@ internal class RemotePlayerHeroHandler : IHandler
             if (!playerRegistry.AddPlayer(player))
                 Logger.Error("Player {HeroId} has already been added.", player.HeroId);
         }, blocking: true);
+    }
+
+    private void Handle_NetworkPlayerRegistrationUpdated(MessagePayload<NetworkPlayerRegistrationUpdated> payload)
+    {
+        var replacement = payload.What.Player;
+
+        // Party creation and this update both defer from the ordered receive stream to the same
+        // game-thread queue, so the replacement resolves after its party has been registered.
+        GameThread.RunSafe(() =>
+        {
+            if (!playerRegistry.TryGetPlayer(replacement.ControllerId, out var registered) ||
+                !playerRegistry.ReplacePlayer(registered, replacement))
+            {
+                Logger.Error(
+                    "Could not replace player registration for controller {ControllerId}",
+                    replacement.ControllerId);
+            }
+        }, blocking: true, context: nameof(Handle_NetworkPlayerRegistrationUpdated));
     }
 }

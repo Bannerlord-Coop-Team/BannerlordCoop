@@ -10,7 +10,6 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using HarmonyLib;
-using Helpers;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -36,6 +35,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
         AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
         AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+        AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)),
     };
 
     [Theory]
@@ -96,7 +96,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         string? woundedPartyBaseId = null;
 
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
             .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyLeftSiegeInternal)))
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
             .ToList();
@@ -175,7 +175,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var (woundedHeroId, woundedPartyId) = CreatePlayerHeroParty("WoundedPlayer");
 
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
             .ToList();
         Server.Call(() =>
         {

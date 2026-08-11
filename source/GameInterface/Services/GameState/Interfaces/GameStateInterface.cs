@@ -68,7 +68,17 @@ internal class GameStateInterface : IGameStateInterface
 
         ISaveDriver driver = new CoopInMemSaveDriver(saveData);
         LoadResult loadResult = SaveManager.Load("", driver, loadAsLateInitialize: true);
+        var loadedGame = (Game)loadResult.Root;
+        var loadedCampaign = (Campaign)loadedGame.GameType;
+        ClearTransferredMapNotices(loadedCampaign.CampaignInformationManager);
         MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
+    }
+
+    internal static void ClearTransferredMapNotices(CampaignInformationManager informationManager)
+    {
+        // A headless server cannot dismiss map notices, so its save contains the campaign's accumulated
+        // UI backlog. Only network-transferred saves use this load path; live notices remain intact.
+        informationManager._mapNotices.Clear();
     }
 
     public void StartNewGame()

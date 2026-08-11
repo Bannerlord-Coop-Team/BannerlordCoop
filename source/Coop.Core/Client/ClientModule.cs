@@ -50,6 +50,13 @@ public class ClientModule : CommonModule
         builder.RegisterType<ConfiguredSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
         builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
 
+        // Keeps the module resolvable on its own; a session container registers the real intent.
+        builder.Register(c =>
+        {
+            var config = c.Resolve<INetworkConfig>();
+            return JoinAttemptPresentation.For(JoinIntent.PlayerDirect, config.Address, config.Port);
+        }).AsSelf().InstancePerLifetimeScope();
+
         RegisterAllTypesWithInterface<ClientModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);
     }

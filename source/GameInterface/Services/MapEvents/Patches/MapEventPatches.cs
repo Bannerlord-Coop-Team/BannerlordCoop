@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Configuration;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
@@ -13,6 +14,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -29,6 +31,36 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class MapEventPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
+    private static readonly Action<MapEventParty>[] CommitResultPhases =
+    {
+        party => party.CommitXpGain(),
+        CommitRenownChanges,
+        party => party.CommitInfluenceChanges(),
+        party => party.CommitMoraleChanges(),
+        party => party.CommitGoldChanges()
+    };
+
+    private static void CommitRenownChanges(MapEventParty party)
+    {
+        Hero leaderHero = party.Party.LeaderHero;
+        if (CanCommitRenownChanges(leaderHero))
+        {
+            party.CommitRenownChanges();
+            return;
+        }
+
+        if (party.GainedRenown <= 0f)
+            return;
+
+        Logger.Error(
+            "Skipped {Renown} renown for map event party {PartyId} because leader hero {HeroId} has no clan",
+            party.GainedRenown,
+            party.Party.Id,
+            leaderHero.StringId);
+    }
+
+    internal static bool CanCommitRenownChanges(Hero leaderHero) =>
+        leaderHero == null || leaderHero.Clan != null;
 
     [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
     [HarmonyPostfix]
@@ -170,7 +202,8 @@ internal class MapEventPatches
         if (ModInformation.IsClient)
             return false;
 
-        // Need to calculate map event results before committing changes
+        // Vanilla calculates plunder from each defeated participant's Party reference.
+        RemovePartiesWithoutParty(__instance);
         __instance.CalculateMapEventResults();
 
         if (__instance.ContainsPlayerParty())
@@ -195,14 +228,77 @@ internal class MapEventPatches
         return false;
     }
 
+    internal static int RemovePartiesWithoutParty(MapEvent mapEvent)
+    {
+        int removedPartyCount = 0;
+
+        foreach (MapEventSide side in mapEvent._sides)
+        {
+            if (side == null)
+                continue;
+
+            for (int i = side._battleParties.Count - 1; i >= 0; i--)
+            {
+                if (side._battleParties[i]?.Party != null)
+                    continue;
+
+                side._battleParties.RemoveAt(i);
+                removedPartyCount++;
+            }
+        }
+
+        return removedPartyCount;
+    }
+
     [HarmonyPatch("CommitCalculatedMapEventResults")]
     [HarmonyPrefix]
-    private static bool Prefix_CommitCalculatedMapEventResults()
+    private static bool Prefix_CommitCalculatedMapEventResults(MapEvent __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-            return true;
+        if (ModInformation.IsClient)
+            return CallOriginalPolicy.IsOriginalAllowed();
 
-        return ModInformation.IsServer;
+        int removedPartyCount;
+        using (AllowedThread.Suspend())
+        {
+            removedPartyCount = CommitCalculatedMapEventResults(__instance, CommitResultPhases);
+        }
+        if (removedPartyCount > 0)
+        {
+            Logger.Error(
+                "Removed {PartyCount} map event parties without a Party from {MapEventId} before committing battle results",
+                removedPartyCount,
+                __instance.StringId);
+        }
+
+        return false;
+    }
+
+    internal static int CommitCalculatedMapEventResults(
+        MapEvent mapEvent,
+        IReadOnlyList<Action<MapEventParty>> commitPhases)
+    {
+        int removedPartyCount = RemovePartiesWithoutParty(mapEvent);
+
+        foreach (MapEventSide side in mapEvent._sides)
+        {
+            if (side == null)
+                continue;
+
+            foreach (Action<MapEventParty> commitPhase in commitPhases)
+            {
+                MapEventParty[] parties = side.Parties.ToArray();
+                foreach (MapEventParty party in parties)
+                {
+                    if (!side._battleParties.Contains(party) || party?.Party == null)
+                        continue;
+
+                    commitPhase(party);
+                    removedPartyCount += RemovePartiesWithoutParty(mapEvent);
+                }
+            }
+        }
+
+        return removedPartyCount;
     }
 
     [HarmonyPatch(nameof(MapEvent.Update))]
@@ -304,12 +400,16 @@ internal class InteractionPatches
     }
 
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleWindows> playerBattleWindows = new();
+    private static readonly ConditionalWeakTable<MapEvent, object> initializingPlayerBattles = new();
 
     /// <summary>True while a player's battle is still within its post-start window for AI parties to join as
-    /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened in
-    /// <see cref="Postfix_Initialize"/>; only the server ever populates it, so this is a server-side query.</summary>
+    /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened after
+    /// initialization; only the server ever populates it, so this is a server-side query.</summary>
     public static bool IsWithinAiJoinWindow(MapEvent mapEvent)
         => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.AiJoinWindowExpired;
+
+    internal static bool IsInitializingPlayerBattle(MapEvent mapEvent)
+        => initializingPlayerBattles.TryGetValue(mapEvent, out _);
 
     public static bool IsWithinGoldFoodConsumptionWindow(MapEvent mapEvent)
         => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.GoldFoodConsumptionExpired;
@@ -387,13 +487,26 @@ internal class InteractionPatches
         if (!__instance.ContainsPlayerParty())
             return;
 
-        // A player's battle stays open to AI reinforcements for a campaign day after it begins (the join
-        // window is opened in Postfix_Initialize). While it is open, AI may keep joining; once it expires —
+        // A player's battle stays open to AI reinforcements for a campaign day after it begins. While the
+        // window is open, AI may keep joining; once it expires —
         // or if no window was opened for this event — no more AI may join a player's battle.
-        if (IsWithinAiJoinWindow(__instance))
+        if (IsInitializingPlayerBattle(__instance) || IsWithinAiJoinWindow(__instance))
             return;
 
         __result = false;
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
+    [HarmonyPrefix]
+    private static void Prefix_Initialize(
+        MapEvent __instance,
+        PartyBase attackerParty,
+        PartyBase defenderParty)
+    {
+        if (ModInformation.IsClient || !StartsWithPlayerParty(attackerParty, defenderParty))
+            return;
+
+        initializingPlayerBattles.GetValue(__instance, _ => new object());
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
@@ -403,20 +516,24 @@ internal class InteractionPatches
         PartyBase attackerParty,
         PartyBase defenderParty)
     {
-        if (ModInformation.IsClient)
+        if (ModInformation.IsClient || !StartsWithPlayerParty(attackerParty, defenderParty))
             return;
 
-        var attackerIsPlayer = attackerParty.MobileParty?.IsPlayerParty() == true;
-        var defenderIsPlayer = defenderParty.MobileParty?.IsPlayerParty() == true;
-
-        // Only create a join window for battles that started with a player party.
-        if (!attackerIsPlayer && !defenderIsPlayer)
-            return;
-
-        MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
-
+        initializingPlayerBattles.Remove(__instance);
         playerBattleWindows.GetValue(
             __instance,
             _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
+        MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
     }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
+    [HarmonyFinalizer]
+    private static void Finalizer_Initialize(MapEvent __instance)
+    {
+        initializingPlayerBattles.Remove(__instance);
+    }
+
+    private static bool StartsWithPlayerParty(PartyBase attackerParty, PartyBase defenderParty)
+        => attackerParty.MobileParty?.IsPlayerParty() == true ||
+           defenderParty.MobileParty?.IsPlayerParty() == true;
 }

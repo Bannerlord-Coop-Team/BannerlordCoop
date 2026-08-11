@@ -2518,6 +2518,124 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             AssertPeaceMade(environmentClient, playerClanId, targetClanId);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void NpcPeaceBarter_StationarySettlementConversation_ReturnsAcceptedAfterMutation(
+        bool failDuringPeaceDispatch,
+        bool failAfterMutation)
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int initialTargetGold = 40;
+        const int offeredGold = 500_000;
+        const string requestId = "settlement-peace-success";
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var (targetHeroId, targetMobilePartyId, targetPartyId) = CreateAiPartyWithRegisteredLeader();
+        var (playerClanId, targetClanId) = MakePartiesHostile(playerPartyId, targetPartyId);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var harmony = new Harmony($"e2e.settlement-peace.{Guid.NewGuid():N}");
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(targetMobilePartyId, out var targetParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            playerHero.Gold = initialPlayerGold;
+            targetHero.Gold = initialTargetGold;
+            playerParty.CurrentSettlement = settlement;
+            targetHero.PartyBelongedTo = null;
+            targetHero.StayingInSettlement = settlement;
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
+            Assert.Equal(settlement, playerHero.CurrentSettlement);
+            Assert.Equal(settlement, targetHero.CurrentSettlement);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
+        });
+        TestEnvironment.FlushCoalescer();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
+        });
+
+        if (failDuringPeaceDispatch)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(CampaignEventDispatcher),
+                    nameof(CampaignEventDispatcher.OnMakePeace)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowDuringMakePeaceDispatch)));
+        }
+        else if (failAfterMutation)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(CampaignEventDispatcher),
+                    nameof(CampaignEventDispatcher.OnBarterAccepted)),
+                postfix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowAfterBarterAccepted)));
+        }
+
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestPeaceBarter(
+                targetHeroId,
+                PeaceConversationContext.Settlement,
+                settlementId,
+                new[]
+                {
+                    new PeaceBarterTerm(
+                        PeaceBarterTermType.Gold,
+                        playerHeroId,
+                        objectId: null,
+                        itemModifierId: null,
+                        itemModifierNull: true,
+                        amount: offeredGold),
+                },
+                requestId)));
+            TestEnvironment.FlushCoalescer();
+
+            var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>());
+            Assert.True(result.Accepted, result.Reason);
+            Assert.Equal(requestId, result.RequestId);
+            var expectedPlayerGold = failDuringPeaceDispatch
+                ? initialPlayerGold
+                : initialPlayerGold - offeredGold;
+            var expectedTargetGold = failDuringPeaceDispatch
+                ? initialTargetGold
+                : initialTargetGold + offeredGold;
+            Assert.Equal(expectedPlayerGold, result.PlayerGold);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+                Assert.Equal(expectedPlayerGold, playerHero.Gold);
+                Assert.Equal(expectedTargetGold, targetHero.Gold);
+            });
+            AssertPeaceMade(Server, playerClanId, targetClanId);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
     [Fact]
     public void NpcPeaceBarter_DifferentEngagedParty_RejectsWithoutEffects()
     {
@@ -2911,6 +3029,140 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void BanditSafePassage_Failure_CommitsAfterSafePassageIsInstalled(
+        bool failBeforeSafePassageIsInstalled,
+        bool failDuringGoldDispatch)
+    {
+        const int initialPlayerGold = 1000;
+        const int initialBanditGold = 40;
+        const int offeredGold = 250;
+        const string requestId = "bandit-post-apply-failure";
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var banditMobilePartyId = CreateBanditParty("E2EBanditPostApplyFailure");
+        var banditPartyId = GetPartyBaseId(Server, banditMobilePartyId);
+        var harmony = new Harmony($"e2e.bandit-post-apply.{Guid.NewGuid():N}");
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+
+            Server.Resolve<ISessionInteractionsPlayerDataInterface>().AddPlayerKeys(playerHeroId);
+            playerHero.Gold = initialPlayerGold;
+            banditParty.PartyTradeGold = initialBanditGold;
+            VillageHostileFactionStanceHelper.ApplyWarStance(banditParty.MapFaction, playerParty.MapFaction);
+            Assert.True(ConversationPartyHold.TryEngage(
+                Server.Resolve<ConversationPartyTracker>(),
+                client.NetPeer,
+                playerPartyId,
+                banditParty,
+                banditPartyId,
+                engagerIsDefender: true));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        if (failBeforeSafePassageIsInstalled)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(DefaultMobilePartyAIModelPatches),
+                    nameof(DefaultMobilePartyAIModelPatches.PreventAttacksUntil)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowBeforeBanditSafePassageMutation)));
+        }
+        else if (failDuringGoldDispatch)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(CampaignEventDispatcher),
+                    nameof(CampaignEventDispatcher.OnHeroOrPartyTradedGold)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowDuringBanditGoldDispatch)));
+        }
+        else
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(ConversationPartyHold),
+                    nameof(ConversationPartyHold.EndEngagement),
+                    new[] { typeof(ConversationPartyTracker), typeof(object) }),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowAfterBanditBarterMutation)));
+        }
+
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestBanditBarter(
+                banditMobilePartyId,
+                offeredGold,
+                Array.Empty<ItemRosterElementData>(),
+                Array.Empty<TroopRosterElementData>(),
+                requestId)));
+            if (!failDuringGoldDispatch)
+                TestEnvironment.FlushCoalescer();
+
+            var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBanditBarterResult>());
+            Assert.Equal(!failBeforeSafePassageIsInstalled, result.Accepted);
+            Assert.Equal(requestId, result.RequestId);
+            var expectedPlayerGold = failBeforeSafePassageIsInstalled
+                ? initialPlayerGold
+                : initialPlayerGold - offeredGold;
+            var expectedBanditGold = failBeforeSafePassageIsInstalled
+                ? initialBanditGold
+                : initialBanditGold + offeredGold;
+            Assert.Equal(expectedPlayerGold, result.PlayerGold);
+            AssertBanditBarterGold(
+                Server,
+                playerHeroId,
+                banditMobilePartyId,
+                expectedPlayerGold,
+                expectedBanditGold);
+
+            if (failDuringGoldDispatch)
+            {
+                foreach (var environmentClient in Clients)
+                {
+                    environmentClient.Call(() =>
+                    {
+                        Assert.True(environmentClient.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                        Assert.Equal(expectedPlayerGold, playerHero.Gold);
+                    });
+                }
+
+                Server.Call(() =>
+                {
+                    Assert.False(Server.Resolve<ConversationPartyTracker>().TryGetEngagement(client.NetPeer, out _));
+                    Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+                    Assert.False(banditParty.Ai.IsDisabled);
+                });
+            }
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            Server.Call(() =>
+            {
+                ConversationPartyHold.EndEngagement(Server.Resolve<ConversationPartyTracker>(), client.NetPeer);
+                if (Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty))
+                    DefaultMobilePartyAIModelPatches.RemoveAttackProtectionsForParty(banditParty);
+            });
+        }
+    }
+
     [Fact]
     public void BanditSafePassage_Underpayment_IsRejectedWithoutEffects()
     {
@@ -3120,6 +3372,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         var (initiatorHeroId, initiatorMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var (responderHeroId, responderMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            playerManager.SetPeer("PlayerOne", client1.NetPeer);
+            playerManager.SetPeer("PlayerTwo", client2.NetPeer);
+        });
 
         return (
             client1,
@@ -3829,6 +4087,21 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         return 0;
     }
+
+    private static void ThrowAfterBarterAccepted()
+        => throw new InvalidOperationException("Post-acceptance barter work failed.");
+
+    private static void ThrowDuringMakePeaceDispatch()
+        => throw new InvalidOperationException("Peace event dispatch failed after the factions became neutral.");
+
+    private static void ThrowBeforeBanditSafePassageMutation()
+        => throw new InvalidOperationException("Bandit safe-passage installation failed.");
+
+    private static void ThrowDuringBanditGoldDispatch()
+        => throw new InvalidOperationException("Bandit gold dispatch failed after payment.");
+
+    private static void ThrowAfterBanditBarterMutation()
+        => throw new InvalidOperationException("Post-apply bandit barter work failed.");
 
     private static void AssertPartyItemSnapshotContains(ItemRosterElementData[] items, string itemId, int amount)
     {

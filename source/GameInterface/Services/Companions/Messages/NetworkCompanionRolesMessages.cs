@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 
 namespace GameInterface.Services.Companions.Messages;
@@ -143,37 +144,22 @@ public readonly struct DoCompanionJoinedPartyByRescue : IEvent
 public readonly struct DoPartyScreenClosedFromRescuing : IEvent
 {
     [ProtoMember(1)]
-    public readonly string LeftOwnerPartyId;
+    public readonly TroopRosterData LeftMemberRosterData;
 
     [ProtoMember(2)]
-    public readonly string LeftMemberRosterId;
+    public readonly TroopRosterData LeftPrisonRosterData;
 
     [ProtoMember(3)]
-    public readonly string LeftPrisonRosterId;
-
-    [ProtoMember(4)]
     public readonly string RightOwnerPartyId;
 
-    [ProtoMember(5)]
-    public readonly string RightMemberRosterId;
-
-    [ProtoMember(6)]
-    public readonly string RightPrisonRosterId;
-
     public DoPartyScreenClosedFromRescuing(
-        string leftOwnerPartyId,
-        string leftMemberRosterId,
-        string leftPrisonRosterId,
-        string rightOwnerPartyId,
-        string rightMemberRosterId,
-        string rightPrisonRosterId)
+        TroopRosterData leftMemberRosterData,
+        TroopRosterData leftPrisonRosterData,
+        string rightOwnerPartyId)
     {
-        LeftOwnerPartyId = leftOwnerPartyId;
-        LeftMemberRosterId = leftMemberRosterId;
-        LeftPrisonRosterId = leftPrisonRosterId;
+        LeftMemberRosterData = leftMemberRosterData;
+        LeftPrisonRosterData = leftPrisonRosterData;
         RightOwnerPartyId = rightOwnerPartyId;
-        RightMemberRosterId = rightMemberRosterId;
-        RightPrisonRosterId = rightPrisonRosterId;
     }
 }
 

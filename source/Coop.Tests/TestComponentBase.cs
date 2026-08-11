@@ -32,6 +32,7 @@ using Coop.Core.Server.Services.MobileParties;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI;
 using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.UI.JoinCancel;
 using GameInterface.Services.Villages.Interfaces;
 using Moq;
 using Serilog;
@@ -39,6 +40,7 @@ using System;
 using Xunit.Abstractions;
 using IGameInterface = GameInterface.IGameInterface;
 using GameInterface.Services.CampaignService.Interfaces;
+using GameInterface.Services.Chat;
 
 namespace Coop.Tests;
 
@@ -98,11 +100,13 @@ internal abstract class TestComponentBase
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
         RegisterPlayerManagerMock(builder);
+        RegisterMock<IPlayerPartyRestorer>(builder);
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
         RegisterMock<IJoinCampaignBaselineSender>(builder);
         RegisterMock<ILoadingInterface>(builder);
+        RegisterMock<IJoinAttemptOverlay>(builder);
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMobilePartyInterface>(builder);
@@ -114,6 +118,8 @@ internal abstract class TestComponentBase
         RegisterMock<IBattleTroopReserveBuilder>(builder);
         RegisterMock<IMapEventInitializationBarrier>(builder);
         RegisterMock<IConnectedPlayerCountService>(builder);
+        RegisterMock<IChatService>(builder);
+        RegisterMock<IChatPlayerNameResolver>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
