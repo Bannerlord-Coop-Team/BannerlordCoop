@@ -6,6 +6,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using HarmonyLib;
 using SandBox.View.Map;
+using SandBox.View.Map.Visuals;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -189,6 +190,8 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
 
         party.Party.SetAsCameraFollowParty();
         mapScreen.MapCameraView.ResetCamera(resetDistance: true, teleportToMainParty: false);
+        focusedParty = null;
+        mapScreen.RemoveMapTooltip();
         focusedParty = party.Party;
         RefreshFocusedPartyTooltip(mapScreen);
         string output = $"focused=true|networkId={args[0]}|party={party.StringId}|" +
@@ -205,19 +208,35 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
 
     internal static void RefreshFocusedPartyTooltip(MapScreen mapScreen)
     {
+        if (!TryGetFocusedPartyVisual(mapScreen, out var partyVisual) || mapScreen.IsInMenu)
+            return;
+
+        if (mapScreen.CurrentVisualOfTooltip != partyVisual)
+            mapScreen.CurrentVisualOfTooltip = partyVisual;
+
+        if (!TaleWorlds.Library.InformationManager.GetIsAnyTooltipActive())
+            mapScreen.OnHoverMapEntity(partyVisual);
+    }
+
+    internal static bool ShouldKeepFocusedPartyTooltip(MapScreen mapScreen) =>
+        TryGetFocusedPartyVisual(mapScreen, out _) && !mapScreen.IsInMenu;
+
+    internal static bool CanShowMapTooltip(MapScreen mapScreen, MapEntityVisual mapEntityVisual) =>
+        !TryGetFocusedPartyVisual(mapScreen, out var partyVisual) ||
+        mapScreen.IsInMenu ||
+        mapEntityVisual == partyVisual;
+
+    private static bool TryGetFocusedPartyVisual(MapScreen mapScreen, out MapEntityVisual partyVisual)
+    {
+        partyVisual = null;
         if (mapScreen == null || focusedParty?.MobileParty == null || !focusedParty.MobileParty.IsActive)
         {
             focusedParty = null;
-            return;
+            return false;
         }
 
-        var partyVisual = focusedParty.GetPartyVisual();
-        if (partyVisual == null || mapScreen.CurrentVisualOfTooltip == partyVisual)
-            return;
-
-        mapScreen.RemoveMapTooltip();
-        mapScreen.OnHoverMapEntity(partyVisual);
-        mapScreen.CurrentVisualOfTooltip = partyVisual;
+        partyVisual = focusedParty.GetPartyVisual();
+        return partyVisual != null;
     }
 
     [CommandLineArgumentFunction("trade_gold_coalescing_restore", "coop.debug.mobileparty")]
@@ -442,12 +461,26 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
     }
 }
 
-[HarmonyPatch(typeof(MapScreen), nameof(MapScreen.HandleMouse))]
+[HarmonyPatch(typeof(MapScreen), nameof(MapScreen.OnFrameTick), new Type[] { typeof(float) })]
 internal static class PartyTradeGoldCoalescingTooltipPatch
 {
     private static void Postfix(MapScreen __instance)
     {
         PartyTradeGoldCoalescingFixtureCommands.RefreshFocusedPartyTooltip(__instance);
     }
+}
+
+[HarmonyPatch(typeof(MapScreen), nameof(MapScreen.RemoveMapTooltip))]
+internal static class PartyTradeGoldCoalescingTooltipRemovalPatch
+{
+    private static bool Prefix(MapScreen __instance) =>
+        !PartyTradeGoldCoalescingFixtureCommands.ShouldKeepFocusedPartyTooltip(__instance);
+}
+
+[HarmonyPatch(typeof(MapScreen), nameof(MapScreen.OnHoverMapEntity), new Type[] { typeof(MapEntityVisual) })]
+internal static class PartyTradeGoldCoalescingTooltipHoverPatch
+{
+    private static bool Prefix(MapScreen __instance, MapEntityVisual mapEntityVisual) =>
+        PartyTradeGoldCoalescingFixtureCommands.CanShowMapTooltip(__instance, mapEntityVisual);
 }
 #endif
