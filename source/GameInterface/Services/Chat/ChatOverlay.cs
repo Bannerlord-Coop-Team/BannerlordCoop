@@ -1,17 +1,24 @@
 using System;
+using SandBox.View.Map;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Chat;
 
-/// <summary>A global layer that remains available on both the campaign map and missions.</summary>
+/// <summary>Chat UI shared by campaign-map and mission gameplay.</summary>
 internal sealed class ChatOverlay : GlobalLayer, IDisposable
 {
     private const string InputWidgetId = "CoopChatMessageInput";
+    private const int LayerOrder = 1;
 
     private readonly ChatVM dataSource;
     private readonly Action refreshParticipants;
@@ -21,14 +28,16 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private bool initialized;
     private bool isInputFocused;
     private bool ignoreNextOutsideClick;
+    private bool isEnabled;
 
-    public ChatOverlay(ChatVM dataSource, Action refreshParticipants)
+    public ChatOverlay(ChatVM dataSource, Action refreshParticipants, bool isEnabled)
     {
         if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
         if (refreshParticipants == null) throw new ArgumentNullException(nameof(refreshParticipants));
 
         this.dataSource = dataSource;
         this.refreshParticipants = refreshParticipants;
+        this.isEnabled = isEnabled;
         dataSource.OpenRequested += OpenInput;
         dataSource.CloseRequested += CloseInput;
     }
@@ -37,17 +46,22 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     {
         if (initialized) return;
 
-        gauntletLayer = new GauntletLayer("CoopChat", 900);
+        gauntletLayer = new GauntletLayer("CoopChat", LayerOrder);
         movie = gauntletLayer.LoadMovie("CoopChatUIMovie", dataSource);
         SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
         Layer = gauntletLayer;
         ScreenManager.AddGlobalLayer(this, false);
         initialized = true;
+
+        if (!isEnabled)
+            ScreenManager.SetSuspendLayer(gauntletLayer, true);
     }
 
     protected override void OnTick(float dt)
     {
         base.OnTick(dt);
+        if (!UpdateVisibility()) return;
+
         if (!dataSource.IsOpen)
         {
             if (ShouldOpenInput(
@@ -60,9 +74,15 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             return;
         }
 
-        if (ShouldCloseInput(
+        if (ShouldCaptureCloseInput(
+                isInputFocused,
                 Input.IsKeyPressed(InputKey.Escape),
-                Input.IsKeyPressed(InputKey.ControllerRRight),
+                Input.IsKeyPressed(InputKey.ControllerRRight)))
+            FocusInput();
+
+        if (ShouldCloseInput(
+                Input.IsKeyReleased(InputKey.Escape),
+                Input.IsKeyReleased(InputKey.ControllerRRight),
                 Input.IsKeyPressed(InputKey.ControllerLOption)))
         {
             CloseInput();
@@ -122,9 +142,23 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         initialized = false;
     }
 
+    internal bool IsEnabled => isEnabled;
+
+    internal void SetEnabled(bool value)
+    {
+        if (isEnabled == value) return;
+
+        isEnabled = value;
+        if (!isEnabled && initialized)
+        {
+            CloseInput();
+            ScreenManager.SetSuspendLayer(gauntletLayer, true);
+        }
+    }
+
     private bool CanOpenInput()
     {
-        if (Input.IsOnScreenKeyboardActive) return false;
+        if (!gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive) return false;
 
         var focusedLayer = ScreenManager.FocusedLayer;
         if (focusedLayer == null || ReferenceEquals(focusedLayer, gauntletLayer)) return true;
@@ -132,6 +166,45 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         return focusedLayer is not GauntletLayer focusedGauntletLayer ||
                focusedGauntletLayer.UIContext.EventManager.FocusedWidget is not EditableTextWidget;
+    }
+
+    private bool UpdateVisibility()
+    {
+        var topScreen = ScreenManager.TopScreen;
+        ScreenLayer gameplayLayer;
+        bool isGameplayScreen;
+        bool isConversationActive = Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
+
+        if (topScreen is MapScreen mapScreen)
+        {
+            gameplayLayer = mapScreen.SceneLayer;
+            isGameplayScreen = GameStateManager.Current?.ActiveState is MapState mapState && !mapState.AtMenu;
+        }
+        else if (topScreen is MissionScreen missionScreen)
+        {
+            gameplayLayer = missionScreen.SceneLayer;
+            isGameplayScreen = true;
+            isConversationActive |= missionScreen.IsConversationActive;
+        }
+        else
+        {
+            gameplayLayer = null;
+            isGameplayScreen = false;
+        }
+
+        var focusedLayer = ScreenManager.FocusedLayer;
+        bool shouldShow = ShouldShowPresentation(
+            isEnabled,
+            isGameplayScreen && !LoadingWindow.IsLoadingWindowActive,
+            isConversationActive,
+            ReferenceEquals(focusedLayer, gameplayLayer),
+            ReferenceEquals(focusedLayer, gauntletLayer));
+
+        if (gauntletLayer.IsActive == shouldShow) return shouldShow;
+
+        if (!shouldShow) CloseInput();
+        ScreenManager.SetSuspendLayer(gauntletLayer, !shouldShow);
+        return shouldShow;
     }
 
     private void OpenInput()
@@ -201,11 +274,20 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     }
 
     internal static bool ShouldCloseInput(
-        bool escapePressed,
-        bool controllerCancelPressed,
+        bool escapeReleased,
+        bool controllerCancelReleased,
         bool controllerTogglePressed)
     {
-        return escapePressed || controllerCancelPressed || controllerTogglePressed;
+        return escapeReleased || controllerCancelReleased || controllerTogglePressed;
+    }
+
+    internal static bool ShouldCaptureCloseInput(
+        bool inputFocused,
+        bool escapePressed,
+        bool controllerCancelPressed)
+    {
+        return !inputFocused &&
+               (escapePressed || controllerCancelPressed);
     }
 
     internal static bool ShouldSendInput(
@@ -214,6 +296,19 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         bool controllerSendPressed)
     {
         return enterPressed || numpadEnterPressed || controllerSendPressed;
+    }
+
+    internal static bool ShouldShowPresentation(
+        bool isEnabled,
+        bool isGameplayScreen,
+        bool isConversationActive,
+        bool isGameplayLayerFocused,
+        bool isChatLayerFocused)
+    {
+        return isEnabled &&
+               isGameplayScreen &&
+               !isConversationActive &&
+               (isGameplayLayerFocused || isChatLayerFocused);
     }
 
     internal static void SetPassiveInputRestrictions(InputRestrictions inputRestrictions)
