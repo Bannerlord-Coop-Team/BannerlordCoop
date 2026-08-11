@@ -34,6 +34,7 @@ internal class SettlementPopulationTracker : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly FixedTownNpcService fixedTownNpcService;
 
     // Keyed by Settlement.StringId; holds the settlement so cleanup never rescans the campaign.
     private readonly Dictionary<string, Settlement> populatedSettlements = new Dictionary<string, Settlement>();
@@ -53,11 +54,16 @@ internal class SettlementPopulationTracker : IHandler
         }
     }
 
-    public SettlementPopulationTracker(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public SettlementPopulationTracker(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        FixedTownNpcService fixedTownNpcService)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.fixedTownNpcService = fixedTownNpcService;
 
         messageBroker.Subscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
@@ -204,20 +210,23 @@ internal class SettlementPopulationTracker : IHandler
         if (behavior == null)
         {
             Logger.Warning("HeroAgentSpawnCampaignBehavior not found; cannot populate {Settlement}", settlement.StringId);
-            return;
+        }
+        else
+        {
+            foreach (var hero in CollectHeroesToPlace(settlement))
+            {
+                try
+                {
+                    behavior.RefreshLocationOfHeroForSettlement(hero, settlement);
+                }
+                catch (Exception e)
+                {
+                    Logger.Warning(e, "Failed to place {Hero} in {Settlement}", hero.StringId, settlement.StringId);
+                }
+            }
         }
 
-        foreach (var hero in CollectHeroesToPlace(settlement))
-        {
-            try
-            {
-                behavior.RefreshLocationOfHeroForSettlement(hero, settlement);
-            }
-            catch (Exception e)
-            {
-                Logger.Warning(e, "Failed to place {Hero} in {Settlement}", hero.StringId, settlement.StringId);
-            }
-        }
+        fixedTownNpcService.Populate(settlement);
     }
 
     private static IEnumerable<Hero> CollectHeroesToPlace(Settlement settlement)

@@ -13,6 +13,7 @@ using GameInterface;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Handlers;
 using GameInterface.Services.Chat;
+using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
@@ -506,6 +507,7 @@ namespace Coop
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
+                campaignGameStarter.AddBehavior(new FixedTownNpcConversationBehavior());
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
                 campaignGameStarter.AddBehavior(new CoopTournamentCampaignBehavior());
             }
