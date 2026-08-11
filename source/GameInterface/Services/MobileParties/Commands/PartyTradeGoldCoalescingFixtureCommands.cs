@@ -3,6 +3,9 @@ using Common;
 using Common.Network.Coalescing;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
+using HarmonyLib;
+using SandBox.View.Map;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -23,6 +26,7 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
     private const string Channel = "AutoSync.SetValue.MobileParty.PartyTradeGold";
 
     private static FixtureState fixture;
+    private static PartyBase focusedParty;
 
     [CommandLineArgumentFunction("trade_gold_coalescing_probe", "coop.debug.mobileparty")]
     public static string Probe(List<string> args)
@@ -176,7 +180,17 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
         if (!IsEligible(party))
             return $"Mobile party '{args[0]}' is not available on the campaign map.";
 
+        MapScreen mapScreen = MapScreen.Instance;
+        if (mapScreen == null)
+            return "Campaign map screen is unavailable.";
+
+        if (mapScreen.MapState?.AtMenu == true)
+            mapScreen.MapState.ExitMenuMode();
+
         party.Party.SetAsCameraFollowParty();
+        mapScreen.MapCameraView.ResetCamera(resetDistance: true, teleportToMainParty: false);
+        focusedParty = party.Party;
+        RefreshFocusedPartyTooltip(mapScreen);
         string output = $"focused=true|networkId={args[0]}|party={party.StringId}|" +
             $"name={Clean(party.Name?.ToString())}|gold={party.PartyTradeGold}";
         return WithStructuredResult(output, new
@@ -187,6 +201,23 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
             name = Clean(party.Name?.ToString()),
             gold = party.PartyTradeGold,
         });
+    }
+
+    internal static void RefreshFocusedPartyTooltip(MapScreen mapScreen)
+    {
+        if (mapScreen == null || focusedParty?.MobileParty == null || !focusedParty.MobileParty.IsActive)
+        {
+            focusedParty = null;
+            return;
+        }
+
+        var partyVisual = focusedParty.GetPartyVisual();
+        if (partyVisual == null || mapScreen.CurrentVisualOfTooltip == partyVisual)
+            return;
+
+        mapScreen.RemoveMapTooltip();
+        mapScreen.OnHoverMapEntity(partyVisual);
+        mapScreen.CurrentVisualOfTooltip = partyVisual;
     }
 
     [CommandLineArgumentFunction("trade_gold_coalescing_restore", "coop.debug.mobileparty")]
@@ -408,6 +439,15 @@ internal static class PartyTradeGoldCoalescingFixtureCommands
             Final = final;
             Coalescer = coalescer;
         }
+    }
+}
+
+[HarmonyPatch(typeof(MapScreen), nameof(MapScreen.HandleMouse))]
+internal static class PartyTradeGoldCoalescingTooltipPatch
+{
+    private static void Postfix(MapScreen __instance)
+    {
+        PartyTradeGoldCoalescingFixtureCommands.RefreshFocusedPartyTooltip(__instance);
     }
 }
 #endif
