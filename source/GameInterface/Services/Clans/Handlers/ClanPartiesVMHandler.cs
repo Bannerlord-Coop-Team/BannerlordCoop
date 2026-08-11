@@ -161,10 +161,9 @@ internal class ClanPartiesVMHandler : IHandler
                 }
                 else // Swapping with new leader
                 {
-                    if (objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty))
-                    {
-                        TeleportHeroAction.ApplyDelayedTeleportToParty(oldLeader, mainParty);
-                    }
+                    if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+
+                    TeleportHeroAction.ApplyDelayedTeleportToParty(oldLeader, mainParty);
                 }
             }
             if (newLeader != null) // Teleport new leader to party
