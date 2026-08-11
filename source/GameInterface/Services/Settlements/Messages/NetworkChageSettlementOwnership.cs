@@ -30,17 +30,4 @@ namespace GameInterface.Services.Settlements.Messages
         }
     }
 
-#if DEBUG
-    [ProtoContract(SkipConstructor = true)]
-    public record NetworkPrepareMissingSettlementOwnerFixture : ICommand
-    {
-        [ProtoMember(1)]
-        public string SettlementId { get; }
-
-        public NetworkPrepareMissingSettlementOwnerFixture(string settlementId)
-        {
-            SettlementId = settlementId;
-        }
-    }
-#endif
 }

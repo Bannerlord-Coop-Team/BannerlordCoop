@@ -1,8 +1,6 @@
 ﻿using Autofac;
 using Common;
-using Common.Network;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Settlements.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -508,52 +506,6 @@ internal class SettlementCommands
                Environment.NewLine + FormatOwnerState(settlement);
     }
 
-#if DEBUG
-    [CommandLineArgumentFunction("prepare_missing_owner_fixture", "coop.debug.settlements")]
-    public static string PrepareMissingOwnerFixture(List<string> args)
-    {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
-        if (args.Count != 1)
-            return "Usage: coop.debug.settlements.prepare_missing_owner_fixture <Settlement name or id>";
-
-        var settlement = Campaign.Current.CampaignObjectManager.Settlements
-            .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
-        if (settlement == null)
-            return $"Settlement '{args[0]}' not found";
-        if (!settlement.IsFortification)
-            return $"'{args[0]}' is not a town or castle";
-        if (settlement.OwnerClan?.Leader == null)
-            return $"'{args[0]}' has no authoritative previous owner";
-        if (!ContainerProvider.TryResolve<INetwork>(out var network))
-            return "Unable to resolve network";
-
-        network.SendAll(new NetworkPrepareMissingSettlementOwnerFixture(settlement.StringId));
-        return $"Prepared missing-owner fixture for {settlement.Name} ({settlement.StringId}); server owner remains {settlement.OwnerClan.Leader.StringId}";
-    }
-
-    [CommandLineArgumentFunction("change_owner_by_gift", "coop.debug.settlements")]
-    public static string ChangeOwnerByGift(List<string> args)
-    {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
-        if (args.Count != 2)
-            return "Usage: coop.debug.settlements.change_owner_by_gift <Settlement name or id> <OwnerHero id>";
-
-        var settlement = Campaign.Current.CampaignObjectManager.Settlements
-            .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
-        if (settlement == null)
-            return $"Settlement '{args[0]}' not found";
-        if (!settlement.IsFortification)
-            return $"'{args[0]}' is not a town or castle";
-
-        var owner = Campaign.Current.CampaignObjectManager.Find<Hero>(args[1]);
-        if (owner?.Clan == null)
-            return $"Owner hero '{args[1]}' or their clan was not found";
-
-        ChangeOwnerOfSettlementAction.ApplyByGift(settlement, owner);
-        return $"Changed {settlement.Name} owner by gift to {owner.Name} ({owner.StringId})";
-    }
-#endif
-
     [CommandLineArgumentFunction("owner_state", "coop.debug.settlements")]
     public static string OwnerState(List<string> args)
     {
@@ -567,26 +519,6 @@ internal class SettlementCommands
 
         return FormatOwnerState(settlement);
     }
-
-#if DEBUG
-    [CommandLineArgumentFunction("assert_owner", "coop.debug.settlements")]
-    public static string AssertOwner(List<string> args)
-    {
-        if (args.Count != 2)
-            return "Usage: coop.debug.settlements.assert_owner <Settlement name or id> <OwnerHero id|null>";
-
-        var settlement = Campaign.Current.CampaignObjectManager.Settlements
-            .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
-        if (settlement == null)
-            return $"Settlement '{args[0]}' not found";
-
-        var actualOwner = settlement.OwnerClan?.Leader?.StringId ?? "null";
-        if (actualOwner != args[1])
-            return $"Settlement '{settlement.StringId}' owner is '{actualOwner}', expected '{args[1]}'";
-
-        return FormatOwnerState(settlement);
-    }
-#endif
 
     private static string FormatOwnerState(Settlement settlement)
     {
