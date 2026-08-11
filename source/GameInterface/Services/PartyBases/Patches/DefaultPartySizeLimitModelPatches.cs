@@ -18,8 +18,9 @@ internal class DefaultPartySizeLimitModelPatches
     [HarmonyPrefix]
     public static bool CalculateMobilePartyMemberSizeLimitPrefix(DefaultPartySizeLimitModel __instance, ref ExplainedNumber __result, MobileParty party, bool includeDescriptions = false)
     {
-        // Override result if party is a player caravan
-        if (party.IsCaravan && party.Party.Owner != null && party.Party.Owner.IsPlayerHero())
+        // Override result if party is a player caravan.
+        // Check using IsNotable instead of IsPlayerHero() as this isn't dependent on the player registry.
+        if (party.IsCaravan && party.Party.Owner != null && !party.Party.Owner.IsNotable)
         {
             ExplainedNumber result = new ExplainedNumber(20f, includeDescriptions, __instance._baseSizeText);
 
