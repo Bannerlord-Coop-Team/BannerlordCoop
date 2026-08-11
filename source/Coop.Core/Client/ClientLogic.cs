@@ -75,7 +75,7 @@ public class ClientLogic : IClientLogic
     private IReadOnlyDictionary<Type, Func<IClientState>> CreateStateFactories() =>
         new Dictionary<Type, Func<IClientState>>
         {
-            [typeof(MainMenuState)] = () => new MainMenuState(this, context.MessageBroker, context.Network, context.GameInterface, context.GameStateInterface, context.LoadingInterface),
+            [typeof(MainMenuState)] = () => new MainMenuState(this, context.MessageBroker, context.Network, context.GameInterface, context.GameStateInterface, context.LoadingInterface, context.JoinAttemptOverlay, context.JoinAttempt, context.CoopFinalizer),
             [typeof(ValidateModuleState)] = () => new ValidateModuleState(this, context.MessageBroker, context.Network, context.ControllerIdProvider, context.CoopFinalizer, context.GameStateInterface, context.ModuleInfoProvider),
             [typeof(CharacterCreationState)] = () => new CharacterCreationState(this, context.MessageBroker, context.Network, context.HeroInterface, context.RegistryManager, context.ControllerIdProvider, context.LoadingInterface, context.PlayerManager, context.GameStateInterface, context.CoopFinalizer),
             [typeof(ReceivingSavedDataState)] = () => new ReceivingSavedDataState(this, context.MessageBroker, context.LoadingInterface, context.GameStateInterface),
