@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -73,18 +75,18 @@ internal class TradeAgreementsCampaignBehaviorPatches
     public static bool ApplyBrokenTradeAgreementPenaltyPrefix(Kingdom kingdom, Kingdom otherKingdom, DeclareWarAction.DeclareWarDetail detail)
     {
         // Vanilla uses a check for player hostility to apply penalty for player.
-        // Player hero that caused the war to be declared isn't available here.
+        // Use main hero context to apply relation penalty.
         var targetHero = kingdom.Leader;
         if (detail == DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility)
         {
-            // TODO: Apply the penalty to the hero of the client that declared the war once it is passed down here
-            // Traits are not synced yet either.
-            //targetHero = playerHero;
-            //TraitLevelingHelper.OnTradeAgreementBroken();
-            return false;
+            // Falls back to the kingdom leader when no player hero is available.
+            targetHero = ResolvedMainHeroContext.ResolvedMainHero ?? kingdom.Leader;
+
+            // TODO: Traits are not synced yet
+            // TraitLevelingHelper.OnTradeAgreementBroken()
         }
 
-        if (kingdom.Leader == null || otherKingdom.Leader == null) return false;
+        if (targetHero == null || otherKingdom.Leader == null) return false;
 
         ChangeRelationAction.ApplyRelationChangeBetweenHeroes(targetHero, otherKingdom.Leader, -50, true);
 

@@ -6,7 +6,10 @@ namespace GameInterface.Services.UI.Notifications.Messages;
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkNotifyTributePaymentEnded : ICommand
 {
+    [ProtoMember(1)]
     public readonly string ClanId;
+
+    [ProtoMember(2)]
     public readonly string PayerFactionId;
 
     public NetworkNotifyTributePaymentEnded(
