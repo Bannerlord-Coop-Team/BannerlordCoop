@@ -425,7 +425,7 @@ namespace Coop
             Updateables.Add(GameThread.Instance);
 
 #if DEBUG
-            if (isAutoConnect)
+            if (isAutoConnect && LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs()))
             {
                 liveTestControlServer = new LiveTestControlServer(isServer, activeLogFilePath);
                 liveTestControlServer.Start();
