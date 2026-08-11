@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Logging;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -45,7 +46,12 @@ public class ServerModule : CommonModule
 
         builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
-        builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<CoopServer>()
+            .As<ICoopServer>()
+            .As<INetwork>()
+            .As<INetEventListener>()
+            .As<IPacketProfileCapture>()
+            .InstancePerLifetimeScope();
         builder.RegisterType<SendCoalescer>().As<ISendCoalescer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
         builder.RegisterType<JoinCampaignBaselineSender>()

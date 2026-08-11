@@ -18,7 +18,7 @@ using System.Threading;
 namespace Coop.Core.Common.Network;
 
 /// <inheritdoc cref="INetwork"/>
-public abstract class CoopNetworkBase : INetwork, INetEventListener
+public abstract class CoopNetworkBase : INetwork, INetEventListener, IPacketProfileCapture
 {
     public INetworkConfig Config { get; }
     public abstract int Priority { get; }
@@ -31,6 +31,20 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     // Profiles outbound packets; dumps per-type counts and byte totals every 10 seconds (server only).
     private readonly PacketProfiler packetProfiler = new PacketProfiler(TimeSpan.FromSeconds(10));
+
+    public bool TryStartCapture(
+        string packetName,
+        TimeSpan duration,
+        Action completion,
+        out PacketProfileCaptureSnapshot snapshot,
+        out string error) =>
+        packetProfiler.TryStartCapture(packetName, duration, completion, out snapshot, out error);
+
+    public bool TryGetCapture(out PacketProfileCaptureSnapshot snapshot, out string error) =>
+        packetProfiler.TryGetCapture(out snapshot, out error);
+
+    public bool TryCancelCapture(out PacketProfileCaptureSnapshot snapshot, out string error) =>
+        packetProfiler.TryCancelCapture(out snapshot, out error);
 
     // Guard against repeated container and explicit disposal.
     private int disposed;
