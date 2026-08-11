@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Players;
 using Serilog;
@@ -54,8 +55,8 @@ public static class HeroExtensions
     }
 
     /// <summary>
-    /// Checks for local player hero as well heroes in a player's party.
-    /// Hero health is owned by the party leader's client in battle.
+    /// Determine Whether this client owns a hero's health.
+    /// Use BattleSpawnGate.HeroAgentAuthorityProbe to determine if client has authority.
     /// </summary>
     public static bool IsHealthControlledByThisInstance(this Hero hero)
     {
@@ -65,14 +66,13 @@ public static class HeroExtensions
             return false;
         }
 
-        // Hero is this player's character, don't need to check party
+        // Determine if this client has control of the hero from the mission layer
+        var agentAuthority = BattleSpawnGate.HeroAgentAuthorityProbe?.Invoke(hero);
+        if (agentAuthority.HasValue) return agentAuthority.Value;
+
+        // Fallback: Hero is this player's character
         if (hero.IsControlledByThisInstance()) return true;
 
-        // Don't manage health for other players in this player's party (for future)
-        if (hero.IsPlayerHero()) return false;
-
-        var party = hero.PartyBelongedTo;
-
-        return party != null && party.IsControlledByThisInstance();
+        return false;
     }
 }
