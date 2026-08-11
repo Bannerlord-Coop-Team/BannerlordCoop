@@ -14,7 +14,8 @@ internal static class MovementDebugCommands
     {
         if (args.Count != 0)
             return "Usage: coop.debug.movement.state";
-        if (!TryGetHandler(out AgentMovementHandler handler))
+        if (!TryGetHandler(out IAgentMovementHandler handler) ||
+            !TryGetDebugControl(handler, out IAgentMovementDebugControl debugControl))
             return "No active co-op mission movement handler.";
 
         MovementRateSnapshot state = handler.MovementRate;
@@ -51,9 +52,9 @@ internal static class MovementDebugCommands
             $"deferredAge={state.MaximumDeferredAgeSeconds.ToString("0.000", CultureInfo.InvariantCulture)}",
             $"bulkPolls={state.BulkPollsPerSecond}",
             $"priorityOnlyPolls={state.PriorityOnlyPollsPerSecond}",
-            $"initialConfiguredBulkHz={handler.InitialConfiguredBulkHz}",
-            $"syntheticReceivePressureActive={handler.SyntheticReceivePressureActive.ToString().ToLowerInvariant()}",
-            $"syntheticReceivePressureRemainingSeconds={handler.SyntheticReceivePressureRemainingSeconds.ToString("0.00", CultureInfo.InvariantCulture)}",
+            $"initialConfiguredBulkHz={debugControl.InitialConfiguredBulkHz}",
+            $"syntheticReceivePressureActive={debugControl.SyntheticReceivePressureActive.ToString().ToLowerInvariant()}",
+            $"syntheticReceivePressureRemainingSeconds={debugControl.SyntheticReceivePressureRemainingSeconds.ToString("0.00", CultureInfo.InvariantCulture)}",
             $"reason={state.Reason}",
         });
     }
@@ -68,7 +69,7 @@ internal static class MovementDebugCommands
                 out int? rate,
                 out string error))
             return error;
-        if (!TryGetHandler(out AgentMovementHandler handler))
+        if (!TryGetHandler(out IAgentMovementHandler handler))
             return "No active co-op mission movement handler.";
         if (!handler.TrySetForcedBulkHz(rate, out error))
             return error;
@@ -90,7 +91,7 @@ internal static class MovementDebugCommands
         {
             return error;
         }
-        if (!TryGetHandler(out AgentMovementHandler handler))
+        if (!TryGetHandler(out IAgentMovementHandler handler))
             return "No active co-op mission movement handler.";
         if (!handler.TrySetForcedReceiverCapHz(rate, out error))
             return error;
@@ -111,9 +112,10 @@ internal static class MovementDebugCommands
         {
             return "Usage: coop.debug.movement.simulate_receive_pressure <duration-seconds> <queue-ms> <apply-ms> <snapshots>";
         }
-        if (!TryGetHandler(out AgentMovementHandler handler))
+        if (!TryGetHandler(out IAgentMovementHandler handler) ||
+            !TryGetDebugControl(handler, out IAgentMovementDebugControl debugControl))
             return "No active co-op mission movement handler.";
-        if (!handler.TrySetSyntheticReceivePressure(
+        if (!debugControl.TrySetSyntheticReceivePressure(
                 durationSeconds,
                 queueMilliseconds,
                 applyMilliseconds,
@@ -138,19 +140,28 @@ internal static class MovementDebugCommands
     {
         if (args.Count != 0)
             return "Usage: coop.debug.movement.clear_receive_pressure";
-        if (!TryGetHandler(out AgentMovementHandler handler))
+        if (!TryGetHandler(out IAgentMovementHandler handler) ||
+            !TryGetDebugControl(handler, out IAgentMovementDebugControl debugControl))
             return "No active co-op mission movement handler.";
 
-        handler.ClearSyntheticReceivePressure();
+        debugControl.ClearSyntheticReceivePressure();
         return "MOVEMENT_RECEIVE_PRESSURE_CLEARED";
     }
 
-    private static bool TryGetHandler(out AgentMovementHandler handler)
+    private static bool TryGetHandler(out IAgentMovementHandler handler)
     {
         handler = Mission.Current?
             .GetMissionBehavior<CoopMissionController>()?
-            .AgentMovementHandler as AgentMovementHandler;
+            .AgentMovementHandler;
         return handler != null;
+    }
+
+    private static bool TryGetDebugControl(
+        IAgentMovementHandler handler,
+        out IAgentMovementDebugControl debugControl)
+    {
+        debugControl = handler as IAgentMovementDebugControl;
+        return debugControl != null;
     }
 
     private static bool TryParseRate(

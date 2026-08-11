@@ -46,7 +46,30 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     IPacketHandler MountMovementApplier { get; }
 }
 
+#if DEBUG
+internal interface IAgentMovementDebugControl
+{
+    int InitialConfiguredBulkHz { get; }
+
+    bool SyntheticReceivePressureActive { get; }
+
+    float SyntheticReceivePressureRemainingSeconds { get; }
+
+    bool TrySetSyntheticReceivePressure(
+        float durationSeconds,
+        double queueMilliseconds,
+        double applyMilliseconds,
+        int snapshots,
+        out string error);
+
+    void ClearSyntheticReceivePressure();
+}
+#endif
+
 public class AgentMovementHandler : IAgentMovementHandler
+#if DEBUG
+    , IAgentMovementDebugControl
+#endif
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
@@ -369,15 +392,15 @@ public class AgentMovementHandler : IAgentMovementHandler
         movementRateController.TrySetForcedReceiverCapHz(hz, out error);
 
 #if DEBUG
-    internal int InitialConfiguredBulkHz => initialConfiguredBulkHz;
+    int IAgentMovementDebugControl.InitialConfiguredBulkHz => initialConfiguredBulkHz;
 
-    internal bool SyntheticReceivePressureActive =>
+    bool IAgentMovementDebugControl.SyntheticReceivePressureActive =>
         syntheticReceivePressureRemainingSeconds > 0f;
 
-    internal float SyntheticReceivePressureRemainingSeconds =>
+    float IAgentMovementDebugControl.SyntheticReceivePressureRemainingSeconds =>
         syntheticReceivePressureRemainingSeconds;
 
-    internal bool TrySetSyntheticReceivePressure(
+    bool IAgentMovementDebugControl.TrySetSyntheticReceivePressure(
         float durationSeconds,
         double queueMilliseconds,
         double applyMilliseconds,
@@ -413,7 +436,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         return true;
     }
 
-    internal void ClearSyntheticReceivePressure()
+    void IAgentMovementDebugControl.ClearSyntheticReceivePressure()
     {
         syntheticReceivePressureRemainingSeconds = 0f;
         syntheticReceiveQueueMilliseconds = 0d;
