@@ -85,6 +85,9 @@ namespace Coop
         private bool isServer = false;
         private bool isAutoConnect = false;
         private bool deferClientAutoConnect;
+#if DEBUG
+        private bool isLiveTestRun;
+#endif
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
@@ -105,6 +108,10 @@ namespace Coop
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
             deferClientAutoConnect = args.Any(a =>
                 a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase));
+#if DEBUG
+            isLiveTestRun = args.Any(a =>
+                a.Equals("/cooptestrun", StringComparison.OrdinalIgnoreCase));
+#endif
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
@@ -578,10 +585,19 @@ namespace Coop
             if (!steamBootAttempted && isAtMainMenu)
             {
                 steamBootAttempted = true;
-                var steamPump = SteamIntegrationBoot.TryStartWithCallbackPump(
-                    isServer, Utilities.GetFullCommandLineString());
-                // The standalone server has no game frame of its own to dispatch its game-server callbacks.
-                if (steamPump != null) Updateables.Add(steamPump);
+#if DEBUG
+                if (isLiveTestRun)
+                {
+                    Logger.Information("[LiveTest] Steam integration disabled for this scoped runtime");
+                }
+                else
+#endif
+                {
+                    var steamPump = SteamIntegrationBoot.TryStartWithCallbackPump(
+                        isServer, Utilities.GetFullCommandLineString());
+                    // The standalone server has no game frame of its own to dispatch its game-server callbacks.
+                    if (steamPump != null) Updateables.Add(steamPump);
+                }
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
