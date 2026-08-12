@@ -63,6 +63,7 @@ namespace Coop
 
 #if DEBUG
         private LiveTestControlServer liveTestControlServer;
+        private bool isDeferredClientJoin;
 #endif
 
         public CoopMod()
@@ -100,6 +101,10 @@ namespace Coop
             }
 
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
+#if DEBUG
+            isDeferredClientJoin = args.Any(a =>
+                a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase));
+#endif
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
@@ -428,7 +433,11 @@ namespace Coop
 #if DEBUG
             if (isAutoConnect)
             {
-                liveTestControlServer = new LiveTestControlServer(isServer, activeLogFilePath);
+                liveTestControlServer = new LiveTestControlServer(
+                    isServer,
+                    activeLogFilePath,
+                    isDeferredClientJoin,
+                    () => Coop.StartAsClient());
                 liveTestControlServer.Start();
             }
 #endif
@@ -641,6 +650,7 @@ namespace Coop
         {
             // The auto-load-save start path owns this process's startup.
             if (ManagedServerConfig.HasAutoLoadSave) return;
+            if (!isServer && isDeferredClientJoin) return;
 
             if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
             {
