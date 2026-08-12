@@ -118,7 +118,6 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
         CommandLineFunctionality.CollectCommandLineFunctions();
         functionsCollected = true;
     }
-
 }
 
 public class LiveTestCommandResult
