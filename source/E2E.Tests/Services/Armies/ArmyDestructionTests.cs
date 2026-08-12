@@ -1,4 +1,4 @@
-using E2E.Tests.Environment;
+﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies;
 using HarmonyLib;

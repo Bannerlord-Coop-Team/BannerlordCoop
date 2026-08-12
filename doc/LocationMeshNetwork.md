@@ -44,7 +44,7 @@ sequenceDiagram
     actor Player as Local Player
     participant Game as SandBoxMissions
     participant Patch as PlayerLocationEntryPatches
-    participant Ctrl as CoopTavernsController<br/>(ILocationMissionBehavior)
+    participant Ctrl as CoopLocationsController<br/>(ILocationMissionBehavior)
     participant Mesh as IMeshNetwork<br/>(LiteNetP2PClient)
     participant NAT as Rendezvous / NAT-Punch<br/>(campaign server)
     participant Peer as Remote Co-host Peer
@@ -102,10 +102,11 @@ sequenceDiagram
 
 | Concern | Type | File |
 |---|---|---|
-| Mesh network interface | `IMeshNetwork` | [`source/Missions/Services/Network/IMeshNetwork.cs`](../source/Missions/Services/Network/IMeshNetwork.cs) |
+| Mesh network interface | `IBattleNetwork` | [`source/Missions/IBattleNetwork.cs`](../source/Missions/IBattleNetwork.cs) |
 | Mesh network implementation | `LiteNetP2PClient` | [`source/Missions/Services/Network/LiteNetP2PClient.cs`](../source/Missions/Services/Network/LiteNetP2PClient.cs) |
 | Entry trigger (Harmony postfix) | `PlayerLocationEntryPatches` | [`source/GameInterface/Services/Locations/Patches/PlayerLocationEntryPatches.cs`](../source/GameInterface/Services/Locations/Patches/PlayerLocationEntryPatches.cs) |
-| Connection / join / leave owner | `CoopTavernsController` | [`source/Missions/Services/Taverns/CoopTavernsController.cs`](../source/Missions/Services/Taverns/CoopTavernsController.cs) |
+| Instance id derivation | `LocationInstanceId` | [`source/Missions/LocationInstanceId.cs`](../source/Missions/LocationInstanceId.cs) |
+| Connection / join / leave owner | `CoopLocationsController` | [`source/Missions/Taverns/CoopLocationsController.cs`](../source/Missions/Taverns/CoopLocationsController.cs) |
 | DI registration | `MissionModule` | [`source/Missions/MissionModule.cs`](../source/Missions/MissionModule.cs) |
 
 ---
@@ -113,7 +114,7 @@ sequenceDiagram
 ## 4. Notes and edge cases
 
 - **Attach before publish.** `PlayerLocationEntryPatches.AttachLocationBehaviors` adds the
-  `ILocationMissionBehavior`s (`CoopTavernsController`, `CoopMissionNetworkBehavior`) to the
+  registered `ILocationMissionBehavior`s (in practice exactly one: `CoopLocationsController`) to the
   freshly-opened mission *before* `PlayerEnteredLocation` is published, so the controller is
   alive and subscribed when it owns the instance request and join exchange. `OpenIndoorMission`
   fires several times per entry, so attachment is deduped via a `ConditionalWeakTable`.
