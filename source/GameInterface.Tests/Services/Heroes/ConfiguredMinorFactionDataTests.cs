@@ -1,5 +1,4 @@
-using GameInterface.Services.Heroes.Patches;
-using GameInterface.Services.Heroes.Patches.Disable;
+using GameInterface.Services.Heroes;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -7,16 +6,13 @@ using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameComponents;
-using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Heroes;
 
 public sealed class ConfiguredMinorFactionDataTests
 {
-    private const string CoopTeamLeaderId = "coop_team_lord_another_joke";
-
     private static readonly (string Id, string Name, string NativeTemplate)[] FoundingLords =
     {
         ("coop_team_lord_hasted", "Hasted", "spc_skolderbrotva_leader_0"),
@@ -25,116 +21,81 @@ public sealed class ConfiguredMinorFactionDataTests
         ("coop_team_lord_shotup", "ShotUp", "spc_skolderbrotva_leader_3"),
     };
 
-    [Fact]
-    public void ApplyConfiguredMinorFactionLordName_UsesTemplateNameForFirstAndFullName()
-    {
-        var template = new CharacterObject
-        {
-            StringId = FoundingLords[0].Id,
-            _basicName = new TextObject(FoundingLords[0].Name),
-            _occupation = Occupation.Lord,
-        };
-        var generatedCharacter = new CharacterObject
-        {
-            _originCharacter = template,
-        };
-        var hero = new Hero
-        {
-            _characterObject = generatedCharacter,
-            _name = new TextObject("Random Sturgian Name"),
-            _firstName = new TextObject("Random"),
-        };
-
-        HeroCreatorPatches.ApplyConfiguredMinorFactionLordName(hero);
-
-        Assert.Equal(FoundingLords[0].Name, hero.Name.ToString());
-        Assert.Equal(FoundingLords[0].Name, hero.FirstName.ToString());
-    }
-
-    [Fact]
-    public void ApplyConfiguredMinorFactionLordName_UsesExplicitCreationTemplate()
-    {
-        var configuredTemplate = new CharacterObject
-        {
-            StringId = FoundingLords[0].Id,
-            _basicName = new TextObject(FoundingLords[0].Name),
-            _occupation = Occupation.Lord,
-        };
-        var hero = new Hero
-        {
-            _characterObject = new CharacterObject
-            {
-                _originCharacter = new CharacterObject { StringId = "different_template" },
-            },
-            _name = new TextObject("Random Sturgian Name"),
-            _firstName = new TextObject("Random"),
-        };
-
-        HeroCreatorPatches.ApplyConfiguredMinorFactionLordName(hero, configuredTemplate);
-
-        Assert.Equal(FoundingLords[0].Name, hero.Name.ToString());
-        Assert.Equal(FoundingLords[0].Name, hero.FirstName.ToString());
-    }
-
     [Theory]
-    [InlineData(true, false, true)]
-    [InlineData(false, true, true)]
-    [InlineData(false, false, false)]
-    public void ShouldApplyConfiguredName_RequiresServerOrNativeAuthority(
-        bool isServer,
-        bool originalAllowed,
-        bool expected)
+    [InlineData("coop_team", true, true, true, true)]
+    [InlineData("coop_team", false, true, true, false)]
+    [InlineData("coop_team", true, false, false, false)]
+    [InlineData("other_minor_faction", true, true, false, false)]
+    public void SpawnPolicy_OnlyCreatesCoopTeamOnAuthoritativeNewCampaigns(
+        string clanId,
+        bool firstTime,
+        bool hasAuthority,
+        bool expectedReplacement,
+        bool expectedCreation)
     {
         Assert.Equal(
-            expected,
-            HeroCreatorPatches.ShouldApplyConfiguredName(isServer, originalAllowed));
+            expectedReplacement,
+            ConfiguredMinorFactionHeroSpawner.ShouldReplaceNativeSpawn(clanId, hasAuthority));
+        Assert.Equal(
+            expectedCreation,
+            ConfiguredMinorFactionHeroSpawner.ShouldCreateInitialHeroes(
+                clanId,
+                firstTime,
+                hasAuthority));
     }
 
     [Fact]
-    public void HeroCreatorPatch_TargetsExactCreateSpecialHeroOverload()
+    public void EnabledTemplates_AreSelectedInConfigurationOrderWithoutFourLordLimit()
     {
-        var harmony = new Harmony($"{nameof(HeroCreatorPatch_TargetsExactCreateSpecialHeroOverload)}.{Guid.NewGuid()}");
+        CharacterObject[] configuredTemplates =
+        {
+            CreateTemplate(ConfiguredMinorFactionHeroSpawner.CoopTeamLeaderTemplateId, enabled: true),
+            CreateTemplate("coop_team_lord_disabled", enabled: false),
+            CreateTemplate("coop_team_lord_2", enabled: true),
+            CreateTemplate("coop_team_lord_3", enabled: true),
+            CreateTemplate("coop_team_lord_4", enabled: true),
+            CreateTemplate("coop_team_lord_added_later", enabled: true),
+        };
+
+        IReadOnlyList<CharacterObject> enabled =
+            ConfiguredMinorFactionHeroSpawner.GetEnabledTemplates(configuredTemplates);
+
+        Assert.Equal(
+            new[]
+            {
+                ConfiguredMinorFactionHeroSpawner.CoopTeamLeaderTemplateId,
+                "coop_team_lord_2",
+                "coop_team_lord_3",
+                "coop_team_lord_4",
+                "coop_team_lord_added_later",
+            },
+            enabled.Select(template => template.StringId));
+    }
+
+    [Fact]
+    public void Apply_PatchesNativeMinorFactionSpawnAtFirstPriority()
+    {
+        var harmony = new Harmony(ConfiguredMinorFactionHeroSpawner.HarmonyId);
+        var original = AccessTools.Method(
+            typeof(HeroSpawnCampaignBehavior),
+            nameof(HeroSpawnCampaignBehavior.SpawnMinorFactionHeroes),
+            new[] { typeof(Clan), typeof(bool) });
+        harmony.UnpatchAll(harmony.Id);
+
         try
         {
-            Type[] expectedParameterTypes =
-            {
-                typeof(CharacterObject),
-                typeof(TaleWorlds.CampaignSystem.Settlements.Settlement),
-                typeof(Clan),
-                typeof(Clan),
-                typeof(int),
-            };
+            ConfiguredMinorFactionHeroSpawner.Apply();
 
-            var patched = harmony.CreateClassProcessor(typeof(HeroCreatorPatches)).Patch();
-
-            Assert.Contains(
-                patched,
-                method => method.Name.Contains(nameof(HeroCreator.CreateSpecialHero), StringComparison.Ordinal) &&
-                          method.GetParameters()
-                              .Select(parameter => parameter.ParameterType)
-                              .SequenceEqual(expectedParameterTypes));
+            Patch patch = Assert.Single(
+                Harmony.GetPatchInfo(original).Prefixes,
+                candidate => candidate.owner == ConfiguredMinorFactionHeroSpawner.HarmonyId);
+            Assert.Equal(Priority.First, patch.priority);
+            Assert.Equal(typeof(ConfiguredMinorFactionHeroSpawner), patch.PatchMethod.DeclaringType);
         }
         finally
         {
             harmony.UnpatchAll(harmony.Id);
         }
-    }
-
-    [Fact]
-    public void CoopTeamMinorFactionSpawn_OnlyAllowsNewCampaignFill()
-    {
-        var coopTeam = new Clan { StringId = HeroSpawnCampaignBehaviorPatches.CoopTeamClanId };
-        var otherClan = new Clan { StringId = "other_minor_faction" };
-
-        Assert.True(HeroSpawnCampaignBehaviorPatches.SpawnMinorFactionHeroesPrefix(
-            coopTeam,
-            firstTime: true));
-        Assert.False(HeroSpawnCampaignBehaviorPatches.SpawnMinorFactionHeroesPrefix(
-            coopTeam,
-            firstTime: false));
-        Assert.True(HeroSpawnCampaignBehaviorPatches.SpawnMinorFactionHeroesPrefix(
-            otherClan,
-            firstTime: false));
     }
 
     [Fact]
@@ -147,7 +108,7 @@ public sealed class ConfiguredMinorFactionDataTests
             ?? throw new InvalidDataException("coop_minor_factions.xml has no root element");
         XElement faction = factionRoot.Elements("Faction").Single();
 
-        Assert.Equal("coop_team", faction.Attribute("id")?.Value);
+        Assert.Equal(ConfiguredMinorFactionHeroSpawner.CoopTeamClanId, faction.Attribute("id")?.Value);
         Assert.Equal("{=!}Coop Team", faction.Attribute("name")?.Value);
         Assert.Equal("true", faction.Attribute("is_minor_faction")?.Value);
         Assert.Equal("true", faction.Attribute("is_clan_type_mercenary")?.Value);
@@ -163,8 +124,9 @@ public sealed class ConfiguredMinorFactionDataTests
                 ?? throw new InvalidDataException("Minor faction template has no id"))
             .ToArray()
             ?? Array.Empty<string>();
-        Assert.True(factionLordIds.Length >= new DefaultMinorFactionsModel().MinorFactionHeroLimit);
-        Assert.Equal($"NPCCharacter.{CoopTeamLeaderId}", factionLordIds[0]);
+        Assert.Equal(
+            $"NPCCharacter.{ConfiguredMinorFactionHeroSpawner.CoopTeamLeaderTemplateId}",
+            factionLordIds[0]);
         foreach ((string id, _, _) in FoundingLords)
         {
             Assert.Contains($"NPCCharacter.{id}", factionLordIds);
@@ -186,7 +148,7 @@ public sealed class ConfiguredMinorFactionDataTests
 
         foreach ((string id, XElement lord) in lordTemplates)
         {
-            Assert.Equal("true", lord.Attribute("is_template")?.Value);
+            Assert.True(bool.TryParse(lord.Attribute("is_template")?.Value, out _));
             Assert.Equal("false", lord.Attribute("is_hero")?.Value);
             Assert.Equal("false", lord.Attribute("is_female")?.Value);
             Assert.Equal("Culture.sturgia", lord.Attribute("culture")?.Value);
@@ -194,7 +156,7 @@ public sealed class ConfiguredMinorFactionDataTests
             Assert.False(string.IsNullOrWhiteSpace(lord.Attribute("name")?.Value));
             Assert.False(string.IsNullOrWhiteSpace(lord.Attribute("skill_template")?.Value));
             Assert.StartsWith(
-                HeroCreatorPatches.ConfiguredMinorFactionLordPrefix,
+                ConfiguredMinorFactionHeroSpawner.ConfiguredLordPrefix,
                 id,
                 StringComparison.Ordinal);
 
@@ -209,6 +171,11 @@ public sealed class ConfiguredMinorFactionDataTests
                 equipmentSets,
                 equipment => equipment.Attribute("equipmentType")?.Value == "Civilian");
         }
+
+        Assert.Equal(
+            "true",
+            lordTemplates[ConfiguredMinorFactionHeroSpawner.CoopTeamLeaderTemplateId]
+                .Attribute("is_template")?.Value);
 
         foreach ((string id, string name, string nativeTemplate) in FoundingLords)
         {
@@ -244,6 +211,16 @@ public sealed class ConfiguredMinorFactionDataTests
 
         AssertRegistration(registrations["coop_minor_faction_lords"], "NPCCharacters");
         AssertRegistration(registrations["coop_minor_factions"], "Factions");
+    }
+
+    private static CharacterObject CreateTemplate(string id, bool enabled)
+    {
+        var template = new CharacterObject
+        {
+            StringId = id,
+            IsTemplate = enabled,
+        };
+        return template;
     }
 
     private static void AssertRegistration(XElement registration, string expectedId)

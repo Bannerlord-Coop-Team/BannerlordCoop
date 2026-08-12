@@ -10,6 +10,7 @@ using Coop.LiveTesting;
 #endif
 using Coop.UI.LoadGameUI;
 using GameInterface;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Handlers;
 using GameInterface.Services.Chat;
@@ -86,6 +87,8 @@ namespace Coop
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
             ProtoBufSerializer.ConfigureRuntimeModel();
+            // This must precede campaign startup: native first-time spawning otherwise caps and randomizes the roster.
+            ConfiguredMinorFactionHeroSpawner.Apply();
 
             var fullCommandLine = Utilities.GetFullCommandLineString();
             var args = fullCommandLine.Split(' ').ToList();

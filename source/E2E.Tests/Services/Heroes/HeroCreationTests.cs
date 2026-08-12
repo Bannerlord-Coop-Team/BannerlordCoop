@@ -2,11 +2,11 @@ using Common;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using GameInterface.Services.Heroes.Patches;
-using HarmonyLib;
+using GameInterface.Services.Heroes;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
@@ -65,19 +65,24 @@ public class HeroCreationTests : IDisposable
     }
 
     [Fact]
-    public void ServerCreateConfiguredMinorFactionLord_SyncsConfiguredName()
+    public void ServerCreateConfiguredMinorFactionLord_UsesFullTemplateAndSyncs()
     {
         var server = TestEnvironment.Server;
         Hero? serverHero = null;
+        CharacterObject? serverTemplate = null;
+        Clan? serverClan = null;
+        string? expectedBattleItemId = null;
 
         server.Call(() =>
         {
             Assert.True(ModInformation.IsServer);
             var template = GameObjectCreator.CreateInitializedObject<CharacterObject>();
             using (new AllowedThread())
-                template.StringId = HeroCreatorPatches.ConfiguredMinorFactionLordPrefix + "test";
+                template.StringId = ConfiguredMinorFactionHeroSpawner.ConfiguredLordPrefix + "test";
             template._basicName = new TextObject("Hasted");
             template._occupation = Occupation.Lord;
+            template.IsTemplate = true;
+            template.Level = 27;
             template.Culture.DefaultBattleEquipmentRoster =
                 GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
             template.Culture.DefaultStealthEquipmentRoster =
@@ -85,38 +90,103 @@ public class HeroCreationTests : IDisposable
             template.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item =
                 GameObjectCreator.CreateInitializedObject<ItemObject>();
 
-            var createSpecialHero = AccessTools.Method(
-                typeof(HeroCreator),
-                nameof(HeroCreator.CreateSpecialHero),
-                new[]
-                {
-                    typeof(CharacterObject),
-                    typeof(Settlement),
-                    typeof(Clan),
-                    typeof(Clan),
-                    typeof(int),
-                });
-            Assert.Contains(
-                Harmony.GetPatchInfo(createSpecialHero).Postfixes,
-                patch => patch.PatchMethod.DeclaringType == typeof(HeroCreatorPatches));
-            Assert.StartsWith(
-                HeroCreatorPatches.ConfiguredMinorFactionLordPrefix,
-                template.StringId,
-                StringComparison.Ordinal);
-
-            serverHero = HeroCreator.CreateSpecialHero(template);
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            serverTemplate = template;
+            serverClan = clan;
+            expectedBattleItemId = template.FirstBattleEquipment[EquipmentIndex.Body].Item.StringId;
+            serverHero = ConfiguredMinorFactionHeroSpawner.CreateHeroFromTemplate(template, clan);
         });
 
         Assert.NotNull(serverHero);
+        Assert.Same(serverTemplate, serverHero.Template);
+        Assert.Same(serverTemplate, serverHero.CharacterObject.OriginalCharacter);
+        Assert.Same(serverClan, serverHero.Clan);
         Assert.Equal("Hasted", serverHero.Name.ToString());
         Assert.Equal("Hasted", serverHero.FirstName.ToString());
+        Assert.Equal(27, serverHero.Level);
+        Assert.Equal(Occupation.Lord, serverHero.Occupation);
+        Assert.Same(serverTemplate!.Culture, serverHero.Culture);
+        Assert.Equal(
+            expectedBattleItemId,
+            serverHero.BattleEquipment[EquipmentIndex.Body].Item.StringId);
+        Assert.True(serverHero.IsMinorFactionHero);
 
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(serverHero.StringId, out var clientHero));
             Assert.Equal("Hasted", clientHero.Name.ToString());
             Assert.Equal("Hasted", clientHero.FirstName.ToString());
+            Assert.Equal(27, clientHero.Level);
+            Assert.Equal(Occupation.Lord, clientHero.Occupation);
+            Assert.Equal(serverTemplate.Culture.StringId, clientHero.Culture.StringId);
+            Assert.Equal(
+                expectedBattleItemId,
+                clientHero.BattleEquipment[EquipmentIndex.Body].Item.StringId);
+            Assert.True(clientHero.IsMinorFactionHero);
         }
+    }
+
+    [Fact]
+    public void ServerInitialCoopTeamFill_CreatesEveryEnabledTemplateAndNeverRefills()
+    {
+        TestEnvironment.Server.Call(() =>
+        {
+            static CharacterObject CreateTemplate(string id, string name, bool enabled)
+            {
+                var template = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+                using (new AllowedThread())
+                    template.StringId = id;
+                template._basicName = new TextObject(name);
+                template._occupation = Occupation.Lord;
+                template.IsTemplate = enabled;
+                template.Culture.DefaultBattleEquipmentRoster =
+                    GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+                template.Culture.DefaultStealthEquipmentRoster =
+                    GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+                template.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item =
+                    GameObjectCreator.CreateInitializedObject<ItemObject>();
+                return template;
+            }
+
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            using (new AllowedThread())
+                clan.StringId = ConfiguredMinorFactionHeroSpawner.CoopTeamClanId;
+            clan._minorFactionCharacterTemplates = new MBList<CharacterObject>
+            {
+                CreateTemplate(
+                    ConfiguredMinorFactionHeroSpawner.CoopTeamLeaderTemplateId,
+                    "AnotherJoke",
+                    enabled: true),
+                CreateTemplate("coop_team_lord_disabled", "Disabled", enabled: false),
+                CreateTemplate("coop_team_lord_2", "Lord 2", enabled: true),
+                CreateTemplate("coop_team_lord_3", "Lord 3", enabled: true),
+                CreateTemplate("coop_team_lord_4", "Lord 4", enabled: true),
+                CreateTemplate("coop_team_lord_added_later", "Lord 5", enabled: true),
+            };
+
+            Assert.False(ConfiguredMinorFactionHeroSpawner.SpawnMinorFactionHeroesPrefix(
+                clan,
+                firstTime: true));
+
+            Assert.Equal(
+                new[]
+                {
+                    ConfiguredMinorFactionHeroSpawner.CoopTeamLeaderTemplateId,
+                    "coop_team_lord_2",
+                    "coop_team_lord_3",
+                    "coop_team_lord_4",
+                    "coop_team_lord_added_later",
+                },
+                clan.AliveLords.Select(hero => hero.Template.StringId));
+            Assert.Equal(
+                ConfiguredMinorFactionHeroSpawner.CoopTeamLeaderTemplateId,
+                clan.Leader.Template.StringId);
+
+            Assert.False(ConfiguredMinorFactionHeroSpawner.SpawnMinorFactionHeroesPrefix(
+                clan,
+                firstTime: false));
+            Assert.Equal(5, clan.AliveLords.Count);
+        });
     }
 
     [Fact]
