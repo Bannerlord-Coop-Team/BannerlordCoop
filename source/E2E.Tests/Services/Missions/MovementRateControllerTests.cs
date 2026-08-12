@@ -286,6 +286,33 @@ public sealed class MovementRateControllerTests
     }
 
     [Fact]
+    public void BattleProfile_ReceiveHealthTransitionsWithFrameRate()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(framesPerSecond: 60);
+        Assert.Equal(
+            MovementRateController.MovementReceiveHealth.Healthy,
+            fixture.Controller.ReportedReceiveHealth);
+
+        fixture.AdvanceWindow(framesPerSecond: 40);
+        Assert.Equal(
+            MovementRateController.MovementReceiveHealth.Degraded,
+            fixture.Controller.ReportedReceiveHealth);
+
+        fixture.AdvanceWindow(framesPerSecond: 20);
+        Assert.Equal(
+            MovementRateController.MovementReceiveHealth.Severe,
+            fixture.Controller.ReportedReceiveHealth);
+
+        fixture.AdvanceWindow(framesPerSecond: 60);
+        Assert.Equal(
+            MovementRateController.MovementReceiveHealth.Healthy,
+            fixture.Controller.ReportedReceiveHealth);
+    }
+
+    [Fact]
     public void BattleProfile_StableThirtyFpsRecoversAfterTransientQueueOverload()
     {
         using var fixture = new RateControllerFixture(frameLimitHz: 30);
