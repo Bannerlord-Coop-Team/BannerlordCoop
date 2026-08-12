@@ -12,6 +12,9 @@
         <DependedModule Id="CustomBattle" DependentVersion="${game_version}"/>
         <DependedModule Id="StoryMode" DependentVersion="${game_version}"/>
     </DependedModules>
+    <IncompatibleModules>
+        <Module Id="CoopNightly"/>
+    </IncompatibleModules>
     <SubModules>
         <SubModule>
             <Name value="Coop"/>

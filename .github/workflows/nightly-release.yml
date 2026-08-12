@@ -177,12 +177,15 @@ jobs:
           sed \
             -e "s/<Name value=\"Coop\"\/>/<Name value=\"$nightly_module_name\"\/>/g" \
             -e "s/<Id value=\"Coop\"\/>/<Id value=\"$nightly_module_id\"\/>/" \
+            -e 's/<Module Id="CoopNightly"\/>/<Module Id="Coop"\/>/' \
             -e 's/${main_class}/CoopMod/g' \
             -e "s/\${version}/v$coop_version/g" \
             -e "s/\${game_version}/$game_version/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
           test "$(grep -Fc "<Name value=\"$nightly_module_name\"/>" "$module/SubModule.xml")" -eq 2
           grep -Fqx "    <Id value=\"$nightly_module_id\"/>" "$module/SubModule.xml"
+          grep -Fqx '        <Module Id="Coop"/>' "$module/SubModule.xml"
+          ! grep -Fq '<Module Id="CoopNightly"/>' "$module/SubModule.xml"
 
           (cd release-stage && 7z a -t7z -m0=LZMA2 -mx=9 -ms=on \
             "../artifact/$FILE_NAME" Coop >/dev/null)
