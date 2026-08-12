@@ -1,7 +1,9 @@
 ﻿#if DEBUG
 using Common;
+using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.ObjectManager;
+using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Battles;
 using System;
@@ -36,6 +38,11 @@ internal static class WeaponPickupDebugCommands
         public SpawnedItemEntity DroppedItem { get; set; }
         public bool PickupAttempted { get; set; }
         public string Phase { get; set; }
+        public bool PartialConsumable { get; set; }
+        public EquipmentIndex SourceSlot { get; set; }
+        public short OriginalSourceAmount { get; set; }
+        public short PreparedSourceAmount { get; set; }
+        public short DroppedAmount { get; set; }
     }
 
     private sealed class FixtureLifetimeBehavior : MissionBehavior
@@ -100,17 +107,27 @@ internal static class WeaponPickupDebugCommands
                 var slot = (EquipmentIndex)index;
                 return $"{index}:{GetItemId(objectManager, agent.Equipment[slot].Item)}";
             }));
+        string amounts = string.Join(",", Enumerable.Range(
+                (int)EquipmentIndex.WeaponItemBeginSlot,
+                (int)EquipmentIndex.NumAllWeaponSlots - (int)EquipmentIndex.WeaponItemBeginSlot)
+            .Select(index =>
+            {
+                var slot = (EquipmentIndex)index;
+                return $"{index}:{GetWeaponAmount(agent.Equipment[slot])}";
+            }));
         string fixturePhase = fixture == null
             ? "inactive"
             : fixture.AgentId == info.AgentId ? fixture.Phase : "other-agent";
-        bool worldItemActive = fixture?.DroppedItem != null && !fixture.DroppedItem.IsDeactivated;
+        bool worldItemActive = fixture == null || fixture.AgentId != info.AgentId
+            ? false
+            : fixture.DroppedItem != null && !fixture.DroppedItem.IsDeactivated;
         bool fieldBattle = MobileParty.MainParty?.MapEvent?.IsFieldBattle == true;
 
         return $"WEAPON_PICKUP_STATE fieldBattle={fieldBattle} agent={info.AgentId:N} " +
             $"authority={info.CurrentAuthority} originalOwner={info.OriginalOwner} " +
             $"local={registry.IsLocallyControlled(info.AgentId)} active={agent.IsActive()} " +
             $"main={(int)agent.GetPrimaryWieldedItemIndex()} off={(int)agent.GetOffhandWieldedItemIndex()} " +
-            $"slots={slots} fixture={fixturePhase} worldItemActive={worldItemActive}";
+            $"slots={slots} amounts={amounts} fixture={fixturePhase} worldItemActive={worldItemActive}";
     }
 
     [CommandLineArgumentFunction("fixture_drop", "coop.debug.weapon_pickup")]
@@ -227,6 +244,139 @@ internal static class WeaponPickupDebugCommands
             $"off={(int)fixture.Agent.GetOffhandWieldedItemIndex()}";
     }
 
+    [CommandLineArgumentFunction("partial_fixture_drop", "coop.debug.weapon_pickup")]
+    public static string DropPartialConsumableFixture(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.weapon_pickup.partial_fixture_drop";
+        if (fixture != null)
+            return $"WEAPON_PICKUP_PARTIAL_DROP error=fixture-active phase={fixture.Phase}";
+        if (!TryResolveLocalMainAgent(out _, out var info, out var error))
+            return "WEAPON_PICKUP_PARTIAL_DROP error=" + error;
+        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))
+            return "WEAPON_PICKUP_PARTIAL_DROP error=message-broker-unavailable";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "WEAPON_PICKUP_PARTIAL_DROP error=object-manager-unavailable";
+        if (!ContainerProvider.TryResolve<INetworkWorldItemRegistry>(out var worldItemRegistry))
+            return "WEAPON_PICKUP_PARTIAL_DROP error=world-item-registry-unavailable";
+
+        var preparation = new PreparePartialConsumablePickupFixture(info.Agent);
+        messageBroker.Publish(info.Agent, preparation);
+        if (!preparation.Handled)
+            return "WEAPON_PICKUP_PARTIAL_DROP error=fixture-handler-unavailable";
+        if (!preparation.Succeeded)
+            return "WEAPON_PICKUP_PARTIAL_DROP error=" + (preparation.Error ?? "fixture-prepare-failed");
+
+        var newFixture = new PickupFixture
+        {
+            Agent = info.Agent,
+            AgentId = info.AgentId,
+            Slot = preparation.DropSlot,
+            SourceSlot = preparation.SourceSlot,
+            ItemId = preparation.ItemObjectId,
+            OriginalSourceAmount = preparation.OriginalSourceAmount,
+            PreparedSourceAmount = preparation.SourceAmount,
+            DroppedAmount = preparation.DroppedAmount,
+            PartialConsumable = true,
+            Phase = "dropping",
+        };
+        fixture = newFixture;
+
+        HashSet<SpawnedItemEntity> before = WeaponDropItemTracker.Capture();
+        info.Agent.DropItem(preparation.DropSlot);
+        SpawnedItemEntity droppedItem = WeaponDropItemTracker.FindDroppedItem(before);
+        if (droppedItem == null)
+        {
+            bool restored = TryRollbackPartialConsumableDrop(
+                messageBroker,
+                worldItemRegistry,
+                newFixture,
+                Guid.Empty,
+                out string rollbackError);
+            return $"WEAPON_PICKUP_PARTIAL_DROP error=world-item-not-created " +
+                $"restored={restored} rollbackError={rollbackError ?? "none"}";
+        }
+
+        newFixture.DroppedItem = droppedItem;
+        newFixture.Phase = "dropped";
+        info.Agent.Mission.AddMissionBehavior(new FixtureLifetimeBehavior(newFixture));
+        Guid worldItemId = worldItemRegistry.GetAll()
+            .Where(pair => ReferenceEquals(pair.Value, droppedItem))
+            .Select(pair => pair.Key)
+            .SingleOrDefault();
+        newFixture.WorldItemId = worldItemId;
+        if (droppedItem.WeaponCopy.Amount != preparation.DroppedAmount)
+        {
+            bool restored = TryRollbackPartialConsumableDrop(
+                messageBroker,
+                worldItemRegistry,
+                newFixture,
+                worldItemId,
+                out string rollbackError);
+            return $"WEAPON_PICKUP_PARTIAL_DROP error=world-item-amount-mismatch " +
+                $"expected={preparation.DroppedAmount} actual={droppedItem.WeaponCopy.Amount} " +
+                $"restored={restored} rollbackError={rollbackError ?? "none"}";
+        }
+        if (worldItemId == Guid.Empty)
+        {
+            bool restored = TryRollbackPartialConsumableDrop(
+                messageBroker,
+                worldItemRegistry,
+                newFixture,
+                Guid.Empty,
+                out string rollbackError);
+            return $"WEAPON_PICKUP_PARTIAL_DROP error=world-item-unregistered " +
+                $"restored={restored} rollbackError={rollbackError ?? "none"}";
+        }
+
+        string itemId = GetItemId(objectManager, droppedItem.WeaponCopy.Item);
+        return $"WEAPON_PICKUP_PARTIAL_DROPPED agent={newFixture.AgentId:N} " +
+            $"sourceSlot={(int)newFixture.SourceSlot} dropSlot={(int)newFixture.Slot} item={itemId} " +
+            $"sourceBefore={newFixture.PreparedSourceAmount} worldBefore={droppedItem.WeaponCopy.Amount} " +
+            $"worldItem={worldItemId:N} worldItemActive={!droppedItem.IsDeactivated}";
+    }
+
+    [CommandLineArgumentFunction("partial_fixture_pickup", "coop.debug.weapon_pickup")]
+    public static string PickupPartialConsumableFixture(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.weapon_pickup.partial_fixture_pickup";
+        if (fixture == null || !fixture.PartialConsumable || fixture.Phase != "dropped")
+        {
+            return $"WEAPON_PICKUP_PARTIAL_PICKUP error=fixture-not-dropped " +
+                $"phase={fixture?.Phase ?? "inactive"}";
+        }
+        if (fixture.DroppedItem == null || fixture.DroppedItem.IsDeactivated)
+            return "WEAPON_PICKUP_PARTIAL_PICKUP error=world-item-unavailable";
+
+        short sourceBefore = GetWeaponAmount(fixture.Agent.Equipment[fixture.SourceSlot]);
+        short worldBefore = fixture.DroppedItem.WeaponCopy.Amount;
+        fixture.PickupAttempted = true;
+        fixture.Phase = "picking";
+        fixture.DroppedItem.OnUseStopped(
+            fixture.Agent,
+            isSuccessful: true,
+            (int)fixture.SourceSlot);
+        fixture.Phase = "picked";
+
+        short sourceAfter = GetWeaponAmount(fixture.Agent.Equipment[fixture.SourceSlot]);
+        short worldAfter = fixture.DroppedItem.WeaponCopy.Amount;
+        if (sourceAfter != 32 || worldAfter <= 0 || worldAfter >= worldBefore ||
+            fixture.DroppedItem.IsDeactivated)
+        {
+            return $"WEAPON_PICKUP_PARTIAL_PICKUP error=unexpected-local-result " +
+                $"sourceBefore={sourceBefore} sourceAfter={sourceAfter} " +
+                $"worldBefore={worldBefore} worldAfter={worldAfter} " +
+                $"worldItemActive={!fixture.DroppedItem.IsDeactivated}";
+        }
+
+        return $"WEAPON_PICKUP_PARTIAL_PICKED agent={fixture.AgentId:N} " +
+            $"sourceSlot={(int)fixture.SourceSlot} dropSlot={(int)fixture.Slot} item={fixture.ItemId} " +
+            $"worldItem={fixture.WorldItemId:N} sourceBefore={sourceBefore} sourceAfter={sourceAfter} " +
+            $"worldBefore={worldBefore} worldAfter={worldAfter} " +
+            $"worldItemActive={!fixture.DroppedItem.IsDeactivated}";
+    }
+
     [CommandLineArgumentFunction("world_item_state", "coop.debug.weapon_pickup")]
     public static string WorldItemState(List<string> args)
     {
@@ -242,7 +392,7 @@ internal static class WeaponPickupDebugCommands
         bool inactive = IsDroppedItemInactive(worldItem);
         return $"WEAPON_PICKUP_WORLD_ITEM id={worldItemId:N} registered=True " +
             $"active={!inactive} deactivated={worldItem.IsDeactivated} removed={worldItem.IsRemoved} " +
-            $"item={GetItemId(objectManager, worldItem.WeaponCopy.Item)}";
+            $"item={GetItemId(objectManager, worldItem.WeaponCopy.Item)} amount={worldItem.WeaponCopy.Amount}";
     }
 
     [CommandLineArgumentFunction("fixture_restore", "coop.debug.weapon_pickup")]
@@ -252,11 +402,13 @@ internal static class WeaponPickupDebugCommands
             return "Usage: coop.debug.weapon_pickup.fixture_restore";
         if (fixture == null)
             return "WEAPON_PICKUP_RESTORED fixture=inactive";
+        if (fixture.PartialConsumable)
+            return RestorePartialConsumableFixture();
         if (fixture.Agent == null || !fixture.Agent.IsActive() || fixture.Agent.Mission != Mission.Current)
         {
             PickupFixture unavailableFixture = fixture;
             ClearFixture(unavailableFixture);
-            return "WEAPON_PICKUP_RESTORE error=agent-unavailable fixtureCleared=True";
+            return "WEAPON_PICKUP_RESTORE error=agent-unavailable fixtureCleared=True mission-ended=True";
         }
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "WEAPON_PICKUP_RESTORE error=object-manager-unavailable";
@@ -294,6 +446,81 @@ internal static class WeaponPickupDebugCommands
         ClearFixture(currentFixture);
         return $"WEAPON_PICKUP_RESTORED agent={agentId:N} slot={(int)slot} item={itemId} " +
             "worldItemInactive=True";
+    }
+
+    private static string RestorePartialConsumableFixture()
+    {
+        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))
+            return "WEAPON_PICKUP_RESTORE error=message-broker-unavailable";
+
+        PickupFixture currentFixture = fixture;
+        if (!TryRestorePartialConsumableFixture(
+                messageBroker,
+                currentFixture,
+                currentFixture.WorldItemId,
+                out RestorePartialConsumablePickupFixture restoration))
+        {
+            return "WEAPON_PICKUP_RESTORE error=" +
+                (restoration?.Error ?? "partial-fixture-restore-failed");
+        }
+
+        Guid agentId = currentFixture.AgentId;
+        EquipmentIndex sourceSlot = currentFixture.SourceSlot;
+        EquipmentIndex dropSlot = currentFixture.Slot;
+        string itemId = currentFixture.ItemId;
+        ClearFixture(currentFixture);
+        return $"WEAPON_PICKUP_PARTIAL_RESTORED agent={agentId:N} " +
+            $"sourceSlot={(int)sourceSlot} dropSlot={(int)dropSlot} item={itemId} " +
+            $"sourceAmount={restoration.RestoredSourceAmount} dropSlotEmpty={restoration.DropSlotEmpty} " +
+            $"worldItemInactive={restoration.WorldItemInactive}";
+    }
+
+    private static bool TryRestorePartialConsumableFixture(
+        IMessageBroker messageBroker,
+        PickupFixture currentFixture,
+        Guid worldItemId,
+        out RestorePartialConsumablePickupFixture restoration)
+    {
+        restoration = new RestorePartialConsumablePickupFixture(
+            currentFixture.Agent,
+            currentFixture.AgentId,
+            worldItemId);
+        messageBroker.Publish(currentFixture.Agent, restoration);
+        return restoration.Handled && restoration.Succeeded;
+    }
+
+    private static bool TryRollbackPartialConsumableDrop(
+        IMessageBroker messageBroker,
+        INetworkWorldItemRegistry worldItemRegistry,
+        PickupFixture currentFixture,
+        Guid worldItemId,
+        out string error)
+    {
+        error = null;
+        if (worldItemId == Guid.Empty)
+            worldItemRegistry.TryGetId(currentFixture.DroppedItem, out worldItemId);
+
+        bool removed = TryRemoveActiveDroppedItem(currentFixture.DroppedItem, out string removalError);
+        if (!TryRestorePartialConsumableFixture(
+                messageBroker,
+                currentFixture,
+                worldItemId,
+                out RestorePartialConsumablePickupFixture restoration))
+        {
+            error = restoration?.Error ?? "partial-fixture-restore-failed";
+            return false;
+        }
+
+        if (!removed && !IsDroppedItemInactive(currentFixture.DroppedItem))
+        {
+            error = removalError ?? "world-item-removal-failed";
+            return false;
+        }
+        if (worldItemId != Guid.Empty)
+            worldItemRegistry.Remove(worldItemId);
+
+        ClearFixture(currentFixture);
+        return true;
     }
 
     [CommandLineArgumentFunction("focus_agent", "coop.debug.weapon_pickup")]
@@ -481,6 +708,11 @@ internal static class WeaponPickupDebugCommands
             : "unregistered:" + (item.StringId ?? "unknown");
     }
 
+    private static short GetWeaponAmount(MissionWeapon weapon)
+    {
+        return weapon.IsEmpty ? (short)0 : weapon.Amount;
+    }
+
     private static bool IsDroppedItemInactive(SpawnedItemEntity droppedItem)
     {
         return droppedItem == null || droppedItem.IsRemoved || droppedItem.IsDeactivated;
@@ -514,6 +746,7 @@ internal static class WeaponPickupDebugCommands
         fixtureToClear.OriginalEquipment = default;
         fixtureToClear.ItemId = null;
         fixtureToClear.WorldItemId = Guid.Empty;
+        fixtureToClear.SourceSlot = EquipmentIndex.None;
     }
 
     private static void EnsureCameraBehavior(Mission mission)
