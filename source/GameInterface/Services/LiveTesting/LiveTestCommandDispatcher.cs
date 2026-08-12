@@ -1,6 +1,9 @@
 ﻿using Common;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.ExceptionServices;
 using TaleWorlds.Library;
 
@@ -9,6 +12,8 @@ namespace GameInterface.Services.LiveTesting;
 public interface ILiveTestCommandDispatcher
 {
     bool EnsureReady();
+
+    IReadOnlyList<string> GetCommandNames();
 
     LiveTestCommandResult Execute(string command, List<string> arguments);
 }
@@ -37,6 +42,42 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 
         exception?.Throw();
         return true;
+    }
+
+    public IReadOnlyList<string> GetCommandNames()
+    {
+        IReadOnlyList<string> commandNames = null;
+        ExceptionDispatchInfo exception = null;
+
+        GameThread.Run(() =>
+        {
+            try
+            {
+                EnsureFunctionsCollected();
+
+                FieldInfo allFunctionsField = typeof(CommandLineFunctionality).GetField(
+                    "AllFunctions",
+                    BindingFlags.NonPublic | BindingFlags.Static);
+                if (allFunctionsField == null ||
+                    !(allFunctionsField.GetValue(null) is IDictionary allFunctions))
+                {
+                    throw new InvalidOperationException("Unable to read the Bannerlord command registry");
+                }
+
+                commandNames = allFunctions.Keys
+                    .Cast<string>()
+                    .Where(command => command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal))
+                    .OrderBy(command => command, StringComparer.Ordinal)
+                    .ToArray();
+            }
+            catch (Exception e)
+            {
+                exception = ExceptionDispatchInfo.Capture(e);
+            }
+        }, blocking: true);
+
+        exception?.Throw();
+        return commandNames;
     }
 
     public LiveTestCommandResult Execute(string command, List<string> arguments)

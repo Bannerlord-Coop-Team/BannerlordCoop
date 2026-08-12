@@ -13,15 +13,14 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ScreenSystem;
 
@@ -29,19 +28,19 @@ namespace Coop.LiveTesting
 {
     internal sealed class LiveTestControlServer : IDisposable
     {
-        private const int MaximumScreenshotCaptures = 128;
+        private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
+
         private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
-        private static readonly TimeSpan ScreenshotCaptureRetention = TimeSpan.FromMinutes(5);
 
         private readonly string logFilePath;
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
-        private readonly object screenshotCaptureLock = new object();
+        private readonly object screenshotGate = new object();
         private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
             new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
-        private readonly Dictionary<string, string> screenshotCapturePaths =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly string endpointDirectory;
+        private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
 
         public LiveTestControlServer(bool isServer, string logFilePath)
@@ -64,14 +63,35 @@ namespace Coop.LiveTesting
                 PlatformId = ReadArgument(arguments, "/platformId"),
                 RunToken = NormalizeRunToken(ReadArgument(arguments, "/cooptestrun")),
             };
+            if (processInfo.RunToken == null)
+                throw new InvalidOperationException("A valid /cooptestrun token is required for live testing.");
 
             string pipeName = LiveTestProtocol.GetPipeName(processId);
             pipeServer = new NamedPipeLiveTestServer(pipeName, GetProcessInfo, Handle);
+            endpointDirectory = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                EndpointDirectoryName,
+                processInfo.RunToken);
+            endpointRegistrationPath = System.IO.Path.Combine(
+                endpointDirectory,
+                processId.ToString(CultureInfo.InvariantCulture) + ".json");
         }
+
+        public static bool IsEnabled(string[] arguments) =>
+            NormalizeRunToken(ReadArgument(arguments, "/cooptestrun")) != null;
 
         public void Start()
         {
             pipeServer.Start();
+            try
+            {
+                WriteEndpointRegistration();
+            }
+            catch
+            {
+                pipeServer.Dispose();
+                throw;
+            }
             Logger.Information(
                 "[LiveTest] Listening on {PipeName} as {Role} (platform {PlatformId}, run {RunToken})",
                 LiveTestProtocol.GetPipeName(processInfo.Pid),
@@ -82,12 +102,8 @@ namespace Coop.LiveTesting
 
         public void Dispose()
         {
+            DeleteEndpointRegistration();
             pipeServer.Dispose();
-            lock (screenshotCaptureLock)
-            {
-                screenshotCaptures.Clear();
-                screenshotCapturePaths.Clear();
-            }
         }
 
         private LiveTestResponse Handle(LiveTestRequest request)
@@ -122,8 +138,7 @@ namespace Coop.LiveTesting
         {
             return ExecuteOnGameThread(request, () =>
             {
-                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher) ||
-                    !dispatcher.EnsureReady())
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
                     return Failure(
                         request.Id,
@@ -132,30 +147,9 @@ namespace Coop.LiveTesting
                         false);
                 }
 
-                var attributeType = typeof(CommandLineFunctionality.CommandLineArgumentFunction);
-                string commandAssemblyName = typeof(CommandLineFunctionality).Assembly.GetName().Name;
-                string[] commands = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(assembly =>
-                        assembly.GetName().Name == commandAssemblyName ||
-                        assembly.GetReferencedAssemblies().Any(reference =>
-                            reference.Name == commandAssemblyName))
-                    .SelectMany(assembly => assembly.GetTypesSafe())
-                    .SelectMany(type => type.GetMethods(
-                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
-                    .SelectMany(method => (method.GetCustomAttributesSafe(attributeType, false) ??
-                        Array.Empty<object>())
-                        .OfType<CommandLineFunctionality.CommandLineArgumentFunction>())
-                    .Select(attribute => attribute.GroupName + "." + attribute.Name)
-                    .Where(command =>
-                        command.StartsWith("coop.debug.", StringComparison.Ordinal) &&
-                        CommandLineFunctionality.HasFunctionForCommand(command))
-                    .Distinct(StringComparer.Ordinal)
-                    .OrderBy(command => command, StringComparer.Ordinal)
-                    .ToArray();
-
                 return Success(request.Id, new
                 {
-                    commands,
+                    commands = dispatcher.GetCommandNames(),
                 });
             }, false);
         }
@@ -193,12 +187,18 @@ namespace Coop.LiveTesting
                     return Failure(request.Id, "command_not_found", result.Output, false);
                 }
 
+                bool hasStructuredResult = TryParseStructuredResult(
+                    result.Output,
+                    out var structuredResult);
+
                 return Success(request.Id, new
                 {
                     name = command,
                     arguments,
                     found = true,
                     output = result.Output,
+                    hasStructuredResult,
+                    structuredResult,
                 });
             }, true);
         }
@@ -227,6 +227,7 @@ namespace Coop.LiveTesting
             }
 
             string captureId = Guid.NewGuid().ToString("N");
+
             return ExecuteOnGameThread(request, () =>
             {
                 string directory = System.IO.Path.GetDirectoryName(screenshotPath);
@@ -240,29 +241,27 @@ namespace Coop.LiveTesting
                 }
 
                 Directory.CreateDirectory(directory);
-                lock (screenshotCaptureLock)
+                if (File.Exists(screenshotPath))
                 {
-                    RemoveExpiredScreenshotCaptures(DateTime.UtcNow);
-                    if (File.Exists(screenshotPath) || screenshotCapturePaths.ContainsKey(screenshotPath))
+                    File.Delete(screenshotPath);
+                }
+
+                lock (screenshotGate)
+                {
+                    foreach (string previousCaptureId in screenshotCaptures
+                        .Where(pair => string.Equals(
+                            pair.Value.Path,
+                            screenshotPath,
+                            StringComparison.OrdinalIgnoreCase))
+                        .Select(pair => pair.Key)
+                        .ToArray())
                     {
-                        return Failure(
-                            request.Id,
-                            "screenshot_path_exists",
-                            "Screenshot path already exists or is reserved by another capture.",
-                            false);
-                    }
-                    if (screenshotCaptures.Count >= MaximumScreenshotCaptures)
-                    {
-                        return Failure(
-                            request.Id,
-                            "screenshot_capacity",
-                            "Too many screenshot captures are still being tracked.",
-                            false);
+                        screenshotCaptures.Remove(previousCaptureId);
                     }
 
-                    var capture = new ScreenshotCapture(captureId, screenshotPath, DateTime.UtcNow);
-                    screenshotCaptures.Add(captureId, capture);
-                    screenshotCapturePaths.Add(screenshotPath, captureId);
+                    screenshotCaptures.Add(
+                        captureId,
+                        new ScreenshotCapture(screenshotPath));
                 }
 
                 try
@@ -271,9 +270,9 @@ namespace Coop.LiveTesting
                 }
                 catch
                 {
-                    lock (screenshotCaptureLock)
+                    lock (screenshotGate)
                     {
-                        RemoveScreenshotCapture(captureId);
+                        screenshotCaptures.Remove(captureId);
                     }
                     throw;
                 }
@@ -290,134 +289,70 @@ namespace Coop.LiveTesting
         private LiveTestResponse HandleScreenshotStatus(LiveTestRequest request)
         {
             if (!TryReadString(request.Parameters, "captureId", out var captureId) ||
-                !Guid.TryParseExact(captureId, "N", out _))
+                captureId.Length != 32 ||
+                !captureId.All(IsLowerHexadecimal))
             {
                 return Failure(
                     request.Id,
                     "invalid_parameters",
-                    "Screenshot capture id must be a 32-character GUID.",
+                    "Screenshot status requires a 32-character lowercase hexadecimal capture id.",
                     false);
             }
 
-            lock (screenshotCaptureLock)
+            ScreenshotCapture capture;
+            lock (screenshotGate)
             {
-                RemoveExpiredScreenshotCaptures(DateTime.UtcNow);
-                if (!screenshotCaptures.TryGetValue(captureId, out var capture))
+                if (!screenshotCaptures.TryGetValue(captureId, out capture))
                 {
                     return Failure(
                         request.Id,
                         "capture_not_found",
-                        "Screenshot capture was not found.",
+                        $"Screenshot capture '{captureId}' was not found.",
+                        false);
+                }
+            }
+
+            ScreenshotFileObservation observation = ObserveScreenshot(capture.Path);
+            bool stable;
+            bool complete;
+            lock (screenshotGate)
+            {
+                if (!screenshotCaptures.TryGetValue(captureId, out var currentCapture) ||
+                    !ReferenceEquals(capture, currentCapture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' was superseded.",
                         false);
                 }
 
-                bool exists = File.Exists(capture.Path);
-                long length = 0;
-                DateTime? lastWriteUtc = null;
-                bool isBmp = false;
-                bool isCompleteBmp = false;
-                if (exists)
-                {
-                    try
-                    {
-                        using (FileStream stream = File.Open(
-                            capture.Path,
-                            FileMode.Open,
-                            FileAccess.Read,
-                            FileShare.None))
-                        {
-                            length = stream.Length;
-                            lastWriteUtc = File.GetLastWriteTimeUtc(capture.Path);
-                            isCompleteBmp = HasCompleteBmp(stream, out isBmp);
-                        }
-                    }
-                    catch (IOException)
-                    {
-                        exists = File.Exists(capture.Path);
-                        length = 0;
-                        lastWriteUtc = null;
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                        exists = File.Exists(capture.Path);
-                        length = 0;
-                        lastWriteUtc = null;
-                    }
-                }
-
-                long lastWriteUtcTicks = lastWriteUtc?.Ticks ?? 0;
-                bool stable = exists &&
-                    isCompleteBmp &&
-                    length > 0 &&
+                stable = observation.Exists &&
+                    observation.IsBmp &&
+                    observation.DeclaredLength == observation.Length &&
+                    observation.Length > 0 &&
                     capture.HasObservation &&
-                    capture.LastLength == length &&
-                    capture.LastWriteUtcTicks == lastWriteUtcTicks;
-                capture.HasObservation = exists && isCompleteBmp && length > 0;
-                capture.LastLength = length;
-                capture.LastWriteUtcTicks = lastWriteUtcTicks;
-                if (stable && !capture.CompletedUtc.HasValue)
-                    capture.CompletedUtc = DateTime.UtcNow;
-
-                return Success(request.Id, new
-                {
-                    captureId = capture.CaptureId,
-                    path = capture.Path,
-                    exists,
-                    isBmp,
-                    stable,
-                    complete = stable,
-                    length,
-                    lastWriteUtc,
-                });
+                    capture.LastLength == observation.Length &&
+                    capture.LastWriteUtc == observation.LastWriteUtc;
+                capture.HasObservation = observation.Exists;
+                capture.LastLength = observation.Length;
+                capture.LastWriteUtc = observation.LastWriteUtc;
+                capture.Complete |= stable;
+                complete = capture.Complete;
             }
-        }
 
-        private static bool HasCompleteBmp(FileStream stream, out bool isBmp)
-        {
-            isBmp = false;
-            if (stream.Length < 54) return false;
-
-            using (var reader = new System.IO.BinaryReader(stream))
+            return Success(request.Id, new
             {
-                isBmp = reader.ReadByte() == 'B' && reader.ReadByte() == 'M';
-                if (!isBmp) return false;
-
-                uint declaredFileSize = reader.ReadUInt32();
-                stream.Position = 10;
-                uint pixelDataOffset = reader.ReadUInt32();
-                uint dibHeaderSize = reader.ReadUInt32();
-                if (declaredFileSize != stream.Length ||
-                    dibHeaderSize < 40 ||
-                    14L + dibHeaderSize > pixelDataOffset ||
-                    pixelDataOffset >= declaredFileSize)
-                {
-                    return false;
-                }
-
-                int width = reader.ReadInt32();
-                int height = reader.ReadInt32();
-                ushort planes = reader.ReadUInt16();
-                ushort bitsPerPixel = reader.ReadUInt16();
-                return width > 0 && height != 0 && planes == 1 && bitsPerPixel > 0;
-            }
-        }
-
-        private void RemoveExpiredScreenshotCaptures(DateTime utcNow)
-        {
-            string[] expiredCaptureIds = screenshotCaptures
-                .Where(pair => utcNow - (pair.Value.CompletedUtc ?? pair.Value.CreatedUtc) >=
-                    ScreenshotCaptureRetention)
-                .Select(pair => pair.Key)
-                .ToArray();
-            foreach (string expiredCaptureId in expiredCaptureIds)
-                RemoveScreenshotCapture(expiredCaptureId);
-        }
-
-        private void RemoveScreenshotCapture(string captureId)
-        {
-            if (!screenshotCaptures.TryGetValue(captureId, out var capture)) return;
-            screenshotCaptures.Remove(captureId);
-            screenshotCapturePaths.Remove(capture.Path);
+                captureId,
+                path = capture.Path,
+                exists = observation.Exists,
+                isBmp = observation.IsBmp,
+                stable,
+                complete,
+                length = observation.Length,
+                declaredLength = observation.DeclaredLength,
+                lastWriteUtc = observation.LastWriteUtc,
+            });
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)
@@ -447,6 +382,10 @@ namespace Coop.LiveTesting
             bool coopRunning = false;
             string coopState = null;
             int? registeredPlayers = null;
+            int? registeredPlayerCount = null;
+            int? connectedPlayerCount = null;
+            string[] registeredControllerIds = null;
+            string[] connectedControllerIds = null;
 
             if (campaignLoaded && ContainerProvider.TryResolve<ILogic>(out var logic))
             {
@@ -469,7 +408,22 @@ namespace Coop.LiveTesting
 
                 if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
                 {
-                    registeredPlayers = playerManager.Players.Count;
+                    var players = playerManager.Players
+                        .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
+                        .ToArray();
+                    registeredPlayers = players.Length;
+                    if (ModInformation.IsServer)
+                    {
+                        registeredPlayerCount = players.Length;
+                        registeredControllerIds = players
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedControllerIds = players
+                            .Where(playerManager.IsConnected)
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedPlayerCount = connectedControllerIds.Length;
+                    }
                 }
             }
 
@@ -526,6 +480,10 @@ namespace Coop.LiveTesting
                 coopRunning,
                 coopState,
                 registeredPlayers,
+                registeredPlayerCount,
+                connectedPlayerCount,
+                registeredControllerIds,
+                connectedControllerIds,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
@@ -611,23 +569,152 @@ namespace Coop.LiveTesting
             };
         }
 
-        private sealed class ScreenshotCapture
+        private void WriteEndpointRegistration()
         {
-            public ScreenshotCapture(string captureId, string path, DateTime createdUtc)
+            Directory.CreateDirectory(endpointDirectory);
+            string temporaryPath = endpointRegistrationPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            string registration = JsonSerializer.Serialize(new
             {
-                CaptureId = captureId;
-                Path = path;
-                CreatedUtc = createdUtc;
+                version = LiveTestProtocol.Version,
+                pid = processInfo.Pid,
+                role = processInfo.Role,
+                platformId = processInfo.PlatformId,
+                runToken = processInfo.RunToken,
+                processStartedUtc,
+                pipeName = LiveTestProtocol.GetPipeName(processInfo.Pid),
+            });
+
+            try
+            {
+                File.WriteAllText(temporaryPath, registration);
+                if (File.Exists(endpointRegistrationPath))
+                {
+                    File.Replace(temporaryPath, endpointRegistrationPath, null);
+                }
+                else
+                {
+                    File.Move(temporaryPath, endpointRegistrationPath);
+                }
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+        }
+
+        private void DeleteEndpointRegistration()
+        {
+            try
+            {
+                if (File.Exists(endpointRegistrationPath))
+                {
+                    File.Delete(endpointRegistrationPath);
+                }
+
+                if (Directory.Exists(endpointDirectory) &&
+                    Directory.GetFileSystemEntries(endpointDirectory).Length == 0)
+                {
+                    Directory.Delete(endpointDirectory);
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Warning(
+                    exception,
+                    "[LiveTest] Failed to remove endpoint registration {RegistrationPath}",
+                    endpointRegistrationPath);
+            }
+        }
+
+        private static bool TryParseStructuredResult(string output, out object structuredResult)
+        {
+            const string prefix = "LIVE_TEST_JSON=";
+            structuredResult = null;
+            string json = null;
+            int matches = 0;
+
+            using (var reader = new StringReader(output ?? string.Empty))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (!line.StartsWith(prefix, StringComparison.Ordinal)) continue;
+
+                    matches++;
+                    json = line.Substring(prefix.Length);
+                }
             }
 
-            public string CaptureId { get; }
-            public string Path { get; }
-            public DateTime CreatedUtc { get; }
-            public DateTime? CompletedUtc { get; set; }
-            public bool HasObservation { get; set; }
-            public long LastLength { get; set; }
-            public long LastWriteUtcTicks { get; set; }
+            if (matches != 1 || string.IsNullOrWhiteSpace(json)) return false;
+
+            try
+            {
+                using (JsonDocument document = JsonDocument.Parse(json))
+                {
+                    structuredResult = document.RootElement.Clone();
+                }
+                return true;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
         }
+
+        private static ScreenshotFileObservation ObserveScreenshot(string path)
+        {
+            if (!File.Exists(path)) return ScreenshotFileObservation.Missing;
+
+            try
+            {
+                using (var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read))
+                {
+                    long length = stream.Length;
+                    var header = new byte[6];
+                    int headerLength = 0;
+                    while (headerLength < header.Length)
+                    {
+                        int bytesRead = stream.Read(
+                            header,
+                            headerLength,
+                            header.Length - headerLength);
+                        if (bytesRead == 0) break;
+                        headerLength += bytesRead;
+                    }
+                    bool isBmp = headerLength == header.Length &&
+                        header[0] == 'B' &&
+                        header[1] == 'M';
+                    uint declaredLength = isBmp
+                        ? BitConverter.ToUInt32(header, 2)
+                        : 0;
+                    return new ScreenshotFileObservation(
+                        true,
+                        isBmp,
+                        length,
+                        declaredLength,
+                        File.GetLastWriteTimeUtc(path));
+                }
+            }
+            catch (IOException)
+            {
+                return new ScreenshotFileObservation(true, false, 0, 0, null);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new ScreenshotFileObservation(true, false, 0, 0, null);
+            }
+        }
+
+        private static bool IsLowerHexadecimal(char character) =>
+            (character >= '0' && character <= '9') ||
+            (character >= 'a' && character <= 'f');
 
         private static bool TryReadCommand(
             JsonElement parameters,
@@ -693,6 +780,46 @@ namespace Coop.LiveTesting
                 char.IsLetterOrDigit(character) || character == '-' || character == '_')
                 ? runToken
                 : null;
+        }
+
+        private sealed class ScreenshotCapture
+        {
+            public string Path { get; }
+            public bool HasObservation { get; set; }
+            public long LastLength { get; set; }
+            public DateTime? LastWriteUtc { get; set; }
+            public bool Complete { get; set; }
+
+            public ScreenshotCapture(string path)
+            {
+                Path = path;
+            }
+        }
+
+        private readonly struct ScreenshotFileObservation
+        {
+            public static readonly ScreenshotFileObservation Missing =
+                new ScreenshotFileObservation(false, false, 0, 0, null);
+
+            public bool Exists { get; }
+            public bool IsBmp { get; }
+            public long Length { get; }
+            public uint DeclaredLength { get; }
+            public DateTime? LastWriteUtc { get; }
+
+            public ScreenshotFileObservation(
+                bool exists,
+                bool isBmp,
+                long length,
+                uint declaredLength,
+                DateTime? lastWriteUtc)
+            {
+                Exists = exists;
+                IsBmp = isBmp;
+                Length = length;
+                DeclaredLength = declaredLength;
+                LastWriteUtc = lastWriteUtc;
+            }
         }
     }
 }

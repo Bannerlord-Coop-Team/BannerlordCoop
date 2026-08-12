@@ -11,6 +11,7 @@ using Missions.Agents;
 using Missions.Data;
 using Missions.Messages;
 using Missions.Services.Network;
+using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -247,7 +248,11 @@ public class CoopBattleController : CoopMissionController
         // agent here. The only exception is a side whose reserve crossed the spawn handler's intentional
         // timeout fallback; that exact side is allowed to start empty so the battle can conclude instead of
         // wedging forever. The release is one-shot, so a later real depletion still concludes normally.
-        if (!endConditionHoldReleased)
+        // Hideout controllers own this switch across their camp/boss phases; enabling it here can resolve the
+        // attacker victory after the camp is cleared, before the boss fight has actually concluded.
+        if (!endConditionHoldReleased && ShouldManageBattleEndLogic(
+                Mission?.GetMissionBehavior<HideoutMissionController>() != null,
+                Mission?.GetMissionBehavior<HideoutAmbushMissionController>() != null))
         {
             var battleEndLogic = Mission?.GetMissionBehavior<BattleEndLogic>();
             if (battleEndLogic != null)
@@ -327,6 +332,11 @@ public class CoopBattleController : CoopMissionController
             && (defenderFielded || defenderMissingReserveAccepted);
     }
 
+    internal static bool ShouldManageBattleEndLogic(
+        bool hasHideoutMissionController,
+        bool hasHideoutAmbushMissionController)
+        => !hasHideoutMissionController && !hasHideoutAmbushMissionController;
+        
     // Compare current authority with controller id
     private bool? ProbeHeroAgentAuthority(Hero hero)
     {

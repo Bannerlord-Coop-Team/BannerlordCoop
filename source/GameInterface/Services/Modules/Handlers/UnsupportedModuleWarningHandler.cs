@@ -19,6 +19,7 @@ public class UnsupportedModuleWarningHandler
     public const string SectionId = "UnsupportedModules";
 
     private const string CoopModuleId = "Coop";
+    private const string CoopNightlyModuleId = "CoopNightly";
     private const string DedicatedServerModulePrefix = "DedicatedServer.";
     
     private readonly IModuleInfoProvider moduleInfoProvider;
@@ -126,8 +127,12 @@ public class UnsupportedModuleWarningHandler
         }
 
         modulesEvaluated = true;
-        unsupportedModuleIds = moduleInfoProvider.GetModuleInfos()
-            .Where(IsUnsupported)
+        var modules = moduleInfoProvider.GetModuleInfos().ToArray();
+        var hasConflictingCoopVariants = modules.Any(module => IsCoopVariant(module, CoopModuleId)) &&
+                                         modules.Any(module => IsCoopVariant(module, CoopNightlyModuleId));
+        unsupportedModuleIds = modules
+            .Where(module => IsUnsupported(module) ||
+                             (hasConflictingCoopVariants && IsCoopVariant(module)))
             .Select(module => module.Id)
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -137,7 +142,7 @@ public class UnsupportedModuleWarningHandler
 
     private static bool IsUnsupported(ModuleInfo module)
     {
-        if (string.Equals(module.Id, CoopModuleId, StringComparison.OrdinalIgnoreCase))
+        if (IsCoopVariant(module))
         {
             return false;
         }
@@ -150,6 +155,14 @@ public class UnsupportedModuleWarningHandler
         }
 
         return !module.IsOfficial || module.IsDlc;
+    }
+
+    private static bool IsCoopVariant(ModuleInfo module, string moduleId = null)
+    {
+        return moduleId == null
+            ? string.Equals(module.Id, CoopModuleId, StringComparison.OrdinalIgnoreCase) ||
+              string.Equals(module.Id, CoopNightlyModuleId, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(module.Id, moduleId, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildPromptText(string[] moduleIds)
