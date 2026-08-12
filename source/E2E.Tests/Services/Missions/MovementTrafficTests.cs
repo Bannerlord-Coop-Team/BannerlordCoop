@@ -138,7 +138,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                     1L,
                     () => 60,
                     enableHeartbeat: false),
-                bulkSendMillisecondsPerPoll: 2d);
+                bulkSendMillisecondsPerPoll: 1d);
             using var handler = new AgentMovementHandler(
                 network,
                 peer.Resolve<IPacketManager>(),
@@ -182,6 +182,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                     framesPerSecond: 57,
                     evaluations: 1);
                 Assert.InRange(handler.MovementRate.FramesPerSecond, 56.5f, 57.5f);
+                Assert.Equal(57, handler.MovementRate.BulkPollsPerSecond);
                 Assert.Equal(40, handler.MovementRate.PerformanceCeilingHz);
                 Assert.Equal(40, handler.MovementRate.BulkHz);
             }
