@@ -8,6 +8,7 @@ using Missions.Messages;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
 using Serilog;
+using Serilog.Events;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -43,6 +44,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly Queue<DeferredDamage> deferredDamage = new();
     private readonly Dictionary<(Guid AgentId, long ShotSequence), ReconstructionInfo> reconstructions = new();
     private readonly Queue<(Guid AgentId, long ShotSequence)> reconstructionHistory = new();
+    private readonly Dictionary<Guid, NoHealthReductionWarningState> noHealthReductionWarnings = new();
     private long presentationEpoch;
     private float presentationTime;
     private bool disposed;
@@ -55,6 +57,13 @@ public class BattleDamageRouter : IBattleDamageRouter
     private const float MinimumFlightSeconds = 0.05f;
     private const float MaximumFlightSeconds = 2.5f;
     private const float MaximumTickSeconds = 0.1f;
+    private const double NoHealthReductionWarningIntervalSeconds = 5d;
+
+    private sealed class NoHealthReductionWarningState
+    {
+        public long LastWarningTimestamp { get; set; }
+        public int SuppressedHits { get; set; }
+    }
 
     private readonly struct ReconstructionInfo
     {
@@ -153,6 +162,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         pendingLocalDamage.Clear();
         reconstructions.Clear();
         reconstructionHistory.Clear();
+        noHealthReductionWarnings.Clear();
         while (inboundDamage.TryDequeue(out _)) { }
 
         if (BattleSpawnGate.MountAuthorityProbe == mountAuthorityProbe)
@@ -321,21 +331,24 @@ public class BattleDamageRouter : IBattleDamageRouter
         BattlePuppetHit hit = pending.Hit;
         if (registry.TryGetAgentInfo(hit.Victim, out var victimInfo))
         {
-            Logger.Debug(
-                "[BattleDamage] Routing blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
-                "victimIndex={VictimIndex} attackerId={AttackerId} sourceController={SourceController} " +
-                "damage={Damage} victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} " +
-                "missile={Missile} shotSequence={ShotSequence}",
-                victimInfo.AgentId,
-                victimInfo.CurrentAuthority,
-                hit.Victim?.Index ?? -1,
-                pending.AttackerId,
-                session.OwnControllerId,
-                hit.Blow.InflictedDamage,
-                hit.Victim?.IsMount ?? hit.IsMount,
-                false,
-                hit.Blow.IsMissile,
-                pending.ShotSequence);
+            if (Logger.IsEnabled(LogEventLevel.Debug))
+            {
+                Logger.Debug(
+                    "[BattleDamage] Routing blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
+                    "victimIndex={VictimIndex} attackerId={AttackerId} sourceController={SourceController} " +
+                    "damage={Damage} victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} " +
+                    "missile={Missile} shotSequence={ShotSequence}",
+                    victimInfo.AgentId,
+                    victimInfo.CurrentAuthority,
+                    hit.Victim?.Index ?? -1,
+                    pending.AttackerId,
+                    session.OwnControllerId,
+                    hit.Blow.InflictedDamage,
+                    hit.Victim?.IsMount ?? hit.IsMount,
+                    false,
+                    hit.Blow.IsMissile,
+                    pending.ShotSequence);
+            }
             network.SendAll(new NetworkApplyBattleDamage(
                 victimInfo.AgentId,
                 pending.AttackerId,
@@ -350,21 +363,24 @@ public class BattleDamageRouter : IBattleDamageRouter
             hit.Victim?.RiderAgent is Agent rider &&
             registry.TryGetAgentInfo(rider, out var riderInfo))
         {
-            Logger.Debug(
-                "[BattleDamage] Routing blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
-                "victimIndex={VictimIndex} attackerId={AttackerId} sourceController={SourceController} " +
-                "damage={Damage} victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} " +
-                "missile={Missile} shotSequence={ShotSequence}",
-                riderInfo.AgentId,
-                riderInfo.CurrentAuthority,
-                hit.Victim?.Index ?? -1,
-                pending.AttackerId,
-                session.OwnControllerId,
-                hit.Blow.InflictedDamage,
-                hit.Victim?.IsMount ?? true,
-                true,
-                hit.Blow.IsMissile,
-                pending.ShotSequence);
+            if (Logger.IsEnabled(LogEventLevel.Debug))
+            {
+                Logger.Debug(
+                    "[BattleDamage] Routing blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
+                    "victimIndex={VictimIndex} attackerId={AttackerId} sourceController={SourceController} " +
+                    "damage={Damage} victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} " +
+                    "missile={Missile} shotSequence={ShotSequence}",
+                    riderInfo.AgentId,
+                    riderInfo.CurrentAuthority,
+                    hit.Victim?.Index ?? -1,
+                    pending.AttackerId,
+                    session.OwnControllerId,
+                    hit.Blow.InflictedDamage,
+                    hit.Victim?.IsMount ?? true,
+                    true,
+                    hit.Blow.IsMissile,
+                    pending.ShotSequence);
+            }
             network.SendAll(new NetworkApplyBattleDamage(
                 riderInfo.AgentId,
                 pending.AttackerId,
@@ -657,36 +673,40 @@ public class BattleDamageRouter : IBattleDamageRouter
         float appliedDamage = healthBefore - healthAfter;
         bool activeAfter = victim.IsActive();
         var mortalityAfter = victim.CurrentMortalityState;
-        Logger.Debug(
-            "[BattleDamage] Applied routed blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
-            "victimIndex={VictimIndex} victimName={VictimName} attackerId={AttackerId} " +
-            "attackerAuthority={AttackerAuthority} routedDamage={RoutedDamage} inputDamage={InputDamage} " +
-            "appliedDamage={AppliedDamage:0.0} " +
-            "victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} missile={Missile} " +
-            "healthBefore={HealthBefore:0.0} healthAfter={HealthAfter:0.0} activeAfter={ActiveAfter} " +
-            "mortalityBefore={MortalityBefore} mortalityAfter={MortalityAfter} " +
-            "disableDying={DisableDying} missionMode={MissionMode}",
-            damage.VictimAgentId,
-            info.CurrentAuthority,
-            victim.Index,
-            victim.Name,
-            damage.AttackerAgentId,
-            attackerControllerId,
-            routedDamage,
-            inputDamage,
-            appliedDamage,
-            victim.IsMount,
-            damage.IsMount,
-            wasMissile,
-            healthBefore,
-            healthAfter,
-            activeAfter,
-            mortalityBefore,
-            mortalityAfter,
-            disableDying,
-            missionMode);
+        if (Logger.IsEnabled(LogEventLevel.Debug))
+        {
+            Logger.Debug(
+                "[BattleDamage] Applied routed blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
+                "victimIndex={VictimIndex} victimName={VictimName} attackerId={AttackerId} " +
+                "attackerAuthority={AttackerAuthority} routedDamage={RoutedDamage} inputDamage={InputDamage} " +
+                "appliedDamage={AppliedDamage:0.0} " +
+                "victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} missile={Missile} " +
+                "healthBefore={HealthBefore:0.0} healthAfter={HealthAfter:0.0} activeAfter={ActiveAfter} " +
+                "mortalityBefore={MortalityBefore} mortalityAfter={MortalityAfter} " +
+                "disableDying={DisableDying} missionMode={MissionMode}",
+                damage.VictimAgentId,
+                info.CurrentAuthority,
+                victim.Index,
+                victim.Name,
+                damage.AttackerAgentId,
+                attackerControllerId,
+                routedDamage,
+                inputDamage,
+                appliedDamage,
+                victim.IsMount,
+                damage.IsMount,
+                wasMissile,
+                healthBefore,
+                healthAfter,
+                activeAfter,
+                mortalityBefore,
+                mortalityAfter,
+                disableDying,
+                missionMode);
+        }
 
-        if (inputDamage > 0 && activeAfter && appliedDamage <= 0f)
+        if (inputDamage > 0 && activeAfter && appliedDamage <= 0f &&
+            ShouldLogNoHealthReductionWarning(damage.VictimAgentId, out int suppressedHits))
         {
             Logger.Warning(
                 "[BattleDamage] Routed blow did not reduce health: victimId={VictimId} " +
@@ -694,7 +714,7 @@ public class BattleDamageRouter : IBattleDamageRouter
                 "inputDamage={InputDamage} appliedDamage={AppliedDamage:0.0} victimIsMount={VictimIsMount} " +
                 "healthBefore={HealthBefore:0.0} healthAfter={HealthAfter:0.0} " +
                 "mortalityBefore={MortalityBefore} mortalityAfter={MortalityAfter} " +
-                "disableDying={DisableDying} missionMode={MissionMode}",
+                "disableDying={DisableDying} missionMode={MissionMode} suppressedHits={SuppressedHits}",
                 damage.VictimAgentId,
                 info.CurrentAuthority,
                 victim.Index,
@@ -707,7 +727,8 @@ public class BattleDamageRouter : IBattleDamageRouter
                 mortalityBefore,
                 mortalityAfter,
                 disableDying,
-                missionMode);
+                missionMode,
+                suppressedHits);
         }
 
         if (healthAfter > 0 && victim.Character is CharacterObject character && character.IsHero
@@ -715,6 +736,32 @@ public class BattleDamageRouter : IBattleDamageRouter
         {
             hero.HitPoints = Math.Max(1, (int)healthAfter);
         }
+    }
+
+    private bool ShouldLogNoHealthReductionWarning(Guid victimId, out int suppressedHits)
+    {
+        long now = Stopwatch.GetTimestamp();
+        if (!noHealthReductionWarnings.TryGetValue(victimId, out var warningState))
+        {
+            noHealthReductionWarnings[victimId] = new NoHealthReductionWarningState
+            {
+                LastWarningTimestamp = now
+            };
+            suppressedHits = 0;
+            return true;
+        }
+
+        if (ElapsedSeconds(warningState.LastWarningTimestamp) < NoHealthReductionWarningIntervalSeconds)
+        {
+            warningState.SuppressedHits++;
+            suppressedHits = warningState.SuppressedHits;
+            return false;
+        }
+
+        suppressedHits = warningState.SuppressedHits;
+        warningState.LastWarningTimestamp = now;
+        warningState.SuppressedHits = 0;
+        return true;
     }
 
     private static void ApplyPlayerReceivedDamageMultiplier(

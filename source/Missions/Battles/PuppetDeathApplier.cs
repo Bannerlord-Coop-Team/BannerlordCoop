@@ -104,17 +104,26 @@ public class PuppetDeathApplier : IPuppetDeathApplier
         if (mission == null) return false;
 
         Agent agent = info.Agent;
-        int agentIndex = agent?.Index ?? -1;
-        float healthBefore = agent?.Health ?? -1f;
+        int agentIndex = -1;
+        float healthBefore = -1f;
         float healthAfter = healthBefore;
-        bool activeBefore = agent?.IsActive() ?? false;
-        bool activeAfter = activeBefore;
+        bool activeBefore = false;
+        bool activeAfter = false;
         object mortalityBefore = null;
         object mortalityAfter = null;
         bool disableDying = mission.DisableDying;
         MissionMode missionMode = mission.Mode;
         int appliedDamage = death.InflictedDamage;
-        bool appliedDeath = agent != null && healthBefore > 0f;
+        bool appliedDeath = false;
+        if (agent != null && agent.Mission == mission)
+        {
+            agentIndex = agent.Index;
+            healthBefore = agent.Health;
+            healthAfter = healthBefore;
+            activeBefore = agent.IsActive();
+            activeAfter = activeBefore;
+            appliedDeath = activeBefore && healthBefore > 0f;
+        }
         if (appliedDeath)
         {
             mortalityBefore = agent.CurrentMortalityState;
