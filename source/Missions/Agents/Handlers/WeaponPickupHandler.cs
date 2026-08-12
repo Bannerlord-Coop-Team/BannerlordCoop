@@ -91,7 +91,11 @@ namespace Missions.Agents.Handlers
                 itemObjectId,
                 payload.WeaponModifier,
                 payload.Banner,
-                payload.CurrentEquipment);
+                payload.CurrentEquipment,
+                payload.PreviousSlotAmount,
+                payload.PreviousWorldItemAmount,
+                payload.ResultingSlotAmount,
+                payload.ResultingWorldItemAmount);
 
             network.SendAll(message);
         }
@@ -135,18 +139,30 @@ namespace Missions.Agents.Handlers
                     worldItem,
                     obj.What.EquipmentIndex,
                     ref missionWeapon,
-                    obj.What.CurrentEquipment);
+                    obj.What.CurrentEquipment,
+                    obj.What.PreviousSlotAmount,
+                    obj.What.PreviousWorldItemAmount,
+                    obj.What.ResultingSlotAmount,
+                    obj.What.ResultingWorldItemAmount);
             });
         }
 
         private bool TryGetWorldItem(Guid worldItemId, out SpawnedItemEntity worldItem)
         {
             if (worldItemRegistry.TryGet(worldItemId, out worldItem))
-                return true;
+            {
+                if (IsWorldItemAvailable(worldItem))
+                    return true;
+
+                worldItemRegistry.Remove(worldItemId);
+                worldItem = null;
+            }
 
             foreach (MissionObject missionObject in Mission.Current.MissionObjects)
             {
-                if (!(missionObject is SpawnedItemEntity candidate) || candidate.Id.CreatedAtRuntime)
+                if (!(missionObject is SpawnedItemEntity candidate) ||
+                    candidate.Id.CreatedAtRuntime ||
+                    !IsWorldItemAvailable(candidate))
                     continue;
                 if (worldItemRegistry.GetOrCreateId(candidate) != worldItemId)
                     continue;
@@ -159,25 +175,81 @@ namespace Missions.Agents.Handlers
             return false;
         }
 
+        internal static bool IsWorldItemAvailable(SpawnedItemEntity worldItem)
+        {
+            return worldItem != null &&
+                IsWorldItemStateAvailable(
+                    worldItem.IsRemoved,
+                    worldItem.IsDeactivated,
+                    worldItem.GameEntity.IsValid);
+        }
+
+        internal static bool IsWorldItemStateAvailable(
+            bool isRemoved,
+            bool isDeactivated,
+            bool isGameEntityValid)
+        {
+            return !isRemoved && !isDeactivated && isGameEntityValid;
+        }
+
         internal static void ApplyWeaponPickup(
             CoopAgentInfo agentInfo,
             SpawnedItemEntity worldItem,
             EquipmentIndex equipmentIndex,
             ref MissionWeapon missionWeapon,
-            AgentEquipmentData currentEquipment)
+            AgentEquipmentData currentEquipment,
+            short previousSlotAmount,
+            short previousWorldItemAmount,
+            short resultingSlotAmount,
+            short resultingWorldItemAmount)
         {
             Agent agent = agentInfo.Agent;
             agentInfo.RecordAuthoritativeEquipment(currentEquipment);
             using (new AllowedThread())
             {
+                ApplyWeaponAmounts(
+                    agent,
+                    worldItem,
+                    equipmentIndex,
+                    previousSlotAmount,
+                    previousWorldItemAmount);
+
                 if (worldItem == null)
                     ApplyDetachedWeaponPickup(agent, equipmentIndex, ref missionWeapon);
                 else
                     ApplyWorldItemPickup(worldItem, agent, isSuccessful: true, (int)equipmentIndex);
 
+                ApplyWeaponAmounts(
+                    agent,
+                    worldItem,
+                    equipmentIndex,
+                    resultingSlotAmount,
+                    resultingWorldItemAmount);
+
                 // Replay the owner's final hand selection after vanilla applies the world-item pickup.
                 currentEquipment.Apply(agent);
             }
+        }
+
+        private static void ApplyWeaponAmounts(
+            Agent agent,
+            SpawnedItemEntity worldItem,
+            EquipmentIndex equipmentIndex,
+            short slotAmount,
+            short worldItemAmount)
+        {
+            if (equipmentIndex >= EquipmentIndex.WeaponItemBeginSlot &&
+                equipmentIndex < EquipmentIndex.NumAllWeaponSlots &&
+                !agent.Equipment[equipmentIndex].IsEmpty)
+            {
+                agent.SetWeaponAmountInSlot(
+                    equipmentIndex,
+                    slotAmount,
+                    enforcePrimaryItem: true);
+            }
+
+            if (worldItem != null)
+                worldItem._weapon.Amount = worldItemAmount;
         }
 
         private static void ApplyWorldItemPickup(

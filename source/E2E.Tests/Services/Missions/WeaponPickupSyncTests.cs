@@ -27,8 +27,10 @@ namespace E2E.Tests.Services.Missions;
 public class WeaponPickupSyncTests
 {
     private static readonly List<string> ApplyCalls = new();
+    private static readonly List<short> AppliedSlotAmounts = new();
     private static EquipmentIndex pickedItemSlot;
     private static AgentEquipmentData appliedEquipment;
+    private static short worldItemAmountAtPickup;
     private static bool pickupRanInsideAllowedThread;
     private static bool runtimeEquipmentRanInsideAllowedThread;
     private static bool wieldRanInsideAllowedThread;
@@ -56,7 +58,11 @@ public class WeaponPickupSyncTests
             "ItemObject_test_weapon",
             itemModifier,
             banner,
-            equipment);
+            equipment,
+            previousSlotAmount: 3,
+            previousWorldItemAmount: 9,
+            resultingSlotAmount: 7,
+            resultingWorldItemAmount: 5);
         PropertyInfo? property = typeof(NetworkWeaponPickedup).GetProperty(
             nameof(NetworkWeaponPickedup.CurrentEquipment));
         Assert.NotNull(property);
@@ -85,6 +91,10 @@ public class WeaponPickupSyncTests
         Assert.Equal((int)EquipmentIndex.Weapon0, received.CurrentEquipment.MainHandIndex);
         Assert.Equal((int)EquipmentIndex.Weapon2, received.CurrentEquipment.OffHandIndex);
         Assert.Equal(0, received.CurrentEquipment.MainHandUsageIndex);
+        Assert.Equal(3, received.PreviousSlotAmount);
+        Assert.Equal(9, received.PreviousWorldItemAmount);
+        Assert.Equal(7, received.ResultingSlotAmount);
+        Assert.Equal(5, received.ResultingWorldItemAmount);
     }
 
     [Fact]
@@ -148,19 +158,24 @@ public class WeaponPickupSyncTests
     }
 
     [Fact]
-    public void ApplyWeaponPickup_UsesWorldItemBeforeApplyingWieldState()
+    public void ApplyWeaponPickup_ReconcilesAmountsAroundWorldItemPickupBeforeApplyingWieldState()
     {
-        var harmony = new Harmony($"{nameof(ApplyWeaponPickup_UsesWorldItemBeforeApplyingWieldState)}.{System.Guid.NewGuid()}");
+        var harmony = new Harmony($"{nameof(ApplyWeaponPickup_ReconcilesAmountsAroundWorldItemPickupBeforeApplyingWieldState)}.{System.Guid.NewGuid()}");
         MethodInfo pickup = AccessTools.Method(
             typeof(WeaponPickupHandler),
             "ApplyWorldItemPickup");
+        MethodInfo setAmount = AccessTools.Method(
+            typeof(Agent),
+            nameof(Agent.SetWeaponAmountInSlot));
         MethodInfo wield = AccessTools.Method(
             typeof(AgentEquipmentData),
             nameof(AgentEquipmentData.Apply),
             new[] { typeof(Agent) });
 
         ApplyCalls.Clear();
+        AppliedSlotAmounts.Clear();
         pickedItemSlot = EquipmentIndex.None;
+        worldItemAmountAtPickup = 0;
         pickupRanInsideAllowedThread = false;
         wieldRanInsideAllowedThread = false;
 
@@ -179,12 +194,18 @@ public class WeaponPickupSyncTests
                     typeof(WeaponPickupSyncTests),
                     nameof(CapturePickup))));
             harmony.Patch(
+                setAmount,
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(WeaponPickupSyncTests),
+                    nameof(CaptureSlotAmount))));
+            harmony.Patch(
                 wield,
                 prefix: new HarmonyMethod(AccessTools.Method(
                     typeof(WeaponPickupSyncTests),
                     nameof(CaptureWield))));
 
             Agent agent = ObjectHelper.SkipConstructor<Agent>();
+            InitializeEquipmentSlot(agent, EquipmentIndex.Weapon2);
             SpawnedItemEntity worldItem = ObjectHelper.SkipConstructor<SpawnedItemEntity>();
             CoopAgentInfo agentInfo = CreateAgentInfo(agent);
             MissionWeapon weapon = default;
@@ -198,10 +219,17 @@ public class WeaponPickupSyncTests
                 worldItem,
                 EquipmentIndex.Weapon2,
                 ref weapon,
-                equipment);
+                equipment,
+                previousSlotAmount: 0,
+                previousWorldItemAmount: 9,
+                resultingSlotAmount: 7,
+                resultingWorldItemAmount: 5);
 
             Assert.Equal(new[] { "pickup", "wield" }, ApplyCalls);
+            Assert.Equal(new short[] { 0, 7 }, AppliedSlotAmounts);
             Assert.Equal(EquipmentIndex.Weapon2, pickedItemSlot);
+            Assert.Equal(9, worldItemAmountAtPickup);
+            Assert.Equal(5, worldItem.WeaponCopy.Amount);
             Assert.True(agentInfo.TryGetAuthoritativeEquipment(out AgentEquipmentData recorded));
             Assert.Equal(equipment, recorded);
             Assert.True(pickupRanInsideAllowedThread);
@@ -224,8 +252,12 @@ public class WeaponPickupSyncTests
             typeof(AgentEquipmentData),
             nameof(AgentEquipmentData.Apply),
             new[] { typeof(Agent) });
+        MethodInfo setAmount = AccessTools.Method(
+            typeof(Agent),
+            nameof(Agent.SetWeaponAmountInSlot));
 
         ApplyCalls.Clear();
+        AppliedSlotAmounts.Clear();
         pickedItemSlot = EquipmentIndex.None;
         pickupRanInsideAllowedThread = false;
         wieldRanInsideAllowedThread = false;
@@ -238,12 +270,18 @@ public class WeaponPickupSyncTests
                     typeof(WeaponPickupSyncTests),
                     nameof(CaptureDetachedPickup))));
             harmony.Patch(
+                setAmount,
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(WeaponPickupSyncTests),
+                    nameof(CaptureSlotAmount))));
+            harmony.Patch(
                 wield,
                 prefix: new HarmonyMethod(AccessTools.Method(
                     typeof(WeaponPickupSyncTests),
                     nameof(CaptureWield))));
 
             Agent agent = ObjectHelper.SkipConstructor<Agent>();
+            InitializeEquipmentSlot(agent, EquipmentIndex.Weapon2);
             CoopAgentInfo agentInfo = CreateAgentInfo(agent);
             MissionWeapon weapon = default;
             var equipment = new AgentEquipmentData(
@@ -256,9 +294,14 @@ public class WeaponPickupSyncTests
                 null,
                 EquipmentIndex.Weapon2,
                 ref weapon,
-                equipment);
+                equipment,
+                previousSlotAmount: 3,
+                previousWorldItemAmount: 9,
+                resultingSlotAmount: 7,
+                resultingWorldItemAmount: 5);
 
             Assert.Equal(new[] { "pickup", "wield" }, ApplyCalls);
+            Assert.Equal(new short[] { 3, 7 }, AppliedSlotAmounts);
             Assert.Equal(EquipmentIndex.Weapon2, pickedItemSlot);
             Assert.True(agentInfo.TryGetAuthoritativeEquipment(out AgentEquipmentData recorded));
             Assert.Equal(equipment, recorded);
@@ -269,6 +312,25 @@ public class WeaponPickupSyncTests
         {
             harmony.UnpatchAll(harmony.Id);
         }
+    }
+
+    [Theory]
+    [InlineData(false, false, true, true)]
+    [InlineData(true, false, true, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(false, false, false, false)]
+    public void IsWorldItemStateAvailable_RequiresAnActiveValidItem(
+        bool isRemoved,
+        bool isDeactivated,
+        bool isGameEntityValid,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            WeaponPickupHandler.IsWorldItemStateAvailable(
+                isRemoved,
+                isDeactivated,
+                isGameEntityValid));
     }
 
     [Fact]
@@ -371,12 +433,50 @@ public class WeaponPickupSyncTests
             1);
     }
 
-    private static bool CapturePickup(bool isSuccessful, int preferenceIndex)
+    private static void InitializeEquipmentSlot(
+        Agent agent,
+        EquipmentIndex equipmentIndex)
+    {
+        var equipment = new MissionEquipment();
+        var weaponSlots = new MissionWeapon[(int)EquipmentIndex.NumAllWeaponSlots];
+        var weapon = new MissionWeapon(
+            ObjectHelper.SkipConstructor<ItemObject>(),
+            null,
+            null);
+        object boxedWeapon = weapon;
+        typeof(MissionWeapon)
+            .GetField("_weapons", BindingFlags.Instance | BindingFlags.NonPublic)
+            .SetValue(
+                boxedWeapon,
+                new List<WeaponComponentData>
+                {
+                    new WeaponComponentData(null, WeaponClass.Arrow, default),
+                });
+        weaponSlots[(int)equipmentIndex] = (MissionWeapon)boxedWeapon;
+        typeof(MissionEquipment)
+            .GetField(
+                "_weaponSlots",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+            .SetValue(equipment, weaponSlots);
+        agent.InitializeMissionEquipment(equipment, null);
+    }
+
+    private static bool CapturePickup(
+        SpawnedItemEntity worldItem,
+        bool isSuccessful,
+        int preferenceIndex)
     {
         ApplyCalls.Add("pickup");
         Assert.True(isSuccessful);
         pickedItemSlot = (EquipmentIndex)preferenceIndex;
+        worldItemAmountAtPickup = worldItem.WeaponCopy.Amount;
         pickupRanInsideAllowedThread = AllowedThread.IsThisThreadAllowed();
+        return false;
+    }
+
+    private static bool CaptureSlotAmount(short amount)
+    {
+        AppliedSlotAmounts.Add(amount);
         return false;
     }
 

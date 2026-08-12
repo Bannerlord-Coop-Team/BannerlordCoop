@@ -17,6 +17,10 @@ namespace Missions.Agents.Messages
         public ItemModifier WeaponModifier { get; }
         public Banner Banner { get; }
         public AgentEquipmentData CurrentEquipment { get; }
+        public short PreviousSlotAmount { get; }
+        public short PreviousWorldItemAmount { get; }
+        public short ResultingSlotAmount { get; }
+        public short ResultingWorldItemAmount { get; }
 
         public WeaponPickedup(
             Agent agent,
@@ -25,7 +29,11 @@ namespace Missions.Agents.Messages
             ItemObject weaponObject, 
             ItemModifier itemModifier,
             Banner banner,
-            AgentEquipmentData currentEquipment)
+            AgentEquipmentData currentEquipment,
+            short previousSlotAmount,
+            short previousWorldItemAmount,
+            short resultingSlotAmount,
+            short resultingWorldItemAmount)
         {
             Agent = agent;
             WorldItem = worldItem;
@@ -34,6 +42,10 @@ namespace Missions.Agents.Messages
             WeaponModifier = itemModifier;
             Banner = banner;
             CurrentEquipment = currentEquipment;
+            PreviousSlotAmount = previousSlotAmount;
+            PreviousWorldItemAmount = previousWorldItemAmount;
+            ResultingSlotAmount = resultingSlotAmount;
+            ResultingWorldItemAmount = resultingWorldItemAmount;
         }
     }
 }

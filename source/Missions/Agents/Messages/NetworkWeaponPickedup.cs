@@ -32,6 +32,18 @@ namespace Missions.Agents.Messages
         [ProtoMember(7)]
         public Guid WorldItemId { get; }
 
+        [ProtoMember(8)]
+        public short PreviousSlotAmount { get; }
+
+        [ProtoMember(9)]
+        public short PreviousWorldItemAmount { get; }
+
+        [ProtoMember(10)]
+        public short ResultingSlotAmount { get; }
+
+        [ProtoMember(11)]
+        public short ResultingWorldItemAmount { get; }
+
         public NetworkWeaponPickedup(
             Guid agentId, 
             EquipmentIndex equipmentIndex,
@@ -39,7 +51,11 @@ namespace Missions.Agents.Messages
             string itemObjectId,
             ItemModifier itemModifier, 
             Banner banner,
-            AgentEquipmentData currentEquipment)
+            AgentEquipmentData currentEquipment,
+            short previousSlotAmount,
+            short previousWorldItemAmount,
+            short resultingSlotAmount,
+            short resultingWorldItemAmount)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
@@ -48,6 +64,10 @@ namespace Missions.Agents.Messages
             ItemModifier = itemModifier;
             Banner = banner;
             CurrentEquipment = currentEquipment;
+            PreviousSlotAmount = previousSlotAmount;
+            PreviousWorldItemAmount = previousWorldItemAmount;
+            ResultingSlotAmount = resultingSlotAmount;
+            ResultingWorldItemAmount = resultingWorldItemAmount;
         }
     }
 }
