@@ -76,7 +76,6 @@ internal class PartyCommands
     [CommandLineArgumentFunction("whoami", "coop.debug.mobileparty")]
     public static string WhoAmICommand(List<string> strings)
     {
-        
         if(!ModInformation.IsClient) return "Command can only be run on a client.";
         
         var me = Hero.MainHero;
