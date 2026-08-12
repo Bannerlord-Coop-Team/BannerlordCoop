@@ -2333,6 +2333,77 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void MultiPlayerRaid_BattleSimulation_IsCancelled_ByInitiatingClient_CanBeStartedAgain()
+    {
+        var client = Clients.First();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+
+        try
+        {
+            // Start the first simulation
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(
+                    new NetworkBattleStartRequest(
+                        Guid.NewGuid().ToString(),
+                        (int)BattleStartMode.Simulation,
+                        hostileAction.MapEventId,
+                        hostileAction.AttackerMobilePartyId)),
+                MapEventDisabledMethods);
+
+            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+
+            Server.Call(() =>
+            {
+                Assert.True(ServerBattleModeArbiter.TryGetMode(hostileAction.MapEventId, out var mode));
+                Assert.Equal(BattleStartMode.Simulation, mode);
+            });
+
+            // The initiating client closes/cancels the unfinished simulation.
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(
+                    new NetworkCancelBattleSimulation(
+                        hostileAction.MapEventId)),
+                MapEventDisabledMethods);
+
+            var finished = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+
+            Assert.Equal(hostileAction.MapEventId, finished.MapEventId);
+
+            var unclaimed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
+
+            Assert.Equal(hostileAction.MapEventId, unclaimed.MapEventId);
+            Assert.Equal((int)BattleStartMode.Unclaimed, unclaimed.Mode);
+
+            Server.Call(() => { Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId)); });
+
+            // Start another simulation for the same battle.
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(
+                    new NetworkBattleStartRequest(
+                        Guid.NewGuid().ToString(),
+                        (int)BattleStartMode.Simulation,
+                        hostileAction.MapEventId,
+                        hostileAction.AttackerMobilePartyId)),
+                MapEventDisabledMethods);
+
+            var retryReply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>());
+
+            Assert.True(retryReply.Accepted);
+
+            var retryMode = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
+
+            Assert.Equal((int)BattleStartMode.Simulation, retryMode.Mode);
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(hostileAction.MapEventId));
+        }
+    }
+
+    [Fact]
     public void RaidSimulation_WhenSecondPlayerJoins_OpensSimulationForJoiner()
     {
         var client = Clients.First();
