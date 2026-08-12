@@ -9,32 +9,19 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Heroes;
 
+[HarmonyPatch(typeof(HeroSpawnCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_CONFIGURED_MINOR_FACTION_CATEGORY)]
 public static class ConfiguredMinorFactionHeroSpawner
 {
-    internal const string HarmonyId = "Coop.ConfiguredMinorFactionHeroSpawner";
     internal const string CoopTeamClanId = "coop_team";
     internal const string CoopTeamLeaderTemplateId = "coop_team_lord_another_joke";
     internal const string ConfiguredLordPrefix = "coop_team_lord_";
 
-    public static void Apply()
-    {
-        if (Harmony.HasAnyPatches(HarmonyId)) return;
-
-        var original = AccessTools.Method(
-            typeof(HeroSpawnCampaignBehavior),
-            nameof(HeroSpawnCampaignBehavior.SpawnMinorFactionHeroes),
-            new[] { typeof(Clan), typeof(bool) });
-        var prefix = AccessTools.Method(
-            typeof(ConfiguredMinorFactionHeroSpawner),
-            nameof(SpawnMinorFactionHeroesPrefix));
-        var harmonyPrefix = new HarmonyMethod(prefix)
-        {
-            priority = Priority.First,
-        };
-
-        new Harmony(HarmonyId).Patch(original, prefix: harmonyPrefix);
-    }
-
+    [HarmonyPatch(
+        nameof(HeroSpawnCampaignBehavior.SpawnMinorFactionHeroes),
+        new[] { typeof(Clan), typeof(bool) })]
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     internal static bool SpawnMinorFactionHeroesPrefix(Clan clan, bool firstTime)
     {
         bool hasAuthority = ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();

@@ -73,22 +73,23 @@ public sealed class ConfiguredMinorFactionDataTests
     }
 
     [Fact]
-    public void Apply_PatchesNativeMinorFactionSpawnAtFirstPriority()
+    public void BootCategory_PatchesNativeMinorFactionSpawnAtFirstPriority()
     {
-        var harmony = new Harmony(ConfiguredMinorFactionHeroSpawner.HarmonyId);
+        var harmony = new Harmony(nameof(BootCategory_PatchesNativeMinorFactionSpawnAtFirstPriority));
         var original = AccessTools.Method(
             typeof(HeroSpawnCampaignBehavior),
             nameof(HeroSpawnCampaignBehavior.SpawnMinorFactionHeroes),
             new[] { typeof(Clan), typeof(bool) });
-        harmony.UnpatchAll(harmony.Id);
 
         try
         {
-            ConfiguredMinorFactionHeroSpawner.Apply();
+            harmony.PatchCategory(
+                typeof(ConfiguredMinorFactionHeroSpawner).Assembly,
+                GameInterface.HARMONY_CONFIGURED_MINOR_FACTION_CATEGORY);
 
             Patch patch = Assert.Single(
                 Harmony.GetPatchInfo(original).Prefixes,
-                candidate => candidate.owner == ConfiguredMinorFactionHeroSpawner.HarmonyId);
+                candidate => candidate.owner == harmony.Id);
             Assert.Equal(Priority.First, patch.priority);
             Assert.Equal(typeof(ConfiguredMinorFactionHeroSpawner), patch.PatchMethod.DeclaringType);
         }
