@@ -332,8 +332,12 @@ internal static class TroopXpTransferFixtureCommands
         if (!((ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource is { } partyVm))
             return "No active Party screen view model.";
 
-        partyVm.ExecuteDone();
-        return "CLAN_PARTY_TRANSFER_COMMITTED";
+        // ExecuteDone opens a confirmation inquiry when the save's player party is over its limit.
+        // CloseScreenInternal is the inquiry's affirmative action and always exercises DoneLogic.
+        partyVm.CloseScreenInternal();
+        return Game.Current.GameStateManager.ActiveState is PartyState
+            ? "CLAN_PARTY_TRANSFER_NOT_COMMITTED"
+            : "CLAN_PARTY_TRANSFER_COMMITTED";
     }
 
     [CommandLineArgumentFunction("clan_party_xp_fixture_restore", "coop.debug.mobileparty")]
