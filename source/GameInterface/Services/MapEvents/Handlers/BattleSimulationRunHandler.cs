@@ -265,7 +265,6 @@ internal class BattleSimulationRunHandler : IHandler
         {
             network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
             network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
-
         }
         mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
     }
