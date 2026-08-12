@@ -18,6 +18,7 @@ internal class IssueOwnershipPersistencePatches
     private static void SyncDataPostfix(IDataStore dataStore)
     {
         if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return;
+        if (!ContainerProvider.TryResolve<IIssueGenerationRegistry>(out var generationRegistry)) return;
 
         List<IssueOwnershipSaveData> saveData = null;
         if (dataStore.IsSaving)
@@ -45,7 +46,7 @@ internal class IssueOwnershipPersistencePatches
         List<IssueGenerationSaveData> generationSaveData = null;
         if (dataStore.IsSaving)
         {
-            generationSaveData = IssueGenerationRegistry.Snapshot()
+            generationSaveData = generationRegistry.Snapshot()
                 .Select(kvp => new IssueGenerationSaveData(kvp.Key, kvp.Value))
                 .ToList();
         }
@@ -53,7 +54,7 @@ internal class IssueOwnershipPersistencePatches
         dataStore.SyncData(GenerationSaveKey, ref generationSaveData);
         if (!dataStore.IsLoading) return;
 
-        IssueGenerationRegistry.RestoreAll((generationSaveData ?? new List<IssueGenerationSaveData>())
+        generationRegistry.RestoreAll((generationSaveData ?? new List<IssueGenerationSaveData>())
             .Where(entry => entry?.IssueGiverHero != null)
             .Select(entry => new KeyValuePair<Hero, int>(entry.IssueGiverHero, entry.Generation)));
     }

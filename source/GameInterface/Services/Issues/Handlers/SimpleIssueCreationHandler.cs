@@ -18,12 +18,18 @@ internal class SimpleIssueCreationHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
-    public SimpleIssueCreationHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    public SimpleIssueCreationHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<SimpleIssueCreated>(Handle_SimpleIssueCreated);
         messageBroker.Subscribe<NetworkSimpleIssueCreated>(Handle_NetworkSimpleIssueCreated);
@@ -48,7 +54,7 @@ internal class SimpleIssueCreationHandler : IHandler
             return;
         }
 
-        var generation = IssueGenerationRegistry.Bump(issue.IssueOwner);
+        var generation = generationRegistry.Bump(issue.IssueOwner);
 
         network.SendAll(new NetworkSimpleIssueCreated(ownerId, key, generation));
     }
@@ -62,7 +68,7 @@ internal class SimpleIssueCreationHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
-            IssueGenerationRegistry.SetGeneration(owner, data.Generation);
+            generationRegistry.SetGeneration(owner, data.Generation);
 
             if (owner.Issue != null) return;
 

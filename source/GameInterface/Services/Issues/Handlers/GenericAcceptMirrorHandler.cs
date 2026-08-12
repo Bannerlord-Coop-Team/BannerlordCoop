@@ -36,6 +36,7 @@ internal class GenericAcceptMirrorHandler : IHandler
     private readonly IPrisonerSaleValidator troopValidator;
     private readonly IIssueConversationTracker conversationTracker;
     private readonly IIssueOwnershipRegistry ownershipRegistry;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
     public GenericAcceptMirrorHandler(
         IMessageBroker messageBroker,
@@ -46,7 +47,8 @@ internal class GenericAcceptMirrorHandler : IHandler
         ITroopRosterInterface troopRosterInterface,
         IPrisonerSaleValidator troopValidator,
         IIssueConversationTracker conversationTracker,
-        IIssueOwnershipRegistry ownershipRegistry)
+        IIssueOwnershipRegistry ownershipRegistry,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -57,6 +59,7 @@ internal class GenericAcceptMirrorHandler : IHandler
         this.troopValidator = troopValidator;
         this.conversationTracker = conversationTracker;
         this.ownershipRegistry = ownershipRegistry;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<GenericIssueQuestAcceptTriggered>(Handle_GenericIssueQuestAcceptTriggered);
         messageBroker.Subscribe<RequestGenericIssueAcceptQuest>(Handle_RequestGenericIssueAcceptQuest);
@@ -146,7 +149,7 @@ internal class GenericAcceptMirrorHandler : IHandler
         if (!GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(issueGiver.Issue) &&
             !GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(issueGiver.Issue)) return false;
 
-        IssueGenerationRegistry.TryGetGeneration(issueGiver, out var generation);
+        generationRegistry.TryGetGeneration(issueGiver, out var generation);
         conversationTracker.Register(issueGiverId, controllerId, generation);
         return true;
     }
@@ -164,7 +167,7 @@ internal class GenericAcceptMirrorHandler : IHandler
         }
         else
         {
-            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            generationRegistry.TryGetGeneration(owner, out var generation);
             network.SendAll(new RequestGenericIssueAcceptQuest(ownerId, generation));
         }
     }
@@ -188,7 +191,7 @@ internal class GenericAcceptMirrorHandler : IHandler
                 return;
             }
 
-            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
             {
                 Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
                     nameof(RequestGenericIssueAcceptQuest), ownerId);
@@ -248,7 +251,7 @@ internal class GenericAcceptMirrorHandler : IHandler
         }
         else
         {
-            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
             network.SendAll(new RequestGenericIssueAcceptAlternative(ownerId, generation, packedTroops));
         }
@@ -273,7 +276,7 @@ internal class GenericAcceptMirrorHandler : IHandler
                 return;
             }
 
-            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
             {
                 Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
                     nameof(RequestGenericIssueAcceptAlternative), ownerId);

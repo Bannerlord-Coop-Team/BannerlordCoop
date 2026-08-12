@@ -32,6 +32,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPrisonerSaleValidator troopValidator;
     private readonly IIssueOwnershipRegistry ownershipRegistry;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -40,7 +41,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         IPlayerManager playerManager,
         ITroopRosterInterface troopRosterInterface,
         IPrisonerSaleValidator troopValidator,
-        IIssueOwnershipRegistry ownershipRegistry)
+        IIssueOwnershipRegistry ownershipRegistry,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -49,6 +51,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         this.troopRosterInterface = troopRosterInterface;
         this.troopValidator = troopValidator;
         this.ownershipRegistry = ownershipRegistry;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<QuestTypeQuestSolutionAcceptTriggered>(Handle_QuestTypeQuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestTypeAcceptQuest>(Handle_RequestQuestTypeAcceptQuest);
@@ -87,7 +90,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
         else
         {
-            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            generationRegistry.TryGetGeneration(owner, out var generation);
             network.SendAll(new RequestQuestTypeAcceptQuest(ownerId, generation));
         }
     }
@@ -111,7 +114,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
-            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
             {
                 Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
                     nameof(RequestQuestTypeAcceptQuest), ownerId);
@@ -180,7 +183,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
         else
         {
-            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
             network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops, payload.What.FieldsBytes));
         }
@@ -205,7 +208,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
-            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
             {
                 Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);

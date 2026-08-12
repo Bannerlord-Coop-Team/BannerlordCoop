@@ -109,8 +109,9 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
                     }
                 }
 
-                if (isServer) generation = IssueGenerationRegistry.Bump(owner);
-                else IssueGenerationRegistry.SetGeneration(owner, generation);
+                var generationRegistry = instance.Resolve<IIssueGenerationRegistry>();
+                if (isServer) generation = generationRegistry.Bump(owner);
+                else generationRegistry.SetGeneration(owner, generation);
             });
         }
     }
@@ -369,7 +370,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
-            Assert.True(IssueGenerationRegistry.TryGetGeneration(owner, out var generation));
+            Assert.True(Client.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
 
             var network = Client.Resolve<INetwork>();
             network.SendAll(new RequestGenericIssueAcceptQuest(ownerId, generation));
