@@ -40,6 +40,7 @@ namespace GameInterface.Services.Settlements.Handlers
             var message = new NetworkChangeSettlementOwnership(
                 payload.SettlementId,
                 payload.OwnerId,
+                payload.PreviousOwnerId,
                 payload.CapturerId,
                 payload.Detail);
 
@@ -55,6 +56,7 @@ namespace GameInterface.Services.Settlements.Handlers
             {
                 if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
                 if (!objectManager.TryGetObjectWithLogging(payload.OwnerId, out Hero owner)) return;
+                if (!objectManager.TryGetObjectWithLogging(payload.PreviousOwnerId, out Hero previousOwner)) return;
 
                 Hero capturer = null;
                 if (payload.CapturerId != null &&
@@ -68,8 +70,6 @@ namespace GameInterface.Services.Settlements.Handlers
                 // whole action would apply them a second time.
                 using (new AllowedThread())
                 {
-                    var oldOwner = settlement.OwnerClan?.Leader;
-
                     if (settlement.Town != null)
                     {
                         settlement.Town.IsOwnerUnassigned = false;
@@ -96,7 +96,7 @@ namespace GameInterface.Services.Settlements.Handlers
                         && settlement.IsFortification;
 
                     CampaignEventDispatcher.Instance.OnSettlementOwnerChanged(
-                        settlement, openToClaim, owner, oldOwner, capturer, detail);
+                        settlement, openToClaim, owner, previousOwner, capturer, detail);
                 }
             }, context: nameof(NetworkChangeSettlementOwnership));
         }
