@@ -101,16 +101,16 @@ namespace GameInterface.Services.Kingdoms
             if (!TryGetDecisionIndex(decisionOption.Decision, out int decisionIndex)) return false;
             if (!TryGetKingdomId(decisionOption.Decision.Kingdom, out string kingdomId)) return false;
 
+            int outcomeIndex = decisionOption.IsOptionForAbstain
+                ? -1
+                : GetOutcomeIndex(decisionOption.Option, decisionOption._kingdomDecisionMaker);
+            if (!decisionOption.IsOptionForAbstain && outcomeIndex < 0) return false;
+
             string outcomeKey = null;
             if (!decisionOption.IsOptionForAbstain)
             {
                 outcomeResolver.TryGetOutcomeKey(decisionOption.Option, objectManager, out outcomeKey);
             }
-
-            int outcomeIndex = decisionOption.IsOptionForAbstain
-                ? -1
-                : GetOutcomeIndex(decisionOption.Option, decisionOption._kingdomDecisionMaker, outcomeKey);
-            if (!decisionOption.IsOptionForAbstain && outcomeIndex < 0) return false;
 
             voteData = new KingdomDecisionVoteData(
                 kingdomId,
@@ -134,20 +134,20 @@ namespace GameInterface.Services.Kingdoms
             if (!TryGetDecisionIndex(decision, out int decisionIndex)) return false;
             if (!TryGetKingdomId(decision.Kingdom, out string kingdomId)) return false;
 
+            int outcomeIndex = selectedOption.IsOptionForAbstain
+                ? -1
+                : GetOutcomeIndex(selectedOption.Option, decisionItem.KingdomDecisionMaker);
+            if (!selectedOption.IsOptionForAbstain && outcomeIndex < 0)
+            {
+                outcomeIndex = GetOutcomeIndex(selectedOption.Option, selectedOption._kingdomDecisionMaker);
+            }
+            if (!selectedOption.IsOptionForAbstain && outcomeIndex < 0) return false;
+
             string outcomeKey = null;
             if (!selectedOption.IsOptionForAbstain)
             {
                 outcomeResolver.TryGetOutcomeKey(selectedOption.Option, objectManager, out outcomeKey);
             }
-
-            int outcomeIndex = selectedOption.IsOptionForAbstain
-                ? -1
-                : GetOutcomeIndex(selectedOption.Option, decisionItem.KingdomDecisionMaker, outcomeKey);
-            if (!selectedOption.IsOptionForAbstain && outcomeIndex < 0)
-            {
-                outcomeIndex = GetOutcomeIndex(selectedOption.Option, selectedOption._kingdomDecisionMaker, outcomeKey);
-            }
-            if (!selectedOption.IsOptionForAbstain && outcomeIndex < 0) return false;
 
             voteData = new KingdomDecisionVoteData(
                 kingdomId,
@@ -1126,20 +1126,6 @@ namespace GameInterface.Services.Kingdoms
                 {
                     return i;
                 }
-            }
-            return -1;
-        }
-
-        private int GetOutcomeIndex(DecisionOutcome decisionOutcome, KingdomElection election, string outcomeKey)
-        {
-            int outcomeIndex = GetOutcomeIndex(decisionOutcome, election);
-            if (outcomeIndex >= 0 || election == null || string.IsNullOrWhiteSpace(outcomeKey)) return outcomeIndex;
-
-            for (int i = 0; i < election._possibleOutcomes.Count; i++)
-            {
-                DecisionOutcome possibleOutcome = election._possibleOutcomes[i];
-                if (!outcomeResolver.TryGetOutcomeKey(possibleOutcome, objectManager, out string possibleOutcomeKey)) continue;
-                if (string.Equals(possibleOutcomeKey, outcomeKey, StringComparison.Ordinal)) return i;
             }
             return -1;
         }

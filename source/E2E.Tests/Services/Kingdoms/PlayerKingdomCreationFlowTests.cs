@@ -1519,91 +1519,25 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void KingdomDecisionFinalVote_RecoversAndPublishesEquivalentPolicyOutcome()
-    {
-        var client = Clients.First();
-        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
-        var player = CreateSyncedPlayerContext(ControllerId, client);
-        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-
-        ConfigureClanInKingdom(player.ClanId, kingdomId);
-        EnsureKingdomRegisteredEverywhere(kingdomId);
-
-        string policyId = null;
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
-            PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
-            policyId = policy.StringId;
-            using (new AllowedThread())
-            {
-                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
-            }
-        });
-
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
-            PolicyObject policy = PolicyObject.All.Single(candidate => candidate.StringId == policyId);
-            var decision = new KingdomPolicyDecision(proposerClan, policy, false);
-            using (new AllowedThread())
-            {
-                kingdom._unresolvedDecisions.Add(decision);
-            }
-
-            var decisionItem = new DecisionItemBaseVM(decision, () => { });
-            var detachedOutcome = new KingdomPolicyDecision.PolicyDecisionOutcome(shouldBeEnforced: true);
-            DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
-                candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
-                outcome.ShouldDecisionBeEnforced);
-            option.Option = detachedOutcome;
-            option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
-            decisionItem._currentSelectedOption = option;
-
-            Assert.DoesNotContain(detachedOutcome, decisionItem.KingdomDecisionMaker._possibleOutcomes);
-            Assert.True(GetVoteManager(client).TryPublishFinalVote(decisionItem));
-            Assert.False(decisionItem.IsActive);
-        });
-
-        NetworkRequestKingdomDecisionVote request = Assert.Single(
-            client.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
-        Assert.True(request.VoteData.IsFinal);
-        Assert.Equal(0, request.VoteData.OutcomeIndex);
-        Assert.Contains("ShouldDecisionBeEnforced=True", request.VoteData.OutcomeKey);
-
-        Assert.Single(
-            Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
-            message => message.KingdomId == kingdomId
-                       && message.DecisionIndex == 0
-                       && message.OutcomeIndex == 0
-                       && message.IsPlayerDecision);
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            PolicyObject policy = PolicyObject.All.Single(candidate => candidate.StringId == policyId);
-            Assert.Empty(kingdom.UnresolvedDecisions);
-            Assert.Contains(policy, kingdom.ActivePolicies);
-        });
-    }
-
-    [Fact]
     public void KingdomDecisionFinalVote_MissingKingdomId_KeepsDecisionUiOpenAndRetries()
     {
-        var client = Clients.First();
-        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
-        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var client1 = Clients.First();
+        var client2 = Clients.Skip(1).First();
+        client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        client2.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+        var player1 = CreateSyncedPlayerContext(ControllerId, client1);
+        var player2 = CreateSyncedPlayerContext(SecondControllerId, client2);
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
 
-        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(player1.ClanId, kingdomId);
+        ConfigureClanInKingdom(player2.ClanId, kingdomId);
         EnsureKingdomRegisteredEverywhere(kingdomId);
 
         string policyId = null;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
             PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
             policyId = policy.StringId;
             using (new AllowedThread())
@@ -1612,39 +1546,67 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             }
         });
 
-        client.Call(() =>
+        foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
-            PolicyObject policy = PolicyObject.All.Single(candidate => candidate.StringId == policyId);
-            var decision = new KingdomPolicyDecision(proposerClan, policy, false);
-            using (new AllowedThread())
+            client.Call(() =>
             {
-                kingdom._unresolvedDecisions.Add(decision);
-            }
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+                PolicyObject policy = PolicyObject.All.Single(candidate => candidate.StringId == policyId);
+                using (new AllowedThread())
+                {
+                    kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
+                }
+            });
+        }
 
-            var decisionItem = new DecisionItemBaseVM(decision, () => { });
+        client2.Call(() =>
+        {
+            Assert.True(client2.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+
+            var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
                 candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
                 outcome.ShouldDecisionBeEnforced);
             option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
             decisionItem._currentSelectedOption = option;
-            RemoveReverseObjectManagerId(client, kingdom);
-
             decisionItem.ExecuteFinalSelection();
 
-            Assert.True(decisionItem.IsActive);
-            Assert.False(decisionItem._finalSelectionDone);
-            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
-
-            RestoreReverseObjectManagerId(client, kingdom, kingdomId);
-            decisionItem.ExecuteFinalSelection();
-
-            Assert.False(decisionItem.IsActive);
-            Assert.True(decisionItem._finalSelectionDone);
+            Assert.Null(decisionsVm.CurrentDecision);
         });
 
-        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+
+            var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
+                candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
+                outcome.ShouldDecisionBeEnforced);
+            option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
+            decisionItem._currentSelectedOption = option;
+            RemoveReverseObjectManagerId(client1, kingdom);
+
+            decisionItem.ExecuteFinalSelection();
+
+            Assert.Same(decisionItem, decisionsVm.CurrentDecision);
+            Assert.True(decisionItem.IsActive);
+            Assert.False(decisionItem._finalSelectionDone);
+            Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
+
+            RestoreReverseObjectManagerId(client1, kingdom, kingdomId);
+            decisionItem.ExecuteFinalSelection();
+
+            Assert.Null(decisionsVm.CurrentDecision);
+        });
+
+        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
             message => message.KingdomId == kingdomId);
