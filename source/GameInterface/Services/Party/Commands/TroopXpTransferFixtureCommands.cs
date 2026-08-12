@@ -28,7 +28,7 @@ internal static class TroopXpTransferFixtureCommands
 {
     private const string FixtureCompanionName = "Coop XP Transfer Fixture";
     private const int FixtureTroopCount = 1;
-    private const int FixtureTroopXp = 600;
+    private const int FixtureTroopXp = 200;
 
     private static TroopXpTransferCapture pendingSetupCapture;
     private static TroopXpTransferFixture pendingFixture;
