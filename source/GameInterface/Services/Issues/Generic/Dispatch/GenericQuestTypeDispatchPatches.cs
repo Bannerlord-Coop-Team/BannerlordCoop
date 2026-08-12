@@ -1,7 +1,9 @@
 using Common;
+using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -36,10 +38,11 @@ internal class GenericQuestTypeQuestSolutionAcceptTriggerPatch
         if (!__result) return;
 
         var descriptor = QuestTypeRegistry.Get(issueOwner?.Issue);
-        if (descriptor?.OnGenuineQuestSolutionAccept == null) return;
+        if (descriptor?.SupportsQuestSolutionAccept != true) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        descriptor.OnGenuineQuestSolutionAccept(issueOwner, controllerIdProvider?.ControllerId);
+        descriptor.OnGenuineQuestSolutionAccept?.Invoke(issueOwner, controllerIdProvider?.ControllerId);
+        MessageBroker.Instance.Publish(issueOwner, new QuestTypeQuestSolutionAcceptTriggered(issueOwner, controllerIdProvider?.ControllerId));
     }
 }
 
@@ -52,12 +55,14 @@ internal class GenericQuestTypeAlternativeAcceptTriggerPatch
     private static void Postfix(IssueBase __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed() || IssueDispatchReplayGuard.IsActive) return;
+        if (AlternativeSolutionStartAuthorityGuard.IsActive) return;
 
         var descriptor = QuestTypeRegistry.Get(__instance);
-        if (descriptor?.OnGenuineAlternativeAccept == null) return;
+        if (descriptor?.SupportsAlternativeAccept != true) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        descriptor.OnGenuineAlternativeAccept(__instance.IssueOwner, controllerIdProvider?.ControllerId);
+        descriptor.OnGenuineAlternativeAccept?.Invoke(__instance.IssueOwner, controllerIdProvider?.ControllerId);
+        MessageBroker.Instance.Publish(__instance, new QuestTypeAlternativeAcceptTriggered(__instance.IssueOwner, controllerIdProvider?.ControllerId));
     }
 }
 
@@ -67,9 +72,21 @@ internal class GenericQuestTypeAlternativeSolutionOwnershipGatePatch
     [HarmonyPrefix]
     private static bool Prefix(IssueBase __instance)
     {
-        if (!QuestTypeRegistry.IsRegistered(__instance?.GetType())) return true;
+        if (QuestTypeRegistry.Get(__instance)?.SupportsAlternativeAccept != true) return true;
 
         return (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(__instance.IssueOwner))
             || AlternativeSolutionCompletionAuthorityGuard.IsActive;
+    }
+}
+
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithAlternativeSolution))]
+internal class GenericQuestTypeAlternativeSolutionStartOwnershipGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance)
+    {
+        if (QuestTypeRegistry.Get(__instance)?.SupportsAlternativeAccept != true) return true;
+
+        return AlternativeSolutionStartAuthorityGuard.IsActive;
     }
 }

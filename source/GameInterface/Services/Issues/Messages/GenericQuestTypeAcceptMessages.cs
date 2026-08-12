@@ -1,4 +1,5 @@
 using Common.Messaging;
+using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
@@ -9,13 +10,11 @@ public readonly struct QuestTypeQuestSolutionAcceptTriggered : IEvent
 {
     public readonly Hero Owner;
     public readonly string ControllerId;
-    public readonly byte[] FieldsBytes;
 
-    public QuestTypeQuestSolutionAcceptTriggered(Hero owner, string controllerId, byte[] fieldsBytes)
+    public QuestTypeQuestSolutionAcceptTriggered(Hero owner, string controllerId)
     {
         Owner = owner;
         ControllerId = controllerId;
-        FieldsBytes = fieldsBytes;
     }
 }
 
@@ -23,13 +22,11 @@ public readonly struct QuestTypeAlternativeAcceptTriggered : IEvent
 {
     public readonly Hero Owner;
     public readonly string ControllerId;
-    public readonly byte[] FieldsBytes;
 
-    public QuestTypeAlternativeAcceptTriggered(Hero owner, string controllerId, byte[] fieldsBytes)
+    public QuestTypeAlternativeAcceptTriggered(Hero owner, string controllerId)
     {
         Owner = owner;
         ControllerId = controllerId;
-        FieldsBytes = fieldsBytes;
     }
 }
 
@@ -75,15 +72,12 @@ public readonly struct RequestQuestTypeAcceptAlternative : ICommand
     public readonly int Generation;
     [ProtoMember(3)]
     public readonly TroopRosterData SentTroops;
-    [ProtoMember(4)]
-    public readonly byte[] FieldsBytes;
 
-    public RequestQuestTypeAcceptAlternative(string ownerId, int generation, TroopRosterData sentTroops, byte[] fieldsBytes)
+    public RequestQuestTypeAcceptAlternative(string ownerId, int generation, TroopRosterData sentTroops)
     {
         OwnerId = ownerId;
         Generation = generation;
         SentTroops = sentTroops;
-        FieldsBytes = fieldsBytes;
     }
 }
 
@@ -95,14 +89,17 @@ public readonly struct NetworkQuestTypeAlternativeAccepted : IServerToClientComm
     [ProtoMember(2)]
     public readonly string OwnerControllerId;
     [ProtoMember(3)]
-    public readonly byte[] FieldsBytes;
+    public readonly AlternativeSolutionVanillaState State;
     [ProtoMember(4)]
+    public readonly byte[] FieldsBytes;
+    [ProtoMember(5)]
     public readonly TroopRosterData SentTroops;
 
-    public NetworkQuestTypeAlternativeAccepted(string ownerId, string ownerControllerId, byte[] fieldsBytes, TroopRosterData sentTroops)
+    public NetworkQuestTypeAlternativeAccepted(string ownerId, string ownerControllerId, AlternativeSolutionVanillaState state, byte[] fieldsBytes, TroopRosterData sentTroops)
     {
         OwnerId = ownerId;
         OwnerControllerId = ownerControllerId;
+        State = state;
         FieldsBytes = fieldsBytes;
         SentTroops = sentTroops;
     }

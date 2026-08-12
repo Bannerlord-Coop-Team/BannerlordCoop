@@ -4,7 +4,9 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using System;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
@@ -16,6 +18,7 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -33,6 +36,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly IPrisonerSaleValidator troopValidator;
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
+    private readonly IIssueConversationTracker conversationTracker;
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -42,7 +46,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         ITroopRosterInterface troopRosterInterface,
         IPrisonerSaleValidator troopValidator,
         IIssueOwnershipRegistry ownershipRegistry,
-        IIssueGenerationRegistry generationRegistry)
+        IIssueGenerationRegistry generationRegistry,
+        IIssueConversationTracker conversationTracker)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -52,6 +57,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         this.troopValidator = troopValidator;
         this.ownershipRegistry = ownershipRegistry;
         this.generationRegistry = generationRegistry;
+        this.conversationTracker = conversationTracker;
 
         messageBroker.Subscribe<QuestTypeQuestSolutionAcceptTriggered>(Handle_QuestTypeQuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestTypeAcceptQuest>(Handle_RequestQuestTypeAcceptQuest);
@@ -82,11 +88,22 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         var owner = payload.What.Owner;
         if (owner == null || !objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
 
+        var descriptor = QuestTypeRegistry.Get(owner.Issue);
+        if (descriptor?.SupportsQuestSolutionAccept != true) return;
+
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
+            byte[] fieldsBytes = null;
+            if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
+            {
+                var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => true);
+                if (!accepted) return;
+                fieldsBytes = bytes;
+            }
+
             ownershipRegistry.SetOwner(owner, hostControllerId);
-            network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, hostControllerId, payload.What.FieldsBytes));
+            network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, hostControllerId, fieldsBytes));
         }
         else
         {
@@ -122,28 +139,43 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            if (!conversationTracker.TryGetTrackedRequester(ownerId, out var trackedControllerId, out var trackedGeneration) ||
+                trackedControllerId != player.ControllerId || trackedGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a requester with no tracked conversation with owner {Owner}",
+                    nameof(RequestQuestTypeAcceptQuest), ownerId);
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
+                return;
+            }
+
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
-            if (descriptor?.TryArbitrateQuestSolutionAcceptBytes == null)
+            var canAccept = descriptor?.SupportsQuestSolutionAccept == true &&
+                owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
+            if (!canAccept)
             {
                 network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
                 return;
             }
 
-            var canAccept = owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
-            var (accepted, fieldsBytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => canAccept);
-            if (accepted)
+            byte[] fieldsBytes = null;
+            if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
             {
-                ownershipRegistry.SetOwner(owner, player.ControllerId);
-                network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, player.ControllerId, fieldsBytes));
+                var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => canAccept);
+                if (!accepted)
+                {
+                    Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
+                    network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
+                    return;
+                }
+                fieldsBytes = bytes;
             }
             else
             {
-                if (canAccept)
-                {
-                    Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
-                }
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
+                owner.Issue.StartIssueWithQuest();
             }
+
+            ownershipRegistry.SetOwner(owner, player.ControllerId);
+            network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, player.ControllerId, fieldsBytes));
         });
     }
 
@@ -154,9 +186,17 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
+            var descriptor = QuestTypeRegistry.Get(owner.Issue);
             try
             {
-                QuestTypeRegistry.Get(owner.Issue)?.MirrorQuestSolutionAcceptBytes?.Invoke(owner, data.FieldsBytes);
+                if (descriptor?.MirrorQuestSolutionAcceptBytes != null)
+                {
+                    descriptor.MirrorQuestSolutionAcceptBytes(owner, data.FieldsBytes);
+                }
+                else
+                {
+                    MirrorQuestAccepted(owner);
+                }
             }
             catch (Exception e)
             {
@@ -174,18 +214,33 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         var owner = payload.What.Owner;
         if (owner == null || !objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
 
+        var descriptor = QuestTypeRegistry.Get(owner.Issue);
+        if (descriptor?.SupportsAlternativeAccept != true) return;
+
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
+            if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player)) return;
+
+            var state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
+
+            byte[] fieldsBytes = null;
+            if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
+            {
+                var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
+                if (!accepted) return;
+                fieldsBytes = bytes;
+            }
+
             ownershipRegistry.SetOwner(owner, hostControllerId);
             var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, payload.What.FieldsBytes, hostTroops));
+            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, state, fieldsBytes, hostTroops));
         }
         else
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops, payload.What.FieldsBytes));
+            network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
 
@@ -216,36 +271,53 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            if (!conversationTracker.TryGetTrackedRequester(ownerId, out var trackedControllerId, out var trackedGeneration) ||
+                trackedControllerId != player.ControllerId || trackedGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a requester with no tracked conversation with owner {Owner}",
+                    nameof(RequestQuestTypeAcceptAlternative), ownerId);
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
+                return;
+            }
+
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
-            if (descriptor?.MirrorAlternativeAcceptBytes == null)
+            var canAccept = descriptor?.SupportsAlternativeAccept == true &&
+                owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
+            if (!canAccept)
             {
                 network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
                 return;
             }
 
-            if (owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions())
+            AlternativeSolutionVanillaState state;
+            byte[] fieldsBytes = null;
+            try
             {
-                try
-                {
-                    ApplyValidatedSentTroops(owner, player, payload.What.SentTroops);
-                    descriptor.MirrorAlternativeAcceptBytes(owner, payload.What.FieldsBytes);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply {Message} for owner {Owner} - malformed or version-mismatched payload",
-                        nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                    network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
-                    return;
-                }
+                ApplyValidatedSentTroops(owner, player, payload.What.SentTroops);
+                state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
 
-                ownershipRegistry.SetOwner(owner, player.ControllerId);
-                var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-                network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, player.ControllerId, payload.What.FieldsBytes, validatedTroops));
+                if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
+                {
+                    var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
+                    if (!accepted)
+                    {
+                        network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
+                        return;
+                    }
+                    fieldsBytes = bytes;
+                }
             }
-            else
+            catch (Exception e)
             {
+                Logger.Error(e, "Failed to apply {Message} for owner {Owner} - malformed or version-mismatched payload",
+                    nameof(RequestQuestTypeAcceptAlternative), ownerId);
                 network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId));
+                return;
             }
+
+            ownershipRegistry.SetOwner(owner, player.ControllerId);
+            var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, player.ControllerId, state, fieldsBytes, validatedTroops));
         });
     }
 
@@ -280,10 +352,12 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner.Issue == null) return;
 
+            var descriptor = QuestTypeRegistry.Get(owner.Issue);
             try
             {
                 ApplyReceivedTroops(owner, data.SentTroops);
-                QuestTypeRegistry.Get(owner.Issue)?.MirrorAlternativeAcceptBytes?.Invoke(owner, data.FieldsBytes);
+                MirrorAlternativeAccepted(owner, data.State);
+                descriptor?.MirrorAlternativeAcceptBytes?.Invoke(owner, data.FieldsBytes);
             }
             catch (Exception e)
             {
@@ -315,7 +389,42 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
-            QuestTypeRegistry.Get(owner.Issue)?.RejectQuestSolutionAccept?.Invoke(owner);
+
+            var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            if (descriptor?.RejectQuestSolutionAccept != null)
+            {
+                descriptor.RejectQuestSolutionAccept(owner);
+            }
+            else
+            {
+                AcceptMirrorSupport.RejectAcceptance(owner);
+            }
         });
+    }
+
+    private static void MirrorQuestAccepted(Hero owner)
+    {
+        if (owner?.Issue == null || !owner.Issue.IsOngoingWithoutQuest) return;
+
+        var issue = owner.Issue;
+        using (new AllowedThread())
+        {
+            issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+            issue.IsTriedToSolveBefore = true;
+            issue.IssueDueTime = CampaignTime.Never;
+        }
+    }
+
+    private static void MirrorAlternativeAccepted(Hero owner, AlternativeSolutionVanillaState state)
+    {
+        if (owner?.Issue == null || !owner.Issue.IsOngoingWithoutQuest) return;
+
+        var issue = owner.Issue;
+        using (new AllowedThread())
+        {
+            issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+            issue.IsTriedToSolveBefore = true;
+            AlternativeSolutionVanillaStateSync.Apply(issue, state);
+        }
     }
 }

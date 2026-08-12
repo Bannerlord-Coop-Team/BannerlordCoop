@@ -11,6 +11,10 @@ namespace GameInterface.Services.Issues.Generic.AcceptMirror;
 
 public interface IAlternativeAcceptMirrorStrategy<TPayload>
 {
+    void ReplayAlternativeAccepted(Hero owner);
+
+    bool TryCaptureAlternativeFields(Hero owner, out TPayload payload);
+
     void MirrorAlternativeAccepted(Hero owner, TPayload payload);
 
     void RejectAcceptance(Hero owner);
@@ -89,6 +93,18 @@ public sealed class AlternativeAcceptMirrorHandler<TPayload>
     public AlternativeAcceptMirrorHandler(IAlternativeAcceptMirrorStrategy<TPayload> strategy)
     {
         _strategy = strategy;
+    }
+
+    public bool TryArbitrate(Hero owner, System.Func<Hero, bool> canAccept, out TPayload payload)
+    {
+        payload = default;
+        if (owner == null || canAccept == null || !canAccept(owner)) return false;
+
+        _strategy.ReplayAlternativeAccepted(owner);
+        if (_strategy.TryCaptureAlternativeFields(owner, out payload)) return true;
+
+        _strategy.RejectAcceptance(owner);
+        return false;
     }
 
     public void Mirror(Hero owner, TPayload payload) => _strategy.MirrorAlternativeAccepted(owner, payload);
