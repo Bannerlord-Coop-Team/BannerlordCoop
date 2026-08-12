@@ -154,11 +154,7 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
-                    return Failure(
-                        request.Id,
-                        "session_not_ready",
-                        "The co-op session command dispatcher is not available yet.",
-                        false);
+                    dispatcher = new LiveTestCommandDispatcher();
                 }
 
                 return Success(request.Id, new
@@ -188,6 +184,23 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
+                    if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
+                    {
+                        string output = Coop.JoinFixtureCommands.Start(arguments);
+                        bool hasFallbackStructuredResult = TryParseStructuredResult(
+                            output,
+                            out var fallbackStructuredResult);
+                        return Success(request.Id, new
+                        {
+                            name = command,
+                            arguments,
+                            found = true,
+                            output,
+                            hasStructuredResult = hasFallbackStructuredResult,
+                            structuredResult = fallbackStructuredResult,
+                        });
+                    }
+
                     return Failure(
                         request.Id,
                         "session_not_ready",
@@ -204,7 +217,6 @@ namespace Coop.LiveTesting
                 bool hasStructuredResult = TryParseStructuredResult(
                     result.Output,
                     out var structuredResult);
-
                 return Success(request.Id, new
                 {
                     name = command,
