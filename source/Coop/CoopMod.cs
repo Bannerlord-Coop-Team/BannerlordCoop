@@ -154,9 +154,13 @@ namespace Coop
                 EnsureSafeExitConfig();
             }
 
-            // Boot-apply the loading-window patches so the keepalive guard exists before a host or join waits on PatchAll
-            new Harmony("Coop.UILoading").PatchCategory(
+            // Reuse one boot Harmony owner for categories that must be active before normal PatchAll.
+            var bootHarmony = new Harmony("Coop.UILoading");
+            bootHarmony.PatchCategory(
                 typeof(IGameInterface).Assembly, GameInterface.GameInterface.HARMONY_UI_LOADING_CATEGORY);
+            bootHarmony.PatchCategory(
+                typeof(IGameInterface).Assembly,
+                GameInterface.GameInterface.HARMONY_CONFIGURED_MINOR_FACTION_CATEGORY);
 
             GameThread.Instance.MarkGameThread();
         }
