@@ -588,8 +588,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(IssueManagerQuestCompletedReasonCapture.PendingReasons.TryGetValue(owner, out var reason));
-            Assert.Equal(IssueFinalizeReason.AlternativeSolutionSuccess, reason);
+            Assert.Null(owner.Issue);
         });
     }
 

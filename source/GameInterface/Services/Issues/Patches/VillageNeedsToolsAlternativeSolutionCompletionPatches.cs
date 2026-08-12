@@ -7,18 +7,6 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Patches;
 
-[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAlternativeSolution))]
-internal class VillageNeedsToolsAlternativeSolutionOwnershipGatePatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix(IssueBase __instance)
-    {
-        if (__instance is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue) return true;
-
-        return IssueOwnershipRegistry.IsLocalPeerOwner(__instance.IssueOwner);
-    }
-}
-
 [HarmonyPatch(typeof(VillageNeedsToolsIssueBehavior))]
 internal class VillageNeedsToolsAlternativeSolutionCompletionPatches
 {
