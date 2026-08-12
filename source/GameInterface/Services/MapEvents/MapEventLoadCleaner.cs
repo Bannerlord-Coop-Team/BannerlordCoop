@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Armies;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
@@ -26,17 +27,20 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
+    private readonly IArmyDisbander armyDisbander;
 
     public MapEventLoadCleaner(
         ILogger logger,
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IArmyDisbander armyDisbander)
     {
         this.logger = logger;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
+        this.armyDisbander = armyDisbander;
     }
 
     public void FinalizePlayerMapEvents()
@@ -71,7 +75,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     "Dispersing loaded player-led army {ArmyName} released from map event {MapEventId}",
                     army.Name,
                     mapEvent.StringId);
-                DisbandArmyAction.ApplyByUnknownReason(army);
+                armyDisbander.Disband(army, Army.ArmyDispersionReason.Unknown);
             }
 
             foreach (var mobileParty in involvedMobileParties.Concat(releasedArmyParties).Distinct())

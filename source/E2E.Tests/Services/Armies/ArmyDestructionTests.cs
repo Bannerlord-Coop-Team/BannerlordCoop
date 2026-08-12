@@ -1,5 +1,6 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Services.Armies;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -104,6 +105,38 @@ public class ArmyDestructionTests : IDisposable
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var _));
+        }
+    }
+
+    [Fact]
+    public void ServerDisbandArmyWithoutMainParty_SyncAllClients()
+    {
+        var server = TestEnvironment.Server;
+        string? armyId = null;
+        string? leaderPartyId = null;
+
+        server.Call(() =>
+        {
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var leaderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var army = new Army(kingdom, leaderParty, Army.ArmyTypes.Patrolling);
+
+            Assert.True(server.ObjectManager.TryGetId(army, out armyId));
+            Assert.True(server.ObjectManager.TryGetId(leaderParty, out leaderPartyId));
+            Campaign.Current.MainParty = null;
+            Assert.Null(MobileParty.MainParty);
+
+            server.Resolve<IArmyDisbander>().Disband(army, Army.ArmyDispersionReason.Unknown);
+
+            Assert.Null(leaderParty.Army);
+            Assert.False(server.ObjectManager.TryGetObject<Army>(armyId, out _));
+        });
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<Army>(armyId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(leaderPartyId, out var leaderParty));
+            Assert.Null(leaderParty.Army);
         }
     }
 }
