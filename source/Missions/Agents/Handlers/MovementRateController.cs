@@ -215,10 +215,9 @@ public sealed class MovementRateController : IMovementRateController
     private sealed class RejectedRateState
     {
         public int Failures;
-        public bool HasLowerTierBaseline;
-        public double LowerTierBulkMillisecondsPerPoll;
-        public double LowerTierSenderMillisecondsPerSecond;
-        public float LowerTierFramesPerSecond;
+        public double FailedBulkMillisecondsPerPoll;
+        public double FailedSenderMillisecondsPerSecond;
+        public float FailedFramesPerSecond;
     }
 
     public MovementRateController(
@@ -323,8 +322,8 @@ public sealed class MovementRateController : IMovementRateController
                     // Start every battle from the same baseline, then let measured windows adapt it.
                     const int startingBattleHz = 40;
                     performanceCeilingHz = NormalizeRate(effectiveFrameLimitHz);
-                    localAdaptiveHz = startingBattleHz;
-                    automaticReceiverCapHz = startingBattleHz;
+                    localAdaptiveHz = Math.Min(startingBattleHz, performanceCeilingHz);
+                    automaticReceiverCapHz = localAdaptiveHz;
                     advertisedReceiverCapHz = forcedReceiverCapHz ?? automaticReceiverCapHz;
                     localReason = "battle-start";
                     break;
@@ -577,7 +576,6 @@ public sealed class MovementRateController : IMovementRateController
             effectiveFrameLimitHz);
         performanceCeilingHz = Math.Min(senderCeilingHz, receiverCeilingHz);
         int desired = performanceCeilingHz;
-        CapturePendingLowerTierBaseline();
         if (desired < localAdaptiveHz)
         {
             if (senderCeilingHz < localAdaptiveHz)
@@ -619,11 +617,7 @@ public sealed class MovementRateController : IMovementRateController
 
         localAdaptiveHz = candidate;
         if (retryingRejectedRate)
-        {
-            if (rejectedRecoveryRates[candidate].Failures > 1)
-                CaptureLowerTierBaseline(rejectedRecoveryRates[candidate]);
             activeRecoveryProbeRate = candidate;
-        }
         healthyWindows = 0;
         localReason = "battle-recovered";
     }
@@ -642,18 +636,16 @@ public sealed class MovementRateController : IMovementRateController
 
         double bulkMillisecondsPerPoll =
             lastBulkSendMillisecondsPerSecond / lastBulkPollsPerSecond;
-        if (!rejectedRate.HasLowerTierBaseline) return false;
-
         bool bulkCostImproved =
-            rejectedRate.LowerTierBulkMillisecondsPerPoll > 0d &&
+            rejectedRate.FailedBulkMillisecondsPerPoll > 0d &&
             bulkMillisecondsPerPoll <=
-                rejectedRate.LowerTierBulkMillisecondsPerPoll * RejectedRateRetryCostRatio;
+                rejectedRate.FailedBulkMillisecondsPerPoll * RejectedRateRetryCostRatio;
         bool senderCostImproved =
-            rejectedRate.LowerTierSenderMillisecondsPerSecond > 0d &&
+            rejectedRate.FailedSenderMillisecondsPerSecond > 0d &&
             lastSenderMillisecondsPerSecond <=
-                rejectedRate.LowerTierSenderMillisecondsPerSecond * RejectedRateRetryCostRatio;
+                rejectedRate.FailedSenderMillisecondsPerSecond * RejectedRateRetryCostRatio;
         int baselineFrameCeilingHz = CalculateSenderCeiling(
-            rejectedRate.LowerTierFramesPerSecond,
+            rejectedRate.FailedFramesPerSecond,
             0d,
             effectiveFrameLimitHz);
         int currentFrameCeilingHz = CalculateSenderCeiling(
@@ -662,17 +654,20 @@ public sealed class MovementRateController : IMovementRateController
             effectiveFrameLimitHz);
         bool frameRateImproved =
             (baselineFrameCeilingHz < candidate && currentFrameCeilingHz >= candidate) ||
-            (rejectedRate.LowerTierFramesPerSecond > 0f &&
+            (rejectedRate.FailedFramesPerSecond > 0f &&
                 lastFramesPerSecond >=
-                    rejectedRate.LowerTierFramesPerSecond / RejectedRateRetryCostRatio);
+                    rejectedRate.FailedFramesPerSecond / RejectedRateRetryCostRatio);
         if (!bulkCostImproved && !senderCostImproved && !frameRateImproved)
             return false;
 
-        double projectedBulkMillisecondsPerSecond =
-            bulkMillisecondsPerPoll * candidate;
+        double priorityMillisecondsPerSecond = Math.Max(
+            0d,
+            lastSenderMillisecondsPerSecond - lastBulkSendMillisecondsPerSecond);
+        double projectedSenderMillisecondsPerSecond =
+            priorityMillisecondsPerSecond + (bulkMillisecondsPerPoll * candidate);
         return CalculateSenderCeiling(
                 lastFramesPerSecond,
-                projectedBulkMillisecondsPerSecond,
+                projectedSenderMillisecondsPerSecond,
                 effectiveFrameLimitHz) >= candidate;
     }
 
@@ -684,37 +679,14 @@ public sealed class MovementRateController : IMovementRateController
             rejectedRecoveryRates.Add(rate, rejectedRate);
         }
 
-        bool failedQualifiedProbe =
-            activeRecoveryProbeRate == rate && rejectedRate.Failures > 1;
         rejectedRate.Failures++;
-        if (!failedQualifiedProbe)
-            rejectedRate.HasLowerTierBaseline = false;
-        activeRecoveryProbeRate = null;
-    }
-
-    private void CapturePendingLowerTierBaseline()
-    {
-        int candidate = NextHigherRate(localAdaptiveHz);
-        if (candidate <= localAdaptiveHz ||
-            !rejectedRecoveryRates.TryGetValue(candidate, out RejectedRateState rejectedRate) ||
-            rejectedRate.Failures <= 1 ||
-            rejectedRate.HasLowerTierBaseline)
-        {
-            return;
-        }
-
-        CaptureLowerTierBaseline(rejectedRate);
-    }
-
-    private void CaptureLowerTierBaseline(RejectedRateState rejectedRate)
-    {
-        rejectedRate.HasLowerTierBaseline = true;
-        rejectedRate.LowerTierBulkMillisecondsPerPoll = lastBulkPollsPerSecond > 0
+        rejectedRate.FailedBulkMillisecondsPerPoll = lastBulkPollsPerSecond > 0
             ? lastBulkSendMillisecondsPerSecond / lastBulkPollsPerSecond
             : 0d;
-        rejectedRate.LowerTierSenderMillisecondsPerSecond =
+        rejectedRate.FailedSenderMillisecondsPerSecond =
             lastSenderMillisecondsPerSecond;
-        rejectedRate.LowerTierFramesPerSecond = lastFramesPerSecond;
+        rejectedRate.FailedFramesPerSecond = lastFramesPerSecond;
+        activeRecoveryProbeRate = null;
     }
 
     private void ForgetActiveRecoveryProbe(int rate)

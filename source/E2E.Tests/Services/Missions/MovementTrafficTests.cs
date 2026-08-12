@@ -116,7 +116,7 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PollMovement_FrameRateRecoveryCanRetryWithoutLowerBulkCost()
+    public void PollMovement_FrameRateRecoveryRetriesAfterRepeatedConfirmationFailures()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -158,14 +158,41 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             foreach (int expectedRate in new[] { 15, 20, 30, 40 })
             {
-                for (int i = 0; i < 4; i++)
-                    PollMovementWindow(handler, framesPerSecond: 60);
+                PollMovementEvaluations(
+                    handler,
+                    network,
+                    framesPerSecond: 60,
+                    evaluations: 4);
 
                 Assert.Equal(expectedRate, handler.MovementRate.BulkHz);
             }
 
-            PollMovementWindow(handler, framesPerSecond: 60);
-            Assert.Equal(40, handler.MovementRate.BulkHz);
+            for (int i = 0; i < 3; i++)
+            {
+                PollMovementEvaluations(
+                    handler,
+                    network,
+                    framesPerSecond: 60,
+                    evaluations: 4);
+                Assert.Equal(60, handler.MovementRate.BulkHz);
+
+                PollMovementEvaluations(
+                    handler,
+                    network,
+                    framesPerSecond: 57,
+                    evaluations: 1);
+                Assert.InRange(handler.MovementRate.FramesPerSecond, 56.5f, 57.5f);
+                Assert.Equal(40, handler.MovementRate.PerformanceCeilingHz);
+                Assert.Equal(40, handler.MovementRate.BulkHz);
+            }
+
+            PollMovementEvaluations(
+                handler,
+                network,
+                framesPerSecond: 60,
+                evaluations: 4);
+
+            Assert.Equal(60, handler.MovementRate.BulkHz);
         });
     }
 
@@ -1177,8 +1204,24 @@ public class MovementTrafficTests : MissionTestEnvironment
         int framesPerSecond)
     {
         float elapsedSeconds = 1f / framesPerSecond;
-        for (int i = 0; i <= framesPerSecond; i++)
+        for (int i = 0; i < framesPerSecond; i++)
             handler.PollMovement(elapsedSeconds);
+    }
+
+    private static void PollMovementEvaluations(
+        IAgentMovementHandler handler,
+        MockBattleNetwork network,
+        int framesPerSecond,
+        int evaluations)
+    {
+        int targetReports = network.NetworkSentMessages
+            .GetMessageCount<NetworkMovementReceiverCap>() + evaluations;
+        float elapsedSeconds = 1f / framesPerSecond;
+        while (network.NetworkSentMessages
+            .GetMessageCount<NetworkMovementReceiverCap>() < targetReports)
+        {
+            handler.PollMovement(elapsedSeconds);
+        }
     }
 
     private static void AssertSerializedBatchesFitRelay(

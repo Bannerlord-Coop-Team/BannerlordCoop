@@ -294,8 +294,9 @@ public sealed class MovementRateControllerTests
         MovementRateSnapshot initial = fixture.Controller.Snapshot;
         Assert.Equal(30, initial.FrameLimitHz);
         Assert.Equal(30, initial.PerformanceCeilingHz);
-        Assert.Equal(40, initial.BulkHz);
-        Assert.Equal(40, initial.AdvertisedReceiverCapHz);
+        Assert.Equal(30, initial.BulkHz);
+        Assert.Equal(30, initial.AdvertisedReceiverCapHz);
+        Assert.Equal(30, Assert.Single(fixture.Advertisements).MaximumBulkHz);
 
         fixture.AdvanceWindow(
             framesPerSecond: 30,
@@ -493,7 +494,7 @@ public sealed class MovementRateControllerTests
         {
             fixture.AdvanceWindow(
                 framesPerSecond: 60,
-                senderMilliseconds: 120d,
+                senderMilliseconds: 105d,
                 prioritySenderMilliseconds: 30d);
         }
         Assert.Equal(30, fixture.Controller.Snapshot.BulkHz);
@@ -512,41 +513,6 @@ public sealed class MovementRateControllerTests
                 prioritySenderMilliseconds: 30d);
         }
         Assert.Equal(20, fixture.Controller.Snapshot.BulkHz);
-    }
-
-    [Fact]
-    public void BattleProfile_FrameRateRecoveryRetriesAfterConfirmationFailure()
-    {
-        using var fixture = new RateControllerFixture();
-        fixture.Controller.Configure(MovementCadenceProfile.Battle);
-
-        for (int i = 0; i < 4; i++)
-            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
-        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
-
-        fixture.AdvanceWindow(framesPerSecond: 57, senderMilliseconds: 70d);
-        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
-
-        for (int i = 0; i < 4; i++)
-            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
-        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
-
-        fixture.AdvanceWindow(framesPerSecond: 57, senderMilliseconds: 70d);
-        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
-
-        fixture.AdvanceWindow(framesPerSecond: 57, senderMilliseconds: 70d);
-        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
-
-        for (int i = 0; i < 4; i++)
-            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
-        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
-
-        fixture.AdvanceWindow(framesPerSecond: 57, senderMilliseconds: 70d);
-        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
-
-        for (int i = 0; i < 12; i++)
-            fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 70d);
-        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
     }
 
     [Fact]
@@ -767,7 +733,9 @@ public sealed class MovementRateControllerTests
         {
             if (senderMilliseconds > 0d)
             {
-                int bulkReports = Controller.Snapshot.BulkHz;
+                int bulkReports = Math.Min(
+                    Controller.Snapshot.BulkHz,
+                    framesPerSecond);
                 for (int i = 0; i < bulkReports; i++)
                 {
                     Controller.ReportSend(
