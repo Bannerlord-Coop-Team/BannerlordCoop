@@ -90,6 +90,8 @@ namespace Coop.LiveTesting
                         request,
                         () => CreateStatusResponse(request.Id),
                         false);
+                case "command-catalog":
+                    return HandleCommandCatalog(request);
                 case "command":
                     return HandleCommand(request);
                 case "screenshot":
@@ -148,6 +150,26 @@ namespace Coop.LiveTesting
                     output = result.Output,
                 });
             }, true);
+        }
+
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
+                {
+                    return Failure(
+                        request.Id,
+                        "session_not_ready",
+                        "The co-op session command dispatcher is not available yet.",
+                        false);
+                }
+
+                return Success(request.Id, new
+                {
+                    commands = dispatcher.GetCommandNames(),
+                });
+            }, false);
         }
 
         private LiveTestResponse HandleScreenshot(LiveTestRequest request)
@@ -307,6 +329,10 @@ namespace Coop.LiveTesting
             bool coopRunning = false;
             string coopState = null;
             int? registeredPlayers = null;
+            int? registeredPlayerCount = null;
+            int? connectedPlayerCount = null;
+            string[] registeredControllerIds = null;
+            string[] connectedControllerIds = null;
 
             if (campaignLoaded && ContainerProvider.TryResolve<ILogic>(out var logic))
             {
@@ -329,7 +355,22 @@ namespace Coop.LiveTesting
 
                 if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
                 {
-                    registeredPlayers = playerManager.Players.Count;
+                    var players = playerManager.Players
+                        .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
+                        .ToArray();
+                    registeredPlayers = players.Length;
+                    if (ModInformation.IsServer)
+                    {
+                        registeredPlayerCount = players.Length;
+                        registeredControllerIds = players
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedControllerIds = players
+                            .Where(playerManager.IsConnected)
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedPlayerCount = connectedControllerIds.Length;
+                    }
                 }
             }
 
@@ -386,6 +427,10 @@ namespace Coop.LiveTesting
                 coopRunning,
                 coopState,
                 registeredPlayers,
+                registeredPlayerCount,
+                connectedPlayerCount,
+                registeredControllerIds,
+                connectedControllerIds,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
@@ -659,6 +704,7 @@ namespace Coop.LiveTesting
                 ? runToken
                 : null;
         }
+
     }
 }
 #endif
