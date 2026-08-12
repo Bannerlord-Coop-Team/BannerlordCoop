@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Messages;
@@ -65,6 +66,7 @@ internal class InteractionsInitializationHandler : IHandler
         PatrolPartiesCampaignBehavior patrolPartiesCampaignBehavior = Campaign.Current.GetCampaignBehavior<PatrolPartiesCampaignBehavior>();
         ArenaMasterCampaignBehavior arenaMasterCampaignBehavior = Campaign.Current.GetCampaignBehavior<ArenaMasterCampaignBehavior>();
         PerkResetCampaignBehavior perkResetCampaignBehavior = Campaign.Current.GetCampaignBehavior<PerkResetCampaignBehavior>();
+        EncounterGameMenuBehavior encounterGameMenuBehavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
 
         villagerCampaignBehavior._interactedVillagers = GetInteractedVillagers(playerHeroId);
         caravansCampaignBehavior._interactedCaravans = GetInteractedCaravans(playerHeroId);
@@ -73,13 +75,17 @@ internal class InteractionsInitializationHandler : IHandler
         arenaMasterCampaignBehavior._arenaMasterHasMetInSettlements = GetMetArenaMasters(playerHeroId);
         arenaMasterCampaignBehavior._knowTournaments = GetKnowTournaments(playerHeroId);
         perkResetCampaignBehavior._warningTime = GetWarningTime(playerHeroId);
+        encounterGameMenuBehavior._alreadySneakedSettlements = GetAlreadySneakedSettlements(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerInteractionsDataKeys(playerHeroId));
     }
 
     private void Handle(MessagePayload<NetworkInitializeServerInteractionsDataKeys> obj)
     {
-        sessionInteractionsPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        GameThread.RunSafe(() =>
+        {
+            sessionInteractionsPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        });
     }
 
     private Dictionary<MobileParty, VillagerCampaignBehavior.PlayerInteraction> GetInteractedVillagers(string playerHeroId)
@@ -179,5 +185,22 @@ internal class InteractionsInitializationHandler : IHandler
         if (interactionsPlayerData?.PlayerWarningTime?.ContainsKey(playerHeroId) != true) return CampaignTime.Zero;
 
         return new CampaignTime(interactionsPlayerData.PlayerWarningTime[playerHeroId]);
+    }
+
+    private List<Settlement> GetAlreadySneakedSettlements(string playerHeroId)
+    {
+        var alreadySneakedSettlements = new List<Settlement>();
+
+        // Null and key check for players without existing interacted caravans data
+        if (interactionsPlayerData?.PlayerAlreadySneakedSettlements?.ContainsKey(playerHeroId) != true) return alreadySneakedSettlements;
+
+        foreach (var sneakedSettlementId in interactionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId])
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(sneakedSettlementId, out var settlement)) continue;
+
+            alreadySneakedSettlements.Add(settlement);
+        }
+
+        return alreadySneakedSettlements;
     }
 }
