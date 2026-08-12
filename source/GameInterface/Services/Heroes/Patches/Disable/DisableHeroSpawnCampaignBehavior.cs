@@ -24,11 +24,20 @@ internal class DisableHeroSpawnCampaignBehavior
 [HarmonyPatch(typeof(HeroSpawnCampaignBehavior))]
 internal class HeroSpawnCampaignBehaviorPatches
 {
+    internal const string CoopTeamClanId = "coop_team";
+
     [HarmonyPatch(nameof(HeroSpawnCampaignBehavior.TrySpawnHeroesAndParties))]
     [HarmonyPrefix]
     public static bool TrySpawnHeroesAndPartiesPrefix(Clan clan, bool isNewGame)
     {
         return clan == null || !clan.IsPlayerClan();
+    }
+
+    [HarmonyPatch(nameof(HeroSpawnCampaignBehavior.SpawnMinorFactionHeroes))]
+    [HarmonyPrefix]
+    public static bool SpawnMinorFactionHeroesPrefix(Clan clan, bool firstTime)
+    {
+        return firstTime || clan?.StringId != CoopTeamClanId;
     }
 
     [HarmonyPatch(nameof(HeroSpawnCampaignBehavior.CanHeroMoveToAnotherSettlement))]
