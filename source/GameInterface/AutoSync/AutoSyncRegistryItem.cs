@@ -24,9 +24,9 @@ public class AutoSyncRegistryItem
             || Properties.Contains(new Debuggable<PropertyInfo>(property, false));
     }
 
-    public void AddField(FieldInfo field, bool debug, bool coalesce)
+    public void AddField(FieldInfo field, bool debug, bool coalesce, bool skipUnregisteredReference)
     {
-        Fields.Add(new Debuggable<FieldInfo>(field, debug, coalesce));
+        Fields.Add(new Debuggable<FieldInfo>(field, debug, coalesce, skipUnregisteredReference));
     }
 
     public void AddProperty(PropertyInfo property, bool debug, bool coalesce)
@@ -64,11 +64,14 @@ public class Debuggable<T>
     public bool Debug;
     // Route this member's per-change sends through the per-tick coalescer instead of SendAll.
     public bool Coalesce;
+    // Preserve the local assignment but do not publish a reference that has no network identity.
+    public bool SkipUnregisteredReference;
 
-    public Debuggable(T value, bool debug, bool coalesce = false)
+    public Debuggable(T value, bool debug, bool coalesce = false, bool skipUnregisteredReference = false)
     {
         Value = value;
         Debug = debug;
         Coalesce = coalesce;
+        SkipUnregisteredReference = skipUnregisteredReference;
     }
 }

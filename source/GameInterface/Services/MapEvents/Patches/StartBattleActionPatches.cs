@@ -17,6 +17,15 @@ internal class StartBattleActionPatches
     [HarmonyPrefix]
     public static bool PrefixApply(PartyBase attackerParty, PartyBase defenderParty, object subject, MapEvent.BattleTypes battleType)
     {
+        // Server-side direct AI encounters can reach StartBattleAction without
+        // calling MapEvent.CanPartyJoinBattle. Reject before native mutates the
+        // side and before OnStartBattle assumes that mutation succeeded.
+        if (InteractionPatches.TrySuppressExpiredReinforcement(
+                attackerParty, defenderParty))
+        {
+            return false;
+        }
+
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

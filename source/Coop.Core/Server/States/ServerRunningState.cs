@@ -4,6 +4,8 @@ using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Server.States;
@@ -22,13 +24,18 @@ public class ServerRunningState : ServerStateBase
         IMessageBroker messageBroker,
         INetwork network,
         IGameStateInterface gameStateInterface,
-        ILoadingInterface loadingInterface) : base(logic)    {
+        ILoadingInterface loadingInterface,
+        ITimeControlInterface timeControlInterface) : base(logic)    {
         this.messageBroker = messageBroker;
         this.network = network;
         this.gameStateInterface = gameStateInterface;
 
         // Start server
         network.Start();
+
+        // A loaded dedicated campaign starts paused. Advancing it at 1x immediately lets Bannerlord
+        // finish its first campaign tick and materialize the map before any player begins joining.
+        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_1x);
 
         loadingInterface.HideLoadingScreen();
 

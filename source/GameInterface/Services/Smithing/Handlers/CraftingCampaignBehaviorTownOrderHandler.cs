@@ -3,6 +3,8 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using System;
+using System.Linq;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
@@ -187,71 +189,165 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
 
     private void CompleteOrderServer(CompleteOrderServer data)
     {
-        GameThread.RunSafe(() =>
+        if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(
+                out var craftingBehavior))
+            throw new InvalidOperationException(
+                "Crafting behavior is unavailable during order completion.");
+
+        var craftingOrder = data.CraftingOrder;
+        var craftedItem = data.CraftedItem;
+        var town = data.Town;
+        var completerHero = data.CompleterHero;
+        if (craftingOrder == null || craftedItem == null || town == null ||
+            completerHero == null || data.MainHero == null ||
+            !craftingBehavior.CraftingOrders.TryGetValue(
+                town, out CraftingCampaignBehavior.CraftingOrderSlots slots) ||
+            slots == null ||
+            !IsActiveOrder(slots, craftingOrder))
         {
-            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
+            throw new InvalidOperationException(
+                "The crafting order is no longer active.");
+        }
 
-            var craftingOrder = data.CraftingOrder;
-            var craftedItem = data.CraftedItem;
-            var town = data.Town;
-            var completerHero = data.CompleterHero;
+        if (!objectManager.TryGetIdWithLogging(data.Town, out var townId) ||
+            !objectManager.TryGetIdWithLogging(
+                data.CraftingOrder, out var craftingOrderId) ||
+            !objectManager.TryGetIdWithLogging(
+                data.CraftedItem, out var craftedItemId) ||
+            !objectManager.TryGetIdWithLogging(
+                data.CompleterHero, out var completerHeroId))
+        {
+            throw new InvalidOperationException(
+                "Crafting order completion objects are not registered.");
+        }
 
-            // Replace TaleWorlds implementation
-            int amount = craftingBehavior.CalculateOrderPriceDifference(craftingOrder, craftedItem);
-            GiveGoldAction.ApplyBetweenCharacters(null, data.MainHero, amount, false);
-
-            Hero orderOwner = craftingOrder.OrderOwner;
-            CraftingOrder previousOrder = null;
-
-            craftingBehavior.GetOrderResult(craftingOrder, craftedItem, out var isSucceed, out _, out _, out _);
-            if (craftingBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))
-            {
-                craftingBehavior._craftingOrders[town].RemoveCustomOrder(craftingOrder);
-            }
+        bool isCustom = slots.CustomOrders.Contains(craftingOrder);
+        craftingBehavior.GetOrderResult(
+            craftingOrder,
+            craftedItem,
+            out bool succeeded,
+            out _,
+            out _,
+            out _);
+        int goldBefore = data.MainHero.Gold;
+        int amount = craftingBehavior.CalculateOrderPriceDifference(
+            craftingOrder, craftedItem);
+        try
+        {
+            GiveGoldAction.ApplyBetweenCharacters(
+                null, data.MainHero, amount, false);
+            if (isCustom)
+                slots.RemoveCustomOrder(craftingOrder);
             else
-            {
-                if (craftingOrder.IsLordOrder)
-                {
-                    craftingBehavior.ChangeCraftedOrderWithTheNoblesWeaponIfItIsBetter(craftedItem, craftingOrder);
-                    if (orderOwner.PartyBelongedTo != null)
-                    {
-                        craftingBehavior.GiveTroopToNobleAtWeaponTier((int)craftedItem.Tier, orderOwner);
-                    }
-                    if (isSucceed && completerHero.GetPerkValue(DefaultPerks.Crafting.SteelMaker3))
-                    {
-                        ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.SteelMaker3.SecondaryBonus, true);
-                    }
-                }
-                else
-                {
-                    orderOwner.AddPower((float)(craftedItem.Tier + 1));
-                    if (isSucceed && completerHero.GetPerkValue(DefaultPerks.Crafting.ExperiencedSmith))
-                    {
-                        ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.ExperiencedSmith.SecondaryBonus, true);
-                    }
-                }
-                previousOrder = craftingBehavior._craftingOrders[town].Slots[craftingOrder.DifficultyLevel];
+                slots.RemoveTownOrder(craftingOrder);
+        }
+        catch
+        {
+            RestoreOrderCore(
+                data.MainHero,
+                goldBefore,
+                slots,
+                craftingOrder,
+                isCustom);
+            throw;
+        }
 
-                craftingBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
-            }
+        Hero orderOwner = craftingOrder.OrderOwner;
+        if (!isCustom && craftingOrder.IsLordOrder)
+        {
+            TryPostOrderEffect(() => craftingBehavior
+                .ChangeCraftedOrderWithTheNoblesWeaponIfItIsBetter(
+                    craftedItem, craftingOrder), "noble weapon reward");
+            if (orderOwner?.PartyBelongedTo != null)
+                TryPostOrderEffect(() => craftingBehavior
+                    .GiveTroopToNobleAtWeaponTier(
+                        (int)craftedItem.Tier, orderOwner),
+                    "noble troop reward");
+            if (succeeded && completerHero.GetPerkValue(
+                    DefaultPerks.Crafting.SteelMaker3))
+                TryPostOrderEffect(() => ChangeRelationAction
+                    .ApplyRelationChangeBetweenHeroes(
+                        completerHero,
+                        orderOwner,
+                        (int)DefaultPerks.Crafting.SteelMaker3.SecondaryBonus,
+                        true), "noble relation reward");
+        }
+        else if (!isCustom && orderOwner != null)
+        {
+            TryPostOrderEffect(() => orderOwner.AddPower(
+                (float)(craftedItem.Tier + 1)), "notable power reward");
+            if (succeeded && completerHero.GetPerkValue(
+                    DefaultPerks.Crafting.ExperiencedSmith))
+                TryPostOrderEffect(() => ChangeRelationAction
+                    .ApplyRelationChangeBetweenHeroes(
+                        completerHero,
+                        orderOwner,
+                        (int)DefaultPerks.Crafting.ExperiencedSmith
+                            .SecondaryBonus,
+                        true), "notable relation reward");
+        }
 
-            CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
+        TryPostOrderEffect(() => CampaignEventDispatcher.Instance
+            .OnCraftingOrderCompleted(
+                town, craftingOrder, craftedItem, completerHero),
+            "crafting order event");
+        TryPostOrderEffect(() => network.SendAll(
+            new NetworkCompleteOrderClients(
+                townId,
+                craftingOrderId,
+                craftedItemId,
+                completerHeroId)), "crafting order broadcast");
+        if (!isCustom)
+            TryPostOrderEffect(() => MessageBroker.Instance.Publish(
+                null,
+                new InstanceDestroyed<CraftingOrder>(craftingOrder)),
+                "crafting order cleanup");
+    }
 
-            if (!objectManager.TryGetIdWithLogging(data.Town, out var townId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.CraftingOrder, out var craftingOrderId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.CraftedItem, out var craftedItemId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.CompleterHero, out var completerHeroId)) return;
+    private static bool IsActiveOrder(
+        CraftingCampaignBehavior.CraftingOrderSlots slots,
+        CraftingOrder order)
+    {
+        return slots != null && order != null &&
+            (slots.CustomOrders.Contains(order) || slots.Slots.Contains(order));
+    }
 
-            network.SendAll(new NetworkCompleteOrderClients(townId, craftingOrderId, craftedItemId, completerHeroId));
+    private static void RestoreOrderCore(
+        Hero mainHero,
+        int goldBefore,
+        CraftingCampaignBehavior.CraftingOrderSlots slots,
+        CraftingOrder craftingOrder,
+        bool isCustom)
+    {
+        mainHero.Gold = goldBefore;
+        if (isCustom)
+        {
+            if (!slots.CustomOrders.Contains(craftingOrder))
+                slots.AddCustomOrder(craftingOrder);
+            return;
+        }
 
-            // Remove previous order from objectManager
-            // Queue destroying the instance after sending NetworkCompleteOrderClients message
-            // Destroying the instance before sending client message prevents clients from being able to resolve the removed crafting order by network id
-            if (previousOrder is not null)
-            {
-                MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
-            }
-        });
+        if (!slots.Slots.Contains(craftingOrder) &&
+            craftingOrder.DifficultyLevel >= 0 &&
+            craftingOrder.DifficultyLevel < slots.Slots.Length)
+        {
+            slots.Slots[craftingOrder.DifficultyLevel] = craftingOrder;
+        }
+    }
+
+    private static void TryPostOrderEffect(Action action, string operation)
+    {
+        try
+        {
+            action?.Invoke();
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Crafting order committed, but {Operation} failed",
+                operation);
+        }
     }
 
     private void CompleteOrderClients(NetworkCompleteOrderClients obj)

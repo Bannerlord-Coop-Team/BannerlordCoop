@@ -33,7 +33,7 @@ public readonly struct ModOptions
     [ProtoMember(6)]
     public readonly bool GoldFoodInfluenceChangeForDisconnectedPlayers { get; } = false;
     [ProtoMember(7)]
-    public readonly int PlayerBattleAiJoinWindowHours { get; } = 24;
+    public readonly int PlayerBattleAiJoinWindowHours { get; } = 10;
     [ProtoMember(8)]
     public readonly bool SpeedLimitWhilePlayersInBattle { get; } = true;
     [ProtoMember(9)]
@@ -63,7 +63,12 @@ public readonly struct ModOptions
         GoldFoodInfluenceChangeInSettlements = modOptionsData.GoldFoodInfluenceChangeInSettlements ?? GoldFoodInfluenceChangeInSettlements;
         GoldFoodInfluenceChangeInBattles = modOptionsData.GoldFoodInfluenceChangeInBattles ?? GoldFoodInfluenceChangeInBattles;
         GoldFoodInfluenceChangeForDisconnectedPlayers = modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers ?? GoldFoodInfluenceChangeForDisconnectedPlayers;
-        PlayerBattleAiJoinWindowHours = modOptionsData.PlayerBattleAiJoinWindowHours ?? PlayerBattleAiJoinWindowHours;
+        PlayerBattleAiJoinWindowHours = System.Math.Max(
+            0,
+            System.Math.Min(
+                10,
+                modOptionsData.PlayerBattleAiJoinWindowHours ??
+                PlayerBattleAiJoinWindowHours));
         SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
         WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;

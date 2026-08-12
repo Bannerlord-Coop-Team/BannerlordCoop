@@ -45,6 +45,16 @@ public interface IPlayerManager
     /// </summary>
     void SetPeer(string controllerId, NetPeer peer);
 
+    bool TrySetPeerIfAvailable(
+        string controllerId, NetPeer peer, out NetPeer existingPeer);
+
+    bool TryReserveNewController(
+        string controllerId, NetPeer peer, out NetPeer existingPeer);
+
+    bool TryCommitReservedPlayer(string controllerId, NetPeer peer, Player player);
+
+    void ReleaseNewControllerReservation(NetPeer peer);
+
     /// <summary>
     /// Resolves the currently associated peer for a registered controller.
     /// </summary>
@@ -97,6 +107,7 @@ public class PlayerManager : IPlayerManager
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ConcurrentDictionary<NetPeer, Player> peerToPlayer = new();
     private readonly Dictionary<string, NetPeer> controllerToPeer = new();
+    private readonly Dictionary<string, NetPeer> newControllerReservations = new();
 
     // Guards _players and controllerToPeer: registrations mutate on the game thread (e.g. a
     // player deletion) while join handlers read them on the network thread.
@@ -273,6 +284,115 @@ public class PlayerManager : IPlayerManager
         }
     }
 
+    public bool TrySetPeerIfAvailable(
+        string controllerId, NetPeer peer, out NetPeer existingPeer)
+    {
+        existingPeer = null;
+        lock (registrySync)
+        {
+            if (!_players.TryGetValue(controllerId, out var player))
+            {
+                logger.Error(
+                    "Cannot associate peer with unregistered controller {ControllerId}",
+                    controllerId);
+                return false;
+            }
+
+            if (controllerToPeer.TryGetValue(controllerId, out var currentPeer) &&
+                !ReferenceEquals(currentPeer, peer))
+            {
+                if (currentPeer?.ConnectionState == ConnectionState.Connected)
+                {
+                    existingPeer = currentPeer;
+                    return false;
+                }
+
+                peerToPlayer.TryRemove(currentPeer, out _);
+            }
+
+            peerToPlayer[peer] = player;
+            controllerToPeer[controllerId] = peer;
+            return true;
+        }
+    }
+
+    public bool TryReserveNewController(
+        string controllerId, NetPeer peer, out NetPeer existingPeer)
+    {
+        existingPeer = null;
+        if (string.IsNullOrWhiteSpace(controllerId) || peer == null)
+            return false;
+
+        lock (registrySync)
+        {
+            var reservationForPeer = newControllerReservations.FirstOrDefault(pair =>
+                ReferenceEquals(pair.Value, peer));
+            if (!string.IsNullOrEmpty(reservationForPeer.Key))
+            {
+                if (reservationForPeer.Key == controllerId) return true;
+                existingPeer = peer;
+                return false;
+            }
+
+            if (_players.ContainsKey(controllerId))
+            {
+                controllerToPeer.TryGetValue(controllerId, out existingPeer);
+                return false;
+            }
+
+            if (newControllerReservations.TryGetValue(controllerId, out var reservedPeer))
+            {
+                if (ReferenceEquals(reservedPeer, peer)) return true;
+                existingPeer = reservedPeer;
+                return false;
+            }
+
+            newControllerReservations[controllerId] = peer;
+            return true;
+        }
+    }
+
+    public bool TryCommitReservedPlayer(string controllerId, NetPeer peer, Player player)
+    {
+        if (player == null || player.ControllerId != controllerId || peer == null)
+            return false;
+
+        lock (registrySync)
+        {
+            if (!newControllerReservations.TryGetValue(controllerId, out var owner) ||
+                !ReferenceEquals(owner, peer) ||
+                peer.ConnectionState != ConnectionState.Connected ||
+                _players.ContainsKey(controllerId))
+                return false;
+
+            _players.Add(controllerId, player);
+            newControllerReservations.Remove(controllerId);
+            peerToPlayer[peer] = player;
+            controllerToPeer[controllerId] = peer;
+        }
+
+        AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
+        AddPlayerObject<Hero>(player.ControllerId, player.HeroId);
+        AddPlayerObject<Clan>(player.ControllerId, player.ClanId);
+        return true;
+    }
+
+    public void ReleaseNewControllerReservation(NetPeer peer)
+    {
+        if (peer == null) return;
+
+        lock (registrySync)
+        {
+            foreach (var controllerId in newControllerReservations
+                         .Where(pair => ReferenceEquals(pair.Value, peer))
+                         .Select(pair => pair.Key)
+                         .ToArray())
+            {
+                newControllerReservations.Remove(controllerId);
+            }
+        }
+    }
+
     public bool TryGetPeer(string controllerId, out NetPeer peer)
     {
         lock (registrySync)
@@ -285,6 +405,14 @@ public class PlayerManager : IPlayerManager
     {
         lock (registrySync)
         {
+            foreach (var controllerId in newControllerReservations
+                         .Where(pair => ReferenceEquals(pair.Value, peer))
+                         .Select(pair => pair.Key)
+                         .ToArray())
+            {
+                newControllerReservations.Remove(controllerId);
+            }
+
             if (!peerToPlayer.TryRemove(peer, out var player)) return;
 
             if (controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) &&

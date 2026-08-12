@@ -2,6 +2,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.UI.Interfaces;
@@ -22,7 +23,8 @@ public class ServerContext
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
         IGameStateInterface gameStateInterface,
-        ILoadingInterface loadingInterface)
+        ILoadingInterface loadingInterface,
+        ITimeControlInterface timeControlInterface)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -31,6 +33,7 @@ public class ServerContext
         ModuleInfoProvider = moduleInfoProvider;
         GameStateInterface = gameStateInterface;
         LoadingInterface = loadingInterface;
+        TimeControlInterface = timeControlInterface;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -40,4 +43,5 @@ public class ServerContext
     public IModuleInfoProvider ModuleInfoProvider { get; }
     public IGameStateInterface GameStateInterface { get; }
     public ILoadingInterface LoadingInterface { get; }
+    public ITimeControlInterface TimeControlInterface { get; }
 }

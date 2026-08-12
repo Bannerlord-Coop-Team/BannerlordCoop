@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Save.Commands;
 using GameInterface.Services.Save.Messages;
+using GameInterface.Services.Heroes.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -14,7 +15,7 @@ class SavePatches
 {
     static bool Prefix(Game __instance, ref string saveName)
     {
-        if (ModInformation.IsServer)
+        if (ModInformation.IsServer && !SaveInterface.IsTransferSaveInProgress)
         {
             MessageBroker.Instance.Publish(__instance, new GameSaved(saveName));
         }
@@ -28,7 +29,7 @@ internal class SaveStartedPatch
 {
     static void Prefix(SaveHandler __instance)
     {
-        if (ModInformation.IsServer)
+        if (ModInformation.IsServer && !SaveInterface.IsTransferSaveInProgress)
         {
             MessageBroker.Instance.Publish(__instance, new GameSaveStateChanged(true));
             SaveDebugCommand.HoldForEvidenceIfRequested();
@@ -41,7 +42,7 @@ internal class SaveEndedPatch
 {
     static void Postfix(SaveHandler __instance)
     {
-        if (ModInformation.IsServer)
+        if (ModInformation.IsServer && !SaveInterface.IsTransferSaveInProgress)
         {
             MessageBroker.Instance.Publish(__instance, new GameSaveStateChanged(false));
         }

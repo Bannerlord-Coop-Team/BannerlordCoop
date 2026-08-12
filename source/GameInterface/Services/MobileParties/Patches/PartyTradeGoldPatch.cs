@@ -1,5 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
+using Common;
+using GameInterface.Services.Clans.Patches;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
@@ -21,5 +23,13 @@ internal class PartyTradeGoldPatch
             return false;
         }
         return true;
+    }
+
+    [HarmonyPatch(nameof(MobileParty.PartyTradeGold), MethodType.Setter)]
+    [HarmonyPostfix]
+    static void PartyTradeGoldSetPostfix(MobileParty __instance)
+    {
+        if (ModInformation.IsClient && __instance?.IsCaravan == true)
+            ClanPartyItemVMPatches.RefreshCaravanIncome(__instance);
     }
 }

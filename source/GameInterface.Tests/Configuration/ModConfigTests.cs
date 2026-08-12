@@ -274,7 +274,7 @@ public class ModConfigTests : IDisposable
         Assert.True(options.GoldFoodInfluenceChangeInSettlements);
         Assert.Equal(GoldFoodChangeMode.OneDayMax, options.GoldFoodInfluenceChangeInBattles);
         Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
-        Assert.Equal(24, options.PlayerBattleAiJoinWindowHours);
+        Assert.Equal(10, options.PlayerBattleAiJoinWindowHours);
         Assert.True(options.SpeedLimitWhilePlayersInBattle);
         Assert.Equal(32, options.WandererLimit);
         Assert.False(options.WandererLimitScalesWithPlayers);

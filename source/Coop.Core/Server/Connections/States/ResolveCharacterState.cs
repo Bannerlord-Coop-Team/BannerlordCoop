@@ -128,6 +128,9 @@ public class ResolveCharacterState : ConnectionStateBase
 
     private void ResolveCharacter(NetPeer peer, string controllerId)
     {
+        if (peer?.ConnectionState != ConnectionState.Connected)
+            return;
+
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
             var heroExists = false;
@@ -140,6 +143,12 @@ public class ResolveCharacterState : ConnectionStateBase
             // validation has already arrived.
             GameThread.Run(() =>
             {
+                // A timed-out blocking call remains queued in GameThread. Never let that late
+                // action mutate registration after this socket/state has gone away.
+                if (peer.ConnectionState != ConnectionState.Connected ||
+                    !ReferenceEquals(ConnectionLogic.State, this))
+                    return;
+
                 heroExists = objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _);
                 if (!heroExists) return;
 
@@ -147,7 +156,16 @@ public class ResolveCharacterState : ConnectionStateBase
                 if (!partyRestored || ReferenceEquals(restoredPlayer, player)) return;
 
                 registrationReplaced = playerManager.ReplacePlayer(player, restoredPlayer);
+                if (registrationReplaced)
+                {
+                    // Replacement is authoritative once committed. Existing clients must receive
+                    // it even if the reconnecting socket dies immediately afterwards.
+                    network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
+                }
             }, blocking: true);
+
+            if (peer.ConnectionState != ConnectionState.Connected)
+                return;
 
             if (heroExists)
             {
@@ -161,12 +179,20 @@ public class ResolveCharacterState : ConnectionStateBase
                     return;
                 }
 
-                if (registrationReplaced)
-                    network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
-
                 // This peer is a new NetPeer for an already registered player, so the
                 // peer-Player link must be established here
-                playerManager.SetPeer(controllerId, peer);
+                if (!playerManager.TrySetPeerIfAvailable(
+                        controllerId, peer, out NetPeer existingPeer))
+                {
+                    Logger.Warning(
+                        "Refusing overlapping reconnect for controller {ControllerId}: " +
+                        "peer {PeerId} is still connected as peer {ExistingPeerId}",
+                        controllerId,
+                        peer.Id,
+                        existingPeer?.Id);
+                    peer.Disconnect();
+                    return;
+                }
                 network.SendImmediate(peer, new NetworkClientValidated(true, restoredPlayer));
                 ConnectionLogic.TransferSave();
 
@@ -174,16 +200,27 @@ public class ResolveCharacterState : ConnectionStateBase
                 return;
             }
 
-            // Registered, but the hero it names is not in the campaign — a registration that
-            // outlived its objects. Deregister it before routing to character creation: the
-            // character created next registers this same controller id, and leaving the dead
-            // entry behind would make the controller ambiguous for the rest of the session.
-            Logger.Warning(
-                "Controller {ControllerId} is registered to hero {HeroId}, which no longer exists; " +
-                "dropping the stale registration and creating a new character",
+            // Never turn a transient/missing campaign object into character deletion. The
+            // authoritative registration stays intact for repair or an explicit admin reset.
+            Logger.Error(
+                "Controller {ControllerId} is registered to hero {HeroId}, but that hero is not " +
+                "available in the loaded campaign; refusing reconnect without changing the character",
                 controllerId, player.HeroId);
+            peer.Disconnect();
+            return;
+        }
 
-            playerManager.RemovePlayer(player);
+        if (!playerManager.TryReserveNewController(
+                controllerId, peer, out NetPeer reservedPeer))
+        {
+            Logger.Warning(
+                "Refusing duplicate character creation for controller {ControllerId}: " +
+                "peer {PeerId} conflicts with peer {ExistingPeerId}",
+                controllerId,
+                peer.Id,
+                reservedPeer?.Id);
+            peer.Disconnect();
+            return;
         }
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));
@@ -197,11 +234,11 @@ public class ResolveCharacterState : ConnectionStateBase
 
     public override void TransferSave()
     {
-        // SetState packages and sends the save synchronously; then move to LoadingState to await the
-        // client reporting it has entered the campaign. Load() must run here (not inside the
-        // TransferSaveState ctor) so it resolves against TransferSaveState, not this state.
-        ConnectionLogic.SetState<TransferSaveState>();
-        ConnectionLogic.Load();
+        // Assign the state before blocking game-thread work starts. A disconnect can then cancel a
+        // queued save before it serializes an abandoned join later.
+        var transfer = ConnectionLogic.SetState<TransferSaveState>();
+        if (transfer.StartTransfer())
+            ConnectionLogic.Load();
     }
 
     public override void Load()

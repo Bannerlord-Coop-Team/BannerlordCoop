@@ -16,6 +16,7 @@ using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Settlements.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
@@ -47,6 +48,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly ISettlementInterface settlementInterface;
     private readonly Dictionary<MobileParty, MapEvent> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
@@ -54,13 +56,15 @@ internal class PlayerPartyVisibilityHandler : IHandler
         IPlayerManager playerManager,
         IObjectManager objectManager,
         INetwork network,
-        ISiegeEventInterface siegeEventInterface)
+        ISiegeEventInterface siegeEventInterface,
+        ISettlementInterface settlementInterface)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.network = network;
         this.siegeEventInterface = siegeEventInterface;
+        this.settlementInterface = settlementInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
@@ -118,12 +122,14 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private void ParkParty(Player player, MobileParty party, string reason)
     {
         var mapEvent = party.MapEvent;
-        if (mapEvent != null)
+        if (mapEvent != null && !mapEvent.IsFinalized)
         {
             deferredMapEventParking[party] = mapEvent;
+            party.IgnoreByOtherPartiesTill(CampaignTime.Never);
+            RemoveVisual(party);
             messageBroker.Publish(this, new PlayerDisconnectedFromMapEvent(player.ControllerId, mapEvent));
             Logger.Information(
-                "Keeping party {PartyId} active in MapEvent {MapEventId} because {Reason}",
+                "Hid and ignored party {PartyId} in MapEvent {MapEventId} because {Reason}",
                 party.StringId,
                 mapEvent.StringId,
                 reason);
@@ -132,6 +138,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         LeaveSiegeBeforeParking(party);
 
+        party.IgnoreByOtherPartiesTill(CampaignTime.Never);
         var wasActive = party.IsActive;
         party.IsActive = false;
         party.IsVisible = false;
@@ -166,26 +173,41 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (party.MapEvent != null)
                 messageBroker.Publish(this, new PlayerReconnectedToMapEvent());
 
-            if (party.IsActive)
-            {
-                return; // fresh join, never parked, nothing to restore
-            }
-
             // Retrieves the player and outs it to the Hero Object
             // Checks if the player is prisoner or if they belong there
             // If they do, the Debug message appears.
             if (objectManager.TryGetObject(player.HeroId, out Hero hero) &&
                 (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null))
             {
+                party.IgnoreByOtherPartiesTill(CampaignTime.Never);
+                party.IsActive = false;
+                party.IsVisible = false;
+                RemoveVisual(party);
                 Logger.Debug("Keeping captive party {PartyId} parked for peer {Peer}",
                     party.StringId,
                     peer.Id);
                 return;
             }
 
+            party.IgnoreByOtherPartiesTill(CampaignTime.Now);
             party.IsActive = true;
-            CreateVisual(party, player.MobilePartyId);
+            party.IsVisible = true;
+            var existingVisual = party.Party.GetPartyVisual();
+            if (existingVisual == null || !objectManager.TryGetId(existingVisual, out _))
+                CreateVisual(party, player.MobilePartyId);
             party.Party.UpdateVisibilityAndInspected(party.Position);
+
+            // A newly created or reconnecting player can already be inside a
+            // settlement, so no enter-settlement command is emitted. Populate and
+            // broadcast its authoritative location roster here; otherwise tavern
+            // heroes exist in the campaign but never appear in the settlement UI
+            // or scene until a later leave-and-reenter round trip.
+            if (party.CurrentSettlement != null)
+            {
+                settlementInterface.OnPartyEnteredSettlement(
+                    party.CurrentSettlement,
+                    party);
+            }
             Logger.Information("Restored party {PartyId} for reconnected peer {Peer}", party.StringId, peer.Id);
         });
     }
@@ -194,18 +216,36 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
+        var finalizedMapEvent = payload.What.MapEvent;
+        GameThread.EnqueueSafe(
+            () => FinishDeferredMapEventParking(finalizedMapEvent),
+            nameof(PlayerPartyVisibilityHandler));
+    }
+
+    private void FinishDeferredMapEventParking(MapEvent finalizedMapEvent)
+    {
         foreach (var party in deferredMapEventParking
-            .Where(entry => ReferenceEquals(entry.Value, payload.What.MapEvent))
+            .Where(entry => ReferenceEquals(entry.Value, finalizedMapEvent))
             .Select(entry => entry.Key)
             .ToArray())
         {
-            if (party.MapEvent != null) continue;
+            if (party.MapEvent != null && !party.MapEvent.IsFinalized)
+            {
+                deferredMapEventParking[party] = party.MapEvent;
+                continue;
+            }
 
             deferredMapEventParking.Remove(party);
-            if (!party.IsActive || !playerManager.IsOwnerOfPartyDisconnected(party)) continue;
+            if (!playerManager.IsOwnerOfPartyDisconnected(party))
+            {
+                party.IgnoreByOtherPartiesTill(CampaignTime.Now);
+                continue;
+            }
 
             LeaveSiegeBeforeParking(party);
-            party.IsActive = false;
+            party.IgnoreByOtherPartiesTill(CampaignTime.Never);
+            if (party.IsActive)
+                party.IsActive = false;
             party.IsVisible = false;
             RemoveVisual(party);
             Logger.Information(
@@ -233,18 +273,22 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null) return;
-        if (!objectManager.TryGetIdWithLogging(partyVisual, out string partyVisualId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId))
-            return;
-        objectManager.Remove(partyVisual);
+        bool hasPartyVisualId = objectManager.TryGetId(partyVisual, out string partyVisualId);
+        bool hasMobilePartyId = objectManager.TryGetId(party, out string mobilePartyId);
+        if (hasPartyVisualId)
+            objectManager.Remove(partyVisual);
 
-        using (new AllowedThread())
+        if (MobilePartyVisualManager.Current != null)
         {
-            AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty").Invoke(MobilePartyVisualManager.Current, new object[] { party });
+            using (new AllowedThread())
+            {
+                AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty")
+                    .Invoke(MobilePartyVisualManager.Current, new object[] { party });
+            }
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
+        if (hasPartyVisualId && hasMobilePartyId)
+            network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
     }
 
     /// <summary>
@@ -254,12 +298,16 @@ internal class PlayerPartyVisibilityHandler : IHandler
     /// </summary>
     private void CreateVisual(MobileParty party, string mobilePartyId)
     {
-        using (new AllowedThread())
+        var partyVisual = party.Party.GetPartyVisual();
+        if (partyVisual == null)
         {
-            party.CreateNewPartyVisual();
+            using (new AllowedThread())
+            {
+                party.CreateNewPartyVisual();
+            }
+            partyVisual = party.Party.GetPartyVisual();
         }
 
-        var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null)
         {
             Logger.Error("CreateNewPartyVisual did not produce a visual for party {PartyId}", party.StringId);

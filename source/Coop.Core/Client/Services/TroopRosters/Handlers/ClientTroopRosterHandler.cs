@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System.Collections.Generic;
@@ -34,13 +35,21 @@ public class ClientTroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId))
+        {
+            AbortCart("Recruitment could not be sent because your party is still synchronizing. Please reopen the recruitment screen.");
+            return;
+        }
 
         List<TroopInfo> troops = new();
         foreach (var (hero, character, index) in obj.TroopsInCart)
         {
-            if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) continue;
-            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) continue;
+            if (!objectManager.TryGetIdWithLogging(hero, out var heroId) ||
+                !objectManager.TryGetIdWithLogging(character, out var characterId))
+            {
+                AbortCart("Recruitment changed while the screen was open. No troops were recruited; please reopen the recruitment screen.");
+                return;
+            }
 
             troops.Add(new TroopInfo(heroId, characterId, index));
         }
@@ -54,5 +63,11 @@ public class ClientTroopRosterHandler : IHandler
         var message = new ClientRequestRecruitment(mobilePartyId, troops.ToArray());
 
         network.SendAll(message);
+    }
+
+    private void AbortCart(string reason)
+    {
+        Logger.Warning(reason);
+        messageBroker.Publish(this, new SendInformationMessage(reason));
     }
 }

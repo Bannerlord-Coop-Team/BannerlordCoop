@@ -19,7 +19,13 @@ internal class MapEventSync : IAutoSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.State)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.TroopUpgradeTracker)), debug: true);
 
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.MapEventVisual)), debug: true);
+        // DedicatedServer.Core supplies a private headless IMapEventVisual. It is authoritative server state,
+        // but it has no corresponding client object and is intentionally absent from the ObjectManager.
+        // Preserve the wire contract for graphical hosts while skipping only that unregistered reference.
+        autoSyncBuilder.AddField(
+            AccessTools.Field(typeof(MapEvent), nameof(MapEvent.MapEventVisual)),
+            debug: true,
+            skipUnregisteredReference: true);
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.DiplomaticallyFinished)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.StrengthOfSide)));
         //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._battleResultExplainers)));

@@ -227,11 +227,13 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
 
     private void Handle_TournamentSessionRemoved(MessagePayload<TournamentSessionRemoved> payload)
     {
-        bool removed = RemoveSession(payload.What.SessionId, payload.What.TownId);
+        RemoveSession(payload.What.SessionId, payload.What.TownId);
         GameThread.RunSafe(() =>
         {
-            if (removed)
-                SessionRemoved?.Invoke(payload.What.SessionId);
+            // Authoritative removal is also the mission-leave acknowledgement. Notify idempotently
+            // even if cache reconciliation already removed the row; otherwise a missing UI cache can
+            // strand the player inside the tournament mission.
+            SessionRemoved?.Invoke(payload.What.SessionId);
             RouteRemovedSession(payload.What.TownId);
         });
     }

@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Serilog;
 using System;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -17,6 +18,9 @@ public interface ISaveInterface : IGameAbstraction
 internal class SaveInterface : ISaveInterface
 {
     private readonly ILogger Logger = LogManager.GetLogger<SaveInterface>();
+    private static readonly AsyncLocal<int> TransferSaveDepth = new AsyncLocal<int>();
+
+    internal static bool IsTransferSaveInProgress => TransferSaveDepth.Value > 0;
 
     public SaveResults SaveCurrentGame()
     {
@@ -35,7 +39,15 @@ internal class SaveInterface : ISaveInterface
         CampaignEventDispatcher.Instance.OnBeforeSave();
 
         var saveDriver = new CoopInMemSaveDriver();
-        Game.Current.Save(metaData, "TransferSave", saveDriver, (SaveResult) => { });
+        TransferSaveDepth.Value++;
+        try
+        {
+            Game.Current.Save(metaData, "TransferSave", saveDriver, (SaveResult) => { });
+        }
+        finally
+        {
+            TransferSaveDepth.Value--;
+        }
 
         return new SaveResults(true, saveDriver.Data, Campaign.Current?.UniqueGameId);
     }

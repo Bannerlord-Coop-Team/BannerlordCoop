@@ -104,7 +104,7 @@ public class OverloadedPeerManagerTests
     }
 
     [Fact]
-    public void InitialJoinCatchUp_PausesAfterTwentySecondsRegardlessOfPacketCount()
+    public void InitialJoinCatchUp_PausesAfterTwentySecondsWhenQueueIsOverloaded()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
         timeControlMock.Setup(t => t.GetTimeControl()).Returns(TimeControlEnum.Play_1x);
@@ -112,7 +112,7 @@ public class OverloadedPeerManagerTests
         var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
         var peer = AddConnectedPeer(connections);
         StartInitialCatchUp(connections, peer);
-        peer.SetQueueLength(100);
+        peer.SetQueueLength(AbovePauseThreshold);
         DateTime startedUtc = DateTime.UtcNow;
 
         manager.CheckForOverloadedPeers(startedUtc);
@@ -130,7 +130,7 @@ public class OverloadedPeerManagerTests
     }
 
     [Fact]
-    public void FinalJoinCatchUp_RemainsPausedUntilCatchUpCompletes()
+    public void FinalJoinCatchUp_ResumesWhenQueueDrainsBelowThreshold()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
         timeControlMock.Setup(t => t.GetTimeControl()).Returns(TimeControlEnum.Play_1x);
@@ -140,7 +140,7 @@ public class OverloadedPeerManagerTests
         StartFinalCatchUp(connections, peer);
         DateTime startedUtc = DateTime.UtcNow;
 
-        peer.SetQueueLength(100);
+        peer.SetQueueLength(AbovePauseThreshold);
         manager.CheckForOverloadedPeers(startedUtc);
         manager.CheckForOverloadedPeers(startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay);
 
@@ -148,7 +148,7 @@ public class OverloadedPeerManagerTests
         manager.CheckForOverloadedPeers(
             startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(1));
 
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_1x), Times.Never());
+        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_1x), Times.Once());
 
         var state = Assert.IsType<LoadingState>(connections.ConnectionStates[peer].State);
         SendAndDrain(state, peer, JoinSyncSignal.FinalBaselineApplied);
@@ -168,7 +168,7 @@ public class OverloadedPeerManagerTests
         var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
         var peer = AddConnectedPeer(connections);
         StartFinalCatchUp(connections, peer);
-        peer.SetQueueLength(NetworkJoinSync.CompletionPacketThreshold + 1);
+        peer.SetQueueLength(AbovePauseThreshold);
         DateTime startedUtc = DateTime.UtcNow;
         manager.CheckForOverloadedPeers(startedUtc);
         manager.CheckForOverloadedPeers(startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay);

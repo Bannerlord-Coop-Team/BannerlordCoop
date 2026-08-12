@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Settlements.Interfaces;
 using HarmonyLib;
 using Moq;
 using System;
@@ -80,7 +81,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             playerManager.Object,
             objectManager.Object,
             Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<ISettlementInterface>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -104,7 +106,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             playerManager.Object,
             objectManager.Object,
             Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<ISettlementInterface>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -135,7 +138,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             playerManager.Object,
             objectManager.Object,
             Mock.Of<INetwork>(),
-            siegeEventInterface.Object);
+            siegeEventInterface.Object,
+            Mock.Of<ISettlementInterface>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 

@@ -19,11 +19,12 @@ public class AutoSyncRegistry
     
     public readonly List<Action<object, object>> ReadonlySetters = new List<Action<object, object>>();
 
-    public void AddField(FieldInfo field, bool debug = false, bool coalesce = false)
+    public void AddField(FieldInfo field, bool debug = false, bool coalesce = false,
+        bool skipUnregisteredReference = false)
     {
         if (field == null) throw new ArgumentNullException(nameof(field));
 
-        if (!AddMember(field.DeclaringType, field, debug, coalesce)) throw new ArgumentException($"{nameof(AutoSyncBuilder)} Field: {field.Name} has already been registered as a synced field");
+        if (!AddMember(field.DeclaringType, field, debug, coalesce, skipUnregisteredReference)) throw new ArgumentException($"{nameof(AutoSyncBuilder)} Field: {field.Name} has already been registered as a synced field");
     }
 
     public void AddProperty(PropertyInfo property, bool debug = false, bool coalesce = false)
@@ -33,7 +34,7 @@ public class AutoSyncRegistry
         // only prevent properties from being added if they are no collection like type
         if (property.CanWrite == false) throw new ArgumentException($"{nameof(AutoSyncBuilder)} Property: {property.Name} does not have a set method");
 
-        if (!AddMember(property.DeclaringType, property, debug, coalesce)) throw new ArgumentException($"{nameof(AutoSyncBuilder)} Property: {property.Name} has already been registered as a synced property");
+        if (!AddMember(property.DeclaringType, property, debug, coalesce, false)) throw new ArgumentException($"{nameof(AutoSyncBuilder)} Property: {property.Name} has already been registered as a synced property");
     }
 
     public bool AddTargetMethod(Type type, MethodInfo methodInfo, string patchCategory = null)
@@ -75,7 +76,8 @@ public class AutoSyncRegistry
         return ReadonlySetters.Count - 1;
     }
 
-    private bool AddMember(Type type, MemberInfo memberInfo, bool debug, bool coalesce)
+    private bool AddMember(Type type, MemberInfo memberInfo, bool debug, bool coalesce,
+        bool skipUnregisteredReference)
     {
         if (memberInfo is not FieldInfo && memberInfo is not PropertyInfo)
             return false;
@@ -89,7 +91,7 @@ public class AutoSyncRegistry
             if (Registrations[type].Contains(fieldInfo))
                 return false;
 
-            Registrations[type].AddField(fieldInfo, debug, coalesce);
+            Registrations[type].AddField(fieldInfo, debug, coalesce, skipUnregisteredReference);
         }
         else if (memberInfo is PropertyInfo propertyInfo)
         {

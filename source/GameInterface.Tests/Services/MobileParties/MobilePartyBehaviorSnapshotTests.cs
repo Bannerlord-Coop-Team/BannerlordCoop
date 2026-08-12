@@ -491,6 +491,7 @@ public class MobilePartyBehaviorSnapshotTests
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         party.Ai = new MobilePartyAi(party);
+        party._position = new CampaignVec2(new Vec2(5f, 5f), isOnLand: true);
         party.PartyMoveMode = MoveModeType.Party;
         party.MoveTargetPoint = new CampaignVec2(new Vec2(10f, 20f), isOnLand: true);
         return party;

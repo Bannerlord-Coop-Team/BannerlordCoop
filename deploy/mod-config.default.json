@@ -58,10 +58,10 @@
     // true: Disconnected players have gold and food change.
     "goldFoodInfluenceChangeForDisconnectedPlayers": false,
 
-    // Set grace period (hours) for AI parties to be able to join battles involving players.
-    // Default is 24, meaning AI parties can only join a player battle within a day of it starting.
-    // If set to 0, AI parties will not join in player battles.
-    "playerBattleAiJoinWindowHours": 24,
+    // Set the campaign-hour grace period for any AI or player reinforcement.
+    // Default and hard maximum are 10 hours from the battle's native start time.
+    // If set to 0, reinforcements are allowed only at the instant the battle starts.
+    "playerBattleAiJoinWindowHours": 10,
 
     // Toggle speed limit when players are in a battle.
     // Default is true, meaning the game will be locked at 1x speed when any player is in a battle.

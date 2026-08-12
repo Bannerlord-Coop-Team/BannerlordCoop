@@ -16,6 +16,8 @@ public interface IPlayerPartyRestorer
 {
     bool TryRestore(Player player, out Player restoredPlayer);
     void Restore(Hero hero, MobileParty party);
+    void RestoreMemberships(Hero hero, MobileParty party);
+    void RestorePartyLeader(Hero hero, MobileParty party);
 }
 
 internal class PlayerPartyRestorer : IPlayerPartyRestorer
@@ -188,6 +190,39 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
 
     public void Restore(Hero hero, MobileParty party)
     {
+        RestoreMemberships(hero, party);
+        RestorePartyLeader(hero, party);
+    }
+
+    public void RestoreMemberships(Hero hero, MobileParty party)
+    {
+        if (hero == null)
+            throw new ArgumentNullException(nameof(hero));
+        if (party == null)
+            throw new ArgumentNullException(nameof(party));
+        if (hero.Clan == null || hero.CharacterObject == null)
+            throw new InvalidOperationException("The transferred player hero has no clan or character object.");
+        if (party.Party == null ||
+            party.Party.MobileParty != party ||
+            party.PartyComponent == null ||
+            party.MemberRoster == null ||
+            party.PrisonRoster == null ||
+            party.ItemRoster == null)
+        {
+            throw new InvalidOperationException("The transferred player party graph is incomplete.");
+        }
+
+        // Binary hero transfer reconstructs MobileParty and PartyComponent separately. On the
+        // dedicated runtime the component's non-saved back-reference can therefore still be null
+        // here even though the MobileParty already owns that component. Native ChangePartyLeader
+        // dereferences PartyComponent.MobileParty immediately, so restore the invariant before any
+        // membership/leader operation. A component pointing at another party is corrupt and must
+        // fail closed instead of mutating either graph.
+        if (party.PartyComponent.MobileParty == null)
+            party.PartyComponent.MobileParty = party;
+        else if (party.PartyComponent.MobileParty != party)
+            throw new InvalidOperationException("The transferred player party component belongs to another party.");
+
         // Transferred root references can be missing from clan, roster, and party-component state.
         if (!hero.Clan.Heroes.Contains(hero))
             hero.Clan.OnLordAdded(hero);
@@ -195,9 +230,6 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         if (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null)
         {
             hero.PartyBelongedTo = null;
-
-            if (party.LeaderHero != null)
-                party.ChangePartyLeader(null);
 
             var heroCount = party.MemberRoster.GetTroopCount(hero.CharacterObject);
             if (heroCount > 0)
@@ -215,6 +247,23 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
 
         if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
             party.MemberRoster.AddToCounts(hero.CharacterObject, 1, insertAtFront: true);
+    }
+
+    public void RestorePartyLeader(Hero hero, MobileParty party)
+    {
+        if (hero == null)
+            throw new ArgumentNullException(nameof(hero));
+        if (party == null)
+            throw new ArgumentNullException(nameof(party));
+        if (party.PartyComponent == null || party.PartyComponent.MobileParty != party)
+            throw new InvalidOperationException("The transferred player party component is not ready.");
+
+        if (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null)
+        {
+            if (party.LeaderHero != null)
+                party.ChangePartyLeader(null);
+            return;
+        }
 
         if (party.LeaderHero != hero)
             party.ChangePartyLeader(hero);

@@ -2,10 +2,12 @@
 using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages.Collections;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.TroopRosters.Messages;
+using Helpers;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +16,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.TroopRosters.Interfaces;
 
@@ -55,7 +58,10 @@ public interface ITroopRosterInterface : IGameAbstraction
     /// <summary>
     /// Runs troop recruitment logic for client requests.
     /// </summary>
-    void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart);
+    bool TryHandleOnRecruitmentDone(
+        string mobilePartyId,
+        TroopInfo[] troopsInCart,
+        out string rejectionReason);
 
     /// <summary>
     /// Players are able to change the order of their party roster.
@@ -232,10 +238,24 @@ internal class TroopRosterInterface : ITroopRosterInterface
             }
         }
 
-        // AddToCounts(hero, -n) nulls the hero's party linkage, so additions must be the last operation.
-        ApplyDeltaElements(elements, applyAdditions: false);
-        ApplyDeltaElements(elements, applyAdditions: true);
-        return true;
+        var snapshots = deltas
+            .Select(entry => entry.roster)
+            .Distinct()
+            .ToDictionary(roster => roster, SumByCharacter);
+        try
+        {
+            ApplyDeltaElements(elements, applyAdditions: false);
+            ApplyDeltaElements(elements, applyAdditions: true);
+            return true;
+        }
+        catch (System.Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Troop roster delta failed; restoring authoritative snapshots");
+            RestoreRosterSnapshots(snapshots);
+            return false;
+        }
     }
 
     private void ApplyDeltaElements(
@@ -266,6 +286,79 @@ internal class TroopRosterInterface : ITroopRosterInterface
         }
     }
 
+    private static bool RestoreRosterSnapshots(
+        IReadOnlyDictionary<TroopRoster, Dictionary<CharacterObject,
+            (int number, int wounded, int xp)>> snapshots)
+    {
+        bool restored = true;
+        // Remove excess units from every roster before adding missing units back.
+        // This preserves hero party linkage across a failed transfer.
+        for (int pass = 0; pass < 2; pass++)
+        {
+            foreach (var snapshot in snapshots)
+            {
+                var current = SumByCharacter(snapshot.Key);
+                var characters = new HashSet<CharacterObject>(current.Keys);
+                characters.UnionWith(snapshot.Value.Keys);
+                foreach (CharacterObject character in characters)
+                {
+                    current.TryGetValue(character, out var actual);
+                    snapshot.Value.TryGetValue(character, out var target);
+                    int numberDelta = target.number - actual.number;
+                    if ((numberDelta < 0) != (pass == 0))
+                        continue;
+                    if (!RestoreRosterElement(
+                            snapshot.Key, character, target))
+                        restored = false;
+                }
+            }
+        }
+        return restored;
+    }
+
+    private static bool RestoreRosterElement(
+        TroopRoster roster,
+        CharacterObject character,
+        (int number, int wounded, int xp) target)
+    {
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            var current = SumByCharacter(roster);
+            current.TryGetValue(character, out var actual);
+            int numberDelta = target.number - actual.number;
+            int woundedDelta = target.wounded - actual.wounded;
+            int xpDelta = target.xp - actual.xp;
+            if (numberDelta == 0 && woundedDelta == 0 && xpDelta == 0)
+                return true;
+            try
+            {
+                roster.AddToCounts(
+                    character,
+                    numberDelta,
+                    false,
+                    woundedDelta,
+                    xpDelta,
+                    true);
+            }
+            catch (System.Exception rollbackException)
+            {
+                Logger.Error(
+                    rollbackException,
+                    "Troop roster snapshot restore threw for {Character}",
+                    character?.StringId);
+            }
+        }
+
+        var final = SumByCharacter(roster);
+        final.TryGetValue(character, out var finalValue);
+        bool matches = finalValue == target;
+        if (!matches)
+            Logger.Error(
+                "Troop roster snapshot restore did not converge for {Character}",
+                character?.StringId);
+        return matches;
+    }
+
     private static Dictionary<CharacterObject, (int number, int wounded, int xp)> SumByCharacter(TroopRoster roster)
     {
         var counts = new Dictionary<CharacterObject, (int number, int wounded, int xp)>();
@@ -280,50 +373,232 @@ internal class TroopRosterInterface : ITroopRosterInterface
         return counts;
     }
 
-    public void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart)
+    public bool TryHandleOnRecruitmentDone(
+        string mobilePartyId,
+        TroopInfo[] troopsInCart,
+        out string rejectionReason)
     {
-        if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out MobileParty mobileParty)) return;
+        rejectionReason = "Recruitment could not be completed.";
+        if (!objectManager.TryGetObjectWithLogging(
+                mobilePartyId, out MobileParty mobileParty) ||
+            mobileParty?.LeaderHero == null ||
+            troopsInCart == null || troopsInCart.Length == 0)
+            return false;
 
-        List<(Hero, CharacterObject, int)> herosValidated = new();
+        List<(Hero hero, CharacterObject character, int resolvedIndex, bool rebound)>
+            herosValidated = new();
+        HashSet<(Hero, int)> submittedSlots = new();
+        HashSet<(Hero, int)> claimedSlots = new();
+        Settlement currentSettlement = mobileParty.CurrentSettlement;
+        if (currentSettlement == null)
+        {
+            rejectionReason = "You are no longer in that settlement.";
+            return false;
+        }
 
         // Validate troops before committing to recruiting
         foreach (var troop in troopsInCart)
         {
-            if (!objectManager.TryGetObjectWithLogging(troop.RecruiterHeroId, out Hero hero)) continue;
-            if (!objectManager.TryGetObjectWithLogging(troop.CharacterObjectId, out CharacterObject characterObject)) continue;
+            if (!objectManager.TryGetObjectWithLogging(
+                    troop.RecruiterHeroId, out Hero hero) ||
+                !objectManager.TryGetObjectWithLogging(
+                    troop.CharacterObjectId, out CharacterObject characterObject) ||
+                troop.TroopIndex < 0 ||
+                troop.TroopIndex >= hero.VolunteerTypes.Length ||
+                !submittedSlots.Add((hero, troop.TroopIndex)) ||
+                hero.CurrentSettlement != currentSettlement ||
+                !currentSettlement.Notables.Contains(hero))
+            {
+                rejectionReason = "The requested volunteer slot is no longer valid.";
+                return false;
+            }
 
-            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.TroopIndex];
+            int resolvedIndex = ResolveVolunteerSlot(
+                mobileParty.LeaderHero,
+                hero,
+                characterObject,
+                troop.TroopIndex,
+                claimedSlots);
+            if (resolvedIndex < 0)
+            {
+                rejectionReason =
+                    "That volunteer changed while the recruitment screen was open. No troops were recruited; please try again.";
+                return false;
+            }
 
-            if (volunteerTroopAtIndex is null) continue;
+            claimedSlots.Add((hero, resolvedIndex));
+            herosValidated.Add((
+                hero,
+                characterObject,
+                resolvedIndex,
+                resolvedIndex != troop.TroopIndex));
+        }
 
-            herosValidated.Add((hero, characterObject, troop.TroopIndex));
+        if ((long)mobileParty.Party.NumberOfAllMembers +
+                herosValidated.Count > mobileParty.Party.PartySizeLimit)
+        {
+            rejectionReason = "Your party no longer has room for those recruits.";
+            return false;
         }
 
         // Calculate cost before changing any data
         var cost = 0;
-        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
+        foreach (var validated in herosValidated)
         {
-            cost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(characterObject, mobileParty.LeaderHero).RoundedResultNumber;
+            cost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(
+                validated.character, mobileParty.LeaderHero).RoundedResultNumber;
         }
 
         // Do not apply recruitment if the player does not have enough gold
         if (cost > mobileParty.LeaderHero.Gold)
         {
             Logger.Warning("Attempted to recruit troops that cost more than the player had");
-            return;
+            rejectionReason = "You no longer have enough denars for this recruitment.";
+            return false;
         }
 
-        // Commit recruitment
-        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
+        // Commit recruitment with compensation. A native event/patch exception
+        // must not consume a volunteer, troop or denars while the transaction is
+        // reported as rejected.
+        int goldBefore = mobileParty.LeaderHero.Gold;
+        var rosterBefore = new Dictionary<TroopRoster, Dictionary<
+            CharacterObject, (int number, int wounded, int xp)>>
         {
-            hero.VolunteerTypes[index] = null;
-            MessageBroker.Instance.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
-
-            mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
+            [mobileParty.MemberRoster] =
+                SumByCharacter(mobileParty.MemberRoster)
+        };
+        var clearedSlots = new List<(Hero hero, CharacterObject troop, int index)>();
+        try
+        {
+            GiveGoldAction.ApplyBetweenCharacters(
+                mobileParty.LeaderHero, null, cost, false);
+            foreach (var validated in herosValidated)
+            {
+                validated.hero.VolunteerTypes[validated.resolvedIndex] = null;
+                clearedSlots.Add((
+                    validated.hero,
+                    validated.character,
+                    validated.resolvedIndex));
+                mobileParty.MemberRoster.AddToCounts(
+                    validated.character, 1, false, 0, 0, true, -1);
+            }
+        }
+        catch (System.Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Recruitment failed during commit; restoring authoritative state");
+            RestoreRosterSnapshots(rosterBefore);
+            foreach (var cleared in clearedSlots)
+                cleared.hero.VolunteerTypes[cleared.index] = cleared.troop;
+            mobileParty.LeaderHero.Gold = goldBefore;
+            rejectionReason =
+                "Recruitment could not be committed safely. Please try again.";
+            return false;
         }
 
-        GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, cost, false);
+        // State is committed. Notifications and progression may fail, but must
+        // never turn the accepted recruitment into a retryable transaction.
+        var reboundSnapshots = new Dictionary<Hero, CharacterObject[]>();
+        foreach (var validated in herosValidated)
+        {
+            try
+            {
+                if (validated.rebound)
+                {
+                    reboundSnapshots[validated.hero] =
+                        validated.hero.VolunteerTypes.ToArray();
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(
+                        this,
+                        new VolunteerTypesArrayUpdated(
+                            validated.hero,
+                            null,
+                            validated.resolvedIndex));
+                }
+            }
+            catch (System.Exception exception)
+            {
+                Logger.Error(
+                    exception,
+                    "Recruitment committed, but volunteer broadcast failed");
+            }
+            try
+            {
+                CampaignEventDispatcher.Instance.OnUnitRecruited(
+                    validated.character, 1);
+            }
+            catch (System.Exception exception)
+            {
+                Logger.Error(
+                    exception,
+                    "Recruitment committed, but progression event failed");
+            }
+        }
+
+        if (reboundSnapshots.Count > 0)
+        {
+            try
+            {
+                MessageBroker.Instance.Publish(
+                    this,
+                    new VolunteersUpdated(reboundSnapshots));
+            }
+            catch (System.Exception exception)
+            {
+                Logger.Error(
+                    exception,
+                    "Recruitment committed, but rebound volunteer snapshot failed");
+            }
+        }
+
+        rejectionReason = string.Empty;
+        return true;
+    }
+
+    private static int ResolveVolunteerSlot(
+        Hero recruitingHero,
+        Hero notable,
+        CharacterObject requestedCharacter,
+        int requestedIndex,
+        HashSet<(Hero, int)> claimedSlots)
+    {
+        if (SlotMatches(
+                recruitingHero,
+                notable,
+                requestedCharacter,
+                requestedIndex,
+                claimedSlots))
+            return requestedIndex;
+
+        for (int index = 0; index < notable.VolunteerTypes.Length; index++)
+        {
+            if (index != requestedIndex && SlotMatches(
+                    recruitingHero,
+                    notable,
+                    requestedCharacter,
+                    index,
+                    claimedSlots))
+                return index;
+        }
+
+        return -1;
+    }
+
+    private static bool SlotMatches(
+        Hero recruitingHero,
+        Hero notable,
+        CharacterObject requestedCharacter,
+        int index,
+        HashSet<(Hero, int)> claimedSlots)
+    {
+        return index >= 0 &&
+            index < notable.VolunteerTypes.Length &&
+            !claimedSlots.Contains((notable, index)) &&
+            ReferenceEquals(notable.VolunteerTypes[index], requestedCharacter) &&
+            HeroHelper.HeroCanRecruitFromHero(recruitingHero, notable, index);
     }
 
     public TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster)

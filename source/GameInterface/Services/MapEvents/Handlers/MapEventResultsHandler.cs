@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Interfaces;
@@ -10,7 +11,11 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Data;
 using Serilog;
+using System;
+using System.Collections.Generic;
+using LiteNetLib;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -28,6 +33,10 @@ internal class MapEventResultsHandler : IHandler
     private readonly IMapEventResultsInterface mapEventResultsInterface;
     private readonly IMapEventContributionBarrier contributionBarrier;
     private readonly IPlayerManager playerManager;
+    private readonly IBattleLootGrantRegistry battleLootGrants;
+    private readonly IBattlePartyGrantRegistry battlePartyGrants;
+    private readonly object lootPeerGate = new();
+    private readonly Dictionary<NetPeer, string> lootControllerByPeer = new();
 
     public MapEventResultsHandler(
         IMessageBroker messageBroker,
@@ -35,7 +44,9 @@ internal class MapEventResultsHandler : IHandler
         IObjectManager objectManager,
         IMapEventResultsInterface mapEventResultsInterface,
         IMapEventContributionBarrier contributionBarrier,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IBattleLootGrantRegistry battleLootGrants,
+        IBattlePartyGrantRegistry battlePartyGrants)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -43,10 +54,13 @@ internal class MapEventResultsHandler : IHandler
         this.mapEventResultsInterface = mapEventResultsInterface;
         this.contributionBarrier = contributionBarrier;
         this.playerManager = playerManager;
+        this.battleLootGrants = battleLootGrants;
+        this.battlePartyGrants = battlePartyGrants;
 
         messageBroker.Subscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
         messageBroker.Subscribe<NetworkCommitMapEventResults>(Handle_NetworkCommitMapEventResults);
         messageBroker.Subscribe<MapEventContributionFlushRequested>(Handle_MapEventContributionFlushRequested);
+        messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     public void Dispose()
@@ -54,6 +68,7 @@ internal class MapEventResultsHandler : IHandler
         messageBroker.Unsubscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
         messageBroker.Unsubscribe<NetworkCommitMapEventResults>(Handle_NetworkCommitMapEventResults);
         messageBroker.Unsubscribe<MapEventContributionFlushRequested>(Handle_MapEventContributionFlushRequested);
+        messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     private void Handle_MapEventContributionFlushRequested(
@@ -88,6 +103,43 @@ internal class MapEventResultsHandler : IHandler
                     continue;
                 }
 
+                lock (lootPeerGate)
+                    lootControllerByPeer[peer] = player.ControllerId;
+
+                if (mapEvent.WinningSide == playerSide)
+                {
+                    ItemRosterElement[] awardedItems = null;
+                    networkPlayerLootData.LootedItems?.TryGetValue(
+                        playerMapEventPartyId,
+                        out awardedItems);
+                    battleLootGrants.Stage(
+                        player.ControllerId,
+                        player.HeroId,
+                        player.MobilePartyId,
+                        mapEventId,
+                        awardedItems ?? Array.Empty<ItemRosterElement>());
+                    var awardedMembers = new TroopRosterData(
+                        Array.Empty<TroopRosterElementData>());
+                    var awardedPrisoners = new TroopRosterData(
+                        Array.Empty<TroopRosterElementData>());
+                    networkPlayerLootData.LootedMembers?.TryGetValue(
+                        playerMapEventPartyId, out awardedMembers);
+                    networkPlayerLootData.LootedPrisoners?.TryGetValue(
+                        playerMapEventPartyId, out awardedPrisoners);
+                    battlePartyGrants.Stage(
+                        player.ControllerId,
+                        player.HeroId,
+                        player.MobilePartyId,
+                        mapEventId,
+                        awardedMembers,
+                        awardedPrisoners);
+                }
+                else
+                {
+                    battleLootGrants.Forfeit(player.ControllerId);
+                    battlePartyGrants.Forfeit(player.ControllerId);
+                }
+
                 network.Send(peer, new NetworkCommitMapEventResults(
                     mapEventId,
                     mapEvent.WinningSide,
@@ -96,6 +148,25 @@ internal class MapEventResultsHandler : IHandler
                     networkPlayerLootData));
             }
         });
+    }
+
+    private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
+    {
+        if (ModInformation.IsClient || payload?.What?.PlayerId == null)
+            return;
+
+        string controllerId = null;
+        lock (lootPeerGate)
+        {
+            if (lootControllerByPeer.TryGetValue(payload.What.PlayerId, out controllerId))
+                lootControllerByPeer.Remove(payload.What.PlayerId);
+        }
+
+        if (!string.IsNullOrEmpty(controllerId))
+        {
+            battleLootGrants.Forfeit(controllerId);
+            battlePartyGrants.Forfeit(controllerId);
+        }
     }
 
     private void Handle_NetworkCommitMapEventResults(MessagePayload<NetworkCommitMapEventResults> obj)

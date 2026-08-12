@@ -59,7 +59,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             {
                 if (!objectManager.TryGetIdWithLogging(playerLootedItems.Key, out var mapEventPartyId)) continue;
 
-                lootedItems[mapEventPartyId] = playerLootedItems.Value._data;
+                lootedItems[mapEventPartyId] = playerLootedItems.Value.ToArray();
             }
 
             foreach (var playerLootedMembers in playerLootData.LootedMembers)

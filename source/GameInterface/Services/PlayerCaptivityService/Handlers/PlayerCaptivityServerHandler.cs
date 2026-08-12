@@ -60,6 +60,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
+    private readonly HashSet<string> invalidCaptorPositionsLogged = new HashSet<string>();
 
     public PlayerCaptivityServerHandler(
         IObjectManager objectManager,
@@ -452,7 +453,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         var facilitatorId = payload.What.FacilitatorId;
         var detail = payload.What.Detail;
         var ransomAmount = payload.What.RansomAmount;
-        var releasePosition = payload.What.PlayerPartyPosition;
         var peer = payload.Who as NetPeer;
 
         // The release touches party/roster game state the main-thread tick also touches, so defer the
@@ -474,6 +474,23 @@ internal class PlayerCaptivityServerHandler : IHandler
 
                 PlayerCaptivityLogger.Debug("Handle_NetworkEndPlayerCaptivityAttempted (server): hero={HeroId} party={PartyId} detail={Detail} facilitator={FacilitatorId}",
                     playerHero.StringId, playerParty.StringId, detail, facilitator?.StringId);
+
+                // Use authoritative campaign geography only. The position in
+                // the client request is not trusted, and no invalid position is
+                // ever installed or broadcast.
+                if (!TryResolveReleasePosition(
+                        playerHero,
+                        playerParty,
+                        GetReleasePosition(
+                            playerHero.PartyBelongedToAsPrisoner,
+                            CampaignVec2.Invalid),
+                        out CampaignVec2 releasePosition))
+                {
+                    Logger.Error(
+                        "Could not resolve a valid release position for {HeroId}; captivity remains active",
+                        playerHero.StringId);
+                    return;
+                }
 
                 ReleasePlayerFromCaptivity(playerHero, playerParty, detail, facilitator, releasePosition);
 
@@ -516,9 +533,21 @@ internal class PlayerCaptivityServerHandler : IHandler
             playerHero.StringId, playerParty.StringId, payload.What.Detail);
 
         var captorParty = playerHero.PartyBelongedToAsPrisoner;
-        var releasePosition = payload.What.HasReleasePosition
+        var preferredReleasePosition = payload.What.HasReleasePosition
             ? payload.What.ReleasePosition
             : GetReleasePosition(captorParty, playerParty.Position);
+
+        if (!TryResolveReleasePosition(
+                playerHero,
+                playerParty,
+                preferredReleasePosition,
+                out CampaignVec2 releasePosition))
+        {
+            Logger.Error(
+                "Could not resolve a valid release position for {HeroId}; captivity remains active",
+                playerHero.StringId);
+            return;
+        }
 
         ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, payload.What.Facilitator, releasePosition);
     }
@@ -611,12 +640,42 @@ internal class PlayerCaptivityServerHandler : IHandler
         // would be meaningless.
         if (captorParty?.IsActive == true && captorParty.IsMobile && !captorParty.MobileParty.IsCurrentlyAtSea)
         {
-            playerParty.TeleportPartyToOutSideOfEncounterRadius();
+            // The parked captive party can itself hold an invalid position. Seed native separation from
+            // the already-validated release coordinate, retain its valid result, and fail back to the seed
+            // if navigation cannot produce one. The old order called the helper on the invalid parked
+            // position and then overwrote its result later in this method.
+            CampaignVec2 releaseSeed = releasePosition;
+            playerParty.Position = releaseSeed;
+            try
+            {
+                playerParty.TeleportPartyToOutSideOfEncounterRadius();
+                if (playerParty.Position.IsValid())
+                {
+                    releasePosition = playerParty.Position;
+                }
+                else
+                {
+                    releasePosition = releaseSeed;
+                    playerParty.Position = releaseSeed;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(
+                    ex,
+                    "Could not separate released party {PartyId} from its captor; using validated release position",
+                    playerParty.StringId);
+                releasePosition = releaseSeed;
+                playerParty.Position = releaseSeed;
+            }
         }
 
         if (captorParty != null && captorParty.IsSettlement)
         {
-            playerParty.DisembarkToPosition(captorParty.Settlement.GatePosition);
+            // releasePosition has already passed the authoritative fallback chain. Using the
+            // settlement gate again here could reinstall the invalid coordinate that the chain
+            // deliberately rejected; DisembarkToPosition writes both Position and TargetPosition.
+            playerParty.DisembarkToPosition(releasePosition);
         }
         else if (captorParty != null && captorParty.IsMobile)
         {
@@ -686,8 +745,54 @@ internal class PlayerCaptivityServerHandler : IHandler
         return captorParty.Position;
     }
 
+    private static bool TryResolveReleasePosition(
+        Hero playerHero,
+        MobileParty playerParty,
+        CampaignVec2 preferredPosition,
+        out CampaignVec2 releasePosition)
+    {
+        if (preferredPosition.IsValid())
+        {
+            releasePosition = preferredPosition;
+            return true;
+        }
+
+        if (playerParty?.Position.IsValid() == true)
+        {
+            releasePosition = playerParty.Position;
+            return true;
+        }
+
+        CampaignVec2 heroPosition = playerHero?.GetCampaignPosition() ??
+            CampaignVec2.Invalid;
+        if (heroPosition.IsValid())
+        {
+            releasePosition = heroPosition;
+            return true;
+        }
+
+        CampaignVec2 settlementPosition =
+            playerHero?.LastKnownClosestSettlement?.GatePosition ??
+            CampaignVec2.Invalid;
+        if (settlementPosition.IsValid())
+        {
+            releasePosition = settlementPosition;
+            return true;
+        }
+
+        releasePosition = CampaignVec2.Invalid;
+        return false;
+    }
+
     private void SyncReleasePosition(MobileParty playerParty, CampaignVec2 releasePosition)
     {
+        if (!releasePosition.IsValid())
+        {
+            Logger.Error(
+                "Refused to broadcast an invalid release position for {PartyId}",
+                playerParty?.StringId);
+            return;
+        }
         if (!objectManager.TryGetIdWithLogging(playerParty, out string playerPartyId)) return;
 
         network.SendAll(new NetworkPlayerCaptivityReleasePositionSet(playerPartyId, releasePosition));
@@ -773,7 +878,37 @@ internal class PlayerCaptivityServerHandler : IHandler
 
             if (captorParty == null) continue;
 
-            mobileParty.Position = captorParty.Position;
+            CampaignVec2 captorPosition = captorParty.Position;
+            string partyKey = mobileParty.StringId ?? hero.StringId ?? "unknown-player-party";
+            if (captorPosition.IsValid())
+            {
+                invalidCaptorPositionsLogged.Remove(partyKey);
+                mobileParty.Position = captorPosition;
+                continue;
+            }
+
+            // Never propagate an invalid captor coordinate through the normal movement sync. Keep
+            // the captive party at its last valid authoritative location; if that is invalid too,
+            // repair it from the same server-owned hero/settlement fallback used by release.
+            if (!mobileParty.Position.IsValid() &&
+                TryResolveReleasePosition(
+                    hero,
+                    mobileParty,
+                    CampaignVec2.Invalid,
+                    out CampaignVec2 fallbackPosition))
+            {
+                mobileParty.Position = fallbackPosition;
+            }
+
+            if (invalidCaptorPositionsLogged.Add(partyKey))
+            {
+                Logger.Warning(
+                    "Refused invalid captive-follow position from captor {CaptorId} for party {PartyId}",
+                    captorParty.MobileParty?.StringId ??
+                        captorParty.Settlement?.StringId ??
+                        "unknown-captor",
+                    partyKey);
+            }
         }
     }
 

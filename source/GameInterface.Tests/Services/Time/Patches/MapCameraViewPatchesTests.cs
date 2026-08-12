@@ -23,8 +23,35 @@ public class MapCameraViewPatchesTests
     }
 
     [Fact]
-    public void ShouldTickMapCamera_WhenMenuStateIsActive_ReturnsTrue()
+    public void ShouldTickMapCamera_WhenMapMenuIsActive_ReturnsFalse()
     {
-        Assert.True(MapCameraViewPatches.ShouldTickMapCamera(new InventoryState()));
+        Assert.False(MapCameraViewPatches.ShouldTickMapCamera(
+            new MapState(), isInMenu: true));
+    }
+
+    [Fact]
+    public void ShouldTickMapCamera_WhenMapConversationIsActive_ReturnsFalse()
+    {
+        Assert.False(MapCameraViewPatches.ShouldTickMapCamera(
+            new MapState(), isConversationActive: true));
+    }
+
+    [Fact]
+    public void ShouldTickMapCamera_WhenEncounterTransitionIsActive_ReturnsFalse()
+    {
+        Assert.False(MapCameraViewPatches.ShouldTickMapCamera(
+            new MapState(), isEncounterActive: true));
+    }
+
+    [Fact]
+    public void ShouldTickMapCamera_WhenMenuStateIsActive_ReturnsFalse()
+    {
+        Assert.False(MapCameraViewPatches.ShouldTickMapCamera(new InventoryState()));
+    }
+
+    [Fact]
+    public void ShouldTickMapCamera_WhenNoStateIsActive_ReturnsFalse()
+    {
+        Assert.False(MapCameraViewPatches.ShouldTickMapCamera(null));
     }
 }

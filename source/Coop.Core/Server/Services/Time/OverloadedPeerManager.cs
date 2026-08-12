@@ -34,12 +34,14 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private TimeControlEnum? originalSpeed;
     private volatile NetPeer[] cachedOverloadedPeers = Array.Empty<NetPeer>();
     private readonly Dictionary<NetPeer, DateTime> joinCatchUpStartedUtc = new Dictionary<NetPeer, DateTime>();
+    private readonly HashSet<NetPeer> idleJoinPeers = new HashSet<NetPeer>();
+    private bool resumeAtPlayAfterIdleJoin;
 
     // Diagnostics for the catch-up pause: when it started and when depths were last logged, so a
     // long pause leaves periodic evidence in the log instead of only an in-game message.
     private DateTime pauseStartedUtc;
     private DateTime lastPauseDepthLogUtc;
-    private static readonly TimeSpan PauseDepthLogInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan PauseDepthLogInterval = TimeSpan.FromSeconds(30);
     internal static readonly TimeSpan JoinCatchUpPauseDelay = TimeSpan.FromSeconds(20);
 
     public OverloadedPeerManager(
@@ -67,6 +69,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         // Removes pause policy from time handler
         timeControlInterface.RemoveUnpausePolicy(PlayersOverloadedPolicy);
         joinCatchUpStartedUtc.Clear();
+        idleJoinPeers.Clear();
     }
 
     private static int GetQueueDepth(NetPeer peer)
@@ -90,14 +93,19 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private List<NetPeer> UpdateJoinCatchUpPeers(DateTime utcNow)
     {
         var peers = connectionCollection
-            .Where(logic => logic.State is LoadingState { IsJoinCatchUpPending: true })
+            .Where(logic => logic.State is LoadingState { IsJoinCatchUpPauseEligible: true })
             .Select(logic => logic.Peer)
             .ToList();
         var activePeers = new HashSet<NetPeer>(peers);
 
         foreach (var peer in joinCatchUpStartedUtc.Keys.Where(peer => !activePeers.Contains(peer)).ToArray())
         {
+            var connection = connectionCollection.FirstOrDefault(logic => logic.Peer == peer);
             joinCatchUpStartedUtc.Remove(peer);
+            if (idleJoinPeers.Remove(peer) && connection?.IsLoading == false)
+            {
+                resumeAtPlayAfterIdleJoin = true;
+            }
         }
 
         foreach (var peer in peers)
@@ -105,15 +113,25 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             if (!joinCatchUpStartedUtc.ContainsKey(peer))
             {
                 joinCatchUpStartedUtc.Add(peer, utcNow);
+                bool hasCampaignPeer = connectionCollection.Any(logic => logic.IsLoading == false);
+                if (!hasCampaignPeer &&
+                    timeControlInterface.GetTimeControl() == TimeControlEnum.Pause)
+                {
+                    idleJoinPeers.Add(peer);
+                }
             }
         }
 
         return peers;
     }
 
-    private List<NetPeer> GetStalledJoiningPeers(IEnumerable<NetPeer> joinCatchUpPeers, DateTime utcNow) =>
+    private List<NetPeer> GetStalledJoiningPeers(
+        IEnumerable<NetPeer> joinCatchUpPeers,
+        DateTime utcNow,
+        int queueThreshold) =>
         joinCatchUpPeers
-            .Where(peer => utcNow - joinCatchUpStartedUtc[peer] >= JoinCatchUpPauseDelay)
+            .Where(peer => utcNow - joinCatchUpStartedUtc[peer] >= JoinCatchUpPauseDelay &&
+                GetReportedQueueDepth(peer) > queueThreshold)
             .ToList();
 
     private int GetReportedQueueDepth(NetPeer peer) =>
@@ -126,7 +144,15 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private string DescribePeerQueues(IEnumerable<NetPeer> peers)
     {
         return string.Join(", ", peers.Select(peer =>
-            $"{peer.Id}@{peer.Address} queue={GetReportedQueueDepth(peer)} ping={peer.Ping}ms"));
+        {
+            string phase = connectionCollection
+                .FirstOrDefault(logic => logic.Peer == peer)?.State is LoadingState loading
+                ? loading.JoinPhaseName
+                : "Campaign";
+            return $"{peer.Id}@{peer.Address} phase={phase} " +
+                   $"queue={GetReportedQueueDepth(peer)} ping={peer.Ping}ms " +
+                   connectionMessageQueue.DescribeCatchUp(peer);
+        }));
     }
 
     public void CheckForOverloadedPeers() => CheckForOverloadedPeers(DateTime.UtcNow);
@@ -134,7 +160,10 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     internal void CheckForOverloadedPeers(DateTime utcNow)
     {
         var joinCatchUpPeers = UpdateJoinCatchUpPeers(utcNow);
-        var stalledJoiningPeers = GetStalledJoiningPeers(joinCatchUpPeers, utcNow);
+        var stalledJoiningPeers = GetStalledJoiningPeers(
+            joinCatchUpPeers,
+            utcNow,
+            config.MaxPacketsInQueue);
 
         // While paused for overload, hold until every peer has drained below the (lower) resume
         // threshold, not just back under the pause threshold. The gap between the two thresholds is
@@ -142,7 +171,10 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         if (originalSpeed.HasValue)
         {
             var stillDraining = GetLivePeersAboveThreshold(config.ResumePacketsInQueue)
-                .Concat(stalledJoiningPeers)
+                .Concat(GetStalledJoiningPeers(
+                    joinCatchUpPeers,
+                    utcNow,
+                    config.ResumePacketsInQueue))
                 .Distinct()
                 .ToArray();
             cachedOverloadedPeers = stillDraining;
@@ -151,10 +183,11 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
                 if (utcNow - lastPauseDepthLogUtc >= PauseDepthLogInterval)
                 {
                     lastPauseDepthLogUtc = utcNow;
+                    string queueDescription = DescribePeerQueues(stillDraining);
                     Logger.Information(
                         "Catch-up pause ongoing for {Seconds:0}s: {PeerQueues}",
                         (utcNow - pauseStartedUtc).TotalSeconds,
-                        DescribePeerQueues(stillDraining));
+                        queueDescription);
                 }
                 return;
             }
@@ -173,12 +206,19 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             return;
         }
 
-        if (overloadedPeers.Count == 0) return;
+        if (overloadedPeers.Count > 0)
+        {
+            PauseTime(
+                overloadedPeers.ToArray(),
+                utcNow,
+                $"{overloadedPeers.Count} clients are catching up. Pausing...");
+            return;
+        }
 
-        PauseTime(
-            overloadedPeers.ToArray(),
-            utcNow,
-            $"{overloadedPeers.Count} clients are catching up. Pausing...");
+        if (resumeAtPlayAfterIdleJoin && !originalSpeed.HasValue)
+        {
+            ResumeIdleServerAfterJoin();
+        }
     }
 
     private void PauseTime(NetPeer[] overloadedPeers, DateTime utcNow, string notification)
@@ -188,10 +228,11 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         pauseStartedUtc = utcNow;
         lastPauseDepthLogUtc = utcNow;
 
+        string queueDescription = DescribePeerQueues(overloadedPeers);
         Logger.Information(
             "Pausing campaign time for {PeerCount} peer(s): {PeerQueues}",
             overloadedPeers.Length,
-            DescribePeerQueues(overloadedPeers));
+            queueDescription);
 
         timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
         NotifyAll(notification);
@@ -201,8 +242,13 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     {
         if (!originalSpeed.HasValue) return;
 
-        var resumeSpeed = originalSpeed.Value;
+        bool joinedIdleServer = resumeAtPlayAfterIdleJoin &&
+            connectionCollection.Any(logic => logic.IsLoading == false);
+        var resumeSpeed = joinedIdleServer
+            ? TimeControlEnum.Play_1x
+            : originalSpeed.Value;
         originalSpeed = null;
+        resumeAtPlayAfterIdleJoin = false;
         cachedOverloadedPeers = Array.Empty<NetPeer>();   // clear first so the policy allows it
 
         Logger.Information(
@@ -213,19 +259,27 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         NotifyAll("All clients synchronized. Resuming...");
     }
 
+    private void ResumeIdleServerAfterJoin()
+    {
+        resumeAtPlayAfterIdleJoin = false;
+        cachedOverloadedPeers = Array.Empty<NetPeer>();
+        Logger.Information("First player finished loading; resuming idle campaign at 1x");
+        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_1x);
+        NotifyAll("All clients synchronized. Resuming...");
+    }
+
     /// <summary>
     /// Policy to prevent unpausing when a client queue is overloaded
     /// </summary>
     /// <returns>True if unpausing is allowed, otherwise false</returns>
     private bool PlayersOverloadedPolicy()
     {
-        if (cachedOverloadedPeers.Any())
-        {
-            NotifyAll($"{cachedOverloadedPeers.Length} clients are catching up. Unable to change time.");
-            return false;
-        }
-
-        return true;
+        // Policies are evaluated repeatedly while a time-control request is blocked.
+        // Broadcasting here fed a new reliable message into the same joining peer's
+        // gated queue on every evaluation, so the catch-up barrier could sustain its
+        // own backlog indefinitely. Pause/resume notifications are emitted once by
+        // PauseTime and ResumeTime instead.
+        return !cachedOverloadedPeers.Any();
     }
 
     private void NotifyAll(string message)

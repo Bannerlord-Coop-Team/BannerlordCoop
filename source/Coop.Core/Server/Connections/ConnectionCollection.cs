@@ -31,6 +31,7 @@ public class ConnectionCollection : IConnectionCollection
 
     private readonly IMessageBroker messageBroker;
     private readonly ConnectionContext connectionContext;
+    private readonly object connectionGate = new object();
 
     private int lastBroadcastLoadingCount;
 
@@ -55,21 +56,37 @@ public class ConnectionCollection : IConnectionCollection
     internal void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
     {
         var playerPeer = obj.What.PlayerPeer;
-        if (ConnectionStates.TryAdd(playerPeer, new ConnectionLogic(playerPeer, connectionContext)))
+        bool added = false;
+        lock (connectionGate)
         {
-            BroadcastConnectedPlayersChanged();
+            if (ConnectionStates.ContainsKey(playerPeer)) return;
+
+            var logic = new ConnectionLogic(playerPeer, connectionContext);
+            if (!ConnectionStates.TryAdd(playerPeer, logic))
+            {
+                logic.Dispose();
+                return;
+            }
+            added = true;
         }
+
+        if (added)
+            BroadcastConnectedPlayersChanged();
     }
 
     internal void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
     {
         var playerId = obj.What.PlayerId;
 
-        if (ConnectionStates.TryRemove(playerId, out IConnectionLogic logic))
+        IConnectionLogic logic;
+        lock (connectionGate)
         {
-            logic.Dispose();
-            BroadcastConnectedPlayersChanged();
+            ConnectionStates.TryRemove(playerId, out logic);
         }
+        logic?.Dispose();
+
+        if (logic != null)
+            BroadcastConnectedPlayersChanged();
 
         BroadcastLoadingStateIfChanged();
     }

@@ -135,6 +135,28 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         state = default;
         if (liveParties == null || liveSettlements == null)
             return FailCreation("live campaign objects are unavailable", out failure);
+        if (party?.Ai == null)
+            return FailCreation("party AI is unavailable", out failure);
+        if (!TryGetCompactId(party, out _))
+            return FailCreation("party is not registered", out failure);
+
+        if (!TryResolveAuthoritativeJoinPosition(party, out CampaignVec2 joinPosition))
+        {
+            return FailCreation(
+                $"party '{party?.StringId}' has no valid authoritative campaign position",
+                out failure);
+        }
+
+        if (!IsValidCoordinate(party.Position))
+        {
+            // Repair the authoritative object before capturing the baseline. Sending a client-local
+            // fallback would make the join appear successful while the server retained an invalid
+            // position and could broadcast it again on the next movement update.
+            party.Position = joinPosition;
+            Logger.Warning(
+                "Repaired invalid authoritative join position for party {PartyId}",
+                party.StringId);
+        }
 
         bool created = TryCreate(party, out PartyBehaviorUpdateData behavior, out failure);
         if (TryGetInvalidJoinReferences(
@@ -186,6 +208,7 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 
         // Preserve a removed move target as its last point instead of resetting the party to Hold.
         PreserveUnavailableMoveTarget(party, liveParties, ref behavior);
+        behavior.PartyPosition = joinPosition;
 
         state = new MobilePartyJoinState
         {
@@ -305,6 +328,11 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             PartyBehaviorUpdateData behavior = states[i].Behavior;
             if (string.IsNullOrEmpty(behavior.MobilePartyId))
                 return RejectJoinBaseline($"state {i} has no mobile-party id");
+            if (!IsValidCoordinate(behavior.PartyPosition))
+            {
+                return RejectJoinBaseline(
+                    $"state {i} party '{behavior.MobilePartyId}' has an invalid authoritative position");
+            }
             if (!this.objectManager.TryGetObject(
                 behavior.MobilePartyId,
                 out MobileParty party))
@@ -461,6 +489,8 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
     private static void ApplyJoinState(MobileParty party, MobilePartyJoinState state)
     {
         party.IsCurrentlyAtSea = state.IsCurrentlyAtSea;
+        // TryApplyJoinBaseline validates every state before beforeApply is invoked, so application
+        // never substitutes stale client-local geography for an invalid server position.
         party.Position = state.Behavior.PartyPosition;
         party.EventPositionAdder = state.EventPositionAdder;
         party.ArmyPositionAdder = state.ArmyPositionAdder;
@@ -470,6 +500,30 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         party.StartTransitionNextFrameToExitFromPort = state.StartTransitionNextFrameToExitFromPort;
         party.ForceAiNoPathMode = state.ForceAiNoPathMode;
     }
+
+    private static bool TryResolveAuthoritativeJoinPosition(
+        MobileParty party,
+        out CampaignVec2 position)
+    {
+        position = party?.Position ?? CampaignVec2.Invalid;
+        if (IsValidCoordinate(position))
+            return true;
+
+        position = party?.CurrentSettlement?.GatePosition ?? CampaignVec2.Invalid;
+        if (IsValidCoordinate(position))
+            return true;
+
+        position = party?.LeaderHero?.GetCampaignPosition() ?? CampaignVec2.Invalid;
+        if (IsValidCoordinate(position))
+            return true;
+
+        position = party?.LeaderHero?.LastKnownClosestSettlement?.GatePosition ??
+            CampaignVec2.Invalid;
+        return IsValidCoordinate(position);
+    }
+
+    private static bool IsValidCoordinate(CampaignVec2 position) =>
+        position.ToVec2().IsValid;
 
     private static void ApplyBehavior(ResolvedBehaviorUpdate resolved, bool resetPath)
     {

@@ -10,6 +10,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Server.Connections.States;
@@ -26,6 +27,8 @@ public class CreateCharacterState : ConnectionStateBase
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerManager;
     private readonly IExistingPlayerSender existingPlayerSender;
+    private readonly IConnectionMessageQueue connectionMessageQueue;
+    private bool playerCommitted;
 
     public CreateCharacterState(
         IConnectionLogic connectionLogic,
@@ -34,7 +37,8 @@ public class CreateCharacterState : ConnectionStateBase
         INetwork network,
         IHeroInterface heroInterface,
         IPlayerManager playerManager,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        IConnectionMessageQueue connectionMessageQueue)
         : base(connectionLogic)
     {
         this.objectManager = objectManager;
@@ -43,12 +47,15 @@ public class CreateCharacterState : ConnectionStateBase
         this.heroInterface = heroInterface;
         this.playerManager = playerManager;
         this.existingPlayerSender = existingPlayerSender;
+        this.connectionMessageQueue = connectionMessageQueue;
         messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
+        if (!playerCommitted)
+            playerManager.ReleaseNewControllerReservation(ConnectionLogic.Peer);
     }
 
     internal void Handle_NetworkTransferNewHero(MessagePayload<NetworkTransferNewHero> obj)
@@ -56,40 +63,78 @@ public class CreateCharacterState : ConnectionStateBase
         var netPeer = obj.Who as NetPeer;
 
         if (netPeer != ConnectionLogic.Peer) return;
+        if (netPeer.ConnectionState != ConnectionState.Connected)
+        {
+            playerManager.ReleaseNewControllerReservation(netPeer);
+            return;
+        }
 
         var controllerId = obj.What.PlayerId;
         var data = obj.What.PlayerHero;
 
+        if (!playerManager.TryReserveNewController(
+                controllerId, netPeer, out NetPeer existingPeer))
+        {
+            Logger.Warning(
+                "Rejected character payload for unreserved controller {ControllerId} from peer {PeerId}; " +
+                "reservation belongs to peer {ExistingPeerId}",
+                controllerId,
+                netPeer.Id,
+                existingPeer?.Id);
+            netPeer.Disconnect();
+            return;
+        }
+
+        connectionMessageQueue.InvalidateJoinSnapshot();
+
         Logger.Debug("Unpacking hero for {ControllerId}", controllerId);
 
-        var hero = heroInterface.ServerUnpackHero(data);
+        Hero hero;
+        try
+        {
+            hero = heroInterface.ServerUnpackHero(data);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Character creation failed for {ControllerId}; disconnecting", controllerId);
+            netPeer.Disconnect();
+            return;
+        }
+
+        if (netPeer.ConnectionState != ConnectionState.Connected)
+        {
+            heroInterface.DiscardUncommittedServerHero(hero);
+            playerManager.ReleaseNewControllerReservation(netPeer);
+            return;
+        }
 
         if (!TryCreatePlayer(controllerId, hero, out var player))
         {
             Logger.Error("Failed to create player; disconnecting the joining peer");
-            ConnectionLogic.Peer.Disconnect();
+            heroInterface.DiscardUncommittedServerHero(hero);
+            netPeer.Disconnect();
             return;
         }
 
-        if (!playerManager.AddPlayer(player))
+        if (!playerManager.TryCommitReservedPlayer(controllerId, netPeer, player))
         {
-            // The controller already holds a registration — two joins for it raced into character
-            // creation before either finished. Everything below assumes this peer owns the player
-            // it just created, so continuing would bind the peer to the *other* registration and
-            // announce this refused one to the joiner and every other client. Drop the connection
-            // instead, exactly as a failed create does above.
             Logger.Error(
-                "Controller {ControllerId} is already registered; disconnecting the joining peer",
+                "Character creation reservation was lost for {ControllerId}; disconnecting",
                 controllerId);
-            ConnectionLogic.Peer.Disconnect();
+            heroInterface.DiscardUncommittedServerHero(hero);
+            netPeer.Disconnect();
             return;
         }
+        playerCommitted = true;
+        connectionMessageQueue.InvalidateJoinSnapshot();
 
-        // First join: associate this peer with the player it just created.
-        playerManager.SetPeer(controllerId, netPeer);
-        // Send created to all other clients
+        // Once committed, every live client must learn about the authoritative hero even if the
+        // creator disconnects immediately afterwards.
         var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
         network.SendAllBut(netPeer, message);
+
+        if (netPeer.ConnectionState != ConnectionState.Connected)
+            return;
 
         // Respond with ids for the creating client
         network.SendImmediate(netPeer, new NetworkHeroRecieved(player));
@@ -136,10 +181,8 @@ public class CreateCharacterState : ConnectionStateBase
 
     public override void TransferSave()
     {
-        // SetState packages and sends the save synchronously; then move to LoadingState to await the
-        // client reporting it has entered the campaign. Load() must run here (not inside the
-        // TransferSaveState ctor) so it resolves against TransferSaveState, not this state.
-        ConnectionLogic.SetState<TransferSaveState>();
-        ConnectionLogic.Load();
+        var transfer = ConnectionLogic.SetState<TransferSaveState>();
+        if (transfer.StartTransfer())
+            ConnectionLogic.Load();
     }
 }

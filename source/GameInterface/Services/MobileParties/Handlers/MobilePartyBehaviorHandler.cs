@@ -174,6 +174,8 @@ internal class MobilePartyBehaviorHandler : IHandler
 
     private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
     {
+        if (!position.ToVec2().IsValid)
+            return;
         party.Position = position;
 
         if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
@@ -185,6 +187,8 @@ internal class MobilePartyBehaviorHandler : IHandler
         CampaignVec2 position,
         bool isCurrentlyAtSea)
     {
+        if (!position.ToVec2().IsValid)
+            return null;
         ApplyForcedPosition(party, position, isCurrentlyAtSea);
 
         if (party.Army == null)
@@ -247,7 +251,7 @@ internal class MobilePartyBehaviorHandler : IHandler
         CampaignVec2 currentPosition,
         CampaignVec2 authoritativePosition)
     {
-        return !isSelfEcho &&
+        return authoritativePosition.ToVec2().IsValid && !isSelfEcho &&
             (forcePosition || isHolding || currentPosition.IsOnLand != authoritativePosition.IsOnLand);
     }
 }

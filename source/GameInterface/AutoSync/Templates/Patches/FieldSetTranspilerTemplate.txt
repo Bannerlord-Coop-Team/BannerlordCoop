@@ -59,6 +59,22 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
         return;
     }
 
+{{~ if SkipUnregisteredReference ~}}
+    // Dedicated/headless implementations can satisfy a native interface without having a client-side
+    // network identity. Keep the authoritative field assignment, but do not publish an unusable reference.
+    if (newValue != null &&
+        (!GameInterface.ContainerProvider.TryResolve<GameInterface.Services.ObjectManager.IObjectManager>(out var objectManager) ||
+         !objectManager.TryGetId(newValue, out _)))
+    {
+{{~ if ReadOnly ~}}
+	    {{MemberName}}FieldInfo.SetValue(instance, newValue);
+{{~ else ~}}
+	    instance.{{MemberName}} = newValue;
+{{~ end ~}}
+        return;
+    }
+{{~ end ~}}
+
 {{~ if Debug ~}}
     Logger.Debug("[Server] Publishing local set message for {type}", "{{MemberName}}");
 {{~ end ~}}

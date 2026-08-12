@@ -15,8 +15,20 @@ internal class PartyBasePatch
 {
     [HarmonyPatch(nameof(PartyBase.ItemRoster), MethodType.Setter)]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     public static void ItemRosterSetterPrefix(PartyBase __instance, ItemRoster value)
     {
+        if (!ModInformation.IsClient &&
+            !CallOriginalPolicy.IsOriginalAllowed() &&
+            value != null &&
+            !ItemRosterPatch.IsRegistered(value))
+        {
+            // ItemRoster's tiny constructor can be inlined by the runtime, bypassing its lifetime patch.
+            // Assignment to a PartyBase is the reliable boundary that proves this is persistent state.
+            // Register synchronously before the generated ItemRoster reference-sync prefix resolves its id.
+            MessageBroker.Instance.Publish(null, new ItemRosterCreated(value));
+        }
+
         if (ModInformation.IsClient) return;
 
         ItemRosterLookup.Set(value, __instance);

@@ -205,12 +205,12 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void SendAll(IPacket packet)
     {
-        SendAll(netManager, packet);
+        connectionMessageQueue.ExecuteWorldSend(packet, () => SendAll(netManager, packet));
     }
 
     public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
-        SendAllBut(netManager, ignoredPeer, packet);
+        connectionMessageQueue.ExecuteWorldSend(packet, () => SendAllBut(netManager, ignoredPeer, packet));
     }
 
     // Every per-peer send funnels through here, so a still-loading peer's world deltas are dropped
@@ -219,7 +219,10 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     // mid-join peer (the save, the join handshake) uses SendImmediate to bypass this.
     public override void Send(NetPeer netPeer, IPacket packet)
     {
-        if (connectionMessageQueue.TryHandleBroadcast(netPeer, packet)) return;
-        base.Send(netPeer, packet);
+        connectionMessageQueue.ExecuteWorldSend(packet, () =>
+        {
+            if (connectionMessageQueue.TryHandleBroadcast(netPeer, packet)) return;
+            base.Send(netPeer, packet);
+        });
     }
 }

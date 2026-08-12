@@ -27,23 +27,33 @@ public class ExistingPlayerSender : IExistingPlayerSender
 {
     private readonly IPlayerManager playerManager;
     private readonly INetwork network;
+    private readonly IConnectionMessageQueue connectionMessageQueue;
 
-    public ExistingPlayerSender(IPlayerManager playerManager, INetwork network)
+    public ExistingPlayerSender(
+        IPlayerManager playerManager,
+        INetwork network,
+        IConnectionMessageQueue connectionMessageQueue)
     {
         this.playerManager = playerManager;
         this.network = network;
+        this.connectionMessageQueue = connectionMessageQueue;
     }
 
     public void SendExistingPlayers(NetPeer joiner, string joinerControllerId)
     {
-        foreach (var player in playerManager.Players)
+        // These empty-data messages only restore controller markers for heroes already present in
+        // the save. They still enter the joiner's queue, but do not dirty the snapshot itself.
+        connectionMessageQueue.ExecuteCacheNeutralWorldSend(() =>
         {
-            // Skip the joiner's own player (it registers itself on load) and the host (the server is not a
-            // controlled player on clients).
-            if (player.ControllerId == joinerControllerId) continue;
-            if (player.ControllerId == CoopServer.ServerControllerId) continue;
+            foreach (var player in playerManager.Players)
+            {
+                // Skip the joiner's own player (it registers itself on load) and the host (the server is not a
+                // controlled player on clients).
+                if (player.ControllerId == joinerControllerId) continue;
+                if (player.ControllerId == CoopServer.ServerControllerId) continue;
 
-            network.Send(joiner, new NetworkNewPlayerHeroCreated(player.ControllerId, player, Array.Empty<byte>()));
-        }
+                network.Send(joiner, new NetworkNewPlayerHeroCreated(player.ControllerId, player, Array.Empty<byte>()));
+            }
+        });
     }
 }

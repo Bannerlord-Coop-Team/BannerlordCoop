@@ -176,7 +176,8 @@ namespace Coop.Tests.Server.Connections.States
             SetupUnpackedHero();
             var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
             playerRegistryMock
-                .Setup(p => p.AddPlayer(It.IsAny<Player>()))
+                .Setup(p => p.TryCommitReservedPlayer(
+                    It.IsAny<string>(), It.IsAny<NetPeer>(), It.IsAny<Player>()))
                 .Returns(false);
             var currentState = connectionLogic.SetState<CreateCharacterState>();
 
@@ -191,7 +192,8 @@ namespace Coop.Tests.Server.Connections.States
             // only this peer is ejected and nothing is sent.
             Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
             Assert.NotEqual(ConnectionState.ShutdownRequested, differentPeer.ConnectionState);
-            playerRegistryMock.Verify(p => p.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()), Times.Never);
+            playerRegistryMock.Verify(p => p.TryCommitReservedPlayer(
+                It.IsAny<string>(), It.IsAny<NetPeer>(), It.IsAny<Player>()), Times.Once);
             Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
         }

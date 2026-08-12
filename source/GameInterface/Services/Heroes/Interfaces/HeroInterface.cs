@@ -17,6 +17,7 @@ using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -32,6 +33,7 @@ public interface IHeroInterface : IGameAbstraction
     byte[] PackageMainHero();
     void SwitchToPlayer(Player player);
     Hero ServerUnpackHero(byte[] bytes);
+    void DiscardUncommittedServerHero(Hero hero);
     Hero ClientUnpackHero(byte[] bytes, Player player);
 }
 
@@ -87,8 +89,9 @@ internal class HeroInterface : IHeroInterface
     private Hero UnpackHero(byte[] bytes, Action<Hero> assignNetworkIds)
     {
         Hero hero = null;
+        Exception unpackError = null;
 
-        GameThread.Run(() => {
+        RunGameThreadWithoutAbandoning(() => {
             try
             {
                 using (new AllowedThread())
@@ -102,12 +105,127 @@ internal class HeroInterface : IHeroInterface
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Failed to unpack hero");
+                unpackError = ex;
             }
-        },
-        blocking: true);
+        });
+
+        if (unpackError != null)
+        {
+            try
+            {
+                DiscardUncommittedServerHero(hero);
+            }
+            catch (Exception cleanupError)
+            {
+                Logger.Error(cleanupError, "Failed to roll back a partially unpacked hero");
+            }
+
+            throw new InvalidOperationException("Failed to unpack and register the player hero.", unpackError);
+        }
 
         return hero;
+    }
+
+    public void DiscardUncommittedServerHero(Hero hero)
+    {
+        if (hero == null) return;
+
+        RunGameThreadWithoutAbandoning(() =>
+        {
+            using (new AllowedThread())
+            {
+                var party = hero.PartyBelongedTo;
+                var clan = hero.Clan;
+                var character = hero.CharacterObject;
+                var campaign = Campaign.Current;
+                var campaignObjects = campaign?.CampaignObjectManager;
+
+                TryCleanup("remove party locator", () =>
+                    campaign?.MobilePartyLocator?.RemoveLocatable(party));
+                TryCleanup("remove party tracking", () =>
+                    campaign?.VisualTrackerManager?.RemoveTrackedObject(party, true));
+                TryCleanup("remove mobile party", () =>
+                    campaignObjects?.RemoveMobileParty(party));
+                TryCleanup("remove hero from clan", () =>
+                    clan?.OnLordRemoved(hero));
+                TryCleanup("remove clan", () =>
+                    campaignObjects?.RemoveClan(clan));
+                TryCleanup("remove alive hero", () =>
+                    campaignObjects?._aliveHeroes?.Remove(hero));
+                TryCleanup("remove disabled hero", () =>
+                    campaignObjects?._deadOrDisabledHeroes?.Remove(hero));
+
+                if (party != null)
+                {
+                    objectManager.Remove(party.Party?.GetPartyVisual());
+                    objectManager.Remove(party.ItemRoster);
+                    objectManager.Remove(party.Party);
+                    objectManager.Remove(party.MemberRoster);
+                    objectManager.Remove(party.PrisonRoster);
+                    objectManager.Remove(party);
+                }
+
+                objectManager.Remove(hero.HeroDeveloper);
+                objectManager.Remove(character);
+                objectManager.Remove(clan);
+                objectManager.Remove(hero);
+
+                TryCleanup("unregister character", () =>
+                {
+                    if (character?.IsRegistered == true)
+                        MBObjectManager.Instance?.UnregisterObject(character);
+                });
+            }
+        });
+    }
+
+    private static void TryCleanup(string step, Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to {Step} while rolling back an uncommitted player hero", step);
+        }
+    }
+
+    /// <summary>
+    /// Cancels a hero-unpack action only while it is still waiting in the game-thread queue. Once
+    /// native object creation has started, the caller waits for it to finish instead of timing out
+    /// and leaving an orphan hero graph to appear later.
+    /// </summary>
+    private static void RunGameThreadWithoutAbandoning(Action action)
+    {
+        using var completed = new ManualResetEventSlim(false);
+        int state = 0; // 0=pending, 1=running, 2=cancelled, 3=complete
+
+        GameThread.Run(() =>
+        {
+            if (Interlocked.CompareExchange(ref state, 1, 0) != 0)
+                return;
+
+            try
+            {
+                action();
+            }
+            finally
+            {
+                Volatile.Write(ref state, 3);
+                completed.Set();
+            }
+        });
+
+        if (completed.Wait(GameThread.BlockingTimeout)) return;
+
+        // If it has not started, cancel it so a failed join cannot create a hero later. If native
+        // creation is already running, it is safer to finish the one operation than abandon it.
+        if (Interlocked.CompareExchange(ref state, 2, 0) == 0)
+            throw new TimeoutException(
+                $"Hero unpack did not start within {GameThread.BlockingTimeout.TotalSeconds:0} seconds.");
+
+        completed.Wait();
     }
 
     public void SwitchToPlayer(Player player)

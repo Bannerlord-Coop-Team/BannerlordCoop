@@ -293,6 +293,16 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            // CampaignVec2.IsValid resolves campaign navigation data; never run it on the
+            // network poll thread or after Campaign.Current has already torn down.
+            if (Campaign.Current == null || !releasePosition.IsValid())
+            {
+                Logger.Error(
+                    "Refused invalid released-player position for {PartyId}",
+                    playerPartyId);
+                return;
+            }
+
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(playerPartyId, out var playerParty))
                 return;
 

@@ -5,7 +5,9 @@ using GameInterface.Services.Locations.Messages.Conversation;
 using HarmonyLib;
 using SandBox.Conversation.MissionLogics;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.MountAndBlade;
+using System;
 
 namespace GameInterface.Services.Locations.Conversations.Patches;
 
@@ -97,10 +99,39 @@ internal static class LocationConversationPatches
     [HarmonyPostfix]
     static void OnConversationEndPostfix()
     {
+        ReleaseHeldConversation();
+    }
+
+    [HarmonyPatch(typeof(ConversationManager), nameof(ConversationManager.EndConversation))]
+    [HarmonyFinalizer]
+    static Exception ConversationManagerEndConversationFinalizer(Exception __exception)
+    {
+        // This is the canonical lower-level lifecycle boundary. MissionConversationLogic subscribes
+        // its own end callback only after conversation setup, so a conversation that ends during setup
+        // (or a close-window path that bypasses that callback) could otherwise reserve the NPC forever.
+        // A finalizer also runs when native conversation teardown throws. Preserve that exception after
+        // making the best-effort release attempt.
+        ReleaseHeldConversation();
+        return __exception;
+    }
+
+    private static void ReleaseHeldConversation()
+    {
         if (heldNpcKey == null) return;
 
-        heldNpcKey = null;
-        MessageBroker.Instance.Publish(null, new LocationConversationEnded());
+        try
+        {
+            // Keep the local marker until publish completes. If the synchronous broker/send path throws,
+            // the mission-end/next-mission lifecycle gets another chance instead of forgetting a server
+            // reservation that may still be live. Duplicate successful releases are server-idempotent.
+            MessageBroker.Instance.Publish(null, new LocationConversationEnded());
+            heldNpcKey = null;
+        }
+        catch
+        {
+            // Release is cleanup and must never replace the native conversation exception or abort mission
+            // teardown. Retaining heldNpcKey deliberately schedules a later lifecycle retry.
+        }
     }
 
     [HarmonyPatch(typeof(MissionConversationLogic), "OnBehaviorInitialize")]
@@ -128,9 +159,16 @@ internal static class LocationConversationPatches
     {
         if (!pending.HasValue && heldNpcKey == null) return;
 
-        pending = null;
-        heldNpcKey = null;
-        MessageBroker.Instance.Publish(null, new LocationConversationEnded());
+        try
+        {
+            MessageBroker.Instance.Publish(null, new LocationConversationEnded());
+            pending = null;
+            heldNpcKey = null;
+        }
+        catch
+        {
+            // Retain both markers so OnEndMission/OnBehaviorInitialize can retry the release.
+        }
     }
 
     /// <summary>
@@ -144,6 +182,10 @@ internal static class LocationConversationPatches
         var p = pending.Value;
         pending = null;
 
+        // The server has already granted and reserved this NPC. Record the hold before any local validation
+        // or setup so every abandoned/throwing approval has durable release state.
+        heldNpcKey = LocationConversationTracker.ComposeKey(p.LocationId, p.CharacterId);
+
         // MissionConversationLogic.Current dereferences Mission.Current; the player may have left the scene
         // before the approval arrived. Release the lock and bail rather than crash.
         var logic = Mission.Current != null ? MissionConversationLogic.Current : null;
@@ -152,21 +194,19 @@ internal static class LocationConversationPatches
         if (logic == null || conversationManager == null || conversationManager.IsConversationInProgress
             || p.Agent == null || !p.Agent.IsActive())
         {
-            MessageBroker.Instance.Publish(null, new LocationConversationEnded());
+            ReleaseHeldConversation();
             return;
         }
 
         // Hold before starting so a conversation that ends synchronously still releases. If the start throws
         // the conversation never opened (no end callback), so release here and clear the hold.
-        heldNpcKey = LocationConversationTracker.ComposeKey(p.LocationId, p.CharacterId);
         try
         {
             logic.StartConversation(p.Agent, setActionsInstantly: false);
         }
         catch
         {
-            heldNpcKey = null;
-            MessageBroker.Instance.Publish(null, new LocationConversationEnded());
+            ReleaseHeldConversation();
             throw;
         }
     }

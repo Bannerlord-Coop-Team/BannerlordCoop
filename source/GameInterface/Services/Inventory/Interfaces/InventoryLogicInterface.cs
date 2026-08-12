@@ -22,14 +22,21 @@ namespace GameInterface.Services.Inventory.Interfaces
 {
     public interface IInventoryLogicInterface : IGameAbstraction
     {
-        void ApplyDoneLogic(
+        void ApplyTradeGold(
             ItemRoster fromRoster,
             ItemRoster toRoster,
+            bool isTrading,
+            Hero ownerHero,
+            int totalAmount,
+            int merchantGold,
+            MobileParty currentMobileParty,
+            SettlementComponent currentSettlementComponent);
+
+        void ApplyPostTradeEffects(
             bool isTrading,
             bool isDiscardDonating,
             Hero ownerHero,
             int totalAmount,
-            int merchantGold,
             MobileParty currentMobileParty,
             SettlementComponent currentSettlementComponent,
             List<(ItemRosterElement, int)> boughtItems,
@@ -55,64 +62,42 @@ namespace GameInterface.Services.Inventory.Interfaces
             this.defaultItemDiscardModelInterface = defaultItemDiscardModelInterface;
         }
 
-        public void ApplyDoneLogic(
+        public void ApplyTradeGold(
             ItemRoster fromRoster,
             ItemRoster toRoster,
+            bool isTrading,
+            Hero ownerHero,
+            int totalAmount,
+            int merchantGold,
+            MobileParty currentMobileParty,
+            SettlementComponent currentSettlementComponent)
+        {
+            if (!isTrading)
+                return;
+            PartyBase partyBase = currentMobileParty?.Party ??
+                currentSettlementComponent?.Owner;
+            if (ownerHero?.CharacterObject != null)
+                GiveGoldAction.ApplyBetweenCharacters(null, ownerHero, MathF.Min(-totalAmount, merchantGold), false);
+            if (currentSettlementComponent != null)
+                currentSettlementComponent.ChangeGold(totalAmount);
+            else if (currentMobileParty?.Party.LeaderHero != null)
+                GiveGoldAction.ApplyBetweenCharacters(null, currentMobileParty.Party.LeaderHero, totalAmount, false);
+            else if (partyBase != null)
+                GiveGoldAction.ApplyForCharacterToParty(null, partyBase, totalAmount, false);
+        }
+
+        public void ApplyPostTradeEffects(
             bool isTrading,
             bool isDiscardDonating,
             Hero ownerHero,
             int totalAmount,
-            int merchantGold,
             MobileParty currentMobileParty,
             SettlementComponent currentSettlementComponent,
             List<ValueTuple<ItemRosterElement, int>> boughtItems,
             List<ValueTuple<ItemRosterElement, int>> soldItems)
         {
-            GameThread.RunSafe(() =>
-            {
-                ApplyDoneLogicInternal(
-                        fromRoster,
-                        toRoster,
-                        isTrading,
-                        isDiscardDonating,
-                        ownerHero,
-                        totalAmount,
-                        merchantGold,
-                        currentMobileParty,
-                        currentSettlementComponent,
-                        boughtItems,
-                        soldItems);
-            });
-        }
-
-        private void ApplyDoneLogicInternal(
-            ItemRoster fromRoster,
-            ItemRoster toRoster,
-            bool isTrading, 
-            bool isDiscardDonating,
-            Hero ownerHero,
-            int totalAmount,
-            int merchantGold,
-            MobileParty currentMobileParty,
-            SettlementComponent currentSettlementComponent,
-            List<ValueTuple<ItemRosterElement, int>> boughtItems,
-            List<ValueTuple<ItemRosterElement, int>> soldItems)
-        {
-            PartyBase partyBase = null;
-            if (currentMobileParty != null)
-            {
-                partyBase = currentMobileParty.Party;
-            }
-            else if (currentSettlementComponent != null)
-            {
-                partyBase = currentSettlementComponent.Owner;
-            }
-
             if (ownerHero.CharacterObject != null && ownerHero != null && isTrading)
             {
-                // Transfers gold between player and other party (if party does not have enough gold, sends all gold)
-                // Note: Total amount = transactional debt which is negative
-                GiveGoldAction.ApplyBetweenCharacters(null, ownerHero, MathF.Min(-totalAmount, merchantGold), false);
                 if (currentSettlementComponent != null && currentSettlementComponent.IsTown && ownerHero.CharacterObject.GetPerkValue(DefaultPerks.Trade.TrickleDown))
                 {
                     int total = 0;
@@ -155,22 +140,12 @@ namespace GameInterface.Services.Inventory.Interfaces
             }
 
             sessionTradePlayerDataInterface.UpdatePlayerInventory(ownerHero, boughtItems, soldItems, isTrading);
-            if (currentSettlementComponent != null && isTrading)
+            if (currentMobileParty?.Party.LeaderHero != null && isTrading)
             {
-                // Sets the gold of the other party
-                currentSettlementComponent.ChangeGold(totalAmount);
-            }
-            else if (((currentMobileParty != null) ? currentMobileParty.Party.LeaderHero : null) != null && isTrading)
-            {
-                GiveGoldAction.ApplyBetweenCharacters(null, currentMobileParty.Party.LeaderHero, totalAmount, false);
                 if (currentMobileParty.Party.LeaderHero.CompanionOf != null)
                 {
                     currentMobileParty.AddTaxGold((int)(totalAmount * 0.1f));
                 }
-            }
-            else if (partyBase != null && partyBase.LeaderHero == null && isTrading)
-            {
-                GiveGoldAction.ApplyForCharacterToParty(null, partyBase, totalAmount, false);
             }
         }
 
@@ -186,44 +161,41 @@ namespace GameInterface.Services.Inventory.Interfaces
 
         public void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments, Hero initialHero)
         {
-            GameThread.RunSafe(() =>
+            foreach (KeyValuePair<CharacterObject, Equipment[]> characterEquipment in characterEquipments)
             {
-                foreach (KeyValuePair<CharacterObject, Equipment[]> characterEquipment in characterEquipments)
+                CharacterObject character = characterEquipment.Key;
+
+                foreach (Equipment equipment in characterEquipment.Value)
                 {
-                    CharacterObject character = characterEquipment.Key;
-
-                    foreach (Equipment equipment in characterEquipment.Value)
+                    Equipment targetEquipment = null;
+                    if (equipment._equipmentType == EquipmentType.Battle)
                     {
-                        Equipment targetEquipment = null;
-                        if (equipment._equipmentType == EquipmentType.Battle)
-                        {
-                            targetEquipment = character.FirstBattleEquipment;
-                        }
-                        else if (equipment._equipmentType == EquipmentType.Civilian)
-                        {
-                            targetEquipment = character.FirstCivilianEquipment;
-                        }
-                        else if (equipment._equipmentType == EquipmentType.Stealth)
-                        {
-                            targetEquipment = character.FirstStealthEquipment;
-                        }
+                        targetEquipment = character.FirstBattleEquipment;
+                    }
+                    else if (equipment._equipmentType == EquipmentType.Civilian)
+                    {
+                        targetEquipment = character.FirstCivilianEquipment;
+                    }
+                    else if (equipment._equipmentType == EquipmentType.Stealth)
+                    {
+                        targetEquipment = character.FirstStealthEquipment;
+                    }
 
-                        if (targetEquipment != null)
+                    if (targetEquipment != null)
+                    {
+                        for (int i = 0; i < EquipmentSlotLength; i++)
                         {
-                            for (int i = 0; i < EquipmentSlotLength; i++)
-                            {
-                                targetEquipment._itemSlots[i] = equipment._itemSlots[i];
-                            }
+                            targetEquipment._itemSlots[i] = equipment._itemSlots[i];
                         }
                     }
                 }
+            }
 
-                mobileParty.Party.SetVisualAsDirty();
-                UpdateMissionHeroVisuals(mobileParty);
+            mobileParty.Party.SetVisualAsDirty();
+            UpdateMissionHeroVisuals(mobileParty);
 
-                // When concluding an inventory screen managing a hero not in the main party, need to also update their party's visual
-                initialHero.PartyBelongedTo.Party.SetVisualAsDirty();
-            });
+            // When concluding an inventory screen managing a hero not in the main party, need to also update their party's visual
+            initialHero.PartyBelongedTo.Party.SetVisualAsDirty();
         }
 
         // Find and update all visuals of agents in a mission for managed heroes

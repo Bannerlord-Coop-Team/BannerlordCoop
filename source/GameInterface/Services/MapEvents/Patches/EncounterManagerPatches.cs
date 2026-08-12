@@ -36,6 +36,12 @@ internal class EncounterManagerPatches
         if (IsAwaitingMissionExit(attackerParty?.Party))
             return false;
 
+        if (InteractionPatches.TrySuppressExpiredReinforcement(
+                attackerParty?.Party, settlement?.Party?.MapEvent))
+        {
+            return false;
+        }
+
         if (RaidAiInterventionSuppression.ShouldSuppressSettlementEncounter(attackerParty, settlement))
             return false;
 
@@ -62,6 +68,12 @@ internal class EncounterManagerPatches
 
         if (IsAwaitingMissionExit(attackerParty) || IsAwaitingMissionExit(defenderParty))
             return false;
+
+        if (InteractionPatches.TrySuppressExpiredReinforcement(
+                attackerParty, defenderParty))
+        {
+            return false;
+        }
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 

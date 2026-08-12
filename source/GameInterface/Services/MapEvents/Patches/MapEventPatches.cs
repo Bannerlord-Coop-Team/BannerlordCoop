@@ -361,16 +361,13 @@ internal class InteractionPatches
 {
     private sealed class PlayerBattleWindows
     {
-        public CampaignTime AiJoinWindowExpiresAt { get; }
         public CampaignTime GoldFoodConsumptionWindowExpiresAt { get; }
 
-        public PlayerBattleWindows(int aiJoinWindowHours, int goldFoodConsumptionWindowHours = 24)
+        public PlayerBattleWindows(int goldFoodConsumptionWindowHours = 24)
         {
-            AiJoinWindowExpiresAt = CampaignTime.HoursFromNow(aiJoinWindowHours);
             GoldFoodConsumptionWindowExpiresAt = CampaignTime.HoursFromNow(goldFoodConsumptionWindowHours);
         }
 
-        public bool AiJoinWindowExpired => CampaignTime.Now > AiJoinWindowExpiresAt;
         public bool GoldFoodConsumptionExpired => CampaignTime.Now > GoldFoodConsumptionWindowExpiresAt;
     }
 
@@ -402,11 +399,76 @@ internal class InteractionPatches
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleWindows> playerBattleWindows = new();
     private static readonly ConditionalWeakTable<MapEvent, object> initializingPlayerBattles = new();
 
-    /// <summary>True while a player's battle is still within its post-start window for AI parties to join as
-    /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened after
-    /// initialization; only the server ever populates it, so this is a server-side query.</summary>
+    /// <summary>True while any battle is inside the authoritative campaign-time
+    /// reinforcement window. Player and AI joins use this same battle-start
+    /// clock, capped at ten in-game hours.</summary>
     public static bool IsWithinAiJoinWindow(MapEvent mapEvent)
-        => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.AiJoinWindowExpired;
+    {
+        if (mapEvent == null || mapEvent.BattleStartTime == CampaignTime.Zero)
+            return false;
+
+        float elapsedHours = mapEvent.BattleStartTime.ElapsedHoursUntilNow;
+        int configuredHours = Math.Max(
+            0,
+            Math.Min(
+                10,
+                ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
+        return elapsedHours >= 0f && elapsedHours <= configuredHours;
+    }
+
+    /// <summary>
+    /// Rejects a party that is trying to enter an already-running battle after
+    /// the shared reinforcement window. This must run at the encounter/join
+    /// operation boundary. Cancelling PartyBase.MapEventSide itself is unsafe:
+    /// native StartBattleAction continues into OnStartBattle and dereferences
+    /// the membership it assumes the setter created.
+    /// </summary>
+    internal static bool TrySuppressExpiredReinforcement(
+        PartyBase joiningParty,
+        MapEvent targetMapEvent)
+    {
+        if (ModInformation.IsClient || joiningParty == null ||
+            targetMapEvent == null || joiningParty.MapEvent == targetMapEvent ||
+            targetMapEvent.BattleStartTime == CampaignTime.Zero ||
+            IsWithinAiJoinWindow(targetMapEvent))
+        {
+            return false;
+        }
+
+        // A rejected AI encounter would otherwise be attempted again every
+        // campaign tick. Stop it and ask the authoritative AI to choose again.
+        // Player requests receive their correlated rejection in the Coop
+        // request handlers and must not have their movement rewritten here.
+        var mobileParty = joiningParty.MobileParty;
+        if (mobileParty?.IsPlayerParty() != true)
+            RaidAiInterventionSuppression.HoldParty(mobileParty);
+
+        return true;
+    }
+
+    internal static bool TrySuppressExpiredReinforcement(
+        PartyBase firstParty,
+        PartyBase secondParty)
+    {
+        if (firstParty == null || secondParty == null)
+            return false;
+
+        if (firstParty.MapEvent != null &&
+            firstParty.MapEvent != secondParty.MapEvent)
+        {
+            return TrySuppressExpiredReinforcement(
+                secondParty, firstParty.MapEvent);
+        }
+
+        if (secondParty.MapEvent != null &&
+            secondParty.MapEvent != firstParty.MapEvent)
+        {
+            return TrySuppressExpiredReinforcement(
+                firstParty, secondParty.MapEvent);
+        }
+
+        return false;
+    }
 
     internal static bool IsInitializingPlayerBattle(MapEvent mapEvent)
         => initializingPlayerBattles.TryGetValue(mapEvent, out _);
@@ -480,16 +542,9 @@ internal class InteractionPatches
             return;
         }
 
-        if (__instance.IsRaidHostileAction() && MapEventConfig.AllowRaidAiIntervention)
-            return;
-
-        // Allow AI to join if no players are involved
-        if (!__instance.ContainsPlayerParty())
-            return;
-
-        // A player's battle stays open to AI reinforcements for a campaign day after it begins. While the
-        // window is open, AI may keep joining; once it expires —
-        // or if no window was opened for this event — no more AI may join a player's battle.
+        // Every battle uses the same authoritative campaign-time reinforcement
+        // window. This includes AI-only battles and raid intervention: special
+        // native eligibility can still deny a join, but cannot extend the clock.
         if (IsInitializingPlayerBattle(__instance) || IsWithinAiJoinWindow(__instance))
             return;
 
@@ -522,7 +577,7 @@ internal class InteractionPatches
         initializingPlayerBattles.Remove(__instance);
         playerBattleWindows.GetValue(
             __instance,
-            _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
+            _ => new PlayerBattleWindows());
         MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
     }
 

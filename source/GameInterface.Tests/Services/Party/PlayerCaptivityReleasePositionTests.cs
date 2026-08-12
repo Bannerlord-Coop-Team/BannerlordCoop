@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
@@ -44,7 +45,9 @@ public class PlayerCaptivityReleasePositionTests
             messageBroker.Object,
             objectManager.Object,
             network.Object,
-            troopRosterInterface.Object);
+            troopRosterInterface.Object,
+            Mock.Of<IPlayerManager>(),
+            new BattlePartyGrantRegistry(objectManager.Object));
     }
 
     [Fact]

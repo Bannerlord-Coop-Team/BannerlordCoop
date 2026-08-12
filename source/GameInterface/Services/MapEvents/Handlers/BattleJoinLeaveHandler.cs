@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -117,8 +118,11 @@ internal class BattleJoinLeaveHandler : IHandler
                         if (trackParties)
                             mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
                         var mobileParty = mapEventParty.Party.MobileParty;
-                        if (mobileParty != null && positions != null && i < positions.Length)
+                        if (mobileParty != null && positions != null &&
+                            i < positions.Length && positions[i].IsValid())
+                        {
                             mobileParty.Position = positions[i];
+                        }
                     }
                 }
             }
@@ -229,6 +233,17 @@ internal class BattleJoinLeaveHandler : IHandler
                     if (mapEvent.IsActiveSlowVillageRaid() && data.Side == BattleSideEnum.Defender)
                     {
                         Logger.Warning("Ignoring defender join request: map event {MapEventId} is an active slow village raid", data.MapEventId);
+                        return;
+                    }
+                    // Revalidate inside the same game-thread action that commits
+                    // membership. The earlier request check may have run just
+                    // before the ten-hour campaign window elapsed.
+                    if (mapEvent.BattleStartTime != CampaignTime.Zero &&
+                        !InteractionPatches.IsWithinAiJoinWindow(mapEvent))
+                    {
+                        Logger.Warning(
+                            "Ignoring join request: reinforcement window closed for map event {MapEventId}",
+                            data.MapEventId);
                         return;
                     }
                     var side = mapEvent.GetMapEventSide(data.Side);

@@ -783,6 +783,16 @@ internal sealed partial class TournamentSessionHandler : IHandler
             "[Tournament] Completed tournament leave requested session={SessionId}, controller={ControllerId}",
             current.SessionId,
             controllerId);
+
+        // A completed tournament can fail or stall during reward/native finalization. Eject the
+        // requesting client independently first; the later global removal is idempotent and still
+        // clears every remaining participant once finalization succeeds.
+        if (peer != null)
+        {
+            network.Send(
+                peer,
+                new NetworkTournamentSessionRemoved(current.SessionId, current.TownId));
+        }
         FinalizeCompletedTournament(current);
         return true;
     }

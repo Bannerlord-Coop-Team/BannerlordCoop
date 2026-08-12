@@ -30,7 +30,6 @@ internal sealed class DisconnectedPlayersServerHandler : IHandler
         this.timeControlInterface = timeControlInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(HandlePlayerDisconnected);
-        timeControlInterface.AddUnpausePolicy(PlayersConnectedPolicy);
     }
 
     private void HandlePlayerDisconnected(MessagePayload<PlayerDisconnected> _)
@@ -48,14 +47,8 @@ internal sealed class DisconnectedPlayersServerHandler : IHandler
         }
     }
 
-    private bool PlayersConnectedPolicy()
-    {
-        return playerManager.Players.Any(playerManager.IsConnected);
-    }
-
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerDisconnected>(HandlePlayerDisconnected);
-        timeControlInterface.RemoveUnpausePolicy(PlayersConnectedPolicy);
     }
 }

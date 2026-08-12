@@ -22,7 +22,7 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
     {
         var fieldInfo = fieldItem.Value;
 
-        var templateData = GetTemplateData(fieldInfo, fieldItem.Debug, fieldItem.Coalesce);
+        var templateData = GetTemplateData(fieldItem);
         string localMessage = AutoSyncUtils.GetLocalSetMessage(fieldInfo);
         string networkMessage;
         if (SyncByValue(fieldInfo.FieldType))
@@ -45,15 +45,16 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
     {
         var fieldInfo = fieldItem.Value;
 
-        var templateData = GetTemplateData(fieldInfo, fieldItem.Debug, fieldItem.Coalesce);
+        var templateData = GetTemplateData(fieldItem);
         if (SyncByValue(fieldInfo.FieldType))
             return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
         else
             return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
     }
 
-    private object GetTemplateData(FieldInfo fieldInfo, bool debug, bool coalesce)
+    private object GetTemplateData(Debuggable<FieldInfo> fieldItem)
     {
+        var fieldInfo = fieldItem.Value;
         var serializerNames = GetSerializerMethodNames(fieldInfo.FieldType);
         return new
         {
@@ -66,8 +67,9 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
             DeserializeMethod = serializerNames.deserialize,
             ReadOnly = fieldInfo.IsInitOnly,
             ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
-            Debug = debug,
-            Coalesce = coalesce
+            Debug = fieldItem.Debug,
+            Coalesce = fieldItem.Coalesce,
+            SkipUnregisteredReference = fieldItem.SkipUnregisteredReference
         };
     }
 }

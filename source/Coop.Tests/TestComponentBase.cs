@@ -23,6 +23,7 @@ using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
+using LiteNetLib;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Players.Data;
@@ -155,6 +156,15 @@ internal abstract class TestComponentBase
     {
         var mock = new Mock<IPlayerManager>();
         mock.Setup(m => m.Players).Returns(Array.Empty<Player>());
+        mock.Setup(m => m.TryReserveNewController(
+                It.IsAny<string>(), It.IsAny<NetPeer>(), out It.Ref<NetPeer>.IsAny))
+            .Returns(true);
+        mock.Setup(m => m.TryCommitReservedPlayer(
+                It.IsAny<string>(), It.IsAny<NetPeer>(), It.IsAny<Player>()))
+            .Returns(true);
+        mock.Setup(m => m.TrySetPeerIfAvailable(
+                It.IsAny<string>(), It.IsAny<NetPeer>(), out It.Ref<NetPeer>.IsAny))
+            .Returns(true);
         builder.RegisterInstance(mock).AsSelf().SingleInstance();
         builder.RegisterInstance(mock.Object).As<IPlayerManager>().SingleInstance();
     }

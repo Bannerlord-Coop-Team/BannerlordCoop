@@ -72,6 +72,38 @@ public class PlayerPartyRestorerTests
     }
 
     [Fact]
+    public void Restore_DeserializedComponentWithoutPartyBackReference_RestoresBeforeLeaderChange()
+    {
+        var (hero, party, _, _) = CreatePlayerGraph();
+        party.PartyComponent.MobileParty = null;
+        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>(), Mock.Of<IAutoRegistryFactory>());
+
+        restorer.Restore(hero, party);
+
+        Assert.Same(party, party.PartyComponent.MobileParty);
+        Assert.Same(hero, party.LeaderHero);
+        Assert.Same(hero, party.LordPartyComponent.Owner);
+    }
+
+    [Fact]
+    public void RestoreMemberships_DoesNotRaiseLeaderChangeBeforeCallerCommitsParty()
+    {
+        var (hero, party, clan, character) = CreatePlayerGraph();
+        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>(), Mock.Of<IAutoRegistryFactory>());
+
+        restorer.RestoreMemberships(hero, party);
+
+        Assert.Contains(hero, clan.Heroes);
+        Assert.Equal(1, party.MemberRoster.GetTroopCount(character));
+        Assert.Null(party.LeaderHero);
+
+        restorer.RestorePartyLeader(hero, party);
+
+        Assert.Same(hero, party.LeaderHero);
+        Assert.Same(hero, party.LordPartyComponent.Owner);
+    }
+
+    [Fact]
     public void TryRestore_StalePartyId_ReassociatesOwnedPartyWithoutReplacingHero()
     {
         var (hero, party, _, _) = CreatePlayerGraph();

@@ -83,6 +83,15 @@ internal class SettlementPopulationTracker : IHandler
 
             if (party.IsPlayerParty())
             {
+                var alreadyTrackedHere =
+                    playerPartySettlements.TryGetValue(partyId, out var previousSettlementId) &&
+                    previousSettlementId == settlementId;
+
+                if (!alreadyTrackedHere && previousSettlementId != null)
+                {
+                    RemoveCompanionEntries(partyId);
+                }
+
                 playerPartySettlements[partyId] = settlementId;
 
                 if (populatedSettlements.ContainsKey(settlement.StringId) == false)
@@ -91,7 +100,13 @@ internal class SettlementPopulationTracker : IHandler
                     PopulateSettlement(settlement);
                 }
 
-                AddCompanionEntries(partyId, party, settlement);
+                // Campaign-entry recovery can report a party that was already
+                // tracked here before a disconnect. Do not add its companions a
+                // second time; the authoritative snapshot below restores the client.
+                if (!alreadyTrackedHere)
+                {
+                    AddCompanionEntries(partyId, party, settlement);
+                }
                 BroadcastRosterSnapshot(settlement, settlementId);
             }
             else if (HasPlayerVisitors(settlementId) && party.LeaderHero != null)

@@ -74,8 +74,9 @@ namespace Coop.Tests.Server.Connections.States
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, campaignId));
 
-            // Act — entering the state packages the save and sends it to the joining peer.
-            connectionLogic.SetState<TransferSaveState>();
+            // Act — install the cancellable state before starting its blocking snapshot.
+            var state = connectionLogic.SetState<TransferSaveState>();
+            Assert.True(state.StartTransfer());
 
             // Assert — exactly one save chunk for this tiny save, carrying the deflate-compressed
             // save data to the joining peer.
@@ -95,42 +96,35 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void EnteringState_BroadcastsSavingStateAroundSnapshot()
+        public void JoinSnapshot_DoesNotBroadcastDiskAutosaveState()
         {
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock
                 .Setup(value => value.SaveCurrentGame())
-                .Callback(() =>
-                {
-                    var messages = serverComponent.TestNetwork
-                        .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
-                        .ToArray();
-                    Assert.Single(messages);
-                    Assert.True(messages[0].IsSaving);
-                    Assert.Equal(1, serverComponent.TestNetwork.FlushPendingMessagesCalls);
-                })
                 .Returns(new SaveResults(true, new byte[] { 1, 2, 3 }, "12345"));
 
-            connectionLogic.SetState<TransferSaveState>();
+            var state = connectionLogic.SetState<TransferSaveState>();
+            Assert.True(state.StartTransfer());
 
-            var messages = serverComponent.TestNetwork
-                .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
-                .ToArray();
-            Assert.Equal(new[] { true, false }, messages.Select(message => message.IsSaving));
+            Assert.False(
+                serverComponent.TestNetwork.SentNetworkMessages.TryGetValue(
+                    differentPeer.Id, out var messages) &&
+                messages.OfType<NetworkGameSaveStateChanged>().Any());
         }
 
         [Fact]
-        public void EnteringState_FlushFailureStillClearsSavingState()
+        public void JoinSnapshot_DoesNotUseGlobalNetworkFlush()
         {
             serverComponent.TestNetwork.FlushPendingMessagesException =
                 new InvalidOperationException("Flush failed.");
 
-            connectionLogic.SetState<TransferSaveState>();
+            var state = connectionLogic.SetState<TransferSaveState>();
+            Assert.True(state.StartTransfer());
 
-            var messages = serverComponent.TestNetwork
-                .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
-                .ToArray();
-            Assert.Equal(new[] { true, false }, messages.Select(message => message.IsSaving));
+            Assert.False(
+                serverComponent.TestNetwork.SentNetworkMessages.TryGetValue(
+                    differentPeer.Id, out var messages) &&
+                messages.OfType<NetworkGameSaveStateChanged>().Any());
             Assert.Single(
                 serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer));
         }
@@ -145,7 +139,8 @@ namespace Coop.Tests.Server.Connections.States
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, "12345"));
 
             // Act
-            connectionLogic.SetState<TransferSaveState>();
+            var state = connectionLogic.SetState<TransferSaveState>();
+            Assert.True(state.StartTransfer());
 
             // Assert
             var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer).ToArray();

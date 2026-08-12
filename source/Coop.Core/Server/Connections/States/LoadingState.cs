@@ -55,13 +55,15 @@ public class LoadingState : ConnectionStateBase
     public override bool IsLoading => true;
 
     internal bool IsJoinCatchUpPending =>
-        phase == JoinPhase.WaitingForReplayApplied ||
-        phase == JoinPhase.InitialBaselineQueued ||
-        phase == JoinPhase.WaitingForInitialBaseline ||
-        phase == JoinPhase.FinalBaselineQueued ||
-        phase == JoinPhase.WaitingForFinalBaseline ||
-        phase == JoinPhase.WorldReadyQueued ||
-        phase == JoinPhase.WaitingForCatchUpApplied;
+        phase >= JoinPhase.WaitingForReplayApplied &&
+        phase != JoinPhase.CatchUpAppliedQueued;
+
+    // Loading a save is not catch-up and must not freeze the campaign. Emergency join pausing begins
+    // only once replay is underway.
+    internal bool IsJoinCatchUpPauseEligible =>
+        phase >= JoinPhase.WaitingForReplayApplied;
+
+    internal string JoinPhaseName => phase.ToString();
 
     public override void Dispose()
     {
@@ -126,6 +128,8 @@ public class LoadingState : ConnectionStateBase
             if (!IsCurrent(queued)) return;
 
             coalescer.Flush(network);
+            if (isFinal)
+                connectionMessageQueue.EndPartyBehaviorBaselineCoverage(peer);
             connectionMessageQueue.Flush(peer);
             if (!isFinal) initialBaselinesSent++;
             phase = waiting;

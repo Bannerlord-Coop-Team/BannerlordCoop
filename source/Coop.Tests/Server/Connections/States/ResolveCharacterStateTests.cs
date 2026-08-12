@@ -278,7 +278,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void NetworkClientValidate_RegisteredPlayerWithMissingHero_DropsStaleRegistration()
+        public void NetworkClientValidate_RegisteredPlayerWithMissingHero_RefusesWithoutDeletingRegistration()
         {
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
@@ -301,17 +301,13 @@ namespace Coop.Tests.Server.Connections.States
                 playerPeer, new NetworkClientValidate(player.ControllerId));
             currentState.Handle_ClientValidate(payload);
 
-            // Assert — the dead registration must be dropped before character creation, otherwise
-            // the character created next registers this controller a second time and every later
-            // lookup for it is ambiguous.
-            playerManagerMock.Verify(i => i.RemovePlayer(player), Times.Once);
+            // A missing campaign object may be transient during restoration. Keep the authoritative
+            // registration and fail closed instead of creating a duplicate character.
+            playerManagerMock.Verify(i => i.RemovePlayer(player), Times.Never);
             playerManagerMock.Verify(i => i.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()), Times.Never);
-
-            var message = Assert.Single(
-                serverComponent.TestNetwork.GetPeerMessages(playerPeer).OfType<NetworkClientValidated>());
-            Assert.False(message.HeroExists);
-
-            Assert.IsType<CreateCharacterState>(connectionLogic.State);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.False(serverComponent.TestNetwork.SentNetworkMessages.ContainsKey(playerPeer.Id));
+            Assert.IsType<ResolveCharacterState>(connectionLogic.State);
         }
 
         [Fact]
