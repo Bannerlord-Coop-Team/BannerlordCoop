@@ -127,6 +127,25 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
+                    if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
+                    {
+                        string output = Coop.JoinFixtureCommands.Start(arguments);
+                        bool hasFallbackStructuredResult = TryGetStructuredResult(
+                            output,
+                            out JsonElement fallbackStructuredResult);
+                        return Success(request.Id, new
+                        {
+                            name = command,
+                            arguments,
+                            found = true,
+                            output,
+                            hasStructuredResult = hasFallbackStructuredResult,
+                            structuredResult = hasFallbackStructuredResult
+                                ? fallbackStructuredResult
+                                : (JsonElement?)null,
+                        });
+                    }
+
                     return Failure(
                         request.Id,
                         "session_not_ready",
@@ -140,12 +159,19 @@ namespace Coop.LiveTesting
                     return Failure(request.Id, "command_not_found", result.Output, false);
                 }
 
+                bool hasStructuredResult = TryGetStructuredResult(
+                    result.Output,
+                    out JsonElement structuredResult);
                 return Success(request.Id, new
                 {
                     name = command,
                     arguments,
                     found = true,
                     output = result.Output,
+                    hasStructuredResult,
+                    structuredResult = hasStructuredResult
+                        ? structuredResult
+                        : (JsonElement?)null,
                 });
             }, true);
         }
@@ -156,11 +182,7 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
-                    return Failure(
-                        request.Id,
-                        "session_not_ready",
-                        "The co-op session command dispatcher is not available yet.",
-                        false);
+                    dispatcher = new LiveTestCommandDispatcher();
                 }
 
                 return Success(request.Id, new
@@ -534,6 +556,34 @@ namespace Coop.LiveTesting
                 PlatformId = processInfo.PlatformId,
                 RunToken = processInfo.RunToken,
             };
+        }
+
+        private static bool TryGetStructuredResult(
+            string output,
+            out JsonElement structuredResult)
+        {
+            const string prefix = "LIVE_TEST_JSON=";
+            structuredResult = default;
+            if (string.IsNullOrEmpty(output)) return false;
+
+            string json = output
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                .FirstOrDefault(line => line.StartsWith(prefix, StringComparison.Ordinal))?
+                .Substring(prefix.Length);
+            if (string.IsNullOrEmpty(json)) return false;
+
+            try
+            {
+                using (JsonDocument document = JsonDocument.Parse(json))
+                {
+                    structuredResult = document.RootElement.Clone();
+                }
+                return true;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
         }
 
         private static ScreenshotFileObservation ObserveScreenshot(string path)
