@@ -89,7 +89,7 @@ internal class TradeHandler : IHandler
 
         if (what.CanGainXpFromDiscarding)
         {
-            soldItems = ResolveLeftLootIds(what.FromRoster._data);
+            soldItems = ResolveLeftLootIds(what.FromRoster);
         }
 
         var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.OwnerParty, what.InitialCharacterEquipment);
@@ -240,15 +240,17 @@ internal class TradeHandler : IHandler
         return resolvedItems.ToArray();
     }
 
-    private (ItemRosterElementData, int)[] ResolveLeftLootIds(ItemRosterElement[] items)
+    private (ItemRosterElementData, int)[] ResolveLeftLootIds(ItemRoster roster)
     {
         var resolvedItems = new List<(ItemRosterElementData, int)>();
 
-        for (int i = 0; i < items.Length; i++)
+        for (int i = 0; i < roster.Count; i++)
         {
-            if (TryResolveItemRosterId(items[i], out var resolvedItem))
+            var element = roster.GetElementCopyAtIndex(i);
+
+            if (TryResolveItemRosterId(element, out var resolvedItem))
             {
-                resolvedItems.Add((resolvedItem, items[i].Amount));
+                resolvedItems.Add((resolvedItem, element.Amount));
             }
         }
 
@@ -305,16 +307,26 @@ internal class TradeHandler : IHandler
     {
         result = default;
 
-        if (!objectManager.TryGetId(itemRosterElement.EquipmentElement.Item, out var itemObjectId))
+        var item = itemRosterElement.EquipmentElement.Item;
+        var itemModifier = itemRosterElement.EquipmentElement.ItemModifier;
+
+        // Items can be null. Reject and log separately
+        if (item == null)
         {
-            logger.Error("Failed to get id for {type}", nameof(itemRosterElement.EquipmentElement.Item));
+            logger.Error("Skipping roster element with no {type}", nameof(item));
+            return false;
+        }
+
+        if (!objectManager.TryGetId(item, out var itemObjectId))
+        {
+            logger.Error("Failed to get id for {type} {stringId}", nameof(item), item.StringId);
             return false;
         }
 
         string itemModifierId = null;
-        if (itemRosterElement.EquipmentElement.ItemModifier is not null && !objectManager.TryGetId(itemRosterElement.EquipmentElement.ItemModifier, out itemModifierId))
+        if (itemModifier != null && !objectManager.TryGetId(itemModifier, out itemModifierId))
         {
-            logger.Error("Failed to get id for {type}", nameof(itemRosterElement.EquipmentElement.ItemModifier));
+            logger.Error("Failed to get id for {type} {stringId}", nameof(itemModifier), itemModifier.StringId);
             return false;
         }
 

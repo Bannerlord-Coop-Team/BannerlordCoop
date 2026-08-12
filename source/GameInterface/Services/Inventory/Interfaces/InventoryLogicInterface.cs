@@ -178,10 +178,67 @@ namespace GameInterface.Services.Inventory.Interfaces
         {
             if (itemRosterElements == null) return;
 
-            targetItemRoster.Clear();
+            var targetAmounts = SumByElement(itemRosterElements);
+            var currentAmounts = SumByElement(targetItemRoster);
 
-            // Rebuild roster with new data
-            targetItemRoster.Add(itemRosterElements);
+            // Remove items from roster that are no longer present in the target
+            foreach (var currentElement in currentAmounts)
+            {
+                if (targetAmounts.ContainsKey(currentElement.Key)) continue;
+
+                targetItemRoster.AddToCounts(currentElement.Value.EquipmentElement, -currentElement.Value.Amount);
+            }
+
+            // Apply deltas to change amounts in roster
+            foreach (var targetElement in targetAmounts)
+            {
+                var currentElement = currentAmounts.TryGetValue(targetElement.Key, out var current) ? current : default;
+                var delta = targetElement.Value.Amount - currentElement.Amount;
+
+                if (delta == 0) continue;
+
+                var element = currentElement.EquipmentElement.Item != null
+                    ? currentElement.EquipmentElement
+                    : targetElement.Value.EquipmentElement;
+
+                targetItemRoster.AddToCounts(element, delta);
+            }
+        }
+
+        private static Dictionary<string, ItemRosterElement> SumByElement(ItemRoster roster)
+        {
+            // Get non-zero elements from item roster
+            var elements = new ItemRosterElement[roster.Count];
+            for (int i = 0; i < roster.Count; i++)
+            {
+                elements[i] = roster.GetElementCopyAtIndex(i);
+            }
+
+            return SumByElement(elements);
+        }
+
+        private static Dictionary<string, ItemRosterElement> SumByElement(ItemRosterElement[] elements)
+        {
+            var totals = new Dictionary<string, ItemRosterElement>();
+
+            foreach (var element in elements)
+            {
+                if (element.EquipmentElement.Item == null || element.Amount == 0) continue;
+
+                var key = ElementKey(element.EquipmentElement);
+
+                totals[key] = totals.TryGetValue(key, out var running)
+                    ? new ItemRosterElement(running.EquipmentElement, running.Amount + element.Amount) // Increase existing with new amount
+                    : element; // Doesn't exist yet, add to totals
+            }
+
+            return totals;
+        }
+
+        // Can't just use item id as there can be two or more items with the same id but a different modifier.
+        private static string ElementKey(EquipmentElement equipmentElement)
+        {
+            return $"{equipmentElement.Item?.StringId}|{equipmentElement.ItemModifier?.StringId}";
         }
 
         public void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments, Hero initialHero)
