@@ -5,6 +5,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions;
@@ -32,6 +33,7 @@ public interface INetworkAgentRegistry : IDisposable
     bool TryGetAgentInfo(Agent agent, out CoopAgentInfo agentInfo);
     bool TryGetAgentInfo(Guid agentId, out CoopAgentInfo agentInfo);
     bool TryGetAgentInfo(string movementScopeId, ushort movementId, out CoopAgentInfo agentInfo);
+    bool TryGetHeroAgentInfo(Hero hero, out CoopAgentInfo agentInfo);
     bool IsLocallyControlled(Guid agentId);
     bool IsLocallyControlled(Agent agent);
     bool TryTransferAuthority(string controllerId, Guid agentId);
@@ -282,6 +284,32 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         {
             return MovementIdToInfo.TryGetValue((movementScopeId, movementId), out agentInfo);
         }
+    }
+
+    /// <inheritdoc/>
+    public bool TryGetHeroAgentInfo(Hero hero, out CoopAgentInfo agentInfo)
+    {
+        agentInfo = default;
+        if (hero == null) return false;
+
+        lock (gate)
+        {
+            foreach (var info in AgentToInfo.Values)
+            {
+                // Skip this agent if not the target hero
+                if (info.Agent.Character is not CharacterObject character
+                    || !character.IsHero
+                    || character.HeroObject != hero)
+                {
+                    continue;
+                }
+
+                agentInfo = info;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public bool IsLocallyControlled(Guid agentId)

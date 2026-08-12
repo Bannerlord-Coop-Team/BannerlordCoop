@@ -69,7 +69,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float MountedFollowRate = 12f;
     private const float MountedPositionEpsilon = 0.0001f;
     private const float MountedGuardPositionTolerance = 0.15f;
-
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
         new Dictionary<Agent, long>();
@@ -239,6 +238,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
+            // A point-owned puppet's facing belongs to the point it is using — a look write per
+            // native cycle is exactly the churn that spun seated NPCs.
+            if (LocationPoseLock.IsPointOwned(agent))
+                continue;
+
             TargetFrame target = pair.Value;
             if (agent.MountAgent != null && target.HasMountSnapPosition)
             {
@@ -296,6 +300,14 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 FollowMounted(agent, pair.Value, dt);
                 continue;
             }
+
+            // A settlement puppet USING a scene point (seated, at an animation point) is owned by
+            // that point: the point's own machinery aligns it, animates it and holds it — on this
+            // client exactly as on the host, because the puppet uses the SAME local point
+            // (replicated semantically via NetworkNpcPointUse). Driving movement here would only
+            // fight it. When the use ends, the point plays its leave action and this seek resumes.
+            if (LocationPoseLock.IsPointOwned(agent))
+                continue;
 
             // A mount tolerates more slack before we snap; an on-foot rider is held tighter.
             float snapDistance = agent.IsMount ? MountSnapDistance : RiderSnapDistance;
@@ -364,7 +376,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             sampleTarget.Position,
             sampleTarget.UpdateSequence);
     }
-
     private static void MoveTowardTarget(Agent agent, TargetFrame target)
     {
         Vec2 targetPosition = target.Position.AsVec2;
