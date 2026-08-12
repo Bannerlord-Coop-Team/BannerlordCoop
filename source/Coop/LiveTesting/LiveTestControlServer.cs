@@ -134,26 +134,6 @@ namespace Coop.LiveTesting
             }
         }
 
-        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
-        {
-            return ExecuteOnGameThread(request, () =>
-            {
-                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
-                {
-                    return Failure(
-                        request.Id,
-                        "session_not_ready",
-                        "The co-op session command dispatcher is not available yet.",
-                        false);
-                }
-
-                return Success(request.Id, new
-                {
-                    commands = dispatcher.GetCommands(),
-                });
-            }, false);
-        }
-
         private LiveTestResponse HandleCommand(LiveTestRequest request)
         {
             if (!TryReadCommand(request.Parameters, out var command, out var arguments, out var error))
@@ -203,6 +183,26 @@ namespace Coop.LiveTesting
             }, true);
         }
 
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
+                {
+                    return Failure(
+                        request.Id,
+                        "session_not_ready",
+                        "The co-op session command dispatcher is not available yet.",
+                        false);
+                }
+
+                return Success(request.Id, new
+                {
+                    commands = dispatcher.GetCommandNames(),
+                });
+            }, false);
+        }
+
         private LiveTestResponse HandleScreenshot(LiveTestRequest request)
         {
             if (!TryReadString(request.Parameters, "path", out var requestedPath) ||
@@ -248,6 +248,17 @@ namespace Coop.LiveTesting
 
                 lock (screenshotGate)
                 {
+                    foreach (string previousCaptureId in screenshotCaptures
+                        .Where(pair => string.Equals(
+                            pair.Value.Path,
+                            screenshotPath,
+                            StringComparison.OrdinalIgnoreCase))
+                        .Select(pair => pair.Key)
+                        .ToArray())
+                    {
+                        screenshotCaptures.Remove(previousCaptureId);
+                    }
+
                     screenshotCaptures.Add(
                         captureId,
                         new ScreenshotCapture(screenshotPath));
@@ -306,8 +317,19 @@ namespace Coop.LiveTesting
             bool complete;
             lock (screenshotGate)
             {
+                if (!screenshotCaptures.TryGetValue(captureId, out var currentCapture) ||
+                    !ReferenceEquals(capture, currentCapture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' was superseded.",
+                        false);
+                }
+
                 stable = observation.Exists &&
                     observation.IsBmp &&
+                    observation.DeclaredLength == observation.Length &&
                     observation.Length > 0 &&
                     capture.HasObservation &&
                     capture.LastLength == observation.Length &&
@@ -328,6 +350,7 @@ namespace Coop.LiveTesting
                 stable,
                 complete,
                 length = observation.Length,
+                declaredLength = observation.DeclaredLength,
                 lastWriteUtc = observation.LastWriteUtc,
             });
         }
@@ -388,16 +411,19 @@ namespace Coop.LiveTesting
                     var players = playerManager.Players
                         .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
                         .ToArray();
-                    registeredControllerIds = players
-                        .Select(player => player.ControllerId)
-                        .ToArray();
-                    connectedControllerIds = players
-                        .Where(playerManager.IsConnected)
-                        .Select(player => player.ControllerId)
-                        .ToArray();
-                    registeredPlayerCount = registeredControllerIds.Length;
-                    connectedPlayerCount = connectedControllerIds.Length;
-                    registeredPlayers = registeredPlayerCount;
+                    registeredPlayers = players.Length;
+                    if (ModInformation.IsServer)
+                    {
+                        registeredPlayerCount = players.Length;
+                        registeredControllerIds = players
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedControllerIds = players
+                            .Where(playerManager.IsConnected)
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedPlayerCount = connectedControllerIds.Length;
+                    }
                 }
             }
 
@@ -648,26 +674,41 @@ namespace Coop.LiveTesting
                     path,
                     FileMode.Open,
                     FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete))
+                    FileShare.Read))
                 {
                     long length = stream.Length;
-                    bool isBmp = length >= 2 &&
-                        stream.ReadByte() == 'B' &&
-                        stream.ReadByte() == 'M';
+                    var header = new byte[6];
+                    int headerLength = 0;
+                    while (headerLength < header.Length)
+                    {
+                        int bytesRead = stream.Read(
+                            header,
+                            headerLength,
+                            header.Length - headerLength);
+                        if (bytesRead == 0) break;
+                        headerLength += bytesRead;
+                    }
+                    bool isBmp = headerLength == header.Length &&
+                        header[0] == 'B' &&
+                        header[1] == 'M';
+                    uint declaredLength = isBmp
+                        ? BitConverter.ToUInt32(header, 2)
+                        : 0;
                     return new ScreenshotFileObservation(
                         true,
                         isBmp,
                         length,
+                        declaredLength,
                         File.GetLastWriteTimeUtc(path));
                 }
             }
             catch (IOException)
             {
-                return new ScreenshotFileObservation(true, false, 0, null);
+                return new ScreenshotFileObservation(true, false, 0, 0, null);
             }
             catch (UnauthorizedAccessException)
             {
-                return new ScreenshotFileObservation(true, false, 0, null);
+                return new ScreenshotFileObservation(true, false, 0, 0, null);
             }
         }
 
@@ -758,22 +799,25 @@ namespace Coop.LiveTesting
         private readonly struct ScreenshotFileObservation
         {
             public static readonly ScreenshotFileObservation Missing =
-                new ScreenshotFileObservation(false, false, 0, null);
+                new ScreenshotFileObservation(false, false, 0, 0, null);
 
             public bool Exists { get; }
             public bool IsBmp { get; }
             public long Length { get; }
+            public uint DeclaredLength { get; }
             public DateTime? LastWriteUtc { get; }
 
             public ScreenshotFileObservation(
                 bool exists,
                 bool isBmp,
                 long length,
+                uint declaredLength,
                 DateTime? lastWriteUtc)
             {
                 Exists = exists;
                 IsBmp = isBmp;
                 Length = length;
+                DeclaredLength = declaredLength;
                 LastWriteUtc = lastWriteUtc;
             }
         }

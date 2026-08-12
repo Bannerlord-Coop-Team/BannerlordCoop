@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents;
@@ -1517,9 +1518,16 @@ public class AgentMovementHandler : IAgentMovementHandler
                     puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
                 }
 
-                data.Apply(agent);
-                if (data.MountData != null && agent.MountAgent is Agent remoteMount)
-                    UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+                // A point-owned settlement puppet (seated, at an animation point) gets NO
+                // continuous-state writes: the local point it uses drives alignment and animation
+                // natively, and every direction/look write here would fight it (the seated-NPC
+                // spin). Its position target still flows to the interpolator below.
+                if (!LocationPoseLock.IsPointOwned(agent))
+                {
+                    data.Apply(agent);
+                    if (data.MountData != null && agent.MountAgent is Agent remoteMount)
+                        UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+                }
 
                 // Position is reconciled per-frame by the interpolator (smoother than a per-packet
                 // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
@@ -1729,6 +1737,11 @@ public class AgentMovementHandler : IAgentMovementHandler
         // BattleAuthorityMigrator owns battle withdrawal because it can distinguish the player's party from
         // NPC forces the departed host was running. Skip this location-style all-controller cleanup.
         if (BattleSpawnGate.IsCoopBattleActive) return;
+
+        // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
+        // controller's PLAYER agent — its host-owned NPC puppets must survive for adopt-in-place migration,
+        // so this all-agents sweep would fade the whole crowd out with its host.
+        if (LocationNpcGate.IsCoopLocationMissionActive) return;
 
         bool sceneActive = Mission.Current != null;
 
