@@ -33,6 +33,9 @@ namespace Coop.LiveTesting
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
+        private readonly object screenshotGate = new object();
+        private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
+            new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
         private int shutdownScheduled;
 
         public LiveTestControlServer(bool isServer, string logFilePath)
@@ -85,10 +88,14 @@ namespace Coop.LiveTesting
                         request,
                         () => CreateStatusResponse(request.Id),
                         false);
+                case "command-catalog":
+                    return HandleCommandCatalog(request);
                 case "command":
                     return HandleCommand(request);
                 case "screenshot":
                     return HandleScreenshot(request);
+                case "screenshot-status":
+                    return HandleScreenshotStatus(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -143,6 +150,26 @@ namespace Coop.LiveTesting
             }, true);
         }
 
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
+                {
+                    return Failure(
+                        request.Id,
+                        "session_not_ready",
+                        "The co-op session command dispatcher is not available yet.",
+                        false);
+                }
+
+                return Success(request.Id, new
+                {
+                    commands = dispatcher.GetCommandNames(),
+                });
+            }, false);
+        }
+
         private LiveTestResponse HandleScreenshot(LiveTestRequest request)
         {
             if (!TryReadString(request.Parameters, "path", out var requestedPath) ||
@@ -166,6 +193,8 @@ namespace Coop.LiveTesting
                 return Failure(request.Id, "invalid_parameters", exception.Message, false);
             }
 
+            string captureId = Guid.NewGuid().ToString("N");
+
             return ExecuteOnGameThread(request, () =>
             {
                 string directory = System.IO.Path.GetDirectoryName(screenshotPath);
@@ -179,13 +208,118 @@ namespace Coop.LiveTesting
                 }
 
                 Directory.CreateDirectory(directory);
-                Utilities.TakeScreenshot(screenshotPath);
+                if (File.Exists(screenshotPath))
+                {
+                    File.Delete(screenshotPath);
+                }
+
+                lock (screenshotGate)
+                {
+                    foreach (string previousCaptureId in screenshotCaptures
+                        .Where(pair => string.Equals(
+                            pair.Value.Path,
+                            screenshotPath,
+                            StringComparison.OrdinalIgnoreCase))
+                        .Select(pair => pair.Key)
+                        .ToArray())
+                    {
+                        screenshotCaptures.Remove(previousCaptureId);
+                    }
+
+                    screenshotCaptures.Add(
+                        captureId,
+                        new ScreenshotCapture(screenshotPath));
+                }
+
+                try
+                {
+                    Utilities.TakeScreenshot(screenshotPath);
+                }
+                catch
+                {
+                    lock (screenshotGate)
+                    {
+                        screenshotCaptures.Remove(captureId);
+                    }
+                    throw;
+                }
+
                 return Success(request.Id, new
                 {
+                    captureId,
                     path = screenshotPath,
                     captureRequested = true,
                 });
             }, true);
+        }
+
+        private LiveTestResponse HandleScreenshotStatus(LiveTestRequest request)
+        {
+            if (!TryReadString(request.Parameters, "captureId", out var captureId) ||
+                captureId.Length != 32 ||
+                !captureId.All(IsLowerHexadecimal))
+            {
+                return Failure(
+                    request.Id,
+                    "invalid_parameters",
+                    "Screenshot status requires a 32-character lowercase hexadecimal capture id.",
+                    false);
+            }
+
+            ScreenshotCapture capture;
+            lock (screenshotGate)
+            {
+                if (!screenshotCaptures.TryGetValue(captureId, out capture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' was not found.",
+                        false);
+                }
+            }
+
+            ScreenshotFileObservation observation = ObserveScreenshot(capture.Path);
+            bool stable;
+            bool complete;
+            lock (screenshotGate)
+            {
+                if (!screenshotCaptures.TryGetValue(captureId, out var currentCapture) ||
+                    !ReferenceEquals(capture, currentCapture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' was superseded.",
+                        false);
+                }
+
+                stable = observation.Exists &&
+                    observation.IsBmp &&
+                    observation.DeclaredLength == observation.Length &&
+                    observation.Length > 0 &&
+                    capture.HasObservation &&
+                    capture.LastLength == observation.Length &&
+                    capture.LastWriteUtc == observation.LastWriteUtc;
+                capture.HasObservation = observation.Exists;
+                capture.LastLength = observation.Length;
+                capture.LastWriteUtc = observation.LastWriteUtc;
+                capture.Complete |= stable;
+                complete = capture.Complete;
+            }
+
+            return Success(request.Id, new
+            {
+                captureId,
+                path = capture.Path,
+                exists = observation.Exists,
+                isBmp = observation.IsBmp,
+                stable,
+                complete,
+                length = observation.Length,
+                declaredLength = observation.DeclaredLength,
+                lastWriteUtc = observation.LastWriteUtc,
+            });
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)
@@ -402,6 +536,58 @@ namespace Coop.LiveTesting
             };
         }
 
+        private static ScreenshotFileObservation ObserveScreenshot(string path)
+        {
+            if (!File.Exists(path)) return ScreenshotFileObservation.Missing;
+
+            try
+            {
+                using (var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read))
+                {
+                    long length = stream.Length;
+                    var header = new byte[6];
+                    int headerLength = 0;
+                    while (headerLength < header.Length)
+                    {
+                        int bytesRead = stream.Read(
+                            header,
+                            headerLength,
+                            header.Length - headerLength);
+                        if (bytesRead == 0) break;
+                        headerLength += bytesRead;
+                    }
+                    bool isBmp = headerLength == header.Length &&
+                        header[0] == 'B' &&
+                        header[1] == 'M';
+                    uint declaredLength = isBmp
+                        ? BitConverter.ToUInt32(header, 2)
+                        : 0;
+                    return new ScreenshotFileObservation(
+                        true,
+                        isBmp,
+                        length,
+                        declaredLength,
+                        File.GetLastWriteTimeUtc(path));
+                }
+            }
+            catch (IOException)
+            {
+                return new ScreenshotFileObservation(true, false, 0, 0, null);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new ScreenshotFileObservation(true, false, 0, 0, null);
+            }
+        }
+
+        private static bool IsLowerHexadecimal(char character) =>
+            (character >= '0' && character <= '9') ||
+            (character >= 'a' && character <= 'f');
+
         private static bool TryReadCommand(
             JsonElement parameters,
             out string command,
@@ -466,6 +652,46 @@ namespace Coop.LiveTesting
                 char.IsLetterOrDigit(character) || character == '-' || character == '_')
                 ? runToken
                 : null;
+        }
+
+        private sealed class ScreenshotCapture
+        {
+            public string Path { get; }
+            public bool HasObservation { get; set; }
+            public long LastLength { get; set; }
+            public DateTime? LastWriteUtc { get; set; }
+            public bool Complete { get; set; }
+
+            public ScreenshotCapture(string path)
+            {
+                Path = path;
+            }
+        }
+
+        private readonly struct ScreenshotFileObservation
+        {
+            public static readonly ScreenshotFileObservation Missing =
+                new ScreenshotFileObservation(false, false, 0, 0, null);
+
+            public bool Exists { get; }
+            public bool IsBmp { get; }
+            public long Length { get; }
+            public uint DeclaredLength { get; }
+            public DateTime? LastWriteUtc { get; }
+
+            public ScreenshotFileObservation(
+                bool exists,
+                bool isBmp,
+                long length,
+                uint declaredLength,
+                DateTime? lastWriteUtc)
+            {
+                Exists = exists;
+                IsBmp = isBmp;
+                Length = length;
+                DeclaredLength = declaredLength;
+                LastWriteUtc = lastWriteUtc;
+            }
         }
     }
 }

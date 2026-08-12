@@ -3,11 +3,14 @@ using Common;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Patches;
 using Helpers;
+using SandBox.View.Map;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -122,6 +125,147 @@ public class TownDebugCommand
             }
         }
         return sb.ToString();
+    }
+
+    [CommandLineArgumentFunction("garrison_backlink", "coop.debug.town")]
+    public static string GarrisonBacklink(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.town.garrison_backlink <townId>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject(args[0], out Town town))
+        {
+            return $"ID: '{args[0]}' not found";
+        }
+
+        var activeGarrisons = GetActiveGarrisons(town);
+        var backlink = town.GarrisonPartyComponent;
+        string backlinkId = "null";
+        if (backlink != null)
+        {
+            backlinkId = objectManager.TryGetId(backlink, out string id) ? id : "unregistered";
+        }
+
+        string activeParties = activeGarrisons.Count == 0
+            ? "none"
+            : string.Join(",", activeGarrisons.Select(party => party.StringId));
+        bool backlinkMatchesActive = activeGarrisons.Count == 1 &&
+                                     ReferenceEquals(activeGarrisons[0].PartyComponent, backlink);
+
+        return $"{(ModInformation.IsServer ? "SERVER" : "CLIENT")} " +
+               $"town={args[0]} settlement={town.Settlement.StringId} " +
+               $"backlinkComponent={backlinkId} backlinkParty={backlink?.MobileParty?.StringId ?? "null"} " +
+               $"activeGarrisonCount={activeGarrisons.Count} activeGarrisonParties={activeParties} " +
+               $"backlinkMatchesActive={backlinkMatchesActive}";
+    }
+
+    [CommandLineArgumentFunction("focus_garrison", "coop.debug.town")]
+    public static string FocusGarrison(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.town.focus_garrison <townId>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject(args[0], out Town town))
+        {
+            return $"ID: '{args[0]}' not found";
+        }
+
+        var activeGarrisons = GetActiveGarrisons(town);
+        if (activeGarrisons.Count != 1)
+        {
+            return $"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}";
+        }
+
+        MapScreen mapScreen = MapScreen.Instance;
+        if (mapScreen?.MapCameraView == null)
+        {
+            return "Campaign map camera is unavailable";
+        }
+
+        MobileParty garrison = activeGarrisons[0];
+        var targetPosition = garrison.MapEvent?.Position ?? garrison.Position;
+        garrison.Party.SetAsCameraFollowParty();
+        mapScreen.MapCameraView.FastMoveCameraToPosition(targetPosition, mapScreen.IsInMenu);
+        mapScreen.MapCameraView.SetCameraMode(MapCameraView.CameraFollowMode.FollowParty);
+        return $"Following {garrison.StringId} at {town.Name} on the campaign map";
+    }
+
+    [CommandLineArgumentFunction("apply_garrison_lifecycle", "coop.debug.town")]
+    public static string ApplyGarrisonLifecycle(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "This function can only be used by the server";
+        }
+
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.town.apply_garrison_lifecycle <townId> <initialize|finalize>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject(args[0], out Town town))
+        {
+            return $"ID: '{args[0]}' not found";
+        }
+
+        var activeGarrisons = GetActiveGarrisons(town);
+        if (activeGarrisons.Count != 1)
+        {
+            return $"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}";
+        }
+
+        var garrison = (GarrisonPartyComponent)activeGarrisons[0].PartyComponent;
+        switch (args[1].ToLowerInvariant())
+        {
+            case "finalize":
+                if (!ReferenceEquals(town.GarrisonPartyComponent, garrison))
+                {
+                    return $"Refusing to finalize: {town.Name} does not point at its active garrison";
+                }
+                garrison.OnFinalize();
+                break;
+            case "initialize":
+                if (town.GarrisonPartyComponent != null &&
+                    !ReferenceEquals(town.GarrisonPartyComponent, garrison))
+                {
+                    return $"Refusing to initialize: {town.Name} points at a different garrison";
+                }
+                garrison.OnInitialize();
+                break;
+            default:
+                return $"Unknown lifecycle action '{args[1]}'; expected initialize or finalize";
+        }
+
+        return $"Applied {args[1].ToLowerInvariant()} to {activeGarrisons[0].StringId}; " +
+               GarrisonBacklink(new List<string> { args[0] });
+    }
+
+    private static List<MobileParty> GetActiveGarrisons(Town town)
+    {
+        return MobileParty.All
+            .Where(party => party.IsActive &&
+                            party.PartyComponent is GarrisonPartyComponent component &&
+                            component.Settlement?.Town == town)
+            .ToList();
     }
 
     // coop.debug.town.list_buildings <townId>
