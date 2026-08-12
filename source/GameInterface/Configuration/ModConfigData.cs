@@ -25,12 +25,11 @@ public sealed class ModConfigData
 }
 
 /// <summary>
-/// The "difficulty" block. Every key nullable: absent (or commented out in the
-/// template) keeps the save's own setting. The CampaignOptions values live IN
-/// the save, so joining clients inherit them with the join-time save transfer —
-/// playerReceivedDamage is the exception (engine config, pushed to clients as a
-/// join-time ServerOption; see CampaignDifficultyHandler for its headless-host
-/// default).
+/// The "difficulty" block. Properties remain nullable so malformed or unreadable
+/// input can fall back safely, while ModConfig activates or fills the documented
+/// values before a normal load. CampaignOptions values live IN the save, so joining
+/// clients inherit them with the join-time save transfer. PlayerReceivedDamage is
+/// engine config and is pushed to clients as a join-time ServerOption.
 /// </summary>
 public sealed class DifficultyConfigData
 {
@@ -96,6 +95,10 @@ public sealed class ModOptionsData
     public float? MaximumLootersMultiplier { get; set; }
 
     public LordDefectionRetryMode? LordDefectionRetries { get; set; }
+  
+    public bool? EnableHeroExecutions { get; set; }
+
+    public bool? EnablePlayerClanMemberExecutions { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }

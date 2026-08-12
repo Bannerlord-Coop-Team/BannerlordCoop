@@ -97,13 +97,12 @@ internal class CompanionRolesPatches
 
         if (fromCancel) return false;
 
+        __instance._partyCreatedAfterRescueForCompanion = true;
+
         var message = new PartyScreenClosedFromRescuing(
-            leftOwnerParty,
             leftMemberRoster,
             leftPrisonRoster,
-            rightOwnerParty,
-            rightMemberRoster,
-            rightPrisonRoster);
+            rightOwnerParty);
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
@@ -116,7 +115,13 @@ internal class CompanionRolesPatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        __instance._partyCreatedAfterRescueForCompanion = false;
+        // Skip CompanionRescued when a party was created
+        if (__instance._partyCreatedAfterRescueForCompanion)
+        {
+            __instance._partyCreatedAfterRescueForCompanion = false;
+            return false;
+        }
+
         if (Hero.OneToOneConversationHero.IsPrisoner)
         {
             var message = new CompanionRescued(Hero.OneToOneConversationHero);

@@ -4,8 +4,11 @@ using GameInterface.Extentions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -105,5 +108,57 @@ internal class CompanionsCampaignBehaviorPatches
         }
 
         return false;
+    }
+
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior.GetCompanionTemplateToSpawn))]
+    [HarmonyPostfix]
+    public static void GetCompanionTemplateToSpawnPostfix(CompanionsCampaignBehavior __instance, ref CharacterObject __result)
+    {
+        // Vanilla limit hit for this template, use a random from the pool
+        if (__result == null)
+        {
+            List<CharacterObject> list = __instance._companionsOfTemplates[__instance.GetCompanionTemplateTypeToSpawn()];
+            list.Shuffle<CharacterObject>();
+
+            var random = new Random();
+            var characterObject = list[random.Next(list.Count)];
+
+            __result = characterObject;
+        }
+    }
+
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior.GetCompanionTemplateTypeToSpawn))]
+    [HarmonyPostfix]
+    public static void GetCompanionTemplateTypeToSpawnPostfix(CompanionsCampaignBehavior __instance, ref CompanionsCampaignBehavior.CompanionTemplateType __result)
+    {
+        // Vanilla limit hit for for all templates, use a random type
+        // Combat represents vanilla's default and doesn't have any templates
+        if (__result == CompanionsCampaignBehavior.CompanionTemplateType.Combat)
+        {
+            var random = new Random();
+
+            var values = Enum.GetValues(typeof(CompanionsCampaignBehavior.CompanionTemplateType));
+            var randomTemplateType = (CompanionsCampaignBehavior.CompanionTemplateType)values.GetValue(random.Next(values.Length));
+
+            __result = randomTemplateType;
+        }
+    }
+
+    /// <summary>
+    /// Add a check to allow stuck companions to become fugitive if they didn't properly get released.
+    /// This is primarily for older saves where some players would have companions stuck as prisoners.
+    /// </summary>
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior.DailyTick))]
+    [HarmonyPostfix]
+    public static void DailyTickPostfix()
+    {
+        foreach (Hero hero in Hero.AllAliveHeroes)
+        {
+            if (hero.IsWanderer && hero.CompanionOf != null && hero.IsPrisoner && hero.PartyBelongedToAsPrisoner == null)
+            {
+                MakeHeroFugitiveAction.Apply(hero, true);
+                break;
+            }
+        }
     }
 }

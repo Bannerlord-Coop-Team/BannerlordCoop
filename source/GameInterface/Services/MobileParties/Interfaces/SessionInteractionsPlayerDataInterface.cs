@@ -7,7 +7,6 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.Engine;
 
 namespace GameInterface.Services.MobileParties.Interfaces;
 
@@ -17,6 +16,9 @@ public interface ISessionInteractionsPlayerDataInterface : IGameAbstraction
     void SetPlayerCaravanInteraction(string playerHeroId, string mobilePartyId, CaravansCampaignBehavior.PlayerInteraction interaction);
     void SetPlayerBanditsInteraction(string playerHeroId, string mobilePartyId, BanditInteractionsCampaignBehavior.PlayerInteraction interaction);
     void SetPlayerPatrolInteraction(string playerHeroId, string settlementId, CampaignTime interactedTime);
+    void AddMetArenaMaster(string playerHeroId, string settlementId);
+    void SetKnowTournaments(string playerHeroId, bool knowTournaments);
+    void UpdateWarningTime(string playerHeroId, long warningTimeNumTicks);
     void RemoveInteractedVillagersForAllPlayers(string mobilePartyId);
     void RemoveInteractedCaravanForAllPlayers(string mobilePartyId);
     void RemoveInteractedBanditsForAllPlayers(string mobilePartyId);
@@ -92,6 +94,30 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         SetPlayerInteraction(playerHeroId, settlementId, interactionTime, InteractionsPlayerData.PlayerInteractedPatrols);
     }
 
+    public void AddMetArenaMaster(string playerHeroId, string settlementId)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        // Skip adding duplicate settlements to list
+        if (InteractionsPlayerData.PlayerMetArenaMasters[playerHeroId]?.Contains(settlementId) == true) return;
+
+        InteractionsPlayerData.PlayerMetArenaMasters[playerHeroId]?.Add(settlementId);
+    }
+
+    public void SetKnowTournaments(string playerHeroId, bool knowTournaments)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerKnowTournaments[playerHeroId] = knowTournaments;
+    }
+
+    public void UpdateWarningTime(string playerHeroId, long warningTimeNumTicks)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerWarningTime[playerHeroId] = warningTimeNumTicks;
+    }
+
     private void RemoveInteractedPartyForAllPlayers(string mobilePartyId, Dictionary<string, Dictionary<string, int>> interactionDictionary)
     {
         foreach (var player in playerManager.Players)
@@ -163,6 +189,18 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         if (!InteractionsPlayerData.PlayerInteractedPatrols.ContainsKey(playerHeroId))
         {
             InteractionsPlayerData.PlayerInteractedPatrols[playerHeroId] = new Dictionary<string, long>();
+        }
+        if (!InteractionsPlayerData.PlayerMetArenaMasters.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerMetArenaMasters[playerHeroId] = new List<string>();
+        }
+        if (!InteractionsPlayerData.PlayerKnowTournaments.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerKnowTournaments[playerHeroId] = false;
+        }
+        if (!InteractionsPlayerData.PlayerWarningTime.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerWarningTime[playerHeroId] = 0L;
         }
     }
 

@@ -1,14 +1,19 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Missions.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Conversations;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Data;
+using Missions.Locations;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -26,6 +31,12 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private static readonly ILogger Logger = LogManager.GetLogger<CoopLocationsController>();
     private readonly INetwork relayNetwork;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly ILocationSession session;
+    private readonly ILocationHostRegistry hostRegistry;
+    private readonly ILocationOwnedAgentReplicator npcReplicator;
+    private readonly ILocationPuppetSpawner npcPuppetSpawner;
+    private readonly ILocationPopulationDirector populationDirector;
+    private readonly ILocationAuthorityMigrator authorityMigrator;
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -34,25 +45,97 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         INetwork relayNetwork,
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
+        ILocationHostRegistry hostRegistry,
+        ILocationPuppetRosterBinder rosterBinder,
+        ILocationNpcHoldRegistry npcHoldRegistry,
+        IBattleAgentBudget agentBudget,
+        ILocationAgentSpawnBatchCodec spawnBatchCodec,
+        IMissionContext missionContext,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent)
-        : base(network, messageBroker, objectManager, coopMissionComponent)
+        : base(
+            network,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            Missions.Agents.Handlers.MovementCadenceProfile.Location)
     {
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;
+        this.hostRegistry = hostRegistry;
         //this.boardGameManager = boardGameManager;
 
-        messageBroker.Subscribe<NetworkMissionLeft>(Handle_LeaveMission);
+        // Composition-root style (mirrors CoopBattleController): the per-mission session and NPC
+        // binding map are SHARED state, so the components are constructed here around single
+        // instances instead of DI-resolving them (transient injection would give each its own).
+        session = new LocationSession(controllerIdProvider, hostRegistry);
+        var bindingMap = new LocationAgentBindingMap();
+
+        npcReplicator = new LocationOwnedAgentReplicator(
+            network, messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, spawnBatchCodec);
+        authorityMigrator = new LocationAuthorityMigrator(
+            messageBroker, coopMissionComponent, session, bindingMap, missionContext, npcHoldRegistry);
+        npcPuppetSpawner = new LocationPuppetSpawner(
+            messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator);
+        populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
+
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
     }
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkMissionLeft>(Handle_LeaveMission);
         messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
 
+        npcReplicator.Dispose();
+        npcPuppetSpawner.Dispose();
+        populationDirector.Dispose();
+        authorityMigrator.Dispose();
+
         base.Dispose();
+    }
+
+    public override void OnMissionTick(float dt)
+    {
+        // Host: flush captured spawns as batches BEFORE polling movement, so a puppet exists on the
+        // receiver before its first movement packet; point-use transitions go out after the spawns
+        // on the same reliable stream; then drain any buffered puppets.
+        npcReplicator.FlushPendingSpawns();
+        npcReplicator.PollPointUsage();
+        base.OnMissionTick(dt);
+        npcPuppetSpawner.DrainPendingPuppets();
+    }
+
+    // SR-026/SR-041 (V8): the engine's removal virtuals are the host-side despawn capture — no
+    // Harmony needed. OnAgentRemoved fires for deaths/knock-outs, OnAgentDeleted when a faded-out
+    // agent is deleted (passage exits, churn). NotifyAgentRemoved ignores anything that is not a
+    // replicated NPC we own, and the teardown guard keeps a local mission end from broadcasting the
+    // whole crowd as despawns (peers handle our departure via mission membership instead).
+    public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
+    {
+        base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, blow);
+        if (IsMissionEnding()) return;
+
+        var reason = agentState == AgentState.Killed || agentState == AgentState.Unconscious
+            ? LocationDespawnReason.Died
+            : LocationDespawnReason.Removed;
+        npcReplicator.NotifyAgentRemoved(affectedAgent, reason);
+    }
+
+    public override void OnAgentDeleted(Agent affectedAgent)
+    {
+        base.OnAgentDeleted(affectedAgent);
+        if (IsMissionEnding()) return;
+
+        npcReplicator.NotifyAgentRemoved(affectedAgent, LocationDespawnReason.Removed);
+    }
+
+    private bool IsMissionEnding()
+    {
+        var mission = Mission.Current;
+        return mission == null
+            || mission.CurrentState == Mission.State.EndingNextFrame
+            || mission.CurrentState == Mission.State.Over;
     }
 
     // Read on the network thread (HandleJoinInfo gate) and written on the main thread
@@ -93,6 +176,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         Logger.Information("[LocationSync] Registered local agent (hero {AgentId}) for {PlayerID}; broadcasting join info",
             agentId, controllerId);
 
+        // NPC puppet spawns wait on the same readiness as join info: the mission is provably set up now.
+        npcPuppetSpawner.NotifyMissionReady();
+
         if (!objectManager.TryGetIdWithLogging(CharacterObject.PlayerCharacter, out var characterObjectId))
             return;
 
@@ -103,6 +189,11 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         // The mission is now set up (player agent + teams exist). Spawn any join info that arrived
         // before we were ready.
         DrainPendingJoinInfos();
+
+        // Mission-ready (SR-010): the local player agent exists, so the mission has provably finished
+        // loading — ask the server to elect (or report) this instance's NPC host.
+        if (instanceId != null)
+            messageBroker.Publish(this, new LocationMissionReady(instanceId));
     }
 
     private void DrainPendingJoinInfos()
@@ -127,30 +218,29 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         var data = payload.What;
 
-        if (data.Settlement == null)
+        if (LocationInstanceId.TryDerive(objectManager, data.Settlement, data.Location, out var derivedInstanceId) == false)
         {
-            Logger.Warning("[LocationSync] PlayerEnteredLocation with no settlement — skipping instance request");
-            return;
-        }
-
-        if (objectManager.TryGetIdWithLogging(data.Settlement, out var settlementId) == false)
-        {
-            Logger.Warning("[LocationSync] Could not resolve settlement id for '{Settlement}' — skipping instance request", data.Settlement.StringId);
-            return;
-        }
-
-        if (objectManager.TryGetIdWithLogging(data.Location, out var locationId) == false)
-        {
-            Logger.Warning("[LocationSync] Could not resolve location id for '{Location}' — skipping instance request", data.Location.StringId);
+            Logger.Warning("[LocationSync] Could not derive instance id for settlement '{Settlement}' location '{Location}' — skipping instance request",
+                data.Settlement?.StringId ?? "<null>", data.Location?.StringId ?? "<null>");
             return;
         }
 
         _instanceRequested = true;
-        Logger.Information("[LocationSync] Requesting P2P instance settlement={SettlementId} location={LocationId}", settlementId, locationId);
+        Logger.Information("[LocationSync] Requesting P2P instance {InstanceId}", derivedInstanceId);
 
         network.Start();
 
-        instanceId = $"{settlementId}|{locationId}";
+        instanceId = derivedInstanceId;
+        session.TryBegin(instanceId);
+
+        // A fresh mission has no host yet: drop any assignment left from a PREVIOUS visit to this
+        // settlement (the server clears only its own entry when an instance empties), or a stale
+        // host would read as "previous host" and fake a migration when the new election lands.
+        hostRegistry.Remove(instanceId);
+
+        // Engage the NPC gate: native population spawning is suppressed on every client until the
+        // server's host assignment confirms who runs it (SR-013).
+        LocationNpcGate.BeginMission(instanceId);
 
         network.ConnectToInstance(instanceId);
         coopMissionComponent.AgentRegistry.Clear();
@@ -199,47 +289,18 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         network.Send(controllerId, request);
         Logger.Information("Sent Join Request for {PlayerID} to {Controller}", request.ControllerId, controllerId);
+
+        // Catch the joiner up on the settlement NPCs we own (SR-025) — only the host owns any, so
+        // this is a no-op everywhere else.
+        npcReplicator.ReplicateCurrentAgentsTo(controllerId);
     }
 
     protected override void OnLeaving()
     {
+        LocationNpcGate.EndMission();
         relayNetwork.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, instanceId));
         messageBroker.Publish(this, new PlayerLeftLocation());
         network.Stop();
-    }
-
-    private void Handle_LeaveMission(MessagePayload<NetworkMissionLeft> payload)
-    {
-        string leftControllerId = payload.What.ControllerId;
-
-        // Our own broadcast echoed back by a peer — ignore.
-        if (leftControllerId == controllerIdProvider.ControllerId) return;
-
-        var agentRegistry = coopMissionComponent.AgentRegistry;
-
-        int removedCount = 0;
-        foreach (var agentInfo in agentRegistry.GetAgents(leftControllerId))
-        {
-            if (agentRegistry.TryGetAgentInfo(agentInfo.AgentId, out var info) == false) continue;
-
-            Agent agent = info.Agent;
-            GameThread.Run(() =>
-            {
-                if (agent != null && agent.IsActive() && agent.Health > 0)
-                {
-                    bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
-                    agent.FadeOut(false, hideMount);
-                }
-            });
-
-            agentRegistry.RemoveAgent(agentInfo.AgentId);
-            removedCount++;
-        }
-
-        Logger.Information("[LocationSync] LeaveMission from {ControllerId} — removing {AgentCount} agents", leftControllerId, removedCount);
-
-        network.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, instanceId));
-        Logger.Information("[Relay] Announced MissionLeft for instance {Instance}", instanceId);
     }
 
     protected override void HandleJoinInfo(NetPeer netPeer, NetworkMissionJoinInfo joinInfo)
@@ -353,7 +414,17 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 agentBuildData.ClothingColor1(character.HeroObject.MapFaction.Color);
                 agentBuildData.ClothingColor2(character.HeroObject.MapFaction.Color2);
 
-                agent = Mission.Current.SpawnAgent(agentBuildData);
+                // A remote PLAYER puppet is not a host-owned NPC — a promoted host's capture patch
+                // must not re-capture and re-broadcast it.
+                LocationNpcGate.SuppressCapture = true;
+                try
+                {
+                    agent = Mission.Current.SpawnAgent(agentBuildData);
+                }
+                finally
+                {
+                    LocationNpcGate.SuppressCapture = false;
+                }
                 agent.FadeIn();
             }
             catch (Exception ex)

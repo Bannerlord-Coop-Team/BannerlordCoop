@@ -9,6 +9,7 @@ internal enum HideoutCampaignConsequence
     PrepareMission,
     SetAttackCooldown,
     GrantClearRewards,
+    PrepareDirectAssaultMission,
 }
 
 internal readonly struct HideoutCampaignConsequenceRequested : IEvent
@@ -25,7 +26,7 @@ internal readonly struct HideoutCampaignConsequenceRequested : IEvent
     }
 }
 
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkHideoutCampaignConsequenceRequested : ICommand
 {
     [ProtoMember(1)]
@@ -34,11 +35,39 @@ internal readonly struct NetworkHideoutCampaignConsequenceRequested : ICommand
     [ProtoMember(2)]
     public readonly HideoutCampaignConsequence Consequence;
 
+    [ProtoMember(3)]
+    public readonly string RequestId;
+
     public NetworkHideoutCampaignConsequenceRequested(
         string settlementId,
-        HideoutCampaignConsequence consequence)
+        HideoutCampaignConsequence consequence,
+        string requestId = null)
     {
         SettlementId = settlementId;
         Consequence = consequence;
+        RequestId = requestId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkHideoutCampaignConsequenceResolved : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string RequestId;
+
+    [ProtoMember(2)]
+    public readonly bool Accepted;
+
+    [ProtoMember(3)]
+    public readonly int ExpectedHealthyDefenderCount;
+
+    public NetworkHideoutCampaignConsequenceResolved(
+        string requestId,
+        bool accepted,
+        int expectedHealthyDefenderCount)
+    {
+        RequestId = requestId;
+        Accepted = accepted;
+        ExpectedHealthyDefenderCount = expectedHealthyDefenderCount;
     }
 }

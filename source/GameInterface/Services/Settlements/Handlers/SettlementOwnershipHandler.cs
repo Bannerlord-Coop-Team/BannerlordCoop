@@ -1,11 +1,9 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
-using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -20,8 +18,6 @@ namespace GameInterface.Services.Settlements.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
-        private static readonly ILogger Logger = LogManager.GetLogger<SettlementOwnershipHandler>();
-
         public SettlementOwnershipHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
         {
             this.messageBroker = messageBroker;
@@ -44,6 +40,7 @@ namespace GameInterface.Services.Settlements.Handlers
             var message = new NetworkChangeSettlementOwnership(
                 payload.SettlementId,
                 payload.OwnerId,
+                payload.PreviousOwnerId,
                 payload.CapturerId,
                 payload.Detail);
 
@@ -54,36 +51,25 @@ namespace GameInterface.Services.Settlements.Handlers
         {
             var payload = obj.What;
 
-            if (objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) == false)
+            // Resolve in queue order with deferred ownership-object creation.
+            GameThread.RunSafe(() =>
             {
-                Logger.Verbose("Settlement not found in SettlementHandler with SettlementId: {id}", payload.SettlementId);
-                return;
-            }
+                if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
+                if (!objectManager.TryGetObjectWithLogging(payload.OwnerId, out Hero owner)) return;
+                if (!objectManager.TryGetObjectWithLogging(payload.PreviousOwnerId, out Hero previousOwner)) return;
 
-            if (objectManager.TryGetObject(payload.OwnerId, out Hero owner) == false)
-            {
-                Logger.Verbose("Owner not found in SettlementHandler with OwnerId: {id}", payload.OwnerId);
-                return;
-            }
+                Hero capturer = null;
+                if (payload.CapturerId != null &&
+                    !objectManager.TryGetObjectWithLogging(payload.CapturerId, out capturer)) return;
 
-            if (objectManager.TryGetObject(payload.CapturerId, out Hero capturer) == false && payload.CapturerId != null)
-            {
-                Logger.Verbose("Capturer not found in SettlementHandler with CapturerId: {id}", payload.CapturerId);
-                return;
-            }
+                var detail = (ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail)payload.Detail;
 
-            var detail = (ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail)payload.Detail;
-
-            // Apply only the direct owner change. The action's other side effects (patrol
-            // culling, garrison destruction and creation, governor removal) run on the server
-            // with patches live and arrive here as their own replicated messages; replaying the
-            // whole action would apply them a second time.
-            GameThread.Run(() =>
-            {
+                // Apply only the direct owner change. The action's other side effects (patrol
+                // culling, garrison destruction and creation, governor removal) run on the server
+                // with patches live and arrive here as their own replicated messages; replaying the
+                // whole action would apply them a second time.
                 using (new AllowedThread())
                 {
-                    var oldOwner = settlement.OwnerClan?.Leader;
-
                     if (settlement.Town != null)
                     {
                         settlement.Town.IsOwnerUnassigned = false;
@@ -110,9 +96,9 @@ namespace GameInterface.Services.Settlements.Handlers
                         && settlement.IsFortification;
 
                     CampaignEventDispatcher.Instance.OnSettlementOwnerChanged(
-                        settlement, openToClaim, owner, oldOwner, capturer, detail);
+                        settlement, openToClaim, owner, previousOwner, capturer, detail);
                 }
-            });
+            }, context: nameof(NetworkChangeSettlementOwnership));
         }
     }
 }

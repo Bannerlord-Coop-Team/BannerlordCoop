@@ -146,6 +146,8 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
         {
             // AutoRegistryHandler sends the MobileParty destroy after this callback. Drop any state
             // queued before or during teardown so no behavior update can follow that destroy.
+            // AutoSync keys use full registry ids; behavior packets use compact wire ids.
+            coalescer?.DropInstance(id);
             coalescer?.DropInstance(
                 Compact(id, typeof(MobileParty)));
         }
