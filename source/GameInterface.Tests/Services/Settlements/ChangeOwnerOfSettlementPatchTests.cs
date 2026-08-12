@@ -29,12 +29,24 @@ public class ChangeOwnerOfSettlementPatchTests
         var newOwner = ObjectHelper.SkipConstructor<Hero>();
         newOwner._clan = clan;
         newOwner.StringId = "hero-1";
+        var previousOwner = ObjectHelper.SkipConstructor<Hero>();
+        previousOwner.StringId = "hero-old";
+        var previousOwnerClan = ObjectHelper.SkipConstructor<Clan>();
+        previousOwner._clan = previousOwnerClan;
+        previousOwnerClan._leader = previousOwner;
         var settlement = ObjectHelper.SkipConstructor<Settlement>();
         settlement.StringId = "town-1";
+        settlement.Town = ObjectHelper.SkipConstructor<Town>();
+        settlement.Town._ownerClan = previousOwnerClan;
 
         var publishedTypes = new List<Type>();
+        SettlementOwnershipChanged ownershipChanged = null!;
         Action<MessagePayload<SettlementRebelClanInitialized>> clanCapture = payload => publishedTypes.Add(payload.What.GetType());
-        Action<MessagePayload<SettlementOwnershipChanged>> ownershipCapture = payload => publishedTypes.Add(payload.What.GetType());
+        Action<MessagePayload<SettlementOwnershipChanged>> ownershipCapture = payload =>
+        {
+            publishedTypes.Add(payload.What.GetType());
+            ownershipChanged = payload.What;
+        };
         MessageBroker.Instance.Subscribe(clanCapture);
         MessageBroker.Instance.Subscribe(ownershipCapture);
 
@@ -73,6 +85,7 @@ public class ChangeOwnerOfSettlementPatchTests
         Assert.Equal(
             new[] { typeof(SettlementRebelClanInitialized), typeof(SettlementOwnershipChanged) },
             publishedTypes);
+        Assert.Equal(previousOwner.StringId, ownershipChanged.PreviousOwnerId);
     }
 
     private sealed class TestSyncPolicy : ISyncPolicy

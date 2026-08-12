@@ -136,6 +136,26 @@ namespace Coop.LiveTesting
             }
         }
 
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
+                {
+                    return Failure(
+                        request.Id,
+                        "session_not_ready",
+                        "The co-op session command dispatcher is not available yet.",
+                        false);
+                }
+
+                return Success(request.Id, new
+                {
+                    commands = dispatcher.GetCommandNames(),
+                });
+            }, false);
+        }
+
         private LiveTestResponse HandleCommand(LiveTestRequest request)
         {
             if (!TryReadCommand(request.Parameters, out var command, out var arguments, out var error))
@@ -183,26 +203,6 @@ namespace Coop.LiveTesting
                     structuredResult,
                 });
             }, true);
-        }
-
-        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
-        {
-            return ExecuteOnGameThread(request, () =>
-            {
-                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
-                {
-                    return Failure(
-                        request.Id,
-                        "session_not_ready",
-                        "The co-op session command dispatcher is not available yet.",
-                        false);
-                }
-
-                return Success(request.Id, new
-                {
-                    commands = dispatcher.GetCommandNames(),
-                });
-            }, false);
         }
 
         private LiveTestResponse HandleScreenshot(LiveTestRequest request)
@@ -614,6 +614,11 @@ namespace Coop.LiveTesting
                 if (File.Exists(endpointRegistrationPath))
                 {
                     File.Delete(endpointRegistrationPath);
+                }
+                if (Directory.Exists(endpointDirectory) &&
+                    Directory.GetFileSystemEntries(endpointDirectory).Length == 0)
+                {
+                    Directory.Delete(endpointDirectory);
                 }
             }
             catch (Exception exception)
