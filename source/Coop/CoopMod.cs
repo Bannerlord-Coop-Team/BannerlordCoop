@@ -103,7 +103,8 @@ namespace Coop
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
 #if DEBUG
             isDeferredClientJoin = args.Any(a =>
-                a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase));
+                    a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase)) &&
+                LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
 #endif
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
