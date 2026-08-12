@@ -27,5 +27,6 @@ public class CoopAgentSpawnData
         CharacterObjectId = characterObjectId;
         Position = position;
         Health = health;
+        IsPlayer = isPlayer;
     }
 }
