@@ -321,7 +321,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         BattlePuppetHit hit = pending.Hit;
         if (registry.TryGetAgentInfo(hit.Victim, out var victimInfo))
         {
-            Logger.Information(
+            Logger.Debug(
                 "[BattleDamage] Routing blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
                 "victimIndex={VictimIndex} attackerId={AttackerId} sourceController={SourceController} " +
                 "damage={Damage} victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} " +
@@ -350,7 +350,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             hit.Victim?.RiderAgent is Agent rider &&
             registry.TryGetAgentInfo(rider, out var riderInfo))
         {
-            Logger.Information(
+            Logger.Debug(
                 "[BattleDamage] Routing blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
                 "victimIndex={VictimIndex} attackerId={AttackerId} sourceController={SourceController} " +
                 "damage={Damage} victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} " +
@@ -630,6 +630,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         int routedDamage = blow.InflictedDamage;
         // The source calculated this blow against a puppet, so vanilla could not apply its main-agent multiplier.
         ApplyPlayerReceivedDamageMultiplier(victim, ref blow, ref collisionData);
+        int inputDamage = blow.InflictedDamage;
 
         bool wasMissile = IsMissileDamage(damage);
         // The victim owner relays blood so a fatal effect stays ordered before its death broadcast.
@@ -653,12 +654,14 @@ public class BattleDamageRouter : IBattleDamageRouter
             () => victim.RegisterBlow(blow, in collisionData));
 
         float healthAfter = victim.Health;
+        float appliedDamage = healthBefore - healthAfter;
         bool activeAfter = victim.IsActive();
         var mortalityAfter = victim.CurrentMortalityState;
-        Logger.Information(
+        Logger.Debug(
             "[BattleDamage] Applied routed blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
             "victimIndex={VictimIndex} victimName={VictimName} attackerId={AttackerId} " +
-            "attackerAuthority={AttackerAuthority} routedDamage={RoutedDamage} appliedDamage={AppliedDamage} " +
+            "attackerAuthority={AttackerAuthority} routedDamage={RoutedDamage} inputDamage={InputDamage} " +
+            "appliedDamage={AppliedDamage:0.0} " +
             "victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} missile={Missile} " +
             "healthBefore={HealthBefore:0.0} healthAfter={HealthAfter:0.0} activeAfter={ActiveAfter} " +
             "mortalityBefore={MortalityBefore} mortalityAfter={MortalityAfter} " +
@@ -670,7 +673,8 @@ public class BattleDamageRouter : IBattleDamageRouter
             damage.AttackerAgentId,
             attackerControllerId,
             routedDamage,
-            blow.InflictedDamage,
+            inputDamage,
+            appliedDamage,
             victim.IsMount,
             damage.IsMount,
             wasMissile,
@@ -682,12 +686,12 @@ public class BattleDamageRouter : IBattleDamageRouter
             disableDying,
             missionMode);
 
-        if (blow.InflictedDamage > 0 && activeAfter && healthAfter >= healthBefore)
+        if (inputDamage > 0 && activeAfter && appliedDamage <= 0f)
         {
             Logger.Warning(
                 "[BattleDamage] Routed blow did not reduce health: victimId={VictimId} " +
                 "victimAuthority={VictimAuthority} victimIndex={VictimIndex} attackerId={AttackerId} " +
-                "appliedDamage={AppliedDamage} victimIsMount={VictimIsMount} " +
+                "inputDamage={InputDamage} appliedDamage={AppliedDamage:0.0} victimIsMount={VictimIsMount} " +
                 "healthBefore={HealthBefore:0.0} healthAfter={HealthAfter:0.0} " +
                 "mortalityBefore={MortalityBefore} mortalityAfter={MortalityAfter} " +
                 "disableDying={DisableDying} missionMode={MissionMode}",
@@ -695,7 +699,8 @@ public class BattleDamageRouter : IBattleDamageRouter
                 info.CurrentAuthority,
                 victim.Index,
                 damage.AttackerAgentId,
-                blow.InflictedDamage,
+                inputDamage,
+                appliedDamage,
                 victim.IsMount,
                 healthBefore,
                 healthAfter,
