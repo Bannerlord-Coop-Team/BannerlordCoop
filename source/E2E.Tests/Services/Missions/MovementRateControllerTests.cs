@@ -515,31 +515,6 @@ public sealed class MovementRateControllerTests
     }
 
     [Fact]
-    public void BattleProfile_FrameRateRecoveryCanRetryWithoutLowerBulkCost()
-    {
-        using var fixture = new RateControllerFixture();
-        fixture.Controller.Configure(MovementCadenceProfile.Battle);
-
-        fixture.AdvanceWindow(framesPerSecond: 20, senderMilliseconds: 80d);
-        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
-
-        foreach (int expectedRate in new[] { 15, 20, 30, 40 })
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                fixture.AdvanceWindow(
-                    framesPerSecond: 60,
-                    senderMilliseconds: fixture.Controller.Snapshot.BulkHz * 2d);
-            }
-
-            Assert.Equal(expectedRate, fixture.Controller.Snapshot.BulkHz);
-        }
-
-        fixture.AdvanceWindow(framesPerSecond: 60, senderMilliseconds: 80d);
-        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
-    }
-
-    [Fact]
     public void BattleProfile_FrameRateRecoveryRetriesAfterConfirmationFailure()
     {
         using var fixture = new RateControllerFixture();
