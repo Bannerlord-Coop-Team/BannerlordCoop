@@ -16,6 +16,7 @@ using GameInterface.Services.SiegeEvents.Interfaces;
 using SandBox.View.Map.Managers;
 using Serilog;
 using System;
+using System.Runtime.ExceptionServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -78,17 +79,21 @@ internal class HeroInterface : IHeroInterface
 
     public void SetupServerHero(Hero hero)
     {
+        ExceptionDispatchInfo exception = null;
+
         GameThread.Run(() =>
         {
             try
             {
                 SetupNewHero(hero, restoreParty: true);
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                Logger.Error(ex, "Failed to set up server hero");
+                exception = ExceptionDispatchInfo.Capture(e);
             }
         }, blocking: true);
+
+        exception?.Throw();
     }
 
     public Hero ClientUnpackHero(byte[] bytes, Player player)
@@ -239,8 +244,8 @@ internal class HeroInterface : IHeroInterface
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)
         {
-            Logger.Error("{type} was null when trying to register a {managedType}", typeof(CampaignObjectManager), typeof(Hero));
-            return;
+            throw new InvalidOperationException(
+                $"{typeof(CampaignObjectManager)} was null when trying to register a {typeof(Hero)}");
         }
 
         // These registrations assign the final MBGUIDs used by MBObjectBase.GetHashCode. Finish them before

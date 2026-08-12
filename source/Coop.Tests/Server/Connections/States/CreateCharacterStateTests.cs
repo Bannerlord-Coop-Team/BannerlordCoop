@@ -146,6 +146,29 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void NetworkTransferNewHero_ServerSetupFailureDisconnectsBeforeTransferSave()
+        {
+            // Arrange
+            var hero = SetupUnpackedHero();
+            serverComponent.Container.Resolve<Mock<IHeroInterface>>()
+                .Setup(h => h.SetupServerHero(hero))
+                .Throws(new InvalidOperationException("setup failed"));
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            // Act
+            var payload = new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+            currentState.Handle_NetworkTransferNewHero(payload);
+
+            // Assert
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.DoesNotContain(
+                serverComponent.TestNetwork.ImmediateSends,
+                send => send.Payload is NetworkHeroRecieved);
+            Assert.IsType<CreateCharacterState>(connectionLogic.State);
+        }
+
+        [Fact]
         public void NetworkTransferNewHero_ReplaysExistingPlayersToJoiner_ExceptItselfAndHost()
         {
             // Arrange — a pre-existing client, the host, and the joiner's own player are all in the registry.

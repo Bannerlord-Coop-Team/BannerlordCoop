@@ -329,6 +329,7 @@ namespace Coop.LiveTesting
                     isBmp = observation.IsBmp,
                     stable = observation.Stable,
                     length = observation.Length,
+                    declaredLength = observation.DeclaredLength,
                     lastWriteUtc = observation.LastWriteUtc,
                 });
             }
@@ -670,6 +671,7 @@ namespace Coop.LiveTesting
                 long length = 0;
                 DateTime? lastWriteUtc = null;
                 bool isBmp = false;
+                uint declaredLength = 0;
                 if (exists)
                 {
                     try
@@ -677,7 +679,7 @@ namespace Coop.LiveTesting
                         var file = new FileInfo(Path);
                         length = file.Length;
                         lastWriteUtc = file.LastWriteTimeUtc;
-                        isBmp = HasBitmapSignature(Path);
+                        isBmp = TryReadBitmapDeclaredLength(Path, out declaredLength);
                     }
                     catch (IOException)
                     {
@@ -691,13 +693,18 @@ namespace Coop.LiveTesting
 
                 bool stable = exists &&
                     isBmp &&
+                    declaredLength == length &&
                     length > 0 &&
                     observedLength.HasValue &&
                     observedLength.Value == length &&
                     observedLastWriteUtc.HasValue &&
                     lastWriteUtc.HasValue &&
                     observedLastWriteUtc.Value == lastWriteUtc.Value;
-                bool validObservation = exists && isBmp && length > 0 && lastWriteUtc.HasValue;
+                bool validObservation = exists &&
+                    isBmp &&
+                    declaredLength == length &&
+                    length > 0 &&
+                    lastWriteUtc.HasValue;
                 observedLength = validObservation ? length : (long?)null;
                 observedLastWriteUtc = validObservation ? lastWriteUtc : null;
                 if (stable)
@@ -710,11 +717,13 @@ namespace Coop.LiveTesting
                     isBmp,
                     stable,
                     length,
+                    declaredLength,
                     lastWriteUtc?.ToString("o"));
             }
 
-            private static bool HasBitmapSignature(string path)
+            private static bool TryReadBitmapDeclaredLength(string path, out uint declaredLength)
             {
+                declaredLength = 0;
                 try
                 {
                     using (var stream = new FileStream(
@@ -723,7 +732,24 @@ namespace Coop.LiveTesting
                         FileAccess.Read,
                         FileShare.ReadWrite | FileShare.Delete))
                     {
-                        return stream.ReadByte() == 'B' && stream.ReadByte() == 'M';
+                        var header = new byte[6];
+                        int headerLength = 0;
+                        while (headerLength < header.Length)
+                        {
+                            int bytesRead = stream.Read(
+                                header,
+                                headerLength,
+                                header.Length - headerLength);
+                            if (bytesRead == 0) break;
+                            headerLength += bytesRead;
+                        }
+
+                        bool isBmp = headerLength == header.Length &&
+                            header[0] == 'B' &&
+                            header[1] == 'M';
+                        if (isBmp)
+                            declaredLength = BitConverter.ToUInt32(header, 2);
+                        return isBmp;
                     }
                 }
                 catch (IOException)
@@ -744,12 +770,14 @@ namespace Coop.LiveTesting
                 bool isBmp,
                 bool stable,
                 long length,
+                uint declaredLength,
                 string lastWriteUtc)
             {
                 Exists = exists;
                 IsBmp = isBmp;
                 Stable = stable;
                 Length = length;
+                DeclaredLength = declaredLength;
                 LastWriteUtc = lastWriteUtc;
             }
 
@@ -762,6 +790,8 @@ namespace Coop.LiveTesting
             public bool Stable { get; }
 
             public long Length { get; }
+
+            public uint DeclaredLength { get; }
 
             public string LastWriteUtc { get; }
         }

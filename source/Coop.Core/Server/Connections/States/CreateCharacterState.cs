@@ -93,7 +93,19 @@ public class CreateCharacterState : ConnectionStateBase
 
         // Run authoritative setup only after existing clients can create the referenced hero graph. Follow-up
         // messages use the same reliable-ordered channel; the joining peer is still dropping pre-snapshot deltas.
-        heroInterface.SetupServerHero(hero);
+        try
+        {
+            heroInterface.SetupServerHero(hero);
+        }
+        catch (System.Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Failed to set up hero for {ControllerId}; disconnecting the joining peer",
+                controllerId);
+            ConnectionLogic.Peer.Disconnect();
+            return;
+        }
 
         // Respond with ids for the creating client
         network.SendImmediate(netPeer, new NetworkHeroRecieved(player));
