@@ -3,52 +3,62 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Interfaces;
 
-internal static class AwaitingAlternativeSolutionTroopsRegistry
+public interface IAwaitingAlternativeSolutionTroopsRegistry
 {
-    private static readonly Dictionary<string, TroopRoster> TroopsByOwnerControllerId = new();
+    void Deposit(string ownerControllerId, TroopRoster troops);
+    bool TryGet(string ownerControllerId, out TroopRoster troops);
+    void Clear(string ownerControllerId);
+    void ClearAll();
+    void Restore(string ownerControllerId, TroopRoster troops);
+    IReadOnlyCollection<(string OwnerControllerId, TroopRoster Troops)> Snapshot();
+}
 
-    public static void Deposit(string ownerControllerId, TroopRoster troops)
+internal sealed class AwaitingAlternativeSolutionTroopsRegistry : IAwaitingAlternativeSolutionTroopsRegistry
+{
+    private readonly Dictionary<string, TroopRoster> troopsByOwnerControllerId = new();
+
+    public void Deposit(string ownerControllerId, TroopRoster troops)
     {
         if (string.IsNullOrEmpty(ownerControllerId) || troops == null || troops.Count == 0) return;
 
-        if (!TroopsByOwnerControllerId.TryGetValue(ownerControllerId, out var existing))
+        if (!troopsByOwnerControllerId.TryGetValue(ownerControllerId, out var existing))
         {
             existing = TroopRoster.CreateDummyTroopRoster();
-            TroopsByOwnerControllerId[ownerControllerId] = existing;
+            troopsByOwnerControllerId[ownerControllerId] = existing;
         }
 
         existing.Add(troops);
     }
 
-    public static bool TryGet(string ownerControllerId, out TroopRoster troops)
+    public bool TryGet(string ownerControllerId, out TroopRoster troops)
     {
         troops = null;
         if (string.IsNullOrEmpty(ownerControllerId)) return false;
 
-        return TroopsByOwnerControllerId.TryGetValue(ownerControllerId, out troops) && troops.Count > 0;
+        return troopsByOwnerControllerId.TryGetValue(ownerControllerId, out troops) && troops.Count > 0;
     }
 
-    public static void Clear(string ownerControllerId)
+    public void Clear(string ownerControllerId)
     {
         if (string.IsNullOrEmpty(ownerControllerId)) return;
-        TroopsByOwnerControllerId.Remove(ownerControllerId);
+        troopsByOwnerControllerId.Remove(ownerControllerId);
     }
 
-    public static void ClearAll()
+    public void ClearAll()
     {
-        TroopsByOwnerControllerId.Clear();
+        troopsByOwnerControllerId.Clear();
     }
 
-    public static void Restore(string ownerControllerId, TroopRoster troops)
+    public void Restore(string ownerControllerId, TroopRoster troops)
     {
         if (string.IsNullOrEmpty(ownerControllerId) || troops == null || troops.Count == 0) return;
-        TroopsByOwnerControllerId[ownerControllerId] = troops;
+        troopsByOwnerControllerId[ownerControllerId] = troops;
     }
 
-    public static IReadOnlyCollection<(string OwnerControllerId, TroopRoster Troops)> Snapshot()
+    public IReadOnlyCollection<(string OwnerControllerId, TroopRoster Troops)> Snapshot()
     {
-        var snapshot = new List<(string, TroopRoster)>(TroopsByOwnerControllerId.Count);
-        foreach (var kvp in TroopsByOwnerControllerId)
+        var snapshot = new List<(string, TroopRoster)>(troopsByOwnerControllerId.Count);
+        foreach (var kvp in troopsByOwnerControllerId)
         {
             snapshot.Add((kvp.Key, kvp.Value));
         }

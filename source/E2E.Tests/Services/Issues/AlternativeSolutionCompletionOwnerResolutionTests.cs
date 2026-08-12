@@ -139,7 +139,7 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
             Assert.Equal(serverMainHeroGoldBefore, Hero.MainHero.Gold);
             Assert.Equal(serverMainHeroCharacterBefore, Hero.MainHero.CharacterObject);
 
-            Assert.True(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out var deposited));
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
             Assert.True(deposited.TotalManCount >= 1);
         });
     }

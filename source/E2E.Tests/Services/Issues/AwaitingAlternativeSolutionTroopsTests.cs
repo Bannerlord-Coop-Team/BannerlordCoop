@@ -234,7 +234,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
                 Hero.MainHero.ChangeState(previousState);
             }
 
-            Assert.True(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out var deposited));
+            Assert.True(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
             Assert.True(deposited.TotalManCount >= 1);
             Assert.True(deposited.TotalHeroes >= 1);
         });
@@ -242,23 +242,24 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDeposit>());
         Server.Call(() =>
         {
-            Assert.True(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out var serverDeposited));
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var serverDeposited));
             Assert.True(serverDeposited.TotalManCount >= 1);
             depositedManCount = serverDeposited.TotalManCount;
         });
 
         Server.Call(() =>
         {
+            var troopsRegistry = Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>();
             var behavior = new IssuesCampaignBehavior();
             var records = new Dictionary<string, object>();
 
             behavior.SyncData(new TestDataStore(isSaving: true, records));
 
-            AwaitingAlternativeSolutionTroopsRegistry.ClearAll();
+            troopsRegistry.ClearAll();
 
             behavior.SyncData(new TestDataStore(isSaving: false, records));
 
-            Assert.True(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out var restored));
+            Assert.True(troopsRegistry.TryGet(controllerId, out var restored));
             Assert.Equal(depositedManCount, restored.TotalManCount);
         });
 
@@ -300,13 +301,13 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(clientPartyId, out var clientParty));
             Assert.True(clientParty.MemberRoster.Contains(companion.CharacterObject));
 
-            Assert.False(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out _));
+            Assert.False(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
 
         Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDrain>());
         Server.Call(() =>
         {
-            Assert.False(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out _));
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
     }
 
@@ -344,7 +345,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
                 Game.Current.PlayerTroop = previousPlayerTroop;
             }
 
-            Assert.True(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out var deposited));
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
             Assert.Equal(1, deposited.TotalManCount);
         });
     }

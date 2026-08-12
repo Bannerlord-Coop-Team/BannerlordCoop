@@ -20,17 +20,20 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPlayerManager playerManager;
+    private readonly IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry;
 
     public AwaitingAlternativeSolutionTroopsHandler(
         IMessageBroker messageBroker,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
         this.playerManager = playerManager;
+        this.troopsRegistry = troopsRegistry;
 
         messageBroker.Subscribe<AwaitingAlternativeSolutionTroopsDepositedLocally>(Handle_AwaitingAlternativeSolutionTroopsDepositedLocally);
         messageBroker.Subscribe<RequestAwaitingAlternativeSolutionTroopsDeposit>(Handle_RequestAwaitingAlternativeSolutionTroopsDeposit);
@@ -72,7 +75,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
             roster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
         }
 
-        AwaitingAlternativeSolutionTroopsRegistry.Deposit(player.ControllerId, roster);
+        troopsRegistry.Deposit(player.ControllerId, roster);
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDrainedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDrainedLocally> payload)
@@ -92,6 +95,6 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
             return;
         }
 
-        AwaitingAlternativeSolutionTroopsRegistry.Clear(player.ControllerId);
+        troopsRegistry.Clear(player.ControllerId);
     }
 }

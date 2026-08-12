@@ -52,7 +52,9 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
             return false;
         }
 
-        AwaitingAlternativeSolutionTroopsRegistry.Deposit(ownerControllerId, troops);
+        if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return false;
+
+        troopsRegistry.Deposit(ownerControllerId, troops);
         MessageBroker.Instance.Publish(issue, new AwaitingAlternativeSolutionTroopsDepositedLocally(ownerControllerId, troops));
 
         return false;
@@ -69,7 +71,8 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         var localControllerId = controllerIdProvider.ControllerId;
         if (string.IsNullOrEmpty(localControllerId)) return false;
 
-        if (!AwaitingAlternativeSolutionTroopsRegistry.TryGet(localControllerId, out var troops)) return false;
+        if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return false;
+        if (!troopsRegistry.TryGet(localControllerId, out var troops)) return false;
         if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
 
         TextObject textObject = BuildReturnedTroopsInquiryText(troops);
@@ -79,7 +82,10 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
             isNegativeOptionShown: false, GameTexts.FindText("str_ok").ToString(), null, delegate
             {
                 MakeAlternativeTroopsReturn(troops);
-                AwaitingAlternativeSolutionTroopsRegistry.Clear(localControllerId);
+                if (ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registryAtDrainTime))
+                {
+                    registryAtDrainTime.Clear(localControllerId);
+                }
                 _inquiryInFlight = false;
                 MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId));
             }, null), pauseGameActiveState: true);
