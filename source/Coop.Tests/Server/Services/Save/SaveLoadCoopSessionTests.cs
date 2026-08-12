@@ -125,6 +125,10 @@ namespace Coop.Tests.Server.Services.Save
                 Assert.Equal(sessionData.Players[i].HeroId, savedSession.Players[i].HeroId);
                 Assert.Equal(sessionData.Players[i].MobilePartyId, savedSession.Players[i].MobilePartyId);
                 Assert.Equal(sessionData.Players[i].ClanId, savedSession.Players[i].ClanId);
+
+                var playerHeroId = sessionData.Players[i].HeroId;
+
+                Assert.Equal(sessionData.InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId], savedSession.InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId]);
             }
         }
 

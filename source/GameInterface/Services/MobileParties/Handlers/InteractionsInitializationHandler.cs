@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Messages;
@@ -81,7 +82,10 @@ internal class InteractionsInitializationHandler : IHandler
 
     private void Handle(MessagePayload<NetworkInitializeServerInteractionsDataKeys> obj)
     {
-        sessionInteractionsPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        GameThread.RunSafe(() =>
+        {
+            sessionInteractionsPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        });
     }
 
     private Dictionary<MobileParty, VillagerCampaignBehavior.PlayerInteraction> GetInteractedVillagers(string playerHeroId)
