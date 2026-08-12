@@ -72,10 +72,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
             if (!voteManager.ShouldBlockLocalResolution(__instance)) return true;
 
-            if (!voteManager.TryPublishFinalVote(__instance))
-            {
-                voteManager.CloseDecisionItem(__instance);
-            }
+            voteManager.TryPublishFinalVote(__instance);
             return false;
         }
 
