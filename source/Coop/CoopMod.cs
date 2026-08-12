@@ -69,6 +69,8 @@ namespace Coop
 
 #if DEBUG
         private LiveTestControlServer liveTestControlServer;
+        private bool isDeferredClientJoin;
+        private bool isLiveTestRun;
 #endif
 
         public CoopMod()
@@ -88,10 +90,6 @@ namespace Coop
 
         private bool isServer = false;
         private bool isAutoConnect = false;
-#if DEBUG
-        private bool deferClientAutoConnect;
-        private bool isLiveTestRun;
-#endif
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
@@ -111,10 +109,10 @@ namespace Coop
 
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
 #if DEBUG
-            deferClientAutoConnect = args.Any(a =>
-                a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase));
-            isLiveTestRun = args.Any(a =>
-                a.Equals("/cooptestrun", StringComparison.OrdinalIgnoreCase));
+            isDeferredClientJoin = args.Any(a =>
+                    a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase)) &&
+                LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
+            isLiveTestRun = LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
 #endif
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
@@ -444,7 +442,11 @@ namespace Coop
 #if DEBUG
             if (isAutoConnect && LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs()))
             {
-                liveTestControlServer = new LiveTestControlServer(isServer, activeLogFilePath);
+                liveTestControlServer = new LiveTestControlServer(
+                    isServer,
+                    activeLogFilePath,
+                    isDeferredClientJoin,
+                    () => Coop.StartAsClient());
                 liveTestControlServer.Start();
             }
 #endif
@@ -666,12 +668,9 @@ namespace Coop
         {
             // The auto-load-save start path owns this process's startup.
             if (ManagedServerConfig.HasAutoLoadSave) return;
+            if (!isServer && isDeferredClientJoin) return;
 
-            if (isAutoConnect &&
-#if DEBUG
-                !deferClientAutoConnect &&
-#endif
-                !_autoStarted &&
+            if (isAutoConnect && !_autoStarted &&
                 GameStateManager.Current?.ActiveState is InitialState)
             {
                 _autoStarted = true;
