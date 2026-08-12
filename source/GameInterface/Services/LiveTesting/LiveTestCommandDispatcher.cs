@@ -1,5 +1,6 @@
 ﻿using Common;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -12,7 +13,7 @@ public interface ILiveTestCommandDispatcher
 {
     bool EnsureReady();
 
-    IReadOnlyList<string> GetCommands();
+    IReadOnlyList<string> GetCommandNames();
 
     LiveTestCommandResult Execute(string command, List<string> arguments);
 }
@@ -43,9 +44,9 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
         return true;
     }
 
-    public IReadOnlyList<string> GetCommands()
+    public IReadOnlyList<string> GetCommandNames()
     {
-        IReadOnlyList<string> commands = null;
+        IReadOnlyList<string> commandNames = null;
         ExceptionDispatchInfo exception = null;
 
         GameThread.Run(() =>
@@ -53,14 +54,19 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
             try
             {
                 EnsureFunctionsCollected();
-                commands = AppDomain.CurrentDomain.GetAssemblies()
-                    .SelectMany(GetLoadableTypes)
-                    .SelectMany(GetStaticMethods)
-                    .SelectMany(GetCommandNames)
-                    .Where(command =>
-                        command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal) &&
-                        CommandLineFunctionality.HasFunctionForCommand(command))
-                    .Distinct(StringComparer.Ordinal)
+
+                FieldInfo allFunctionsField = typeof(CommandLineFunctionality).GetField(
+                    "AllFunctions",
+                    BindingFlags.NonPublic | BindingFlags.Static);
+                if (allFunctionsField == null ||
+                    !(allFunctionsField.GetValue(null) is IDictionary allFunctions))
+                {
+                    throw new InvalidOperationException("Unable to read the Bannerlord command registry");
+                }
+
+                commandNames = allFunctions.Keys
+                    .Cast<string>()
+                    .Where(command => command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal))
                     .OrderBy(command => command, StringComparer.Ordinal)
                     .ToArray();
             }
@@ -71,7 +77,7 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
         }, blocking: true);
 
         exception?.Throw();
-        return commands;
+        return commandNames;
     }
 
     public LiveTestCommandResult Execute(string command, List<string> arguments)
@@ -112,59 +118,6 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 
         CommandLineFunctionality.CollectCommandLineFunctions();
         functionsCollected = true;
-    }
-
-    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException exception)
-        {
-            return exception.Types.Where(type => type != null);
-        }
-    }
-
-    private static IEnumerable<MethodInfo> GetStaticMethods(Type type)
-    {
-        try
-        {
-            return type.GetMethods(
-                BindingFlags.Public |
-                BindingFlags.NonPublic |
-                BindingFlags.Static);
-        }
-        catch (Exception)
-        {
-            return Array.Empty<MethodInfo>();
-        }
-    }
-
-    private static IEnumerable<string> GetCommandNames(MethodInfo method)
-    {
-        try
-        {
-            var commands = new List<string>();
-            foreach (CustomAttributeData attribute in method.GetCustomAttributesData())
-            {
-                if (attribute.AttributeType != typeof(CommandLineFunctionality.CommandLineArgumentFunction) ||
-                    attribute.ConstructorArguments.Count < 2)
-                    continue;
-
-                string name = attribute.ConstructorArguments[0].Value as string;
-                string group = attribute.ConstructorArguments[1].Value as string;
-                if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(group))
-                    continue;
-
-                commands.Add(group + "." + name);
-            }
-            return commands;
-        }
-        catch (Exception)
-        {
-            return Array.Empty<string>();
-        }
     }
 }
 

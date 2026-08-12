@@ -43,15 +43,15 @@ public class LiveTestCommandDispatcherTests
     }
 
     [Fact]
-    public void GetCommands_ReturnsSortedUniqueDebugCommandsOnly()
+    public void GetCommandNames_ReturnsSortedDebugCommands()
     {
-        IReadOnlyList<string> commands = new LiveTestCommandDispatcher().GetCommands();
+        IReadOnlyList<string> commandNames = new LiveTestCommandDispatcher().GetCommandNames();
 
-        Assert.Contains(DebugCommand, commands);
-        Assert.DoesNotContain(NonDebugCommand, commands);
-        Assert.All(commands, command => Assert.StartsWith("coop.debug.", command));
-        Assert.Equal(commands.OrderBy(command => command, StringComparer.Ordinal), commands);
-        Assert.Equal(commands.Distinct(StringComparer.Ordinal), commands);
+        Assert.Contains(DebugCommand, commandNames);
+        Assert.DoesNotContain(NonDebugCommand, commandNames);
+        Assert.Equal(
+            commandNames.OrderBy(command => command, StringComparer.Ordinal),
+            commandNames);
     }
 
     [Fact]

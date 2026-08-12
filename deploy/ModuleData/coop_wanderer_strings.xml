@@ -25,4 +25,364 @@
   <string
     id="generic_backstory.coop_wanderer_hasted"
     text="{=!}I am a Sturgian scout and skirmisher. I find quick roads, spot ambushes, and make sure my employer reaches trouble before trouble reaches them." />
+  <string
+    id="prebackstory.coop_wanderer_member1"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member1"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member1"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member1"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member1"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member1"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member1"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member1"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member2"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member2"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member2"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member2"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member2"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member2"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member2"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member2"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member3"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member3"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member3"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member3"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member3"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member3"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member3"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member3"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member4"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member4"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member4"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member4"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member4"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member4"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member4"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member4"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member5"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member5"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member5"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member5"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member5"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member5"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member5"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member5"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member6"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member6"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member6"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member6"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member6"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member6"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member6"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member6"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member7"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member7"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member7"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member7"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member7"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member7"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member7"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member7"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member8"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member8"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member8"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member8"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member8"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member8"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member8"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member8"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member9"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member9"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member9"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member9"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member9"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member9"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member9"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member9"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member10"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member10"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member10"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member10"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member10"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member10"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member10"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member10"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member11"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member11"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member11"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member11"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member11"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member11"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member11"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member11"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member12"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member12"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member12"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member12"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member12"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member12"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member12"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member12"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member13"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member13"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member13"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member13"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member13"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member13"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member13"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member13"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member14"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member14"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member14"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member14"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member14"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member14"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member14"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member14"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_member15"
+    text="{=coop_temporary_wanderer_prebackstory}You are looking for someone who can handle a hard road? Then we should talk." />
+  <string
+    id="backstory_a.coop_wanderer_member15"
+    text="{=coop_temporary_wanderer_backstory_a}I have worked as a scout, caravan guard, and hired blade wherever there was coin and a road leading onward." />
+  <string
+    id="backstory_b.coop_wanderer_member15"
+    text="{=coop_temporary_wanderer_backstory_b}The work taught me to read tracks, keep watch, and stay calm when plans fall apart." />
+  <string
+    id="backstory_c.coop_wanderer_member15"
+    text="{=coop_temporary_wanderer_backstory_c}My last company broke apart after a job went wrong. I kept my gear and decided to choose my next employer more carefully." />
+  <string
+    id="response_1.coop_wanderer_member15"
+    text="{=coop_temporary_wanderer_response_1}Experience on the road is useful." />
+  <string
+    id="response_2.coop_wanderer_member15"
+    text="{=coop_temporary_wanderer_response_2}That story leaves out a great deal." />
+  <string
+    id="backstory_d.coop_wanderer_member15"
+    text="{=coop_temporary_wanderer_backstory_d}Ask what you need of me. If the terms are fair, I will earn my place in your company." />
+  <string
+    id="generic_backstory.coop_wanderer_member15"
+    text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
 </strings>
