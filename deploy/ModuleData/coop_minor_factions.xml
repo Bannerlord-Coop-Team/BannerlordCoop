@@ -14,8 +14,8 @@
     name="{=!}Coop Team"
     tier="4">
     <minor_faction_character_templates>
-      <template id="NPCCharacter.coop_team_lord_hasted" />
       <template id="NPCCharacter.coop_team_lord_another_joke" />
+      <template id="NPCCharacter.coop_team_lord_hasted" />
       <template id="NPCCharacter.coop_team_lord_curzek" />
       <template id="NPCCharacter.coop_team_lord_shotup" />
     </minor_faction_character_templates>

@@ -1,5 +1,9 @@
+using Common;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Services.Heroes.Patches;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -57,6 +61,61 @@ public class HeroCreationTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Hero>(newHeroStringId, out var newHero));
 
             Assert.Equal(serverHero?.FirstName.Value, newHero.FirstName.Value);
+        }
+    }
+
+    [Fact]
+    public void ServerCreateConfiguredMinorFactionLord_SyncsConfiguredName()
+    {
+        var server = TestEnvironment.Server;
+        Hero? serverHero = null;
+
+        server.Call(() =>
+        {
+            Assert.True(ModInformation.IsServer);
+            var template = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            using (new AllowedThread())
+                template.StringId = HeroCreatorPatches.ConfiguredMinorFactionLordPrefix + "test";
+            template._basicName = new TextObject("Hasted");
+            template._occupation = Occupation.Lord;
+            template.Culture.DefaultBattleEquipmentRoster =
+                GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            template.Culture.DefaultStealthEquipmentRoster =
+                GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            template.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item =
+                GameObjectCreator.CreateInitializedObject<ItemObject>();
+
+            var createSpecialHero = AccessTools.Method(
+                typeof(HeroCreator),
+                nameof(HeroCreator.CreateSpecialHero),
+                new[]
+                {
+                    typeof(CharacterObject),
+                    typeof(Settlement),
+                    typeof(Clan),
+                    typeof(Clan),
+                    typeof(int),
+                });
+            Assert.Contains(
+                Harmony.GetPatchInfo(createSpecialHero).Postfixes,
+                patch => patch.PatchMethod.DeclaringType == typeof(HeroCreatorPatches));
+            Assert.StartsWith(
+                HeroCreatorPatches.ConfiguredMinorFactionLordPrefix,
+                template.StringId,
+                StringComparison.Ordinal);
+
+            serverHero = HeroCreator.CreateSpecialHero(template);
+        });
+
+        Assert.NotNull(serverHero);
+        Assert.Equal("Hasted", serverHero.Name.ToString());
+        Assert.Equal("Hasted", serverHero.FirstName.ToString());
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(serverHero.StringId, out var clientHero));
+            Assert.Equal("Hasted", clientHero.Name.ToString());
+            Assert.Equal("Hasted", clientHero.FirstName.ToString());
         }
     }
 

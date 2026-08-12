@@ -1,5 +1,6 @@
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Heroes.Patches.Disable;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,7 +15,9 @@ namespace GameInterface.Tests.Services.Heroes;
 
 public sealed class ConfiguredMinorFactionDataTests
 {
-    private static readonly (string Id, string Name, string NativeTemplate)[] Lords =
+    private const string CoopTeamLeaderId = "coop_team_lord_another_joke";
+
+    private static readonly (string Id, string Name, string NativeTemplate)[] FoundingLords =
     {
         ("coop_team_lord_hasted", "Hasted", "spc_skolderbrotva_leader_0"),
         ("coop_team_lord_another_joke", "AnotherJoke", "spc_skolderbrotva_leader_1"),
@@ -27,8 +30,8 @@ public sealed class ConfiguredMinorFactionDataTests
     {
         var template = new CharacterObject
         {
-            StringId = Lords[0].Id,
-            _basicName = new TextObject(Lords[0].Name),
+            StringId = FoundingLords[0].Id,
+            _basicName = new TextObject(FoundingLords[0].Name),
             _occupation = Occupation.Lord,
         };
         var generatedCharacter = new CharacterObject
@@ -44,8 +47,77 @@ public sealed class ConfiguredMinorFactionDataTests
 
         HeroCreatorPatches.ApplyConfiguredMinorFactionLordName(hero);
 
-        Assert.Equal(Lords[0].Name, hero.Name.ToString());
-        Assert.Equal(Lords[0].Name, hero.FirstName.ToString());
+        Assert.Equal(FoundingLords[0].Name, hero.Name.ToString());
+        Assert.Equal(FoundingLords[0].Name, hero.FirstName.ToString());
+    }
+
+    [Fact]
+    public void ApplyConfiguredMinorFactionLordName_UsesExplicitCreationTemplate()
+    {
+        var configuredTemplate = new CharacterObject
+        {
+            StringId = FoundingLords[0].Id,
+            _basicName = new TextObject(FoundingLords[0].Name),
+            _occupation = Occupation.Lord,
+        };
+        var hero = new Hero
+        {
+            _characterObject = new CharacterObject
+            {
+                _originCharacter = new CharacterObject { StringId = "different_template" },
+            },
+            _name = new TextObject("Random Sturgian Name"),
+            _firstName = new TextObject("Random"),
+        };
+
+        HeroCreatorPatches.ApplyConfiguredMinorFactionLordName(hero, configuredTemplate);
+
+        Assert.Equal(FoundingLords[0].Name, hero.Name.ToString());
+        Assert.Equal(FoundingLords[0].Name, hero.FirstName.ToString());
+    }
+
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(false, false, false)]
+    public void ShouldApplyConfiguredName_RequiresServerOrNativeAuthority(
+        bool isServer,
+        bool originalAllowed,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            HeroCreatorPatches.ShouldApplyConfiguredName(isServer, originalAllowed));
+    }
+
+    [Fact]
+    public void HeroCreatorPatch_TargetsExactCreateSpecialHeroOverload()
+    {
+        var harmony = new Harmony($"{nameof(HeroCreatorPatch_TargetsExactCreateSpecialHeroOverload)}.{Guid.NewGuid()}");
+        try
+        {
+            Type[] expectedParameterTypes =
+            {
+                typeof(CharacterObject),
+                typeof(TaleWorlds.CampaignSystem.Settlements.Settlement),
+                typeof(Clan),
+                typeof(Clan),
+                typeof(int),
+            };
+
+            var patched = harmony.CreateClassProcessor(typeof(HeroCreatorPatches)).Patch();
+
+            Assert.Contains(
+                patched,
+                method => method.Name.Contains(nameof(HeroCreator.CreateSpecialHero), StringComparison.Ordinal) &&
+                          method.GetParameters()
+                              .Select(parameter => parameter.ParameterType)
+                              .SequenceEqual(expectedParameterTypes));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
     }
 
     [Fact]
@@ -66,7 +138,7 @@ public sealed class ConfiguredMinorFactionDataTests
     }
 
     [Fact]
-    public void CoopTeam_IsRegisteredAsMinorFactionWithFourNamedLordTemplates()
+    public void CoopTeam_IsRegisteredWithAnotherJokeLeadingConfiguredLordTemplates()
     {
         string repositoryRoot = GetRepositoryRoot();
         string moduleData = Path.Combine(repositoryRoot, "deploy", "ModuleData");
@@ -85,36 +157,64 @@ public sealed class ConfiguredMinorFactionDataTests
             "PartyTemplate.kingdom_hero_party_mercenary_sturgia_template",
             faction.Attribute("default_party_template")?.Value);
         Assert.Equal("4", faction.Attribute("tier")?.Value);
-        Assert.Equal(Lords.Length, new DefaultMinorFactionsModel().MinorFactionHeroLimit);
-
-        Assert.Equal(
-            Lords.Select(lord => $"NPCCharacter.{lord.Id}"),
-            faction.Element("minor_faction_character_templates")?
-                .Elements("template")
-                .Select(template => template.Attribute("id")?.Value));
+        string[] factionLordIds = faction.Element("minor_faction_character_templates")?
+            .Elements("template")
+            .Select(template => template.Attribute("id")?.Value
+                ?? throw new InvalidDataException("Minor faction template has no id"))
+            .ToArray()
+            ?? Array.Empty<string>();
+        Assert.True(factionLordIds.Length >= new DefaultMinorFactionsModel().MinorFactionHeroLimit);
+        Assert.Equal($"NPCCharacter.{CoopTeamLeaderId}", factionLordIds[0]);
+        foreach ((string id, _, _) in FoundingLords)
+        {
+            Assert.Contains($"NPCCharacter.{id}", factionLordIds);
+        }
 
         XElement lordRoot = XDocument.Load(Path.Combine(moduleData, "coop_minor_faction_lords.xml")).Root
             ?? throw new InvalidDataException("coop_minor_faction_lords.xml has no root element");
-        XElement[] lordTemplates = lordRoot.Elements("NPCCharacter").ToArray();
-        Assert.Equal(Lords.Length, lordTemplates.Length);
+        Dictionary<string, XElement> lordTemplates = lordRoot
+            .Elements("NPCCharacter")
+            .ToDictionary(
+                lord => lord.Attribute("id")?.Value
+                    ?? throw new InvalidDataException("Minor faction lord template has no id"),
+                StringComparer.Ordinal);
+        Assert.Equal(
+            factionLordIds.OrderBy(id => id, StringComparer.Ordinal),
+            lordTemplates.Keys
+                .Select(id => $"NPCCharacter.{id}")
+                .OrderBy(id => id, StringComparer.Ordinal));
 
-        for (int index = 0; index < Lords.Length; index++)
+        foreach ((string id, XElement lord) in lordTemplates)
         {
-            (string id, string name, string nativeTemplate) = Lords[index];
-            XElement lord = lordTemplates[index];
-
-            Assert.Equal(id, lord.Attribute("id")?.Value);
-            Assert.Equal($"{{=!}}{name}", lord.Attribute("name")?.Value);
             Assert.Equal("true", lord.Attribute("is_template")?.Value);
             Assert.Equal("false", lord.Attribute("is_hero")?.Value);
             Assert.Equal("false", lord.Attribute("is_female")?.Value);
             Assert.Equal("Culture.sturgia", lord.Attribute("culture")?.Value);
             Assert.Equal("Lord", lord.Attribute("occupation")?.Value);
-            Assert.Equal($"SkillSet.{nativeTemplate}_skills", lord.Attribute("skill_template")?.Value);
+            Assert.False(string.IsNullOrWhiteSpace(lord.Attribute("name")?.Value));
+            Assert.False(string.IsNullOrWhiteSpace(lord.Attribute("skill_template")?.Value));
             Assert.StartsWith(
                 HeroCreatorPatches.ConfiguredMinorFactionLordPrefix,
                 id,
                 StringComparison.Ordinal);
+
+            XElement[] equipmentSets = lord.Element("Equipments")?
+                .Elements("EquipmentSet")
+                .ToArray()
+                ?? Array.Empty<XElement>();
+            Assert.Contains(
+                equipmentSets,
+                equipment => equipment.Attribute("equipmentType") == null);
+            Assert.Contains(
+                equipmentSets,
+                equipment => equipment.Attribute("equipmentType")?.Value == "Civilian");
+        }
+
+        foreach ((string id, string name, string nativeTemplate) in FoundingLords)
+        {
+            XElement lord = lordTemplates[id];
+            Assert.Equal($"{{=!}}{name}", lord.Attribute("name")?.Value);
+            Assert.Equal($"SkillSet.{nativeTemplate}_skills", lord.Attribute("skill_template")?.Value);
 
             XElement[] equipmentSets = lord.Element("Equipments")?
                 .Elements("EquipmentSet")
