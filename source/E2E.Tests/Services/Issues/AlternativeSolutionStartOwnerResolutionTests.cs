@@ -18,13 +18,13 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
 
-public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
+public class AlternativeSolutionStartOwnerResolutionTests : IDisposable
 {
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
     private EnvironmentInstance ClientB => TestEnvironment.Clients.ElementAt(1);
 
-    public AlternativeSolutionCompletionOwnerResolutionTests(ITestOutputHelper output)
+    public AlternativeSolutionStartOwnerResolutionTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -35,7 +35,7 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
     }
 
     [Fact]
-    public void CompleteOnServer_TrueOwnerIsRemoteClient_RewardGoldAndTroopsLandOnTrueOwnerNotServerMainHero()
+    public void StartOnServer_TrueOwnerIsRemoteClient_StateComputedUnderTrueOwnerNotServerMainHero()
     {
         var controllerId = "player-B-" + Guid.NewGuid();
 
@@ -91,8 +91,14 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
             {
                 Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in pid, owner));
             }
+        });
 
-            IssueOwnershipRegistry.SetOwner(owner, controllerId);
+        int serverMainHeroGoldBefore = 0;
+        CharacterObject serverMainHeroCharacterBefore = null;
+        Server.Call(() =>
+        {
+            serverMainHeroGoldBefore = Hero.MainHero.Gold;
+            serverMainHeroCharacterBefore = Hero.MainHero.CharacterObject;
         });
 
         Server.Call(() =>
@@ -100,47 +106,32 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var owner));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
 
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(controllerId, out var truePlayer));
+
             using (new AllowedThread())
-            using (new AlternativeSolutionStartAuthorityGuard())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                owner.Issue.StartIssueWithAlternativeSolution();
             }
-        });
 
-        int serverMainHeroGoldBefore = 0;
-        CharacterObject serverMainHeroCharacterBefore = null;
-        int trueOwnerGoldBefore = 0;
-        Server.Call(() =>
-        {
-            serverMainHeroGoldBefore = Hero.MainHero.Gold;
-            serverMainHeroCharacterBefore = Hero.MainHero.CharacterObject;
+            var state = AlternativeSolutionStartRunner.StartOnServer(owner, truePlayer);
 
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(trueOwnerHeroId, out var trueOwner));
-            trueOwnerGoldBefore = trueOwner.Gold;
+            Assert.True(owner.Issue.IsSolvingWithAlternative);
+            Assert.True(owner.Issue.AlternativeSolutionReturnTimeForTroops.IsFuture);
+            Assert.Equal(owner.Issue.AlternativeSolutionReturnTimeForTroops, state.ReturnTime);
+
+            IssueOwnershipRegistry.SetOwner(owner, controllerId);
         });
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var owner));
-            var issue = (IssueBase)owner.Issue;
 
-            using (new AllowedThread())
-            {
-                AlternativeSolutionCompletionRunner.CompleteOnServer(owner, issue);
-            }
-        });
+            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.Equal(controllerId, ownerControllerId);
 
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(trueOwnerHeroId, out var trueOwner));
-
-            Assert.True(trueOwner.Gold > trueOwnerGoldBefore);
             Assert.Equal(serverMainHeroGoldBefore, Hero.MainHero.Gold);
             Assert.Equal(serverMainHeroCharacterBefore, Hero.MainHero.CharacterObject);
-
-            Assert.True(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out var deposited));
-            Assert.True(deposited.TotalManCount >= 1);
         });
     }
 }

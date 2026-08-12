@@ -154,15 +154,18 @@ internal class GenericAcceptMirrorHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
+            if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player)) return;
+
+            var state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
             IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
             var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, hostControllerId, payload.What.State, hostTroops));
+            network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, hostControllerId, state, hostTroops));
         }
         else
         {
             IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new RequestGenericIssueAcceptAlternative(ownerId, generation, packedTroops, payload.What.State));
+            network.SendAll(new RequestGenericIssueAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
 
@@ -196,10 +199,11 @@ internal class GenericAcceptMirrorHandler : IHandler
             if (GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest &&
                 owner.Issue.IssueStayAliveConditions())
             {
+                AlternativeSolutionVanillaState state;
                 try
                 {
                     ApplyValidatedSentTroops(owner, player, payload.What.SentTroops);
-                    issueInterface.MirrorAlternativeAccepted(owner, payload.What.State);
+                    state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
                 }
                 catch (Exception e)
                 {
@@ -211,7 +215,7 @@ internal class GenericAcceptMirrorHandler : IHandler
 
                 IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
                 var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-                network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, player.ControllerId, payload.What.State, validatedTroops));
+                network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, player.ControllerId, state, validatedTroops));
             }
             else
             {

@@ -22,13 +22,11 @@ public readonly struct GenericIssueAlternativeAcceptTriggered : IEvent
 {
     public readonly Hero Owner;
     public readonly string ControllerId;
-    public readonly AlternativeSolutionVanillaState State;
 
-    public GenericIssueAlternativeAcceptTriggered(Hero owner, string controllerId, AlternativeSolutionVanillaState state)
+    public GenericIssueAlternativeAcceptTriggered(Hero owner, string controllerId)
     {
         Owner = owner;
         ControllerId = controllerId;
-        State = state;
     }
 }
 
@@ -71,15 +69,12 @@ public readonly struct RequestGenericIssueAcceptAlternative : ICommand
     public readonly int Generation;
     [ProtoMember(3)]
     public readonly TroopRosterData SentTroops;
-    [ProtoMember(4)]
-    public readonly AlternativeSolutionVanillaState State;
 
-    public RequestGenericIssueAcceptAlternative(string ownerId, int generation, TroopRosterData sentTroops, AlternativeSolutionVanillaState state)
+    public RequestGenericIssueAcceptAlternative(string ownerId, int generation, TroopRosterData sentTroops)
     {
         OwnerId = ownerId;
         Generation = generation;
         SentTroops = sentTroops;
-        State = state;
     }
 }
 

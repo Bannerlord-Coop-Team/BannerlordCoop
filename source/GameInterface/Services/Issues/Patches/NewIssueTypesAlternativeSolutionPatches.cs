@@ -26,6 +26,18 @@ internal class NewIssueTypesAlternativeSolutionOwnershipGatePatch
     }
 }
 
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithAlternativeSolution))]
+internal class NewIssueTypesAlternativeSolutionStartOwnershipGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance)
+    {
+        if (!GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Contains(__instance.GetType())) return true;
+
+        return AlternativeSolutionStartAuthorityGuard.IsActive;
+    }
+}
+
 [HarmonyPatch]
 internal class NewIssueTypesAlternativeSolutionCompletionPatches
 {
