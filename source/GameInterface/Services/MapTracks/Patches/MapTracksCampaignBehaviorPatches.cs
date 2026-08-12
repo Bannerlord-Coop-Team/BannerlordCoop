@@ -88,5 +88,6 @@ internal class MapTracksCampaignBehaviorPatches
         if (!ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface)) return;
 
         mapTracksCampaignBehaviorInterface.SyncTrackMapFactions(__instance, dataStore);
+        mapTracksCampaignBehaviorInterface.SyncPlayerDetectedTracks(__instance, dataStore);
     }
 }

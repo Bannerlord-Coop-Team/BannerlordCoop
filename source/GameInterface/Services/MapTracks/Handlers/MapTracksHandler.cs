@@ -132,8 +132,9 @@ internal class MapTracksHandler : IHandler
         {
             if (!TryGetMapTracksBehavior(out var mapTracksBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.PlayerPartyId, out var playerParty)) return;
-
-            mapTracksCampaignBehaviorInterface.AddPlayerPartyKeys(obj.What.PlayerPartyId);
+            
+            // Don't initialise tracks for joining players as they won't be granted xp for nearby tracks
+            if (mapTracksCampaignBehaviorInterface.AddPlayerPartyKeys(obj.What.PlayerPartyId)) return;
 
             // Track data is not kept as part of the save game even in vanilla Bannerlord.
             // When a player joins, calculate the tracks for their party and update.

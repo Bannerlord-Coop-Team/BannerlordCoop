@@ -53,6 +53,12 @@ public interface IMapTracksCampaignBehaviorInterface : IGameAbstraction
 
     /// <summary>
     /// Server method
+    /// Save player detected tracks unique per player. Vanilla only ever assumes one player.
+    /// </summary>
+    void SyncPlayerDetectedTracks(MapTracksCampaignBehavior behavior, IDataStore dataStore);
+
+    /// <summary>
+    /// Server method
     /// Detect visible tracks for a single player party, granting scouting xp based on argument
     /// </summary>
     List<MapTrackData> DetectTracksForPlayerParty(MapTracksCampaignBehavior behavior, MobileParty playerParty, bool grantScoutingXp = true);
@@ -97,6 +103,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
     private readonly Dictionary<Track, IFaction> trackMapFactions = new();
 
     private const string TrackMapFactionsSaveKey = "Coop_TrackMapFactions";
+    private const string PlayerDetectedTracksSaveKey = "Coop_PlayerDetectedTracks";
 
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
@@ -132,6 +139,9 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         // Run for all player parties instead of just one
         foreach (var playerParty in GetPlayerParties())
         {
+            // Don't update tracks for disconnected players
+            if (playerManager.IsOwnerOfPartyDisconnected(playerParty)) continue;
+
             if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId)) continue;
             if (!playerDetectedTracks.ContainsKey(playerPartyId)) continue;
 
@@ -223,6 +233,35 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         }
     }
 
+    public void SyncPlayerDetectedTracks(MapTracksCampaignBehavior behavior, IDataStore dataStore)
+    {
+        // Loaded on clients too. Load empty data, the server tracks all player detected track data
+        var savedPlayerDetectedTracks = ModInformation.IsClient
+            ? new List<PlayerDetectedTracksSaveData>()
+            : BuildPlayerDetectedTracks();
+
+        dataStore.SyncData(PlayerDetectedTracksSaveKey, ref savedPlayerDetectedTracks);
+
+        if (!dataStore.IsLoading) return;
+
+        playerDetectedTracks.Clear();
+
+        // Don't load data on clients
+        // Also return early if not on a save written before this record existed
+        if (ModInformation.IsClient || savedPlayerDetectedTracks == null) return;
+
+        // Load detected tracks back into playerDetectedTracks
+        foreach (var savedPlayerDetectedTrack in savedPlayerDetectedTracks)
+        {
+            if (savedPlayerDetectedTrack?.PlayerId == null || savedPlayerDetectedTrack.DetectedTracks == null) continue;
+
+            foreach (var detectedTrack in savedPlayerDetectedTrack.DetectedTracks)
+            {
+                playerDetectedTracks[savedPlayerDetectedTrack.PlayerId].Add(detectedTrack);
+            }
+        }
+    }
+
     private List<TrackMapFactionSaveData> BuildTrackMapFactionSaveData(MapTracksCampaignBehavior behavior)
     {
         var savedTrackMapFactions = new List<TrackMapFactionSaveData>();
@@ -235,6 +274,18 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         }
 
         return savedTrackMapFactions;
+    }
+
+    private List<PlayerDetectedTracksSaveData> BuildPlayerDetectedTracks()
+    {
+        var savedPlayerDetectedTracks = new List<PlayerDetectedTracksSaveData>();
+
+        foreach (var playerDetectedTracks in playerDetectedTracks)
+        {
+            savedPlayerDetectedTracks.Add(new PlayerDetectedTracksSaveData(playerDetectedTracks.Key, playerDetectedTracks.Value.ToList()));
+        }
+
+        return savedPlayerDetectedTracks;
     }
 
     public List<MapTrackData> DetectTracksForPlayerParty(MapTracksCampaignBehavior behavior, MobileParty playerParty, bool grantScoutingXp = true)
