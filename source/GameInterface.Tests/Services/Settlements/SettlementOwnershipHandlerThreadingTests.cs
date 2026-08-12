@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 using SettlementOwnershipMessageHandler = System.Action<Common.Messaging.MessagePayload<GameInterface.Services.Settlements.Messages.NetworkChangeSettlementOwnership>>;
+using SettlementOwnershipEventHandler = System.Action<Common.Messaging.MessagePayload<GameInterface.Services.Settlements.Messages.SettlementOwnershipChanged>>;
 
 namespace GameInterface.Tests.Services.Settlements;
 
@@ -21,6 +22,35 @@ public class SettlementOwnershipHandlerThreadingTests
     static SettlementOwnershipHandlerThreadingTests()
     {
         RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
+
+    [Fact]
+    public void SettlementOwnershipChanged_ForwardsAuthoritativePreviousOwnerId()
+    {
+        SettlementOwnershipEventHandler subscriber = null!;
+        var messageBroker = new Mock<IMessageBroker>();
+        messageBroker
+            .Setup(b => b.Subscribe(It.IsAny<SettlementOwnershipEventHandler>()))
+            .Callback<SettlementOwnershipEventHandler>(s => subscriber = s);
+
+        IMessage sentMessage = null!;
+        var network = new Mock<INetwork>();
+        network
+            .Setup(n => n.SendAll(It.IsAny<IMessage>()))
+            .Callback<IMessage>(message => sentMessage = message);
+
+        using var handler = new SettlementOwnershipHandler(
+            messageBroker.Object,
+            new Mock<IObjectManager>().Object,
+            network.Object);
+        Assert.NotNull(subscriber);
+
+        subscriber(new MessagePayload<SettlementOwnershipChanged>(
+            this,
+            new SettlementOwnershipChanged("town-1", "hero-1", "hero-old", null, 0)));
+
+        var networkMessage = Assert.IsType<NetworkChangeSettlementOwnership>(sentMessage);
+        Assert.Equal("hero-old", networkMessage.PreviousOwnerId);
     }
 
     [Fact]
@@ -73,7 +103,7 @@ public class SettlementOwnershipHandlerThreadingTests
             GameThread.EnqueueSafe(() => Volatile.Write(ref ownerRegistered, true));
             subscriber(new MessagePayload<NetworkChangeSettlementOwnership>(
                 this,
-                new NetworkChangeSettlementOwnership("town-1", "hero-1", null, 0)));
+                new NetworkChangeSettlementOwnership("town-1", "hero-1", "hero-old", null, 0)));
 
             Assert.False(ownerLookupCompleted.IsSet);
         }

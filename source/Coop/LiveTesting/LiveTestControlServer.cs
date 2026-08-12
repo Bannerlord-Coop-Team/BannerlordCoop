@@ -13,6 +13,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -27,6 +28,8 @@ namespace Coop.LiveTesting
 {
     internal sealed class LiveTestControlServer : IDisposable
     {
+        private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
+
         private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
 
         private readonly string logFilePath;
@@ -36,6 +39,8 @@ namespace Coop.LiveTesting
         private readonly object screenshotGate = new object();
         private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
             new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
+        private readonly string endpointDirectory;
+        private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
 
         public LiveTestControlServer(bool isServer, string logFilePath)
@@ -58,14 +63,35 @@ namespace Coop.LiveTesting
                 PlatformId = ReadArgument(arguments, "/platformId"),
                 RunToken = NormalizeRunToken(ReadArgument(arguments, "/cooptestrun")),
             };
+            if (processInfo.RunToken == null)
+                throw new InvalidOperationException("A valid /cooptestrun token is required for live testing.");
 
             string pipeName = LiveTestProtocol.GetPipeName(processId);
             pipeServer = new NamedPipeLiveTestServer(pipeName, GetProcessInfo, Handle);
+            endpointDirectory = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                EndpointDirectoryName,
+                processInfo.RunToken);
+            endpointRegistrationPath = System.IO.Path.Combine(
+                endpointDirectory,
+                processId.ToString(CultureInfo.InvariantCulture) + ".json");
         }
+
+        public static bool IsEnabled(string[] arguments) =>
+            NormalizeRunToken(ReadArgument(arguments, "/cooptestrun")) != null;
 
         public void Start()
         {
             pipeServer.Start();
+            try
+            {
+                WriteEndpointRegistration();
+            }
+            catch
+            {
+                pipeServer.Dispose();
+                throw;
+            }
             Logger.Information(
                 "[LiveTest] Listening on {PipeName} as {Role} (platform {PlatformId}, run {RunToken})",
                 LiveTestProtocol.GetPipeName(processInfo.Pid),
@@ -76,6 +102,7 @@ namespace Coop.LiveTesting
 
         public void Dispose()
         {
+            DeleteEndpointRegistration();
             pipeServer.Dispose();
         }
 
@@ -107,6 +134,22 @@ namespace Coop.LiveTesting
             }
         }
 
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
+                {
+                    dispatcher = new LiveTestCommandDispatcher();
+                }
+
+                return Success(request.Id, new
+                {
+                    commands = dispatcher.GetCommandNames(),
+                });
+            }, false);
+        }
+
         private LiveTestResponse HandleCommand(LiveTestRequest request)
         {
             if (!TryReadCommand(request.Parameters, out var command, out var arguments, out var error))
@@ -130,9 +173,9 @@ namespace Coop.LiveTesting
                     if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
                     {
                         string output = Coop.JoinFixtureCommands.Start(arguments);
-                        bool hasFallbackStructuredResult = TryGetStructuredResult(
+                        bool hasFallbackStructuredResult = TryParseStructuredResult(
                             output,
-                            out JsonElement fallbackStructuredResult);
+                            out var fallbackStructuredResult);
                         return Success(request.Id, new
                         {
                             name = command,
@@ -140,9 +183,7 @@ namespace Coop.LiveTesting
                             found = true,
                             output,
                             hasStructuredResult = hasFallbackStructuredResult,
-                            structuredResult = hasFallbackStructuredResult
-                                ? fallbackStructuredResult
-                                : (JsonElement?)null,
+                            structuredResult = fallbackStructuredResult,
                         });
                     }
 
@@ -159,9 +200,9 @@ namespace Coop.LiveTesting
                     return Failure(request.Id, "command_not_found", result.Output, false);
                 }
 
-                bool hasStructuredResult = TryGetStructuredResult(
+                bool hasStructuredResult = TryParseStructuredResult(
                     result.Output,
-                    out JsonElement structuredResult);
+                    out var structuredResult);
                 return Success(request.Id, new
                 {
                     name = command,
@@ -169,27 +210,9 @@ namespace Coop.LiveTesting
                     found = true,
                     output = result.Output,
                     hasStructuredResult,
-                    structuredResult = hasStructuredResult
-                        ? structuredResult
-                        : (JsonElement?)null,
+                    structuredResult,
                 });
             }, true);
-        }
-
-        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
-        {
-            return ExecuteOnGameThread(request, () =>
-            {
-                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
-                {
-                    dispatcher = new LiveTestCommandDispatcher();
-                }
-
-                return Success(request.Id, new
-                {
-                    commands = dispatcher.GetCommandNames(),
-                });
-            }, false);
         }
 
         private LiveTestResponse HandleScreenshot(LiveTestRequest request)
@@ -558,19 +581,86 @@ namespace Coop.LiveTesting
             };
         }
 
-        private static bool TryGetStructuredResult(
-            string output,
-            out JsonElement structuredResult)
+        private void WriteEndpointRegistration()
+        {
+            Directory.CreateDirectory(endpointDirectory);
+            string temporaryPath = endpointRegistrationPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            string registration = JsonSerializer.Serialize(new
+            {
+                version = LiveTestProtocol.Version,
+                pid = processInfo.Pid,
+                role = processInfo.Role,
+                platformId = processInfo.PlatformId,
+                runToken = processInfo.RunToken,
+                processStartedUtc,
+                pipeName = LiveTestProtocol.GetPipeName(processInfo.Pid),
+            });
+
+            try
+            {
+                File.WriteAllText(temporaryPath, registration);
+                if (File.Exists(endpointRegistrationPath))
+                {
+                    File.Replace(temporaryPath, endpointRegistrationPath, null);
+                }
+                else
+                {
+                    File.Move(temporaryPath, endpointRegistrationPath);
+                }
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+        }
+
+        private void DeleteEndpointRegistration()
+        {
+            try
+            {
+                if (File.Exists(endpointRegistrationPath))
+                {
+                    File.Delete(endpointRegistrationPath);
+                }
+
+                if (Directory.Exists(endpointDirectory) &&
+                    Directory.GetFileSystemEntries(endpointDirectory).Length == 0)
+                {
+                    Directory.Delete(endpointDirectory);
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Warning(
+                    exception,
+                    "[LiveTest] Failed to remove endpoint registration {RegistrationPath}",
+                    endpointRegistrationPath);
+            }
+        }
+
+        private static bool TryParseStructuredResult(string output, out object structuredResult)
         {
             const string prefix = "LIVE_TEST_JSON=";
-            structuredResult = default;
-            if (string.IsNullOrEmpty(output)) return false;
+            structuredResult = null;
+            string json = null;
+            int matches = 0;
 
-            string json = output
-                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
-                .FirstOrDefault(line => line.StartsWith(prefix, StringComparison.Ordinal))?
-                .Substring(prefix.Length);
-            if (string.IsNullOrEmpty(json)) return false;
+            using (var reader = new StringReader(output ?? string.Empty))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (!line.StartsWith(prefix, StringComparison.Ordinal)) continue;
+
+                    matches++;
+                    json = line.Substring(prefix.Length);
+                }
+            }
+
+            if (matches != 1 || string.IsNullOrWhiteSpace(json)) return false;
 
             try
             {

@@ -38,10 +38,12 @@ namespace GameInterface.Services.Settlements.Patches
                 MessageBroker.Instance.Publish(rebelClan, new SettlementRebelClanInitialized(rebelClan));
             }
 
+            var previousOwnerId = settlement.OwnerClan?.Leader?.StringId;
             MessageBroker.Instance.Publish(settlement,
                 new SettlementOwnershipChanged(
                     settlement.StringId,
                     newOwner?.StringId,
+                    previousOwnerId,
                     capturerHero?.StringId,
                     Convert.ToInt32(detail)));
 

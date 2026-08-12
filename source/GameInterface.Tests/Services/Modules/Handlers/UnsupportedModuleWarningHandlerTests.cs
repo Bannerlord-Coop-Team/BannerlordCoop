@@ -11,14 +11,16 @@ namespace GameInterface.Tests.Services.Modules.Handlers;
 /// </summary>
 public class UnsupportedModuleWarningHandlerTests
 {
-    [Fact]
-    public void OfficialModulesAndCoop_DoNotShowWarning()
+    [Theory]
+    [InlineData("Coop")]
+    [InlineData("CoopNightly")]
+    public void OfficialModulesAndSingleCoopVariant_DoNotShowWarning(string coopModuleId)
     {
         var provider = new TestModuleInfoProvider(
             Module("Native", isOfficial: true),
             Module("SandBox", isOfficial: true),
             Module("StoryMode", isOfficial: true),
-            Module("Coop", isOfficial: false));
+            Module(coopModuleId, isOfficial: false));
 
         var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
         var shown = 0;
@@ -27,6 +29,24 @@ public class UnsupportedModuleWarningHandlerTests
 
         Assert.Equal(0, shown);
         Assert.Equal(1, provider.RequestCount);
+    }
+
+    [Fact]
+    public void WorkshopAndNightlyTogether_ShowWarning()
+    {
+        var provider = new TestModuleInfoProvider(
+            Module("Native", isOfficial: true),
+            Module("Coop", isOfficial: false),
+            Module("CoopNightly", isOfficial: false));
+
+        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        InquiryData inquiry = null;
+
+        coordinator.TryShowPrompt(true, value => inquiry = value);
+
+        Assert.NotNull(inquiry);
+        Assert.Contains("- Coop\n", inquiry.Text);
+        Assert.Contains("- CoopNightly\n", inquiry.Text);
     }
 
     [Fact]
