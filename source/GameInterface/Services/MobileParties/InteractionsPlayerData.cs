@@ -12,6 +12,7 @@ namespace GameInterface.Services.MobileParties;
 /// _arenaMasterHasMetInSettlements tracks arena masters a player has met, needs to be unique per player
 /// _knowTournaments is used to allow a player to enter practice fights after they have spoken with an arena master
 /// _warningTime is used to give clients a 6 day warning before sending a message to the server to remove a companion
+/// _alreadySneakedSettlements is used to save when a player establishes a contact in a settlement
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class InteractionsPlayerData
@@ -44,6 +45,10 @@ public class InteractionsPlayerData
     [ProtoMember(7)]
     public Dictionary<string, long> PlayerWarningTime { get; }
 
+    // Dictionary<PlayerHeroId, List<SettlementId>>
+    [ProtoMember(8)]
+    public Dictionary<string, List<string>> PlayerAlreadySneakedSettlements { get; }
+
     public InteractionsPlayerData(
         Dictionary<string, Dictionary<string, int>> playerInteractedVillagers,
         Dictionary<string, Dictionary<string, int>> playerInteractedCaravans,
@@ -51,7 +56,8 @@ public class InteractionsPlayerData
         Dictionary<string, Dictionary<string, long>> playerInteractedPatrols,
         Dictionary<string, List<string>> playerMetArenaMasters,
         Dictionary<string, bool> playerKnowTournaments,
-        Dictionary<string, long> playerWarningTime)
+        Dictionary<string, long> playerWarningTime,
+        Dictionary<string, List<string>> playerAlreadySneakedSettlements)
     {
         PlayerInteractedVillagers = playerInteractedVillagers ?? new();
         PlayerInteractedCaravans = playerInteractedCaravans ?? new();
@@ -60,5 +66,6 @@ public class InteractionsPlayerData
         PlayerMetArenaMasters = playerMetArenaMasters ?? new();
         PlayerKnowTournaments = playerKnowTournaments ?? new();
         PlayerWarningTime = playerWarningTime ?? new();
+        PlayerAlreadySneakedSettlements = playerAlreadySneakedSettlements ?? new();
     }
 }

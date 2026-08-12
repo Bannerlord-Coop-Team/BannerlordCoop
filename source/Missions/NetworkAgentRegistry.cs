@@ -160,12 +160,35 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
         lock (gate)
         {
-            if (AgentToInfo.ContainsKey(agent) ||
-                IdToInfo.ContainsKey(agentId) ||
-                (movementId != 0 && MovementIdToInfo.ContainsKey((movementScopeId, movementId))))
+            bool nativeAgentCollision = AgentToInfo.TryGetValue(agent, out var existingByAgent);
+            bool canonicalIdCollision = IdToInfo.TryGetValue(agentId, out var existingById);
+            CoopAgentInfo existingByMovement = null;
+            bool movementIdCollision = movementId != 0 &&
+                MovementIdToInfo.TryGetValue((movementScopeId, movementId), out existingByMovement);
+            if (nativeAgentCollision || canonicalIdCollision || movementIdCollision)
             {
-                Logger.Error("Agent is already registered. AgentId: {AgentId}, movement identity: {Scope}/{MovementId}",
-                    agentId, movementScopeId, movementId);
+                CoopAgentInfo existing = existingByAgent ?? existingById ?? existingByMovement;
+                Logger.Error(
+                    "[AgentRegistry] Rejected agent registration: controller={ControllerId} " +
+                    "originalOwner={OriginalOwner} agentId={AgentId} movementIdentity={Scope}/{MovementId} " +
+                    "agentIndex={AgentIndex} nativeAgentCollision={NativeAgentCollision} " +
+                    "canonicalIdCollision={CanonicalIdCollision} movementIdCollision={MovementIdCollision} " +
+                    "existingAgentId={ExistingAgentId} existingAuthority={ExistingAuthority} " +
+                    "existingMovementIdentity={ExistingScope}/{ExistingMovementId} existingAgentIndex={ExistingAgentIndex}",
+                    controllerId,
+                    originalOwner,
+                    agentId,
+                    movementScopeId,
+                    movementId,
+                    agent.Index,
+                    nativeAgentCollision,
+                    canonicalIdCollision,
+                    movementIdCollision,
+                    existing?.AgentId ?? Guid.Empty,
+                    existing?.CurrentAuthority,
+                    existing?.MovementScopeId,
+                    existing?.MovementId ?? 0,
+                    existing?.Agent?.Index ?? -1);
                 return false;
             }
 

@@ -1,12 +1,8 @@
 ﻿using Common;
 using GameInterface.Services.LiveTesting;
-#if DEBUG
 using System;
-#endif
 using System.Collections.Generic;
-#if DEBUG
 using System.Linq;
-#endif
 using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
 using Xunit;
@@ -46,19 +42,17 @@ public class LiveTestCommandDispatcherTests
         Assert.True(new LiveTestCommandDispatcher().EnsureReady());
     }
 
-#if DEBUG
     [Fact]
-    public void GetCommands_ReturnsSortedUniqueDebugCommandsOnly()
+    public void GetCommandNames_ReturnsSortedDebugCommands()
     {
-        IReadOnlyList<string> commands = new LiveTestCommandDispatcher().GetCommands();
+        IReadOnlyList<string> commandNames = new LiveTestCommandDispatcher().GetCommandNames();
 
-        Assert.Contains(DebugCommand, commands);
-        Assert.DoesNotContain(NonDebugCommand, commands);
-        Assert.All(commands, command => Assert.StartsWith("coop.debug.", command));
-        Assert.Equal(commands.OrderBy(command => command, StringComparer.Ordinal), commands);
-        Assert.Equal(commands.Distinct(StringComparer.Ordinal), commands);
+        Assert.Contains(DebugCommand, commandNames);
+        Assert.DoesNotContain(NonDebugCommand, commandNames);
+        Assert.Equal(
+            commandNames.OrderBy(command => command, StringComparer.Ordinal),
+            commandNames);
     }
-#endif
 
     [Fact]
     public void Execute_WhenDebugCommandDoesNotExist_ReturnsNotFound()

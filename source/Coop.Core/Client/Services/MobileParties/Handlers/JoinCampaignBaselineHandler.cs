@@ -2,6 +2,9 @@
 using Common.Messaging;
 using Common.Util;
 using Coop.Core.Client.Messages;
+#if DEBUG
+using Coop.Core.Common.Commands;
+#endif
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MobileParties.Data;
@@ -46,6 +49,12 @@ public sealed class JoinCampaignBaselineHandler : IHandler
         var baseline = payload.What;
         GameThread.RunSafe(() =>
         {
+#if DEBUG
+            if (baseline.IsComplete)
+            {
+                JoinDebugCommands.ForceArmedInactivePartyDeficit();
+            }
+#endif
             bool success = baseline.IsComplete &&
                 mobilePartyBehaviorSnapshot.TryApplyJoinBaseline(
                     baseline.PartyStates,

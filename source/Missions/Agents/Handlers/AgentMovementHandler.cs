@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents;
@@ -46,7 +47,30 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     IPacketHandler MountMovementApplier { get; }
 }
 
+#if DEBUG
+internal interface IAgentMovementDebugControl
+{
+    int InitialConfiguredBulkHz { get; }
+
+    bool SyntheticReceivePressureActive { get; }
+
+    float SyntheticReceivePressureRemainingSeconds { get; }
+
+    bool TrySetSyntheticReceivePressure(
+        float durationSeconds,
+        double queueMilliseconds,
+        double applyMilliseconds,
+        int snapshots,
+        out string error);
+
+    void ClearSyntheticReceivePressure();
+}
+#endif
+
 public class AgentMovementHandler : IAgentMovementHandler
+#if DEBUG
+    , IAgentMovementDebugControl
+#endif
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
@@ -236,7 +260,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
-    private readonly AgentPositionInterpolator _interpolator = new AgentPositionInterpolator();
+    private readonly AgentPositionInterpolator _interpolator;
     public IAgentPositionInterpolator Interpolator => _interpolator;
 
     // Masterless-horse movement receive side. Owned here (registered/removed with this handler) so both
@@ -254,6 +278,13 @@ public class AgentMovementHandler : IAgentMovementHandler
     private float populationSampleElapsed;
     private bool firstMovementPoll = true;
     private bool firstPopulationSample = true;
+#if DEBUG
+    private int initialConfiguredBulkHz;
+    private float syntheticReceivePressureRemainingSeconds;
+    private double syntheticReceiveQueueMilliseconds;
+    private double syntheticReceiveApplyMilliseconds;
+    private int syntheticReceiveSnapshots;
+#endif
 
     public AgentMovementHandler(
         IBattleNetwork client,
@@ -284,6 +315,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.visualActionAccessor = visualActionAccessor;
         this.movementRateController = movementRateController;
         this.missionContext = missionContext;
+        _interpolator = new AgentPositionInterpolator(agentRegistry);
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
         this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -347,14 +379,86 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public MovementRateSnapshot MovementRate => movementRateController.Snapshot;
 
-    public void Configure(MovementCadenceProfile profile) =>
+    public void Configure(MovementCadenceProfile profile)
+    {
         movementRateController.Configure(profile);
+#if DEBUG
+        initialConfiguredBulkHz = movementRateController.Snapshot.BulkHz;
+#endif
+    }
 
     public bool TrySetForcedBulkHz(int? hz, out string error) =>
         movementRateController.TrySetForcedBulkHz(hz, out error);
 
     public bool TrySetForcedReceiverCapHz(int? hz, out string error) =>
         movementRateController.TrySetForcedReceiverCapHz(hz, out error);
+
+#if DEBUG
+    int IAgentMovementDebugControl.InitialConfiguredBulkHz => initialConfiguredBulkHz;
+
+    bool IAgentMovementDebugControl.SyntheticReceivePressureActive =>
+        syntheticReceivePressureRemainingSeconds > 0f;
+
+    float IAgentMovementDebugControl.SyntheticReceivePressureRemainingSeconds =>
+        syntheticReceivePressureRemainingSeconds;
+
+    bool IAgentMovementDebugControl.TrySetSyntheticReceivePressure(
+        float durationSeconds,
+        double queueMilliseconds,
+        double applyMilliseconds,
+        int snapshots,
+        out string error)
+    {
+        if (MovementRate.Profile != MovementCadenceProfile.Battle)
+        {
+            error = "Synthetic receive pressure is only available in adaptive battle missions.";
+            return false;
+        }
+        if (float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds) ||
+            durationSeconds < 0.5f || durationSeconds > 30f)
+        {
+            error = "Duration must be from 0.5 through 30 seconds.";
+            return false;
+        }
+        if (double.IsNaN(queueMilliseconds) || double.IsInfinity(queueMilliseconds) ||
+            double.IsNaN(applyMilliseconds) || double.IsInfinity(applyMilliseconds) ||
+            queueMilliseconds < 0d || queueMilliseconds > 10000d ||
+            applyMilliseconds < 0d || applyMilliseconds > 1000d ||
+            snapshots < 1 || snapshots > 10000)
+        {
+            error = "Queue/apply milliseconds or snapshot count is outside the supported range.";
+            return false;
+        }
+
+        syntheticReceivePressureRemainingSeconds = durationSeconds;
+        syntheticReceiveQueueMilliseconds = queueMilliseconds;
+        syntheticReceiveApplyMilliseconds = applyMilliseconds;
+        syntheticReceiveSnapshots = snapshots;
+        error = null;
+        return true;
+    }
+
+    void IAgentMovementDebugControl.ClearSyntheticReceivePressure()
+    {
+        syntheticReceivePressureRemainingSeconds = 0f;
+        syntheticReceiveQueueMilliseconds = 0d;
+        syntheticReceiveApplyMilliseconds = 0d;
+        syntheticReceiveSnapshots = 0;
+    }
+
+    private void ReportSyntheticReceivePressure(float elapsedSeconds)
+    {
+        if (syntheticReceivePressureRemainingSeconds <= 0f) return;
+
+        movementRateController.ReportReceive(
+            syntheticReceiveQueueMilliseconds,
+            syntheticReceiveApplyMilliseconds,
+            syntheticReceiveSnapshots);
+        syntheticReceivePressureRemainingSeconds = Math.Max(
+            0f,
+            syntheticReceivePressureRemainingSeconds - elapsedSeconds);
+    }
+#endif
 
     // Capture every locally authoritative agent once, then apply per-recipient cadence and delta history.
     public void PollMovement(float dt)
@@ -363,6 +467,9 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         movementBatchSender.BeginFrame(dt);
         totalSimulationTime += dt;
+#if DEBUG
+        ReportSyntheticReceivePressure(Math.Max(0f, dt));
+#endif
         MovementCadence rate = movementRateController.AdvanceFrame(dt);
         float elapsedSeconds = Math.Max(0f, dt);
         bulkPollElapsed += elapsedSeconds;
@@ -1412,9 +1519,16 @@ public class AgentMovementHandler : IAgentMovementHandler
                     puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
                 }
 
-                data.Apply(agent);
-                if (data.MountData != null && agent.MountAgent is Agent remoteMount)
-                    UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+                // A point-owned settlement puppet (seated, at an animation point) gets NO
+                // continuous-state writes: the local point it uses drives alignment and animation
+                // natively, and every direction/look write here would fight it (the seated-NPC
+                // spin). Its position target still flows to the interpolator below.
+                if (!LocationPoseLock.IsPointOwned(agent))
+                {
+                    data.Apply(agent);
+                    if (data.MountData != null && agent.MountAgent is Agent remoteMount)
+                        UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+                }
 
                 // Position is reconciled per-frame by the interpolator (smoother than a per-packet
                 // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
@@ -1624,6 +1738,11 @@ public class AgentMovementHandler : IAgentMovementHandler
         // BattleAuthorityMigrator owns battle withdrawal because it can distinguish the player's party from
         // NPC forces the departed host was running. Skip this location-style all-controller cleanup.
         if (BattleSpawnGate.IsCoopBattleActive) return;
+
+        // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
+        // controller's PLAYER agent — its host-owned NPC puppets must survive for adopt-in-place migration,
+        // so this all-agents sweep would fade the whole crowd out with its host.
+        if (LocationNpcGate.IsCoopLocationMissionActive) return;
 
         bool sceneActive = Mission.Current != null;
 
