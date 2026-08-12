@@ -183,6 +183,19 @@ internal static class BattleSimulationReplay
         }
     }
 
+    // Ends an unfinished local playback and returns its MapEventId;
+    // Spectators and simulations already completed by the server do not request cancellation.
+    public static bool TryCancel(out string cancelledMapEventId)
+    {
+        cancelledMapEventId = null;
+
+        if (mapEventId == null || finishRequested || isSpectator) return false;
+        
+        cancelledMapEventId = mapEventId;
+        Reset();
+        return true;
+    }
+
     private static int GetSimulationState(BattleSimulation simulation)
     {
         try

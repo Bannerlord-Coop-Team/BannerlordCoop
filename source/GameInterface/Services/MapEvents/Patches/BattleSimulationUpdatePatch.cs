@@ -1,6 +1,9 @@
 using Common;
+using Common.Messaging;
+using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -22,5 +25,20 @@ public class BattleSimulationUpdatePatch
 
         BattleSimulationReplay.Tick(__instance, dt);
         return false;
+    }
+
+    [HarmonyPatch(typeof(MapState), nameof(MapState.EndBattleSimulation))]
+    internal static class BattleSimulationEndPatch
+    {
+        [HarmonyPrefix]
+        private static void Prefix()
+        {
+            if (ModInformation.IsServer) return;
+
+            if (BattleSimulationReplay.TryCancel(out var mapEventId))
+            {
+                MessageBroker.Instance.Publish(typeof(BattleSimulationEndPatch), new RequestCancelBattleSimulation(mapEventId));
+            }
+        }
     }
 }
