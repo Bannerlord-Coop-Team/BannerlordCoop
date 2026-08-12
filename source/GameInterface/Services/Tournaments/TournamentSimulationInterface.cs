@@ -1,4 +1,5 @@
 using Common.Util;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments.Data;
 using SandBox.Tournaments.MissionLogics;
 using System;
@@ -39,7 +40,10 @@ public sealed partial class TournamentGameInterface
                 TournamentContestantData contestant = snapshot.Contestants
                     .FirstOrDefault(candidate => candidate.SlotId == slotId);
                 if (contestant == null ||
-                    !objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character))
+                    !StaticObjectRegistration.TryResolve(
+                        objectManager,
+                        contestant.CharacterId,
+                        out CharacterObject character))
                 {
                     return false;
                 }

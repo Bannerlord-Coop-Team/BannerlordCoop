@@ -24,6 +24,16 @@ internal class DefaultClanFinanceModelPatches
     [HarmonyPrefix]
     private static bool AddExpenseFromLeaderPartyPrefix(DefaultClanFinanceModel __instance, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals, ref int __result)
     {
+        // A player who is committed to a MapEvent cannot manage, forage or
+        // advance on the campaign map. Pause only that leader party's wage;
+        // the rest of the clan finance calculation (caravans, workshops,
+        // tributes and other parties) must continue normally.
+        if (clan?.Leader?.IsPlayerHero() == true &&
+            clan.Leader.PartyBelongedTo?.MapEvent != null)
+        {
+            __result = 0;
+            return false;
+        }
         ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
 
         __result = financeModelInterface.AddExpenseFromLeaderParty(__instance, clan, goldChange, applyWithdrawals);
@@ -80,6 +90,11 @@ internal class DefaultClanFinanceModelPatches
     [HarmonyPrefix]
     public static bool AddPartyExpensePrefix(DefaultClanFinanceModel __instance, ref int __result, MobileParty party, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals)
     {
+        if (party?.MapEvent != null && party.IsPlayerParty())
+        {
+            __result = 0;
+            return false;
+        }
         ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
 
         __result = financeModelInterface.AddPartyExpense(__instance, party, clan, goldChange, applyWithdrawals);
@@ -110,14 +125,11 @@ internal class DefaultClanFinanceModelPatches
         // Clan leader not in a map event, calculate gold change normally
         if (clanLeaderMapEvent == null) return true;
 
-        // Gold change is disabled in battles, skip this tick
-        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.Disabled) return false;
-
-        // Use gold food consumption window to determine if the gold change should be calculated based on config.
-        // This way players only have a gold change at most once during a map event when set to OneDayMax.
-        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.OneDayMax
-            && !InteractionPatches.IsWithinGoldFoodConsumptionWindow(clanLeaderMapEvent)) return false;
-
+        // Realm applies the rest of the clan ledger normally while a player is
+        // in battle. The two party-expense prefixes above remove only wages for
+        // player-owned parties that are actually in a MapEvent, so caravan and
+        // workshop income, tributes, garrisons and unrelated parties continue
+        // to update instead of freezing the whole clan economy.
         return true;
     }
 }

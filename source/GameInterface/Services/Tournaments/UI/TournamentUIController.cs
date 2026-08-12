@@ -95,7 +95,10 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
             !candidate.IsReplaced &&
             candidate.ControllerId == LocalControllerId);
         if (contestant == null ||
-            !objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character) ||
+            !StaticObjectRegistration.TryResolve(
+                objectManager,
+                contestant.CharacterId,
+                out CharacterObject character) ||
             character.HeroObject == null)
         {
             return false;
@@ -113,7 +116,10 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
         if (!TryGetTownSession(townId, out var snapshot) || string.IsNullOrEmpty(snapshot.PrizeItemId))
             return new TaleWorlds.Localization.TextObject("{=coop_tournament_no_prize}No prize").ToString();
 
-        if (objectManager.TryGetObject<ItemObject>(snapshot.PrizeItemId, out var item))
+        if (StaticObjectRegistration.TryResolve(
+                objectManager,
+                snapshot.PrizeItemId,
+                out ItemObject item))
             return item.Name.ToString();
 
         return new TaleWorlds.Localization.TextObject("{=coop_tournament_unknown_prize}Unknown prize").ToString();

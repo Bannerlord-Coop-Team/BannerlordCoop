@@ -75,12 +75,20 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         if (Campaign.Current == null) return;
 
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
+        bool currentEncounterWasDestroyed =
+            DoesCurrentEncounterReference(obj);
+        bool preserveBattleResults = currentEncounterWasDestroyed &&
+            IsBattleResultEncounter(PlayerEncounter.Current);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
         var preservedParty = localPartyWasInvolved && IsBattleMissionActive()
             ? MobileParty.MainParty?.Party
             : null;
         initializationBarrier.DestroyGraph(obj, preservedParty);
-        CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
+        CloseDestroyedMapEventEncounterIfNeeded(
+            id,
+            localPartyWasInvolved,
+            currentEncounterWasDestroyed,
+            preserveBattleResults);
     }
 
     private void CaptureMainPartyBattleRewards(MapEvent mapEvent)
@@ -130,7 +138,11 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         return false;
     }
 
-    private void CloseDestroyedMapEventEncounterIfNeeded(string mapEventId, bool localPartyWasInvolved)
+    private void CloseDestroyedMapEventEncounterIfNeeded(
+        string mapEventId,
+        bool localPartyWasInvolved,
+        bool currentEncounterWasDestroyed,
+        bool preserveBattleResults)
     {
         if (!localPartyWasInvolved)
         {
@@ -146,6 +158,20 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         {
             return;
         }
+
+        // NetworkCommitMapEventResults and MapEvent destruction share the reliable stream. Destruction
+        // can therefore arrive while PlayerEncounter is intentionally advancing through its capture,
+        // prisoner and loot states. Finishing it here skips those screens and discards their grants.
+        if (preserveBattleResults)
+        {
+            return;
+        }
+
+        // An older MapEvent can be destroyed after the client has already entered a newer encounter.
+        // Never close or mutate that unrelated encounter merely because the main party participated in
+        // the older event.
+        if (PlayerEncounter.Current != null && !currentEncounterWasDestroyed)
+            return;
 
         if (!HasEncounterMenuToClose())
         {
@@ -184,6 +210,32 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         return PlayerEncounter.Current != null ||
                Campaign.Current?.CurrentMenuContext != null ||
                mapState?.AtMenu == true;
+    }
+
+    private static bool IsBattleResultEncounter(PlayerEncounter encounter)
+    {
+        if (encounter == null) return false;
+        switch (encounter.EncounterState)
+        {
+            case PlayerEncounterState.CaptureHeroes:
+            case PlayerEncounterState.FreeHeroes:
+            case PlayerEncounterState.LootParty:
+            case PlayerEncounterState.LootInventory:
+            case PlayerEncounterState.LootShips:
+            case PlayerEncounterState.End:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool DoesCurrentEncounterReference(MapEvent mapEvent)
+    {
+        if (mapEvent == null || PlayerEncounter.Current == null)
+            return false;
+        return PlayerEncounter.Current._mapEvent == mapEvent ||
+            GetPlayerEncounterBattle() == mapEvent ||
+            GetPlayerEncounterEncounteredBattle() == mapEvent;
     }
 
     private static MapEvent GetPlayerEncounterBattle()

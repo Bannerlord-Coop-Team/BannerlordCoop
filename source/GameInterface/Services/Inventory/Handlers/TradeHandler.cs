@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.Transactions;
 using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
@@ -78,6 +79,12 @@ internal class TradeHandler : IHandler
     {
         var what = payload.What;
 
+        void RejectLocal(string reason)
+        {
+            what.FailureReason = reason;
+            logger.Error("Refused to send a partial inventory transaction: {Reason}", reason);
+        }
+
         var isManagingWarehouse = what.InventoryMode == InventoryScreenHelper.InventoryMode.Warehouse;
 
         // Don't update warehouse rosters directly if managing a warehouse, server uses CoopSession.WorkshopPlayerData
@@ -87,30 +94,51 @@ internal class TradeHandler : IHandler
         string fromRosterId = null;
         if (!isManagingWarehouse) objectManager.TryGetId(what.FromRoster, out fromRosterId);
 
-        if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.OwnerParty, out var ownerPartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.TroopRoster, out var troopRosterId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId) ||
+            !objectManager.TryGetIdWithLogging(what.Hero, out var heroId) ||
+            !objectManager.TryGetIdWithLogging(what.OwnerParty, out var ownerPartyId) ||
+            !objectManager.TryGetIdWithLogging(what.TroopRoster, out var troopRosterId) ||
+            !objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId))
+        {
+            RejectLocal("The inventory owner is still synchronizing. Nothing was changed; please try again.");
+            return;
+        }
 
         // CurrentMobileParty can be already destroyed when this logic runs. Attempt to get an id without logging
         objectManager.TryGetId(what.CurrentMobileParty, out var currentMobilePartyId);
 
         string currentSettlementComponentId = null;
         if (what.CurrentSettlementComponent is not null && 
-            !objectManager.TryGetIdWithLogging(what.CurrentSettlementComponent, out currentSettlementComponentId)) return;
+            !objectManager.TryGetIdWithLogging(what.CurrentSettlementComponent, out currentSettlementComponentId))
+        {
+            RejectLocal("The merchant is still synchronizing. Nothing was changed; please try again.");
+            return;
+        }
 
-        var boughtItems = ResolveTradeItemIds(what.BoughtItems);
-        var soldItems = ResolveTradeItemIds(what.SoldItems);
+        if (!TryResolveTradeItemIds(what.BoughtItems, out var boughtItems) ||
+            !TryResolveTradeItemIds(what.SoldItems, out var soldItems))
+        {
+            RejectLocal("One of the selected items is still synchronizing. Nothing was changed; please try again.");
+            return;
+        }
 
         if (what.CanGainXpFromDiscarding)
         {
-            soldItems = ResolveLeftLootIds(what.FromRoster.ToArray());
+            if (!TryResolveLeftLootIds(what.FromRoster.ToArray(), out soldItems))
+            {
+                RejectLocal("One of the battle-loot items is still synchronizing. Nothing was changed; please try again.");
+                return;
+            }
         }
 
-        var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.OwnerParty, what.InitialCharacterEquipment);
-
-        var troopRosterData = troopRosterInterface.PackTroopRosterData(what.TroopRoster);
+        if (!TryResolveCharacterIdEquipmentsData(
+                what.OwnerParty,
+                what.InitialCharacterEquipment,
+                out var characterIdEquipmentsData))
+        {
+            RejectLocal("Party equipment is still synchronizing. Nothing was changed; please try again.");
+            return;
+        }
 
         var message = new CompleteTrade(
             fromRosterId,
@@ -133,10 +161,14 @@ internal class TradeHandler : IHandler
             boughtItems,
             soldItems,
             troopRosterId,
-            troopRosterData
+            // Legacy wire field: the server authenticates the roster by its registered identity and
+            // never consumes a client roster snapshot. Sending an empty snapshot avoids making an
+            // unrelated custom-troop registration delay block item purchases or battle loot.
+            new TroopRosterData(Array.Empty<TroopRosterElementData>())
         );
 
         network.SendAll(message);
+        what.CommandSent = true;
     }
 
     private void Handle_CompleteTrade(MessagePayload<CompleteTrade> payload)
@@ -211,8 +243,6 @@ internal class TradeHandler : IHandler
                 RejectTrade(peer, "The submitted trade contained invalid items.");
                 return;
             }
-            ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
-
             BattleLootClaim battleLootClaim = null;
             bool isBattleLootClaim = false;
             if (!message.IsTrading &&
@@ -235,6 +265,22 @@ internal class TradeHandler : IHandler
                     return;
                 }
                 isBattleLootClaim = claimStatus == BattleLootClaimStatus.Accepted;
+            }
+
+            Dictionary<CharacterObject, Equipment[]> characterEquipmentsData;
+            if (isBattleLootClaim)
+            {
+                // Battle loot is an immutable server grant, not a general equipment edit. Preserve all
+                // live server equipment and put the selected grant subset into the party inventory. A
+                // stale companion loadout from the aftermath UI must never reject or overwrite the claim.
+                characterEquipmentsData = CloneEquipment(
+                    GetExpectedEquipmentCharacters(ownerParty, initialHero));
+            }
+            else
+            {
+                ResolveCharacterEquipmentsData(
+                    message.CharacterIdEquipmentsData,
+                    out characterEquipmentsData);
             }
 
             List<(ItemRosterElement, int)> ownedSoldItems = isBattleLootClaim
@@ -333,8 +379,9 @@ internal class TradeHandler : IHandler
                         warehouseSettlementId,
                         fromItemRosterData);
 
-                inventoryLogicInterface.UpdateEquipmentWithData(
-                    ownerParty, characterEquipmentsData, initialHero);
+                if (!isBattleLootClaim)
+                    inventoryLogicInterface.UpdateEquipmentWithData(
+                        ownerParty, characterEquipmentsData, initialHero);
                 inventoryLogicInterface.ApplyTradeGold(
                     fromRoster,
                     toRoster,
@@ -406,11 +453,12 @@ internal class TradeHandler : IHandler
                 return;
             }
 
-            TryPostTradeEffect(() => network.SendAll(
-                new UpdateEquipmentClients(
-                    message.CharacterIdEquipmentsData,
-                    message.OwnerPartyId,
-                    message.InitialHeroId)), "equipment broadcast");
+            if (!isBattleLootClaim)
+                TryPostTradeEffect(() => network.SendAll(
+                    new UpdateEquipmentClients(
+                        message.CharacterIdEquipmentsData,
+                        message.OwnerPartyId,
+                        message.InitialHeroId)), "equipment broadcast");
             if (warehouseBefore != null)
                 TryPostTradeEffect(() => network.Send(
                     peer,
@@ -1047,6 +1095,22 @@ internal class TradeHandler : IHandler
             });
     }
 
+    private static IEnumerable<CharacterObject> GetExpectedEquipmentCharacters(
+        MobileParty ownerParty,
+        Hero initialHero)
+    {
+        var characters = new HashSet<CharacterObject>();
+        foreach (TroopRosterElement element in
+                 ownerParty.MemberRoster.GetTroopRoster())
+        {
+            if (element.Character?.IsHero == true)
+                characters.Add(element.Character);
+        }
+        if (initialHero?.CharacterObject != null)
+            characters.Add(initialHero.CharacterObject);
+        return characters;
+    }
+
     private static void TryPostTradeEffect(Action action, string operation)
     {
         try
@@ -1079,35 +1143,47 @@ internal class TradeHandler : IHandler
         });
     }
 
-    private (ItemRosterElementData, int)[] ResolveTradeItemIds(
-        IEnumerable<(ItemRosterElement, int)> items)
+    private bool TryResolveTradeItemIds(
+        IEnumerable<(ItemRosterElement, int)> items,
+        out (ItemRosterElementData, int)[] result)
     {
         var resolvedItems = new List<(ItemRosterElementData, int)>();
 
-        foreach (var (item, count) in items)
+        foreach (var (item, count) in items ??
+                     Enumerable.Empty<(ItemRosterElement, int)>())
         {
-            if (TryResolveItemRosterId(item, out var resolvedItem))
+            if (!TryResolveItemRosterId(item, out var resolvedItem))
             {
-                resolvedItems.Add((resolvedItem, count));
+                result = null;
+                return false;
             }
+            resolvedItems.Add((resolvedItem, count));
         }
 
-        return resolvedItems.ToArray();
+        result = resolvedItems.ToArray();
+        return true;
     }
 
-    private (ItemRosterElementData, int)[] ResolveLeftLootIds(ItemRosterElement[] items)
+    private bool TryResolveLeftLootIds(
+        ItemRosterElement[] items,
+        out (ItemRosterElementData, int)[] result)
     {
         var resolvedItems = new List<(ItemRosterElementData, int)>();
 
-        for (int i = 0; i < items.Length; i++)
+        for (int i = 0; i < (items?.Length ?? 0); i++)
         {
-            if (TryResolveItemRosterId(items[i], out var resolvedItem))
+            if (items[i].EquipmentElement.Item == null && items[i].Amount == 0)
+                continue;
+            if (!TryResolveItemRosterId(items[i], out var resolvedItem))
             {
-                resolvedItems.Add((resolvedItem, items[i].Amount));
+                result = null;
+                return false;
             }
+            resolvedItems.Add((resolvedItem, items[i].Amount));
         }
 
-        return resolvedItems.ToArray();
+        result = resolvedItems.ToArray();
+        return true;
     }
 
     private List<(ItemRosterElement, int)> ResolveTradeItems(
@@ -1183,16 +1259,20 @@ internal class TradeHandler : IHandler
         return true;
     }
 
-    private Dictionary<string, EquipmentData[]> ResolveCharacterIdEquipmentsData(MobileParty party, CharacterObject initialCharacter)
+    private bool TryResolveCharacterIdEquipmentsData(
+        MobileParty party,
+        CharacterObject initialCharacter,
+        out Dictionary<string, EquipmentData[]> characterIdEquipmentsData)
     {
-        var characterIdEquipmentsData = new Dictionary<string, EquipmentData[]>();
+        characterIdEquipmentsData = new Dictionary<string, EquipmentData[]>();
         bool initialCharacterInParty = false;
 
         for (int i = 0; i < party.MemberRoster.Count; i++)
         {
             var character = party.MemberRoster.GetElementCopyAtIndex(i).Character;
 
-            AddHeroEquipmentData(characterIdEquipmentsData, character);
+            if (!TryAddHeroEquipmentData(characterIdEquipmentsData, character))
+                return false;
 
             if (character == initialCharacter)
             {
@@ -1202,17 +1282,18 @@ internal class TradeHandler : IHandler
 
         if (!initialCharacterInParty)
         {
-            AddHeroEquipmentData(characterIdEquipmentsData, initialCharacter);
+            if (!TryAddHeroEquipmentData(characterIdEquipmentsData, initialCharacter))
+                return false;
         }
 
-        return characterIdEquipmentsData;
+        return true;
     }
 
-    private void AddHeroEquipmentData(Dictionary<string, EquipmentData[]> characterIdEquipmentsData, CharacterObject character)
+    private bool TryAddHeroEquipmentData(Dictionary<string, EquipmentData[]> characterIdEquipmentsData, CharacterObject character)
     {
-        if (!character.IsHero) return;
+        if (!character.IsHero) return true;
 
-        if (!objectManager.TryGetIdWithLogging(character.HeroObject, out var heroId)) return;
+        if (!objectManager.TryGetIdWithLogging(character.HeroObject, out var heroId)) return false;
 
         characterIdEquipmentsData[heroId] = new EquipmentData[]
         {
@@ -1220,6 +1301,25 @@ internal class TradeHandler : IHandler
             new EquipmentData(character.FirstCivilianEquipment._equipmentType, character.FirstCivilianEquipment._itemSlots),
             new EquipmentData(character.FirstStealthEquipment._equipmentType, character.FirstStealthEquipment._itemSlots)
         };
+        return true;
+    }
+
+    private bool CanPackTroopRoster(TroopRoster roster)
+    {
+        if (roster == null) return false;
+        foreach (TroopRosterElement element in roster.data)
+        {
+            if (element.Character == null)
+            {
+                if (element.Number == 0 && element.WoundedNumber == 0)
+                    continue;
+                return false;
+            }
+            if (!objectManager.TryGetIdWithLogging(
+                    element.Character, out string _))
+                return false;
+        }
+        return true;
     }
 
     private void ResolveCharacterEquipmentsData(Dictionary<string, EquipmentData[]> characterIdEquipmentsData, out Dictionary<CharacterObject, Equipment[]> characterEquipmentsData)

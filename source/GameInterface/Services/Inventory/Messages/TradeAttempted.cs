@@ -9,7 +9,7 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Inventory.Messages;
 
-public readonly struct TradeAttempted : IEvent
+public sealed class TradeAttempted : IEvent
 {
     public readonly ItemRoster FromRoster;
     public readonly ItemRoster ToRoster;
@@ -26,6 +26,8 @@ public readonly struct TradeAttempted : IEvent
     public readonly List<(ItemRosterElement, int)> BoughtItems;
     public readonly List<(ItemRosterElement, int)> SoldItems;
     public readonly TroopRoster TroopRoster;
+    internal bool CommandSent;
+    internal string FailureReason;
 
     public TradeAttempted(
         ItemRoster fromRoster,

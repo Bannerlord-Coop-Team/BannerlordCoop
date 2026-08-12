@@ -9,16 +9,19 @@ using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -126,6 +129,7 @@ internal class MapEventResultsHandler : IHandler
                         playerMapEventPartyId, out awardedMembers);
                     networkPlayerLootData.LootedPrisoners?.TryGetValue(
                         playerMapEventPartyId, out awardedPrisoners);
+                    awardedPrisoners = FilterPlayerHeroes(awardedPrisoners);
                     battlePartyGrants.Stage(
                         player.ControllerId,
                         player.HeroId,
@@ -145,10 +149,45 @@ internal class MapEventResultsHandler : IHandler
                     mapEvent.WinningSide,
                     playerSide,
                     playerMapEventPartyId,
-                    networkPlayerLootData));
+                    WithFilteredPlayerHeroPrisoners(
+                        networkPlayerLootData,
+                        playerMapEventPartyId)));
             }
         });
     }
+
+    private NetworkPlayerLootData WithFilteredPlayerHeroPrisoners(
+        NetworkPlayerLootData data,
+        string playerMapEventPartyId)
+    {
+        if (data.LootedPrisoners == null ||
+            !data.LootedPrisoners.TryGetValue(
+                playerMapEventPartyId,
+                out TroopRosterData roster))
+            return data;
+
+        var prisoners = new Dictionary<string, TroopRosterData>(
+            data.LootedPrisoners,
+            StringComparer.Ordinal)
+        {
+            [playerMapEventPartyId] = FilterPlayerHeroes(roster)
+        };
+        return new NetworkPlayerLootData(
+            data.LootedItems,
+            data.LootedMembers,
+            prisoners);
+    }
+
+    private TroopRosterData FilterPlayerHeroes(TroopRosterData roster) =>
+        new((roster.Data ?? Array.Empty<TroopRosterElementData>()).Where(
+            element =>
+            {
+                if (!objectManager.TryGetObject(
+                        element.CharacterId,
+                        out CharacterObject character))
+                    return true;
+                return character?.HeroObject?.IsPlayerHero() != true;
+            }));
 
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {

@@ -75,12 +75,25 @@ internal class PartyDoneLogicHandler : IHandler
     // Client
     private void Handle_PartyDoneLogicAttempted(MessagePayload<PartyDoneLogicAttempted> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
+        void RejectLocal(string reason)
+        {
+            obj.What.FailureReason = reason;
+            logger.Error("Refused to send a partial party transaction: {Reason}", reason);
+        }
+
+        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId))
+        {
+            RejectLocal("The player party is still synchronizing. Nothing was changed; please try again.");
+            return;
+        }
 
         string leftPartyId = null;
         if (obj.What.LeftParty != null && 
             !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId))
+        {
+            RejectLocal("The other party is still synchronizing. Nothing was changed; please try again.");
             return;
+        }
 
         // Not registered when donating
         objectManager.TryGetId(obj.What.LeftPrisonerRoster, out var leftPrisonerRosterId);
@@ -88,8 +101,12 @@ internal class PartyDoneLogicHandler : IHandler
         var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
         foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)
         {
-            if (!objectManager.TryGetIdWithLogging(tuple.Item1, out var character1Id)) continue;
-            if (!objectManager.TryGetIdWithLogging(tuple.Item2, out var character2Id)) continue;
+            if (!objectManager.TryGetIdWithLogging(tuple.Item1, out var character1Id) ||
+                !objectManager.TryGetIdWithLogging(tuple.Item2, out var character2Id))
+            {
+                RejectLocal("An upgraded troop is still synchronizing. Nothing was changed; please try again.");
+                return;
+            }
 
             upgradedTroopHistory.Data.Add(new(character1Id, character2Id, tuple.Item3));
         }
@@ -97,20 +114,54 @@ internal class PartyDoneLogicHandler : IHandler
         // Send only the per-troop change the player made (current minus the screen-open snapshot). Heroes and
         // companions that did not change net to zero and are omitted, so the server needs no special handling
         // for them when re-applying the delta.
-        var leftMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftMemberRoster, obj.What.InitialLeftMemberRoster);
-        var leftPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftPrisonerRoster, obj.What.InitialLeftPrisonerRoster);
-        var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightMemberRoster, obj.What.InitialRightMemberRoster);
-        var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightPrisonerRoster, obj.What.InitialRightPrisonerRoster);
+        if (!troopRosterInterface.TryPackTroopRosterDelta(
+                obj.What.LeftMemberRoster,
+                obj.What.InitialLeftMemberRoster,
+                out var leftMemberRosterData) ||
+            !troopRosterInterface.TryPackTroopRosterDelta(
+                obj.What.LeftPrisonerRoster,
+                obj.What.InitialLeftPrisonerRoster,
+                out var leftPrisonerRosterData) ||
+            !troopRosterInterface.TryPackTroopRosterDelta(
+                obj.What.RightMemberRoster,
+                obj.What.InitialRightMemberRoster,
+                out var rightMemberRosterData) ||
+            !troopRosterInterface.TryPackTroopRosterDelta(
+                obj.What.RightPrisonerRoster,
+                obj.What.InitialRightPrisonerRoster,
+                out var rightPrisonerRosterData) ||
+            !FlattenedTroopSerializer.TrySerialize(
+                obj.What.ReleasedPrisonersRoster,
+                objectManager,
+                out var releasedPrisoners) ||
+            !FlattenedTroopSerializer.TrySerialize(
+                obj.What.TakenPrisonersRoster,
+                objectManager,
+                out var takenPrisoners) ||
+            !FlattenedTroopSerializer.TrySerialize(
+                obj.What.RecruitedPrisonersRoster,
+                objectManager,
+                out var recruitedPrisoners))
+        {
+            RejectLocal("A selected troop or prisoner is still synchronizing. Nothing was changed; please try again.");
+            return;
+        }
 
-        var rightMemberOrderData = troopRosterInterface.PackTroopRosterOrderData(obj.What.RightMemberRoster);
+        if (!troopRosterInterface.TryPackTroopRosterOrderData(
+                obj.What.RightMemberRoster,
+                out var rightMemberOrderData))
+        {
+            RejectLocal("The party order is still synchronizing. Nothing was changed; please try again.");
+            return;
+        }
 
         var releaserPartyPosition = GetReleaserPartyPosition(obj.What.MainHero);
 
         var message = new NetworkCompleteDoneLogic(
             mainHeroId,
-            FlattenedTroopSerializer.Serialize(obj.What.ReleasedPrisonersRoster, objectManager),
-            FlattenedTroopSerializer.Serialize(obj.What.TakenPrisonersRoster, objectManager),
-            FlattenedTroopSerializer.Serialize(obj.What.RecruitedPrisonersRoster, objectManager),
+            releasedPrisoners,
+            takenPrisoners,
+            recruitedPrisoners,
             leftMemberRosterData,
             leftPrisonerRosterData,
             rightMemberRosterData,
@@ -134,6 +185,7 @@ internal class PartyDoneLogicHandler : IHandler
         );
 
         network.SendAll(message);
+        obj.What.CommandSent = true;
     }
 
     private static CampaignVec2 GetReleaserPartyPosition(Hero mainHero)
@@ -333,6 +385,7 @@ internal class PartyDoneLogicHandler : IHandler
                     out rightPrisonerRosterData);
             }
             var takenHeroCharacterIds = new HashSet<string>();
+            var releasedHeroCharacterIds = new HashSet<string>();
             bool validatePrisonerActions =
                 message.ApplyReleasedAndTakenPrisonerActions ||
                 hasPrisonerDonation;
@@ -342,7 +395,9 @@ internal class PartyDoneLogicHandler : IHandler
                     releasedPrisonersRoster,
                     takenPrisonersRoster,
                     signedRightPrisonerRosterData,
-                    out takenHeroCharacterIds);
+                    playerParty.Party,
+                    out takenHeroCharacterIds,
+                    out releasedHeroCharacterIds);
             if (!actionRostersAreValid)
             {
                 RollbackCreatedDonationGarrison(
@@ -355,9 +410,13 @@ internal class PartyDoneLogicHandler : IHandler
             }
             if (message.ApplyReleasedAndTakenPrisonerActions)
             {
-                rightPrisonerRosterData = FilterTakenHeroAdditions(
+                // Native captivity actions exclusively own NPC hero rows. Keep
+                // their signed deltas for validation, but never also apply the
+                // same add/removal through TroopRoster deltas.
+                rightPrisonerRosterData = FilterHeroPrisonerChanges(
                     rightPrisonerRosterData,
-                    takenHeroCharacterIds);
+                    takenHeroCharacterIds,
+                    releasedHeroCharacterIds);
             }
 
             var rosterDeltas = CreateRosterDeltas(
@@ -432,10 +491,17 @@ internal class PartyDoneLogicHandler : IHandler
             // turn a completed action into a retryable rejection.
             ItemRosterElement[] itemRosterBefore =
                 mainHero.PartyBelongedTo.ItemRoster.ToArray();
-            var prisonerRosterBefore =
-                playerParty.PrisonRoster.GetTroopRoster();
+            TroopRosterElement[] prisonerRosterBefore =
+                playerParty.PrisonRoster.GetTroopRoster().ToArray();
             int goldBefore = mainHero.Gold;
             bool rostersApplied = false;
+            bool ransomSaleApplied = false;
+            PrisonerSalePlan ransomSalePlan = default;
+            List<HeroCaptureSnapshot> heroCaptureSnapshots =
+                SnapshotTakenHeroCaptures(mainHero, takenPrisonersRoster);
+            List<HeroReleaseSnapshot> heroReleaseSnapshots =
+                SnapshotReleasedHeroCaptures(releasedPrisonersRoster);
+            bool nativeHeroActionAttempted = false;
             try
             {
                 // SellPrisonersAction owns ransom roster changes.
@@ -446,19 +512,34 @@ internal class PartyDoneLogicHandler : IHandler
                         throw new InvalidOperationException(PartyChangedMessage);
                     rostersApplied = true;
                 }
-                // The ransom screen cannot mutate inventory. Retain the live
-                // authoritative roster instead of overwriting it with the
-                // screen-open client snapshot while food consumption continues.
+                // A party screen is not an inventory authority. Its item snapshot may predate a battle
+                // loot commit (or another normal server mutation), so replacing the live roster here
+                // deletes legitimate items. Only troop upgrades consume items, and validation above has
+                // already proven the exact item/modifier deltas and required categories.
                 if (!isRansom)
-                    ApplyRightOwnerPartyItemRoster(mainHero, message);
+                    ApplyValidatedUpgradeItemCosts(
+                        mainHero, upgradedTroopHistory);
                 ApplyPartyRewardChanges(
                     mainHero,
                     message,
                     suppressInfluence:
                         hasPrisonerDonation || hasGarrisonDonation);
                 if (isRansom)
-                    SellPrisonersHandler.ApplySale(
+                {
+                    ransomSalePlan = SellPrisonersHandler.ApplySale(
                         playerParty, ransomPrisoners);
+                    ransomSaleApplied = true;
+                }
+                if (message.ApplyReleasedAndTakenPrisonerActions)
+                {
+                    ApplyTakenHeroCapturesRequired(
+                        mainHero,
+                        heroCaptureSnapshots,
+                        ref nativeHeroActionAttempted);
+                    ApplyReleasedHeroCapturesRequired(
+                        heroReleaseSnapshots,
+                        ref nativeHeroActionAttempted);
+                }
                 if (!battlePartyGrants.Consume(battlePartyClaim))
                     throw new InvalidOperationException(
                         "The server post-battle party award changed during its commit.");
@@ -466,36 +547,65 @@ internal class PartyDoneLogicHandler : IHandler
             }
             catch (Exception exception)
             {
-                battlePartyGrants.Release(battlePartyClaim);
-                mainHero.Gold = goldBefore;
-                // Ransom mutates the prisoner roster outside rosterDeltas. Normal party
-                // operations are rolled back by the inverse deltas below; restoring both
-                // would apply the prisoner rollback twice.
-                if (isRansom)
+                bool rollbackComplete = false;
+                bool rosterRollbackComplete = false;
+                try
                 {
-                    playerParty.PrisonRoster.Clear();
-                    foreach (TroopRosterElement element in prisonerRosterBefore)
-                        playerParty.PrisonRoster.AddToCounts(
-                            element.Character,
-                            element.Number,
-                            false,
-                            element.WoundedNumber,
-                            element.Xp,
-                            true);
+                    bool heroRollbackComplete =
+                        RollbackTakenHeroCaptures(heroCaptureSnapshots);
+                    heroRollbackComplete &=
+                        RollbackReleasedHeroCaptures(heroReleaseSnapshots);
+                    mainHero.Gold = goldBefore;
+                    // Ransom mutates the prisoner roster outside rosterDeltas. Normal party
+                    // operations are rolled back by the inverse deltas below; restoring both
+                    // would apply the prisoner rollback twice.
+                    if (isRansom)
+                    {
+                        playerParty.PrisonRoster.Clear();
+                        foreach (TroopRosterElement element in prisonerRosterBefore)
+                            playerParty.PrisonRoster.AddToCounts(
+                                element.Character,
+                                element.Number,
+                                false,
+                                element.WoundedNumber,
+                                element.Xp,
+                                true);
+                    }
+                    mainHero.PartyBelongedTo.ItemRoster.Clear();
+                    mainHero.PartyBelongedTo.ItemRoster.Add(itemRosterBefore);
+                    rosterRollbackComplete = !rostersApplied ||
+                        troopRosterInterface.TryApplyTroopRosterDeltas(
+                            InvertRosterDeltas(rosterDeltas));
+                    rollbackComplete = heroRollbackComplete &&
+                        rosterRollbackComplete;
+                    if (rollbackComplete)
+                        RollbackCreatedDonationGarrison(
+                            donationGarrison, createdDonationGarrison);
                 }
-                mainHero.PartyBelongedTo.ItemRoster.Clear();
-                mainHero.PartyBelongedTo.ItemRoster.Add(itemRosterBefore);
-                bool rolledBack = !rostersApplied ||
-                    troopRosterInterface.TryApplyTroopRosterDeltas(
-                        InvertRosterDeltas(rosterDeltas));
-                if (rolledBack)
-                    RollbackCreatedDonationGarrison(
-                        donationGarrison, createdDonationGarrison);
+                catch (Exception rollbackException)
+                {
+                    logger.Error(
+                        rollbackException,
+                        "Party commit rollback failed for {MainHeroId}; the post-battle grant will be forfeited",
+                        message.MainHeroId);
+                }
+
+                // A claim is retryable only when every authoritative mutation was
+                // proven restored. Otherwise consume it fail-closed so a partially
+                // captured hero/item/roster cannot be claimed a second time.
+                bool retrySafe = rollbackComplete &&
+                    !nativeHeroActionAttempted;
+                if (retrySafe)
+                    battlePartyGrants.Release(battlePartyClaim);
+                else if (!battlePartyGrants.Consume(battlePartyClaim))
+                    logger.Error(
+                        "Unable to forfeit an incompletely rolled-back post-battle claim for {MainHeroId}; its active token remains fail-closed",
+                        message.MainHeroId);
                 logger.Error(
                     exception,
                     "Rolled back rejected party commit for {MainHeroId}; rosterRollback={RosterRollback}",
                     message.MainHeroId,
-                    rolledBack);
+                    rosterRollbackComplete);
                 if (requester != null)
                     network.Send(
                         requester,
@@ -512,9 +622,6 @@ internal class PartyDoneLogicHandler : IHandler
                 PartyScreenHelperHandler.ClearPendingPrisonerDonation(requester);
             if (hasGarrisonDonation)
                 PartyScreenHelperHandler.ClearPendingGarrisonDonation(requester);
-            if (isRansom)
-                SellPrisonersHandler.ClearPendingSale(requester);
-
             // Each post-commit effect is isolated. A stale hero/reference must not
             // prevent unrelated rewards and progression from being applied.
             TryPostPartyEffect(
@@ -563,11 +670,19 @@ internal class PartyDoneLogicHandler : IHandler
                 message.MainHeroId,
                 "party roster order");
             if (isRansom)
+            {
+                if (ransomSaleApplied)
+                    TryPostPartyEffect(
+                        () => SellPrisonersHandler.PublishSalePostCommit(
+                            ransomSalePlan),
+                        message.MainHeroId,
+                        "ransom player release events");
                 TryPostPartyEffect(
                     () => SellPrisonersHandler.NotifySaleCommitted(
                         requester, playerParty),
                     message.MainHeroId,
                     "ransom roster refresh");
+            }
             ServerTransactionOutcome.Accept(
                 requester, ServerTransactionOutcome.Party);
         }));
@@ -1375,54 +1490,28 @@ internal class PartyDoneLogicHandler : IHandler
     {
         if (currentRoster == null || submittedRoster == null)
             return false;
-        var current = new Dictionary<EquipmentElement, int>();
+        // Party-screen item data is a screen-open snapshot, not an authoritative inventory baseline.
+        // Battle loot or another normal server mutation may have changed the live roster meanwhile.
+        if (requiredItems == null || requiredItems.Count == 0)
+            return true;
+
+        var availableByCategory = new Dictionary<ItemCategory, int>();
         foreach (ItemRosterElement element in currentRoster)
         {
             if (element.EquipmentElement.Item == null || element.Amount < 0)
                 return false;
-            current[element.EquipmentElement] = element.Amount;
-        }
-        var submitted = new Dictionary<EquipmentElement, int>();
-        foreach (ItemRosterElement element in submittedRoster)
-        {
-            if (element.EquipmentElement.Item == null)
-            {
-                // Older clients sent ItemRoster._data rather than ToArray().
-                // Its unused capacity is represented by null/zero rows and
-                // carries no state. A null row with a non-zero amount remains
-                // invalid and is rejected.
-                if (element.Amount == 0)
-                    continue;
+            ItemCategory category = element.EquipmentElement.Item.ItemCategory;
+            if (category == null || element.Amount == 0) continue;
+            availableByCategory.TryGetValue(category, out int available);
+            if (available > int.MaxValue - element.Amount)
                 return false;
-            }
-            if (element.Amount < 0 ||
-                submitted.ContainsKey(element.EquipmentElement))
-                return false;
-            if (element.Amount > 0)
-                submitted[element.EquipmentElement] = element.Amount;
+            availableByCategory[category] = available + element.Amount;
         }
 
-        var removedByCategory = new Dictionary<ItemCategory, int>();
-        foreach (EquipmentElement element in current.Keys.Union(submitted.Keys))
-        {
-            current.TryGetValue(element, out int before);
-            submitted.TryGetValue(element, out int after);
-            if (after > before)
-                return false;
-            int removed = before - after;
-            if (removed == 0)
-                continue;
-            ItemCategory category = element.Item?.ItemCategory;
-            if (category == null || !requiredItems.ContainsKey(category))
-                return false;
-            removedByCategory.TryGetValue(category, out int existing);
-            removedByCategory[category] = existing + removed;
-        }
-
-        return requiredItems.Count == removedByCategory.Count &&
-            requiredItems.All(pair =>
-                removedByCategory.TryGetValue(pair.Key, out int removed) &&
-                removed == pair.Value);
+        return requiredItems.All(pair =>
+            pair.Value >= 0 &&
+            availableByCategory.TryGetValue(pair.Key, out int available) &&
+            available >= pair.Value);
     }
 
     private void PublishPlayerCaptivityReleaseEvents(List<PlayerCaptivityEndedByServer> releasedPlayerCaptivityEvents)
@@ -1433,30 +1522,52 @@ internal class PartyDoneLogicHandler : IHandler
         }
     }
 
-    private static void ApplyRightOwnerPartyItemRoster(Hero mainHero, NetworkCompleteDoneLogic message)
+    private static void ApplyValidatedUpgradeItemCosts(
+        Hero mainHero,
+        IReadOnlyCollection<Tuple<CharacterObject, CharacterObject, int>> upgrades)
     {
-        mainHero.PartyBelongedTo.ItemRoster.Clear();
-        foreach (var itemRosterElement in message.RightOwnerPartyItemRosterData ?? Enumerable.Empty<ItemRosterElement>())
+        ItemRoster live = mainHero.PartyBelongedTo.ItemRoster;
+        var required = new Dictionary<ItemCategory, int>();
+        foreach (Tuple<CharacterObject, CharacterObject, int> upgrade in
+                 upgrades ??
+                 Array.Empty<Tuple<CharacterObject, CharacterObject, int>>())
         {
-            // v1.4.17 and older clients serialized ItemRoster._data, whose unused
-            // capacity is represented by default null/zero rows. Validation above
-            // rejects any state-bearing null row; do not feed harmless padding back
-            // into Bannerlord's roster implementation during a compatible retry.
-            if (itemRosterElement.EquipmentElement.Item == null &&
-                itemRosterElement.Amount == 0)
-                continue;
-            mainHero.PartyBelongedTo.ItemRoster.Add(itemRosterElement);
+            ItemCategory category = upgrade?.Item2?.UpgradeRequiresItemFromCategory;
+            if (category == null || upgrade.Item3 <= 0) continue;
+            required.TryGetValue(category, out int current);
+            required[category] = checked(current + upgrade.Item3);
+        }
+
+        foreach (var cost in required)
+        {
+            int remaining = cost.Value;
+            foreach (ItemRosterElement row in live.ToArray())
+            {
+                if (remaining == 0) break;
+                if (row.EquipmentElement.Item?.ItemCategory != cost.Key ||
+                    row.Amount <= 0)
+                    continue;
+                int take = Math.Min(remaining, row.Amount);
+                live.AddToCounts(row.EquipmentElement, -take);
+                remaining -= take;
+            }
+            if (remaining != 0)
+                throw new InvalidOperationException(
+                    "Validated troop-upgrade items disappeared during commit.");
         }
     }
 
-    private HashSet<string> GetTakenHeroCharacterIds(FlattenedTroopRoster takenPrisonersRoster)
+    private HashSet<string> GetNpcHeroCharacterIds(FlattenedTroopRoster actionRoster)
     {
         var characterIds = new HashSet<string>();
-        foreach (var element in takenPrisonersRoster)
+        foreach (var element in actionRoster)
         {
             if (element.Troop?.IsHero == true &&
+                element.Troop.HeroObject?.IsPlayerHero() != true &&
                 objectManager.TryGetIdWithLogging(element.Troop, out var characterId))
-                characterIds.Add(characterId);
+                characterIds.Add(global::GameInterface.Services.ObjectManager.ObjectManager.Compact(
+                    characterId,
+                    typeof(CharacterObject)));
         }
 
         return characterIds;
@@ -1466,9 +1577,12 @@ internal class PartyDoneLogicHandler : IHandler
         FlattenedTroopRoster releasedPrisonersRoster,
         FlattenedTroopRoster takenPrisonersRoster,
         TroopRosterData rightPrisonerRosterData,
-        out HashSet<string> takenHeroCharacterIds)
+        PartyBase expectedCaptor,
+        out HashSet<string> takenHeroCharacterIds,
+        out HashSet<string> releasedHeroCharacterIds)
     {
-        takenHeroCharacterIds = GetTakenHeroCharacterIds(takenPrisonersRoster);
+        takenHeroCharacterIds = GetNpcHeroCharacterIds(takenPrisonersRoster);
+        releasedHeroCharacterIds = GetNpcHeroCharacterIds(releasedPrisonersRoster);
         var signedDeltas = (rightPrisonerRosterData.Data ?? Array.Empty<TroopRosterElementData>())
             .GroupBy(element => element.CharacterId)
             .ToDictionary(group => group.Key, group => group.Sum(element => element.Number));
@@ -1477,6 +1591,14 @@ internal class PartyDoneLogicHandler : IHandler
         Dictionary<string, int> taken =
             GetActionCountsById(takenPrisonersRoster);
         if (released == null || taken == null)
+            return false;
+        if (HasOverlappingPrisonerActions(released.Keys, taken.Keys))
+            return false;
+        if (!AreNpcHeroActionCountsSingleton(released, releasedHeroCharacterIds) ||
+            !AreNpcHeroActionCountsSingleton(taken, takenHeroCharacterIds) ||
+            !AreReleasedNpcHeroesOwnedBy(
+                releasedPrisonersRoster,
+                expectedCaptor))
             return false;
 
         var characterIds = new HashSet<string>(signedDeltas.Keys);
@@ -1489,6 +1611,47 @@ internal class PartyDoneLogicHandler : IHandler
             taken.TryGetValue(characterId, out int takenCount);
             return delta == takenCount - releasedCount;
         });
+    }
+
+    internal static bool AreNpcHeroActionCountsSingleton(
+        IReadOnlyDictionary<string, int> actionCounts,
+        IEnumerable<string> npcHeroCharacterIds)
+    {
+        if (actionCounts == null || npcHeroCharacterIds == null)
+            return false;
+
+        foreach (string characterId in npcHeroCharacterIds)
+        {
+            if (!actionCounts.TryGetValue(characterId, out int count) ||
+                count != 1)
+                return false;
+        }
+
+        return true;
+    }
+
+    internal static bool AreReleasedNpcHeroesOwnedBy(
+        FlattenedTroopRoster releasedPrisonersRoster,
+        PartyBase expectedCaptor)
+    {
+        if (releasedPrisonersRoster == null || expectedCaptor == null)
+            return false;
+
+        var seen = new HashSet<Hero>();
+        foreach (FlattenedTroopRosterElement element in releasedPrisonersRoster)
+        {
+            Hero hero = element.Troop?.HeroObject;
+            if (hero == null || hero.IsPlayerHero())
+                continue;
+
+            if (!seen.Add(hero) ||
+                hero.PartyBelongedToAsPrisoner != expectedCaptor ||
+                expectedCaptor.PrisonRoster?.GetTroopCount(
+                    hero.CharacterObject) != 1)
+                return false;
+        }
+
+        return true;
     }
 
     private static void TryPostPartyEffect(
@@ -1710,6 +1873,9 @@ internal class PartyDoneLogicHandler : IHandler
                 !objectManager.TryGetIdWithLogging(element.Troop, out var characterId))
                 return null;
 
+            characterId = global::GameInterface.Services.ObjectManager.ObjectManager.Compact(
+                characterId,
+                typeof(CharacterObject));
             actionCounts.TryGetValue(characterId, out var count);
             actionCounts[characterId] = count + 1;
         }
@@ -1717,20 +1883,33 @@ internal class PartyDoneLogicHandler : IHandler
         return actionCounts;
     }
 
-    internal static TroopRosterData FilterTakenHeroAdditions(
+    internal static TroopRosterData FilterHeroPrisonerChanges(
         TroopRosterData delta,
-        HashSet<string> takenHeroCharacterIds)
+        HashSet<string> takenHeroCharacterIds,
+        HashSet<string> releasedHeroCharacterIds)
     {
-        if (delta.Data == null || takenHeroCharacterIds.Count == 0)
+        if (delta.Data == null ||
+            (takenHeroCharacterIds.Count == 0 && releasedHeroCharacterIds.Count == 0))
             return delta;
 
         var filtered = delta.Data
-            .Where(element => element.Number <= 0 || !takenHeroCharacterIds.Contains(element.CharacterId))
+            .Where(element =>
+                !(element.Number > 0 && takenHeroCharacterIds.Contains(element.CharacterId)) &&
+                !(element.Number < 0 && releasedHeroCharacterIds.Contains(element.CharacterId)))
             .ToArray();
         return filtered.Length == delta.Data.Length
             ? delta
             : new TroopRosterData(filtered);
     }
+
+    internal static bool HasOverlappingPrisonerActions(
+        IEnumerable<string> releasedCharacterIds,
+        IEnumerable<string> takenCharacterIds)
+        => releasedCharacterIds != null &&
+           takenCharacterIds != null &&
+           releasedCharacterIds.Intersect(
+               takenCharacterIds,
+               StringComparer.Ordinal).Any();
 
     internal static bool HasLeftPrisonerTransferDestination(
         bool applyReleasedAndTakenPrisonerActions,
@@ -1743,32 +1922,289 @@ internal class PartyDoneLogicHandler : IHandler
         FlattenedTroopRoster releasedPrisonersRoster,
         FlattenedTroopRoster takenPrisonersRoster)
     {
+        // Required NPC-hero release actions are part of the reversible core above.
+        // This is only the native aggregate notification for the final committed
+        // released roster (regular troops have no individual action).
         var nonPlayerReleases = new FlattenedTroopRoster(4);
-        foreach (var element in releasedPrisonersRoster)
+        foreach (FlattenedTroopRosterElement element in
+                 releasedPrisonersRoster)
         {
             if (element.Troop?.HeroObject?.IsPlayerHero() != true)
                 nonPlayerReleases[element.Descriptor] = element;
         }
-
         if (!nonPlayerReleases.IsEmpty<FlattenedTroopRosterElement>())
-            EndCaptivityAction.ApplyByReleasedByChoice(nonPlayerReleases);
+            CampaignEventDispatcher.Instance.OnPrisonerReleased(
+                nonPlayerReleases);
 
-        if (takenPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>())
-            return;
+        if (!takenPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>())
+            CampaignEventDispatcher.Instance.OnPrisonerTaken(takenPrisonersRoster);
+    }
 
-        var captorParty = mainHero.PartyBelongedTo?.Party;
-        if (captorParty == null)
-        {
-            logger.Error("Cannot apply Party screen prisoner captures because main hero {Hero} has no party", mainHero);
-            return;
-        }
+    private static List<HeroCaptureSnapshot> SnapshotTakenHeroCaptures(
+        Hero mainHero,
+        FlattenedTroopRoster takenPrisonersRoster)
+    {
+        var captor = mainHero?.PartyBelongedTo?.Party;
+        var snapshots = new List<HeroCaptureSnapshot>();
+        if (captor == null || takenPrisonersRoster == null)
+            return snapshots;
 
+        var seen = new HashSet<Hero>();
         foreach (var element in takenPrisonersRoster)
         {
-            if (element.Troop?.HeroObject is Hero hero)
-                TakePrisonerAction.Apply(captorParty, hero);
+            Hero hero = element.Troop?.HeroObject;
+            if (hero == null || hero.IsPlayerHero() || !seen.Add(hero))
+                continue;
+            int priorCount = captor.PrisonRoster?.GetTroopCount(
+                hero.CharacterObject) ?? 0;
+            snapshots.Add(new HeroCaptureSnapshot(
+                hero,
+                captor,
+                hero.PartyBelongedToAsPrisoner,
+                hero.HeroState,
+                priorCount));
         }
-        CampaignEventDispatcher.Instance.OnPrisonerTaken(takenPrisonersRoster);
+        return snapshots;
+    }
+
+    private static void ApplyTakenHeroCapturesRequired(
+        Hero mainHero,
+        IReadOnlyList<HeroCaptureSnapshot> snapshots,
+        ref bool nativeHeroActionAttempted)
+    {
+        PartyBase captor = mainHero?.PartyBelongedTo?.Party;
+        if (captor == null && snapshots.Count != 0)
+            throw new InvalidOperationException(
+                "The player party is unavailable for captured heroes.");
+
+        foreach (HeroCaptureSnapshot snapshot in snapshots)
+        {
+            Hero hero = snapshot.Hero;
+            if (hero.PartyBelongedToAsPrisoner != captor ||
+                captor.PrisonRoster.GetTroopCount(hero.CharacterObject) <= 0)
+            {
+                if (hero.PartyBelongedToAsPrisoner != null &&
+                    hero.PartyBelongedToAsPrisoner != captor)
+                    throw new InvalidOperationException(
+                        $"Captured hero {hero.StringId} belongs to another captor.");
+
+                try
+                {
+                    nativeHeroActionAttempted = true;
+                    TakePrisonerAction.Apply(captor, hero);
+                }
+                catch
+                {
+                    // A campaign listener may throw after the native action reached its final state.
+                    // Treat only the verified authoritative postcondition as success.
+                    if (hero.PartyBelongedToAsPrisoner != captor ||
+                        captor.PrisonRoster.GetTroopCount(hero.CharacterObject) <= 0)
+                        throw;
+                }
+            }
+
+            if (hero.PartyBelongedToAsPrisoner != captor ||
+                captor.PrisonRoster.GetTroopCount(hero.CharacterObject) <= 0)
+                throw new InvalidOperationException(
+                    $"Captured hero {hero.StringId} was not committed.");
+        }
+    }
+
+    private static List<HeroReleaseSnapshot> SnapshotReleasedHeroCaptures(
+        FlattenedTroopRoster releasedPrisonersRoster)
+    {
+        var snapshots = new List<HeroReleaseSnapshot>();
+        if (releasedPrisonersRoster == null)
+            return snapshots;
+
+        var seen = new HashSet<Hero>();
+        foreach (FlattenedTroopRosterElement element in
+                 releasedPrisonersRoster)
+        {
+            Hero hero = element.Troop?.HeroObject;
+            if (hero == null || hero.IsPlayerHero() || !seen.Add(hero))
+                continue;
+
+            PartyBase captor = hero.PartyBelongedToAsPrisoner;
+            snapshots.Add(new HeroReleaseSnapshot(
+                hero,
+                captor,
+                hero.HeroState,
+                captor?.PrisonRoster?.GetTroopCount(
+                    hero.CharacterObject) ?? 0));
+        }
+        return snapshots;
+    }
+
+    private static void ApplyReleasedHeroCapturesRequired(
+        IReadOnlyList<HeroReleaseSnapshot> snapshots,
+        ref bool nativeHeroActionAttempted)
+    {
+        foreach (HeroReleaseSnapshot snapshot in snapshots)
+        {
+            Hero hero = snapshot.Hero;
+            try
+            {
+                nativeHeroActionAttempted = true;
+                EndCaptivityAction.ApplyByReleasedByChoice(hero);
+            }
+            catch
+            {
+                // Campaign listeners can throw after the native release reached
+                // its final state. Accept only the verified state transition.
+                if (hero.PartyBelongedToAsPrisoner != null ||
+                    (snapshot.Captor != null &&
+                     snapshot.Captor.PrisonRoster.GetTroopCount(
+                         hero.CharacterObject) >= snapshot.PriorCaptorCount))
+                    throw;
+            }
+
+            if (hero.PartyBelongedToAsPrisoner != null ||
+                (snapshot.Captor != null &&
+                 snapshot.Captor.PrisonRoster.GetTroopCount(
+                     hero.CharacterObject) >= snapshot.PriorCaptorCount))
+                throw new InvalidOperationException(
+                    $"Released hero {hero.StringId} remained captive.");
+        }
+    }
+
+    private static bool RollbackTakenHeroCaptures(
+        IReadOnlyList<HeroCaptureSnapshot> snapshots)
+    {
+        bool complete = true;
+        foreach (HeroCaptureSnapshot snapshot in snapshots.Reverse())
+        {
+            try
+            {
+                int currentCount = snapshot.Captor.PrisonRoster.GetTroopCount(
+                    snapshot.Hero.CharacterObject);
+                int remove = Math.Max(currentCount - snapshot.PriorCaptorCount, 0);
+                if (remove > 0)
+                    snapshot.Captor.PrisonRoster.AddToCounts(
+                        snapshot.Hero.CharacterObject,
+                        -remove,
+                        false,
+                        0,
+                        0,
+                        true);
+                snapshot.Hero.PartyBelongedToAsPrisoner =
+                    snapshot.PriorCaptor;
+                if (snapshot.Hero.HeroState != snapshot.PriorState)
+                    snapshot.Hero.ChangeState(snapshot.PriorState);
+
+                if (snapshot.Captor.PrisonRoster.GetTroopCount(
+                        snapshot.Hero.CharacterObject) !=
+                    snapshot.PriorCaptorCount ||
+                    snapshot.Hero.PartyBelongedToAsPrisoner !=
+                    snapshot.PriorCaptor ||
+                    snapshot.Hero.HeroState != snapshot.PriorState)
+                {
+                    complete = false;
+                    logger.Error(
+                        "Captured hero rollback postconditions failed for {HeroId}",
+                        snapshot.Hero.StringId);
+                }
+            }
+            catch (Exception exception)
+            {
+                complete = false;
+                logger.Error(
+                    exception,
+                    "Failed to roll back captured hero {HeroId}; the battle grant remains blocked from acceptance",
+                    snapshot.Hero.StringId);
+            }
+        }
+        return complete;
+    }
+
+    private static bool RollbackReleasedHeroCaptures(
+        IReadOnlyList<HeroReleaseSnapshot> snapshots)
+    {
+        bool complete = true;
+        foreach (HeroReleaseSnapshot snapshot in snapshots.Reverse())
+        {
+            try
+            {
+                if (snapshot.Captor != null)
+                {
+                    int current = snapshot.Captor.PrisonRoster.GetTroopCount(
+                        snapshot.Hero.CharacterObject);
+                    int add = Math.Max(snapshot.PriorCaptorCount - current, 0);
+                    if (add > 0)
+                        snapshot.Captor.PrisonRoster.AddToCounts(
+                            snapshot.Hero.CharacterObject,
+                            add,
+                            false,
+                            0,
+                            0,
+                            true);
+                }
+                snapshot.Hero.PartyBelongedToAsPrisoner = snapshot.Captor;
+                if (snapshot.Hero.HeroState != snapshot.PriorState)
+                    snapshot.Hero.ChangeState(snapshot.PriorState);
+
+                if (snapshot.Hero.PartyBelongedToAsPrisoner !=
+                        snapshot.Captor ||
+                    snapshot.Hero.HeroState != snapshot.PriorState ||
+                    (snapshot.Captor != null &&
+                     snapshot.Captor.PrisonRoster.GetTroopCount(
+                         snapshot.Hero.CharacterObject) !=
+                     snapshot.PriorCaptorCount))
+                    complete = false;
+            }
+            catch (Exception exception)
+            {
+                complete = false;
+                logger.Error(
+                    exception,
+                    "Failed to roll back released hero {HeroId}",
+                    snapshot.Hero.StringId);
+            }
+        }
+        return complete;
+    }
+
+    private readonly struct HeroCaptureSnapshot
+    {
+        internal readonly Hero Hero;
+        internal readonly PartyBase Captor;
+        internal readonly PartyBase PriorCaptor;
+        internal readonly Hero.CharacterStates PriorState;
+        internal readonly int PriorCaptorCount;
+
+        internal HeroCaptureSnapshot(
+            Hero hero,
+            PartyBase captor,
+            PartyBase priorCaptor,
+            Hero.CharacterStates priorState,
+            int priorCaptorCount)
+        {
+            Hero = hero;
+            Captor = captor;
+            PriorCaptor = priorCaptor;
+            PriorState = priorState;
+            PriorCaptorCount = priorCaptorCount;
+        }
+    }
+
+    private readonly struct HeroReleaseSnapshot
+    {
+        internal readonly Hero Hero;
+        internal readonly PartyBase Captor;
+        internal readonly Hero.CharacterStates PriorState;
+        internal readonly int PriorCaptorCount;
+
+        internal HeroReleaseSnapshot(
+            Hero hero,
+            PartyBase captor,
+            Hero.CharacterStates priorState,
+            int priorCaptorCount)
+        {
+            Hero = hero;
+            Captor = captor;
+            PriorState = priorState;
+            PriorCaptorCount = priorCaptorCount;
+        }
     }
 
     private static void NotifyTakenPrisonersChanged(FlattenedTroopRoster takenPrisonersRoster)

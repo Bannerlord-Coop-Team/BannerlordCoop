@@ -487,12 +487,16 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             bool changed = false;
             if (session.TryGetActiveContestant(controllerId, out var slot))
             {
+                string replacementCharacterId =
+                    slot.DisplacedCharacterId ?? session.ReplacementCharacterId;
+                if (string.IsNullOrEmpty(replacementCharacterId))
+                    return TournamentMutationStatus.Rejected;
                 replacementDescriptorSeed = TournamentDescriptorSeedAllocator.ResolveUniqueSeed(
-                    session.ReplacementCharacterId,
+                    replacementCharacterId,
                     replacementDescriptorSeed,
                     session.Contestants.Select(contestant => contestant.ToData()));
                 slot.ReplaceDepartedHuman(
-                    session.ReplacementCharacterId,
+                    replacementCharacterId,
                     replacementDisplayName,
                     replacementDescriptorSeed);
                 session.DepartedControllers.Add(controllerId);

@@ -78,7 +78,11 @@ internal sealed class TournamentStateSyncHandler : IHandler
         }
 
         GameThread.RunSafe(
-            () => network.Send(peer, CreateStateSnapshot()),
+            () =>
+            {
+                if (TryCreateStateSnapshot(out var snapshot))
+                    network.Send(peer, snapshot);
+            },
             context: nameof(Handle_StateRequest));
     }
 
@@ -89,7 +93,9 @@ internal sealed class TournamentStateSyncHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            NetworkTournamentStateSnapshot snapshot = CreateStateSnapshot();
+            if (!TryCreateStateSnapshot(
+                    out NetworkTournamentStateSnapshot snapshot))
+                return;
             Logger.Information(
                 "[Tournament] Broadcasting native tournament state: tournaments={TournamentCount}, towns={TournamentTowns}, sessions={SessionCount}",
                 snapshot.NativeTournaments.Length,
@@ -125,8 +131,13 @@ internal sealed class TournamentStateSyncHandler : IHandler
         RemoveStaleSessions(sessions);
 
         Dictionary<Town, FightTournamentGame> authoritativeTournaments =
-            RehydrateAuthoritativeTournaments(nativeTournaments);
-        ReconcileNativeTournaments(manager, authoritativeTournaments);
+            RehydrateAuthoritativeTournaments(
+                nativeTournaments,
+                out HashSet<Town> authoritativeTowns);
+        ReconcileNativeTournaments(
+            manager,
+            authoritativeTournaments,
+            authoritativeTowns);
         ReconcileLeaderboard(manager, leaderboard);
         ApplySessions(sessions);
     }
@@ -159,13 +170,28 @@ internal sealed class TournamentStateSyncHandler : IHandler
     }
 
     private Dictionary<Town, FightTournamentGame> RehydrateAuthoritativeTournaments(
-        TournamentNativeGameData[] nativeTournaments)
+        TournamentNativeGameData[] nativeTournaments,
+        out HashSet<Town> authoritativeTowns)
     {
         var authoritativeTournaments = new Dictionary<Town, FightTournamentGame>();
+        authoritativeTowns = new HashSet<Town>();
         foreach (TournamentNativeGameData data in nativeTournaments)
         {
-            if (data == null || !TryRehydrateNativeGame(data, out var game))
+            if (data == null || !objectManager.TryGetObject(data.TownId, out Town town))
                 continue;
+            authoritativeTowns.Add(town);
+            // Unsupported/custom tournament rows are presence markers only.
+            // Coop cannot safely reconstruct their implementation-specific
+            // state, so never replace or mutate the native local instance.
+            if (!data.IsSupported)
+                continue;
+            if (!TryRehydrateNativeGame(data, out var game))
+            {
+                Logger.Error(
+                    "[Tournament] Preserving existing tournament in {Town}; authoritative entry could not yet be rehydrated",
+                    town.Name);
+                continue;
+            }
             authoritativeTournaments[game.Town] = game;
         }
         return authoritativeTournaments;
@@ -173,9 +199,10 @@ internal sealed class TournamentStateSyncHandler : IHandler
 
     private static void ReconcileNativeTournaments(
         TournamentManager manager,
-        IReadOnlyDictionary<Town, FightTournamentGame> authoritativeTournaments)
+        IReadOnlyDictionary<Town, FightTournamentGame> authoritativeTournaments,
+        ISet<Town> authoritativeTowns)
     {
-        RemoveStaleNativeTournaments(manager, authoritativeTournaments);
+        RemoveStaleNativeTournaments(manager, authoritativeTowns);
         AddOrUpdateNativeTournaments(manager, authoritativeTournaments);
         Logger.Information(
             "[Tournament] Reconciled native tournament state: authoritative={AuthoritativeCount}, localAfter={LocalCount}, localTownsAfter={LocalTowns}",
@@ -188,11 +215,11 @@ internal sealed class TournamentStateSyncHandler : IHandler
 
     private static void RemoveStaleNativeTournaments(
         TournamentManager manager,
-        IReadOnlyDictionary<Town, FightTournamentGame> authoritativeTournaments)
+        ISet<Town> authoritativeTowns)
     {
         foreach (TournamentGame tournament in manager._activeTournaments.ToArray())
         {
-            if (tournament?.Town != null && authoritativeTournaments.ContainsKey(tournament.Town))
+            if (tournament?.Town != null && authoritativeTowns.Contains(tournament.Town))
                 continue;
 
             Town removedTown = tournament?.Town;
@@ -269,8 +296,10 @@ internal sealed class TournamentStateSyncHandler : IHandler
         }, context: nameof(Handle_SessionRemoved));
     }
 
-    private NetworkTournamentStateSnapshot CreateStateSnapshot()
+    private bool TryCreateStateSnapshot(
+        out NetworkTournamentStateSnapshot snapshot)
     {
+        snapshot = default;
         var tournaments = new List<TournamentNativeGameData>();
         if (Campaign.Current?.TournamentManager is TournamentManager manager)
         {
@@ -282,11 +311,37 @@ internal sealed class TournamentStateSyncHandler : IHandler
                 }
 
                 bool isSupported = tournament.GetType() == typeof(FightTournamentGame);
+                if (isSupported && tournament.Prize == null)
+                {
+                    Logger.Error(
+                        "[Tournament] Supported tournament in {Town} has no prize; preserving client state until the authoritative prize exists",
+                        tournament.Town.Name);
+                    return false;
+                }
                 string prizeId = null;
-                if (tournament.Prize != null && !objectManager.TryGetId(tournament.Prize, out prizeId))
+                if (tournament.Prize != null &&
+                    !StaticObjectRegistration.TryEnsure(
+                        objectManager,
+                        tournament.Prize,
+                        out prizeId))
                 {
                     if (isSupported)
-                        continue;
+                    {
+                        Logger.Error(
+                            "[Tournament] Could not register prize {Prize} for supported tournament in {Town}; preserving client state until it can be resolved",
+                            tournament.Prize.StringId,
+                            tournament.Town.Name);
+                        return false;
+                    }
+
+                    // Unsupported tournament implementations are carried only so the client knows
+                    // that the authoritative town is occupied.  Their prize is not rehydrated by
+                    // Coop, so one unregistered custom prize must not suppress every other native
+                    // tournament and session in the snapshot.
+                    Logger.Warning(
+                        "[Tournament] Could not register prize {Prize} for unsupported tournament in {Town}; publishing the town-presence entry without a prize",
+                        tournament.Prize.StringId,
+                        tournament.Town.Name);
                     prizeId = null;
                 }
                 tournaments.Add(new TournamentNativeGameData(
@@ -307,10 +362,11 @@ internal sealed class TournamentStateSyncHandler : IHandler
             })
             .Where(entry => entry != null)
             .ToArray() ?? Array.Empty<TournamentLeaderboardEntryData>();
-        return new NetworkTournamentStateSnapshot(
+        snapshot = new NetworkTournamentStateSnapshot(
             tournaments.ToArray(),
             leaderboard,
             sessionRegistry.GetAll());
+        return true;
     }
 
     private bool TryRehydrateNativeGame(TournamentNativeGameData data, out FightTournamentGame game)
@@ -320,7 +376,10 @@ internal sealed class TournamentStateSyncHandler : IHandler
             return false;
 
         ItemObject prize = null;
-        if (data.PrizeItemId != null && !objectManager.TryGetObject(data.PrizeItemId, out prize))
+        if (data.IsSupported && string.IsNullOrEmpty(data.PrizeItemId))
+            return false;
+        if (data.PrizeItemId != null &&
+            !StaticObjectRegistration.TryResolve(objectManager, data.PrizeItemId, out prize))
             return false;
 
         game = data.IsSupported

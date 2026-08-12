@@ -9,6 +9,7 @@ using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
@@ -29,10 +30,26 @@ public interface ITroopRosterInterface : IGameAbstraction
     TroopRosterData PackTroopRosterData(TroopRoster troopRoster);
 
     /// <summary>
+    /// Packs a complete roster atomically. A result/reward roster must never be
+    /// shortened merely because one character has not reached the network registry.
+    /// </summary>
+    bool TryPackTroopRosterData(
+        TroopRoster troopRoster,
+        out TroopRosterData data);
+
+    /// <summary>
     /// Unpack troop roster data into usable TroopRosterElements.
     /// Optional mainHero parameter for avoiding retrieving a duplicate of a player hero already in a roster.
     /// </summary>
     IEnumerable<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData);
+
+    /// <summary>
+    /// Resolves an entire packed roster atomically. Authoritative battle results
+    /// must never be shortened because one static character is unavailable.
+    /// </summary>
+    bool TryUnpackTroopRosterData(
+        TroopRosterData troopRosterData,
+        out TroopRosterElement[] elements);
 
     /// <summary>
     /// Updates target roster with incoming data from the client.
@@ -46,6 +63,15 @@ public interface ITroopRosterInterface : IGameAbstraction
     /// handling for heroes or companions.
     /// </summary>
     TroopRosterData PackTroopRosterDelta(TroopRoster current, TroopRoster initial);
+
+    /// <summary>
+    /// Packs a roster delta atomically. Returns false instead of silently omitting a changed
+    /// character whose network identity is not registered yet.
+    /// </summary>
+    bool TryPackTroopRosterDelta(
+        TroopRoster current,
+        TroopRoster initial,
+        out TroopRosterData data);
 
     /// <summary>
     /// Validates and applies a set of packed deltas (produced by <see cref="PackTroopRosterDelta"/>).
@@ -68,6 +94,10 @@ public interface ITroopRosterInterface : IGameAbstraction
     /// Used to pack the order of elements in a TroopRoster to reshuffle after apply deltas.
     /// </summary>
     TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster);
+
+    bool TryPackTroopRosterOrderData(
+        TroopRoster roster,
+        out TroopRosterOrderData data);
 }
 
 internal class TroopRosterInterface : ITroopRosterInterface
@@ -91,14 +121,44 @@ internal class TroopRosterInterface : ITroopRosterInterface
         {
             if (troopRosterElement.Character == null)
                 continue;
-
-            if (!objectManager.TryGetIdWithLogging(troopRosterElement.Character, out var characterId))
+            if (!objectManager.TryGetIdWithLogging(
+                    troopRosterElement.Character,
+                    out var characterId))
                 continue;
+            elements.Add(new TroopRosterElementData(
+                characterId,
+                troopRosterElement.Number,
+                troopRosterElement.WoundedNumber,
+                troopRosterElement.Xp));
+        }
+        return new TroopRosterData(elements);
+    }
+
+    public bool TryPackTroopRosterData(
+        TroopRoster troopRoster,
+        out TroopRosterData data)
+    {
+        var elements = new List<TroopRosterElementData>();
+        foreach (TroopRosterElement troopRosterElement in troopRoster.data)
+        {
+            if (troopRosterElement.Character == null)
+                continue;
+
+            if (!StaticObjectRegistration.TryEnsure(
+                    objectManager,
+                    troopRosterElement.Character,
+                    out var characterId))
+            {
+                data = new TroopRosterData(
+                    Array.Empty<TroopRosterElementData>());
+                return false;
+            }
 
             elements.Add(new TroopRosterElementData(characterId, troopRosterElement.Number, troopRosterElement.WoundedNumber, troopRosterElement.Xp));
         }
 
-        return new TroopRosterData(elements);
+        data = new TroopRosterData(elements);
+        return true;
     }
 
     public IEnumerable<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData)
@@ -108,7 +168,10 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
         foreach (var elementData in troopRosterData.Data)
         {
-            if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character))
+            if (!StaticObjectRegistration.TryResolve(
+                    objectManager,
+                    elementData.CharacterId,
+                    out CharacterObject character))
                 continue;
 
             yield return new TroopRosterElement(character)
@@ -150,6 +213,51 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
     public TroopRosterData PackTroopRosterDelta(TroopRoster current, TroopRoster initial)
     {
+        TryPackTroopRosterDelta(current, initial, out TroopRosterData data);
+        return data;
+    }
+
+    public bool TryUnpackTroopRosterData(
+        TroopRosterData troopRosterData,
+        out TroopRosterElement[] elements)
+    {
+        TroopRosterElementData[] packed = troopRosterData.Data?.ToArray() ??
+            Array.Empty<TroopRosterElementData>();
+        var resolved = new TroopRosterElement[packed.Length];
+        for (int i = 0; i < packed.Length; i++)
+        {
+            TroopRosterElementData elementData = packed[i];
+            if (string.IsNullOrEmpty(elementData.CharacterId) ||
+                elementData.Number < 0 ||
+                elementData.WoundedNumber < 0 ||
+                elementData.WoundedNumber > elementData.Number ||
+                elementData.Xp < 0 ||
+                !StaticObjectRegistration.TryResolve(
+                    objectManager,
+                    elementData.CharacterId,
+                    out CharacterObject character))
+            {
+                elements = Array.Empty<TroopRosterElement>();
+                return false;
+            }
+
+            resolved[i] = new TroopRosterElement(character)
+            {
+                _number = elementData.Number,
+                _woundedNumber = elementData.WoundedNumber,
+                _xp = elementData.Xp
+            };
+        }
+
+        elements = resolved;
+        return true;
+    }
+
+    public bool TryPackTroopRosterDelta(
+        TroopRoster current,
+        TroopRoster initial,
+        out TroopRosterData data)
+    {
         // Diffed via per-character totals (not raw slots), so any quirk present in both snapshots cancels.
         var currentCounts = SumByCharacter(current);
         var initialCounts = SumByCharacter(initial);
@@ -178,13 +286,20 @@ internal class TroopRosterInterface : ITroopRosterInterface
             if (numberDelta == 0 && woundedDelta == 0 && xpDelta == 0)
                 continue;
 
-            if (!objectManager.TryGetIdWithLogging(character, out var characterId))
-                continue;
+            if (!StaticObjectRegistration.TryEnsure(
+                    objectManager,
+                    character,
+                    out var characterId))
+            {
+                data = new TroopRosterData(Array.Empty<TroopRosterElementData>());
+                return false;
+            }
 
             elements.Add(new TroopRosterElementData(characterId, numberDelta, woundedDelta, xpDelta));
         }
 
-        return new TroopRosterData(elements);
+        data = new TroopRosterData(elements);
+        return true;
     }
 
     public bool TryApplyTroopRosterDeltas(
@@ -603,17 +718,32 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
     public TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster)
     {
-        var troopRosterOrderData = new TroopRosterOrderData(new());
-        if (roster == null || roster.data == null) return null;
+        TryPackTroopRosterOrderData(roster, out TroopRosterOrderData data);
+        return data;
+    }
+
+    public bool TryPackTroopRosterOrderData(
+        TroopRoster roster,
+        out TroopRosterOrderData troopRosterOrderData)
+    {
+        troopRosterOrderData = new TroopRosterOrderData(new());
+        if (roster == null || roster.data == null) return false;
 
         for (int i = 0; i < roster.Count; i++)
         {
             var character = roster.data[i].Character;
 
-            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) continue;
+            if (!StaticObjectRegistration.TryEnsure(
+                    objectManager,
+                    character,
+                    out var characterId))
+            {
+                troopRosterOrderData = null;
+                return false;
+            }
 
             troopRosterOrderData.IndexCharacterIds[i] = characterId;
         }
-        return troopRosterOrderData;
+        return true;
     }
 }

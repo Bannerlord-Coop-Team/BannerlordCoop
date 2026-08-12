@@ -37,6 +37,8 @@ public class TournamentDisconnectFlowTests : SyncTestBase
         string townPartyId = TestEnvironment.CreateRegisteredObject<PartyBase>();
         string cultureId = TestEnvironment.CreateRegisteredObject<CultureObject>();
         string troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string displacedHostId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string displacedSuccessorId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
 
         Server.Call(() =>
         {
@@ -67,7 +69,8 @@ public class TournamentDisconnectFlowTests : SyncTestBase
             playerManager.SetPeer(HostControllerId, host.NetPeer);
             playerManager.SetPeer(SuccessorControllerId, successor.NetPeer);
 
-            Assert.True(Server.Resolve<ITournamentSessionRegistry>().ApplySnapshot(CreateSnapshot(townId)));
+            Assert.True(Server.Resolve<ITournamentSessionRegistry>().ApplySnapshot(
+                CreateSnapshot(townId, displacedHostId, displacedSuccessorId)));
         });
 
         Server.SimulateMessage(host.NetPeer, new NetworkTournamentMissionEntered(SessionId, 1));
@@ -89,15 +92,23 @@ public class TournamentDisconnectFlowTests : SyncTestBase
             Assert.Empty(disconnected.SuccessorControllerIds);
             Assert.DoesNotContain(disconnected.Contestants, contestant =>
                 contestant.IsHuman && contestant.ControllerId == HostControllerId);
+            TournamentContestantData restored = Assert.Single(
+                disconnected.Contestants,
+                contestant => contestant.SlotId == "host-slot");
+            Assert.Equal(displacedHostId, restored.CharacterId);
+            Assert.False(restored.IsHuman);
         });
     }
 
-    private static TournamentSessionSnapshot CreateSnapshot(string townId)
+    private static TournamentSessionSnapshot CreateSnapshot(
+        string townId,
+        string displacedHostId,
+        string displacedSuccessorId)
     {
         TournamentContestantData[] contestants =
         {
-            CreateContestant("host-slot", "host-character", HostControllerId, "Tournament Host"),
-            CreateContestant("successor-slot", "successor-character", SuccessorControllerId, "Tournament Successor")
+            CreateContestant("host-slot", "host-character", HostControllerId, "Tournament Host", displacedHostId),
+            CreateContestant("successor-slot", "successor-character", SuccessorControllerId, "Tournament Successor", displacedSuccessorId)
         };
         var match = new TournamentMatchData(
             "match-1",
@@ -145,7 +156,8 @@ public class TournamentDisconnectFlowTests : SyncTestBase
         string slotId,
         string characterId,
         string controllerId,
-        string displayName)
+        string displayName,
+        string displacedCharacterId)
         => new(
             slotId,
             characterId,
@@ -155,5 +167,5 @@ public class TournamentDisconnectFlowTests : SyncTestBase
             true,
             false,
             true,
-            characterId);
+            displacedCharacterId);
 }

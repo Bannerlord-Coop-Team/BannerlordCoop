@@ -62,9 +62,10 @@ internal class PartyScreenHelperPatches
     [HarmonyPrefix]
     public static bool SellPrisonersDoneHandlerPrefix(ref bool __result, TroopRoster leftPrisonRoster)
     {
-        var message = new PrisonersSold(MobileParty.MainParty.Party, leftPrisonRoster);
-        MessageBroker.Instance.Publish(null, message);
-
+        // The enclosing PartyDoneLogicAttempted message already contains the complete, authenticated
+        // ransom-screen deltas. Publishing PrisonersSold here created a second command for the same sale;
+        // whichever arrived first made the other look stale and required an unsafe payload fingerprint.
+        // Sell All still uses PrisonersSold because it has no PartyDone screen.
         __result = true;
         return false;
     }

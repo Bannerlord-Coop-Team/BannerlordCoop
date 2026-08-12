@@ -121,11 +121,19 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         prizeId = null;
         replacementId = null;
         CharacterObject replacement = town.Culture?.BasicTroop;
-        if (replacement == null || !objectManager.TryGetId(replacement, out replacementId))
+        if (replacement == null ||
+            !StaticObjectRegistration.TryEnsure(
+                objectManager,
+                replacement,
+                out replacementId))
             return false;
 
         ItemObject prize = LockPrizeForFrozenRoster(town, tournamentGame, sortedCharacters);
-        return prize != null && objectManager.TryGetId(prize, out prizeId);
+        return prize != null &&
+            StaticObjectRegistration.TryEnsure(
+                objectManager,
+                prize,
+                out prizeId);
     }
 
     private bool TryCreateTournamentSeed(
@@ -196,7 +204,10 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         for (int i = 0; i < sortedCharacters.Count; i++)
         {
             CharacterObject character = sortedCharacters[i];
-            if (!objectManager.TryGetId(character, out var characterId))
+            if (!StaticObjectRegistration.TryEnsure(
+                    objectManager,
+                    character,
+                    out var characterId))
                 return false;
 
             bool isLord = character.IsHero && character.HeroObject?.IsLord == true;
@@ -318,7 +329,10 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
     {
         if (snapshot == null ||
             !objectManager.TryGetObject(snapshot.TownId, out Town town) ||
-            !objectManager.TryGetObject(snapshot.PrizeItemId, out ItemObject prize) ||
+            !StaticObjectRegistration.TryResolve(
+                objectManager,
+                snapshot.PrizeItemId,
+                out ItemObject prize) ||
             Campaign.Current?.TournamentManager?.GetTournamentGame(town) is not FightTournamentGame game ||
             game.GetType() != typeof(FightTournamentGame))
         {
@@ -337,7 +351,8 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
             return false;
 
         ItemObject prize = null;
-        if (snapshot.PrizeItemId != null && !objectManager.TryGetObject(snapshot.PrizeItemId, out prize))
+        if (snapshot.PrizeItemId != null &&
+            !StaticObjectRegistration.TryResolve(objectManager, snapshot.PrizeItemId, out prize))
             return false;
 
         tournamentGame = ObjectHelper.SkipConstructor<FightTournamentGame>();
@@ -390,7 +405,10 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         slotIds = new Dictionary<TournamentParticipant, string>();
         foreach (var contestant in snapshot.Contestants)
         {
-            if (!objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character))
+            if (!StaticObjectRegistration.TryResolve(
+                    objectManager,
+                    contestant.CharacterId,
+                    out CharacterObject character))
                 return false;
 
             var participant = new TournamentParticipant(

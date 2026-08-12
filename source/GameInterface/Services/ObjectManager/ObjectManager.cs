@@ -51,6 +51,13 @@ public interface IObjectManager
     bool AddExisting(string id, object obj);
 
     /// <summary>
+    /// Atomically replaces an exact stale registration while retaining its id.
+    /// Used when Bannerlord's static object table is authoritatively overridden
+    /// after Coop's initial registry scan.
+    /// </summary>
+    bool ReplaceExisting(string id, object expected, object replacement);
+
+    /// <summary>
     /// Adds an object without a registered StringId
     /// </summary>
     /// <param name="obj">Object to register</param>
@@ -159,6 +166,39 @@ public class ObjectManager : IObjectManager
             objsIds.Add(obj, id);
 
             return true;
+        }
+    }
+
+    public bool ReplaceExisting(string id, object expected, object replacement)
+    {
+        if (string.IsNullOrEmpty(id) || expected == null || replacement == null)
+            return false;
+
+        lock (_gate)
+        {
+            if (!idObjs.TryGetValue(id, out object current) ||
+                !ReferenceEquals(current, expected))
+                return false;
+            if (ReferenceEquals(expected, replacement))
+                return true;
+            if (objsIds.TryGetValue(replacement, out _))
+                return false;
+
+            idObjs[id] = replacement;
+            objsIds.Remove(expected);
+            try
+            {
+                objsIds.Add(replacement, id);
+                GetUniqueTypeId(replacement);
+                return true;
+            }
+            catch
+            {
+                idObjs[id] = expected;
+                if (!objsIds.TryGetValue(expected, out _))
+                    objsIds.Add(expected, id);
+                throw;
+            }
         }
     }
 

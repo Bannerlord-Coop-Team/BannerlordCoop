@@ -52,30 +52,62 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         var lootedItems = new Dictionary<string, ItemRosterElement[]>();
         var lootedMembers = new Dictionary<string, TroopRosterData>();
         var lootedPrisoners = new Dictionary<string, TroopRosterData>();
+        bool complete = true;
+        string failure = null;
 
         GameThread.RunSafe(() =>
         {
             foreach (var playerLootedItems in playerLootData.LootedItems)
             {
-                if (!objectManager.TryGetIdWithLogging(playerLootedItems.Key, out var mapEventPartyId)) continue;
+                if (!objectManager.TryGetIdWithLogging(playerLootedItems.Key, out var mapEventPartyId))
+                {
+                    complete = false;
+                    failure = "A winning map-event party was not registered.";
+                    continue;
+                }
 
                 lootedItems[mapEventPartyId] = playerLootedItems.Value.ToArray();
             }
 
             foreach (var playerLootedMembers in playerLootData.LootedMembers)
             {
-                if (!objectManager.TryGetIdWithLogging(playerLootedMembers.Key, out var mapEventPartyId)) continue;
+                if (!objectManager.TryGetIdWithLogging(playerLootedMembers.Key, out var mapEventPartyId) ||
+                    !troopRosterInterface.TryPackTroopRosterData(
+                        playerLootedMembers.Value,
+                        out TroopRosterData packedMembers))
+                {
+                    complete = false;
+                    failure = "A post-battle rescued troop was not registered.";
+                    continue;
+                }
 
-                lootedMembers[mapEventPartyId] = troopRosterInterface.PackTroopRosterData(playerLootedMembers.Value);
+                lootedMembers[mapEventPartyId] = packedMembers;
             }
 
             foreach (var playerLootedPrisoners in playerLootData.LootedPrisoners)
             {
-                if (!objectManager.TryGetIdWithLogging(playerLootedPrisoners.Key, out var mapEventPartyId)) continue;
+                if (!objectManager.TryGetIdWithLogging(playerLootedPrisoners.Key, out var mapEventPartyId) ||
+                    !troopRosterInterface.TryPackTroopRosterData(
+                        playerLootedPrisoners.Value,
+                        out TroopRosterData packedPrisoners))
+                {
+                    complete = false;
+                    failure = "A post-battle prisoner was not registered.";
+                    continue;
+                }
 
-                lootedPrisoners[mapEventPartyId] = troopRosterInterface.PackTroopRosterData(playerLootedPrisoners.Value);
+                lootedPrisoners[mapEventPartyId] = packedPrisoners;
             }
-        });
+        }, blocking: true, context: nameof(PackPlayerLootData));
+
+        if (!complete)
+        {
+            Logger.Error(
+                "Refused to publish a truncated battle result: {Failure}",
+                failure);
+            throw new System.InvalidOperationException(
+                failure ?? "The battle result could not be packed completely.");
+        }
 
         return new NetworkPlayerLootData(lootedItems, lootedMembers, lootedPrisoners);
     }
@@ -108,10 +140,16 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedMembers.Key, out var mapEventParty)) continue;
 
+                if (!troopRosterInterface.TryUnpackTroopRosterData(
+                        playerLootedMembers.Value,
+                        out TroopRosterElement[] members))
+                    throw new System.InvalidOperationException(
+                        "An authoritative rescued-troop award could not be resolved completely.");
+
                 using (new AllowedThread())
                 {
                     lootedMembers[mapEventParty] = new TroopRoster();
-                    foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(playerLootedMembers.Value))
+                    foreach (var troopRosterElement in members)
                     {
                         lootedMembers[mapEventParty].Add(troopRosterElement);
                     }
@@ -123,10 +161,16 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedPrisoners.Key, out var mapEventParty)) continue;
 
+                if (!troopRosterInterface.TryUnpackTroopRosterData(
+                        playerLootedPrisoners.Value,
+                        out TroopRosterElement[] prisoners))
+                    throw new System.InvalidOperationException(
+                        "An authoritative prisoner award could not be resolved completely.");
+
                 using (new AllowedThread())
                 {
                     lootedPrisoners[mapEventParty] = new TroopRoster();
-                    foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(playerLootedPrisoners.Value))
+                    foreach (var troopRosterElement in prisoners)
                     {
                         lootedPrisoners[mapEventParty].Add(troopRosterElement);
                     }
@@ -155,13 +199,23 @@ public class MapEventResultsInterface : IMapEventResultsInterface
 
             if (networkPlayerLootData.LootedMembers?.TryGetValue(mapEventPartyId, out var memberData) == true)
             {
-                foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(memberData))
+                if (!troopRosterInterface.TryUnpackTroopRosterData(
+                        memberData,
+                        out TroopRosterElement[] members))
+                    throw new System.InvalidOperationException(
+                        "An authoritative rescued-troop award could not be resolved completely.");
+                foreach (var troopRosterElement in members)
                     lootedMembers.Add(troopRosterElement);
             }
 
             if (networkPlayerLootData.LootedPrisoners?.TryGetValue(mapEventPartyId, out var prisonerData) == true)
             {
-                foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(prisonerData))
+                if (!troopRosterInterface.TryUnpackTroopRosterData(
+                        prisonerData,
+                        out TroopRosterElement[] prisoners))
+                    throw new System.InvalidOperationException(
+                        "An authoritative prisoner award could not be resolved completely.");
+                foreach (var troopRosterElement in prisoners)
                     lootedPrisoners.Add(troopRosterElement);
             }
         }

@@ -97,6 +97,39 @@ public class PrisonerSaleProcessorTests
     }
 
     [Fact]
+    public void Prepare_DoesNotPublishPlayerReleaseBeforeCoreCommit()
+    {
+        var playerHero = ObjectHelper.SkipConstructor<Hero>();
+        var playerCharacter = ObjectHelper.SkipConstructor<CharacterObject>();
+        var requested = Roster(Element(playerCharacter));
+        var sellingParty = MobilePartyAtSettlement(Position(2f, 3f));
+        sellingParty.PrisonRoster = Roster(Element(playerCharacter));
+        playerCharacter.HeroObject = playerHero;
+        var releaseSettlement = ObjectHelper.SkipConstructor<Settlement>();
+        releaseSettlement.GatePosition = Position(7f, 9f);
+        playerManager.Setup(p => p.Contains(playerHero)).Returns(true);
+        releaseSettlementProvider.ExpectedSellingParty = sellingParty;
+        releaseSettlementProvider.ExpectedPlayerHero = playerHero;
+        releaseSettlementProvider.ReleaseSettlement = releaseSettlement;
+        var processor = CreateProcessor();
+
+        PrisonerSalePlan plan = processor.Prepare(sellingParty, requested);
+        processor.ApplyCore(sellingParty, plan);
+
+        messageBroker.Verify(
+            b => b.Publish(It.IsAny<object>(),
+                It.IsAny<PlayerCaptivityEndedByServer>()),
+            Times.Never);
+
+        processor.PublishPostCommit(plan);
+
+        messageBroker.Verify(
+            b => b.Publish(It.IsAny<object>(),
+                It.IsAny<PlayerCaptivityEndedByServer>()),
+            Times.Once);
+    }
+
+    [Fact]
     public void PrisonerRansomValue_PlayerHero_ReturnsZero()
     {
         var playerHero = ObjectHelper.SkipConstructor<Hero>();

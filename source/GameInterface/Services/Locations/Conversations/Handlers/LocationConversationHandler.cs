@@ -13,7 +13,10 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Locations.Conversations.Handlers;
@@ -106,19 +109,82 @@ internal class LocationConversationHandler : IHandler
             return;
         }
 
-        var engagerNpcKey = LocationConversationTracker.ComposeKey(request.LocationId, player.CharacterObjectId);
-        var targetNpcKey = LocationConversationTracker.ComposeKey(request.LocationId, request.CharacterId);
+        // Location/roster access is campaign state and must be resolved on the game thread. More
+        // importantly, never turn the two client-supplied ids directly into an authority record: doing
+        // so lets a modified client reserve a character that is not present in its current settlement.
+        GameThread.RunSafe(() =>
+        {
+            if (!TryResolveAuthoritativeLocationRequest(
+                    player.MobilePartyId,
+                    request.LocationId,
+                    request.CharacterId,
+                    out var authoritativeLocationId))
+            {
+                network.Send(peer, new NetworkLocationConversationDenied(request.Generation));
+                return;
+            }
 
-        // Reserve both participants so crossed requests cannot approve two conversations at once.
-        if (tracker.TryBeginEngagement(peer, engagerNpcKey, targetNpcKey))
+            var engagerNpcKey = LocationConversationTracker.ComposeKey(
+                authoritativeLocationId, player.CharacterObjectId);
+            var targetNpcKey = LocationConversationTracker.ComposeKey(
+                authoritativeLocationId, request.CharacterId);
+
+            // Reserve both participants so crossed requests cannot approve two conversations at once.
+            if (tracker.TryBeginEngagement(peer, engagerNpcKey, targetNpcKey))
+            {
+                network.Send(peer, new NetworkAllowLocationConversation(request.Generation));
+                StartPlayerWaitingInteraction(peer, request.CharacterId);
+            }
+            else
+            {
+                network.Send(peer, new NetworkLocationConversationDenied(request.Generation));
+            }
+        }, context: nameof(NetworkRequestLocationConversation));
+    }
+
+    private bool TryResolveAuthoritativeLocationRequest(
+        string playerPartyId,
+        string requestedLocationId,
+        string requestedCharacterId,
+        out string authoritativeLocationId)
+    {
+        authoritativeLocationId = null;
+
+        if (string.IsNullOrEmpty(playerPartyId) ||
+            string.IsNullOrEmpty(requestedLocationId) ||
+            string.IsNullOrEmpty(requestedCharacterId) ||
+            !tracker.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty) ||
+            !tracker.ObjectManager.TryGetObject<Location>(requestedLocationId, out var requestedLocation) ||
+            !tracker.ObjectManager.TryGetObject<CharacterObject>(requestedCharacterId, out var requestedCharacter))
+            return false;
+
+        // Player-to-player location conversations are deliberately unavailable: one player may not force
+        // another into dialogue or combat. This is separate from the authoritative NPC roster lane below.
+        if (requestedCharacter.HeroObject?.IsPlayerHero() == true)
+            return false;
+
+        var settlement = playerParty?.CurrentSettlement;
+        var locations = settlement?.LocationComplex?.GetListOfLocations();
+        if (locations == null || !locations.Contains(requestedLocation))
+            return false;
+
+        // The server-authored location roster is the source of truth for who can be spoken to here.
+        // Player agents are intentionally absent from these rosters, which also keeps P2P dialogue
+        // unavailable through this NPC-conversation route.
+        if (requestedLocation.GetCharacterList()?.Any(entry =>
+                entry?.Character == requestedCharacter ||
+                (requestedCharacter.HeroObject != null &&
+                 entry?.Character?.HeroObject == requestedCharacter.HeroObject)) != true)
+            return false;
+
+        if (!tracker.ObjectManager.TryGetId(requestedLocation, out authoritativeLocationId) ||
+            !string.Equals(authoritativeLocationId, requestedLocationId, StringComparison.Ordinal))
         {
-            network.Send(peer, new NetworkAllowLocationConversation(request.Generation));
-            StartPlayerWaitingInteraction(peer, request.CharacterId);
+            authoritativeLocationId = null;
+            return false;
         }
-        else
-        {
-            network.Send(peer, new NetworkLocationConversationDenied(request.Generation));
-        }
+
+        return true;
     }
 
     /// <summary>[Client] Server approved: start the held-back conversation on the main thread.</summary>

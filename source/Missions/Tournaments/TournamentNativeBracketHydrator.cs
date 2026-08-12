@@ -41,7 +41,10 @@ public class TournamentNativeBracketHydrator : ITournamentNativeBracketHydrator
         var result = new Dictionary<string, TournamentParticipant>();
         foreach (var data in contestants)
         {
-            if (!objectManager.TryGetObject(data.CharacterId, out CharacterObject character))
+            if (!StaticObjectRegistration.TryResolve(
+                    objectManager,
+                    data.CharacterId,
+                    out CharacterObject character))
                 throw new NullReferenceException(data.CharacterId);
 
             var descriptor = new UniqueTroopDescriptor(data.DescriptorSeed);

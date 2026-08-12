@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Party.Messages;
 
-public readonly struct PartyDoneLogicAttempted : IEvent
+public sealed class PartyDoneLogicAttempted : IEvent
 {
     public readonly Hero MainHero;
     public readonly FlattenedTroopRoster ReleasedPrisonersRoster;
@@ -33,6 +33,8 @@ public readonly struct PartyDoneLogicAttempted : IEvent
     public readonly bool DoNotApplyGoldTransactions;
     public readonly PartyScreenHelper.PartyScreenMode PartyScreenMode;
     public readonly bool ApplyReleasedAndTakenPrisonerActions;
+    public bool CommandSent;
+    public string FailureReason;
 
     public PartyDoneLogicAttempted(
         Hero mainHero,

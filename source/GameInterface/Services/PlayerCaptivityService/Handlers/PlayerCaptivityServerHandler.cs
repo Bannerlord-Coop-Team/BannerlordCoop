@@ -61,6 +61,11 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly HashSet<string> invalidCaptorPositionsLogged = new HashSet<string>();
+    private readonly Dictionary<Hero, int> captivityEpochs = new Dictionary<Hero, int>();
+    private readonly Dictionary<Hero, CampaignTime> captivityStartedAt =
+        new Dictionary<Hero, CampaignTime>();
+    private readonly Dictionary<Hero, PendingServerRelease> pendingServerReleases =
+        new Dictionary<Hero, PendingServerRelease>();
 
     public PlayerCaptivityServerHandler(
         IObjectManager objectManager,
@@ -91,6 +96,9 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Unsubscribe<NetworkEndCaptivityAttempted>(Handle_NetworkEndCaptivityAttempted);
         messageBroker.Unsubscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        captivityEpochs.Clear();
+        captivityStartedAt.Clear();
+        pendingServerReleases.Clear();
     }
 
     /// <summary>
@@ -113,6 +121,16 @@ internal class PlayerCaptivityServerHandler : IHandler
         // cleared hero.PartyBelongedTo and set PartyBelongedToAsPrisoner. The party the hero was captured
         // from therefore has to come from the message, not from the (now-null) hero.PartyBelongedTo.
         var playerParty = payload.What.PrisonerParty;
+
+        if (hero != null && playerManager.Contains(hero))
+        {
+            captivityEpochs.TryGetValue(hero, out int previousEpoch);
+            captivityEpochs[hero] = previousEpoch == int.MaxValue
+                ? 1
+                : previousEpoch + 1;
+            captivityStartedAt[hero] = CampaignTime.Now;
+            pendingServerReleases.Remove(hero);
+        }
 
         PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: hero={HeroId} party={PartyId} captor={CaptorId}",
             hero?.StringId, playerParty?.StringId, payload.What.CapturerParty?.MobileParty?.StringId);
@@ -455,6 +473,18 @@ internal class PlayerCaptivityServerHandler : IHandler
         var ransomAmount = payload.What.RansomAmount;
         var peer = payload.Who as NetPeer;
 
+        if (peer == null ||
+            !playerManager.TryGetPlayer(peer, out var registeredPlayer) ||
+            !string.Equals(registeredPlayer.HeroId, heroId, StringComparison.Ordinal) ||
+            !string.Equals(registeredPlayer.MobilePartyId, partyId, StringComparison.Ordinal))
+        {
+            Logger.Warning(
+                "Rejected an unauthenticated captivity-release request for hero {HeroId} and party {PartyId}",
+                heroId,
+                partyId);
+            return;
+        }
+
         // The release touches party/roster game state the main-thread tick also touches, so defer the
         // apply to the game loop; resolve the object ids inside the lambda so a deferred create that lands
         // first is visible, and send the reply inside the lambda after the release runs so the client only
@@ -463,14 +493,74 @@ internal class PlayerCaptivityServerHandler : IHandler
         {
             try
             {
+                // Re-bind the peer after the deferred game-thread hop. A disconnect/reconnect or
+                // controller replacement between receipt and execution must not let the old peer
+                // release the new controller's hero.
+                if (!playerManager.TryGetPlayer(peer, out var currentPlayer) ||
+                    !string.Equals(currentPlayer.HeroId, heroId, StringComparison.Ordinal) ||
+                    !string.Equals(currentPlayer.MobilePartyId, partyId, StringComparison.Ordinal))
+                {
+                    Logger.Warning(
+                        "Rejected a stale captivity-release request for hero {HeroId} and party {PartyId}",
+                        heroId,
+                        partyId);
+                    return;
+                }
+
                 if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var playerHero))
                     return;
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var playerParty))
                     return;
 
-                Hero facilitator = null;
-                if (facilitatorId != null && !objectManager.TryGetObjectWithLogging(facilitatorId, out facilitator))
+                if (playerHero.PartyBelongedToAsPrisoner == null ||
+                    playerParty.IsActive ||
+                    (playerParty.LeaderHero != null &&
+                     playerParty.LeaderHero != playerHero))
+                {
+                    Logger.Warning(
+                        "Rejected a captivity-release request that no longer matched the authoritative captive state for {HeroId}",
+                        heroId);
                     return;
+                }
+
+                PartyBase expectedCaptor = playerHero.PartyBelongedToAsPrisoner;
+                captivityEpochs.TryGetValue(playerHero, out int epoch);
+                if (pendingServerReleases.TryGetValue(
+                        playerHero,
+                        out PendingServerRelease existingPending))
+                {
+                    if (existingPending.CaptivityEpoch == epoch &&
+                        existingPending.ExpectedCaptor == expectedCaptor &&
+                        existingPending.ReplyPeer == peer)
+                    {
+                        if (TryProcessPendingServerRelease(existingPending))
+                            pendingServerReleases.Remove(playerHero);
+                    }
+                    else
+                    {
+                        Logger.Warning(
+                            "Rejected a captivity-release request while another release is pending for {HeroId}",
+                            heroId);
+                    }
+                    return;
+                }
+
+                if (!TryAuthorizeClientRelease(
+                        playerHero,
+                        expectedCaptor,
+                        detail,
+                        facilitatorId,
+                        ransomAmount,
+                        out Hero facilitator,
+                        out int authoritativeRansom))
+                {
+                    Logger.Warning(
+                        "Rejected an unauthorized captivity release for {HeroId}: detail={Detail} ransom={RansomAmount}",
+                        heroId,
+                        detail,
+                        ransomAmount);
+                    return;
+                }
 
                 PlayerCaptivityLogger.Debug("Handle_NetworkEndPlayerCaptivityAttempted (server): hero={HeroId} party={PartyId} detail={Detail} facilitator={FacilitatorId}",
                     playerHero.StringId, playerParty.StringId, detail, facilitator?.StringId);
@@ -492,14 +582,19 @@ internal class PlayerCaptivityServerHandler : IHandler
                     return;
                 }
 
-                ReleasePlayerFromCaptivity(playerHero, playerParty, detail, facilitator, releasePosition);
-
-                if (detail == EndCaptivityDetail.Ransom && ransomAmount != 0)
-                {
-                    GiveGoldAction.ApplyBetweenCharacters(playerHero, null, ransomAmount, false);
-                }
-
-                network.Send(peer, new NetworkPlayerCaptivityEnded());
+                var pending = new PendingServerRelease(
+                    new PlayerCaptivityEndedByServer(
+                        playerHero,
+                        detail,
+                        facilitator,
+                        releasePosition),
+                    expectedCaptor,
+                    epoch,
+                    peer,
+                    authoritativeRansom);
+                pendingServerReleases[playerHero] = pending;
+                if (TryProcessPendingServerRelease(pending))
+                    pendingServerReleases.Remove(playerHero);
             }
             catch (Exception e)
             {
@@ -523,19 +618,148 @@ internal class PlayerCaptivityServerHandler : IHandler
         var playerHero = payload.What.PrisonerHero;
         if (playerHero == null) return;
 
-        if (!TryGetPlayerParty(playerHero, out var playerParty))
+        if (pendingServerReleases.TryGetValue(
+                playerHero, out PendingServerRelease existingPending))
         {
-            Logger.Error("Could not resolve a player party for released hero {HeroId}; cannot restore it", playerHero.StringId);
+            // A release can be published twice after the first attempt has already cleared the
+            // captivity pointer but before party/visual restoration completed. Never let the
+            // duplicate erase the only retry record.
+            if (TryProcessPendingServerRelease(existingPending))
+                pendingServerReleases.Remove(playerHero);
             return;
         }
 
-        PlayerCaptivityLogger.Debug("Handle_PlayerCaptivityEndedByServer: hero={HeroId} party={PartyId} detail={Detail}",
-            playerHero.StringId, playerParty.StringId, payload.What.Detail);
+        PartyBase expectedCaptor = playerHero.PartyBelongedToAsPrisoner;
+        if (expectedCaptor == null)
+        {
+            return;
+        }
 
-        var captorParty = playerHero.PartyBelongedToAsPrisoner;
-        var preferredReleasePosition = payload.What.HasReleasePosition
-            ? payload.What.ReleasePosition
-            : GetReleasePosition(captorParty, playerParty.Position);
+        captivityEpochs.TryGetValue(playerHero, out int epoch);
+        var pending = new PendingServerRelease(
+            payload.What, expectedCaptor, epoch);
+        // Register before the first attempt. The broker deliberately swallows subscriber exceptions, so
+        // the authoritative release must remain recoverable even if this callback exits partway through.
+        pendingServerReleases[playerHero] = pending;
+        if (TryProcessPendingServerRelease(pending))
+            pendingServerReleases.Remove(playerHero);
+    }
+
+    private bool TryAuthorizeClientRelease(
+        Hero playerHero,
+        PartyBase captor,
+        EndCaptivityDetail detail,
+        string facilitatorId,
+        int submittedRansom,
+        out Hero facilitator,
+        out int authoritativeRansom)
+    {
+        facilitator = null;
+        authoritativeRansom = 0;
+        if (playerHero == null || captor == null)
+            return false;
+
+        // A client may only accept its local ransom offer or report the vanilla timed escape
+        // opportunity. Peace, battle, compensation, choice and death releases are produced by
+        // authoritative server actions and must never be selectable through this request.
+        if (detail == EndCaptivityDetail.Ransom)
+        {
+            Hero captorLeader = captor.LeaderHero;
+            if (captorLeader == null)
+            {
+                // Settlement parties have no MobileParty leader. Vanilla offers dungeon ransom
+                // with a null facilitator, so null is the only valid client representation here.
+                if (facilitatorId != null)
+                    return false;
+            }
+            else if (!objectManager.TryGetId(captorLeader, out string expectedFacilitatorId) ||
+                     !string.Equals(facilitatorId, expectedFacilitatorId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            int expectedRansom = CalculateAuthoritativeRansom(playerHero, captor);
+            if (submittedRansom != expectedRansom ||
+                submittedRansom > playerHero.Gold)
+                return false;
+
+            facilitator = captorLeader;
+            authoritativeRansom = expectedRansom;
+            return true;
+        }
+
+        if (detail != EndCaptivityDetail.ReleasedAfterEscape || facilitatorId != null)
+            return false;
+
+        // Vanilla does not offer a random escape immediately. Bind the request to this exact
+        // captivity epoch and require a conservative minimum captivity duration, unless the
+        // authoritative captor has already disappeared or is no longer hostile.
+        bool captorGone = !captor.IsActive;
+        bool noLongerHostile = playerHero.MapFaction == null ||
+            captor.MapFaction == null ||
+            !FactionManager.IsAtWarAgainstFaction(captor.MapFaction, playerHero.MapFaction);
+        bool elapsed = captivityStartedAt.TryGetValue(playerHero, out CampaignTime started) &&
+            started.ElapsedHoursUntilNow >= 4f;
+        return captorGone || noLongerHostile || elapsed;
+    }
+
+    internal static int CalculateAuthoritativeRansom(Hero playerHero, PartyBase captor)
+    {
+        float settlementFactor = !captor.IsSettlement
+            ? 1f
+            : captor.Settlement.MapFaction.IsKingdomFaction ? 4f : 2f;
+        float lordFactor = captor.IsMobile && captor.MobileParty.IsLordParty
+            ? 2f
+            : 1f;
+        float perkFactor = playerHero.GetPerkValue(DefaultPerks.Trade.ManOfMeans)
+            ? 1f + DefaultPerks.Trade.ManOfMeans.SecondaryBonus
+            : 1f;
+        // Vanilla rolls a 0.5..1.0 factor locally. A headless server cannot reproduce that
+        // unsynchronized random draw, so Coop uses the deterministic midpoint on both sides.
+        double value = 0.75d * ((double)playerHero.Gold * 0.05d + 300d) *
+            settlementFactor * lordFactor * perkFactor;
+        if (value >= int.MaxValue)
+            return int.MaxValue;
+        return Math.Max((int)value, 1);
+    }
+
+    private bool TryProcessPendingServerRelease(PendingServerRelease pending)
+    {
+        Hero playerHero = pending.Release.PrisonerHero;
+        if (playerHero == null) return true;
+
+        captivityEpochs.TryGetValue(playerHero, out int currentEpoch);
+        if (currentEpoch != pending.CaptivityEpoch)
+        {
+            Logger.Warning(
+                "Discarded stale captivity release for {HeroId}; captivity epoch changed",
+                playerHero.StringId);
+            return true;
+        }
+
+        PartyBase currentCaptor = playerHero.PartyBelongedToAsPrisoner;
+        if (currentCaptor != null && currentCaptor != pending.ExpectedCaptor)
+        {
+            Logger.Warning(
+                "Discarded stale captivity release for {HeroId}; captor changed",
+                playerHero.StringId);
+            return true;
+        }
+
+        if (!TryGetPlayerParty(playerHero, out var playerParty))
+        {
+            Logger.Error("Could not resolve a player party for released hero {HeroId}; cannot restore it", playerHero.StringId);
+            return false;
+        }
+
+        PlayerCaptivityLogger.Debug("Handle_PlayerCaptivityEndedByServer: hero={HeroId} party={PartyId} detail={Detail}",
+            playerHero.StringId, playerParty.StringId, pending.Release.Detail);
+
+        var preferredReleasePosition = pending.HasFinalReleasePosition
+            ? pending.FinalReleasePosition
+            : pending.Release.HasReleasePosition
+            ? pending.Release.ReleasePosition
+            : GetReleasePosition(pending.ExpectedCaptor, playerParty.Position);
 
         if (!TryResolveReleasePosition(
                 playerHero,
@@ -546,10 +770,117 @@ internal class PlayerCaptivityServerHandler : IHandler
             Logger.Error(
                 "Could not resolve a valid release position for {HeroId}; captivity remains active",
                 playerHero.StringId);
-            return;
+            return false;
         }
 
-        ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, payload.What.Facilitator, releasePosition);
+        if (!TryApplyPendingRansom(pending, playerHero))
+            return false;
+
+        try
+        {
+            ReleasePlayerFromCaptivity(
+                playerHero,
+                playerParty,
+                pending.Release.Detail,
+                pending.Release.Facilitator,
+                releasePosition,
+                pending.ExpectedCaptor,
+                pending);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Authoritative captivity release remains pending for {HeroId}",
+                playerHero.StringId);
+            return false;
+        }
+
+        if (!IsReleaseConverged(pending, playerHero, playerParty))
+            return false;
+
+        if (pending.ReplyPeer != null && !pending.ReplySent)
+        {
+            if (!playerManager.TryGetPlayer(pending.ReplyPeer, out var replyPlayer) ||
+                !objectManager.TryGetId(playerHero, out string releasedHeroId) ||
+                !string.Equals(replyPlayer.HeroId, releasedHeroId, StringComparison.Ordinal))
+            {
+                // The requester disconnected after the authoritative release. There is no UI to
+                // acknowledge; normal reconnect state will observe the converged free hero.
+                pending.ReplySent = true;
+            }
+            else
+            {
+                network.Send(pending.ReplyPeer, new NetworkPlayerCaptivityEnded());
+                pending.ReplySent = true;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryApplyPendingRansom(PendingServerRelease pending, Hero playerHero)
+    {
+        if (pending.RansomAmount <= 0 || pending.RansomApplied)
+            return true;
+
+        if (!pending.HasRansomGoldBaseline)
+        {
+            if (playerHero.Gold < pending.RansomAmount)
+                return false;
+            pending.RansomGoldBefore = playerHero.Gold;
+            pending.RansomGoldAfter = playerHero.Gold - pending.RansomAmount;
+            pending.HasRansomGoldBaseline = true;
+        }
+
+        // Hero.Gold is the authoritative replicated property. Converge to one frozen target
+        // before clearing captivity, so a multi-tick visual retry can never free first/pay later.
+        if (playerHero.Gold == pending.RansomGoldAfter)
+        {
+            pending.RansomApplied = true;
+            return true;
+        }
+        if (playerHero.Gold != pending.RansomGoldBefore)
+            return false;
+
+        playerHero.Gold = pending.RansomGoldAfter;
+        pending.RansomApplied = playerHero.Gold == pending.RansomGoldAfter;
+        return pending.RansomApplied;
+    }
+
+    private static bool IsReleaseConverged(
+        PendingServerRelease pending,
+        Hero playerHero,
+        MobileParty playerParty)
+    {
+        if (playerHero.PartyBelongedToAsPrisoner != null ||
+            playerHero.CurrentSettlement != null)
+            return false;
+
+        PartyBase captor = pending.ExpectedCaptor;
+        if (captor?.PrisonRoster != null)
+        {
+            int captorIndex = captor.PrisonRoster.FindIndexOfTroop(
+                playerHero.CharacterObject);
+            if (captorIndex >= 0 &&
+                captor.PrisonRoster.GetElementNumber(captorIndex) != 0)
+                return false;
+        }
+
+        if (!playerHero.IsAlive)
+            return true;
+
+        int memberCount = playerParty.MemberRoster.GetTroopRoster()
+            .Where(element =>
+                element.Character == playerHero.CharacterObject)
+            .Sum(element => element.Number);
+        return playerHero.HeroState == Hero.CharacterStates.Active &&
+            playerParty.IsActive &&
+            playerParty.LeaderHero == playerHero &&
+            memberCount == 1 &&
+            playerParty.Position.IsValid() &&
+            pending.PositionSynchronized &&
+            pending.VisualRecreated;
     }
 
     /// <summary>
@@ -560,14 +891,21 @@ internal class PlayerCaptivityServerHandler : IHandler
     /// instance's main hero; the menu/encounter cleanup the native version does happens on the owning client
     /// instead (<see cref="PlayerCaptivityClientHandler"/>).
     /// </summary>
-    private void ReleasePlayerFromCaptivity(Hero playerHero, MobileParty playerParty, EndCaptivityDetail detail, Hero facilitator, CampaignVec2 releasePosition)
+    private void ReleasePlayerFromCaptivity(
+        Hero playerHero,
+        MobileParty playerParty,
+        EndCaptivityDetail detail,
+        Hero facilitator,
+        CampaignVec2 releasePosition,
+        PartyBase expectedCaptor = null,
+        PendingServerRelease pending = null)
     {
         // Guard against re-processing an already-ended captivity: a client release request can race a
         // server-initiated release, and a second pass would re-add the hero to the member roster,
         // doubling the troop count. The captor reference is the captivity's source of truth — it is
         // still set on every legitimate entry (the EndCaptivityAction prefix intercepts before native
         // clears anything, including a death in captivity) and cleared below on the first pass.
-        if (playerHero.PartyBelongedToAsPrisoner == null)
+        if (playerHero.PartyBelongedToAsPrisoner == null && expectedCaptor == null)
         {
             PlayerCaptivityLogger.Debug("ReleasePlayerFromCaptivity: skipping, hero {HeroId} is no longer captive", playerHero.StringId);
             return;
@@ -575,14 +913,29 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         // Snapshot the captor before the release: clearing the captivity below nulls
         // PartyBelongedToAsPrisoner, and a captor defeated in battle may already be inactive.
-        PartyBase captorParty = playerHero.PartyBelongedToAsPrisoner;
+        PartyBase captorParty =
+            playerHero.PartyBelongedToAsPrisoner ?? expectedCaptor;
         IFaction capturerFaction = captorParty?.MapFaction;
 
         if (playerHero.IsAlive)
         {
-            playerHero.ChangeState(Hero.CharacterStates.Active);
-            playerParty.AddElementToMemberRoster(playerHero.CharacterObject, 1, true);
-            playerParty.ChangePartyLeader(playerHero);
+            if (playerHero.HeroState != Hero.CharacterStates.Active)
+                playerHero.ChangeState(Hero.CharacterStates.Active);
+            int memberIndex = playerParty.MemberRoster.FindIndexOfTroop(
+                playerHero.CharacterObject);
+            int existingMemberCount = memberIndex < 0
+                ? 0
+                : playerParty.MemberRoster.GetElementNumber(memberIndex);
+            if (existingMemberCount <= 0)
+                playerParty.AddElementToMemberRoster(
+                    playerHero.CharacterObject, 1, true);
+            else if (existingMemberCount > 1)
+                playerParty.MemberRoster.AddToCounts(
+                    playerHero.CharacterObject,
+                    1 - existingMemberCount,
+                    insertAtFront: true);
+            if (playerParty.LeaderHero != playerHero)
+                playerParty.ChangePartyLeader(playerHero);
         }
         if (playerHero.CurrentSettlement != null)
         {
@@ -644,30 +997,45 @@ internal class PlayerCaptivityServerHandler : IHandler
             // the already-validated release coordinate, retain its valid result, and fail back to the seed
             // if navigation cannot produce one. The old order called the helper on the invalid parked
             // position and then overwrote its result later in this method.
-            CampaignVec2 releaseSeed = releasePosition;
+            CampaignVec2 releaseSeed = pending?.HasFinalReleasePosition == true
+                ? pending.FinalReleasePosition
+                : releasePosition;
             playerParty.Position = releaseSeed;
-            try
+            if (pending?.HasFinalReleasePosition == true)
             {
-                playerParty.TeleportPartyToOutSideOfEncounterRadius();
-                if (playerParty.Position.IsValid())
+                releasePosition = releaseSeed;
+            }
+            else
+            {
+                try
                 {
-                    releasePosition = playerParty.Position;
+                    playerParty.TeleportPartyToOutSideOfEncounterRadius();
+                    if (playerParty.Position.IsValid())
+                    {
+                        releasePosition = playerParty.Position;
+                    }
+                    else
+                    {
+                        releasePosition = releaseSeed;
+                        playerParty.Position = releaseSeed;
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
+                    Logger.Warning(
+                        ex,
+                        "Could not separate released party {PartyId} from its captor; using validated release position",
+                        playerParty.StringId);
                     releasePosition = releaseSeed;
                     playerParty.Position = releaseSeed;
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Warning(
-                    ex,
-                    "Could not separate released party {PartyId} from its captor; using validated release position",
-                    playerParty.StringId);
-                releasePosition = releaseSeed;
-                playerParty.Position = releaseSeed;
-            }
+        }
+
+        if (pending != null && !pending.HasFinalReleasePosition)
+        {
+            pending.FinalReleasePosition = releasePosition;
+            pending.HasFinalReleasePosition = true;
         }
 
         if (captorParty != null && captorParty.IsSettlement)
@@ -687,7 +1055,13 @@ internal class PlayerCaptivityServerHandler : IHandler
             StringHelpers.SetCharacterProperties("PRISONER", playerHero.CharacterObject, null, false);
             MBInformationManager.AddQuickInformation(new TextObject("{=xPuSASof}{FACILITATOR.NAME} paid a ransom and freed {PRISONER.NAME} from captivity."));
         }
-        CampaignEventDispatcher.Instance.OnHeroPrisonerReleased(playerHero, captorParty, capturerFaction, detail, true);
+        if (pending == null || !pending.ReleaseEventAttempted)
+        {
+            if (pending != null)
+                pending.ReleaseEventAttempted = true;
+            CampaignEventDispatcher.Instance.OnHeroPrisonerReleased(
+                playerHero, captorParty, capturerFaction, detail, true);
+        }
 
         if (playerHero.IsAlive)
         {
@@ -722,12 +1096,23 @@ internal class PlayerCaptivityServerHandler : IHandler
             {
                 playerParty.Party.UpdateVisibilityAndInspected(playerParty.Position);
             }
-            SyncReleasePosition(playerParty, releasePosition);
+            if (pending == null || !pending.PositionSynchronized)
+            {
+                bool synchronized = SyncReleasePosition(
+                    playerParty, releasePosition);
+                if (pending != null)
+                    pending.PositionSynchronized = synchronized;
+            }
 
             // Rebuild the map mesh after the roster/leader/position are restored, so the freed party's map
             // figure reflects its (re-mounted) state rather than the stale on-foot captive mesh.
             playerParty.Party.SetVisualAsDirty();
-            RecreateVisual(playerParty);
+            if (pending == null || !pending.VisualRecreated)
+            {
+                bool recreated = RecreateVisual(playerParty);
+                if (pending != null)
+                    pending.VisualRecreated = recreated;
+            }
         }
     }
 
@@ -784,18 +1169,19 @@ internal class PlayerCaptivityServerHandler : IHandler
         return false;
     }
 
-    private void SyncReleasePosition(MobileParty playerParty, CampaignVec2 releasePosition)
+    private bool SyncReleasePosition(MobileParty playerParty, CampaignVec2 releasePosition)
     {
         if (!releasePosition.IsValid())
         {
             Logger.Error(
                 "Refused to broadcast an invalid release position for {PartyId}",
                 playerParty?.StringId);
-            return;
+            return false;
         }
-        if (!objectManager.TryGetIdWithLogging(playerParty, out string playerPartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(playerParty, out string playerPartyId)) return false;
 
         network.SendAll(new NetworkPlayerCaptivityReleasePositionSet(playerPartyId, releasePosition));
+        return true;
     }
 
     private void RemoveVisual(MobileParty party)
@@ -815,11 +1201,11 @@ internal class PlayerCaptivityServerHandler : IHandler
         network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
     }
 
-    private void RecreateVisual(MobileParty party)
+    private bool RecreateVisual(MobileParty party)
     {
         RemoveVisual(party);
 
-        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return false;
 
         using (new AllowedThread())
         {
@@ -830,16 +1216,17 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (partyVisual == null)
         {
             Logger.Error("CreateNewPartyVisual did not produce a visual for party {PartyId}", party.StringId);
-            return;
+            return false;
         }
 
         if (!objectManager.AddNewObject(partyVisual, out var visualId))
         {
             Logger.Error("Failed to register recreated visual for party {PartyId}", party.StringId);
-            return;
+            return false;
         }
 
         network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
+        return true;
     }
 
     /// <summary>
@@ -869,6 +1256,8 @@ internal class PlayerCaptivityServerHandler : IHandler
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsClient) return;
+
+        RetryPendingServerReleases();
 
         foreach (var (hero, mobileParty) in PlayerHeros())
         {
@@ -909,6 +1298,50 @@ internal class PlayerCaptivityServerHandler : IHandler
                         "unknown-captor",
                     partyKey);
             }
+        }
+    }
+
+    private void RetryPendingServerReleases()
+    {
+        if (pendingServerReleases.Count == 0) return;
+
+        foreach (var pair in pendingServerReleases.ToArray())
+        {
+            if (TryProcessPendingServerRelease(pair.Value))
+                pendingServerReleases.Remove(pair.Key);
+        }
+    }
+
+    private sealed class PendingServerRelease
+    {
+        internal readonly PlayerCaptivityEndedByServer Release;
+        internal readonly PartyBase ExpectedCaptor;
+        internal readonly int CaptivityEpoch;
+        internal readonly NetPeer ReplyPeer;
+        internal readonly int RansomAmount;
+        internal bool ReleaseEventAttempted;
+        internal bool PositionSynchronized;
+        internal bool VisualRecreated;
+        internal bool RansomApplied;
+        internal bool ReplySent;
+        internal bool HasFinalReleasePosition;
+        internal CampaignVec2 FinalReleasePosition;
+        internal bool HasRansomGoldBaseline;
+        internal int RansomGoldBefore;
+        internal int RansomGoldAfter;
+
+        internal PendingServerRelease(
+            PlayerCaptivityEndedByServer release,
+            PartyBase expectedCaptor,
+            int captivityEpoch,
+            NetPeer replyPeer = null,
+            int ransomAmount = 0)
+        {
+            Release = release;
+            ExpectedCaptor = expectedCaptor;
+            CaptivityEpoch = captivityEpoch;
+            ReplyPeer = replyPeer;
+            RansomAmount = ransomAmount;
         }
     }
 

@@ -84,7 +84,7 @@ internal sealed partial class TournamentSessionHandler
         ResolveBets(snapshot, bracket.MatchWinnerSlotIds);
         BroadcastSnapshot(changed);
         if (bracket.IsCompleted)
-            CompleteTournament(changed);
+            FinalizeCompletedTournament(changed);
         return changed;
     }
 

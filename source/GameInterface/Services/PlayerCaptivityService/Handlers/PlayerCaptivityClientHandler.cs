@@ -242,12 +242,9 @@ internal class PlayerCaptivityClientHandler : IHandler
 
                 var message = new NetworkEndPlayerCaptivityAttempted(heroId, partyId, playerParty.Position, data.Detail, facilitatorId, ransomAmount);
                 network.SendAll(message);
-
-                var playerCaptivity = Campaign.Current.PlayerCaptivity;
-
-                playerCaptivity._captorParty = null;
-                playerCaptivity.CountOfOffers = 0;
-                playerCaptivity.CurrentRansomAmount = 0;
+                // Keep the local captivity state until the authoritative host confirms release.
+                // Optimistically clearing it here stranded the client outside the prisoner UI when
+                // a legitimate request was rejected after a gold/offer-state race.
             }
             catch (Exception e)
             {

@@ -600,7 +600,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
             ResolveBets(current, bracket.MatchWinnerSlotIds);
             BroadcastSnapshot(snapshot);
             if (bracket.IsCompleted)
-                CompleteTournament(snapshot);
+                FinalizeCompletedTournament(snapshot);
         }, context: nameof(Handle_MatchResult));
     }
 
@@ -742,7 +742,14 @@ internal sealed partial class TournamentSessionHandler : IHandler
         bool isMember = IsActiveMember(current, controllerId);
         if (TryHandleCompletedLeave(current, controllerId, isMember, peer))
             return;
-        if (!TryResolveReplacementName(current, out var replacementName))
+        bool isContestant = current.Contestants.Any(contestant =>
+            contestant.IsHuman && contestant.ControllerId == controllerId);
+        string replacementName = null;
+        if (isContestant &&
+            !TryResolveReplacementName(
+                current,
+                controllerId,
+                out replacementName))
         {
             SendCanonical(peer, current);
             return;
@@ -753,7 +760,11 @@ internal sealed partial class TournamentSessionHandler : IHandler
             return;
         }
 
-        ApplyActiveLeave(current, controllerId, replacementName, peer);
+        ApplyActiveLeave(
+            current,
+            controllerId,
+            replacementName ?? "Tournament Recruit",
+            peer);
     }
 
     private static bool IsActiveMember(
@@ -799,15 +810,24 @@ internal sealed partial class TournamentSessionHandler : IHandler
 
     private bool TryResolveReplacementName(
         TournamentSessionSnapshot current,
+        string controllerId,
         out string replacementName)
     {
         replacementName = null;
-        if (!objectManager.TryGetObject(current.TownId, out Town town) ||
-            town.Culture?.BasicTroop == null ||
-            !objectManager.TryGetId(town.Culture.BasicTroop, out _))
+        TournamentContestantData contestant = current.Contestants
+            .FirstOrDefault(candidate =>
+                candidate.IsHuman &&
+                candidate.ControllerId == controllerId);
+        if (contestant == null ||
+            string.IsNullOrEmpty(contestant.DisplacedCharacterId) ||
+            !StaticObjectRegistration.TryResolve(
+                objectManager,
+                contestant.DisplacedCharacterId,
+                out CharacterObject replacement))
             return false;
 
-        replacementName = town.Culture.BasicTroop.Name?.ToString() ?? "Tournament Recruit";
+        replacementName = replacement.Name?.ToString() ??
+            "Tournament Recruit";
         return true;
     }
 
@@ -865,7 +885,15 @@ internal sealed partial class TournamentSessionHandler : IHandler
         if (!snapshot.IsCompleted)
             SimulateRemainingTournament(snapshot);
 
-        if (sessionRegistry.TryGet(snapshot.SessionId, out var completed) && completed.IsCompleted)
+        if (!sessionRegistry.TryGet(snapshot.SessionId, out var completed))
+        {
+            Logger.Information(
+                "[Tournament] Last-human leave already finalized and removed session={SessionId}",
+                snapshot.SessionId);
+            return;
+        }
+
+        if (completed.IsCompleted)
         {
             Logger.Information(
                 "[Tournament] Last-human leave completed simulation session={SessionId}, winner={WinnerSlotId}; finalizing immediately",
@@ -1212,7 +1240,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
         foreach (TournamentSessionSnapshot snapshot in sessionRegistry.GetAll()
                      .Where(session => session.IsCompleted))
         {
-            CompleteTournament(snapshot);
+            FinalizeCompletedTournament(snapshot);
         }
     }
 
@@ -1269,7 +1297,10 @@ internal sealed partial class TournamentSessionHandler : IHandler
         participants = new MBList<CharacterObject>();
         foreach (TournamentContestantData contestant in snapshot.Contestants)
         {
-            if (!objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character))
+            if (!StaticObjectRegistration.TryResolve(
+                    objectManager,
+                    contestant.CharacterId,
+                    out CharacterObject character))
                 return false;
             participants.Add(character);
             if (contestant.SlotId == snapshot.WinnerSlotId)
@@ -1344,7 +1375,10 @@ internal sealed partial class TournamentSessionHandler : IHandler
     {
         foreach (TournamentAgentSpawnData agent in manifest.Agents)
         {
-            if (!objectManager.TryGetObject(agent.CharacterId, out CharacterObject _) ||
+            if (!StaticObjectRegistration.TryResolve(
+                    objectManager,
+                    agent.CharacterId,
+                    out CharacterObject _) ||
                 !HasValidEquipmentObjects(agent.Equipment))
             {
                 return false;

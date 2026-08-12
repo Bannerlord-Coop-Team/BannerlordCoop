@@ -72,6 +72,17 @@ internal class InventoryLogicPatches
 
         MessageBroker.Instance.Publish(__instance, message);
 
+        if (!message.CommandSent)
+        {
+            MBInformationManager.AddQuickInformation(
+                new TaleWorlds.Localization.TextObject(
+                    string.IsNullOrWhiteSpace(message.FailureReason)
+                        ? "The inventory could not be synchronized. Nothing was changed; please try again."
+                        : message.FailureReason));
+            __result = false;
+            return false;
+        }
+
         // Reset rosters so they are set on the server side
         using (new AllowedThread())
         {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Common.Logging;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
@@ -314,9 +315,11 @@ internal sealed class BattlePartyGrantRegistry : IBattlePartyGrantRegistry
                 valid = false;
                 return result;
             }
-            // Hero prisoners are resolved by the dedicated capture/release
-            // conversation flow before the party loot screen opens.
-            if (character.IsHero)
+            // Remote player heroes use the dedicated captivity flow. Native battle results do,
+            // however, award captured AI lords in this temporary roster; retaining those exact
+            // NPC hero IDs lets PartyDone validate the removal before TakePrisonerAction commits it.
+            if (character.IsHero &&
+                character.HeroObject?.IsPlayerHero() == true)
                 continue;
             result.Add(
                 element.CharacterId,
@@ -341,7 +344,9 @@ internal sealed class BattlePartyGrantRegistry : IBattlePartyGrantRegistry
                 return false;
             if (!objectManager.TryGetObject(
                     element.CharacterId, out CharacterObject character) ||
-                character == null || character.IsHero)
+                character == null ||
+                character.IsHero &&
+                    character.HeroObject?.IsPlayerHero() == true)
                 return false;
             if (element.Number == 0 &&
                 element.WoundedNumber == 0 && element.Xp == 0)

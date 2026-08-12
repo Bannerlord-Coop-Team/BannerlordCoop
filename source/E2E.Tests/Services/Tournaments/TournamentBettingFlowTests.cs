@@ -79,9 +79,11 @@ public class TournamentBettingFlowTests : SyncTestBase
         AssertGold(fixture, InitialGold - 100);
         Server.Call(() =>
         {
-            Assert.True(Server.Resolve<ITournamentSessionRegistry>().TryGet(SessionId, out var completed));
-            Assert.True(completed.IsCompleted);
-            Assert.Equal(OpponentSlotId, completed.WinnerSlotId);
+            // Terminal sessions are finalized and removed immediately after
+            // their settlement/removal messages are published. Keeping the
+            // completed snapshot here was the old stuck-tournament behavior.
+            Assert.False(Server.Resolve<ITournamentSessionRegistry>()
+                .TryGet(SessionId, out _));
         });
     }
 

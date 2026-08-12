@@ -15,6 +15,15 @@ internal static class FlattenedTroopSerializer
         FlattenedTroopRoster roster,
         IObjectManager objectManager)
     {
+        TrySerialize(roster, objectManager, out FlattenedTroop[] troops);
+        return troops;
+    }
+
+    public static bool TrySerialize(
+        FlattenedTroopRoster roster,
+        IObjectManager objectManager,
+        out FlattenedTroop[] packed)
+    {
         if (roster == null) throw new ArgumentNullException(nameof(roster));
         if (objectManager == null) throw new ArgumentNullException(nameof(objectManager));
 
@@ -25,17 +34,34 @@ internal static class FlattenedTroopSerializer
             var troop = element.Troop;
 
             if (troop == null)
-                continue;
+            {
+                packed = Array.Empty<FlattenedTroop>();
+                return false;
+            }
 
             var objectToResolve = troop.IsHero
                 ? (object)troop.HeroObject
                 : troop;
 
             if (objectToResolve == null)
-                continue;
+            {
+                packed = Array.Empty<FlattenedTroop>();
+                return false;
+            }
 
-            if (!objectManager.TryGetIdWithLogging(objectToResolve, out var objectId))
-                continue;
+            bool resolved = objectToResolve is CharacterObject character
+                ? StaticObjectRegistration.TryEnsure(
+                    objectManager,
+                    character,
+                    out var objectId)
+                : objectManager.TryGetIdWithLogging(
+                    objectToResolve,
+                    out objectId);
+            if (!resolved)
+            {
+                packed = Array.Empty<FlattenedTroop>();
+                return false;
+            }
 
             troops.Add(new FlattenedTroop(
                 objectId,
@@ -46,7 +72,8 @@ internal static class FlattenedTroopSerializer
                 element.XpGained));
         }
 
-        return troops.ToArray();
+        packed = troops.ToArray();
+        return true;
     }
 
     public static FlattenedTroopRoster Deserialize(IEnumerable<FlattenedTroop> troops, IObjectManager objectManager)
@@ -90,7 +117,8 @@ internal static class FlattenedTroopSerializer
             return characterObject != null;
         }
 
-        return objectManager.TryGetObjectWithLogging(
+        return StaticObjectRegistration.TryResolve(
+            objectManager,
             troop.ObjectId,
             out characterObject);
     }

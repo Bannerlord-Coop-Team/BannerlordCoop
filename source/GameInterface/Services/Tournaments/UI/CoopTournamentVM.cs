@@ -110,7 +110,6 @@ internal sealed class CoopTournamentVM : TournamentVM
         completionPresentation.Observe(initialSnapshot?.IsCompleted == true);
         matchPresentation = new TournamentMatchPresentation(initialSnapshot?.Phase == TournamentSessionPhase.LiveMatch);
         controller.StateChanged += HandleStateChanged;
-        controller.SessionRemoved += HandleSessionRemoved;
         controller.BetResultReceived += HandleBetResultReceived;
 
         RefreshCoopState();
@@ -485,15 +484,8 @@ internal sealed class CoopTournamentVM : TournamentVM
     public override void OnFinalize()
     {
         controller.StateChanged -= HandleStateChanged;
-        controller.SessionRemoved -= HandleSessionRemoved;
         controller.BetResultReceived -= HandleBetResultReceived;
         base.OnFinalize();
-    }
-
-    private void HandleSessionRemoved(string sessionId)
-    {
-        if (snapshot?.SessionId == sessionId)
-            Mission.Current?.EndMission();
     }
 
     private void HandleStateChanged(TournamentSessionSnapshot updatedSnapshot)

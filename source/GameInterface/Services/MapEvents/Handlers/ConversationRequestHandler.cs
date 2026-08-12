@@ -40,6 +40,7 @@ namespace GameInterface.Services.MapEvents.Handlers;
 internal class ConversationRequestHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ConversationRequestHandler>();
+    private static WeakReference<ConversationRequestHandler> clientInstance;
 
     private static readonly TimeSpan RequestCooldown = TimeSpan.FromMilliseconds(500);
 
@@ -50,6 +51,7 @@ internal class ConversationRequestHandler : IHandler
     private readonly IConversationRestartContextTracker restartContextTracker;
     private readonly PlayerPartyInteractionHandler playerPartyInteractionHandler;
     private readonly IPlayerManager playerManager;
+    private readonly IInteractionTimeoutAuthority interactionTimeoutAuthority;
     private readonly object pvpInteractionSync = new object();
 
     // Client request state is game-thread-only; patch publishers run there and receive handlers use GameThread.RunSafe.
@@ -87,7 +89,8 @@ internal class ConversationRequestHandler : IHandler
         ConversationPartyTracker conversationPartyTracker,
         IConversationRestartContextTracker restartContextTracker,
         PlayerPartyInteractionHandler playerPartyInteractionHandler,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IInteractionTimeoutAuthority interactionTimeoutAuthority)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -96,6 +99,10 @@ internal class ConversationRequestHandler : IHandler
         this.restartContextTracker = restartContextTracker;
         this.playerPartyInteractionHandler = playerPartyInteractionHandler;
         this.playerManager = playerManager;
+        this.interactionTimeoutAuthority = interactionTimeoutAuthority;
+
+        if (ModInformation.IsClient)
+            clientInstance = new WeakReference<ConversationRequestHandler>(this);
 
         messageBroker.Subscribe<ConversationRequested>(Handle_ConversationRequested);
         messageBroker.Subscribe<NetworkRequestConversation>(Handle_NetworkRequestConversation);
@@ -117,6 +124,13 @@ internal class ConversationRequestHandler : IHandler
         messageBroker.Unsubscribe<NetworkConversationDenied>(Handle_NetworkConversationDenied);
         messageBroker.Unsubscribe<NetworkPvpDefenderShown>(Handle_NetworkPvpDefenderShown);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+
+        if (clientInstance != null &&
+            clientInstance.TryGetTarget(out var current) &&
+            ReferenceEquals(current, this))
+        {
+            clientInstance = null;
+        }
     }
 
     /// <summary>Route a local encounter request to the server-side approval flow.</summary>
@@ -214,19 +228,13 @@ internal class ConversationRequestHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out var attacker)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
 
-        if (!TryAcceptConversationRequest(requestingPeer, request, attacker, defender, out var aiParty, out var aiPartyId, out var playerPartyId, out var isPlayerVsPlayer))
+        if (!TryAcceptConversationRequest(requestingPeer, request, attacker, defender, out var aiParty, out var aiPartyId, out var playerPartyId))
             return;
 
         if (aiParty == null)
         {
-            // No AI mobile party involved (a settlement side, or both sides are players); nothing to hold.
+            // No AI mobile party involved (a settlement side); nothing to hold.
             SendAllowConversation(requestingPeer, request);
-
-            // PvP: tell the defending player's client to show a "hold on" popup while the attacker drives the
-            // interaction. request.DefenderId is the engaged (non-initiating) party.
-            if (isPlayerVsPlayer)
-                NotifyPvpInteractionStarted(requestingPeer, request, attacker);
-
             return;
         }
 
@@ -237,8 +245,7 @@ internal class ConversationRequestHandler : IHandler
     /// [Server] Identifies the AI side and rejects when both parties are already in
     /// (separate) battles. Returns false (rejection logged, and the requester told when the party is engaged by
     /// another player) when the request must not proceed. On success <paramref name="aiParty"/> is the AI mobile
-    /// party to hold, or null when only a settlement side is involved or both sides are players — in which case
-    /// <paramref name="isPlayerVsPlayer"/> is set so the caller can drive the defender's "hold on" popup.
+    /// party to hold, or null when only a settlement side is involved.
     /// </summary>
     private bool TryAcceptConversationRequest(
         NetPeer requestingPeer,
@@ -247,13 +254,11 @@ internal class ConversationRequestHandler : IHandler
         PartyBase defender,
         out MobileParty aiParty,
         out string aiPartyId,
-        out string playerPartyId,
-        out bool isPlayerVsPlayer)
+        out string playerPartyId)
     {
         aiParty = null;
         aiPartyId = null;
         playerPartyId = null;
-        isPlayerVsPlayer = false;
 
         var attackerIsPlayer = attacker.MobileParty?.IsPlayerParty() == true;
         var defenderIsPlayer = defender.MobileParty?.IsPlayerParty() == true;
@@ -282,7 +287,20 @@ internal class ConversationRequestHandler : IHandler
             return false;
         }
 
-        // PvP: a party joining an existing battle (exactly one side is already in a map event) is allowed through so
+        // Direct player-party conversations and hostile demands are disabled. Army and battle joining are
+        // separate operations and must not force another player into a dialogue or combat session.
+        if (attackerIsPlayer && defenderIsPlayer)
+        {
+            Logger.Debug(
+                "Rejecting direct player-party conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+            network.Send(requestingPeer, new NetworkConversationDenied(
+                ConversationDeniedReason.PlayerUnavailable,
+                request.RequestId));
+            return false;
+        }
+
+        // A player joining an existing AI battle is allowed through so
         // the joining player's PlayerEncounter can attach to that battle. There is no AI party to hold for a join.
         if (attackerInMapEvent ^ defenderInMapEvent)
         {
@@ -291,11 +309,6 @@ internal class ConversationRequestHandler : IHandler
                 request.AttackerId, request.DefenderId);
             return true;
         }
-
-        // PvP: two human players are allowed to open the encounter so they can fight each other. Neither side is AI,
-        // so there is nothing to hold; the defending player is shown a "hold on" popup instead.
-        if (attackerIsPlayer && defenderIsPlayer)
-            return TryAcceptPlayerVersusPlayer(requestingPeer, request, attacker, defender);
 
         // Reject: both parties are already in (separate) battles; do not (re)open an encounter conversation.
         if (attackerInMapEvent || defenderInMapEvent)
@@ -328,52 +341,6 @@ internal class ConversationRequestHandler : IHandler
         request.AttackerId, request.DefenderId);
 
         return true;
-    }
-
-    /// <summary>
-    /// [Server] Resolves a request where both sides are human players.
-    /// </summary>
-    /// <remarks>
-    /// Returning false does NOT always mean refused: the custom interaction session is started here
-    /// and driven from there, so this returns false to stop the caller also approving it.
-    /// </remarks>
-    private bool TryAcceptPlayerVersusPlayer(
-        NetPeer requestingPeer, NetworkRequestConversation request, PartyBase attacker, PartyBase defender)
-    {
-        if (IsInSiege(attacker.MobileParty) || IsInSiege(defender.MobileParty))
-        {
-            Logger.Debug(
-                "Rejecting PvP conversation: a player is participating in a siege. AttackerId={AttackerId}, DefenderId={DefenderId}",
-                request.AttackerId, request.DefenderId);
-            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable, request.RequestId));
-            return false;
-        }
-
-        if (IsArmyJoinRequest(request, attacker, defender))
-        {
-            Logger.Debug(
-                "Allowing army join. AttackerId={AttackerId}, DefenderId={DefenderId}",
-                request.AttackerId, request.DefenderId);
-            return true;
-        }
-
-        // Reject if either player is already conversing with someone else (first interaction wins) — otherwise a
-        // third player could open an encounter with a defender already locked in a conversation.
-        if (IsConversingWithOther(request.DefenderId, request.AttackerId) ||
-            IsConversingWithOther(request.AttackerId, request.DefenderId))
-        {
-            Logger.Debug(
-                "Rejecting PvP conversation: a party is already conversing with another player. AttackerId={AttackerId}, DefenderId={DefenderId}",
-                request.AttackerId, request.DefenderId);
-            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
-            return false;
-        }
-
-        Logger.Debug(
-            "Starting custom player-party interaction. AttackerId={AttackerId}, DefenderId={DefenderId}",
-            request.AttackerId, request.DefenderId);
-        playerPartyInteractionHandler.TryStartSession(requestingPeer, request, attacker, defender);
-        return false;
     }
 
     /// <summary>
@@ -425,6 +392,22 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
+        if (interactionTimeoutAuthority.IsBlocked(
+                requestingPeer,
+                aiPartyId,
+                DateTime.UtcNow,
+                out var cooldownRemaining))
+        {
+            Logger.Debug(
+                "Rejecting conversation request during interaction cooldown. PartyId={PartyId}, RemainingSeconds={RemainingSeconds}",
+                aiPartyId,
+                (int)Math.Ceiling(cooldownRemaining.TotalSeconds));
+            network.Send(requestingPeer, new NetworkConversationDenied(
+                ConversationDeniedReason.PartyEngaged,
+                request.RequestId));
+            return;
+        }
+
         // A map conversation is exclusive to one player, like a settlement conversation. The
         // hostility carve-out that used to live here existed so simultaneous attackers converge on
         // one MapEvent, but it also let two players hold a diplomacy conversation with the same lord
@@ -454,6 +437,20 @@ internal class ConversationRequestHandler : IHandler
                 "Rejecting conversation request: the party or the requester is already engaged. PartyId={PartyId}",
                 aiPartyId);
             network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
+            return;
+        }
+
+        if (!interactionTimeoutAuthority.TryRegister(
+                requestingPeer, aiPartyId, request.RequestId))
+        {
+            ConversationPartyHold.EndEngagement(
+                conversationPartyTracker,
+                requestingPeer,
+                request.RequestId,
+                requireRequestIdMatch: true);
+            network.Send(requestingPeer, new NetworkConversationDenied(
+                ConversationDeniedReason.PartyEngaged,
+                request.RequestId));
             return;
         }
 
@@ -771,6 +768,28 @@ internal class ConversationRequestHandler : IHandler
     {
         if (pendingConversationRequestId == requestId)
             pendingConversationRequestId = null;
+    }
+
+    /// <summary>
+    /// [Client] Confirms that a timer control still belongs to the conversation
+    /// request currently active on this client. Presentation extensions use this
+    /// before closing the native conversation on an authoritative timeout.
+    /// </summary>
+    public bool IsActiveConversationRequest(string requestId)
+    {
+        requestId ??= string.Empty;
+        return hasActiveConversationRequest &&
+            string.Equals(
+                activeConversationRequestId ?? string.Empty,
+                requestId,
+                StringComparison.Ordinal);
+    }
+
+    public static bool IsActiveLocalConversationRequest(string requestId)
+    {
+        return clientInstance != null &&
+            clientInstance.TryGetTarget(out var current) &&
+            current.IsActiveConversationRequest(requestId);
     }
 
     /// <summary>[Server] The defender's client reports it is showing the "hold on" popup; record its peer so a

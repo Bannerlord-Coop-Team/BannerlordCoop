@@ -97,6 +97,16 @@ internal class PartyScreenLogicPatches
             );
 
             MessageBroker.Instance.Publish(__instance, message);
+            if (!message.CommandSent)
+            {
+                MBInformationManager.AddQuickInformation(
+                    new TaleWorlds.Localization.TextObject(
+                        string.IsNullOrWhiteSpace(message.FailureReason)
+                            ? "The party is still synchronizing. Nothing was changed; please try again."
+                            : message.FailureReason));
+                __result = false;
+                return false;
+            }
             // Manage changing rosters on the server
             using (new AllowedThread())
             {

@@ -24,6 +24,8 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
@@ -48,6 +50,82 @@ public class PlayerCaptivityReleasePositionTests
             troopRosterInterface.Object,
             Mock.Of<IPlayerManager>(),
             new BattlePartyGrantRegistry(objectManager.Object));
+    }
+
+    [Fact]
+    public void FilterHeroPrisonerChanges_RemovesBothNativeHeroDirectionsOnly()
+    {
+        var data = new TroopRosterData(new[]
+        {
+            new TroopRosterElementData("taken-hero", 1, 0, 0),
+            new TroopRosterElementData("released-hero", -1, 0, 0),
+            new TroopRosterElementData("regular-troop", 2, 0, 0),
+        });
+
+        TroopRosterData filtered = PartyDoneLogicHandler.FilterHeroPrisonerChanges(
+            data,
+            new HashSet<string>(StringComparer.Ordinal) { "taken-hero" },
+            new HashSet<string>(StringComparer.Ordinal) { "released-hero" });
+
+        TroopRosterElementData remaining = Assert.Single(filtered.Data);
+        Assert.Equal("regular-troop", remaining.CharacterId);
+        Assert.Equal(2, remaining.Number);
+    }
+
+    [Fact]
+    public void HasOverlappingPrisonerActions_RejectsTakeAndReleaseOfSameCharacter()
+    {
+        Assert.True(PartyDoneLogicHandler.HasOverlappingPrisonerActions(
+            new[] { "lord-a" },
+            new[] { "lord-a" }));
+        Assert.False(PartyDoneLogicHandler.HasOverlappingPrisonerActions(
+            new[] { "lord-a" },
+            new[] { "lord-b" }));
+    }
+
+    [Fact]
+    public void AreNpcHeroActionCountsSingleton_RejectsDuplicateHeroAction()
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["lord-a"] = 2,
+        };
+
+        Assert.False(PartyDoneLogicHandler.AreNpcHeroActionCountsSingleton(
+            counts,
+            new[] { "lord-a" }));
+        counts["lord-a"] = 1;
+        Assert.True(PartyDoneLogicHandler.AreNpcHeroActionCountsSingleton(
+            counts,
+            new[] { "lord-a" }));
+    }
+
+    [Fact]
+    public void AreReleasedNpcHeroesOwnedBy_RejectsForeignCaptor()
+    {
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        var character = ObjectHelper.SkipConstructor<CharacterObject>();
+        character.HeroObject = hero;
+        hero._characterObject = character;
+        var actualCaptor = ObjectHelper.SkipConstructor<PartyBase>();
+        actualCaptor.PrisonRoster = new TroopRoster();
+        var requestingParty = ObjectHelper.SkipConstructor<PartyBase>();
+        requestingParty.PrisonRoster = new TroopRoster();
+        hero.PartyBelongedToAsPrisoner = actualCaptor;
+        var descriptor = new UniqueTroopDescriptor(17);
+        var released = new FlattenedTroopRoster(1)
+        {
+            [descriptor] = new FlattenedTroopRosterElement(
+                character,
+                RosterTroopState.Active,
+                0,
+                descriptor,
+                0),
+        };
+
+        Assert.False(PartyDoneLogicHandler.AreReleasedNpcHeroesOwnedBy(
+            released,
+            requestingParty));
     }
 
     [Fact]

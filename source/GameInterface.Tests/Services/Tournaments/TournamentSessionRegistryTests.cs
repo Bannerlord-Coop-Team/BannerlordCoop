@@ -337,9 +337,32 @@ public class TournamentSessionRegistryTests
 
         Assert.Equal("player-2", snapshot.HostControllerId);
         TournamentContestantData replacement = snapshot.Contestants.Single(contestant => contestant.IsReplaced);
-        Assert.Equal("basic-troop", replacement.CharacterId);
+        Assert.Equal("npc-14", replacement.CharacterId);
         Assert.Null(replacement.ControllerId);
         Assert.False(replacement.IsHuman);
+    }
+
+    [Fact]
+    public void ActiveSpectatorLeave_DoesNotRequireReplacementCharacter()
+    {
+        var registry = new TournamentSessionRegistry();
+        TournamentSessionSnapshot snapshot = CreateStartedSession(registry, humanInMatch: false);
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryRequestSpectate(
+            snapshot.SessionId,
+            snapshot.Revision,
+            "spectator",
+            out snapshot));
+
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryLeaveActive(
+            snapshot.SessionId,
+            snapshot.Revision,
+            "spectator",
+            0,
+            null,
+            out snapshot,
+            out _,
+            out _));
+        Assert.DoesNotContain("spectator", snapshot.SpectatorControllerIds);
     }
 
     [Fact]

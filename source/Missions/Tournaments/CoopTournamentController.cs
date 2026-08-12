@@ -76,6 +76,8 @@ public class CoopTournamentController : CoopMissionController
     private long runtimeSequence;
     private NetworkTournamentRuntimeState latestRuntimeState;
     private bool applyingRuntimeState;
+    private Mission attachedMission;
+    private bool missionExitRequested;
     private NetworkApplyTournamentDamage activeDamageMessage;
     private float resultReadyElapsed;
     private readonly Dictionary<Agent, TournamentAgentSpawnData> manifestAgentData = new();
@@ -145,6 +147,7 @@ public class CoopTournamentController : CoopMissionController
         manifestBuilder = new TournamentSpawnManifestBuilder(objectManager, coopMissionComponent);
 
         messageBroker.Subscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
+        messageBroker.Subscribe<TournamentSessionRemoved>(Handle_SessionRemoved);
         messageBroker.Subscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
         messageBroker.Subscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
         messageBroker.Subscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
@@ -162,6 +165,8 @@ public class CoopTournamentController : CoopMissionController
         Mission mission)
     {
         snapshot = initialSnapshot ?? throw new ArgumentNullException(nameof(initialSnapshot));
+        attachedMission = mission ?? throw new ArgumentNullException(nameof(mission));
+        missionExitRequested = false;
         tournamentBehavior = behavior ?? throw new ArgumentNullException(nameof(behavior));
         fightController = nativeFightController ?? throw new ArgumentNullException(nameof(nativeFightController));
         fightController.SetAgentRemovalProvider(() => !matchLifecycle.IsClearing);
@@ -191,6 +196,19 @@ public class CoopTournamentController : CoopMissionController
         GameThread.RunSafe(() => ApplySessionUpdate(updated));
     }
 
+    private void Handle_SessionRemoved(
+        MessagePayload<TournamentSessionRemoved> payload)
+    {
+        if (snapshot == null ||
+            payload.What?.SessionId != snapshot.SessionId)
+            return;
+
+        // Mission exit is lifecycle ownership, not UI ownership. The VM may
+        // already be finalized or its cache may already be reconciled when the
+        // authoritative removal arrives.
+        GameThread.RunSafe(EndAttachedMissionOnce);
+    }
+
     private void ApplySessionUpdate(TournamentSessionSnapshot updated)
     {
         bool wasLocalMember = HasLocalMissionMember(snapshot);
@@ -205,7 +223,7 @@ public class CoopTournamentController : CoopMissionController
         KnockOutDepartingContestants(previous, updated);
         if (wasLocalMember && !HasLocalMissionMember(updated))
         {
-            Mission.Current?.EndMission();
+            EndAttachedMissionOnce();
             return;
         }
 
@@ -1968,6 +1986,18 @@ public class CoopTournamentController : CoopMissionController
         SendAuthoritativeLeaveRequest();
     }
 
+    private void EndAttachedMissionOnce()
+    {
+        Mission mission = attachedMission;
+        if (missionExitRequested ||
+            mission == null ||
+            !ReferenceEquals(Mission.Current, mission))
+            return;
+
+        missionExitRequested = true;
+        mission.EndMission();
+    }
+
     private void SendAuthoritativeLeaveRequest()
     {
         if (snapshot == null || snapshot.IsCompleted || !HasLocalMissionMember(snapshot)) return;
@@ -1979,6 +2009,7 @@ public class CoopTournamentController : CoopMissionController
 
     protected override void OnLeaving()
     {
+        missionExitRequested = true;
         ProcessPendingLocalDamage(force: true);
 
         if (snapshot != null && !snapshot.IsCompleted && HasLocalMissionMember(snapshot) && !leaveRequested)
@@ -2008,12 +2039,14 @@ public class CoopTournamentController : CoopMissionController
     public override void Dispose()
     {
         messageBroker.Unsubscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
+        messageBroker.Unsubscribe<TournamentSessionRemoved>(Handle_SessionRemoved);
         messageBroker.Unsubscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
         messageBroker.Unsubscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
         messageBroker.Unsubscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
         messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
         messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
         pendingLocalDamage.Clear();
+        attachedMission = null;
         guardedHitWindow.Dispose();
         base.Dispose();
     }

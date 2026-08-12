@@ -23,18 +23,20 @@ public class PartyScreenPrisonerReleaseTests
     }
 
     [Fact]
-    public void TakenHeroAdditions_AreOwnedByTakePrisonerAction()
+    public void HeroPrisonerChanges_AreOwnedByNativeCaptivityActions()
     {
         var delta = new GameInterface.Services.TroopRosters.Data.TroopRosterData(new[]
         {
             new GameInterface.Services.TroopRosters.Data.TroopRosterElementData("taken-hero", 1, 0, 0),
+            new GameInterface.Services.TroopRosters.Data.TroopRosterElementData("released-hero", -1, 0, 0),
             new GameInterface.Services.TroopRosters.Data.TroopRosterElementData("regular-troop", 3, 0, 0),
             new GameInterface.Services.TroopRosters.Data.TroopRosterElementData("source-removal", -1, 0, 0),
         });
 
-        var filtered = PartyDoneLogicHandler.FilterTakenHeroAdditions(
+        var filtered = PartyDoneLogicHandler.FilterHeroPrisonerChanges(
             delta,
-            new HashSet<string> { "taken-hero", "source-removal" });
+            new HashSet<string> { "taken-hero" },
+            new HashSet<string> { "released-hero" });
 
         Assert.Collection(
             filtered.Data,

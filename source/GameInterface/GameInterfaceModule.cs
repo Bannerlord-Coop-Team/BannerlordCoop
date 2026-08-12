@@ -64,6 +64,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<InteractionTimeoutAuthority>().As<IInteractionTimeoutAuthority>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleLootGrantRegistry>().As<IBattleLootGrantRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattlePartyGrantRegistry>().As<IBattlePartyGrantRegistry>().InstancePerLifetimeScope();

@@ -130,14 +130,9 @@ internal class FoodConsumptionBehaviorPatches
         // Party not in a map event, calculate gold change normally
         if (playerParty.MapEvent == null) return true;
 
-        // Food change is disabled in battles, skip this tick
-        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.Disabled) return false;
-
-        // Use gold food consumption window to determine if a player party should consume food based on config.
-        // This way players only have food change at most once during a map event when set to OneDayMax.
-        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.OneDayMax
-            && !InteractionPatches.IsWithinGoldFoodConsumptionWindow(playerParty.MapEvent)) return false;
-
-        return true;
+        // Realm rule: a player-controlled party consumes no food while it is
+        // committed to a MapEvent. This is authoritative on the server and the
+        // unchanged ItemRoster is what connected clients receive.
+        return false;
     }
 }

@@ -101,7 +101,10 @@ public class TournamentAgentSpawner
         TournamentContestantData contestant,
         ITournamentMissionSession session)
     {
-        if (!objectManager.TryGetObject(data.CharacterId, out CharacterObject character)) return;
+        if (!StaticObjectRegistration.TryResolve(
+                objectManager,
+                data.CharacterId,
+                out CharacterObject character)) return;
         if (!teams.TryGetValue(data.TeamId, out Team team)) return;
 
         TournamentAgentControlRole role = TournamentAgentControlPolicy.Resolve(
