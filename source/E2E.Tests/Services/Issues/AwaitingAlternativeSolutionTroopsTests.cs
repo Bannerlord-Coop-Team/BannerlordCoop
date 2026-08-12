@@ -1,4 +1,5 @@
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -169,6 +170,37 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var clientOwnerId));
+            MessageBroker.Instance.Publish(owner, new IssueConversationOpenedLocally(owner, controllerId));
+        });
+
+        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestIssueConversationOpened>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetId(owner, out var ownerId));
+
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IsOngoingWithoutQuest, $"IsOngoingWithoutQuest={owner.Issue.IsOngoingWithoutQuest}");
+            Assert.True(owner.Issue.IssueStayAliveConditions(), "IssueStayAliveConditions false");
+            Assert.True(
+                GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(owner.Issue) ||
+                GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner.Issue),
+                "not mirror eligible");
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(controllerId, out var player), "player not found by controllerId");
+
+            var conversationTracker = Server.Resolve<IIssueConversationTracker>();
+            Assert.True(conversationTracker.TryGetTrackedRequester(ownerId, out var trackedControllerId, out _),
+                $"no tracked requester for ownerId={ownerId}");
+            Assert.Equal(controllerId, trackedControllerId);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
             using (new AllowedThread())
             {
@@ -313,6 +345,48 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
 
             Assert.True(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out var deposited));
             Assert.Equal(1, deposited.TotalManCount);
+        });
+    }
+
+    [Fact]
+    public void RequestGenericIssueAcceptQuest_PeerNeverOpenedConversation_RejectedDespiteFreshGeneration()
+    {
+        var controllerId = "player-A-" + Guid.NewGuid();
+
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(controllerId, fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, controllerId);
+        Client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+            Assert.True(IssueGenerationRegistry.TryGetGeneration(owner, out var generation));
+
+            var network = Client.Resolve<INetwork>();
+            network.SendAll(new RequestGenericIssueAcceptQuest(ownerId, generation));
+        });
+
+        var rejection = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkGenericIssueAcceptRejected>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetId(owner, out var ownerId));
+            Assert.Equal(ownerId, rejection.OwnerId);
+
+            Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out _));
+
+            var conversationTracker = Server.Resolve<IIssueConversationTracker>();
+            Assert.False(conversationTracker.TryGetTrackedRequester(ownerId, out _, out _));
         });
     }
 
