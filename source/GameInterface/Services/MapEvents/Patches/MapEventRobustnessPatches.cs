@@ -22,12 +22,8 @@ internal class MapEventRobustnessPatches
     {
         if (__result is null)
         {
-            // The assignment below runs the generated AutoSync setter prefix, which reads this getter
-            // to compare values. Let that nested read observe null instead of recursively restoring again.
             if (restoringTroopUpgradeTracker) return;
 
-            // Pending graphs are incomplete by design. A fallback here would replace the registered
-            // tracker before its queued reference apply reaches the game thread.
             if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) &&
                 barrier.IsPending(__instance))
             {
@@ -38,7 +34,17 @@ internal class MapEventRobustnessPatches
             restoringTroopUpgradeTracker = true;
             try
             {
-                __result = new TroopUpgradeTracker();
+                var restoredTracker = new TroopUpgradeTracker();
+                foreach (var party in __instance.AttackerSide.Parties)
+                {
+                    restoredTracker.AddParty(party);
+                }
+                foreach (var party in __instance.DefenderSide.Parties)
+                {
+                    restoredTracker.AddParty(party);
+                }
+
+                __result = restoredTracker;
                 __instance.TroopUpgradeTracker = __result;
             }
             finally
