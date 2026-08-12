@@ -34,13 +34,15 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         bool modelGatePasses = IsLocalMainHeroSafelyAvailable() && MobileParty.MainParty != null
             && Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution();
 
-        if (IssueOwnershipRegistry.IsLocalPeerOwner(issue.IssueOwner) && modelGatePasses)
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return false;
+
+        if (ownershipRegistry.IsLocalPeerOwner(issue.IssueOwner) && modelGatePasses)
         {
             MakeAlternativeTroopsReturn(troops);
             return false;
         }
 
-        if (!IssueOwnershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var ownerControllerId))
+        if (!ownershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var ownerControllerId))
         {
             Logger.Error(
                 "TryToMakeTroopsReturn: no recorded owner ControllerId for issue owner {IssueOwner} - these " +

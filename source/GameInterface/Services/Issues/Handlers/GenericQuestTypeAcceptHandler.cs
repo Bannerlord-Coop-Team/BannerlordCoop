@@ -31,6 +31,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPrisonerSaleValidator troopValidator;
+    private readonly IIssueOwnershipRegistry ownershipRegistry;
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -38,7 +39,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         ITroopRosterInterface troopRosterInterface,
-        IPrisonerSaleValidator troopValidator)
+        IPrisonerSaleValidator troopValidator,
+        IIssueOwnershipRegistry ownershipRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -46,6 +48,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         this.playerManager = playerManager;
         this.troopRosterInterface = troopRosterInterface;
         this.troopValidator = troopValidator;
+        this.ownershipRegistry = ownershipRegistry;
 
         messageBroker.Subscribe<QuestTypeQuestSolutionAcceptTriggered>(Handle_QuestTypeQuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestTypeAcceptQuest>(Handle_RequestQuestTypeAcceptQuest);
@@ -79,7 +82,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
-            IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
+            ownershipRegistry.SetOwner(owner, hostControllerId);
             network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, hostControllerId, payload.What.FieldsBytes));
         }
         else
@@ -127,7 +130,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             var (accepted, fieldsBytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => canAccept);
             if (accepted)
             {
-                IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
+                ownershipRegistry.SetOwner(owner, player.ControllerId);
                 network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, player.ControllerId, fieldsBytes));
             }
             else
@@ -159,7 +162,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
-            IssueOwnershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 
@@ -171,7 +174,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
-            IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
+            ownershipRegistry.SetOwner(owner, hostControllerId);
             var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
             network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, payload.What.FieldsBytes, hostTroops));
         }
@@ -232,7 +235,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     return;
                 }
 
-                IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
+                ownershipRegistry.SetOwner(owner, player.ControllerId);
                 var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
                 network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, player.ControllerId, payload.What.FieldsBytes, validatedTroops));
             }
@@ -286,7 +289,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
-            IssueOwnershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 

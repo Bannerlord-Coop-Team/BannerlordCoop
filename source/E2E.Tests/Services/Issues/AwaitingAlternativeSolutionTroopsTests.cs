@@ -212,7 +212,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal(controllerId, ownerControllerId);
         });
 
@@ -321,7 +321,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
-            IssueOwnershipRegistry.SetOwner(owner, controllerId);
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
 
             using (new AllowedThread())
             {
@@ -383,7 +383,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(owner, out var ownerId));
             Assert.Equal(ownerId, rejection.OwnerId);
 
-            Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out _));
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
 
             var conversationTracker = Server.Resolve<IIssueConversationTracker>();
             Assert.False(conversationTracker.TryGetTrackedRequester(ownerId, out _, out _));

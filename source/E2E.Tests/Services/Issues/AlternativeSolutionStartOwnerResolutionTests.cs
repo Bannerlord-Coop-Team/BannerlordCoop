@@ -120,14 +120,14 @@ public class AlternativeSolutionStartOwnerResolutionTests : IDisposable
             Assert.True(owner.Issue.AlternativeSolutionReturnTimeForTroops.IsFuture);
             Assert.Equal(owner.Issue.AlternativeSolutionReturnTimeForTroops, state.ReturnTime);
 
-            IssueOwnershipRegistry.SetOwner(owner, controllerId);
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
         });
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var owner));
 
-            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal(controllerId, ownerControllerId);
 
             Assert.Equal(serverMainHeroGoldBefore, Hero.MainHero.Gold);

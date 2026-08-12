@@ -17,10 +17,12 @@ internal class IssueOwnershipPersistencePatches
     [HarmonyPostfix]
     private static void SyncDataPostfix(IDataStore dataStore)
     {
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return;
+
         List<IssueOwnershipSaveData> saveData = null;
         if (dataStore.IsSaving)
         {
-            saveData = IssueOwnershipRegistry.Snapshot()
+            saveData = ownershipRegistry.Snapshot()
                 .Select(kvp => new IssueOwnershipSaveData(kvp.Key, kvp.Value))
                 .ToList();
         }
@@ -30,11 +32,11 @@ internal class IssueOwnershipPersistencePatches
         {
             if (saveData == null)
             {
-                IssueOwnershipRegistry.ClearAll();
+                ownershipRegistry.ClearAll();
             }
             else
             {
-                IssueOwnershipRegistry.RestoreAll(saveData
+                ownershipRegistry.RestoreAll(saveData
                     .Where(entry => entry?.IssueGiverHero != null && !string.IsNullOrEmpty(entry.OwnerControllerId))
                     .Select(entry => new KeyValuePair<Hero, string>(entry.IssueGiverHero, entry.OwnerControllerId)));
             }

@@ -48,7 +48,7 @@ internal class IssueFinalizedPatches
             IssueManagerQuestCompletedReasonCapture.PendingReasons.Remove(owner);
         }
 
-        IssueOwnershipRegistry.Clear(owner);
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) ownershipRegistry.Clear(owner);
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;

@@ -92,7 +92,7 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
                 Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in pid, owner));
             }
 
-            IssueOwnershipRegistry.SetOwner(owner, controllerId);
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
         });
 
         Server.Call(() =>

@@ -30,7 +30,7 @@ public static class AlternativeSolutionCompletionRunner
     {
         if (owner?.Issue is not IssueBase issue) return false;
         if (!issue.IsSolvingWithAlternative || !issue.AlternativeSolutionReturnTimeForTroops.IsPast) return false;
-        if (!IssueOwnershipRegistry.IsLocalPeerOwner(owner)) return false;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) || !ownershipRegistry.IsLocalPeerOwner(owner)) return false;
 
         if (ModInformation.IsServer)
         {
@@ -57,7 +57,7 @@ public static class AlternativeSolutionCompletionRunner
 
     private static IDisposable ResolveTrueOwnerScope(Hero issueOwner)
     {
-        if (!IssueOwnershipRegistry.TryGetOwnerControllerId(issueOwner, out var controllerId)) return NullScope.Instance;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) || !ownershipRegistry.TryGetOwnerControllerId(issueOwner, out var controllerId)) return NullScope.Instance;
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return NullScope.Instance;
         if (!playerManager.TryGetPlayer(controllerId, out var player)) return NullScope.Instance;
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return NullScope.Instance;

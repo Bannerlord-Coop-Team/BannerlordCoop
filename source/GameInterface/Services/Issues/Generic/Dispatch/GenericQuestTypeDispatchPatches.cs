@@ -69,7 +69,7 @@ internal class GenericQuestTypeAlternativeSolutionOwnershipGatePatch
     {
         if (!QuestTypeRegistry.IsRegistered(__instance?.GetType())) return true;
 
-        return IssueOwnershipRegistry.IsLocalPeerOwner(__instance.IssueOwner)
+        return (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(__instance.IssueOwner))
             || AlternativeSolutionCompletionAuthorityGuard.IsActive;
     }
 }

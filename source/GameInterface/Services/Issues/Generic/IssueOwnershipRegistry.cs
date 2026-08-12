@@ -4,33 +4,44 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Generic;
 
-internal static class IssueOwnershipRegistry
+public interface IIssueOwnershipRegistry
 {
-    private static readonly PendingRegistry<string> Registry = new();
+    void SetOwner(Hero issueGiver, string controllerId);
+    void Clear(Hero issueGiver);
+    void ClearAll();
+    bool TryGetOwnerControllerId(Hero issueGiver, out string controllerId);
+    bool IsLocalPeerOwner(Hero issueGiver);
+    IReadOnlyCollection<KeyValuePair<Hero, string>> Snapshot();
+    void RestoreAll(IEnumerable<KeyValuePair<Hero, string>> entries);
+}
 
-    public static void SetOwner(Hero issueGiver, string controllerId)
+internal sealed class IssueOwnershipRegistry : IIssueOwnershipRegistry
+{
+    private readonly PendingRegistry<string> registry = new();
+
+    public void SetOwner(Hero issueGiver, string controllerId)
     {
         if (issueGiver == null || string.IsNullOrEmpty(controllerId)) return;
 
-        Registry.Set(issueGiver, controllerId);
+        registry.Set(issueGiver, controllerId);
     }
 
-    public static void Clear(Hero issueGiver)
+    public void Clear(Hero issueGiver)
     {
-        Registry.Clear(issueGiver);
+        registry.Clear(issueGiver);
     }
 
-    public static void ClearAll()
+    public void ClearAll()
     {
-        Registry.ClearAll();
+        registry.ClearAll();
     }
 
-    public static bool TryGetOwnerControllerId(Hero issueGiver, out string controllerId)
+    public bool TryGetOwnerControllerId(Hero issueGiver, out string controllerId)
     {
-        return Registry.TryGet(issueGiver, out controllerId);
+        return registry.TryGet(issueGiver, out controllerId);
     }
 
-    public static bool IsLocalPeerOwner(Hero issueGiver)
+    public bool IsLocalPeerOwner(Hero issueGiver)
     {
         if (!TryGetOwnerControllerId(issueGiver, out var ownerControllerId)) return false;
         if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return false;
@@ -38,13 +49,13 @@ internal static class IssueOwnershipRegistry
         return controllerIdProvider.ControllerId == ownerControllerId;
     }
 
-    public static IReadOnlyCollection<KeyValuePair<Hero, string>> Snapshot()
+    public IReadOnlyCollection<KeyValuePair<Hero, string>> Snapshot()
     {
-        return Registry.Snapshot();
+        return registry.Snapshot();
     }
 
-    public static void RestoreAll(IEnumerable<KeyValuePair<Hero, string>> entries)
+    public void RestoreAll(IEnumerable<KeyValuePair<Hero, string>> entries)
     {
-        Registry.RestoreAll(entries);
+        registry.RestoreAll(entries);
     }
 }

@@ -35,6 +35,7 @@ internal class GenericAcceptMirrorHandler : IHandler
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPrisonerSaleValidator troopValidator;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly IIssueOwnershipRegistry ownershipRegistry;
 
     public GenericAcceptMirrorHandler(
         IMessageBroker messageBroker,
@@ -44,7 +45,8 @@ internal class GenericAcceptMirrorHandler : IHandler
         IPlayerManager playerManager,
         ITroopRosterInterface troopRosterInterface,
         IPrisonerSaleValidator troopValidator,
-        IIssueConversationTracker conversationTracker)
+        IIssueConversationTracker conversationTracker,
+        IIssueOwnershipRegistry ownershipRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -54,6 +56,7 @@ internal class GenericAcceptMirrorHandler : IHandler
         this.troopRosterInterface = troopRosterInterface;
         this.troopValidator = troopValidator;
         this.conversationTracker = conversationTracker;
+        this.ownershipRegistry = ownershipRegistry;
 
         messageBroker.Subscribe<GenericIssueQuestAcceptTriggered>(Handle_GenericIssueQuestAcceptTriggered);
         messageBroker.Subscribe<RequestGenericIssueAcceptQuest>(Handle_RequestGenericIssueAcceptQuest);
@@ -156,7 +159,7 @@ internal class GenericAcceptMirrorHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
-            IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
+            ownershipRegistry.SetOwner(owner, hostControllerId);
             network.SendAll(new NetworkGenericIssueQuestAccepted(ownerId, hostControllerId));
         }
         else
@@ -206,7 +209,7 @@ internal class GenericAcceptMirrorHandler : IHandler
                 owner.Issue.IssueStayAliveConditions())
             {
                 issueInterface.EnsureServerQuestMirror(owner);
-                IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
+                ownershipRegistry.SetOwner(owner, player.ControllerId);
                 network.SendAll(new NetworkGenericIssueQuestAccepted(ownerId, player.ControllerId));
             }
             else
@@ -224,7 +227,7 @@ internal class GenericAcceptMirrorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
             issueInterface.MirrorQuestAccepted(owner);
-            IssueOwnershipRegistry.SetOwner(owner, ownerControllerId);
+            ownershipRegistry.SetOwner(owner, ownerControllerId);
         });
     }
 
@@ -239,7 +242,7 @@ internal class GenericAcceptMirrorHandler : IHandler
             if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player)) return;
 
             var state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
-            IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
+            ownershipRegistry.SetOwner(owner, hostControllerId);
             var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
             network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, hostControllerId, state, hostTroops));
         }
@@ -304,7 +307,7 @@ internal class GenericAcceptMirrorHandler : IHandler
                     return;
                 }
 
-                IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
+                ownershipRegistry.SetOwner(owner, player.ControllerId);
                 var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
                 network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, player.ControllerId, state, validatedTroops));
             }
@@ -358,7 +361,7 @@ internal class GenericAcceptMirrorHandler : IHandler
                 return;
             }
 
-            IssueOwnershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 
