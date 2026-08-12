@@ -79,11 +79,13 @@ internal class BattleSimulationRunHandler : IHandler
         this.playerManager = playerManager;
 
         messageBroker.Subscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
+        messageBroker.Subscribe<RequestCancelBattleSimulation>(Handle_RequestCancelBattleSimulation);
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Subscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Subscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
         messageBroker.Subscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Subscribe<NetworkCancelBattleSimulation>(Handle_NetworkCancelBattleSimulation);
         messageBroker.Subscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
@@ -92,11 +94,13 @@ internal class BattleSimulationRunHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
+        messageBroker.Unsubscribe<RequestCancelBattleSimulation>(Handle_RequestCancelBattleSimulation);
         messageBroker.Unsubscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Unsubscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Unsubscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Unsubscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
         messageBroker.Unsubscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Unsubscribe<NetworkCancelBattleSimulation>(Handle_NetworkCancelBattleSimulation);
         messageBroker.Unsubscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
@@ -106,6 +110,14 @@ internal class BattleSimulationRunHandler : IHandler
     private void Handle_RequestAdvanceBattleSimulation(MessagePayload<RequestAdvanceBattleSimulation> payload)
     {
         network.SendAll(new NetworkAdvanceBattleSimulation(payload.What.MapEventId, payload.What.Rounds));
+    }
+
+    /// Forwards local simulation cancellation to the server.
+    private void Handle_RequestCancelBattleSimulation(MessagePayload<RequestCancelBattleSimulation> payload)
+    {
+        if (ModInformation.IsServer) return;
+        
+        network.SendAll(new NetworkCancelBattleSimulation(payload.What.MapEventId));
     }
 
     /// <summary>[Server] Handle a battle-start request for the auto-resolve mode: gate it, set the simulation up
@@ -218,6 +230,45 @@ internal class BattleSimulationRunHandler : IHandler
         mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation set up; awaiting client-paced advances");
     }
 
+    /// <summary>
+    ///  Cancels an unfinished simulation when requested by the client currently doing it.
+    /// </summary>
+    private void Handle_NetworkCancelBattleSimulation(MessagePayload<NetworkCancelBattleSimulation> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        if (!(payload.Who is NetPeer requestingPeer))
+        {
+            Logger.Warning("Received {Message} without an originating peer", nameof(NetworkCancelBattleSimulation));
+            return;
+        }
+        
+        var mapEventId = payload.What.MapEventId;
+        ActiveSimulation simulation;
+
+        lock (simLock)
+        {
+            if (!activeSimulations.TryGetValue(mapEventId, out simulation)) return;
+
+            if (simulation.Peer != requestingPeer)
+            {
+                Logger.Warning("Peer attempted to cancel a battle simulation it does not own. MapEventId={MapEventId}", mapEventId);
+                return;
+            }
+            activeSimulations.Remove(mapEventId);
+        }
+        
+        GameThread.RunSafe(() =>
+        { EndSimulationSession(simulation); }, blocking: true, context: nameof(Handle_NetworkCancelBattleSimulation));
+
+        if (ServerBattleModeArbiter.ReleaseSimulation(mapEventId))
+        {
+            network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
+            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+
+        }
+        mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
+    }
     private bool TryGetRequestingParticipant(
         NetPeer requester,
         NetworkBattleStartRequest request,
