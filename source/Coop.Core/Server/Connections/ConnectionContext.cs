@@ -25,6 +25,7 @@ public class ConnectionContext
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
         IPlayerManager playerManager,
+        IPlayerPartyRestorer playerPartyRestorer,
         IObjectManager objectManager,
         IHeroInterface heroInterface,
         ICoopSessionProvider coopSessionProvider,
@@ -41,6 +42,7 @@ public class ConnectionContext
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
         PlayerManager = playerManager;
+        PlayerPartyRestorer = playerPartyRestorer;
         ObjectManager = objectManager;
         HeroInterface = heroInterface;
         CoopSessionProvider = coopSessionProvider;
@@ -58,6 +60,7 @@ public class ConnectionContext
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
     public IPlayerManager PlayerManager { get; }
+    public IPlayerPartyRestorer PlayerPartyRestorer { get; }
     public IObjectManager ObjectManager { get; }
     public IHeroInterface HeroInterface { get; }
     public ICoopSessionProvider CoopSessionProvider { get; }

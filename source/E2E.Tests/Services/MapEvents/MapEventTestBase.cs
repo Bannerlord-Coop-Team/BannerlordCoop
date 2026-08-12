@@ -220,7 +220,7 @@ public abstract class MapEventTestBase : IDisposable
         string? partyId = null;
         var disabledMethods = MapEventDisabledMethods
             // Synthetic party visibility has no live campaign feat model.
-            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
             .ToList();
 
         Server.Call(() =>

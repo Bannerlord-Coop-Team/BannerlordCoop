@@ -105,12 +105,14 @@ esac
 assigned_case_count=$(printf '%s\n' "$assignment" | cut -f2)
 shard_filter=$(printf '%s\n' "$assignment" | cut -f3-)
 echo "running E2E shard $shard_index/$shard_count with $assigned_case_count discovered test cases"
+# Per-test result lines (not ErrorsOnly): flake triage needs to reconstruct which tests ran,
+# in what order, before a failure — an errors-only log makes that unrecoverable afterwards.
 "$dotnet_cmd" test "$test_project" \
     -c Release \
     --no-build \
     --no-restore \
     --filter "$shard_filter" \
-    --consoleLoggerParameters:ErrorsOnly
+    --logger "console;verbosity=normal"
 
 elapsed_seconds=$(( $(date +%s) - start_seconds ))
 echo "E2E shard $shard_index completed in ${elapsed_seconds}s"

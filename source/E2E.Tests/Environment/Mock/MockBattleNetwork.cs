@@ -22,11 +22,16 @@ public sealed class DirectPacketSend
 
 public sealed class SerializedPacketSend
 {
+    public string ControllerId { get; }
     public IPacket Packet { get; }
     public byte[] Payload { get; }
 
-    public SerializedPacketSend(IPacket packet, byte[] payload)
+    public SerializedPacketSend(
+        string controllerId,
+        IPacket packet,
+        byte[] payload)
     {
+        ControllerId = controllerId;
         Packet = packet;
         Payload = payload;
     }
@@ -48,6 +53,7 @@ public class MockBattleNetwork : IBattleNetwork
     public List<DirectPacketSend> DirectPacketSends { get; } = new();
     public List<SerializedPacketSend> SerializedPacketSends { get; } = new();
     public int MaxUnreliablePayloadBytes { get; set; } = 1000;
+    public Dictionary<string, int> ControllerPayloadBytes { get; } = new();
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
@@ -81,13 +87,24 @@ public class MockBattleNetwork : IBattleNetwork
     public void SendAll(IPacket packet, byte[] serializedPacket)
     {
         NetworkSentPackets.Add(packet);
-        SerializedPacketSends.Add(new SerializedPacketSend(packet, serializedPacket));
+        SerializedPacketSends.Add(new SerializedPacketSend(null, packet, serializedPacket));
     }
     public void Send(string controllerId, IPacket packet)
     {
         NetworkSentPackets.Add(packet);
         DirectPacketSends.Add(new DirectPacketSend(controllerId, packet));
     }
+    public void Send(string controllerId, IPacket packet, byte[] serializedPacket)
+    {
+        NetworkSentPackets.Add(packet);
+        DirectPacketSends.Add(new DirectPacketSend(controllerId, packet));
+        SerializedPacketSends.Add(
+            new SerializedPacketSend(controllerId, packet, serializedPacket));
+    }
     public void SendAllBut(string controllerId, IPacket packet) => throw new NotImplementedException();
+    public int GetMaxUnreliablePayloadBytes(string controllerId) =>
+        ControllerPayloadBytes.TryGetValue(controllerId, out int payloadBytes)
+            ? payloadBytes
+            : MaxUnreliablePayloadBytes;
     public int GetMaxUnreliablePayloadBytes() => MaxUnreliablePayloadBytes;
 }

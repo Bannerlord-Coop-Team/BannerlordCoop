@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -80,6 +81,8 @@ public static class BattleSpawnGate
     /// rider-keyed gating. Process-global like the rest of this gate: one live battle per game process.
     /// </summary>
     public static Func<Agent, bool?> MountAuthorityProbe { get; set; }
+
+    public static Func<Hero, bool?> HeroAgentAuthorityProbe { get; set; }
 
     /// <summary>Temporarily exposes a routed missile's serialized weapon while vanilla calculates hit rewards.</summary>
     public static void RunWithRoutedAttackerWeapon(WeaponComponentData attackerWeapon, Action applyBlow)

@@ -87,6 +87,11 @@ internal class TradeHandler : IHandler
         var boughtItems = ResolveTradeItemIds(what.BoughtItems);
         var soldItems = ResolveTradeItemIds(what.SoldItems);
 
+        if (what.CanGainXpFromDiscarding)
+        {
+            soldItems = ResolveLeftLootIds(what.FromRoster._data);
+        }
+
         var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.OwnerParty, what.InitialCharacterEquipment);
 
         var troopRosterData = troopRosterInterface.PackTroopRosterData(what.TroopRoster);
@@ -229,6 +234,21 @@ internal class TradeHandler : IHandler
             if (TryResolveItemRosterId(item, out var resolvedItem))
             {
                 resolvedItems.Add((resolvedItem, count));
+            }
+        }
+
+        return resolvedItems.ToArray();
+    }
+
+    private (ItemRosterElementData, int)[] ResolveLeftLootIds(ItemRosterElement[] items)
+    {
+        var resolvedItems = new List<(ItemRosterElementData, int)>();
+
+        for (int i = 0; i < items.Length; i++)
+        {
+            if (TryResolveItemRosterId(items[i], out var resolvedItem))
+            {
+                resolvedItems.Add((resolvedItem, items[i].Amount));
             }
         }
 

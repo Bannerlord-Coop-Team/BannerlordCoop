@@ -5,10 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -500,7 +502,39 @@ internal class SettlementCommands
 
         ChangeOwnerOfSettlementAction.ApplyBySiege(capturer, capturer, settlement);
 
-        return $"Captured {settlement.Name} by siege; new owner {capturer.Name} ({capturer.MapFaction?.Name})";
+        return $"Captured {settlement.Name} by siege; new owner {capturer.Name} ({capturer.MapFaction?.Name})" +
+               Environment.NewLine + FormatOwnerState(settlement);
+    }
+
+    [CommandLineArgumentFunction("owner_state", "coop.debug.settlements")]
+    public static string OwnerState(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.settlements.owner_state <Settlement name or id>";
+
+        var settlement = Campaign.Current.CampaignObjectManager.Settlements
+            .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
+        if (settlement == null)
+            return $"Settlement '{args[0]}' not found";
+
+        return FormatOwnerState(settlement);
+    }
+
+    private static string FormatOwnerState(Settlement settlement)
+    {
+        var role = ModInformation.IsServer ? "SERVER" : "CLIENT";
+        var ownerClan = settlement.OwnerClan?.StringId;
+        var ownerLeader = settlement.OwnerClan?.Leader?.StringId;
+        var structuredState = JsonSerializer.Serialize(new
+        {
+            role,
+            settlement = settlement.StringId,
+            ownerClan,
+            ownerLeader,
+        });
+
+        return $"{role} settlement={settlement.StringId} ownerClan={ownerClan ?? "null"} ownerLeader={ownerLeader ?? "null"}" +
+               Environment.NewLine + $"LIVE_TEST_JSON={structuredState}";
     }
 
     // coop.debug.settlementcomponent.set_gold town_comp_ES3 401021
@@ -571,21 +605,19 @@ internal class SettlementCommands
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
 
-        if (strings.Count != 2) return "Invalid usage, expected \"set_ownerclan <settlementName> <heroId>\"";
+        if (strings.Count != 2) return "Invalid usage, expected \"set_ownerclan <settlementId|settlementName> <heroId>\"";
 
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var settlement in Settlement.All)
         {
-            if (settlement.Name.ToString() == strings[0])
+            if (settlement.Name.ToString() == strings[0] || settlement.StringId == strings[0])
             {
-                foreach (var hero in Hero.AllAliveHeroes)
-                {
-                    if (hero.StringId == strings[1])
-                    {
-                        ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
-                        stringBuilder.AppendLine("Settlement has a new owner.");
-                    }
-                }
+                var hero = Campaign.Current.CampaignObjectManager.Find<Hero>(strings[1]);
+
+                if (hero == null) return $"Unable to find hero by id: {strings[1]}";
+
+                ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
+                stringBuilder.AppendLine($"{settlement.Name} ({settlement.StringId}) transferred to {hero.Name} ({hero.StringId}).");
             }
         }
 

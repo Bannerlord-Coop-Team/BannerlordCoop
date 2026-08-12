@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -14,6 +15,7 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
@@ -44,22 +46,26 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISiegeEventInterface siegeEventInterface;
     private readonly Dictionary<MobileParty, MapEvent> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.network = network;
+        this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Subscribe<SavedPlayerRegistrationsRestored>(Handle_SavedPlayerRegistrationsRestored);
     }
 
     public void Dispose()
@@ -67,7 +73,23 @@ internal class PlayerPartyVisibilityHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Unsubscribe<SavedPlayerRegistrationsRestored>(Handle_SavedPlayerRegistrationsRestored);
         deferredMapEventParking.Clear();
+    }
+
+    private void Handle_SavedPlayerRegistrationsRestored(
+        MessagePayload<SavedPlayerRegistrationsRestored> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (playerManager.IsConnected(player)) continue;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+                continue;
+
+            ParkParty(player, party, "its saved player is offline");
+        }
     }
 
     /// <summary> A peer dropped: park its party and remove its map figure unless it is in a MapEvent.
@@ -89,31 +111,39 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            var mapEvent = party.MapEvent;
-            if (mapEvent != null)
-            {
-                deferredMapEventParking[party] = mapEvent;
-                messageBroker.Publish(this, new PlayerDisconnectedFromMapEvent(player.ControllerId, mapEvent));
-                Logger.Information(
-                    "Keeping party {PartyId} active in MapEvent {MapEventId} after peer {Peer} disconnected",
-                    party.StringId,
-                    mapEvent.StringId,
-                    peer.Id);
-                return;
-            }
-
-            if (!party.IsActive)
-            {
-                Logger.Debug("Party {PartyId} already parked, skipping", party.StringId);
-                return;
-            }
-
-            party.IsActive = false;
-
-            RemoveVisual(party);
-
-            Logger.Information("Parked party {PartyId} for disconnected peer {Peer}", party.StringId, peer.Id);
+            ParkParty(player, party, $"peer {peer.Id} disconnected");
         });
+    }
+
+    private void ParkParty(Player player, MobileParty party, string reason)
+    {
+        var mapEvent = party.MapEvent;
+        if (mapEvent != null)
+        {
+            deferredMapEventParking[party] = mapEvent;
+            messageBroker.Publish(this, new PlayerDisconnectedFromMapEvent(player.ControllerId, mapEvent));
+            Logger.Information(
+                "Keeping party {PartyId} active in MapEvent {MapEventId} because {Reason}",
+                party.StringId,
+                mapEvent.StringId,
+                reason);
+            return;
+        }
+
+        LeaveSiegeBeforeParking(party);
+
+        var wasActive = party.IsActive;
+        party.IsActive = false;
+        party.IsVisible = false;
+        RemoveVisual(party);
+
+        if (!wasActive)
+        {
+            Logger.Debug("Party {PartyId} already parked because {Reason}", party.StringId, reason);
+            return;
+        }
+
+        Logger.Information("Parked party {PartyId} because {Reason}", party.StringId, reason);
     }
 
     /// <summary> A peer (re)entered the campaign, un-park its party and rebuild its map figure.
@@ -174,12 +204,24 @@ internal class PlayerPartyVisibilityHandler : IHandler
             deferredMapEventParking.Remove(party);
             if (!party.IsActive || !playerManager.IsOwnerOfPartyDisconnected(party)) continue;
 
+            LeaveSiegeBeforeParking(party);
             party.IsActive = false;
+            party.IsVisible = false;
             RemoveVisual(party);
             Logger.Information(
                 "Parked party {PartyId} after its MapEvent ended while its player was disconnected",
                 party.StringId);
         }
+    }
+
+    private void LeaveSiegeBeforeParking(MobileParty party)
+    {
+        if (party.BesiegerCamp == null) return;
+
+        Logger.Information(
+            "Removing disconnected party {PartyId} from its siege camp before parking",
+            party.StringId);
+        siegeEventInterface.BreakSiegeForPartyOnly(party);
     }
 
     /// <summary>

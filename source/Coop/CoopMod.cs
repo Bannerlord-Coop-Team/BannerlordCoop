@@ -10,6 +10,10 @@ using Coop.LiveTesting;
 #endif
 using Coop.UI.LoadGameUI;
 using GameInterface;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Handlers;
+using GameInterface.Services.Chat;
+using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
@@ -52,6 +56,8 @@ namespace Coop
         private string activeLogFilePath;
         private string informationalVersion = "unknown";
         private CrashReportingConsentCoordinator crashReportingConsent;
+        private UnsupportedModuleWarningHandler unsupportedModuleWarning;
+        private bool startupModuleWarningReady;
         private bool automaticCrashReportsRequested;
         private DateTime nextWatchdogRetryUtc;
 
@@ -108,6 +114,17 @@ namespace Coop
 
             SetupLogging();
             InitializeCrashReporting();
+
+            // Creates the handler during launch
+            if (!isServer)
+            {
+                unsupportedModuleWarning = new UnsupportedModuleWarningHandler(
+                    new TaleWorldsModuleInfoProvider(),
+                    new CoopOptionsStore(),
+                    exception => Logger.Warning(
+                        exception,
+                        "Unsupported module wwarning preference could not be saved"));
+            }
 
             if (ManagedServerConfig.IsManagedServer)
             {
@@ -296,6 +313,17 @@ namespace Coop
                     startInfo.EnvironmentVariables["COOP_CRASH_BUILD"] = informationalVersion;
                     startInfo.EnvironmentVariables["COOP_CRASH_READY"] = readyEventName;
 
+                    string gameBinariesDirectory = GameBinariesDirectory.Resolve();
+                    if (gameBinariesDirectory == null)
+                    {
+                        Logger.Warning(
+                            "Game binaries directory could not be resolved; crash reports will not list installed game files");
+                    }
+                    else
+                    {
+                        startInfo.EnvironmentVariables["COOP_CRASH_GAME_BINARIES"] = gameBinariesDirectory;
+                    }
+
                     using (var ready = new EventWaitHandle(
                         false,
                         EventResetMode.AutoReset,
@@ -398,7 +426,7 @@ namespace Coop
             Updateables.Add(GameThread.Instance);
 
 #if DEBUG
-            if (isAutoConnect)
+            if (isAutoConnect && LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs()))
             {
                 liveTestControlServer = new LiveTestControlServer(isServer, activeLogFilePath);
                 liveTestControlServer.Start();
@@ -427,9 +455,10 @@ namespace Coop
                         {
                             Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         }
-                        else
+                        else if (!Coop.StartAsClient())
                         {
-                            Coop.StartAsClient();
+                            InformationManager.DisplayMessage(new InformationMessage(
+                                CoopartiveMultiplayerExperience.StartRefusedNotice));
                         }
                     },
                     () => { return (false, new TextObject("")); }
@@ -473,8 +502,12 @@ namespace Coop
             if (ContainerProvider.TryResolve<IGameInterface>(out var gameInterface))
                 gameInterface.PatchGameStarted();
 
+            if (ModInformation.IsClient && ContainerProvider.TryResolve<IChatService>(out var chatService))
+                chatService.Initialize();
+
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
+                campaignGameStarter.AddBehavior(new FixedTownNpcConversationBehavior());
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
                 campaignGameStarter.AddBehavior(new CoopTournamentCampaignBehavior());
             }
@@ -483,7 +516,14 @@ namespace Coop
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
+            
+            if (isServer)
+            {
+                ManagedOptions.SetConfig(ManagedOptions.ManagedOptionsType.StopGameOnFocusLost, 0f);
+            }
+
             CrashDiagnostics.SetPhase("main-menu");
+            startupModuleWarningReady = true;
             InformationManager.DisplayMessage(new InformationMessage(ClientServerModeMessage));
         }
 
@@ -526,6 +566,7 @@ namespace Coop
 
             var isAtMainMenu = GameStateManager.Current?.ActiveState is InitialState;
             TryApplyAutomaticCrashReports();
+            TryShowUnsupportedModuleWarning(isAtMainMenu);
             TryShowCrashReportingConsent(isAtMainMenu);
 
             // Boot Steam services once the main menu is up, so a +connect_lobby launch resolves while joining is possible.
@@ -557,6 +598,19 @@ namespace Coop
             }
 
             crashReportingConsent.TryShowPrompt(
+                isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
+                inquiry => InformationManager.ShowInquiry(inquiry));
+        }
+        
+        // Show the one-time unsupported module warning when the client startup UI is available.
+        private void TryShowUnsupportedModuleWarning(bool isAtMainMenu)
+        {
+            if (unsupportedModuleWarning == null || !startupModuleWarningReady || isServer || isAutoConnect)
+            {
+                return;
+            }
+            
+            unsupportedModuleWarning.TryShowPrompt(
                 isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
                 inquiry => InformationManager.ShowInquiry(inquiry));
         }
@@ -602,8 +656,8 @@ namespace Coop
                     else
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as client...");
-                        Coop.StartAsClient();
-                        Logger.Information("[AutoConnect] StartAsClient() completed");
+                        bool started = Coop.StartAsClient();
+                        Logger.Information("[AutoConnect] StartAsClient() returned {Started}", started);
                     }
                 }
                 catch (Exception ex)
