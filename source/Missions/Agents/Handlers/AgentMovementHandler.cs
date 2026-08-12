@@ -47,7 +47,30 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     IPacketHandler MountMovementApplier { get; }
 }
 
+#if DEBUG
+internal interface IAgentMovementDebugControl
+{
+    int InitialConfiguredBulkHz { get; }
+
+    bool SyntheticReceivePressureActive { get; }
+
+    float SyntheticReceivePressureRemainingSeconds { get; }
+
+    bool TrySetSyntheticReceivePressure(
+        float durationSeconds,
+        double queueMilliseconds,
+        double applyMilliseconds,
+        int snapshots,
+        out string error);
+
+    void ClearSyntheticReceivePressure();
+}
+#endif
+
 public class AgentMovementHandler : IAgentMovementHandler
+#if DEBUG
+    , IAgentMovementDebugControl
+#endif
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
@@ -255,6 +278,13 @@ public class AgentMovementHandler : IAgentMovementHandler
     private float populationSampleElapsed;
     private bool firstMovementPoll = true;
     private bool firstPopulationSample = true;
+#if DEBUG
+    private int initialConfiguredBulkHz;
+    private float syntheticReceivePressureRemainingSeconds;
+    private double syntheticReceiveQueueMilliseconds;
+    private double syntheticReceiveApplyMilliseconds;
+    private int syntheticReceiveSnapshots;
+#endif
 
     public AgentMovementHandler(
         IBattleNetwork client,
@@ -349,14 +379,86 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public MovementRateSnapshot MovementRate => movementRateController.Snapshot;
 
-    public void Configure(MovementCadenceProfile profile) =>
+    public void Configure(MovementCadenceProfile profile)
+    {
         movementRateController.Configure(profile);
+#if DEBUG
+        initialConfiguredBulkHz = movementRateController.Snapshot.BulkHz;
+#endif
+    }
 
     public bool TrySetForcedBulkHz(int? hz, out string error) =>
         movementRateController.TrySetForcedBulkHz(hz, out error);
 
     public bool TrySetForcedReceiverCapHz(int? hz, out string error) =>
         movementRateController.TrySetForcedReceiverCapHz(hz, out error);
+
+#if DEBUG
+    int IAgentMovementDebugControl.InitialConfiguredBulkHz => initialConfiguredBulkHz;
+
+    bool IAgentMovementDebugControl.SyntheticReceivePressureActive =>
+        syntheticReceivePressureRemainingSeconds > 0f;
+
+    float IAgentMovementDebugControl.SyntheticReceivePressureRemainingSeconds =>
+        syntheticReceivePressureRemainingSeconds;
+
+    bool IAgentMovementDebugControl.TrySetSyntheticReceivePressure(
+        float durationSeconds,
+        double queueMilliseconds,
+        double applyMilliseconds,
+        int snapshots,
+        out string error)
+    {
+        if (MovementRate.Profile != MovementCadenceProfile.Battle)
+        {
+            error = "Synthetic receive pressure is only available in adaptive battle missions.";
+            return false;
+        }
+        if (float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds) ||
+            durationSeconds < 0.5f || durationSeconds > 30f)
+        {
+            error = "Duration must be from 0.5 through 30 seconds.";
+            return false;
+        }
+        if (double.IsNaN(queueMilliseconds) || double.IsInfinity(queueMilliseconds) ||
+            double.IsNaN(applyMilliseconds) || double.IsInfinity(applyMilliseconds) ||
+            queueMilliseconds < 0d || queueMilliseconds > 10000d ||
+            applyMilliseconds < 0d || applyMilliseconds > 1000d ||
+            snapshots < 1 || snapshots > 10000)
+        {
+            error = "Queue/apply milliseconds or snapshot count is outside the supported range.";
+            return false;
+        }
+
+        syntheticReceivePressureRemainingSeconds = durationSeconds;
+        syntheticReceiveQueueMilliseconds = queueMilliseconds;
+        syntheticReceiveApplyMilliseconds = applyMilliseconds;
+        syntheticReceiveSnapshots = snapshots;
+        error = null;
+        return true;
+    }
+
+    void IAgentMovementDebugControl.ClearSyntheticReceivePressure()
+    {
+        syntheticReceivePressureRemainingSeconds = 0f;
+        syntheticReceiveQueueMilliseconds = 0d;
+        syntheticReceiveApplyMilliseconds = 0d;
+        syntheticReceiveSnapshots = 0;
+    }
+
+    private void ReportSyntheticReceivePressure(float elapsedSeconds)
+    {
+        if (syntheticReceivePressureRemainingSeconds <= 0f) return;
+
+        movementRateController.ReportReceive(
+            syntheticReceiveQueueMilliseconds,
+            syntheticReceiveApplyMilliseconds,
+            syntheticReceiveSnapshots);
+        syntheticReceivePressureRemainingSeconds = Math.Max(
+            0f,
+            syntheticReceivePressureRemainingSeconds - elapsedSeconds);
+    }
+#endif
 
     // Capture every locally authoritative agent once, then apply per-recipient cadence and delta history.
     public void PollMovement(float dt)
@@ -365,6 +467,9 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         movementBatchSender.BeginFrame(dt);
         totalSimulationTime += dt;
+#if DEBUG
+        ReportSyntheticReceivePressure(Math.Max(0f, dt));
+#endif
         MovementCadence rate = movementRateController.AdvanceFrame(dt);
         float elapsedSeconds = Math.Max(0f, dt);
         bulkPollElapsed += elapsedSeconds;

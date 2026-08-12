@@ -8,6 +8,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using TaleWorlds.Engine;
+using TaleWorlds.Engine.Options;
 
 namespace Missions.Agents.Handlers;
 
@@ -35,6 +37,7 @@ public sealed class MovementRateSnapshot
     public MovementCadenceProfile Profile { get; }
     public int BulkHz { get; }
     public int PriorityHz { get; }
+    public int FrameLimitHz { get; }
     public int PerformanceCeilingHz { get; }
     public int LocalAdaptiveHz { get; }
     public int AdvertisedReceiverCapHz { get; }
@@ -60,6 +63,7 @@ public sealed class MovementRateSnapshot
         MovementCadenceProfile profile,
         int bulkHz,
         int priorityHz,
+        int frameLimitHz,
         int performanceCeilingHz,
         int localAdaptiveHz,
         int advertisedReceiverCapHz,
@@ -84,6 +88,7 @@ public sealed class MovementRateSnapshot
         Profile = profile;
         BulkHz = bulkHz;
         PriorityHz = priorityHz;
+        FrameLimitHz = frameLimitHz;
         PerformanceCeilingHz = performanceCeilingHz;
         LocalAdaptiveHz = localAdaptiveHz;
         AdvertisedReceiverCapHz = advertisedReceiverCapHz;
@@ -135,6 +140,8 @@ public sealed class MovementRateController : IMovementRateController
     private const float PeerCapLifetimeSeconds = 3.5f;
     private const int ReceiverCapHeartbeatMilliseconds = 1000;
     private const int HealthyWindowsBeforeIncrease = 4;
+    private const int MaximumAdaptiveHz = 60;
+    private const double RejectedRateRetryCostRatio = 0.9d;
 
     internal enum MovementReceiveHealth
     {
@@ -149,9 +156,12 @@ public sealed class MovementRateController : IMovementRateController
     private readonly IMissionContext missionContext;
     private readonly Func<long> timestampProvider;
     private readonly long timestampFrequency;
+    private readonly Func<int> frameLimitProvider;
     private readonly object gate = new object();
     private readonly Dictionary<string, ReceiverCapEntry> receiverCaps =
         new Dictionary<string, ReceiverCapEntry>();
+    private readonly Dictionary<int, RejectedRateState> rejectedRecoveryRates =
+        new Dictionary<int, RejectedRateState>();
     private readonly System.Threading.Timer receiverCapHeartbeatTimer;
 
     private MovementCadenceProfile profile = MovementCadenceProfile.Location;
@@ -159,6 +169,8 @@ public sealed class MovementRateController : IMovementRateController
     private bool disposed;
     private int bulkHz = 40;
     private int priorityHz = 40;
+    private int frameLimitHz = MaximumAdaptiveHz;
+    private int effectiveFrameLimitHz = MaximumAdaptiveHz;
     private int performanceCeilingHz = 40;
     private int localAdaptiveHz = 40;
     private int automaticReceiverCapHz = 40;
@@ -171,6 +183,7 @@ public sealed class MovementRateController : IMovementRateController
     private int locallyControlledAgents;
     private int healthyWindows;
     private int healthyReceiverWindows;
+    private int? activeRecoveryProbeRate;
     private string localReason = "location-fixed";
     private string reason = "location-fixed";
     private long receiverCapSequence;
@@ -182,6 +195,7 @@ public sealed class MovementRateController : IMovementRateController
     private float frameElapsed;
     private int frameCount;
     private double sendMilliseconds;
+    private double bulkSendMilliseconds;
     private double receiveApplyMilliseconds;
     private double maximumReceiverQueueMilliseconds;
     private long wireBytes;
@@ -192,6 +206,7 @@ public sealed class MovementRateController : IMovementRateController
 
     private float lastFramesPerSecond;
     private double lastSenderMillisecondsPerSecond;
+    private double lastBulkSendMillisecondsPerSecond;
     private double lastReceiverApplyMillisecondsPerSecond;
     private double lastMaximumReceiverQueueMilliseconds;
     private long lastWireBytesPerSecond;
@@ -207,6 +222,14 @@ public sealed class MovementRateController : IMovementRateController
         public long ReceivedTimestamp;
     }
 
+    private sealed class RejectedRateState
+    {
+        public int Failures;
+        public double FailedBulkMillisecondsPerPoll;
+        public double FailedSenderMillisecondsPerSecond;
+        public float FailedFramesPerSecond;
+    }
+
     public MovementRateController(
         IBattleNetwork network,
         IMessageBroker messageBroker,
@@ -219,6 +242,7 @@ public sealed class MovementRateController : IMovementRateController
             missionContext,
             Stopwatch.GetTimestamp,
             Stopwatch.Frequency,
+            ReadFrameLimitHz,
             enableHeartbeat: true)
     {
     }
@@ -230,12 +254,14 @@ public sealed class MovementRateController : IMovementRateController
         IMissionContext missionContext,
         Func<long> timestampProvider,
         long timestampFrequency,
+        Func<int> frameLimitProvider,
         bool enableHeartbeat)
     {
         if (network == null) throw new ArgumentNullException(nameof(network));
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (controllerIdProvider == null) throw new ArgumentNullException(nameof(controllerIdProvider));
         if (timestampProvider == null) throw new ArgumentNullException(nameof(timestampProvider));
+        if (frameLimitProvider == null) throw new ArgumentNullException(nameof(frameLimitProvider));
         if (timestampFrequency <= 0) throw new ArgumentOutOfRangeException(nameof(timestampFrequency));
 
         this.network = network;
@@ -244,6 +270,8 @@ public sealed class MovementRateController : IMovementRateController
         this.missionContext = missionContext;
         this.timestampProvider = timestampProvider;
         this.timestampFrequency = timestampFrequency;
+        this.frameLimitProvider = frameLimitProvider;
+        UpdateFrameLimit();
 
         messageBroker.Subscribe<NetworkMovementReceiverCap>(Handle_ReceiverCap);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -282,6 +310,8 @@ public sealed class MovementRateController : IMovementRateController
 
             configured = true;
             this.profile = profile;
+            rejectedRecoveryRates.Clear();
+            activeRecoveryProbeRate = null;
             switch (profile)
             {
                 case MovementCadenceProfile.Location:
@@ -299,9 +329,11 @@ public sealed class MovementRateController : IMovementRateController
                     localReason = "tournament-fixed";
                     break;
                 case MovementCadenceProfile.Battle:
-                    performanceCeilingHz = 60;
-                    localAdaptiveHz = 40;
-                    automaticReceiverCapHz = 40;
+                    // Start every battle from the same baseline, then let measured windows adapt it.
+                    const int startingBattleHz = 40;
+                    performanceCeilingHz = NormalizeRate(effectiveFrameLimitHz);
+                    localAdaptiveHz = Math.Min(startingBattleHz, performanceCeilingHz);
+                    automaticReceiverCapHz = localAdaptiveHz;
                     advertisedReceiverCapHz = forcedReceiverCapHz ?? automaticReceiverCapHz;
                     localReason = "battle-start";
                     break;
@@ -371,7 +403,8 @@ public sealed class MovementRateController : IMovementRateController
         {
             if (disposed) return;
 
-            sendMilliseconds += Math.Max(0d, elapsedMilliseconds);
+            double measuredMilliseconds = Math.Max(0d, elapsedMilliseconds);
+            sendMilliseconds += measuredMilliseconds;
             wireBytes += Math.Max(0L, traffic.SentBytes);
             maximumDeferredSnapshots = Math.Max(
                 maximumDeferredSnapshots,
@@ -380,9 +413,14 @@ public sealed class MovementRateController : IMovementRateController
                 maximumDeferredAgeSeconds,
                 traffic.MaximumDeferredAgeSeconds);
             if (includesAuthoritativeAgents)
+            {
+                bulkSendMilliseconds += measuredMilliseconds;
                 bulkPolls++;
+            }
             else
+            {
                 priorityOnlyPolls++;
+            }
         }
     }
 
@@ -493,6 +531,7 @@ public sealed class MovementRateController : IMovementRateController
         float duration = Math.Max(frameElapsed, 0.001f);
         lastFramesPerSecond = frameCount / duration;
         lastSenderMillisecondsPerSecond = sendMilliseconds / duration;
+        lastBulkSendMillisecondsPerSecond = bulkSendMilliseconds / duration;
         lastReceiverApplyMillisecondsPerSecond = receiveApplyMilliseconds / duration;
         lastMaximumReceiverQueueMilliseconds = maximumReceiverQueueMilliseconds;
         lastWireBytesPerSecond = (long)Math.Round(wireBytes / duration);
@@ -500,16 +539,18 @@ public sealed class MovementRateController : IMovementRateController
         lastMaximumDeferredAgeSeconds = maximumDeferredAgeSeconds;
         lastBulkPollsPerSecond = (int)Math.Round(bulkPolls / duration);
         lastPriorityOnlyPollsPerSecond = (int)Math.Round(priorityOnlyPolls / duration);
+        UpdateFrameLimit();
 
         int desiredReceiverCapHz = CalculateReceiverCap(
             lastFramesPerSecond,
             lastReceiverApplyMillisecondsPerSecond,
-            lastMaximumReceiverQueueMilliseconds);
+            lastMaximumReceiverQueueMilliseconds,
+            effectiveFrameLimitHz);
         EvaluateReceiverCap(desiredReceiverCapHz);
         advertisedReceiverCapHz = forcedReceiverCapHz ?? automaticReceiverCapHz;
 
         if (profile == MovementCadenceProfile.Battle)
-            EvaluateBattleRate();
+            EvaluateBattleRate(desiredReceiverCapHz);
         RecomputeEffectiveRate();
     }
 
@@ -537,19 +578,30 @@ public sealed class MovementRateController : IMovementRateController
         healthyReceiverWindows = 0;
     }
 
-    private void EvaluateBattleRate()
+    private void EvaluateBattleRate(int receiverCeilingHz)
     {
-        performanceCeilingHz = CalculatePerformanceCeiling(
+        int senderCeilingHz = CalculateSenderCeiling(
             lastFramesPerSecond,
-            lastSenderMillisecondsPerSecond + lastReceiverApplyMillisecondsPerSecond,
-            lastMaximumReceiverQueueMilliseconds);
+            lastSenderMillisecondsPerSecond,
+            effectiveFrameLimitHz);
+        performanceCeilingHz = Math.Min(senderCeilingHz, receiverCeilingHz);
         int desired = performanceCeilingHz;
         if (desired < localAdaptiveHz)
         {
+            if (senderCeilingHz < localAdaptiveHz)
+                RememberRejectedRate(localAdaptiveHz);
+            else
+                ForgetActiveRecoveryProbe(localAdaptiveHz);
             localAdaptiveHz = desired;
             healthyWindows = 0;
             localReason = "battle-performance";
             return;
+        }
+
+        if (activeRecoveryProbeRate == localAdaptiveHz)
+        {
+            rejectedRecoveryRates.Remove(localAdaptiveHz);
+            activeRecoveryProbeRate = null;
         }
 
         if (desired <= localAdaptiveHz)
@@ -560,17 +612,99 @@ public sealed class MovementRateController : IMovementRateController
             return;
         }
 
-        double movementDuty =
-            (lastSenderMillisecondsPerSecond + lastReceiverApplyMillisecondsPerSecond) / 1000d;
-        bool healthy = lastFramesPerSecond >= 55f &&
-            movementDuty <= 0.03d &&
-            lastMaximumReceiverQueueMilliseconds <= 50d;
-        healthyWindows = healthy ? healthyWindows + 1 : 0;
+        int candidate = Math.Min(desired, NextHigherRate(localAdaptiveHz));
+        bool retryingRejectedRate = rejectedRecoveryRates.ContainsKey(candidate);
+        if (retryingRejectedRate &&
+            !CanRetryRejectedRate(candidate))
+        {
+            healthyWindows = 0;
+            return;
+        }
+
+        // Probe one tier at a time so each higher cadence proves its own cost before another increase.
+        healthyWindows++;
         if (healthyWindows < HealthyWindowsBeforeIncrease) return;
 
-        localAdaptiveHz = Math.Min(desired, NextHigherRate(localAdaptiveHz));
+        localAdaptiveHz = candidate;
+        if (retryingRejectedRate)
+            activeRecoveryProbeRate = candidate;
         healthyWindows = 0;
         localReason = "battle-recovered";
+    }
+
+    private bool CanRetryRejectedRate(int candidate)
+    {
+        if (lastBulkPollsPerSecond <= 0 ||
+            !rejectedRecoveryRates.TryGetValue(
+                candidate,
+                out RejectedRateState rejectedRate))
+        {
+            return false;
+        }
+
+        if (rejectedRate.Failures <= 1) return true;
+
+        double bulkMillisecondsPerPoll =
+            lastBulkSendMillisecondsPerSecond / lastBulkPollsPerSecond;
+        bool bulkCostImproved =
+            rejectedRate.FailedBulkMillisecondsPerPoll > 0d &&
+            bulkMillisecondsPerPoll <=
+                rejectedRate.FailedBulkMillisecondsPerPoll * RejectedRateRetryCostRatio;
+        bool senderCostImproved =
+            rejectedRate.FailedSenderMillisecondsPerSecond > 0d &&
+            lastSenderMillisecondsPerSecond <=
+                rejectedRate.FailedSenderMillisecondsPerSecond * RejectedRateRetryCostRatio;
+        int baselineFrameCeilingHz = CalculateSenderCeiling(
+            rejectedRate.FailedFramesPerSecond,
+            0d,
+            effectiveFrameLimitHz);
+        int currentFrameCeilingHz = CalculateSenderCeiling(
+            lastFramesPerSecond,
+            0d,
+            effectiveFrameLimitHz);
+        bool frameRateImproved =
+            (baselineFrameCeilingHz < candidate && currentFrameCeilingHz >= candidate) ||
+            (rejectedRate.FailedFramesPerSecond > 0f &&
+                lastFramesPerSecond >=
+                    rejectedRate.FailedFramesPerSecond / RejectedRateRetryCostRatio);
+        if (!bulkCostImproved && !senderCostImproved && !frameRateImproved)
+            return false;
+
+        double priorityMillisecondsPerSecond = Math.Max(
+            0d,
+            lastSenderMillisecondsPerSecond - lastBulkSendMillisecondsPerSecond);
+        double projectedSenderMillisecondsPerSecond =
+            priorityMillisecondsPerSecond + (bulkMillisecondsPerPoll * candidate);
+        return CalculateSenderCeiling(
+                lastFramesPerSecond,
+                projectedSenderMillisecondsPerSecond,
+                effectiveFrameLimitHz) >= candidate;
+    }
+
+    private void RememberRejectedRate(int rate)
+    {
+        if (!rejectedRecoveryRates.TryGetValue(rate, out RejectedRateState rejectedRate))
+        {
+            rejectedRate = new RejectedRateState();
+            rejectedRecoveryRates.Add(rate, rejectedRate);
+        }
+
+        rejectedRate.Failures++;
+        rejectedRate.FailedBulkMillisecondsPerPoll = lastBulkPollsPerSecond > 0
+            ? lastBulkSendMillisecondsPerSecond / lastBulkPollsPerSecond
+            : 0d;
+        rejectedRate.FailedSenderMillisecondsPerSecond =
+            lastSenderMillisecondsPerSecond;
+        rejectedRate.FailedFramesPerSecond = lastFramesPerSecond;
+        activeRecoveryProbeRate = null;
+    }
+
+    private void ForgetActiveRecoveryProbe(int rate)
+    {
+        if (activeRecoveryProbeRate != rate) return;
+
+        rejectedRecoveryRates.Remove(rate);
+        activeRecoveryProbeRate = null;
     }
 
     private void RecomputeEffectiveRate()
@@ -648,6 +782,7 @@ public sealed class MovementRateController : IMovementRateController
             profile,
             bulkHz,
             priorityHz,
+            frameLimitHz,
             performanceCeilingHz,
             localAdaptiveHz,
             advertisedReceiverCapHz,
@@ -673,46 +808,91 @@ public sealed class MovementRateController : IMovementRateController
     private int GetControllerCount() =>
         1 + (missionContext?.ControllersInMission.Count ?? 0);
 
-    private static int CalculatePerformanceCeiling(
+    private static int CalculateSenderCeiling(
         float framesPerSecond,
-        double movementMillisecondsPerSecond,
-        double maximumQueueMilliseconds)
+        double senderMillisecondsPerSecond,
+        int effectiveFrameLimitHz)
     {
-        double duty = movementMillisecondsPerSecond / 1000d;
-        if (framesPerSecond < 25f || duty > 0.12d ||
-            maximumQueueMilliseconds > 150d)
-            return 10;
-        if (framesPerSecond < 35f || duty > 0.08d ||
-            maximumQueueMilliseconds > 100d)
-            return 15;
-        if (framesPerSecond < 45f || duty > 0.05d ||
-            maximumQueueMilliseconds > 75d)
-            return 20;
-        if (framesPerSecond < 55f || duty > 0.03d ||
-            maximumQueueMilliseconds > 50d)
-            return 30;
-        if (framesPerSecond < 58f || duty > 0.02d)
-            return 40;
-        return 60;
+        float normalizedFramesPerSecond = NormalizeFramesPerSecond(
+            framesPerSecond,
+            effectiveFrameLimitHz);
+        double duty = senderMillisecondsPerSecond / 1000d;
+        int desired;
+        if (normalizedFramesPerSecond < 25f || duty > 0.30d)
+            desired = 10;
+        else if (normalizedFramesPerSecond < 35f || duty > 0.25d)
+            desired = 15;
+        else if (normalizedFramesPerSecond < 45f || duty > 0.20d)
+            desired = 20;
+        else if (normalizedFramesPerSecond < 55f || duty > 0.15d)
+            desired = 30;
+        else if (normalizedFramesPerSecond < 58f || duty > 0.12d)
+            desired = 40;
+        else
+            desired = MaximumAdaptiveHz;
+
+        return Math.Min(desired, NormalizeRate(effectiveFrameLimitHz));
     }
 
     private static int CalculateReceiverCap(
         float framesPerSecond,
         double receiveApplyMillisecondsPerSecond,
-        double maximumQueueMilliseconds)
+        double maximumQueueMilliseconds,
+        int effectiveFrameLimitHz)
     {
+        float normalizedFramesPerSecond = NormalizeFramesPerSecond(
+            framesPerSecond,
+            effectiveFrameLimitHz);
         double duty = receiveApplyMillisecondsPerSecond / 1000d;
-        if (framesPerSecond < 25f || duty > 0.12d || maximumQueueMilliseconds > 150d)
-            return 10;
-        if (framesPerSecond < 35f || duty > 0.08d || maximumQueueMilliseconds > 100d)
-            return 15;
-        if (framesPerSecond < 45f || duty > 0.05d || maximumQueueMilliseconds > 75d)
-            return 20;
-        if (framesPerSecond < 55f || duty > 0.03d || maximumQueueMilliseconds > 50d)
-            return 30;
-        if (framesPerSecond < 58f || duty > 0.02d)
-            return 40;
-        return 60;
+        int desired;
+        if (normalizedFramesPerSecond < 25f || duty > 0.12d ||
+            maximumQueueMilliseconds > 150d)
+            desired = 10;
+        else if (normalizedFramesPerSecond < 35f || duty > 0.08d ||
+            maximumQueueMilliseconds > 100d)
+            desired = 15;
+        else if (normalizedFramesPerSecond < 45f || duty > 0.05d ||
+            maximumQueueMilliseconds > 75d)
+            desired = 20;
+        else if (normalizedFramesPerSecond < 55f || duty > 0.03d ||
+            maximumQueueMilliseconds > 50d)
+            desired = 30;
+        else if (normalizedFramesPerSecond < 58f || duty > 0.02d)
+            desired = 40;
+        else
+            desired = MaximumAdaptiveHz;
+
+        return Math.Min(desired, NormalizeRate(effectiveFrameLimitHz));
+    }
+
+    private static int ReadFrameLimitHz()
+    {
+        // Headless hosts do not initialize native graphics config, so they use the adaptive maximum.
+        if (EngineApplicationInterface.IConfig == null)
+            return MaximumAdaptiveHz;
+
+        return (int)Math.Round(NativeOptions.GetConfig(
+            NativeOptions.NativeOptionsType.FrameLimiter));
+    }
+
+    private void UpdateFrameLimit()
+    {
+        frameLimitHz = Math.Max(0, frameLimitProvider());
+        effectiveFrameLimitHz = NormalizeFrameLimit(frameLimitHz);
+    }
+
+    // Meeting a deliberate frame cap is healthy even when that cap is below 60 FPS.
+    private static float NormalizeFramesPerSecond(
+        float framesPerSecond,
+        int effectiveFrameLimitHz) =>
+        framesPerSecond * MaximumAdaptiveHz / effectiveFrameLimitHz;
+
+    private static int NormalizeFrameLimit(int configuredFrameLimitHz)
+    {
+        if (configuredFrameLimitHz <= 0) return MaximumAdaptiveHz;
+        return Math.Max(
+            RatesAscending[0],
+            Math.Min(MaximumAdaptiveHz, configuredFrameLimitHz));
     }
 
     private static int NextHigherRate(int current)
@@ -836,6 +1016,7 @@ public sealed class MovementRateController : IMovementRateController
         frameElapsed = 0f;
         frameCount = 0;
         sendMilliseconds = 0d;
+        bulkSendMilliseconds = 0d;
         receiveApplyMilliseconds = 0d;
         maximumReceiverQueueMilliseconds = 0d;
         wireBytes = 0;
@@ -849,7 +1030,8 @@ public sealed class MovementRateController : IMovementRateController
     {
         Logger.Information(
             "[MovementRate] profile={Profile} bulkHz={BulkHz} priorityHz={PriorityHz} " +
-            "performanceCeilingHz={PerformanceCeilingHz} localAdaptiveHz={LocalAdaptiveHz} " +
+            "frameLimitHz={FrameLimitHz} performanceCeilingHz={PerformanceCeilingHz} " +
+            "localAdaptiveHz={LocalAdaptiveHz} " +
             "receiverCapHz={ReceiverCapHz} peerCapHz={PeerCapHz} peerCapSource={PeerCapSource} " +
             "agents={ActiveAgents} localAgents={LocalAgents} controllers={Controllers} fps={Fps:0.0} " +
             "senderMsPerSecond={SenderMs:0.00} receiverApplyMsPerSecond={ReceiverMs:0.00} " +
@@ -858,6 +1040,7 @@ public sealed class MovementRateController : IMovementRateController
             snapshot.Profile,
             snapshot.BulkHz,
             snapshot.PriorityHz,
+            snapshot.FrameLimitHz,
             snapshot.PerformanceCeilingHz,
             snapshot.LocalAdaptiveHz,
             snapshot.AdvertisedReceiverCapHz,
@@ -933,7 +1116,8 @@ public sealed class MovementRateController : IMovementRateController
         int receiverCap = CalculateReceiverCap(
             snapshot.FramesPerSecond,
             snapshot.ReceiverApplyMillisecondsPerSecond,
-            snapshot.MaximumReceiverQueueMilliseconds);
+            snapshot.MaximumReceiverQueueMilliseconds,
+            NormalizeFrameLimit(snapshot.FrameLimitHz));
         if (receiverCap <= 10)
             return MovementReceiveHealth.Severe;
         if (receiverCap <= 20)

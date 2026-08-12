@@ -54,7 +54,6 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
             try
             {
                 EnsureFunctionsCollected();
-
                 FieldInfo allFunctionsField = typeof(CommandLineFunctionality).GetField(
                     "AllFunctions",
                     BindingFlags.NonPublic | BindingFlags.Static);
