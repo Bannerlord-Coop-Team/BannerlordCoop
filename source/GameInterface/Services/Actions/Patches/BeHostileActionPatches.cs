@@ -16,6 +16,11 @@ internal class BeHostileActionPatches
     {
         if (ModInformation.IsClient) return;
 
+        if (Campaign.Current.Models.EncounterModel.IsEncounterExemptFromHostileActions(attackerParty, defenderParty))
+        {
+            return;
+        }
+
         // Re-do check for player parties
         if (attackerParty.MobileParty != null && attackerParty.MobileParty.IsPlayerParty() && attackerParty.MapFaction != defenderParty.MapFaction && !FactionManager.IsAtWarAgainstFaction(attackerParty.MapFaction, defenderParty.MapFaction))
         {
