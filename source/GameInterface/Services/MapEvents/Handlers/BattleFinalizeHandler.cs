@@ -61,6 +61,7 @@ internal class BattleFinalizeHandler : IHandler
     private readonly ISettlementInterface settlementInterface;
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IPlayerManager playerManager;
+    private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
 
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
@@ -71,7 +72,8 @@ internal class BattleFinalizeHandler : IHandler
         IBattleTroopReserveBuilder reserveBuilder,
         ISettlementInterface settlementInterface,
         IBattleHostRegistry hostRegistry,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -82,6 +84,7 @@ internal class BattleFinalizeHandler : IHandler
         this.settlementInterface = settlementInterface;
         this.hostRegistry = hostRegistry;
         this.playerManager = playerManager;
+        this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
@@ -254,16 +257,15 @@ internal class BattleFinalizeHandler : IHandler
                 mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
             }
 
-            // Vanilla silently re-crowns AttackerSide.LeaderParty to whichever party is first in the
-            // list if the leader's party ever left and rejoined the event; capture and the aftermath
-            // prompt key on it, so re-assert the besieger camp leader before finalizing.
-            if (mapEvent.IsSiegeAssault && mapEvent.AttackerSide != null)
+            if (siegeMapEventLeaderReconciler.RestoreBeforeFinalize(
+                    mapEvent,
+                    out var replacedLeader,
+                    out var restoredLeader))
             {
-                var campLeader = mapEvent.MapEventSettlement?.SiegeEvent?.BesiegerCamp?.LeaderParty?.Party;
-                if (campLeader != null && mapEvent.AttackerSide.LeaderParty != campLeader)
-                {
-                    mapEvent.AttackerSide.LeaderParty = campLeader;
-                }
+                Logger.Warning(
+                    "Restored siege map event leader before finalization. Replaced={ReplacedLeader}, Restored={RestoredLeader}",
+                    replacedLeader?.MobileParty?.StringId ?? replacedLeader?.Settlement?.StringId,
+                    restoredLeader?.MobileParty?.StringId ?? restoredLeader?.Settlement?.StringId);
             }
 
             mapEvent.FinalizeEventAux();
