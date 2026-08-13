@@ -155,6 +155,18 @@ internal static class OnSessionStartDiagnosticPatch
     private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("Campaign.OnSessionStart");
 }
 
+[HarmonyPatch(typeof(Hero), nameof(Hero.CheckInvalidEquipmentsAndReplaceIfNeeded))]
+internal static class CheckInvalidHeroEquipmentDiagnosticPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(Hero __instance) =>
+        CampaignLoadPhaseDiagnosticPatch.RecordStarted($"Hero.CheckInvalidEquipmentsAndReplaceIfNeeded|{__instance.StringId}");
+
+    [HarmonyPostfix]
+    private static void Postfix(Hero __instance) =>
+        CampaignLoadPhaseDiagnosticPatch.RecordCompleted($"Hero.CheckInvalidEquipmentsAndReplaceIfNeeded|{__instance.StringId}");
+}
+
 [HarmonyPatch(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.InitializeDataCache))]
 internal static class InitializeDataCacheDiagnosticPatch
 {
