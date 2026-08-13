@@ -2,6 +2,7 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
