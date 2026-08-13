@@ -44,7 +44,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
     public void Dispose()
     {
-        QuestTypeRegistry.ClearAllForTests();
+        QuestTypeRegistry.UnregisterForTests(TestIssueType);
         GenericAcceptMirrorIssueTypes.QuestSolutionMirrorEligible.Add(TestIssueType);
         GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Add(TestIssueType);
         TestEnvironment.Dispose();

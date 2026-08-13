@@ -1,5 +1,6 @@
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.CreationCapture;
@@ -7,7 +8,6 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using ProtoBuf;
-using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -45,7 +45,8 @@ internal static class VillageNeedsCraftingMaterialsQuestType
     private static void RejectAcceptanceCore(Hero owner)
     {
         if (owner?.Issue == null || owner.Issue.IsOngoingWithoutQuest) return;
-        if (IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out _)) return;
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) &&
+            ownershipRegistry.TryGetOwnerControllerId(owner, out _)) return;
 
         using (new AllowedThread())
         {
@@ -100,59 +101,20 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         public void RejectAcceptance(Hero owner) => RejectAcceptanceCore(owner);
     }
 
-    private sealed class AlternativeAcceptMirrorStrategy : IAlternativeAcceptMirrorStrategy<AlternativeSolutionVanillaState>
-    {
-        public void MirrorAlternativeAccepted(Hero owner, AlternativeSolutionVanillaState state)
-        {
-            if (owner?.Issue is not Issue issue || !issue.IsOngoingWithoutQuest) return;
-
-            using (new AllowedThread())
-            {
-                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
-                issue.IsTriedToSolveBefore = true;
-                AlternativeSolutionVanillaStateSync.Apply(issue, state);
-            }
-        }
-
-        public void RejectAcceptance(Hero owner) => RejectAcceptanceCore(owner);
-    }
-
     private static readonly ICreationCaptureStrategy<Issue, ItemObject> CreationCaptureStrategy =
         new FieldForceCreationCapture<Issue, ItemObject>(RequestedItemField, owner => new Issue(owner));
 
     private static readonly IRaceArbitratedAcceptMirrorStrategy<VillageNeedsCraftingMaterialsAcceptFields> QuestSolutionAcceptMirror =
         new QuestSolutionAcceptMirrorStrategy();
 
-    private static readonly IAlternativeAcceptMirrorStrategy<AlternativeSolutionVanillaState> AlternativeAcceptMirror =
-        new AlternativeAcceptMirrorStrategy();
-
     public static readonly CreationCaptureRunner<Issue, ItemObject> CreationCapture = new(CreationCaptureStrategy);
 
     public static readonly RaceArbitratedAcceptMirrorHandler<VillageNeedsCraftingMaterialsAcceptFields> QuestSolutionAccept =
         new(QuestSolutionAcceptMirror);
 
-    public static readonly AlternativeAcceptMirrorHandler<AlternativeSolutionVanillaState> AlternativeAccept = new(AlternativeAcceptMirror);
-
     private static void OnGenuineCreation(Issue issue)
     {
         MessageBroker.Instance.Publish(issue.IssueOwner, new VillageCraftingIssueCreated(issue));
-    }
-
-    private static void OnGenuineQuestSolutionAccept(Hero issueOwner, string controllerId)
-    {
-        if (!QuestSolutionAccept.TryCaptureQuestFields(issueOwner, out var fields)) return;
-
-        var bytes = GenericAcceptFieldsSerializer.Serialize(fields);
-        MessageBroker.Instance.Publish(issueOwner, new QuestTypeQuestSolutionAcceptTriggered(issueOwner, controllerId, bytes));
-    }
-
-    private static void OnGenuineAlternativeAccept(Hero issueOwner, string controllerId)
-    {
-        if (issueOwner?.Issue is not Issue issue) return;
-
-        var state = AlternativeSolutionVanillaStateSync.Capture(issue);
-        var bytes = GenericAcceptFieldsSerializer.Serialize(state);
-        MessageBroker.Instance.Publish(issue, new QuestTypeAlternativeAcceptTriggered(issueOwner, controllerId, bytes));
     }
 
     public static bool TryTriggerOwnedAlternativeSolutionCompletion(Hero owner) =>
@@ -172,10 +134,8 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("VillageNeedsCraftingMaterials")
             .WithCreationCapture(CreationCaptureStrategy)
             .WithQuestSolutionAccept(QuestSolutionAcceptMirror)
-            .WithAlternativeAccept(AlternativeAcceptMirror)
+            .WithAlternativeAccept()
             .WithCreationTrigger(OnGenuineCreation)
-            .WithQuestSolutionAcceptTrigger(OnGenuineQuestSolutionAccept)
-            .WithAlternativeAcceptTrigger(OnGenuineAlternativeAccept)
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .Build();
 

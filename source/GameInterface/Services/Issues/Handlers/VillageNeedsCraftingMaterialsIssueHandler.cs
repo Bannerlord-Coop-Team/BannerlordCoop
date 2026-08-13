@@ -22,17 +22,23 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IIssueOwnershipRegistry ownershipRegistry;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
     public VillageNeedsCraftingMaterialsIssueHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IIssueOwnershipRegistry ownershipRegistry,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.ownershipRegistry = ownershipRegistry;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<VillageCraftingIssueCreated>(Handle_VillageCraftingIssueCreated);
         messageBroker.Subscribe<NetworkVillageCraftingIssueCreated>(Handle_NetworkVillageCraftingIssueCreated);
@@ -66,7 +72,7 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(requestedItem, out var requestedItemId)) return;
 
-        var generation = IssueGenerationRegistry.Bump(issue.IssueOwner);
+        var generation = generationRegistry.Bump(issue.IssueOwner);
 
         network.SendAll(new NetworkVillageCraftingIssueCreated(ownerId, requestedItemId, generation));
     }
@@ -80,7 +86,7 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
-            IssueGenerationRegistry.SetGeneration(owner, data.Generation);
+            generationRegistry.SetGeneration(owner, data.Generation);
 
             if (owner.Issue != null) return;
 
@@ -119,7 +125,7 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
                 return;
             }
 
-            if (!IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var recordedControllerId) ||
+            if (!ownershipRegistry.TryGetOwnerControllerId(owner, out var recordedControllerId) ||
                 recordedControllerId != player.ControllerId)
             {
                 Logger.Error("Rejecting {Message} from {Requester}, not the recorded owner for {Owner}",

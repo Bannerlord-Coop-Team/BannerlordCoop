@@ -106,6 +106,15 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         }
     }
 
+    private void OpenConversation(EnvironmentInstance instance, string ownerId, string controllerId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+            MessageBroker.Instance.Publish(owner, new IssueConversationOpenedLocally(owner, controllerId));
+        });
+    }
+
     private void CreateIssueOnServer(string ownerId)
     {
         Server.Call(() =>
@@ -215,7 +224,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("host-controller", ownerControllerId);
         });
 
@@ -267,22 +276,21 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         ForcePromisedPayment(Client, fixture.HeroId, 500);
         ForcePromisedPayment(OtherClient, fixture.HeroId, 800);
 
+        OpenConversation(Client, fixture.HeroId, "player-A");
+
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
         });
 
-        var clientTriggered = Assert.Single(Client.InternalMessages.GetMessages<QuestTypeQuestSolutionAcceptTriggered>());
-        var clientFields = GenericAcceptFieldsSerializer.Deserialize<VillageNeedsCraftingMaterialsAcceptFields>(clientTriggered.FieldsBytes);
-        Assert.True(clientFields.RequestedItemAmount > 0);
+        Assert.Single(Client.InternalMessages.GetMessages<QuestTypeQuestSolutionAcceptTriggered>());
 
         var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
         Assert.Equal(fixture.HeroId, accepted.OwnerId);
         Assert.Equal("player-A", accepted.OwnerControllerId);
         var acceptedFields = GenericAcceptFieldsSerializer.Deserialize<VillageNeedsCraftingMaterialsAcceptFields>(accepted.FieldsBytes);
-        Assert.NotEqual(clientFields.RequestedItemAmount, acceptedFields.RequestedItemAmount);
-        Assert.NotEqual(clientFields.RewardGold, acceptedFields.RewardGold);
+        Assert.True(acceptedFields.RequestedItemAmount > 0);
 
         foreach (var instance in AllInstances)
         {
@@ -300,7 +308,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-                Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
                 Assert.Equal("player-A", ownerControllerId);
             });
         }
@@ -321,12 +329,13 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
         TestEnvironment.ConnectRegisteredPlayer(OtherClient, "player-B");
+        OpenConversation(Client, fixture.HeroId, "player-A");
 
         var generation = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(IssueGenerationRegistry.TryGetGeneration(owner, out generation));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out generation));
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
         });
 
@@ -340,10 +349,11 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.False(owner.Issue.IsOngoingWithoutQuest);
             Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
-            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("player-A", ownerControllerId);
         });
 
+        OpenConversation(OtherClient, fixture.HeroId, "player-B");
         Server.Call(() =>
         {
             Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
@@ -362,7 +372,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             {
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
-                Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+                Assert.True(client.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
                 Assert.Equal("player-A", ownerControllerId);
             });
         }
@@ -387,7 +397,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(owner.Issue.IsOngoingWithoutQuest);
-            Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out _));
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
         });
     }
 
@@ -414,6 +424,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
         Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
 
         Client.Call(() =>
         {
@@ -426,15 +437,12 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             owner.Issue.StartIssueWithAlternativeSolution();
         });
 
-        var clientTriggered = Assert.Single(Client.InternalMessages.GetMessages<QuestTypeAlternativeAcceptTriggered>());
-        var clientState = GenericAcceptFieldsSerializer.Deserialize<AlternativeSolutionVanillaState>(clientTriggered.FieldsBytes);
-        Assert.NotEqual(default, clientState.ReturnTime);
+        Assert.Single(Client.InternalMessages.GetMessages<QuestTypeAlternativeAcceptTriggered>());
 
         var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
         Assert.Equal(fixture.HeroId, accepted.OwnerId);
         Assert.Equal("player-A", accepted.OwnerControllerId);
-        var acceptedState = GenericAcceptFieldsSerializer.Deserialize<AlternativeSolutionVanillaState>(accepted.FieldsBytes);
-        Assert.Equal(clientState.ReturnTime, acceptedState.ReturnTime);
+        Assert.NotEqual(default, accepted.State.ReturnTime);
 
         foreach (var instance in AllInstances)
         {
@@ -442,14 +450,14 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 Assert.True(owner.Issue.IsSolvingWithAlternative);
-                Assert.Equal(acceptedState.ReturnTime, owner.Issue.AlternativeSolutionReturnTimeForTroops);
+                Assert.Equal(accepted.State.ReturnTime, owner.Issue.AlternativeSolutionReturnTimeForTroops);
             });
         }
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("player-A", ownerControllerId);
             Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
         });
@@ -480,6 +488,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
         TestEnvironment.ConnectRegisteredPlayer(OtherClient, "player-B");
         Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
 
         Client.Call(() =>
         {
@@ -497,13 +506,14 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         Assert.Equal("player-A", accepted.OwnerControllerId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
 
+        OpenConversation(OtherClient, fixture.HeroId, "player-B");
         var generation = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(IssueGenerationRegistry.TryGetGeneration(owner, out generation));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out generation));
             Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer,
-                new RequestQuestTypeAcceptAlternative(fixture.HeroId, generation, default, System.Array.Empty<byte>()));
+                new RequestQuestTypeAcceptAlternative(fixture.HeroId, generation, default));
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
@@ -516,7 +526,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 Assert.True(owner.Issue.IsSolvingWithAlternative);
-                Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
                 Assert.Equal("player-A", ownerControllerId);
             });
         }
@@ -531,7 +541,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         Server.Call(() =>
         {
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
-                new RequestQuestTypeAcceptAlternative(fixture.HeroId, 0, default, System.Array.Empty<byte>()));
+                new RequestQuestTypeAcceptAlternative(fixture.HeroId, 0, default));
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
@@ -542,7 +552,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(owner.Issue.IsOngoingWithoutQuest);
-            Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out _));
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
         });
     }
 
@@ -566,7 +576,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
-            IssueOwnershipRegistry.SetOwner(owner, "player-A");
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
             quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
         });
 
@@ -626,7 +636,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            IssueOwnershipRegistry.SetOwner(owner, "player-A");
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
         });
 
         Server.Call(() =>

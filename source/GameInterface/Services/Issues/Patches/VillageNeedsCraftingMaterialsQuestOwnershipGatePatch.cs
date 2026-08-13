@@ -1,3 +1,4 @@
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using HarmonyLib;
@@ -12,7 +13,9 @@ internal class VillageNeedsCraftingMaterialsQuestOwnershipGatePatch
     [HarmonyPrefix]
     private static bool Prefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance, ref bool __result, out TextObject explanation)
     {
-        if (!IssueOwnershipRegistry.IsLocalPeerOwner(__instance.QuestGiver))
+        var isOwner = ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) &&
+            ownershipRegistry.IsLocalPeerOwner(__instance.QuestGiver);
+        if (!isOwner)
         {
             __result = false;
             explanation = new TextObject("{=!}You don't have enough crafting materials.");
