@@ -77,6 +77,7 @@ public class MapEventDebugCommands
         public MountedBattleStanceSnapshot Stance;
         public int HorsemanSlots;
         public MapEvent MapEvent;
+        public string MountedBattleEquipmentId;
         public bool Begun;
         public bool Restored;
     }
@@ -668,15 +669,32 @@ public class MapEventDebugCommands
 
         try
         {
-            if (!objectManager.TryGetId(ownerTroop.Equipment, out _))
+            if (!objectManager.TryGetIdWithLogging(
+                    fixture.Receiver.Leader,
+                    out string receiverHeroId))
+            {
+                throw new InvalidOperationException(
+                    "The mounted battle receiver hero was not registered.");
+            }
+
+            fixture.Receiver.MountedBattleEquipment = new Equipment();
+            fixture.Receiver.MountedBattleEquipment.FillFrom(
+                ownerTroop.Equipment);
+            if (!objectManager.TryGetIdWithLogging(
+                    fixture.Receiver.MountedBattleEquipment,
+                    out string mountedBattleEquipmentId))
             {
                 throw new InvalidOperationException(
                     "The mounted joust equipment was not registered.");
             }
 
-            fixture.Receiver.MountedBattleEquipment = ownerTroop.Equipment;
+            fixture.MountedBattleEquipmentId = mountedBattleEquipmentId;
             fixture.Receiver.Leader._battleEquipment =
                 fixture.Receiver.MountedBattleEquipment;
+            network.SendAll(new NetworkApplyMountedBattleFixtureEquipment(
+                receiverHeroId,
+                mountedBattleEquipmentId,
+                fixture.Receiver.MountedBattleEquipment));
 
             StageMountedBattleParty(fixture.Receiver, receiverTroop, MountedBattleReceiverTroops, fixture.Receiver.Party.Position);
             var ownerPosition = new CampaignVec2(
@@ -790,7 +808,12 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.mounted_battle_fixture_verify <fixtureToken>";
         if (restoredMountedBattleFixture != null && restoredMountedBattleFixture.Token == args[0])
         {
-            bool verified = IsMountedBattleFixtureRestored(restoredMountedBattleFixture);
+            if (!TryGetObjectManager(out var objectManager))
+                return "Unable to resolve ObjectManager.";
+
+            bool verified = IsMountedBattleFixtureRestored(
+                restoredMountedBattleFixture,
+                objectManager);
             restoredMountedBattleFixture.Restored = verified;
             return FormatMountedBattleFixture(
                 verified ? "verified" : "verification-failed",
@@ -1003,7 +1026,7 @@ public class MapEventDebugCommands
 
         var failures = new List<string>();
         TryFinalizeMountedBattleMapEvents(fixture, failures);
-        TryRestoreMountedBattleEquipment(fixture, failures);
+        TryRestoreMountedBattleEquipment(fixture, objectManager, failures);
         if (TryResolveMountedBattleParty(objectManager, fixture.Receiver, out var receiverError))
         {
             try
@@ -1047,7 +1070,8 @@ public class MapEventDebugCommands
             failures.Add(exception.Message);
         }
 
-        fixture.Restored = failures.Count == 0 && IsMountedBattleFixtureRestored(fixture);
+        fixture.Restored = failures.Count == 0 &&
+            IsMountedBattleFixtureRestored(fixture, objectManager);
         if (!fixture.Restored && failures.Count == 0)
             failures.Add("The restored state does not match the captured baseline.");
 
@@ -1057,15 +1081,55 @@ public class MapEventDebugCommands
 
     private static void TryRestoreMountedBattleEquipment(
         MountedBattleFixture fixture,
+        IObjectManager objectManager,
         List<string> failures)
     {
-        if (fixture.Receiver.MountedBattleEquipment == null)
+        Equipment mountedBattleEquipment =
+            fixture.Receiver.MountedBattleEquipment;
+        if (mountedBattleEquipment == null)
             return;
 
         try
         {
+            if (!ContainerProvider.TryResolve<INetwork>(out var network) ||
+                !objectManager.TryGetIdWithLogging(
+                    fixture.Receiver.Leader,
+                    out string receiverHeroId))
+            {
+                failures.Add(
+                    "Unable to resolve the mounted battle equipment restore services.");
+                return;
+            }
+
+            string originalBattleEquipmentId = null;
+            if (fixture.Receiver.OriginalBattleEquipment != null &&
+                !objectManager.TryGetIdWithLogging(
+                    fixture.Receiver.OriginalBattleEquipment,
+                    out originalBattleEquipmentId))
+            {
+                failures.Add(
+                    "The receiver's original battle equipment is not registered.");
+                return;
+            }
+
             fixture.Receiver.Leader._battleEquipment =
                 fixture.Receiver.OriginalBattleEquipment;
+            network.SendAll(new NetworkApplyMountedBattleFixtureEquipment(
+                receiverHeroId,
+                originalBattleEquipmentId,
+                fixture.Receiver.OriginalBattleEquipment));
+
+            if (objectManager.Contains(mountedBattleEquipment))
+            {
+                MessageBroker.Instance.Publish(
+                    fixture.Receiver.Leader,
+                    new InstanceDestroyed<Equipment>(mountedBattleEquipment));
+            }
+            if (objectManager.Contains(mountedBattleEquipment))
+            {
+                failures.Add(
+                    "The mounted joust equipment is still registered after restoration.");
+            }
         }
         catch (Exception exception)
         {
@@ -1179,11 +1243,15 @@ public class MapEventDebugCommands
         network.SendAll(restore);
     }
 
-    private static bool IsMountedBattleFixtureRestored(MountedBattleFixture fixture) =>
+    private static bool IsMountedBattleFixtureRestored(
+        MountedBattleFixture fixture,
+        IObjectManager objectManager) =>
         IsMountedBattlePartyRestored(fixture.Receiver) &&
         IsMountedBattlePartyRestored(fixture.Owner) &&
         fixture.Receiver.Leader?._battleEquipment ==
             fixture.Receiver.OriginalBattleEquipment &&
+        (fixture.Receiver.MountedBattleEquipment == null ||
+         !objectManager.Contains(fixture.Receiver.MountedBattleEquipment)) &&
         fixture.Receiver.Party?.MapEvent == fixture.Receiver.OriginalMapEvent &&
         fixture.Owner.Party?.MapEvent == fixture.Owner.OriginalMapEvent &&
         (fixture.MapEvent == null || fixture.MapEvent.IsFinalized || fixture.MapEvent == fixture.Receiver.OriginalMapEvent) &&
@@ -1307,6 +1375,11 @@ public class MapEventDebugCommands
         var receiver = fixture.Receiver.Party;
         var owner = fixture.Owner.Party;
         string[] activeMissionControllers = GetActiveMissionControllers(fixture);
+        bool mountedBattleEquipmentRegistered =
+            fixture.Receiver.MountedBattleEquipment != null &&
+            TryGetObjectManager(out var equipmentObjectManager) &&
+            equipmentObjectManager.Contains(
+                fixture.Receiver.MountedBattleEquipment);
         var result = new
         {
             token = fixture.Token,
@@ -1328,6 +1401,8 @@ public class MapEventDebugCommands
             receiverBattleEquipmentRestored =
                 fixture.Receiver.Leader?._battleEquipment ==
                     fixture.Receiver.OriginalBattleEquipment,
+            mountedBattleEquipmentId = fixture.MountedBattleEquipmentId,
+            mountedBattleEquipmentRegistered,
             activeMissionControllerIds = activeMissionControllers,
             receiverRosterRestored = IsMountedBattlePartyRestored(fixture.Receiver),
             ownerRosterRestored = IsMountedBattlePartyRestored(fixture.Owner),
@@ -4485,6 +4560,98 @@ public class MapEventDebugCommands
 }
 
 #if DEBUG
+/// <summary>[Server -&gt; Client] Applies the fixture-owned equipment contents and hero reference.</summary>
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkApplyMountedBattleFixtureEquipment : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string HeroId;
+
+    [ProtoMember(2)]
+    public readonly string EquipmentId;
+
+    [ProtoMember(3)]
+    public readonly Equipment Equipment;
+
+    public NetworkApplyMountedBattleFixtureEquipment(
+        string heroId,
+        string equipmentId,
+        Equipment equipment)
+    {
+        HeroId = heroId;
+        EquipmentId = equipmentId;
+        Equipment = equipment;
+    }
+}
+
+/// <summary>Applies mounted battle fixture equipment on clients in message order.</summary>
+internal sealed class MountedBattleFixtureEquipmentHandler : IHandler
+{
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+
+    public MountedBattleFixtureEquipmentHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager)
+    {
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        messageBroker.Subscribe<NetworkApplyMountedBattleFixtureEquipment>(Handle);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<NetworkApplyMountedBattleFixtureEquipment>(Handle);
+    }
+
+    private void Handle(
+        MessagePayload<NetworkApplyMountedBattleFixtureEquipment> payload)
+    {
+        if (ModInformation.IsServer)
+            return;
+
+        NetworkApplyMountedBattleFixtureEquipment equipmentUpdate =
+            payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging(
+                    equipmentUpdate.HeroId,
+                    out Hero hero))
+            {
+                return;
+            }
+
+            Equipment equipment = null;
+            if (equipmentUpdate.EquipmentId != null &&
+                !objectManager.TryGetObject(
+                    equipmentUpdate.EquipmentId,
+                    out equipment))
+            {
+                equipment = equipmentUpdate.Equipment;
+                if (equipment == null ||
+                    !objectManager.AddExisting(
+                        equipmentUpdate.EquipmentId,
+                        equipment))
+                {
+                    return;
+                }
+            }
+
+            using (new AllowedThread())
+            {
+                if (equipmentUpdate.Equipment != null &&
+                    equipment != equipmentUpdate.Equipment)
+                {
+                    equipment.FillFrom(equipmentUpdate.Equipment);
+                }
+
+                hero._battleEquipment = equipment;
+            }
+        }, blocking: true,
+            context: nameof(NetworkApplyMountedBattleFixtureEquipment));
+    }
+}
+
 /// <summary>[Server -&gt; Client] Ends a live-test fixture mission without resolving its campaign battle.</summary>
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkEndLateJoinModeFixtureMission : IEvent
