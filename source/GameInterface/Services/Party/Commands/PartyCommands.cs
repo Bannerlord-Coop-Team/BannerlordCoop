@@ -5,6 +5,7 @@ using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -206,6 +207,43 @@ internal class PartyCommands
         party.SetMoveGoToSettlement(settlement, navigationType, isTargetingThePort: false);
 
         return $"Ordered {party.StringId} to {settlement.StringId}.";
+    }
+
+    /// <summary>
+    /// Enters a saved player party into a settlement through Bannerlord's real authoritative action.
+    /// Intended for save/rejoin fixtures where map travel would make the setup timing-dependent.
+    /// </summary>
+    [CommandLineArgumentFunction("enter_settlement", "coop.debug.mobileparty")]
+    public static string EnterSettlementCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient)
+            return "Command can only be run on the server.";
+
+        if (strings.Count != 2)
+            return "Usage: coop.debug.mobileparty.enter_settlement <controllerId> <settlementId>";
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return "Unable to resolve PlayerManager.";
+        if (!playerManager.TryGetPlayer(strings[0], out var player))
+            return $"No registered player has controller id {strings[0]}.";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(player.MobilePartyId, out MobileParty party))
+            return $"Party with id {player.MobilePartyId} not found.";
+
+        var settlement = Settlement.Find(strings[1]);
+        if (settlement == null)
+            return $"Settlement with id {strings[1]} not found.";
+        if (!party.IsActive)
+            return $"Party {party.StringId} is not active.";
+        if (party.CurrentSettlement != null)
+            return $"Party {party.StringId} is already in {party.CurrentSettlement.StringId}.";
+        if (party.MapEvent != null)
+            return $"Party {party.StringId} is in map event {party.MapEvent.StringId}.";
+
+        EnterSettlementAction.ApplyForParty(party, settlement);
+        return $"Entered {party.StringId} into {settlement.StringId}.";
     }
 
     /// <summary>
