@@ -290,8 +290,6 @@ internal static class SiegeAutoResolveFixtureCommands
         // Mirror the finished simulation branch of SPScoreboardVM.OnExitBattle.
         mapState.EndBattleSimulation();
         simulation.OnFinished();
-        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "encounter")
-            return Error("The native scoreboard Done action did not open the encounter aftermath.");
         return StateJson("scoreboard-finished", null, settlement, MobileParty.MainParty);
     }
 
@@ -842,12 +840,17 @@ internal static class SiegeAutoResolveFixtureCommands
             siegeAssault = mapEvent?.IsSiegeAssault == true,
             battleState = mapEvent?.BattleState.ToString(),
             menu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
+            aftermathMenu = IsSiegeAftermathMenu(Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId),
             encounterActive = encounter != null,
             encounterState = encounter?.EncounterState.ToString(),
             simulationActive = mapState?.IsSimulationActive == true,
             simulationFinished = encounter?.BattleSimulation?.IsSimulationFinished,
         });
     }
+
+    private static bool IsSiegeAftermathMenu(string menuId) =>
+        menuId != null && (menuId.StartsWith("menu_settlement_taken", StringComparison.Ordinal) ||
+                           menuId == "siege_aftermath_contextual_summary");
 
     private static string Error(string message) =>
         JsonSerializer.Serialize(new { ok = false, error = message });

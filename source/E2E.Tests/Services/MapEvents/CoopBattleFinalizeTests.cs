@@ -357,14 +357,12 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     }
 
     [Fact]
-    public void SiegeSimulationResultCommit_WithoutMenu_RetiresPresentationAndPreservesEncounterSimulationAndLoot()
+    public void SiegeSimulationResultCommit_PreservesScoreboardAndLootUntilDone()
     {
         var setup = SetupSiegeSimulationResultClient();
         var client = Clients.First();
         var lootTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         object simulation = null;
-        using var deactivationCounter = new PlayerSiegeDeactivationCounter();
-
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out var mapEvent));
@@ -418,18 +416,14 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.False(mapState.AtMenu);
             Assert.Null(mapState.GameMenuId);
         });
-
-        Assert.Equal(1, deactivationCounter.Count);
     }
 
     [Fact]
-    public void DuplicateSiegeSimulationResultCommit_WithRecreatedMenu_RetiresMenuIdempotently()
+    public void DuplicateSiegeSimulationResultCommit_PreservesScoreboardPresentation()
     {
         var setup = SetupSiegeSimulationResultClient();
         var client = Clients.First();
         MenuContext staleMenu = null;
-
-        using var deactivationCounter = new PlayerSiegeDeactivationCounter();
 
         client.Call(() =>
         {
@@ -461,12 +455,10 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         {
             var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
             Assert.True(mapState.IsSimulationActive);
-            Assert.False(mapState.AtMenu);
-            Assert.Null(mapState.GameMenuId);
-            Assert.Equal(MenuContext.MenuContextState.Finalized, staleMenu._currentState);
+            Assert.True(mapState.AtMenu);
+            Assert.Equal("menu_siege_strategies", mapState.GameMenuId);
+            Assert.NotEqual(MenuContext.MenuContextState.Finalized, staleMenu._currentState);
         });
-
-        Assert.Equal(2, deactivationCounter.Count);
     }
 
     [Fact]
@@ -808,32 +800,4 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         return false;
     }
 
-    private sealed class PlayerSiegeDeactivationCounter : IDisposable
-    {
-        private static readonly MethodInfo DeactivationMethod =
-            AccessTools.Method(typeof(MapState), nameof(MapState.OnPlayerSiegeDeactivated));
-        private readonly Harmony harmony = new("coop-battle-finalize-siege-deactivation-counter");
-
-        public PlayerSiegeDeactivationCounter()
-        {
-            playerSiegeDeactivationCount = 0;
-            harmony.Patch(
-                DeactivationMethod,
-                prefix: new HarmonyMethod(typeof(CoopBattleFinalizeTests), nameof(CountPlayerSiegeDeactivation)));
-        }
-
-        public int Count => playerSiegeDeactivationCount;
-
-        public void Dispose()
-        {
-            harmony.Unpatch(DeactivationMethod, HarmonyPatchType.Prefix, harmony.Id);
-        }
-    }
-
-    private static int playerSiegeDeactivationCount;
-
-    private static void CountPlayerSiegeDeactivation()
-    {
-        playerSiegeDeactivationCount++;
-    }
 }

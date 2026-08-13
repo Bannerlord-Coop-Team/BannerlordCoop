@@ -11,8 +11,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -140,12 +138,6 @@ public interface ISiegeEventInterface : IGameAbstraction
         bool besiegerDefeated,
         SiegeTerminationRole role,
         bool interruptedActiveAssault = false);
-
-    /// <summary>
-    /// Retires the local siege presentation when an auto-resolve result is committed, without ending
-    /// the encounter or simulation that still owns the result screens.
-    /// </summary>
-    void RetireLocalSiegeSimulationPresentation(MapEvent mapEvent);
 
     /// <summary>
     /// Whether a rendered mission still owns the screen while an interrupted assault is unwinding.
@@ -609,24 +601,6 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         }
     }
 
-    public void RetireLocalSiegeSimulationPresentation(MapEvent mapEvent)
-    {
-        if (mapEvent?.IsSiegeAssault != true || mapEvent.MapEventSettlement == null)
-            return;
-
-        var mapState = Game.Current?.GameStateManager?.GameStates
-            .FirstOrDefault(state => state is MapState) as MapState;
-        if (mapState?.IsSimulationActive != true)
-            return;
-
-        DeactivateLocalPlayerSiege(mapEvent.MapEventSettlement);
-
-        if (mapState.AtMenu)
-            mapState.ExitMenuMode();
-        else if (!string.IsNullOrEmpty(mapState.GameMenuId))
-            mapState.GameMenuId = null;
-    }
-
     private static void FinishInterruptedActiveAssault(Settlement settlement)
     {
         var party = MobileParty.MainParty;
@@ -807,10 +781,9 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // client can't pause, so its encounter would otherwise roll the choice menu out to the town menu.
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
 
-        // Real-time assault capture: the prompt arrives while the battle mission is still tearing down, which is
-        // too early to touch PlayerEncounter. Park the transition and let SiegeCaptureTransitionRetryHandler
-        // re-run it on the next CampaignTick once the mission has fully popped back to the map.
-        if (TaleWorlds.MountAndBlade.MissionState.Current != null)
+        // The prompt precedes map-event teardown. Let the mission or simulation scoreboard release its view
+        // before replacing the encounter menu, otherwise its completion reopens the generic encounter.
+        if (SiegeCaptureTransitionRetryHandler.IsBattlePresentationActive())
         {
             SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
             return;
