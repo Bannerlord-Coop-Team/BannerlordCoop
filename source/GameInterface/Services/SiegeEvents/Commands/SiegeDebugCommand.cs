@@ -945,6 +945,20 @@ public class SiegeDebugCommand
             fixture.Settlement.Party.MapEvent != null)
             return "The captured siege-victory fixture is no longer clean.";
 
+        if (fixture.PlayerParty.MapFaction == fixture.Settlement.MapFaction)
+        {
+            var defenderOwner = Hero.AllAliveHeroes
+                .Where(hero => !hero.IsPlayerHero() && hero.Clan?.Leader == hero &&
+                    hero.Clan.Kingdom != null && hero.MapFaction != fixture.PlayerParty.MapFaction)
+                .OrderByDescending(hero => hero.MapFaction.IsAtWarWith(fixture.PlayerParty.MapFaction))
+                .FirstOrDefault();
+            if (defenderOwner == null)
+                return $"Unable to find a kingdom owner outside {fixture.PlayerParty.MapFaction.Name} for {fixture.Settlement.Name}.";
+
+            ChangeOwnerOfSettlementAction.ApplyByGift(fixture.Settlement, defenderOwner);
+        }
+        if (fixture.PlayerParty.MapFaction == fixture.Settlement.MapFaction)
+            return $"Unable to give {fixture.Settlement.Name} to a faction outside {fixture.PlayerParty.MapFaction.Name}.";
         if (!fixture.PlayerParty.MapFaction.IsAtWarWith(fixture.Settlement.MapFaction))
             DeclareWarAction.ApplyByDefault(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction);
         if (!fixture.PlayerParty.MapFaction.IsAtWarWith(fixture.Settlement.MapFaction))
@@ -963,14 +977,39 @@ public class SiegeDebugCommand
         if (!objectManager.TryGetId(fixture.MapEvent, out string mapEventId))
             return "Unable to resolve the siege assault map event id.";
 
-        fixture.VictoryRequested = true;
         var hostEpoch = ContainerProvider.TryResolve<IBattleHostRegistry>(out var hostRegistry) &&
             hostRegistry.TryGet(mapEventId, out var hostAssignment)
             ? hostAssignment.Epoch
             : 0;
-        messageBroker.Publish(
-            typeof(SiegeDebugCommand),
-            new AuthoritativeBattleConclusionRequested(mapEventId, BattleState.AttackerVictory, hostEpoch));
+        bool conclusionProcessed = false;
+        bool conclusionApplied = false;
+        void HandleConclusion(MessagePayload<BattleStateChangeProcessed> payload)
+        {
+            if (payload.What.MapEventId != mapEventId || payload.What.BattleState != BattleState.AttackerVictory)
+                return;
+
+            conclusionProcessed = true;
+            conclusionApplied = payload.What.Applied;
+        }
+
+        fixture.VictoryRequested = true;
+        messageBroker.Subscribe<BattleStateChangeProcessed>(HandleConclusion);
+        try
+        {
+            messageBroker.Publish(
+                typeof(SiegeDebugCommand),
+                new AuthoritativeBattleConclusionRequested(mapEventId, BattleState.AttackerVictory, hostEpoch));
+
+            if (!GameThread.WaitWhilePumping(() => conclusionProcessed, DateTime.UtcNow.AddSeconds(10)))
+                return "Timed out waiting for the authoritative siege-victory transition.";
+        }
+        finally
+        {
+            messageBroker.Unsubscribe<BattleStateChangeProcessed>(HandleConclusion);
+        }
+
+        if (!conclusionApplied)
+            return "The authoritative siege-victory transition was rejected.";
 
         if (fixture.PlayerParty.CurrentSettlement != fixture.Settlement)
             return "The real siege-victory transition did not place the player party inside the captured settlement.";
