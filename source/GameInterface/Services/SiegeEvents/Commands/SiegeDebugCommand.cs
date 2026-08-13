@@ -1012,10 +1012,14 @@ public class SiegeDebugCommand
         if (!conclusionApplied)
             return "The authoritative siege-victory transition was rejected.";
 
-        if (fixture.PlayerParty.CurrentSettlement != fixture.Settlement)
-            return "The real siege-victory transition did not place the player party inside the captured settlement.";
         if (!Patches.SiegeAftermathPatches.PendingAftermaths.ContainsKey(fixture.Settlement))
             return "The real siege-victory transition did not park the player's pending aftermath.";
+
+        // The headless server has no local aftermath menu to enter the winning player party, so stage the
+        // server-owned save state after the real capture has parked its pending aftermath.
+        EnterSettlementAction.ApplyForParty(fixture.PlayerParty, fixture.Settlement);
+        if (fixture.PlayerParty.CurrentSettlement != fixture.Settlement)
+            return "Unable to stage the siege victor inside the captured settlement for saving.";
 
         return FormatVictorySaveFixtureState("victory-complete", objectManager, playerManager);
     }
