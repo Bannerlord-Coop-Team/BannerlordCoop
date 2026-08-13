@@ -69,21 +69,7 @@ public class MapEventDebugCommands
         public string OpponentMobilePartyId { get; set; }
         public PartyBehaviorUpdateData OpponentBehavior { get; set; }
         public bool JoiningPartyJoined { get; set; }
-#if DEBUG
-        public List<LateJoinEnemySnapshot> LateEnemyLords { get; } = new List<LateJoinEnemySnapshot>();
-#endif
     }
-
-#if DEBUG
-    private sealed class LateJoinEnemySnapshot
-    {
-        public MobileParty Party { get; set; }
-        public string MobilePartyId { get; set; }
-        public TroopRosterElement[] MemberRoster { get; set; }
-        public PartyBehaviorUpdateData Behavior { get; set; }
-        public Dictionary<Hero, int> HeroHitPoints { get; set; }
-    }
-#endif
 
     private static WoundedAlliedFixture woundedAlliedFixture;
     private static BattleRewardFixture battleRewardFixture;
@@ -2214,122 +2200,6 @@ public class MapEventDebugCommands
     }
 
 #if DEBUG
-    // coop.debug.mapevent.late_join_mode_add_enemy_lords 450 2
-    /// <summary>Adds existing hostile lord parties to the active field battle through the native side setter.</summary>
-    [CommandLineArgumentFunction("late_join_mode_add_enemy_lords", "coop.debug.mapevent")]
-    public static string AddLateJoinModeFixtureEnemyLords(List<string> args)
-    {
-        if (ModInformation.IsClient)
-            return "Run this command on the server.";
-        if (!TryParseLateEnemyTargets(args, out int healthyPerParty, out int lordCount))
-        {
-            return "Usage: coop.debug.mapevent.late_join_mode_add_enemy_lords " +
-                   "<healthyPerParty:5-900> <lordCount:1-2>";
-        }
-
-        var fixture = lateJoinModeFixture;
-        if (fixture == null)
-            return "No late-join mode fixture is active.";
-        if (fixture.LateEnemyLords.Count > 0)
-            return "Late enemy lords are already active for this fixture.";
-        if (!TryGetObjectManager(out var objectManager) ||
-            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
-        {
-            return "Unable to resolve the late enemy fixture services.";
-        }
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(fixture.MapEventId, out var mapEvent) ||
-            mapEvent.IsFinalized || mapEvent.DefenderSide == null)
-        {
-            return "The fixture field battle is no longer available.";
-        }
-        if (!objectManager.TryGetObjectWithLogging<CharacterObject>("imperial_recruit", out var fixtureTroop))
-            return "Unable to resolve fixture troop imperial_recruit.";
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(fixture.FirstPlayerMobilePartyId, out var firstParty) ||
-            !objectManager.TryGetObjectWithLogging<MobileParty>(fixture.JoiningPlayerMobilePartyId, out var joiningParty))
-        {
-            return "Unable to resolve both fixture player parties.";
-        }
-
-        var firstFaction = firstParty.MapFaction?.MapFaction ?? firstParty.MapFaction;
-        var joiningFaction = joiningParty.MapFaction?.MapFaction ?? joiningParty.MapFaction;
-        var fixturePosition = firstParty.Position.ToVec2();
-        MobileParty[] candidates = MobileParty.All
-            .Where(p => p.IsActive && p.IsLordParty && p.LeaderHero != null && !p.LeaderHero.IsWounded &&
-                        p.Army == null && p.MapEvent == null && p.CurrentSettlement == null &&
-                        p.MemberRoster.TotalHealthyCount > 0 &&
-                        p.MapFaction != null &&
-                        VillageHostileFactionStanceHelper.HasWarStance(firstFaction, p.MapFaction) &&
-                        VillageHostileFactionStanceHelper.HasWarStance(joiningFaction, p.MapFaction))
-            .OrderBy(p => p.Position.ToVec2().DistanceSquared(fixturePosition))
-            .Take(lordCount)
-            .ToArray();
-        if (candidates.Length != lordCount)
-            return $"Only {candidates.Length} eligible hostile lord parties were found; {lordCount} are required.";
-
-        try
-        {
-            foreach (MobileParty party in candidates)
-            {
-                if (!behaviorSnapshot.TryCreate(party, out var behavior) ||
-                    !objectManager.TryGetId(party, out string mobilePartyId))
-                {
-                    throw new InvalidOperationException($"Unable to snapshot hostile lord party {party.StringId}.");
-                }
-
-                var snapshot = new LateJoinEnemySnapshot
-                {
-                    Party = party,
-                    MobilePartyId = mobilePartyId,
-                    MemberRoster = party.MemberRoster.GetTroopRoster().ToArray(),
-                    Behavior = behavior,
-                    HeroHitPoints = party.MemberRoster.GetTroopRoster()
-                        .Where(element => element.Character.IsHero && element.Character.HeroObject != null)
-                        .Select(element => element.Character.HeroObject)
-                        .Distinct()
-                        .ToDictionary(hero => hero, hero => hero.HitPoints),
-                };
-                fixture.LateEnemyLords.Add(snapshot);
-                SetExactHealthyRoster(party, snapshot.MemberRoster, fixtureTroop, healthyPerParty);
-                party.Party.MapEventSide = mapEvent.DefenderSide;
-            }
-
-            MessageBroker.Instance.Publish(
-                typeof(MapEventDebugCommands),
-                new MapEventInvolvedPartiesAdded(
-                    mapEvent,
-                    mapEvent._sides.SelectMany(side => side.Parties).ToArray()));
-        }
-        catch (Exception exception)
-        {
-            Logger.Error(exception, "Failed to add late enemy lords to fixture battle");
-            bool restored = RestoreLateEnemyLords(fixture, behaviorSnapshot);
-            return $"Unable to add late enemy lords: {exception.Message}. restored={restored}";
-        }
-
-        return $"Late enemy lords entered: mapEvent={fixture.MapEventId}, lordCount={lordCount}, " +
-               $"healthyPerParty={healthyPerParty}, enemyParties={mapEvent.DefenderSide.Parties.Count}, " +
-               $"lords={string.Join(",", candidates.Select(party => party.StringId))}.";
-    }
-
-    internal static bool TryParseLateEnemyTargets(
-        IReadOnlyList<string> args,
-        out int healthyPerParty,
-        out int lordCount)
-    {
-        healthyPerParty = 0;
-        lordCount = 0;
-        return args != null
-            && args.Count == 2
-            && int.TryParse(args[0], out healthyPerParty)
-            && healthyPerParty >= 5
-            && healthyPerParty <= 900
-            && int.TryParse(args[1], out lordCount)
-            && lordCount >= 1
-            && lordCount <= 2;
-    }
-#endif
-
-#if DEBUG
     // coop.debug.mapevent.late_join_mode_begin_field_battle
     /// <summary>Finishes the local deployment phase so live evidence shows the active field battle.</summary>
     [CommandLineArgumentFunction("late_join_mode_begin_field_battle", "coop.debug.mapevent")]
@@ -2526,16 +2396,11 @@ public class MapEventDebugCommands
             mapEvent.FinalizeEvent();
         ServerBattleModeArbiter.Release(fixture.MapEventId);
 
-#if DEBUG
-        var restored = RestoreLateEnemyLords(fixture, behaviorSnapshot);
-#else
-        var restored = true;
-#endif
-        restored = RestorePartyBehavior(
+        var restored = RestorePartyBehavior(
             fixture.FirstPlayerMobilePartyId,
             fixture.FirstPlayerBehavior,
             behaviorSnapshot,
-            objectManager) && restored;
+            objectManager);
         restored = RestorePartyBehavior(
             fixture.JoiningPlayerMobilePartyId,
             fixture.JoiningPlayerBehavior,
@@ -2547,87 +2412,9 @@ public class MapEventDebugCommands
             behaviorSnapshot,
             objectManager) && restored;
 
-#if DEBUG
-        if (restored)
-#endif
-            lateJoinModeFixture = null;
+        lateJoinModeFixture = null;
         return restored;
     }
-
-#if DEBUG
-    private static void SetExactHealthyRoster(
-        MobileParty party,
-        TroopRosterElement[] originalRoster,
-        CharacterObject fixtureTroop,
-        int healthyTarget)
-    {
-        int healthyHeroes = 0;
-        foreach (TroopRosterElement element in originalRoster)
-        {
-            if (!element.Character.IsHero) continue;
-            healthyHeroes += Math.Max(0, element.Number - element.WoundedNumber);
-        }
-        if (healthyHeroes <= 0 || healthyHeroes > healthyTarget)
-        {
-            throw new InvalidOperationException(
-                $"Hostile lord party {party.StringId} has {healthyHeroes} healthy heroes for target {healthyTarget}.");
-        }
-
-        RestoreTroopRoster(party.MemberRoster, Array.Empty<TroopRosterElement>());
-        foreach (TroopRosterElement element in originalRoster)
-        {
-            if (!element.Character.IsHero) continue;
-            party.MemberRoster.AddToCounts(
-                element.Character,
-                element.Number,
-                false,
-                element.WoundedNumber,
-                element.Xp,
-                true);
-        }
-        party.MemberRoster.AddToCounts(fixtureTroop, healthyTarget - healthyHeroes);
-    }
-
-    private static bool RestoreLateEnemyLords(
-        LateJoinModeFixture fixture,
-        IMobilePartyBehaviorSnapshot behaviorSnapshot)
-    {
-        bool restored = true;
-        foreach (LateJoinEnemySnapshot snapshot in fixture.LateEnemyLords.ToArray())
-        {
-            try
-            {
-                if (snapshot.Party.Party.MapEventSide != null)
-                    snapshot.Party.Party.MapEventSide = null;
-                RestoreTroopRoster(snapshot.Party.MemberRoster, snapshot.MemberRoster);
-                foreach (KeyValuePair<Hero, int> hero in snapshot.HeroHitPoints)
-                {
-                    if (!hero.Key.IsDead)
-                        hero.Key.HitPoints = hero.Value;
-                }
-                snapshot.Party.Position = snapshot.Behavior.PartyPosition;
-                if (!behaviorSnapshot.TryApply(snapshot.Party, snapshot.Behavior, out _))
-                {
-                    restored = false;
-                    continue;
-                }
-                MessageBroker.Instance.Publish(
-                    typeof(MapEventDebugCommands),
-                    new PartyBehaviorChangeAttempted(
-                        snapshot.Party,
-                        forcePosition: true,
-                        isCurrentlyAtSea: snapshot.Behavior.IsCurrentlyAtSea));
-                fixture.LateEnemyLords.Remove(snapshot);
-            }
-            catch (Exception exception)
-            {
-                Logger.Error(exception, "Failed to restore late enemy lord party {PartyId}", snapshot.MobilePartyId);
-                restored = false;
-            }
-        }
-        return restored;
-    }
-#endif
 
     private static bool RestorePartyBehavior(
         string mobilePartyId,

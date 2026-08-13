@@ -28,8 +28,7 @@ internal static class LargeBattleRosterFixtureCommands
         public Campaign Campaign;
         public PartySnapshot FirstParty;
         public PartySnapshot SecondParty;
-        public int? FirstExactHealthyCount;
-        public int? SecondExactHealthyCount;
+        public int? ExactHealthyCount;
     }
 
     private sealed class PartySnapshot
@@ -111,13 +110,12 @@ internal static class LargeBattleRosterFixtureCommands
     {
         if (!ModInformation.IsServer)
             return "Run this command on the server.";
-        if (!TryParseExactHealthyTargets(
-                args,
-                out int firstHealthyTarget,
-                out int secondHealthyTarget))
+        if (args.Count != 3
+            || !int.TryParse(args[2], out int healthyPerParty)
+            || (healthyPerParty != 5 && healthyPerParty != 900))
         {
             return "Usage: coop.debug.mobileparty.exact_battle_roster_begin " +
-                   "<firstPartyId> <secondPartyId> <firstHealthy:5-900> [secondHealthy:5-900]";
+                   "<firstPartyId> <secondPartyId> <healthyPerParty:5|900>";
         }
         if (fixture != null)
             return "A large-battle roster fixture is already pending restoration.";
@@ -162,7 +160,7 @@ internal static class LargeBattleRosterFixtureCommands
         PartySnapshot secondSnapshot = Capture(secondParty, secondBehavior);
         if (!TryGetFixtureTroopCount(
                 firstSnapshot,
-                firstHealthyTarget,
+                healthyPerParty,
                 out int firstTroops,
                 out firstError))
         {
@@ -170,7 +168,7 @@ internal static class LargeBattleRosterFixtureCommands
         }
         if (!TryGetFixtureTroopCount(
                 secondSnapshot,
-                secondHealthyTarget,
+                healthyPerParty,
                 out int secondTroops,
                 out secondError))
         {
@@ -182,8 +180,7 @@ internal static class LargeBattleRosterFixtureCommands
             Campaign = Campaign.Current,
             FirstParty = firstSnapshot,
             SecondParty = secondSnapshot,
-            FirstExactHealthyCount = firstHealthyTarget,
-            SecondExactHealthyCount = secondHealthyTarget,
+            ExactHealthyCount = healthyPerParty,
         };
         fixture = activeFixture;
         try
@@ -210,36 +207,8 @@ internal static class LargeBattleRosterFixtureCommands
         }
 
         return
-            $"EXACT_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} " +
-            $"firstHealthy={firstHealthyTarget} secondHealthy={secondHealthyTarget}\n" +
-            FormatState("active", firstParty, secondParty, firstHealthyTarget, secondHealthyTarget);
-    }
-
-    internal static bool TryParseExactHealthyTargets(
-        IReadOnlyList<string> args,
-        out int firstHealthyTarget,
-        out int secondHealthyTarget)
-    {
-        firstHealthyTarget = 0;
-        secondHealthyTarget = 0;
-        if (args == null || (args.Count != 3 && args.Count != 4))
-            return false;
-        if (!int.TryParse(args[2], out firstHealthyTarget)
-            || firstHealthyTarget < 5
-            || firstHealthyTarget > 900)
-        {
-            return false;
-        }
-
-        if (args.Count == 3)
-        {
-            secondHealthyTarget = firstHealthyTarget;
-            return true;
-        }
-
-        return int.TryParse(args[3], out secondHealthyTarget)
-            && secondHealthyTarget >= 5
-            && secondHealthyTarget <= 900;
+            $"EXACT_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} healthyPerParty={healthyPerParty}\n" +
+            FormatState("active", firstParty, secondParty, healthyPerParty);
     }
 
     [CommandLineArgumentFunction("large_battle_roster_status", "coop.debug.mobileparty")]
@@ -277,8 +246,7 @@ internal static class LargeBattleRosterFixtureCommands
             fixture == null ? "none" : "active",
             firstParty,
             secondParty,
-            fixture?.FirstExactHealthyCount,
-            fixture?.SecondExactHealthyCount);
+            fixture?.ExactHealthyCount);
     }
 
     [CommandLineArgumentFunction("exact_battle_roster_status", "coop.debug.mobileparty")]
@@ -344,8 +312,7 @@ internal static class LargeBattleRosterFixtureCommands
                        "restore-failed",
                        activeFixture.FirstParty.Party,
                        activeFixture.SecondParty.Party,
-                       activeFixture.FirstExactHealthyCount,
-                       activeFixture.SecondExactHealthyCount);
+                       activeFixture.ExactHealthyCount);
         }
 
         fixture = null;
@@ -356,7 +323,6 @@ internal static class LargeBattleRosterFixtureCommands
                 "none",
                 activeFixture.FirstParty.Party,
                 activeFixture.SecondParty.Party,
-                null,
                 null);
     }
 
@@ -597,14 +563,12 @@ internal static class LargeBattleRosterFixtureCommands
         string state,
         MobileParty firstParty,
         MobileParty secondParty,
-        int? firstExactHealthyCount,
-        int? secondExactHealthyCount = null)
+        int? exactHealthyCount)
     {
         var output = new StringBuilder();
         output.AppendLine(
             $"LARGE_BATTLE_ROSTER_FIXTURE state={state}|" +
-            $"firstExactHealthy={firstExactHealthyCount?.ToString() ?? "none"}|" +
-            $"secondExactHealthy={secondExactHealthyCount?.ToString() ?? "none"}");
+            $"exactHealthy={exactHealthyCount?.ToString() ?? "none"}");
         AppendPartyState(output, firstParty);
         AppendPartyState(output, secondParty);
         return output.ToString().TrimEnd();

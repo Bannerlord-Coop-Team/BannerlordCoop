@@ -27,9 +27,6 @@ internal static class BattleDebugCommands
 {
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
     private static int ownDamageEvents;
-#if DEBUG
-    private static int maxOccupiedAgentsObserved;
-#endif
     private static readonly Dictionary<Agent, AgentControllerType> CavalryControllers =
         new Dictionary<Agent, AgentControllerType>();
     private const int MaximumMountPoseSamples = 120;
@@ -52,9 +49,6 @@ internal static class BattleDebugCommands
 
         public override void OnPreDisplayMissionTick(float dt)
         {
-#if DEBUG
-            UpdateObservedOccupiedAgents(Mission);
-#endif
             CaptureMountPoseFrame();
         }
 
@@ -332,16 +326,10 @@ internal static class BattleDebugCommands
             .Where(supplier => !string.IsNullOrEmpty(supplier.PlayerPartyId))
             .Select(supplier => $"{supplier.Side}:{supplier.PlayerPartyId}")
             .ToArray();
-#if DEBUG
-        string capacityState = FormatCapacityState(mission, suppliers);
-#else
-        string capacityState = string.Empty;
-#endif
 
         return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
             $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
-            capacityState +
             $"reserveSuppliers={suppliers.Count} populatedReserves={suppliers.Count(supplier => supplier.IsPopulated)} " +
             $"receiverOwnedReserves={receiverReserves.Length} receiverReserve={string.Join(",", receiverReserves)} " +
             $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
@@ -350,58 +338,6 @@ internal static class BattleDebugCommands
             $"resultState={result?.BattleState.ToString() ?? "None"} " +
             $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
     }
-
-#if DEBUG
-    private static string FormatCapacityState(
-        Mission mission,
-        IReadOnlyList<CoopTroopSupplier> suppliers)
-    {
-        int occupiedAgents = mission.AllAgents?.Count ?? 0;
-        UpdateObservedOccupiedAgents(mission);
-        var spawnLogic = mission.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();
-        string allocationState = string.Join(",", suppliers
-            .OrderBy(supplier => (int)supplier.Side)
-            .Select(supplier => FormatAllocationState(supplier, spawnLogic)));
-        int maxRenderedAgents = ContainerProvider.TryResolve<IBattleAgentBudget>(out var agentBudget)
-            ? agentBudget.MaxRenderedAgents
-            : 2000;
-        int activeHeroes = mission.Agents.Count(agent =>
-            agent.IsActive() && agent.IsHuman && agent.Character?.IsHero == true);
-        string heroOwners = "unavailable";
-        if (ContainerProvider.TryResolve<INetworkAgentRegistry>(out var agentRegistry))
-        {
-            heroOwners = string.Join(",", agentRegistry.GetControllerIds()
-                .OrderBy(controllerId => controllerId, StringComparer.Ordinal)
-                .Select(controllerId => FormatHeroOwnerState(agentRegistry, controllerId)));
-        }
-
-        return $"occupiedAgents={occupiedAgents} peakOccupiedAgents={maxOccupiedAgentsObserved} " +
-               $"maxRenderedAgents={maxRenderedAgents} activeHeroes={activeHeroes} " +
-               $"heroOwners={heroOwners} allocation={allocationState} ";
-    }
-
-    private static string FormatAllocationState(
-        CoopTroopSupplier supplier,
-        DefaultBattleMissionAgentSpawnLogic spawnLogic)
-    {
-        var snapshot = supplier.CaptureAllocationSnapshot();
-        var phase = spawnLogic?._phases[(int)supplier.Side].FirstOrDefault();
-        return $"{supplier.Side}:party={supplier.PlayerPartyId ?? "none"}:owned={snapshot.TotalTroops}:" +
-               $"side={snapshot.SideTotalTroops}:supplied={snapshot.SuppliedTroops}:" +
-               $"initialTarget={phase?.InitialSpawnNumber ?? 0}:totalTarget={phase?.TotalSpawnNumber ?? 0}:" +
-               $"revision={snapshot.Revision}";
-    }
-
-    private static string FormatHeroOwnerState(
-        INetworkAgentRegistry agentRegistry,
-        string controllerId)
-    {
-        int activeHeroes = agentRegistry.GetAgents(controllerId).Count(info =>
-            info.OriginalOwner == controllerId && info.Agent?.IsActive() == true &&
-            info.Agent.IsHuman && info.Agent.Character?.IsHero == true);
-        return $"{controllerId}:{activeHeroes}";
-    }
-#endif
 
     [CommandLineArgumentFunction("charge_owned_formations", "coop.debug.battle")]
     public static string ChargeOwnedFormations(List<string> args)
@@ -866,9 +802,6 @@ internal static class BattleDebugCommands
 
         EnemyPositions.Clear();
         ownDamageEvents = 0;
-#if DEBUG
-        maxOccupiedAgentsObserved = 0;
-#endif
         CavalryControllers.Clear();
         capturedMount = null;
         capturedMountId = Guid.Empty;
@@ -877,15 +810,6 @@ internal static class BattleDebugCommands
         ReleaseMountCamera();
         observedMission = mission;
     }
-
-#if DEBUG
-    private static void UpdateObservedOccupiedAgents(Mission mission)
-    {
-        int occupied = mission?.AllAgents?.Count ?? 0;
-        if (occupied > maxOccupiedAgentsObserved)
-            maxOccupiedAgentsObserved = occupied;
-    }
-#endif
 
     private static void EnsureBattleDebugTickBehavior(Mission mission)
     {
