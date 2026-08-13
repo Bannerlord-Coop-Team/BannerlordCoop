@@ -2,6 +2,12 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Patches;
@@ -12,22 +18,28 @@ using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using GameInterface.Services.Villages.Commands;
 using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -37,6 +49,24 @@ namespace GameInterface.Services.SiegeEvents.Commands;
 public class SiegeDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeDebugCommand>();
+
+#if DEBUG
+    private static SallyOutFixture sallyOutFixture;
+
+    private sealed class SallyOutFixture
+    {
+        public Settlement Settlement;
+        public IFaction BesiegerFaction;
+        public SallyOutPartySnapshot[] Parties;
+        public MapEvent MapEvent;
+    }
+
+    private sealed class SallyOutPartySnapshot
+    {
+        public string ControllerId;
+        public MobileParty Party;
+    }
+#endif
 
     /// <summary>
     /// Creates a player-led siege and sends a multi-party defending army to interrupt it. Server only.
@@ -864,6 +894,401 @@ public class SiegeDebugCommand
         var mapEventId = objectManager.TryGetId(mapEvent, out string id) ? id : mapEvent.StringId;
         return $"Started AI siege assault by {attacker.Name} against {settlement.Name} (MapEvent {mapEventId})";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("sally_out_fixture_capture", "coop.debug.siege")]
+    public static string CaptureSallyOutFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 1)
+            return "Usage: coop.debug.siege.sally_out_fixture_capture <settlementId>";
+        if (sallyOutFixture != null)
+            return "A sally-out fixture is already pending restoration.";
+        if (!TryResolveSallyOutFixtureServices(
+                out var objectManager,
+                out var playerManager,
+                out _,
+                out _,
+                out var error))
+            return error;
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement) || !settlement.IsFortification)
+            return $"Fortification with id {args[0]} not found.";
+        if (settlement.SiegeEvent != null || settlement.Party.MapEvent != null)
+            return $"{settlement.Name} must not already be in a siege or map event.";
+
+        var players = playerManager.Players
+            .Where(playerManager.IsConnected)
+            .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
+            .ToArray();
+        if (players.Length != 2)
+            return $"Expected exactly 2 connected players, found {players.Length}.";
+
+        var partySnapshots = new List<SallyOutPartySnapshot>();
+        foreach (var player in players)
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party) ||
+                !party.IsActive || party.MapEvent != null || party.BesiegerCamp != null ||
+                party.CurrentSettlement != null || party.LeaderHero == null)
+            {
+                return $"Player {player.ControllerId} must have an active party on the campaign map.";
+            }
+            partySnapshots.Add(new SallyOutPartySnapshot
+            {
+                ControllerId = player.ControllerId,
+                Party = party,
+            });
+        }
+
+        var besiegerFaction = partySnapshots[0].Party.MapFaction;
+        if (besiegerFaction == null || partySnapshots.Any(snapshot => snapshot.Party.MapFaction != besiegerFaction))
+            return "Both player parties must belong to the same map faction.";
+        if (settlement.MapFaction == null)
+            return $"{settlement.Name} has no map faction.";
+        if (!besiegerFaction.IsAtWarWith(settlement.MapFaction))
+            return $"{besiegerFaction.Name} must already be at war with {settlement.MapFaction.Name}.";
+
+        sallyOutFixture = new SallyOutFixture
+        {
+            Settlement = settlement,
+            BesiegerFaction = besiegerFaction,
+            Parties = partySnapshots.ToArray(),
+        };
+
+        return FormatSallyOutFixtureState("captured", objectManager);
+    }
+
+    [CommandLineArgumentFunction("sally_out_fixture_start", "coop.debug.siege")]
+    public static string StartSallyOutFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 2 || !int.TryParse(args[1], out var expectedPlayerCount) || expectedPlayerCount != 2)
+            return "Usage: coop.debug.siege.sally_out_fixture_start <settlementId> 2";
+        if (!TryGetSallyOutFixture(args[0], out var fixture, out var error))
+            return error;
+        if (fixture.MapEvent != null)
+            return "The sally-out fixture is already started.";
+        if (!TryResolveSallyOutFixtureServices(
+                out var objectManager,
+                out var playerManager,
+                out var messageBroker,
+                out var network,
+                out error))
+            return error;
+
+        if (!fixture.BesiegerFaction.IsAtWarWith(fixture.Settlement.MapFaction))
+            return $"{fixture.BesiegerFaction.Name} is no longer at war with {fixture.Settlement.MapFaction.Name}.";
+
+        var battlePosition = fixture.Settlement.GatePosition;
+        foreach (var snapshot in fixture.Parties)
+        {
+            snapshot.Party.Position = battlePosition;
+            snapshot.Party.SetMoveModeHold();
+            snapshot.Party.ResetNavigationToHold();
+        }
+
+        var leader = fixture.Parties[0].Party;
+        Campaign.Current.SiegeEventManager.StartSiegeEvent(fixture.Settlement, leader);
+        var camp = fixture.Settlement.SiegeEvent?.BesiegerCamp;
+        if (camp == null || camp.LeaderParty != leader)
+            return "Failed to start the player-led siege.";
+
+        for (var i = 1; i < fixture.Parties.Length; i++)
+            fixture.Parties[i].Party.BesiegerCamp = camp;
+
+        var mapEvent = Campaign.Current.MapEventManager.StartSallyOutMapEvent(
+            fixture.Settlement.Party,
+            leader.Party);
+        fixture.MapEvent = mapEvent;
+        foreach (var snapshot in fixture.Parties.Skip(1))
+            snapshot.Party.Party.MapEventSide = mapEvent.DefenderSide;
+
+        if (!objectManager.TryGetId(mapEvent, out string mapEventId) ||
+            !objectManager.TryGetId(fixture.Settlement.Party, out string settlementPartyId))
+            return "Unable to resolve the sally-out fixture network ids.";
+
+        foreach (var snapshot in fixture.Parties)
+        {
+            if (!objectManager.TryGetId(snapshot.Party.Party, out string playerPartyId))
+                return $"Unable to resolve the party id for {snapshot.ControllerId}.";
+            if (!objectManager.TryGetId(snapshot.Party, out string playerMobilePartyId) ||
+                !playerManager.TryGetPeer(snapshot.ControllerId, out var peer))
+                return $"Unable to resolve the mission request for {snapshot.ControllerId}.";
+
+            network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
+                $"debug-2922-{snapshot.ControllerId}-{Guid.NewGuid():N}",
+                settlementPartyId,
+                playerPartyId,
+                mapEventId));
+            messageBroker.Publish(peer, new NetworkBattleStartRequest(
+                Guid.NewGuid().ToString(),
+                (int)BattleStartMode.Mission,
+                mapEventId,
+                playerMobilePartyId));
+        }
+
+        return FormatSallyOutFixtureState("started", objectManager);
+    }
+
+    [CommandLineArgumentFunction("sally_out_fixture_retreat", "coop.debug.siege")]
+    public static string RetreatSallyOutFixturePlayer(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (!TryGetFixturePlayer(args, out var fixture, out var player, out var error))
+            return error;
+        if (!TryResolveSallyOutFixtureServices(
+                out var objectManager,
+                out var playerManager,
+                out var messageBroker,
+                out var network,
+                out error) ||
+            !playerManager.TryGetPeer(player.ControllerId, out var peer) ||
+            !objectManager.TryGetId(fixture.MapEvent, out string mapEventId))
+            return string.IsNullOrEmpty(error) ? "Unable to resolve the retreating player." : error;
+        if (!objectManager.TryGetId(player.Party.Party, out string partyId))
+            return $"Unable to resolve the party id for {player.ControllerId}.";
+
+        network.Send(peer, new NetworkEndLateJoinModeFixtureMission(mapEventId));
+        messageBroker.Publish(peer, new NetworkRequestLeaveBattle(partyId));
+        return FormatSallyOutFixtureState("retreated", objectManager);
+    }
+
+    [CommandLineArgumentFunction("sally_out_fixture_heal", "coop.debug.siege")]
+    public static string HealSallyOutFixturePlayer(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (!TryGetFixturePlayer(args, out _, out var player, out var error))
+            return error;
+
+        player.Party.LeaderHero.HitPoints = player.Party.LeaderHero.MaxHitPoints;
+        return FormatSallyOutFixtureState("healed", null);
+    }
+
+    [CommandLineArgumentFunction("sally_out_fixture_rejoin", "coop.debug.siege")]
+    public static string RejoinSallyOutFixturePlayer(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (!TryGetFixturePlayer(args, out var fixture, out var player, out var error))
+            return error;
+        if (!TryResolveSallyOutFixtureServices(
+                out var objectManager,
+                out var playerManager,
+                out var messageBroker,
+                out _,
+                out error) ||
+            !playerManager.TryGetPeer(player.ControllerId, out var peer))
+            return "Unable to resolve the rejoining player peer.";
+        if (!objectManager.TryGetId(fixture.MapEvent, out string mapEventId) ||
+            !objectManager.TryGetId(player.Party.Party, out string partyId))
+            return "Unable to resolve the sally-out fixture network ids.";
+
+        messageBroker.Publish(peer, new NetworkRequestJoinBattle(
+            Guid.NewGuid().ToString(),
+            mapEventId,
+            partyId,
+            BattleSideEnum.Defender));
+        if (!objectManager.TryGetId(player.Party, out string playerMobilePartyId))
+            return $"Unable to resolve the mobile party id for {player.ControllerId}.";
+        messageBroker.Publish(peer, new NetworkBattleStartRequest(
+            Guid.NewGuid().ToString(),
+            (int)BattleStartMode.Mission,
+            mapEventId,
+            playerMobilePartyId));
+        return FormatSallyOutFixtureState("rejoined", objectManager);
+    }
+
+    [CommandLineArgumentFunction("sally_out_fixture_finish", "coop.debug.siege")]
+    public static string FinishSallyOutFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.siege.sally_out_fixture_finish";
+        if (sallyOutFixture?.MapEvent == null)
+            return "No active sally-out fixture was found.";
+        if (!TryResolveSallyOutFixtureServices(
+                out var objectManager,
+                out var playerManager,
+                out var messageBroker,
+                out var network,
+                out var error) ||
+            !ContainerProvider.TryResolve<IBattleHostRegistry>(out var hostRegistry) ||
+            !objectManager.TryGetId(sallyOutFixture.MapEvent, out string mapEventId))
+            return string.IsNullOrEmpty(error) ? "Unable to resolve the sally-out map event id." : error;
+
+        foreach (var snapshot in sallyOutFixture.Parties)
+        {
+            if (playerManager.TryGetPeer(snapshot.ControllerId, out var peer))
+                network.Send(peer, new NetworkEndLateJoinModeFixtureMission(mapEventId));
+        }
+
+        var hostEpoch = hostRegistry.TryGet(mapEventId, out var assignment) ? assignment.Epoch : 0;
+        messageBroker.Publish(
+            typeof(SiegeDebugCommand),
+            new AuthoritativeBattleConclusionRequested(mapEventId, BattleState.DefenderVictory, hostEpoch));
+        return FormatSallyOutFixtureState("finished", objectManager);
+    }
+
+    [CommandLineArgumentFunction("sally_out_fixture_state", "coop.debug.siege")]
+    public static string GetSallyOutFixtureState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.siege.sally_out_fixture_state";
+        ContainerProvider.TryResolve<IObjectManager>(out var objectManager);
+        return FormatSallyOutFixtureState("state", objectManager);
+    }
+
+    [CommandLineArgumentFunction("sally_out_fixture_restore", "coop.debug.siege")]
+    public static string RestoreSallyOutFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.siege.sally_out_fixture_restore";
+        if (GetCurrentSallyOutFixture() == null)
+            return "No sally-out fixture is active.";
+
+        // Siege completion can replace campaign objects, so restoration restarts from the baseline save.
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            Thread.Sleep(250);
+            GameThread.RunSafe(Utilities.QuitGame, context: nameof(RestoreSallyOutFixture));
+        });
+        return "Fixture shutdown requested; relaunch this run from its unchanged baseline save.";
+    }
+
+    private static bool TryResolveSallyOutFixtureServices(
+        out IObjectManager objectManager,
+        out IPlayerManager playerManager,
+        out IMessageBroker messageBroker,
+        out INetwork network,
+        out string error)
+    {
+        objectManager = null;
+        playerManager = null;
+        messageBroker = null;
+        network = null;
+        error = null;
+        if (!ContainerProvider.TryGetContainer(out var container) ||
+            !container.TryResolve(out objectManager) ||
+            !container.TryResolve(out playerManager) ||
+            !container.TryResolve(out messageBroker) ||
+            !container.TryResolve(out network))
+        {
+            error = "Unable to resolve sally-out fixture services.";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool TryGetSallyOutFixture(
+        string settlementId,
+        out SallyOutFixture fixture,
+        out string error)
+    {
+        fixture = GetCurrentSallyOutFixture();
+        if (fixture == null)
+        {
+            error = "Capture the sally-out fixture first.";
+            return false;
+        }
+        if (fixture.Settlement.StringId != settlementId)
+        {
+            error = $"The captured fixture belongs to {fixture.Settlement.StringId}.";
+            return false;
+        }
+        error = null;
+        return true;
+    }
+
+    private static bool TryGetFixturePlayer(
+        List<string> args,
+        out SallyOutFixture fixture,
+        out SallyOutPartySnapshot player,
+        out string error)
+    {
+        fixture = GetCurrentSallyOutFixture();
+        player = null;
+        if (args.Count != 1 || !int.TryParse(args[0], out var playerNumber) || playerNumber < 1 || playerNumber > 2)
+        {
+            error = "Expected player number 1 or 2.";
+            return false;
+        }
+        if (fixture?.MapEvent == null)
+        {
+            error = "Start the sally-out fixture first.";
+            return false;
+        }
+        player = fixture.Parties[playerNumber - 1];
+        error = null;
+        return true;
+    }
+
+    private static string FormatSallyOutFixtureState(string phase, IObjectManager objectManager)
+    {
+        var fixture = GetCurrentSallyOutFixture();
+        var settlement = fixture?.Settlement ?? Settlement.Find("town_ES1");
+        var mapEvent = fixture?.MapEvent ?? MobileParty.MainParty?.MapEvent ?? settlement?.Party?.MapEvent;
+        var campLeader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        var players = fixture?.Parties?.Select(snapshot => (object)new
+            {
+                controllerId = snapshot.ControllerId,
+                party = snapshot.Party.StringId,
+                side = snapshot.Party.Party.MapEventSide?.MissionSide.ToString(),
+                hitPoints = snapshot.Party.LeaderHero?.HitPoints,
+            }).ToArray() ?? new object[]
+            {
+                new
+                {
+                    controllerId = "local",
+                    party = MobileParty.MainParty?.StringId,
+                    side = MobileParty.MainParty?.Party?.MapEventSide?.MissionSide.ToString(),
+                    hitPoints = MobileParty.MainParty?.LeaderHero?.HitPoints,
+                },
+            };
+        var state = new
+        {
+            role = ModInformation.IsServer ? "server" : "client",
+            phase,
+            fixtureActive = fixture != null || mapEvent != null || settlement?.SiegeEvent != null,
+            settlement = settlement?.StringId ?? "town_ES1",
+            siegeActive = settlement?.SiegeEvent != null,
+            mapEventId = mapEvent != null && objectManager?.TryGetId(mapEvent, out string id) == true ? id : null,
+            mapEventType = mapEvent?.EventType.ToString(),
+            battleState = mapEvent?.BattleState.ToString(),
+            finalized = mapEvent?.IsFinalized ?? false,
+            campLeader = campLeader?.StringId,
+            attackerLeader = mapEvent?.AttackerSide?.LeaderParty?.MobileParty?.StringId,
+            defenderLeader = mapEvent?.DefenderSide?.LeaderParty?.MobileParty?.StringId,
+            leadershipRestored = IsSallyOutLeadershipRestored(
+                campLeader?.StringId,
+                mapEvent?.DefenderSide?.LeaderParty?.MobileParty?.StringId),
+            players,
+        };
+        return $"Sally-out fixture {phase}: settlement={state.settlement} siege={state.siegeActive} " +
+               $"mapEvent={state.mapEventId ?? "none"} campLeader={state.campLeader ?? "none"} " +
+               $"attackerLeader={state.attackerLeader ?? "none"} defenderLeader={state.defenderLeader ?? "none"}" +
+               Environment.NewLine + $"LIVE_TEST_JSON={JsonSerializer.Serialize(state)}";
+    }
+
+    internal static bool IsSallyOutLeadershipRestored(string campLeader, string defenderLeader) =>
+        !string.IsNullOrEmpty(campLeader) && campLeader == defenderLeader;
+
+    private static SallyOutFixture GetCurrentSallyOutFixture()
+    {
+        var fixture = sallyOutFixture;
+        if (fixture != null && !ReferenceEquals(Settlement.Find(fixture.Settlement.StringId), fixture.Settlement))
+        {
+            sallyOutFixture = null;
+            fixture = null;
+        }
+        return fixture;
+    }
+#endif
 
     // coop.debug.siege.list
     /// <summary>
