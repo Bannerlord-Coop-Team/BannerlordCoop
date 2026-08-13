@@ -4,6 +4,7 @@ using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.CampaignService.Patches;
@@ -165,6 +166,16 @@ internal static class CheckInvalidHeroEquipmentDiagnosticPatch
     [HarmonyPostfix]
     private static void Postfix(Hero __instance) =>
         CampaignLoadPhaseDiagnosticPatch.RecordCompleted($"Hero.CheckInvalidEquipmentsAndReplaceIfNeeded|{__instance.StringId}");
+}
+
+[HarmonyPatch(typeof(MBGameManager), nameof(MBGameManager.OnAfterGameInitializationFinished))]
+internal static class AfterGameInitializationFinishedDiagnosticPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => CampaignLoadPhaseDiagnosticPatch.RecordStarted("MBGameManager.OnAfterGameInitializationFinished");
+
+    [HarmonyPostfix]
+    private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("MBGameManager.OnAfterGameInitializationFinished");
 }
 
 [HarmonyPatch(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.InitializeDataCache))]
