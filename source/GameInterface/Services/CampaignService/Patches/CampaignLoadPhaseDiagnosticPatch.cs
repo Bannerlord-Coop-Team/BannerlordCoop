@@ -189,6 +189,13 @@ internal static class SandBoxGameManagerOnLoadFinishedDiagnosticPatch
     private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("SandBoxGameManager.OnLoadFinished");
 }
 
+[HarmonyPatch(typeof(Module), nameof(Module.OnApplicationTick))]
+internal static class ModuleOnApplicationTickDiagnosticPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("Module.OnApplicationTick");
+}
+
 [HarmonyPatch(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.InitializeDataCache))]
 internal static class InitializeDataCacheDiagnosticPatch
 {
