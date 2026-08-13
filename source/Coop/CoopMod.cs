@@ -672,7 +672,9 @@ namespace Coop
         {
             // The auto-load-save start path owns this process's startup.
             if (ManagedServerConfig.HasAutoLoadSave) return;
+#if DEBUG
             if (!isServer && isDeferredClientJoin) return;
+#endif
 
             if (isAutoConnect && !_autoStarted &&
                 GameStateManager.Current?.ActiveState is InitialState)
