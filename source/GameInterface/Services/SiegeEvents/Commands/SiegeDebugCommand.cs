@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -940,18 +941,12 @@ public class SiegeDebugCommand
             });
         }
 
-        var besiegerFaction = partySnapshots[0].Party.MapFaction;
-        if (besiegerFaction == null || partySnapshots.Any(snapshot => snapshot.Party.MapFaction != besiegerFaction))
-            return "Both player parties must belong to the same map faction.";
         if (settlement.MapFaction == null)
             return $"{settlement.Name} has no map faction.";
-        if (!besiegerFaction.IsAtWarWith(settlement.MapFaction))
-            return $"{besiegerFaction.Name} must already be at war with {settlement.MapFaction.Name}.";
 
         sallyOutFixture = new SallyOutFixture
         {
             Settlement = settlement,
-            BesiegerFaction = besiegerFaction,
             Parties = partySnapshots.ToArray(),
         };
 
@@ -976,6 +971,36 @@ public class SiegeDebugCommand
                 out var network,
                 out error))
             return error;
+
+        if (fixture.Settlement.MapFaction is not Kingdom defenderKingdom)
+            return $"{fixture.Settlement.Name} must belong to a kingdom.";
+        if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+            return "Unable to resolve kingdom membership state.";
+
+        var besiegerKingdom = Kingdom.All
+            .Where(kingdom => kingdom != defenderKingdom && !kingdom.IsEliminated)
+            .OrderBy(kingdom => kingdom.StringId, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (besiegerKingdom == null)
+            return $"No besieger kingdom is available against {fixture.Settlement.Name}.";
+
+        var clans = fixture.Parties
+            .Select(snapshot => snapshot.Party.ActualClan)
+            .ToArray();
+        if (clans.Any(clan => clan == null))
+            return "Both players must have clans.";
+
+        foreach (var clan in clans)
+        {
+            kingdomMembershipState.MoveClanToKingdom(
+                clan.Kingdom,
+                besiegerKingdom,
+                clan,
+                publishCollectionChanges: true);
+        }
+        fixture.BesiegerFaction = besiegerKingdom;
+        if (!besiegerKingdom.IsAtWarWith(defenderKingdom))
+            DeclareWarAction.ApplyByDefault(besiegerKingdom, defenderKingdom);
 
         if (!fixture.BesiegerFaction.IsAtWarWith(fixture.Settlement.MapFaction))
             return $"{fixture.BesiegerFaction.Name} is no longer at war with {fixture.Settlement.MapFaction.Name}.";
