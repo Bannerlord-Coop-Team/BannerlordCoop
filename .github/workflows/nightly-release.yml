@@ -21,8 +21,8 @@ concurrency:
 
 env:
   R2_PRIVATE_BUCKET: bannerlordcoop-build-inputs
-  R2_PUBLIC_BUCKET: bannerlordcoop-nightly-releases
-  R2_PUBLIC_BASE_URL: https://pub-bf6bfe4b880e4d1b83f4b09b10419f78.r2.dev
+  R2_NIGHTLY_BUCKET: bannerlordcoop-patron-nightlies
+  R2_NIGHTLY_BASE_URL: https://pub-bf6bfe4b880e4d1b83f4b09b10419f78.r2.dev
 
 jobs:
   build:
@@ -295,7 +295,7 @@ jobs:
             printf '%s' "$BASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
           fi
           test "$R2_PRIVATE_BUCKET" = bannerlordcoop-build-inputs
-          test "$R2_PUBLIC_BUCKET" = bannerlordcoop-nightly-releases
+          test "$R2_NIGHTLY_BUCKET" = bannerlordcoop-patron-nightlies
 
           test -d transfer
           test ! -L transfer
@@ -389,12 +389,12 @@ jobs:
           "$RUNNER_TEMP/rclone" copyto artifact/manifest.json "r2:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
-      - name: Publish latest client to public R2
+      - name: Publish latest client to private Patron R2
         env:
           RCLONE_CONFIG_R2_TYPE: s3
           RCLONE_CONFIG_R2_PROVIDER: Cloudflare
-          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PUBLIC_ACCESS_KEY_ID }}
-          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PUBLIC_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_NIGHTLY_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_NIGHTLY_SECRET_ACCESS_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           RELEASE_DATE: ${{ needs.build.outputs.release_date }}
           FILE_NAME: ${{ needs.build.outputs.file_name }}
@@ -410,7 +410,7 @@ jobs:
           test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
           built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           export BUILT_AT="$built_at"
-          export PUBLIC_URL="$R2_PUBLIC_BASE_URL/nightly/Coop.7z"
+          export PUBLIC_URL="$R2_NIGHTLY_BASE_URL/nightly/Coop.7z"
           python3 - <<'PY'
           import json
           import os
@@ -431,18 +431,18 @@ jobs:
           path = Path("artifact/client-release.json")
           path.write_text(json.dumps(manifest, separators=(",", ":")) + "\n", encoding="utf-8")
           if json.loads(path.read_text(encoding="utf-8")) != manifest:
-              raise SystemExit("public manifest validation failed")
+              raise SystemExit("Patron nightly manifest validation failed")
           PY
           test "$(stat -c %s artifact/client-release.json)" -le 4096
 
-          "$RUNNER_TEMP/rclone" copyto "$archive" "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" \
+          "$RUNNER_TEMP/rclone" copyto "$archive" "r2:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          remote_bytes=$("$RUNNER_TEMP/rclone" lsl "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" | awk '{print $1}')
+          remote_bytes=$("$RUNNER_TEMP/rclone" lsl "r2:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" | awk '{print $1}')
           test "$remote_bytes" = "$ARCHIVE_BYTES"
-          remote_sha256=$("$RUNNER_TEMP/rclone" cat "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" | sha256sum | awk '{print $1}')
+          remote_sha256=$("$RUNNER_TEMP/rclone" cat "r2:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" | sha256sum | awk '{print $1}')
           test "$remote_sha256" = "$ARCHIVE_SHA256"
           # Publish the manifest last so installers never observe incomplete client bytes.
-          "$RUNNER_TEMP/rclone" copyto artifact/client-release.json "r2:$R2_PUBLIC_BUCKET/nightly/client.json" \
+          "$RUNNER_TEMP/rclone" copyto artifact/client-release.json "r2:$R2_NIGHTLY_BUCKET/nightly/client.json" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
       - name: Upload nightly artifact
