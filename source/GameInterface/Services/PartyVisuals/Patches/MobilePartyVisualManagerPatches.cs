@@ -1,8 +1,10 @@
 ﻿using Common.Logging;
 using HarmonyLib;
 using SandBox.View.Map.Managers;
+using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -13,13 +15,26 @@ namespace GameInterface.Services.PartyVisuals.Patches
     {
         private static ILogger Logger = LogManager.GetLogger<MobilePartyVisualManagerPatches>();
 
+        [HarmonyPatch(nameof(MobilePartyVisualManager.OnInitialize))]
+        [HarmonyPrefix]
+        private static void OnInitializePrefix(MobilePartyVisualManager __instance)
+        {
+            PrepareDirtyPartyVisualBuffer(
+                ref __instance._dirtyPartyVisualCount,
+                ref __instance._dirtyPartiesList,
+                MobileParty.All.Count);
+        }
+
         [HarmonyPatch(nameof(MobilePartyVisualManager.OnTick))]
         [HarmonyPrefix]
-        private static bool Prefix(MobilePartyVisualManager __instance, float realDt, float dt)
+        private static bool OnTickPrefix(MobilePartyVisualManager __instance, float realDt, float dt)
         {
             if (Mission.Current != null) return false;
 
-            __instance._dirtyPartyVisualCount = -1;
+            PrepareDirtyPartyVisualBuffer(
+                ref __instance._dirtyPartyVisualCount,
+                ref __instance._dirtyPartiesList,
+                __instance._visualsFlattened.Count);
             TWParallel.For(0, __instance._visualsFlattened.Count, delegate (int startInclusive, int endExclusive)
             {
                 for (int i = startInclusive; i < endExclusive; i++)
@@ -71,6 +86,22 @@ namespace GameInterface.Services.PartyVisuals.Patches
             }
 
             return false;
+        }
+
+        internal static void PrepareDirtyPartyVisualBuffer(
+            ref int dirtyPartyVisualCount,
+            ref MobilePartyVisual[] dirtyPartiesList,
+            int requiredCapacity)
+        {
+            dirtyPartyVisualCount = -1;
+            if (dirtyPartiesList.Length >= requiredCapacity)
+                return;
+
+            int doubledCapacity = dirtyPartiesList.Length > int.MaxValue / 2
+                ? requiredCapacity
+                : dirtyPartiesList.Length * 2;
+            int newCapacity = Math.Max(requiredCapacity, Math.Max(1, doubledCapacity));
+            Array.Resize(ref dirtyPartiesList, newCapacity);
         }
     }
 }
