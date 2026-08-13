@@ -50,7 +50,6 @@ internal class BattleTroopReserveHandler : IHandler
             message.Parties ?? Array.Empty<PartyReserve>(),
             message.SideTotalTroops,
             message.PlayerOwnedPartyCount,
-            message.HasAllocationMetadata,
             message.AllocationRevision);
 
         if (!message.FlushRequested)

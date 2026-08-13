@@ -199,7 +199,6 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
 
         Assert.Equal(2, hostFeeds.Length);
         Assert.Equal(2, peerFeeds.Length);
-        Assert.All(hostFeeds.Concat(peerFeeds), message => Assert.True(message.HasAllocationMetadata));
         Assert.Single(hostFeeds.Select(message => message.AllocationRevision).Distinct());
         Assert.Single(peerFeeds.Select(message => message.AllocationRevision).Distinct());
         Assert.Contains(hostFeeds.Single(message => message.Side == (int)BattleSideEnum.Defender).Parties,

@@ -15,8 +15,8 @@ public static class CoopTroopSupplierRegistry
 {
     private static readonly object Gate = new object();
     private static readonly Dictionary<string, CoopTroopSupplier> Suppliers = new Dictionary<string, CoopTroopSupplier>();
-    private static readonly Dictionary<string, (PartyReserve[] Reserve, int SideTotal, int PlayerParties, bool HasAllocationMetadata, long AllocationRevision)> Pending =
-        new Dictionary<string, (PartyReserve[], int, int, bool, long)>();
+    private static readonly Dictionary<string, (PartyReserve[] Reserve, int SideTotal, int PlayerParties, long AllocationRevision)> Pending =
+        new Dictionary<string, (PartyReserve[], int, int, long)>();
 
     private static string Key(string mapEventId, BattleSideEnum side) => mapEventId + "|" + (int)side;
 
@@ -31,7 +31,7 @@ public static class CoopTroopSupplierRegistry
             if (Pending.TryGetValue(key, out var buffered))
             {
                 supplier.SetReserve(buffered.Reserve, buffered.SideTotal, buffered.PlayerParties,
-                    buffered.HasAllocationMetadata, buffered.AllocationRevision);
+                    buffered.AllocationRevision);
                 Pending.Remove(key);
             }
         }
@@ -43,18 +43,15 @@ public static class CoopTroopSupplierRegistry
     /// ever supplied locally, so there is nothing beyond the server's own ledger to flush.</summary>
     /// <param name="sideTotalTroops">Every troop on this side across all owners.</param>
     public static IReadOnlyList<(string PartyId, int Supplied)> Feed(string mapEventId, BattleSideEnum side,
-        PartyReserve[] reserve, int sideTotalTroops = 0, int playerOwnedPartyCount = 0,
-        bool hasAllocationMetadata = false, long allocationRevision = 0)
+        PartyReserve[] reserve, int sideTotalTroops, int playerOwnedPartyCount, long allocationRevision)
     {
         lock (Gate)
         {
             var key = Key(mapEventId, side);
             if (Suppliers.TryGetValue(key, out var supplier))
-                return supplier.SetReserve(reserve, sideTotalTroops, playerOwnedPartyCount, hasAllocationMetadata,
-                    allocationRevision);
+                return supplier.SetReserve(reserve, sideTotalTroops, playerOwnedPartyCount, allocationRevision);
 
-            Pending[key] = (reserve, sideTotalTroops, playerOwnedPartyCount, hasAllocationMetadata,
-                allocationRevision); // latest wins
+            Pending[key] = (reserve, sideTotalTroops, playerOwnedPartyCount, allocationRevision); // latest wins
             return Array.Empty<(string, int)>();
         }
     }

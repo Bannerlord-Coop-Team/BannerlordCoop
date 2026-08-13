@@ -97,7 +97,8 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
     private static CoopTroopSupplier CreateSuppliedSupplier(IObjectManager objectManager, string characterId, int reserveCount)
     {
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, objectManager, new BattleAgentBudget());
-        supplier.SetReserve(new[] { new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount)) });
+        supplier.SetReserve(new[] { new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount)) },
+            sideTotal: reserveCount, playerOwnedParties: 0);
         return supplier;
     }
 

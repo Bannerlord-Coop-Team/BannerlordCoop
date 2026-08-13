@@ -389,8 +389,8 @@ internal class BattleHostHandler : IHandler
         long allocationRevision = ++reserveSnapshotRevision;
         foreach (var sideReserve in reserves)
             network.Send(receiver, new NetworkBattleTroopReserve(
-                mapEventId, (int)sideReserve.Side, sideReserve.Parties, flushRequested, sideReserve.TotalTroops,
-                sideReserve.PlayerOwnedPartyCount, hasAllocationMetadata: true, allocationRevision));
+                mapEventId, (int)sideReserve.Side, sideReserve.Parties, sideReserve.TotalTroops,
+                sideReserve.PlayerOwnedPartyCount, allocationRevision, flushRequested));
     }
 
     // [Server, game thread] A late party changes the complete side totals and, when it is AI-owned, expands

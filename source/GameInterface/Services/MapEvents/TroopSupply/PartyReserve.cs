@@ -33,9 +33,6 @@ public class PartyReserve
     /// coordination between them. Proportional rounding cannot do that - it overshoots or undershoots by a
     /// troop per owner - and a "never round down to zero" floor is worse still, spawning one troop per
     /// owner for a one-troop wave.
-    ///
-    /// Additive with a default of 0, so a reserve from a build that does not send it still deserialises;
-    /// 0 for every party simply reproduces the older proportional behaviour.
     /// </remarks>
     [ProtoMember(5)]
     public int SideOffset { get; }
@@ -55,9 +52,6 @@ public class PartyReserve
     /// The rank matters only when the allocation is smaller than the number of player-owned parties, where
     /// there is not one troop to go round: the first <c>allocation</c> ranks get the troop and the rest get
     /// none, which every client agrees on because the ranks come from the server.
-    ///
-    /// Additive with a default of -1, so a reserve from a build that does not send it still deserialises and
-    /// falls back to the older proportional-with-top-up behaviour.
     /// </remarks>
     [ProtoMember(6)]
     public int PlayerOwnedRank { get; }

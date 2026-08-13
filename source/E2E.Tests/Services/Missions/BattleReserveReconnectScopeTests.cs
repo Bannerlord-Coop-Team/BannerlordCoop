@@ -850,26 +850,28 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         {
             var supplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
             CoopTroopSupplierRegistry.Register(supplier);
-            supplier.SetReserve(BothParties());
+            supplier.SetReserve(BothParties(), sideTotal: 7, playerOwnedParties: 0);
             supplier.SupplyTroops(2); // advance "returned-party" locally to 2
 
             int AckCount() => client.NetworkSentMessages.GetMessages<NetworkBattleSupplyProgress>()
                 .Count(message => message.MapEventId == mapEventId);
             int ackBaseline = AckCount();
 
-            // LEGACY: an unflagged shrink applies the REPLACE (the returned party leaves the supplier)
-            // but sends NO ack — exactly today's behavior.
+            // An unflagged shrink applies the REPLACE but sends no ack.
             client.SimulateMessage(Server.NetPeer,
-                new NetworkBattleTroopReserve(mapEventId, (int)BattleSideEnum.Defender, ShrunkToKept()));
+                new NetworkBattleTroopReserve(mapEventId, (int)BattleSideEnum.Defender, ShrunkToKept(),
+                    sideTotalTroops: 3, playerOwnedPartyCount: 0, allocationRevision: 1));
             Assert.Equal(3, supplier.TotalTroops); // only kept-party remains
             Assert.Equal(ackBaseline, AckCount());
 
             // FLAGGED: re-seed and advance again, then shrink with FlushRequested — exactly ONE ack, with
             // IsFlush set, carrying the dropped party's FINAL local pointer.
-            supplier.SetReserve(BothParties());
+            supplier.SetReserve(BothParties(), sideTotal: 7, playerOwnedParties: 0);
             supplier.SupplyTroops(2);
             client.SimulateMessage(Server.NetPeer,
-                new NetworkBattleTroopReserve(mapEventId, (int)BattleSideEnum.Defender, ShrunkToKept(), flushRequested: true));
+                new NetworkBattleTroopReserve(mapEventId, (int)BattleSideEnum.Defender, ShrunkToKept(),
+                    sideTotalTroops: 3, playerOwnedPartyCount: 0, allocationRevision: 2,
+                    flushRequested: true));
 
             var acks = client.NetworkSentMessages.GetMessages<NetworkBattleSupplyProgress>()
                 .Where(message => message.MapEventId == mapEventId)
@@ -888,8 +890,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     }
 
     /// <summary>
-    /// Wire safety of the additive handshake fields: both flags survive a real protobuf round trip (and
-    /// default to false, so unflagged/legacy traffic is unchanged on the wire).
+    /// The reserve allocation and flush fields survive a real protobuf round trip.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-033")]
@@ -899,28 +900,26 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             "rt_battle", (int)BattleSideEnum.Attacker,
             new[] { new PartyReserve("own-party", 0, Array.Empty<TroopReserveEntry>(), isReceiverPlayerParty: true,
                 sideOffset: 7, playerOwnedRank: 2) },
-            flushRequested: true,
             sideTotalTroops: 42,
             playerOwnedPartyCount: 3,
-            hasAllocationMetadata: true,
-            allocationRevision: 17));
+            allocationRevision: 17,
+            flushRequested: true));
         Assert.True(reserve.FlushRequested);
         Assert.Equal(42, reserve.SideTotalTroops);
         Assert.Equal(3, reserve.PlayerOwnedPartyCount);
-        Assert.True(reserve.HasAllocationMetadata);
         Assert.Equal(17, reserve.AllocationRevision);
         var party = Assert.Single(reserve.Parties);
         Assert.True(party.IsReceiverPlayerParty);
         Assert.Equal(7, party.SideOffset);
         Assert.Equal(2, party.PlayerOwnedRank);
 
-        var legacyReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
-            "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>()));
-        Assert.False(legacyReserve.FlushRequested);
-        Assert.Equal(0, legacyReserve.SideTotalTroops);
-        Assert.Equal(0, legacyReserve.PlayerOwnedPartyCount);
-        Assert.False(legacyReserve.HasAllocationMetadata);
-        Assert.Equal(0, legacyReserve.AllocationRevision);
+        var emptyReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
+            "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>(),
+            sideTotalTroops: 0, playerOwnedPartyCount: 0, allocationRevision: 18));
+        Assert.False(emptyReserve.FlushRequested);
+        Assert.Equal(0, emptyReserve.SideTotalTroops);
+        Assert.Equal(0, emptyReserve.PlayerOwnedPartyCount);
+        Assert.Equal(18, emptyReserve.AllocationRevision);
 
         var flush = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
             "rt_battle", new[] { new SupplyProgressEntry("party", 2) }, isFlush: true));

@@ -171,14 +171,14 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         var agentBudget = new BattleAgentBudget();
         var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null, agentBudget);
         var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null, agentBudget);
-        attacker.SetReserve(Array.Empty<PartyReserve>());
+        attacker.SetReserve(Array.Empty<PartyReserve>(), sideTotal: 0, playerOwnedParties: 0);
         defender.SetReserve(new[]
         {
             new PartyReserve("enemy-party", 0, new[]
             {
                 new TroopReserveEntry(1, "looter", formationClass: 0),
             }),
-        });
+        }, sideTotal: 1, playerOwnedParties: 0);
 
         var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
             defenderPopulated: true, attackerPopulated: true, defenderOwned: 1, attackerOwned: 0);
@@ -200,8 +200,8 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             {
                 new TroopReserveEntry(1, "main-hero", formationClass: 0),
             }),
-        });
-        defender.SetReserve(Array.Empty<PartyReserve>());
+        }, sideTotal: 1, playerOwnedParties: 0);
+        defender.SetReserve(Array.Empty<PartyReserve>(), sideTotal: 0, playerOwnedParties: 0);
 
         Assert.True(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
             BattleSideEnum.Attacker, "player-party", defender, attacker));
@@ -219,8 +219,8 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             {
                 new TroopReserveEntry(1, "recruit", formationClass: 0),
             }),
-        });
-        defender.SetReserve(Array.Empty<PartyReserve>());
+        }, sideTotal: 1, playerOwnedParties: 0);
+        defender.SetReserve(Array.Empty<PartyReserve>(), sideTotal: 0, playerOwnedParties: 0);
 
         Assert.True(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
             BattleSideEnum.Attacker, "player-party", defender, attacker));
@@ -238,14 +238,14 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             {
                 new TroopReserveEntry(1, "main-hero", formationClass: 0),
             }, isReceiverPlayerParty: true),
-        });
-        defender.SetReserve(Array.Empty<PartyReserve>());
+        }, sideTotal: 1, playerOwnedParties: 1);
+        defender.SetReserve(Array.Empty<PartyReserve>(), sideTotal: 0, playerOwnedParties: 0);
 
         Assert.Equal("MapEventParty_Created_34", attacker.PlayerPartyId);
         Assert.True(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
             BattleSideEnum.Attacker, attacker.PlayerPartyId, defender, attacker));
 
-        attacker.SetReserve(Array.Empty<PartyReserve>());
+        attacker.SetReserve(Array.Empty<PartyReserve>(), sideTotal: 0, playerOwnedParties: 0);
         Assert.Null(attacker.PlayerPartyId);
     }
 
@@ -261,8 +261,8 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             {
                 new TroopReserveEntry(1, "main-hero", formationClass: 0),
             }),
-        });
-        defender.SetReserve(Array.Empty<PartyReserve>());
+        }, sideTotal: 1, playerOwnedParties: 0);
+        defender.SetReserve(Array.Empty<PartyReserve>(), sideTotal: 0, playerOwnedParties: 0);
 
         Assert.False(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
             BattleSideEnum.Attacker, "player-party", defender, attacker));

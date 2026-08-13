@@ -33,11 +33,9 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     {
         private readonly int[] partyOffsets;
         private readonly int[] partyCounts;
-        private readonly bool hasAllocationMetadata;
         private readonly int playerOwnedPartyCount;
         private readonly bool ownsReceiverPlayerParty;
         private readonly int receiverPlayerRank;
-        private readonly bool receiverPlayerPartyHasTroops;
 
         public long Revision { get; }
         public int SideTotalTroops { get; }
@@ -45,18 +43,16 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         public int SuppliedTroops { get; }
 
         internal AllocationSnapshot(long revision, int sideTotalTroops, int totalTroops, int suppliedTroops,
-            bool hasAllocationMetadata, int playerOwnedPartyCount, bool ownsReceiverPlayerParty,
-            int receiverPlayerRank, bool receiverPlayerPartyHasTroops, int[] partyOffsets, int[] partyCounts)
+            int playerOwnedPartyCount, bool ownsReceiverPlayerParty, int receiverPlayerRank,
+            int[] partyOffsets, int[] partyCounts)
         {
             Revision = revision;
             SideTotalTroops = sideTotalTroops;
             TotalTroops = totalTroops;
             SuppliedTroops = suppliedTroops;
-            this.hasAllocationMetadata = hasAllocationMetadata;
             this.playerOwnedPartyCount = playerOwnedPartyCount;
             this.ownsReceiverPlayerParty = ownsReceiverPlayerParty;
             this.receiverPlayerRank = receiverPlayerRank;
-            this.receiverPlayerPartyHasTroops = receiverPlayerPartyHasTroops;
             this.partyOffsets = partyOffsets;
             this.partyCounts = partyCounts;
         }
@@ -65,28 +61,21 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         {
             if (sideAllocation <= 0 || TotalTroops <= 0) return 0;
 
-            int total = SideTotalTroops > 0 ? SideTotalTroops : TotalTroops;
+            int total = SideTotalTroops;
             if (total <= 0) return 0;
             if (TotalTroops >= total) return sideAllocation;
 
-            if (hasAllocationMetadata)
+            if (playerOwnedPartyCount > 0)
             {
-                if (playerOwnedPartyCount > 0)
-                {
-                    if (sideAllocation < playerOwnedPartyCount)
-                        return receiverPlayerRank >= 0 && receiverPlayerRank < sideAllocation ? 1 : 0;
+                if (sideAllocation < playerOwnedPartyCount)
+                    return receiverPlayerRank >= 0 && receiverPlayerRank < sideAllocation ? 1 : 0;
 
-                    int share = ApportionByInterval(sideAllocation - playerOwnedPartyCount, total);
-                    if (ownsReceiverPlayerParty) share += 1;
-                    return Math.Min(share, sideAllocation);
-                }
-
-                return Math.Min(ApportionByInterval(sideAllocation, total), sideAllocation);
+                int share = ApportionByInterval(sideAllocation - playerOwnedPartyCount, total);
+                if (ownsReceiverPlayerParty) share += 1;
+                return Math.Min(share, sideAllocation);
             }
 
-            int legacyShare = ApportionByInterval(sideAllocation, total);
-            if (legacyShare <= 0 && receiverPlayerPartyHasTroops) legacyShare = 1;
-            return Math.Min(legacyShare, sideAllocation);
+            return Math.Min(ApportionByInterval(sideAllocation, total), sideAllocation);
         }
 
         private int ApportionByInterval(int allocation, int total)
@@ -130,7 +119,6 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private bool populated;
     private int sideTotalTroops;
     private int playerOwnedPartyCount;
-    private bool hasAllocationMetadata;
     private long allocationRevision;
     private int reserveRevision;
     private int numWounded, numKilled, numRouted;
@@ -165,26 +153,14 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// </para>
     /// </summary>
     public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve,
-        int sideTotal = 0, int playerOwnedParties = 0, bool allocationMetadataPresent = false,
-        long snapshotRevision = 0)
+        int sideTotal, int playerOwnedParties, long snapshotRevision = 0)
     {
         var dropped = new List<(string PartyId, int Supplied)>();
         lock (gate)
         {
-            // The marker makes every value authoritative, including zero. Legacy additive fields retain their
-            // earlier positive-only behavior and inexact player top-up when the marker is absent.
-            if (allocationMetadataPresent)
-            {
-                hasAllocationMetadata = true;
-                sideTotalTroops = Math.Max(0, sideTotal);
-                playerOwnedPartyCount = Math.Max(0, playerOwnedParties);
-                allocationRevision = snapshotRevision;
-            }
-            else
-            {
-                if (sideTotal > 0) sideTotalTroops = sideTotal;
-                if (playerOwnedParties > 0) playerOwnedPartyCount = playerOwnedParties;
-            }
+            sideTotalTroops = Math.Max(0, sideTotal);
+            playerOwnedPartyCount = Math.Max(0, playerOwnedParties);
+            allocationRevision = snapshotRevision;
 
             // Capture the current per-party pointers before rebuilding. A resend can carry a STALE pointer: the
             // server's ledger lags our local supply by up to one report interval, and on migration it re-sends
@@ -263,7 +239,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// <summary>Monotonic count of authoritative reserve snapshots applied to this supplier.</summary>
     public int ReserveRevision { get { lock (gate) { return reserveRevision; } } }
 
-    /// <summary>The server-authored complete two-side snapshot generation, or zero for legacy traffic.</summary>
+    /// <summary>The server-authored complete two-side snapshot generation.</summary>
     public long AllocationRevision { get { lock (gate) { return allocationRevision; } } }
 
     public AllocationSnapshot CaptureAllocationSnapshot()
@@ -273,7 +249,6 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             int total = 0;
             int supplied = 0;
             int receiverPlayerRank = -1;
-            bool receiverPlayerPartyHasTroops = false;
             var partyOffsets = new int[parties.Count];
             var partyCounts = new int[parties.Count];
             for (int i = 0; i < parties.Count; i++)
@@ -287,20 +262,16 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 if (party.PartyId != playerPartyId) continue;
 
                 receiverPlayerRank = party.PlayerOwnedRank;
-                receiverPlayerPartyHasTroops = party.Supplied < count;
             }
 
-            int completeSideTotal = hasAllocationMetadata || sideTotalTroops > 0 ? sideTotalTroops : total;
             return new AllocationSnapshot(
                 allocationRevision,
-                completeSideTotal,
+                sideTotalTroops,
                 total,
                 supplied,
-                hasAllocationMetadata,
                 playerOwnedPartyCount,
                 playerPartyId != null,
                 receiverPlayerRank,
-                receiverPlayerPartyHasTroops,
                 partyOffsets,
                 partyCounts);
         }
@@ -397,23 +368,11 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     }
 
     /// <summary>
-    /// Every troop on this side across ALL owners, or <see cref="TotalTroops"/> when the server sent none.
+    /// Every troop on this side across ALL owners.
     /// The spawn handler sizes the engine from this so each client computes the same split; the supplier then
     /// contributes only its <see cref="OwnedShareOf"/> that allocation.
     /// </summary>
-    public int SideTotalTroops
-    {
-        get
-        {
-            lock (gate)
-            {
-                if (hasAllocationMetadata || sideTotalTroops > 0) return sideTotalTroops;
-                int owned = 0;
-                foreach (var party in parties) owned += party.Entries.Length;
-                return owned;
-            }
-        }
-    }
+    public int SideTotalTroops { get { lock (gate) { return sideTotalTroops; } } }
 
     public int PlayerOwnedPartyCount { get { lock (gate) { return playerOwnedPartyCount; } } }
 

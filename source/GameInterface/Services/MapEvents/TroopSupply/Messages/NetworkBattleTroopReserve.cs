@@ -45,7 +45,6 @@ public class NetworkBattleTroopReserve : IEvent
     /// Feeding every client the same side totals makes the split identical everywhere; each supplier then
     /// contributes only its own share of that allocation.
     /// </para>
-    /// Additive and default 0, which reads as "unknown" and falls back to sizing from owned totals.
     /// </summary>
     [ProtoMember(5)]
     public readonly int SideTotalTroops;
@@ -55,30 +54,19 @@ public class NetworkBattleTroopReserve : IEvent
     /// aside per player-owned party before the proportional split, so no player can be rounded down to
     /// nothing while the owners' slices still sum to exactly the allocation - see
     /// <see cref="PartyReserve.PlayerOwnedRank"/>.
-    /// <para>
-    /// Additive and default 0. <see cref="HasAllocationMetadata"/> determines whether zero is authoritative.
-    /// </para>
     /// </summary>
     [ProtoMember(6)]
     public readonly int PlayerOwnedPartyCount;
 
     /// <summary>
-    /// Distinguishes an authoritative zero side total/player count from legacy traffic where the additive
-    /// allocation fields were absent. Current servers always set this, including for an empty side.
-    /// </summary>
-    [ProtoMember(7)]
-    public readonly bool HasAllocationMetadata;
-
-    /// <summary>
     /// Identifies the complete two-side snapshot this message belongs to. Both side messages in one refresh
     /// carry the same value, so a client never reconciles one side from each of two consecutive refreshes.
     /// </summary>
-    [ProtoMember(8)]
+    [ProtoMember(7)]
     public readonly long AllocationRevision;
 
-    public NetworkBattleTroopReserve(string mapEventId, int side, PartyReserve[] parties, bool flushRequested = false,
-        int sideTotalTroops = 0, int playerOwnedPartyCount = 0, bool hasAllocationMetadata = false,
-        long allocationRevision = 0)
+    public NetworkBattleTroopReserve(string mapEventId, int side, PartyReserve[] parties, int sideTotalTroops,
+        int playerOwnedPartyCount, long allocationRevision, bool flushRequested = false)
     {
         MapEventId = mapEventId;
         Side = side;
@@ -86,7 +74,6 @@ public class NetworkBattleTroopReserve : IEvent
         FlushRequested = flushRequested;
         SideTotalTroops = sideTotalTroops;
         PlayerOwnedPartyCount = playerOwnedPartyCount;
-        HasAllocationMetadata = hasAllocationMetadata;
         AllocationRevision = allocationRevision;
     }
 }
