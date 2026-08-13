@@ -3,6 +3,7 @@ using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using Missions.Agents.Packets;
+using Newtonsoft.Json;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
@@ -100,6 +101,153 @@ internal static class BattleDebugCommands
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
     private static bool wieldTestActive;
+    private static JoustDriverBehavior joustDriver;
+
+    private sealed class JoustDriverBehavior : MissionBehavior
+    {
+        private const string RequiredWeaponId = "western_spear_4_t4";
+
+        private readonly Agent rider;
+        private readonly Agent target;
+        private readonly Guid riderId;
+        private readonly Guid targetId;
+        private readonly EquipmentIndex originalMainHand;
+        private bool attackHeld;
+        private bool releasedAttack;
+        private int drivenFrames;
+
+        public JoustDriverBehavior(
+            Agent rider,
+            Agent target,
+            Guid riderId,
+            Guid targetId,
+            EquipmentIndex originalMainHand)
+        {
+            this.rider = rider;
+            this.target = target;
+            this.riderId = riderId;
+            this.targetId = targetId;
+            this.originalMainHand = originalMainHand;
+            attackHeld = true;
+        }
+
+        public override MissionBehaviorType BehaviorType =>
+            MissionBehaviorType.Other;
+
+        public Guid RiderId => riderId;
+        public Guid TargetId => targetId;
+        public int DrivenFrames => drivenFrames;
+        public bool AttackHeld => attackHeld;
+        public bool ReleasedAttack => releasedAttack;
+        public Agent.ActionStage ActionStage =>
+            rider?.GetCurrentActionStage(1) ?? Agent.ActionStage.None;
+        public float TargetDistance => rider == null || target == null
+            ? -1f
+            : rider.Position.Distance(target.Position);
+        public float MountedSpeed => rider?.MountAgent?
+            .GetRealGlobalVelocity().AsVec2.Length ?? 0f;
+        public bool Active =>
+            rider != null &&
+            rider.IsActive() &&
+            rider.Mission == Mission &&
+            target != null &&
+            target.IsActive() &&
+            target.Mission == Mission;
+
+        public override void OnMissionTick(float dt)
+        {
+            if (!Active || rider.Controller != AgentControllerType.Player)
+                return;
+
+            drivenFrames++;
+            Vec3 offset = target.Position - rider.Position;
+            Vec2 heading = offset.AsVec2;
+            if (heading.LengthSquared <= 0.0001f)
+                heading = rider.GetMovementDirection();
+            if (heading.LengthSquared <= 0.0001f)
+                heading = Vec2.Forward;
+            heading.Normalize();
+
+            Vec3 lookDirection = offset;
+            if (lookDirection.LengthSquared <= 0.0001f)
+                lookDirection = new Vec3(heading.X, heading.Y, 0f);
+            lookDirection.Normalize();
+
+            rider.MovementInputVector = new Vec2(0f, 1f);
+            rider.SetMovementDirection(in heading);
+            rider.LookDirection = lookDirection;
+
+            Agent.ActionStage stage = rider.GetCurrentActionStage(1);
+            if (!releasedAttack &&
+                (stage == Agent.ActionStage.AttackReady ||
+                 stage == Agent.ActionStage.AttackQuickReady))
+            {
+                attackHeld = false;
+                releasedAttack = true;
+            }
+
+            Agent.MovementControlFlag preservedFlags =
+                rider.MovementFlags &
+                ~(Agent.MovementControlFlag.MoveMask |
+                  Agent.MovementControlFlag.AttackMask);
+            rider.MovementFlags = preservedFlags |
+                Agent.MovementControlFlag.Forward |
+                (attackHeld
+                    ? Agent.MovementControlFlag.AttackUp
+                    : Agent.MovementControlFlag.None);
+        }
+
+        public void Restore()
+        {
+            if (rider == null || !rider.IsActive() || rider.Mission != Mission)
+                return;
+
+            rider.MovementFlags &= ~(
+                Agent.MovementControlFlag.MoveMask |
+                Agent.MovementControlFlag.AttackMask);
+            rider.MovementInputVector = Vec2.Zero;
+            if (originalMainHand == EquipmentIndex.None)
+            {
+                rider.TryToSheathWeaponInHand(
+                    Agent.HandIndex.MainHand,
+                    Agent.WeaponWieldActionType.WithAnimationUninterruptible);
+            }
+            else
+            {
+                rider.TryToWieldWeaponInSlot(
+                    originalMainHand,
+                    Agent.WeaponWieldActionType.WithAnimationUninterruptible,
+                    isWieldedOnSpawn: false);
+            }
+        }
+
+        public override void OnRemoveBehavior()
+        {
+            Restore();
+            if (ReferenceEquals(joustDriver, this))
+                joustDriver = null;
+        }
+
+        public static bool TryFindWeaponSlot(
+            Agent agent,
+            out EquipmentIndex slot)
+        {
+            slot = EquipmentIndex.None;
+            for (EquipmentIndex candidate = EquipmentIndex.WeaponItemBeginSlot;
+                 candidate < EquipmentIndex.NumAllWeaponSlots;
+                 candidate++)
+            {
+                ItemObject item = agent.Equipment[candidate].Item;
+                if (item?.StringId != RequiredWeaponId)
+                    continue;
+
+                slot = candidate;
+                return true;
+            }
+
+            return false;
+        }
+    }
 
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)
@@ -271,6 +419,198 @@ internal static class BattleDebugCommands
         return $"WIELD_TEST_RESTORED agent={restoredAgentId:D}";
     }
 
+    [CommandLineArgumentFunction("joust", "coop.debug.battle")]
+    public static string Joust(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.battle.joust <start|state|stop>";
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "start":
+                return StartJoust();
+            case "state":
+                return FormatJoustState();
+            case "stop":
+                return StopJoust();
+            default:
+                return "Usage: coop.debug.battle.joust <start|state|stop>";
+        }
+    }
+
+    [CommandLineArgumentFunction("joust_routed_state", "coop.debug.battle")]
+    public static string JoustRoutedState(List<string> args)
+    {
+        if (args.Count > 1 ||
+            (args.Count == 1 &&
+             !Guid.TryParse(args[0], out Guid routedHitId)))
+        {
+            return "Usage: coop.debug.battle.joust_routed_state " +
+                   "[attackerAgentId|routedHitId]";
+        }
+        if (args.Count == 0)
+            routedHitId = Guid.Empty;
+
+        CoopBattleController controller = Mission.Current?
+            .GetMissionBehavior<CoopBattleController>();
+        BattleDamageRouter.RoutedDamageDebugSnapshot snapshot = controller?
+            .DebugDamageRouter
+            .GetRoutedDamageDebugSnapshot(routedHitId);
+        if (snapshot == null)
+        {
+            return routedHitId == Guid.Empty
+                ? "JOUST_ROUTED_STATE no routed damage"
+                : "JOUST_ROUTED_STATE no routed damage for hit " +
+                  routedHitId.ToString("D");
+        }
+
+        return "JOUST_ROUTED_STATE hit=" + routedHitId.ToString("D") +
+               Environment.NewLine +
+               "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(snapshot);
+    }
+
+    [CommandLineArgumentFunction("incoming_ai_hit_source_state", "coop.debug.battle")]
+    public static string IncomingAiHitSourceState(List<string> args)
+    {
+        if (args.Count != 4 ||
+            !Guid.TryParse(args[0], out Guid victimRiderAgentId) ||
+            victimRiderAgentId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(args[1]) ||
+            string.IsNullOrWhiteSpace(args[2]) ||
+            !long.TryParse(args[3], out long afterSequence) ||
+            afterSequence < 0)
+        {
+            return "Usage: coop.debug.battle.incoming_ai_hit_source_state " +
+                   "<victimRiderAgentId> <attackerControllerId> " +
+                   "<victimControllerId> <afterSequence>";
+        }
+
+        CoopBattleController controller = Mission.Current?
+            .GetMissionBehavior<CoopBattleController>();
+        BattleDamageRouter.RoutedDamageDebugSnapshot snapshot = controller?
+            .DebugDamageRouter
+            .GetIncomingAiDamageSourceDebugSnapshot(
+                victimRiderAgentId,
+                args[1],
+                args[2],
+                afterSequence);
+        if (snapshot == null)
+        {
+            return "INCOMING_AI_HIT_SOURCE_STATE no matching source hit on " +
+                   victimRiderAgentId.ToString("D") + " after " +
+                   afterSequence;
+        }
+
+        return "INCOMING_AI_HIT_SOURCE_STATE hit=" +
+               snapshot.RoutedHitId.ToString("D") +
+               Environment.NewLine +
+               "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(snapshot);
+    }
+
+    private static string StartJoust()
+    {
+        if (joustDriver != null)
+            return FormatJoustState();
+
+        Mission mission = Mission.Current;
+        CoopBattleController controller = mission?
+            .GetMissionBehavior<CoopBattleController>();
+        Agent rider = Agent.Main;
+        if (mission == null || controller == null || rider == null ||
+            !rider.IsActive() || rider.Mission != mission)
+        {
+            return "JOUST no active local battle rider";
+        }
+        if (rider.Controller != AgentControllerType.Player ||
+            !rider.HasMount || rider.MountAgent?.IsActive() != true)
+        {
+            return "JOUST main agent must remain player-controlled and mounted";
+        }
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry) ||
+            !registry.TryGetAgentInfo(rider, out var riderInfo) ||
+            !registry.IsLocallyControlled(riderInfo.AgentId))
+        {
+            return "JOUST main agent is not locally controlled";
+        }
+        if (!JoustDriverBehavior.TryFindWeaponSlot(
+                rider,
+                out EquipmentIndex joustWeaponSlot))
+        {
+            return "JOUST main agent does not carry western_spear_4_t4";
+        }
+
+        CoopAgentInfo targetInfo = registry.GetControllerIds()
+            .Where(id => id != controller.Session.OwnControllerId)
+            .SelectMany(registry.GetAgents)
+            .Where(info => info.Agent != null &&
+                           info.Agent.IsActive() &&
+                           info.Agent.IsHuman &&
+                           info.Agent.HasMount &&
+                           info.Agent.MountAgent?.IsActive() == true &&
+                           info.Agent.Team?.Side != rider.Team?.Side)
+            .OrderBy(info =>
+                info.Agent.Position.DistanceSquared(rider.Position))
+            .FirstOrDefault();
+        if (targetInfo?.Agent == null)
+            return "JOUST no active remote mounted enemy puppet";
+
+        EquipmentIndex originalMainHand = rider.GetPrimaryWieldedItemIndex();
+        if (originalMainHand != joustWeaponSlot)
+        {
+            rider.TryToWieldWeaponInSlot(
+                joustWeaponSlot,
+                Agent.WeaponWieldActionType.WithAnimationUninterruptible,
+                isWieldedOnSpawn: false);
+        }
+
+        joustDriver = new JoustDriverBehavior(
+            rider,
+            targetInfo.Agent,
+            riderInfo.AgentId,
+            targetInfo.AgentId,
+            originalMainHand);
+        mission.AddMissionBehavior(joustDriver);
+        return FormatJoustState();
+    }
+
+    private static string StopJoust()
+    {
+        JoustDriverBehavior driver = joustDriver;
+        if (driver == null)
+            return "JOUST inactive";
+
+        Mission mission = driver.Mission;
+        if (mission != null)
+            mission.RemoveMissionBehavior(driver);
+        else
+            driver.Restore();
+        joustDriver = null;
+        return "JOUST stopped";
+    }
+
+    private static string FormatJoustState()
+    {
+        JoustDriverBehavior driver = joustDriver;
+        var state = new
+        {
+            active = driver?.Active == true,
+            riderAgentId = driver?.RiderId ?? Guid.Empty,
+            targetAgentId = driver?.TargetId ?? Guid.Empty,
+            drivenFrames = driver?.DrivenFrames ?? 0,
+            attackHeld = driver?.AttackHeld ?? false,
+            attackReleased = driver?.ReleasedAttack ?? false,
+            actionStage = driver?.ActionStage.ToString() ??
+                Agent.ActionStage.None.ToString(),
+            targetDistance = driver?.TargetDistance ?? -1f,
+            mountedSpeed = driver?.MountedSpeed ?? 0f,
+        };
+        return "JOUST active=" + state.active +
+               " rider=" + state.riderAgentId.ToString("D") +
+               " target=" + state.targetAgentId.ToString("D") +
+               Environment.NewLine +
+               "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state);
+    }
+
 #endif
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
@@ -327,7 +667,7 @@ internal static class BattleDebugCommands
             .Select(supplier => $"{supplier.Side}:{supplier.PlayerPartyId}")
             .ToArray();
 
-        return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
+        string output = $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
             $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
             $"reserveSuppliers={suppliers.Count} populatedReserves={suppliers.Count(supplier => supplier.IsPopulated)} " +
@@ -337,6 +677,32 @@ internal static class BattleDebugCommands
             $"enemyMovedSinceLast={moved} damageReceivedEvents={ownDamageEvents} " +
             $"resultState={result?.BattleState.ToString() ?? "None"} " +
             $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            instanceId = controller.Session.InstanceId,
+            isLocalHost = controller.Session.IsLocalHost,
+            activated = controller.Deployment.IsActivated,
+            committed = controller.Deployment.IsCommitted,
+            deploymentReady,
+            hasMainAgent = Agent.Main != null,
+            activeAgents,
+            reserveSuppliers = suppliers.Count,
+            populatedReserves = suppliers.Count(supplier => supplier.IsPopulated),
+            receiverOwnedReserves = receiverReserves.Length,
+            receiverReserve = receiverReserves,
+            playerSide = playerTeam?.Side.ToString() ?? "None",
+            enemyParties,
+            enemyActive = enemies.Count,
+            enemyAi = enemies.Count(agent => agent.IsAIControlled),
+            enemyFleeing,
+            enemyMovedSinceLast = moved,
+            damageReceivedEvents = ownDamageEvents,
+            resultState = result?.BattleState.ToString() ?? "None",
+            battleResolved = result?.BattleResolved ?? false,
+            playerVictory = result?.PlayerVictory ?? false,
+        });
+        return output + Environment.NewLine +
+            $"LIVE_TEST_JSON={structuredState}";
     }
 
     [CommandLineArgumentFunction("charge_owned_formations", "coop.debug.battle")]
@@ -808,6 +1174,10 @@ internal static class BattleDebugCommands
         MountPoseSamples.Clear();
         ReleaseLadderCamera();
         ReleaseMountCamera();
+#if DEBUG
+        if (joustDriver != null)
+            StopJoust();
+#endif
         observedMission = mission;
     }
 

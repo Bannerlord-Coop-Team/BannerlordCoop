@@ -50,8 +50,25 @@ public class NetworkApplyBattleDamage : IEvent
     /// <summary>The original missile weapon used by vanilla to select the combat skill reward.</summary>
     [ProtoMember(8)]
     public WeaponComponentData AttackerWeapon { get; }
+#if DEBUG
+    /// <summary>Source-generated id used only to correlate live-test damage telemetry across peers.</summary>
+    [ProtoMember(9)]
+    public Guid DebugRoutedHitId { get; }
+    /// <summary>Source authority used only to correlate live-test damage telemetry across peers.</summary>
+    [ProtoMember(10)]
+    public string DebugAttackerControllerId { get; }
+    /// <summary>Source AI identity used only to correlate live-test damage telemetry across peers.</summary>
+    [ProtoMember(11)]
+    public bool DebugAttackerIsAi { get; }
+#endif
     public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData,
-        bool isMount = false, long missileShotSequence = 0, WeaponComponentData attackerWeapon = null)
+        bool isMount = false, long missileShotSequence = 0, WeaponComponentData attackerWeapon = null
+#if DEBUG
+        , Guid debugRoutedHitId = default,
+        string debugAttackerControllerId = null,
+        bool debugAttackerIsAi = false
+#endif
+        )
     {
         VictimAgentId = victimAgentId;
         AttackerAgentId = attackerAgentId;
@@ -61,5 +78,10 @@ public class NetworkApplyBattleDamage : IEvent
         MissileShotSequence = missileShotSequence;
         IsMissile = blow.IsMissile;
         AttackerWeapon = attackerWeapon;
+#if DEBUG
+        DebugRoutedHitId = debugRoutedHitId;
+        DebugAttackerControllerId = debugAttackerControllerId;
+        DebugAttackerIsAi = debugAttackerIsAi;
+#endif
     }
 }

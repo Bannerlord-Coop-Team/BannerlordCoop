@@ -292,6 +292,43 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ApplyMount_DoesNotRewriteMatchingContinuousStateOrSpeedLimit()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetMirror));
+
+            sourceMirror.MovementDirection = new Vec2(0.25f, 0.75f);
+            sourceMirror.LookDirection = new Vec3(0f, 1f, 0f);
+            sourceMirror.InputVector = new Vec2(0.5f, 0.5f);
+            sourceMirror.RealGlobalVelocity = new Vec3(3f, 4f, 0f);
+            sourceMirror.MovementFlags =
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnRight;
+            puppetMirror.MovementDirection = sourceMirror.MovementDirection;
+            puppetMirror.LookDirection = sourceMirror.LookDirection;
+            puppetMirror.InputVector = sourceMirror.InputVector;
+            puppetMirror.MaximumSpeedLimit = 5f;
+            puppetMirror.MovementFlags = sourceMirror.MovementFlags;
+
+            new AgentMountData(sourceHorse).ApplyMount(puppetHorse);
+
+            Assert.Equal(0, puppetMirror.SetMovementDirectionCalls);
+            Assert.Equal(0, puppetMirror.SetLookDirectionCalls);
+            Assert.Equal(0, puppetMirror.SetMovementInputCalls);
+            Assert.Equal(0, puppetMirror.SetMovementFlagsCalls);
+            Assert.Equal(0, puppetMirror.SetMaximumSpeedLimitCalls);
+        });
+    }
+
+    [Fact]
     public void ApplyMount_DoesNotRewindMatchingActiveActionChannels()
     {
         using var fixture = new MissionEngineFixture();
@@ -1244,6 +1281,54 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void MountedFollow_AppliesRetainedContinuousStateOnceAfterTeleport()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            Agent sourceRider = SpawnRider(mock);
+            Agent sourceHorse = mock.SpawnMount(sourceRider);
+            Agent puppetRider = SpawnRider(mock);
+            Agent puppetHorse = mock.SpawnMount(puppetRider);
+            Assert.True(AgentMirror.TryGet(sourceRider, out var sourceRiderMirror));
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetRider, out var puppetRiderMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+
+            sourceRiderMirror.Position = new Vec3(2f, 0f, 1f);
+            sourceRiderMirror.MovementDirection = new Vec2(1f, 0f);
+            sourceRiderMirror.LookDirection = new Vec3(1f, 0f, 0f);
+            sourceRiderMirror.InputVector = new Vec2(0f, 1f);
+            sourceRiderMirror.MovementFlags = Agent.MovementControlFlag.Forward;
+            sourceHorseMirror.Position = new Vec3(2f, 0f, 0f);
+            sourceHorseMirror.MovementDirection = new Vec2(0f, 1f);
+            sourceHorseMirror.LookDirection = new Vec3(0f, 1f, 0f);
+            sourceHorseMirror.InputVector = new Vec2(0.5f, 0.5f);
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(1f, 0f, 0f);
+            sourceHorseMirror.MovementFlags = Agent.MovementControlFlag.TurnRight;
+
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetMountedRiderTarget(
+                puppetRider,
+                new AgentData(sourceRider));
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(1, puppetHorseMirror.TeleportToPositionCalls);
+            Assert.Equal(1, puppetRiderMirror.SetMovementDirectionCalls);
+            Assert.Equal(1, puppetRiderMirror.SetLookDirectionCalls);
+            Assert.Equal(1, puppetRiderMirror.SetMovementInputCalls);
+            Assert.Equal(1, puppetRiderMirror.SetMovementFlagsCalls);
+            Assert.Equal(1, puppetHorseMirror.SetMovementDirectionCalls);
+            Assert.Equal(1, puppetHorseMirror.SetLookDirectionCalls);
+            Assert.Equal(1, puppetHorseMirror.SetMovementInputCalls);
+            Assert.Equal(1, puppetHorseMirror.SetMovementFlagsCalls);
+        });
+    }
+
+    [Fact]
     public void MountedDisplayReplay_RestoresLatestOwnerLookWithoutChangingMovementState()
     {
         using var fixture = new MissionEngineFixture();
@@ -1949,6 +2034,170 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         });
     }
 
+#if DEBUG
+    [Fact]
+    public void RepeatedCompactMountIdentity_UsesCachedHorse()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            const string movementScopeId = "owner-movement-scope";
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            Guid riderId = Guid.NewGuid();
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount();
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, riderId, 1, rider));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, Guid.NewGuid(), 2, horse));
+
+            var packet = new MovementPacket(
+                new[] { riderId },
+                new[] { CreateCompactMountedData(horse, 2) });
+            component.AgentMovementHandler.HandlePacket(null, packet);
+            component.AgentMovementHandler.HandlePacket(null, packet);
+
+            var handler = Assert.IsType<AgentMovementHandler>(
+                component.AgentMovementHandler);
+            Assert.Same(horse, rider.MountAgent);
+            Assert.Equal(1, handler.DebugMountIdentityResolutions);
+            Assert.Equal(1, handler.DebugMountIdentityHits);
+        });
+    }
+
+    [Fact]
+    public void InactiveCachedMountIdentity_IsResolvedAgain()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            const string movementScopeId = "owner-movement-scope";
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            Guid riderId = Guid.NewGuid();
+            Guid horseId = Guid.NewGuid();
+            Agent rider = SpawnRider(mock);
+            Agent firstHorse = mock.SpawnMount();
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, riderId, 1, rider));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, horseId, 2, firstHorse));
+
+            var packet = new MovementPacket(
+                new[] { riderId },
+                new[] { CreateCompactMountedData(firstHorse, 2) });
+            component.AgentMovementHandler.HandlePacket(null, packet);
+
+            Assert.True(AgentMirror.TryGet(firstHorse, out var firstHorseMirror));
+            firstHorseMirror.IsActive = false;
+            Assert.True(registry.RemoveAgent(firstHorse));
+            Agent replacementHorse = mock.SpawnMount();
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, horseId, 2, replacementHorse));
+            component.AgentMovementHandler.HandlePacket(null, packet);
+
+            var handler = Assert.IsType<AgentMovementHandler>(
+                component.AgentMovementHandler);
+            Assert.Same(replacementHorse, rider.MountAgent);
+            Assert.Equal(2, handler.DebugMountIdentityResolutions);
+            Assert.Equal(0, handler.DebugMountIdentityHits);
+        });
+    }
+
+    [Fact]
+    public void UnresolvedCompactMountIdentity_RetriesAfterRegistration()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            const string movementScopeId = "owner-movement-scope";
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            Guid riderId = Guid.NewGuid();
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount();
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, riderId, 1, rider));
+            var packet = new MovementPacket(
+                new[] { riderId },
+                new[] { CreateCompactMountedData(horse, 2) });
+
+            component.AgentMovementHandler.HandlePacket(null, packet);
+            Assert.Null(rider.MountAgent);
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, Guid.NewGuid(), 2, horse));
+            component.AgentMovementHandler.HandlePacket(null, packet);
+
+            var handler = Assert.IsType<AgentMovementHandler>(
+                component.AgentMovementHandler);
+            Assert.Same(horse, rider.MountAgent);
+            Assert.Equal(2, handler.DebugMountIdentityResolutions);
+            Assert.Equal(0, handler.DebugMountIdentityHits);
+        });
+    }
+
+    [Fact]
+    public void ChangedCompactMountIdentity_ReplacesCachedHorse()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            const string movementScopeId = "owner-movement-scope";
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            Guid riderId = Guid.NewGuid();
+            Agent rider = SpawnRider(mock);
+            Agent firstHorse = mock.SpawnMount();
+            Agent secondHorse = mock.SpawnMount();
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, riderId, 1, rider));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, Guid.NewGuid(), 2, firstHorse));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, Guid.NewGuid(), 3, secondHorse));
+
+            var firstPacket = new MovementPacket(
+                new[] { riderId },
+                new[] { CreateCompactMountedData(firstHorse, 2) });
+            var secondPacket = new MovementPacket(
+                new[] { riderId },
+                new[] { CreateCompactMountedData(secondHorse, 3) });
+            component.AgentMovementHandler.HandlePacket(null, firstPacket);
+            component.AgentMovementHandler.HandlePacket(null, firstPacket);
+            component.AgentMovementHandler.HandlePacket(null, secondPacket);
+            component.AgentMovementHandler.HandlePacket(null, secondPacket);
+
+            var handler = Assert.IsType<AgentMovementHandler>(
+                component.AgentMovementHandler);
+            Assert.Same(secondHorse, rider.MountAgent);
+            Assert.Equal(2, handler.DebugMountIdentityResolutions);
+            Assert.Equal(2, handler.DebugMountIdentityHits);
+        });
+    }
+#endif
+
     [Fact]
     public void MovementPolling_RestoresAiOnlyWhenTheLocalHorseIsLocallyDriven()
     {
@@ -2234,6 +2483,17 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         SetBackingField(boxed, nameof(AgentData.MountData), mountData);
         SetBackingField(boxed, nameof(AgentData.Speed), ownerSpeed);
         return (AgentData)boxed;
+    }
+
+    private static AgentData CreateCompactMountedData(
+        Agent horse,
+        ushort mountMovementId)
+    {
+        return CreateAgentData(
+            riderPosition: Vec3.Zero,
+            riderDirection: Vec2.Forward,
+            ownerSpeed: 0f,
+            mountData: new AgentMountData(horse, mountMovementId));
     }
 
     private static void SetBackingField(object boxed, string propertyName, object value)

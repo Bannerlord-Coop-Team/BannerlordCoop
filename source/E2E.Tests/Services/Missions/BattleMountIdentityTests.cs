@@ -96,6 +96,119 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         GC.KeepAlive(attackerController);
     }
 
+#if DEBUG
+    [Fact]
+    public void RegisteredMountHit_DebugTelemetryNamesRiderAndMountOnBothPeers()
+    {
+        using var fixture = new MissionEngineFixture();
+        var attacker = Clients.First();
+        var owner = Clients.Skip(1).First();
+        SetControllerId(attacker, "attacker");
+        SetControllerId(owner, "owner");
+
+        var riderId = Guid.NewGuid();
+        var horseId = Guid.NewGuid();
+        var attackerId = Guid.NewGuid();
+        CoopBattleController ownerController = null;
+        CoopBattleController attackerController = null;
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            ownerController = owner.Resolve<CoopBattleController>();
+            RegisterMountedRider(
+                mock,
+                owner.Resolve<INetworkAgentRegistry>(),
+                "owner",
+                riderId,
+                horseId,
+                AgentControllerType.AI);
+        });
+
+        attacker.Call(() =>
+        {
+            var mock = fixture.CreateMission(attacker);
+            attackerController = attacker.Resolve<CoopBattleController>();
+            (Agent puppetRider, Agent puppetHorse) = RegisterMountedRider(
+                mock,
+                attacker.Resolve<INetworkAgentRegistry>(),
+                "owner",
+                riderId,
+                horseId,
+                AgentControllerType.None);
+            GetBattleComponent(attackerController)
+                .AgentMovementHandler.Interpolator
+                .SetMountedRiderTarget(
+                    puppetRider,
+                    new global::Missions.Agents.Packets.AgentData(puppetRider));
+            Agent localAttacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.AI));
+            Assert.True(attacker.Resolve<INetworkAgentRegistry>()
+                .TryRegisterAgent("attacker", attackerId, localAttacker));
+
+            attacker.Resolve<IMessageBroker>().Publish(
+                this,
+                new BattlePuppetHit(
+                    puppetHorse,
+                    localAttacker,
+                    DamagingBlow(),
+                    default,
+                    isMount: true));
+            GetDamageRouter(attackerController).Tick(0.016f);
+        });
+
+        BattleDamageRouter.RoutedDamageDebugSnapshot source = null;
+        BattleDamageRouter.RoutedDamageDebugSnapshot applied = null;
+        attacker.Call(() => source = GetDamageRouter(attackerController)
+            .GetRoutedDamageDebugSnapshot(attackerId));
+        owner.Call(() => applied = GetDamageRouter(ownerController)
+            .GetRoutedDamageDebugSnapshot(source.RoutedHitId));
+
+        Assert.True(source.TargetIsMount);
+        Assert.Equal(riderId, source.RiderAgentId);
+        Assert.Equal(horseId, source.MountAgentId);
+        Assert.Equal(horseId, source.VictimAgentId);
+        Assert.Equal(horseId, source.ActualVictimAgentId);
+        Assert.Equal("attacker", source.AttackerControllerId);
+        Assert.Equal("owner", source.VictimControllerId);
+        Assert.True(source.AttackerIsAi);
+        Assert.False(source.OwnerApplied);
+        Assert.True(applied.TargetIsMount);
+        Assert.Equal(riderId, applied.RiderAgentId);
+        Assert.Equal(horseId, applied.MountAgentId);
+        Assert.Equal(horseId, applied.VictimAgentId);
+        Assert.Equal(horseId, applied.ActualVictimAgentId);
+        Assert.Equal("attacker", applied.AttackerControllerId);
+        Assert.Equal("owner", applied.VictimControllerId);
+        Assert.True(applied.AttackerIsAi);
+        Assert.True(applied.OwnerApplied);
+        Assert.Same(
+            source,
+            GetDamageRouter(attackerController)
+                .GetIncomingAiDamageSourceDebugSnapshot(
+                    riderId,
+                    "attacker",
+                    "owner",
+                    0));
+        Assert.Null(GetDamageRouter(attackerController)
+            .GetIncomingAiDamageSourceDebugSnapshot(
+                riderId,
+                "attacker",
+                "owner",
+                source.Sequence));
+        Assert.Null(GetDamageRouter(attackerController)
+            .GetIncomingAiDamageSourceDebugSnapshot(
+                Guid.NewGuid(),
+                "attacker",
+                "owner",
+                0));
+
+        GC.KeepAlive(ownerController);
+        GC.KeepAlive(attackerController);
+    }
+#endif
+
     /// <summary>
     /// The #1750 race: the rider dismounts and remounts a DIFFERENT horse inside the routed message's flight
     /// time. Resolution is by the struck horse's own id, so the blow still lands on the original horse — under
@@ -135,6 +248,29 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
             GC.KeepAlive(controller);
         });
+    }
+
+    private static BattleDamageRouter GetDamageRouter(
+        CoopBattleController controller)
+    {
+        var field = typeof(CoopBattleController).GetField(
+            "damageRouter",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return Assert.IsType<BattleDamageRouter>(field.GetValue(controller));
+    }
+
+    private static ICoopMissionComponent GetBattleComponent(
+        CoopBattleController controller)
+    {
+        var field = typeof(BattleDamageRouter).GetField(
+            "coopMissionComponent",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return Assert.IsAssignableFrom<ICoopMissionComponent>(
+            field.GetValue(GetDamageRouter(controller)));
     }
 
     /// <summary>An UNregistered horse (e.g. a loose native one) still routes the #1728 way: keyed off its

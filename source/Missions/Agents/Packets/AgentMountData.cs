@@ -98,8 +98,12 @@ namespace Missions.Agents.Packets
         {
             // NOTE: mount position is NOT applied here — it is reconciled per-frame by AgentPositionInterpolator
             // (fed MountPosition by AgentMovementHandler). Everything below is per-packet mount state/animation.
-            mountAgent.SetMovementDirection(MountMovementDirection);
+            ApplyAnimationState(mountAgent);
+            ApplyContinuousState(mountAgent);
+        }
 
+        internal void ApplyAnimationState(Agent mountAgent)
+        {
             // A Controller.None puppet cannot select its channel-zero stand, turn, or gait action.
             bool stationaryTurn = MountSpeed <= StationarySpeedThreshold
                 && MountAction0TurnDirection != NoTurn;
@@ -157,7 +161,6 @@ namespace Missions.Agents.Packets
             // Once the gait matches, let native animation advance it. Movement packets are unreliable, so
             // replaying snapshot progress here can apply an older packet and visibly rewind the same gait.
 
-            //Currently not doing anything afaik
             if (mountAgent.GetCurrentAction(1).Index != MountAction1Index)
             {
                 string mActionName2 = AgentActionData.GetActionNameWithCode(MountAction1Index);
@@ -175,14 +178,30 @@ namespace Missions.Agents.Packets
                     mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (AnimFlags)MountAction1Flag, startProgress: MountAction1Progress);
                 }
             }
-            mountAgent.LookDirection = MountLookDirection;
-            mountAgent.MovementInputVector = MountSpeed <= StationarySpeedThreshold && !stationaryTurn
-                ? Vec2.Zero
-                : MountInputVector;
 
             // Controller.None still lets native horse motion persist between replicated position corrections.
             // Cap that motion to the owner's real speed so a stopped owner also stops its puppet horse.
-            mountAgent.SetMaximumSpeedLimit(MountSpeed, isMultiplier: false);
+            if (mountAgent.GetMaximumSpeedLimit() != MountSpeed)
+                mountAgent.SetMaximumSpeedLimit(MountSpeed, isMultiplier: false);
+        }
+
+        internal int ApplyContinuousState(Agent mountAgent)
+        {
+            int writes = 0;
+            if (AgentData.ApplyMovementDirection(
+                    mountAgent,
+                    MountMovementDirection)) writes++;
+            if (AgentData.ApplyLookDirection(
+                    mountAgent,
+                    MountLookDirection)) writes++;
+            if (AgentData.ApplyMovementInput(
+                    mountAgent,
+                    GetMovementInput())) writes++;
+
+            bool stationaryTurn = MountSpeed <= StationarySpeedThreshold
+                && MountAction0TurnDirection != NoTurn;
+            bool syntheticStationaryTurn = stationaryTurn
+                && MountAction0IsSyntheticTurn;
             Agent.MovementControlFlag movementFlags =
                 (Agent.MovementControlFlag)MountMovementFlag;
             if (stationaryTurn && !syntheticStationaryTurn)
@@ -191,9 +210,34 @@ namespace Missions.Agents.Packets
                     movementFlags,
                     MountAction0TurnDirection);
             }
-            AgentData.ApplyLocomotionMovementFlags(
-                mountAgent,
-                movementFlags);
+            if (AgentData.ApplyLocomotionMovementFlags(
+                    mountAgent,
+                    movementFlags)) writes++;
+            return writes;
+        }
+
+        internal Vec2 GetMovementInput()
+        {
+            bool stationaryTurn = MountSpeed <= StationarySpeedThreshold
+                && MountAction0TurnDirection != NoTurn;
+            return MountSpeed <= StationarySpeedThreshold && !stationaryTurn
+                ? Vec2.Zero
+                : MountInputVector;
+        }
+
+        internal uint GetMovementFlags()
+        {
+            bool stationaryTurn = MountSpeed <= StationarySpeedThreshold
+                && MountAction0TurnDirection != NoTurn;
+            Agent.MovementControlFlag movementFlags =
+                (Agent.MovementControlFlag)MountMovementFlag;
+            if (stationaryTurn && !MountAction0IsSyntheticTurn)
+            {
+                movementFlags = WithStationaryTurnMovementFlag(
+                    movementFlags,
+                    MountAction0TurnDirection);
+            }
+            return (uint)movementFlags;
         }
 
         internal static void GetRenderedAction0State(
