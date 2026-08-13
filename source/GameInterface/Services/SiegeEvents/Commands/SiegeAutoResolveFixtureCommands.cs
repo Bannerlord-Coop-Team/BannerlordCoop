@@ -272,6 +272,29 @@ internal static class SiegeAutoResolveFixtureCommands
         return StateJson("simulation-skip-requested", null, settlement, MobileParty.MainParty);
     }
 
+    [CommandLineArgumentFunction("auto_resolve_fixture_finish_scoreboard", "coop.debug.siege")]
+    public static string FinishScoreboard(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return Error("Run this command on the client.");
+        if (args.Count != 1)
+            return Error("Usage: coop.debug.siege.auto_resolve_fixture_finish_scoreboard <settlementId>");
+        if (!TryGetLocalSettlement(args[0], out var settlement, out var error))
+            return Error(error);
+
+        var simulation = PlayerEncounter.CurrentBattleSimulation;
+        var mapState = Game.Current?.GameStateManager?.LastOrDefault<MapState>();
+        if (simulation?.IsSimulationFinished != true || mapState?.IsSimulationActive != true)
+            return Error("The finished battle-simulation scoreboard is not active.");
+
+        // Mirror the finished simulation branch of SPScoreboardVM.OnExitBattle.
+        mapState.EndBattleSimulation();
+        simulation.OnFinished();
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "encounter")
+            return Error("The native scoreboard Done action did not open the encounter aftermath.");
+        return StateJson("scoreboard-finished", null, settlement, MobileParty.MainParty);
+    }
+
     [CommandLineArgumentFunction("auto_resolve_fixture_state", "coop.debug.siege")]
     public static string State(List<string> args)
     {
