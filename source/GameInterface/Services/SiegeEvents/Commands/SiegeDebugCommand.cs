@@ -904,8 +904,6 @@ public class SiegeDebugCommand
             return "Run this command on the server.";
         if (args.Count != 1)
             return "Usage: coop.debug.siege.sally_out_fixture_capture <settlementId>";
-        if (sallyOutFixture != null)
-            return "A sally-out fixture is already pending restoration.";
         if (!TryResolveSallyOutFixtureServices(
                 out var objectManager,
                 out var playerManager,
@@ -915,6 +913,13 @@ public class SiegeDebugCommand
             return error;
         if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement) || !settlement.IsFortification)
             return $"Fortification with id {args[0]} not found.";
+        var currentFixture = GetCurrentSallyOutFixture();
+        if (currentFixture != null)
+        {
+            if (currentFixture.MapEvent == null && currentFixture.Settlement.StringId == settlement.StringId)
+                return FormatSallyOutFixtureState("captured", objectManager);
+            return "A sally-out fixture is already pending restoration.";
+        }
         if (settlement.SiegeEvent != null || settlement.Party.MapEvent != null)
             return $"{settlement.Name} must not already be in a siege or map event.";
 
