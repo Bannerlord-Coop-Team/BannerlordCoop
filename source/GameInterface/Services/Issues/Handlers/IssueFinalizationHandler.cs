@@ -21,17 +21,20 @@ internal class IssueFinalizationHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IIssueOwnershipRegistry ownershipRegistry;
 
     public IssueFinalizationHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IIssueOwnershipRegistry ownershipRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.ownershipRegistry = ownershipRegistry;
 
         messageBroker.Subscribe<IssueFinalizedTriggered>(Handle_IssueFinalizedTriggered);
         messageBroker.Subscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
@@ -79,7 +82,7 @@ internal class IssueFinalizationHandler : IHandler
                 return;
             }
 
-            if (!IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner) || recordedOwner != player.ControllerId)
+            if (!ownershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner) || recordedOwner != player.ControllerId)
             {
                 Logger.Error("Rejecting {Message} from {Requester}, who is not the recorded owner of {Owner}",
                     nameof(RequestIssueRemoved), player.ControllerId, ownerId);

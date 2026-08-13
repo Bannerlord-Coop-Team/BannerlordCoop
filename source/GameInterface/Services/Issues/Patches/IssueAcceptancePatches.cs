@@ -1,6 +1,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
@@ -34,10 +35,10 @@ internal class IssueWithAlternativeSolutionAcceptancePatch
     private static void Postfix(IssueBase __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (AlternativeSolutionStartAuthorityGuard.IsActive) return;
         if (!GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(__instance)) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        var state = AlternativeSolutionVanillaStateSync.Capture(__instance);
-        MessageBroker.Instance.Publish(__instance, new GenericIssueAlternativeAcceptTriggered(__instance.IssueOwner, controllerIdProvider?.ControllerId, state));
+        MessageBroker.Instance.Publish(__instance, new GenericIssueAlternativeAcceptTriggered(__instance.IssueOwner, controllerIdProvider?.ControllerId));
     }
 }

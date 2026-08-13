@@ -15,15 +15,18 @@ internal class AlternativeSolutionCompletionHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly IIssueOwnershipRegistry ownershipRegistry;
 
     public AlternativeSolutionCompletionHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IIssueOwnershipRegistry ownershipRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.ownershipRegistry = ownershipRegistry;
 
         messageBroker.Subscribe<RequestAlternativeSolutionCompletion>(Handle_RequestAlternativeSolutionCompletion);
     }
@@ -54,7 +57,7 @@ internal class AlternativeSolutionCompletionHandler : IHandler
 
         if (requester == null || !playerManager.TryGetPlayer(requester, out var player)) return false;
         if (!objectManager.TryGetObjectWithLogging(ownerId, out owner)) return false;
-        if (!IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner)) return false;
+        if (!ownershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner)) return false;
         if (recordedOwner != player.ControllerId) return false;
         if (owner.Issue is not IssueBase resolvedIssue) return false;
         if (!resolvedIssue.IsSolvingWithAlternative || !resolvedIssue.AlternativeSolutionReturnTimeForTroops.IsPast) return false;

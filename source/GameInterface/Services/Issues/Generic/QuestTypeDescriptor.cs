@@ -13,6 +13,10 @@ public abstract class QuestTypeDescriptor
     public Type QuestType { get; }
     public string DisplayName { get; }
 
+    public bool SupportsQuestSolutionAccept { get; }
+
+    public bool SupportsAlternativeAccept { get; }
+
     public Action<IssueBase> OnGenuineCreation { get; }
 
     public Action<Hero, string> OnGenuineQuestSolutionAccept { get; }
@@ -27,6 +31,8 @@ public abstract class QuestTypeDescriptor
 
     public Action<Hero> RejectQuestSolutionAccept { get; }
 
+    public Func<Hero, Func<Hero, bool>, (bool Accepted, byte[] FieldsBytes)> TryArbitrateAlternativeAcceptBytes { get; }
+
     public Action<Hero, byte[]> MirrorAlternativeAcceptBytes { get; }
 
     public Action<Hero> RejectAlternativeAccept { get; }
@@ -35,6 +41,8 @@ public abstract class QuestTypeDescriptor
         Type issueType,
         Type questType,
         string displayName,
+        bool supportsQuestSolutionAccept,
+        bool supportsAlternativeAccept,
         Action<IssueBase> onGenuineCreation,
         Action<Hero, string> onGenuineQuestSolutionAccept,
         Action<Hero, string> onGenuineAlternativeAccept,
@@ -42,12 +50,15 @@ public abstract class QuestTypeDescriptor
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
+        Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateAlternativeAcceptBytes,
         Action<Hero, byte[]> mirrorAlternativeAcceptBytes,
         Action<Hero> rejectAlternativeAccept)
     {
         IssueType = issueType ?? throw new ArgumentNullException(nameof(issueType));
         QuestType = questType ?? throw new ArgumentNullException(nameof(questType));
         DisplayName = displayName;
+        SupportsQuestSolutionAccept = supportsQuestSolutionAccept;
+        SupportsAlternativeAccept = supportsAlternativeAccept;
         OnGenuineCreation = onGenuineCreation;
         OnGenuineQuestSolutionAccept = onGenuineQuestSolutionAccept;
         OnGenuineAlternativeAccept = onGenuineAlternativeAccept;
@@ -55,6 +66,7 @@ public abstract class QuestTypeDescriptor
         TryArbitrateQuestSolutionAcceptBytes = tryArbitrateQuestSolutionAcceptBytes;
         MirrorQuestSolutionAcceptBytes = mirrorQuestSolutionAcceptBytes;
         RejectQuestSolutionAccept = rejectQuestSolutionAccept;
+        TryArbitrateAlternativeAcceptBytes = tryArbitrateAlternativeAcceptBytes;
         MirrorAlternativeAcceptBytes = mirrorAlternativeAcceptBytes;
         RejectAlternativeAccept = rejectAlternativeAccept;
     }
@@ -73,6 +85,8 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         object creationCaptureStrategy,
         object questSolutionAcceptMirrorStrategy,
         object alternativeAcceptMirrorStrategy,
+        bool supportsQuestSolutionAccept,
+        bool supportsAlternativeAccept,
         Action<TIssue> onGenuineCreation,
         Action<Hero, string> onGenuineQuestSolutionAccept,
         Action<Hero, string> onGenuineAlternativeAccept,
@@ -80,12 +94,15 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
+        Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateAlternativeAcceptBytes,
         Action<Hero, byte[]> mirrorAlternativeAcceptBytes,
         Action<Hero> rejectAlternativeAccept)
         : base(
             typeof(TIssue),
             typeof(TQuest),
             displayName,
+            supportsQuestSolutionAccept,
+            supportsAlternativeAccept,
             onGenuineCreation == null ? (Action<IssueBase>)null : issue => { if (issue is TIssue typed) onGenuineCreation(typed); },
             onGenuineQuestSolutionAccept,
             onGenuineAlternativeAccept,
@@ -93,6 +110,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             tryArbitrateQuestSolutionAcceptBytes,
             mirrorQuestSolutionAcceptBytes,
             rejectQuestSolutionAccept,
+            tryArbitrateAlternativeAcceptBytes,
             mirrorAlternativeAcceptBytes,
             rejectAlternativeAccept)
     {
@@ -126,6 +144,8 @@ public static class QuestDescriptorBuilder
         private object _creationCapture;
         private object _questSolutionAccept;
         private object _alternativeAccept;
+        private bool _supportsQuestSolutionAccept;
+        private bool _supportsAlternativeAccept;
         private Action<TIssue> _onGenuineCreation;
         private Action<Hero, string> _onGenuineQuestSolutionAccept;
         private Action<Hero, string> _onGenuineAlternativeAccept;
@@ -133,6 +153,7 @@ public static class QuestDescriptorBuilder
         private Func<Hero, Func<Hero, bool>, (bool, byte[])> _tryArbitrateQuestSolutionAcceptBytes;
         private Action<Hero, byte[]> _mirrorQuestSolutionAcceptBytes;
         private Action<Hero> _rejectQuestSolutionAccept;
+        private Func<Hero, Func<Hero, bool>, (bool, byte[])> _tryArbitrateAlternativeAcceptBytes;
         private Action<Hero, byte[]> _mirrorAlternativeAcceptBytes;
         private Action<Hero> _rejectAlternativeAccept;
 
@@ -147,8 +168,15 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
+        public Builder<TIssue, TQuest> WithQuestSolutionAccept()
+        {
+            _supportsQuestSolutionAccept = true;
+            return this;
+        }
+
         public Builder<TIssue, TQuest> WithQuestSolutionAccept<TFields>(IRaceArbitratedAcceptMirrorStrategy<TFields> strategy)
         {
+            _supportsQuestSolutionAccept = true;
             _questSolutionAccept = strategy;
 
             var handler = new RaceArbitratedAcceptMirrorHandler<TFields>(strategy);
@@ -164,11 +192,23 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
+        public Builder<TIssue, TQuest> WithAlternativeAccept()
+        {
+            _supportsAlternativeAccept = true;
+            return this;
+        }
+
         public Builder<TIssue, TQuest> WithAlternativeAccept<TPayload>(IAlternativeAcceptMirrorStrategy<TPayload> strategy)
         {
+            _supportsAlternativeAccept = true;
             _alternativeAccept = strategy;
 
             var handler = new AlternativeAcceptMirrorHandler<TPayload>(strategy);
+            _tryArbitrateAlternativeAcceptBytes = (owner, canAccept) =>
+            {
+                if (!handler.TryArbitrate(owner, canAccept, out var payload)) return (false, null);
+                return (true, GenericAcceptFieldsSerializer.Serialize(payload));
+            };
             _mirrorAlternativeAcceptBytes = (owner, bytes) =>
                 handler.Mirror(owner, GenericAcceptFieldsSerializer.Deserialize<TPayload>(bytes));
             _rejectAlternativeAccept = owner => handler.Reject(owner);
@@ -202,8 +242,9 @@ public static class QuestDescriptorBuilder
 
         public QuestTypeDescriptor<TIssue, TQuest> Build()
             => new(_displayName, _creationCapture, _questSolutionAccept, _alternativeAccept,
+                _supportsQuestSolutionAccept, _supportsAlternativeAccept,
                 _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept, _validateQuestSuccess,
                 _tryArbitrateQuestSolutionAcceptBytes, _mirrorQuestSolutionAcceptBytes, _rejectQuestSolutionAccept,
-                _mirrorAlternativeAcceptBytes, _rejectAlternativeAccept);
+                _tryArbitrateAlternativeAcceptBytes, _mirrorAlternativeAcceptBytes, _rejectAlternativeAccept);
     }
 }

@@ -3,23 +3,32 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Generic;
 
-internal static class IssueGenerationRegistry
+public interface IIssueGenerationRegistry
 {
-    private static readonly PendingRegistry<int> Registry = new();
+    int Bump(Hero owner);
+    void SetGeneration(Hero owner, int generation);
+    bool TryGetGeneration(Hero owner, out int generation);
+    IReadOnlyCollection<KeyValuePair<Hero, int>> Snapshot();
+    void RestoreAll(IEnumerable<KeyValuePair<Hero, int>> entries);
+}
 
-    public static int Bump(Hero owner)
+internal sealed class IssueGenerationRegistry : IIssueGenerationRegistry
+{
+    private readonly PendingRegistry<int> registry = new();
+
+    public int Bump(Hero owner)
     {
-        Registry.TryGet(owner, out var current);
+        registry.TryGet(owner, out var current);
         var next = current + 1;
-        Registry.Set(owner, next);
+        registry.Set(owner, next);
         return next;
     }
 
-    public static void SetGeneration(Hero owner, int generation) => Registry.Set(owner, generation);
+    public void SetGeneration(Hero owner, int generation) => registry.Set(owner, generation);
 
-    public static bool TryGetGeneration(Hero owner, out int generation) => Registry.TryGet(owner, out generation);
+    public bool TryGetGeneration(Hero owner, out int generation) => registry.TryGet(owner, out generation);
 
-    public static IReadOnlyCollection<KeyValuePair<Hero, int>> Snapshot() => Registry.Snapshot();
+    public IReadOnlyCollection<KeyValuePair<Hero, int>> Snapshot() => registry.Snapshot();
 
-    public static void RestoreAll(IEnumerable<KeyValuePair<Hero, int>> entries) => Registry.RestoreAll(entries);
+    public void RestoreAll(IEnumerable<KeyValuePair<Hero, int>> entries) => registry.RestoreAll(entries);
 }

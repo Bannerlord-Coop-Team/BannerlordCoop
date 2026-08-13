@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
@@ -33,6 +34,9 @@ internal class GenericAcceptMirrorHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPrisonerSaleValidator troopValidator;
+    private readonly IIssueConversationTracker conversationTracker;
+    private readonly IIssueOwnershipRegistry ownershipRegistry;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
     public GenericAcceptMirrorHandler(
         IMessageBroker messageBroker,
@@ -41,7 +45,10 @@ internal class GenericAcceptMirrorHandler : IHandler
         IGenericAcceptMirrorInterface issueInterface,
         IPlayerManager playerManager,
         ITroopRosterInterface troopRosterInterface,
-        IPrisonerSaleValidator troopValidator)
+        IPrisonerSaleValidator troopValidator,
+        IIssueConversationTracker conversationTracker,
+        IIssueOwnershipRegistry ownershipRegistry,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -50,6 +57,9 @@ internal class GenericAcceptMirrorHandler : IHandler
         this.playerManager = playerManager;
         this.troopRosterInterface = troopRosterInterface;
         this.troopValidator = troopValidator;
+        this.conversationTracker = conversationTracker;
+        this.ownershipRegistry = ownershipRegistry;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<GenericIssueQuestAcceptTriggered>(Handle_GenericIssueQuestAcceptTriggered);
         messageBroker.Subscribe<RequestGenericIssueAcceptQuest>(Handle_RequestGenericIssueAcceptQuest);
@@ -83,12 +93,12 @@ internal class GenericAcceptMirrorHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
-            IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
+            ownershipRegistry.SetOwner(owner, hostControllerId);
             network.SendAll(new NetworkGenericIssueQuestAccepted(ownerId, hostControllerId));
         }
         else
         {
-            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            generationRegistry.TryGetGeneration(owner, out var generation);
             network.SendAll(new RequestGenericIssueAcceptQuest(ownerId, generation));
         }
     }
@@ -112,9 +122,18 @@ internal class GenericAcceptMirrorHandler : IHandler
                 return;
             }
 
-            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
             {
                 Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
+                    nameof(RequestGenericIssueAcceptQuest), ownerId);
+                network.Send(requester, new NetworkGenericIssueAcceptRejected(ownerId));
+                return;
+            }
+
+            if (!conversationTracker.TryGetTrackedRequester(ownerId, out var trackedControllerId, out var trackedGeneration) ||
+                trackedControllerId != player.ControllerId || trackedGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a requester with no tracked conversation with owner {Owner}",
                     nameof(RequestGenericIssueAcceptQuest), ownerId);
                 network.Send(requester, new NetworkGenericIssueAcceptRejected(ownerId));
                 return;
@@ -124,7 +143,7 @@ internal class GenericAcceptMirrorHandler : IHandler
                 owner.Issue.IssueStayAliveConditions())
             {
                 issueInterface.EnsureServerQuestMirror(owner);
-                IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
+                ownershipRegistry.SetOwner(owner, player.ControllerId);
                 network.SendAll(new NetworkGenericIssueQuestAccepted(ownerId, player.ControllerId));
             }
             else
@@ -142,7 +161,7 @@ internal class GenericAcceptMirrorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
             issueInterface.MirrorQuestAccepted(owner);
-            IssueOwnershipRegistry.SetOwner(owner, ownerControllerId);
+            ownershipRegistry.SetOwner(owner, ownerControllerId);
         });
     }
 
@@ -154,15 +173,18 @@ internal class GenericAcceptMirrorHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
-            IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
+            if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player)) return;
+
+            var state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
+            ownershipRegistry.SetOwner(owner, hostControllerId);
             var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, hostControllerId, payload.What.State, hostTroops));
+            network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, hostControllerId, state, hostTroops));
         }
         else
         {
-            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new RequestGenericIssueAcceptAlternative(ownerId, generation, packedTroops, payload.What.State));
+            network.SendAll(new RequestGenericIssueAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
 
@@ -185,9 +207,18 @@ internal class GenericAcceptMirrorHandler : IHandler
                 return;
             }
 
-            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
             {
                 Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
+                    nameof(RequestGenericIssueAcceptAlternative), ownerId);
+                network.Send(requester, new NetworkGenericIssueAcceptRejected(ownerId));
+                return;
+            }
+
+            if (!conversationTracker.TryGetTrackedRequester(ownerId, out var trackedControllerId, out var trackedGeneration) ||
+                trackedControllerId != player.ControllerId || trackedGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a requester with no tracked conversation with owner {Owner}",
                     nameof(RequestGenericIssueAcceptAlternative), ownerId);
                 network.Send(requester, new NetworkGenericIssueAcceptRejected(ownerId));
                 return;
@@ -196,10 +227,11 @@ internal class GenericAcceptMirrorHandler : IHandler
             if (GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest &&
                 owner.Issue.IssueStayAliveConditions())
             {
+                AlternativeSolutionVanillaState state;
                 try
                 {
                     ApplyValidatedSentTroops(owner, player, payload.What.SentTroops);
-                    issueInterface.MirrorAlternativeAccepted(owner, payload.What.State);
+                    state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
                 }
                 catch (Exception e)
                 {
@@ -209,9 +241,9 @@ internal class GenericAcceptMirrorHandler : IHandler
                     return;
                 }
 
-                IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
+                ownershipRegistry.SetOwner(owner, player.ControllerId);
                 var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-                network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, player.ControllerId, payload.What.State, validatedTroops));
+                network.SendAll(new NetworkGenericIssueAlternativeAccepted(ownerId, player.ControllerId, state, validatedTroops));
             }
             else
             {
@@ -263,7 +295,7 @@ internal class GenericAcceptMirrorHandler : IHandler
                 return;
             }
 
-            IssueOwnershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 

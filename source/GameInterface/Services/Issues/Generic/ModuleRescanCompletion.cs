@@ -15,6 +15,13 @@ public interface IModuleRescanCompletionRunner
 
 internal sealed class ModuleRescanCompletionRunner : IModuleRescanCompletionRunner
 {
+    private readonly IIssueOwnershipRegistry ownershipRegistry;
+
+    public ModuleRescanCompletionRunner(IIssueOwnershipRegistry ownershipRegistry)
+    {
+        this.ownershipRegistry = ownershipRegistry;
+    }
+
     public void Run<TIssue>(ModuleRescanCompletion<TIssue> spec) where TIssue : IssueBase
     {
         if (spec?.TryTriggerOwnedCompletion == null) return;
@@ -28,7 +35,7 @@ internal sealed class ModuleRescanCompletionRunner : IModuleRescanCompletionRunn
 
         foreach (var kvp in snapshot)
         {
-            if (kvp.Value is TIssue && IssueOwnershipRegistry.IsLocalPeerOwner(kvp.Key))
+            if (kvp.Value is TIssue && ownershipRegistry.IsLocalPeerOwner(kvp.Key))
             {
                 spec.TryTriggerOwnedCompletion(kvp.Key);
             }
