@@ -4,6 +4,8 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using GameInterface.Services.Stances.Handlers;
 using GameInterface.Services.Stances.Messages;
+using ProtoBuf;
+using System.IO;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using Xunit;
@@ -39,7 +41,10 @@ public class NetworkMountedBattleStanceRestoreSerializationTests
             hasFaction1PoliticalStagnation: true,
             faction1PoliticalStagnation: 18,
             hasFaction2PoliticalStagnation: false,
-            faction2PoliticalStagnation: 0);
+            faction2PoliticalStagnation: 0,
+            stanceLinkWasAbsent: true,
+            faction1WasAtWarWithFaction2: true,
+            faction2WasAtWarWithFaction1: true);
 
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(original, serializer);
@@ -83,6 +88,54 @@ public class NetworkMountedBattleStanceRestoreSerializationTests
         Assert.Equal(18, result.Faction1PoliticalStagnation);
         Assert.False(result.HasFaction2PoliticalStagnation);
         Assert.True(result.RestoreExactSnapshot);
+        Assert.True(result.StanceLinkWasAbsent);
+        Assert.True(result.Faction1WasAtWarWithFaction2);
+        Assert.True(result.Faction2WasAtWarWithFaction1);
+    }
+
+    [Fact]
+    public void NetworkRestoreMountedBattleStance_LegacyPayloadDefaultsToExistingStanceLink()
+    {
+        var typeMapper = new SerializableTypeMapper();
+        Assert.True(typeMapper.TryGetId(
+            typeof(NetworkRestoreMountedBattleStance),
+            out int typeId));
+
+        byte[] payload;
+        using (var payloadStream = new MemoryStream())
+        {
+            Serializer.Serialize(
+                payloadStream,
+                new LegacyMountedBattleStanceRestorePayload
+                {
+                    FixtureToken = "fixture-2983",
+                    RestoreExactSnapshot = true
+                });
+            payload = payloadStream.ToArray();
+        }
+
+        byte[] wire;
+        using (var wrapperStream = new MemoryStream())
+        {
+            Serializer.Serialize(
+                wrapperStream,
+                new LegacyMessageWrapper
+                {
+                    TypeId = typeId,
+                    Data = payload
+                });
+            wire = wrapperStream.ToArray();
+        }
+
+        var serializer = new ProtoBufSerializer(typeMapper);
+        var result = Assert.IsType<NetworkRestoreMountedBattleStance>(
+            serializer.Deserialize<IMessage>(wire));
+
+        Assert.Equal("fixture-2983", result.FixtureToken);
+        Assert.True(result.RestoreExactSnapshot);
+        Assert.False(result.StanceLinkWasAbsent);
+        Assert.False(result.Faction1WasAtWarWithFaction2);
+        Assert.False(result.Faction2WasAtWarWithFaction1);
     }
 
     [Fact]
@@ -179,6 +232,20 @@ public class NetworkMountedBattleStanceRestoreSerializationTests
         Assert.Equal(15, stance._dailyTributeInstallments);
         Assert.Equal(17, stance._successfulTownSieges1);
         Assert.Equal(16, stance._successfulTownSieges2);
+    }
+
+    [ProtoContract]
+    private sealed class LegacyMountedBattleStanceRestorePayload
+    {
+        [ProtoMember(1)] public string FixtureToken { get; set; }
+        [ProtoMember(25)] public bool RestoreExactSnapshot { get; set; }
+    }
+
+    [ProtoContract]
+    private sealed class LegacyMessageWrapper
+    {
+        [ProtoMember(1)] public int TypeId { get; set; }
+        [ProtoMember(2)] public byte[] Data { get; set; }
     }
 }
 #endif
