@@ -72,8 +72,8 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
             if (!voteManager.ShouldBlockLocalResolution(__instance)) return true;
 
-            voteManager.TryPublishFinalVote(__instance);
-            return false;
+            bool published = voteManager.TryPublishFinalVote(__instance);
+            return !published; // fall back to native if we couldn't route it
         }
 
         [HarmonyPatch("OnFinalize")]
