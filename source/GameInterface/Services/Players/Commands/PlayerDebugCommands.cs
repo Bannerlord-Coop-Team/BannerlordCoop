@@ -66,6 +66,7 @@ internal class PlayerDebugCommands
             return $"Party {player.MobilePartyId} is not resolved.";
 
         string mapEventId = party.MapEvent?.StringId ?? "none";
+        string settlementId = party.CurrentSettlement?.StringId ?? "none";
         bool hasVisual = party.Party.GetPartyVisual() != null;
 
         return
@@ -73,6 +74,7 @@ internal class PlayerDebugCommands
             $"party={party.StringId}|" +
             $"connected={playerManager.IsConnected(player)}|" +
             $"active={party.IsActive}|" +
+            $"settlement={settlementId}|" +
             $"mapEvent={mapEventId}|" +
             $"visual={hasVisual}";
     }
