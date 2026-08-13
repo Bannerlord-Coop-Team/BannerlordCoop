@@ -21,7 +21,6 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -62,6 +61,7 @@ internal class BattleHostHandler : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleTroopLedger ledger;
+    private readonly IBattleSizeProvider battleSizeProvider;
 
     // [Server] Highest host epoch ever issued per battle instance (BR-102), retained across assignment
     // removal: clients keep their last assignment when a battle is fully abandoned (only the server's entry
@@ -125,7 +125,8 @@ internal class BattleHostHandler : IHandler
         IBattleHostRegistry hostRegistry,
         IControllerIdProvider controllerIdProvider,
         IBattleTroopReserveBuilder reserveBuilder,
-        IBattleTroopLedger ledger)
+        IBattleTroopLedger ledger,
+        IBattleSizeProvider battleSizeProvider)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -135,6 +136,7 @@ internal class BattleHostHandler : IHandler
         this.controllerIdProvider = controllerIdProvider;
         this.reserveBuilder = reserveBuilder;
         this.ledger = ledger;
+        this.battleSizeProvider = battleSizeProvider;
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<BattleMissionReady>(Handle_BattleMissionReady);
@@ -389,11 +391,7 @@ internal class BattleHostHandler : IHandler
     {
         if (receiver == null) return;
         long allocationRevision = ++reserveSnapshotRevision;
-        int configuredBattleSize = mapEvent.IsSiegeAssault
-            ? BannerlordConfig.GetRealBattleSizeForSiege()
-            : BannerlordConfig.GetRealBattleSize();
-        int battleSize = Math.Min(configuredBattleSize,
-            DefaultBattleMissionAgentSpawnLogic.MaxNumberOfTroopsForMission);
+        int battleSize = battleSizeProvider.GetBattleSize(mapEvent);
         foreach (var sideReserve in reserves)
             network.Send(receiver, new NetworkBattleTroopReserve(
                 mapEventId, (int)sideReserve.Side, sideReserve.Parties, sideReserve.TotalTroops,

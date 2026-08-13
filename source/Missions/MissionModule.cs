@@ -130,6 +130,9 @@ public class MissionModule : Module
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<BattleSizeProvider>()
+            .As<IBattleSizeProvider>()
+            .InstancePerDependency();
 
         // Builds the coop field-battle mission (mirrors SandBoxMissions.OpenBattleMission with coop suppliers,
         // no deployment phase, and the coop behaviors attached). Resolved from the container by the GameInterface
