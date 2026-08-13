@@ -180,9 +180,9 @@
 
                         <Standard.Button Id="PasswordFilterButton"
                                          WidthSizePolicy="Fixed"
-                                         SuggestedWidth="230"
+                                         SuggestedWidth="320"
                                          HeightSizePolicy="Fixed"
-                                         SuggestedHeight="58"
+                                         SuggestedHeight="65"
                                          VerticalAlignment="Center"
                                          IsDisabled="@IsSearchSteamLobbiesDisabled"
                                          Command.Click="ActionCycleSteamLobbyPasswordFilter"
@@ -198,22 +198,34 @@
                                     Brush.TextVerticalAlignment="Center"
                                     Text="@MinimumPlayersFilterLabelText"/>
 
-                        <IntegerInputTextWidget Id="MinimumPlayersFilterInput"
-                                                WidthSizePolicy="Fixed"
-                                                SuggestedWidth="96"
-                                                HeightSizePolicy="Fixed"
-                                                SuggestedHeight="58"
-                                                VerticalAlignment="Center"
-                                                MarginLeft="14"
-                                                Brush="ScoreboardPanels_2"
-                                                Brush.AlphaFactor="0.75"
-                                                Brush.FontSize="24"
-                                                Brush.TextHorizontalAlignment="Center"
-                                                Brush.TextVerticalAlignment="Center"
-                                                IntText="@MinimumSteamLobbyPlayers"
-                                                MinInt="0"
-                                                MaxInt="999"
-                                                EnableClamp="true"/>
+						  <BrushWidget WidthSizePolicy="Fixed"
+                                SuggestedWidth="110"
+                                HeightSizePolicy="Fixed"
+                                SuggestedHeight="58"
+                                VerticalAlignment="Center"
+                                MarginLeft="14"
+                                Brush="SaveLoad.Search.Button"
+                                UpdateChildrenStates="true">
+							  <Children>
+								  <IntegerInputTextWidget Id="MinimumPlayersFilterInput"
+														  UpdateChildrenStates="true"
+														  WidthSizePolicy="StretchToParent"
+														  HeightSizePolicy="StretchToParent"
+														  MarginLeft="6"
+														  MarginRight="6"
+														  MarginTop="6"
+														  MarginBottom="6"
+														  Brush="ScoreboardPanels_2"
+														  Brush.AlphaFactor="1"
+														  Brush.FontSize="24"
+														  Brush.TextHorizontalAlignment="Center"
+														  Brush.TextVerticalAlignment="Center"
+														  IntText="@MinimumSteamLobbyPlayers"
+														  MinInt="0"
+														  MaxInt="999"
+														  EnableClamp="true"/>
+							  </Children>
+						  </BrushWidget>
                       </Children>
                     </ListPanel>
                     <!-- End of Filter Buttons -->
