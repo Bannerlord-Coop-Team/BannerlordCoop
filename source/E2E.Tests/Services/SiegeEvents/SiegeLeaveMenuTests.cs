@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -136,6 +137,80 @@ public class SiegeLeaveMenuTests : IDisposable
         {
             AssertBesiegerCamp(client, partyId, expectCamp: false);
         }
+    }
+
+    [Theory]
+    [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
+    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
+    public void AssaultCondition_TornSiegeGraph_ReturnsFalseWithoutThrowing(
+        string methodName,
+        GameMenuOption.LeaveType expectedLeaveType)
+    {
+        var client = Clients.First();
+        var (partyId, siegeEventId) = SetupBesiegingPlayerParty(client);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+            Assert.NotNull(party.BesiegerCamp);
+            Assert.NotNull(siegeEvent.BesiegedSettlement);
+
+            siegeEvent.BesiegedSettlement.SiegeEvent = null;
+            var (shown, args) = InvokeAssaultCondition(methodName);
+
+            Assert.False(shown);
+            Assert.Equal(expectedLeaveType, args.optionLeaveType);
+        });
+    }
+
+    [Theory]
+    [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
+    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
+    public void AssaultCondition_MissingSideEngines_ReturnsFalseWithoutThrowing(
+        string methodName,
+        GameMenuOption.LeaveType expectedLeaveType)
+    {
+        var client = Clients.First();
+        var (partyId, _) = SetupBesiegingPlayerParty(client);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.NotNull(party.BesiegerCamp);
+            party.BesiegerCamp.SiegeEngines = null;
+
+            var (shown, args) = InvokeAssaultCondition(methodName);
+
+            Assert.False(shown);
+            Assert.Equal(expectedLeaveType, args.optionLeaveType);
+        });
+    }
+
+    [Theory]
+    [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
+    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
+    public void AssaultCondition_DefenderWithCompleteSiegeGraph_AllowsVanillaCondition(
+        string methodName,
+        GameMenuOption.LeaveType expectedLeaveType)
+    {
+        var client = Clients.First();
+        var (partyId, siegeEventId) = SetupBesiegingPlayerParty(client);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+            Assert.NotNull(siegeEvent.BesiegedSettlement);
+
+            party._besiegerCamp = null;
+            party.CurrentSettlement = siegeEvent.BesiegedSettlement;
+            var (runOriginal, result, args) = InvokeAssaultConditionPrefix(methodName);
+
+            Assert.True(runOriginal);
+            Assert.False(result);
+            Assert.Equal(expectedLeaveType, args.optionLeaveType);
+        });
     }
 
     [Fact]
@@ -604,6 +679,31 @@ public class SiegeLeaveMenuTests : IDisposable
 
         var behavior = ObjectHelper.SkipConstructor<SiegeEventCampaignBehavior>();
         method.Invoke(behavior, new object[] { null });
+    }
+
+    private static (bool shown, MenuCallbackArgs args) InvokeAssaultCondition(string methodName)
+    {
+        var method = AccessTools.Method(typeof(SiegeEventCampaignBehavior), methodName);
+        Assert.NotNull(method);
+
+        var args = new MenuCallbackArgs((MenuContext)null, null);
+        var behavior = ObjectHelper.SkipConstructor<SiegeEventCampaignBehavior>();
+        var shown = (bool)method.Invoke(behavior, new object[] { args });
+        return (shown, args);
+    }
+
+    private static (bool runOriginal, bool result, MenuCallbackArgs args) InvokeAssaultConditionPrefix(string methodName)
+    {
+        string prefixName = methodName.Contains("lead_assault")
+            ? "LeadAssaultConditionPrefix"
+            : "OrderAssaultConditionPrefix";
+        var prefix = AccessTools.Method(typeof(SiegeAssaultCommandGatePatch), prefixName);
+        Assert.NotNull(prefix);
+
+        var args = new MenuCallbackArgs((MenuContext)null, null);
+        object[] parameters = { args, false };
+        var runOriginal = (bool)prefix.Invoke(null, parameters);
+        return (runOriginal, (bool)parameters[1], args);
     }
 
     private static void InvokePatchedArmyEncounterAbandon()

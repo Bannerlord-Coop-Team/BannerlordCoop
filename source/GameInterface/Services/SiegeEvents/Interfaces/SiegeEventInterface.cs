@@ -11,6 +11,8 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -138,6 +140,12 @@ public interface ISiegeEventInterface : IGameAbstraction
         bool besiegerDefeated,
         SiegeTerminationRole role,
         bool interruptedActiveAssault = false);
+
+    /// <summary>
+    /// Retires the local siege presentation when an auto-resolve result is committed, without ending
+    /// the encounter or simulation that still owns the result screens.
+    /// </summary>
+    void RetireLocalSiegeSimulationPresentation(MapEvent mapEvent);
 
     /// <summary>
     /// Whether a rendered mission still owns the screen while an interrupted assault is unwinding.
@@ -599,6 +607,24 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
             if (!interruptedActiveAssault)
                 GameMenu.ExitToLast();
         }
+    }
+
+    public void RetireLocalSiegeSimulationPresentation(MapEvent mapEvent)
+    {
+        if (mapEvent?.IsSiegeAssault != true || mapEvent.MapEventSettlement == null)
+            return;
+
+        var mapState = Game.Current?.GameStateManager?.GameStates
+            .FirstOrDefault(state => state is MapState) as MapState;
+        if (mapState?.IsSimulationActive != true)
+            return;
+
+        DeactivateLocalPlayerSiege(mapEvent.MapEventSettlement);
+
+        if (mapState.AtMenu)
+            mapState.ExitMenuMode();
+        else if (!string.IsNullOrEmpty(mapState.GameMenuId))
+            mapState.GameMenuId = null;
     }
 
     private static void FinishInterruptedActiveAssault(Settlement settlement)

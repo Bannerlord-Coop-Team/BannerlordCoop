@@ -10,6 +10,7 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -28,6 +29,7 @@ internal class MapEventResultsHandler : IHandler
     private readonly IMapEventResultsInterface mapEventResultsInterface;
     private readonly IMapEventContributionBarrier contributionBarrier;
     private readonly IPlayerManager playerManager;
+    private readonly ISiegeEventInterface siegeEventInterface;
 
     public MapEventResultsHandler(
         IMessageBroker messageBroker,
@@ -35,7 +37,8 @@ internal class MapEventResultsHandler : IHandler
         IObjectManager objectManager,
         IMapEventResultsInterface mapEventResultsInterface,
         IMapEventContributionBarrier contributionBarrier,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -43,6 +46,7 @@ internal class MapEventResultsHandler : IHandler
         this.mapEventResultsInterface = mapEventResultsInterface;
         this.contributionBarrier = contributionBarrier;
         this.playerManager = playerManager;
+        this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
         messageBroker.Subscribe<NetworkCommitMapEventResults>(Handle_NetworkCommitMapEventResults);
@@ -136,6 +140,7 @@ internal class MapEventResultsHandler : IHandler
 
             using (new AllowedThread())
             {
+                siegeEventInterface.RetireLocalSiegeSimulationPresentation(mapEvent);
                 playerEncounter.RosterToReceiveLootItems.Add(lootedItems);
                 playerEncounter.RosterToReceiveLootMembers.Add(lootedMembers);
                 playerEncounter.RosterToReceiveLootPrisoners.Add(lootedPrisoners);
