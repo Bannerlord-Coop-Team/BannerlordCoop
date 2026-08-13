@@ -31,22 +31,10 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
     public GenericQuestTypeAcceptSecurityTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
-
-        GenericAcceptMirrorIssueTypes.QuestSolutionMirrorEligible.Remove(TestIssueType);
-        GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Remove(TestIssueType);
-
-        QuestTypeRegistry.Register(
-            QuestDescriptorBuilder.For<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue, TaleWorlds.CampaignSystem.QuestBase>("VillageNeedsToolsTestOnly")
-                .WithQuestSolutionAccept()
-                .WithAlternativeAccept()
-                .Build());
     }
 
     public void Dispose()
     {
-        QuestTypeRegistry.ClearAllForTests();
-        GenericAcceptMirrorIssueTypes.QuestSolutionMirrorEligible.Add(TestIssueType);
-        GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Add(TestIssueType);
         TestEnvironment.Dispose();
     }
 

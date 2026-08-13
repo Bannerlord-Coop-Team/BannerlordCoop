@@ -114,9 +114,6 @@ internal class IssueConversationHandler : IHandler
         if (issue == null) return false;
 
         var descriptor = QuestTypeRegistry.Get(issue);
-        if (descriptor != null && (descriptor.SupportsQuestSolutionAccept || descriptor.SupportsAlternativeAccept)) return true;
-
-        return GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(issue) ||
-            GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(issue);
+        return descriptor != null && (descriptor.SupportsQuestSolutionAccept || descriptor.SupportsAlternativeAccept);
     }
 }

@@ -1,6 +1,6 @@
 using Common.Messaging;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -16,8 +16,8 @@ internal class IssueConversationOpenedPatch
     {
         var issueGiver = Hero.OneToOneConversationHero;
         if (issueGiver?.Issue == null) return;
-        if (!GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(issueGiver.Issue) &&
-            !GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(issueGiver.Issue)) return;
+        var descriptor = QuestTypeRegistry.Get(issueGiver.Issue);
+        if (descriptor?.SupportsQuestSolutionAccept != true && descriptor?.SupportsAlternativeAccept != true) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
         MessageBroker.Instance.Publish(issueGiver, new IssueConversationOpenedLocally(issueGiver, controllerIdProvider?.ControllerId));
