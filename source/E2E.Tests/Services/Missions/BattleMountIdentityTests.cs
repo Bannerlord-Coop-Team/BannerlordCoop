@@ -173,6 +173,9 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         Assert.Equal("attacker", source.AttackerControllerId);
         Assert.Equal("owner", source.VictimControllerId);
         Assert.True(source.AttackerIsAi);
+        Assert.True(source.ContactTelemetryAvailable);
+        Assert.True(source.TargetDrift >= 0f);
+        Assert.True(source.TargetAge >= 0f);
         Assert.False(source.OwnerApplied);
         Assert.True(applied.TargetIsMount);
         Assert.Equal(riderId, applied.RiderAgentId);
@@ -203,9 +206,136 @@ public class BattleMountIdentityTests : MissionTestEnvironment
                 "attacker",
                 "owner",
                 0));
+        Assert.Null(GetDamageRouter(attackerController)
+            .GetIncomingAiDamageSourceDebugSnapshot(
+                riderId,
+                "wrong-attacker",
+                "owner",
+                0));
+        Assert.Null(GetDamageRouter(attackerController)
+            .GetIncomingAiDamageSourceDebugSnapshot(
+                riderId,
+                "attacker",
+                "wrong-owner",
+                0));
+
+        source.AttackerIsAi = false;
+        Assert.Null(GetDamageRouter(attackerController)
+            .GetIncomingAiDamageSourceDebugSnapshot(
+                riderId,
+                "attacker",
+                "owner",
+                0));
+        source.AttackerIsAi = true;
+
+        source.ContactTelemetryAvailable = false;
+        Assert.Null(GetDamageRouter(attackerController)
+            .GetIncomingAiDamageSourceDebugSnapshot(
+                riderId,
+                "attacker",
+                "owner",
+                0));
+        source.ContactTelemetryAvailable = true;
 
         GC.KeepAlive(ownerController);
         GC.KeepAlive(attackerController);
+    }
+
+    [Fact]
+    public void IncomingAiJoustSelection_UsesNearestLocallyAuthoritativeMountedAiEnemy()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "owner");
+
+        client.Call(() =>
+        {
+            MockMission mock = fixture.CreateMission(client);
+            INetworkAgentRegistry registry = client.Resolve<INetworkAgentRegistry>();
+            Team ownTeam = mock.AttackerTeam.Shell;
+            Team enemyTeam = mock.DefenderTeam.Shell;
+            Agent target = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None)
+                    .Team(enemyTeam)
+                    .InitialPosition(new Vec3(10f, 0f, 0f)));
+            mock.SpawnMount(target);
+
+            Agent nearestAi = RegisterCandidate(
+                mock,
+                registry,
+                "owner",
+                AgentControllerType.AI,
+                ownTeam,
+                new Vec3(8f, 0f, 0f),
+                mounted: true);
+            RegisterCandidate(
+                mock,
+                registry,
+                "owner",
+                AgentControllerType.AI,
+                ownTeam,
+                Vec3.Zero,
+                mounted: true);
+            RegisterCandidate(
+                mock,
+                registry,
+                "owner",
+                AgentControllerType.Player,
+                ownTeam,
+                new Vec3(9f, 0f, 0f),
+                mounted: true);
+            RegisterCandidate(
+                mock,
+                registry,
+                "owner",
+                AgentControllerType.AI,
+                enemyTeam,
+                new Vec3(9.5f, 0f, 0f),
+                mounted: true);
+            RegisterCandidate(
+                mock,
+                registry,
+                "owner",
+                AgentControllerType.AI,
+                ownTeam,
+                new Vec3(9.75f, 0f, 0f),
+                mounted: false);
+
+            CoopAgentInfo selected = BattleDebugCommands
+                .SelectIncomingAiJoustRider(
+                    registry.GetAgents("owner"),
+                    target);
+
+            Assert.NotNull(selected);
+            Assert.Same(nearestAi, selected.Agent);
+            Assert.Equal(AgentControllerType.AI, selected.Agent.Controller);
+            Assert.True(selected.Agent.HasMount);
+            Assert.Equal(BattleSideEnum.Attacker, selected.Agent.Team.Side);
+        });
+    }
+
+    private static Agent RegisterCandidate(
+        MockMission mock,
+        INetworkAgentRegistry registry,
+        string controllerId,
+        AgentControllerType controller,
+        Team team,
+        Vec3 position,
+        bool mounted)
+    {
+        Agent candidate = mock.SpawnAgent(
+            new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(controller)
+                .Team(team)
+                .InitialPosition(position));
+        if (mounted)
+            mock.SpawnMount(candidate);
+        Assert.True(registry.TryRegisterAgent(
+            controllerId,
+            Guid.NewGuid(),
+            candidate));
+        return candidate;
     }
 #endif
 
