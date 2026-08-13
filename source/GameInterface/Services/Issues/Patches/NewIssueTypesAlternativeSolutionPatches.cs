@@ -15,31 +15,6 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Patches;
 
-[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAlternativeSolution))]
-internal class NewIssueTypesAlternativeSolutionOwnershipGatePatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix(IssueBase __instance)
-    {
-        if (!GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Contains(__instance.GetType())) return true;
-
-        return (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(__instance.IssueOwner))
-            || AlternativeSolutionCompletionAuthorityGuard.IsActive;
-    }
-}
-
-[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithAlternativeSolution))]
-internal class NewIssueTypesAlternativeSolutionStartOwnershipGatePatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix(IssueBase __instance)
-    {
-        if (!GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Contains(__instance.GetType())) return true;
-
-        return AlternativeSolutionStartAuthorityGuard.IsActive;
-    }
-}
-
 [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.RegisterEvents))]
 internal class NewIssueTypesAlternativeSolutionCompletionPatches
 {
@@ -67,7 +42,7 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
 
         foreach (var kvp in snapshot)
         {
-            if (!GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Contains(kvp.Value.GetType())) continue;
+            if (QuestTypeRegistry.Get(kvp.Value)?.SupportsAlternativeAccept != true) continue;
             if (!ownershipRegistry.IsLocalPeerOwner(kvp.Key)) continue;
 
             TryTriggerOwnedAlternativeSolutionCompletion(kvp.Value);
