@@ -55,7 +55,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return false;
 
         troopsRegistry.Deposit(ownerControllerId, troops);
-        MessageBroker.Instance.Publish(issue, new AwaitingAlternativeSolutionTroopsDepositedLocally(ownerControllerId, troops));
+        MessageBroker.Instance.Publish(issue, new AwaitingAlternativeSolutionTroopsDepositedLocally(issue.IssueOwner, ownerControllerId, troops));
 
         return false;
     }
