@@ -72,6 +72,7 @@ internal class BattleHostHandler : IHandler
     // [Server] Mutable state that lives exactly as long as one battle mission instance. The epoch watermark
     // stays separate because it must survive teardown and increase when the same MapEvent is entered again.
     private readonly Dictionary<string, BattleRuntimeState> battleRuntimeStates = new Dictionary<string, BattleRuntimeState>();
+    private long reserveSnapshotRevision;
 
     private sealed class BattleRuntimeState
     {
@@ -142,6 +143,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -156,6 +158,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -383,9 +386,38 @@ internal class BattleHostHandler : IHandler
     private void SendSideReserves(NetPeer receiver, string mapEventId, List<SideReserve> reserves, bool flushRequested)
     {
         if (receiver == null) return;
+        long allocationRevision = ++reserveSnapshotRevision;
         foreach (var sideReserve in reserves)
             network.Send(receiver, new NetworkBattleTroopReserve(
-                mapEventId, (int)sideReserve.Side, sideReserve.Parties, flushRequested));
+                mapEventId, (int)sideReserve.Side, sideReserve.Parties, flushRequested, sideReserve.TotalTroops,
+                sideReserve.PlayerOwnedPartyCount, hasAllocationMetadata: true, allocationRevision));
+    }
+
+    // [Server, game thread] A late party changes the complete side totals and, when it is AI-owned, expands
+    // the current host's reserve. Refresh every participating peer so owner shares stay proportional.
+    private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var mapEvent = payload.What.MapEvent;
+        if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId)) return;
+        GameThread.RunSafe(() => RefreshReservesAfterPartiesAdded(mapEventId, mapEvent));
+    }
+
+    private void RefreshReservesAfterPartiesAdded(string mapEventId, MapEvent mapEvent)
+    {
+        if (!hostRegistry.TryGet(mapEventId, out var assignment)) return;
+        foreach (var player in playerManager.Players)
+        {
+            if (!playerManager.IsConnected(player) || !IsRequesterInBattle(mapEvent, player.ControllerId))
+                continue;
+            if (!playerManager.TryGetPeer(player.ControllerId, out var peer))
+                continue;
+
+            if (player.ControllerId == assignment.HostControllerId)
+                network.Send(peer, new NetworkBattleReserveOwnershipExpanded(mapEventId));
+
+            SendOwnedReserves(mapEventId, mapEvent, peer, player.ControllerId, includeEmptySides: true);
+        }
     }
 
     /// <summary>[Server, game thread] Record the current host's live peer for this battle, from one of its

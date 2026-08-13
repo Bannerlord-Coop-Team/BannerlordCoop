@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
@@ -47,7 +47,11 @@ internal class BattleTroopReserveHandler : IHandler
         var dropped = CoopTroopSupplierRegistry.Feed(
             message.MapEventId,
             (BattleSideEnum)message.Side,
-            message.Parties ?? Array.Empty<PartyReserve>());
+            message.Parties ?? Array.Empty<PartyReserve>(),
+            message.SideTotalTroops,
+            message.PlayerOwnedPartyCount,
+            message.HasAllocationMetadata,
+            message.AllocationRevision);
 
         if (!message.FlushRequested)
             return; // legacy shrink — REPLACE only, no ack (today's behavior)

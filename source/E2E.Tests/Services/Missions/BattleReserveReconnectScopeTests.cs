@@ -897,14 +897,30 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     {
         var reserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
             "rt_battle", (int)BattleSideEnum.Attacker,
-            new[] { new PartyReserve("own-party", 0, Array.Empty<TroopReserveEntry>(), isReceiverPlayerParty: true) },
-            flushRequested: true));
+            new[] { new PartyReserve("own-party", 0, Array.Empty<TroopReserveEntry>(), isReceiverPlayerParty: true,
+                sideOffset: 7, playerOwnedRank: 2) },
+            flushRequested: true,
+            sideTotalTroops: 42,
+            playerOwnedPartyCount: 3,
+            hasAllocationMetadata: true,
+            allocationRevision: 17));
         Assert.True(reserve.FlushRequested);
-        Assert.True(Assert.Single(reserve.Parties).IsReceiverPlayerParty);
+        Assert.Equal(42, reserve.SideTotalTroops);
+        Assert.Equal(3, reserve.PlayerOwnedPartyCount);
+        Assert.True(reserve.HasAllocationMetadata);
+        Assert.Equal(17, reserve.AllocationRevision);
+        var party = Assert.Single(reserve.Parties);
+        Assert.True(party.IsReceiverPlayerParty);
+        Assert.Equal(7, party.SideOffset);
+        Assert.Equal(2, party.PlayerOwnedRank);
 
         var legacyReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
             "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>()));
         Assert.False(legacyReserve.FlushRequested);
+        Assert.Equal(0, legacyReserve.SideTotalTroops);
+        Assert.Equal(0, legacyReserve.PlayerOwnedPartyCount);
+        Assert.False(legacyReserve.HasAllocationMetadata);
+        Assert.Equal(0, legacyReserve.AllocationRevision);
 
         var flush = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
             "rt_battle", new[] { new SupplyProgressEntry("party", 2) }, isFlush: true));
