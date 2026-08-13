@@ -1,10 +1,14 @@
 ﻿#if DEBUG
+using Common;
 using Common.Logging;
 using HarmonyLib;
 using SandBox;
 using Serilog;
+using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 
@@ -12,6 +16,8 @@ namespace GameInterface.Services.CampaignService.Patches;
 
 internal static class CampaignLoadPhaseDiagnosticPatch
 {
+    private const string DedicatedServerHostTypeName = "DedicatedServer.CoopServerHost";
+
     internal static void RecordStarted(string phase)
     {
         if (!ContainerProvider.TryResolve<ICampaignLoadPhaseDiagnostic>(out var diagnostic))
@@ -32,6 +38,21 @@ internal static class CampaignLoadPhaseDiagnosticPatch
         }
 
         diagnostic.RecordCompleted(phase);
+    }
+
+    internal static Type GetDedicatedServerHostType() => AccessTools.TypeByName(DedicatedServerHostTypeName);
+
+    internal static string GetDedicatedServerHostState()
+    {
+        Type hostType = GetDedicatedServerHostType();
+        object phase = AccessTools.Field(hostType, "_phase")?.GetValue(null);
+        object ticks = AccessTools.Field(hostType, "_ticks")?.GetValue(null);
+        GameManagerBase manager = GameManagerBase.Current;
+        MBGameManager gameManager = manager as MBGameManager;
+
+        return $"phase={phase ?? "<unknown>"}|ticks={ticks ?? "<unknown>"}|" +
+            $"manager={manager?.GetType().FullName ?? "<null>"}|isLoaded={gameManager?.IsLoaded.ToString() ?? "<null>"}|" +
+            $"campaign={(Campaign.Current != null)}|queue={GameThread.Instance.QueueLength}";
     }
 
     private static readonly ILogger Logger = LogManager.GetLogger(typeof(CampaignLoadPhaseDiagnosticPatch));
@@ -189,11 +210,67 @@ internal static class SandBoxGameManagerOnLoadFinishedDiagnosticPatch
     private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("SandBoxGameManager.OnLoadFinished");
 }
 
-[HarmonyPatch(typeof(Module), nameof(Module.OnApplicationTick))]
-internal static class ModuleOnApplicationTickDiagnosticPatch
+[HarmonyPatch]
+internal static class DedicatedServerHostTickDiagnosticPatch
 {
+    [HarmonyPrepare]
+    private static bool Prepare() => CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostType() != null;
+
+    [HarmonyTargetMethod]
+    private static MethodBase TargetMethod() => AccessTools.Method(
+        CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostType(),
+        "Tick",
+        new[] { typeof(float) });
+
+    [HarmonyPrefix]
+    private static void Prefix() => CampaignLoadPhaseDiagnosticPatch.RecordStarted(
+        $"CoopServerHost.Tick|{CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState()}");
+
     [HarmonyPostfix]
-    private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("Module.OnApplicationTick");
+    private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted(
+        $"CoopServerHost.Tick|{CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState()}");
+}
+
+[HarmonyPatch]
+internal static class DedicatedServerHostOnLoadedDiagnosticPatch
+{
+    [HarmonyPrepare]
+    private static bool Prepare() => CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostType() != null;
+
+    [HarmonyTargetMethod]
+    private static MethodBase TargetMethod() => AccessTools.Method(
+        CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostType(),
+        "OnLoaded");
+
+    [HarmonyPrefix]
+    private static void Prefix() => CampaignLoadPhaseDiagnosticPatch.RecordStarted(
+        $"CoopServerHost.OnLoaded|{CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState()}");
+
+    [HarmonyPostfix]
+    private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted(
+        $"CoopServerHost.OnLoaded|{CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState()}");
+}
+
+[HarmonyPatch(typeof(GameThread), nameof(GameThread.Update))]
+internal static class GameThreadUpdateDiagnosticPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix()
+    {
+        if (CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostType() == null) return;
+
+        CampaignLoadPhaseDiagnosticPatch.RecordStarted(
+            $"GameThread.Update|{CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState()}");
+    }
+
+    [HarmonyPostfix]
+    private static void Postfix()
+    {
+        if (CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostType() == null) return;
+
+        CampaignLoadPhaseDiagnosticPatch.RecordCompleted(
+            $"GameThread.Update|{CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState()}");
+    }
 }
 
 [HarmonyPatch(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.InitializeDataCache))]
