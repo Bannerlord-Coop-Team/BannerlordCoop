@@ -77,7 +77,6 @@ public class MapEventDebugCommands
         public MountedBattleStanceSnapshot Stance;
         public int HorsemanSlots;
         public MapEvent MapEvent;
-        public string TemporaryBattleEquipmentId;
         public bool Begun;
         public bool Restored;
     }
@@ -105,7 +104,7 @@ public class MapEventDebugCommands
         public int LeaderUnspentFocusPoints;
         public int LeaderUnspentAttributePoints;
         public Equipment OriginalBattleEquipment;
-        public Equipment TemporaryBattleEquipment;
+        public Equipment MountedBattleEquipment;
     }
 
     private sealed class MountedBattleStanceSnapshot
@@ -669,19 +668,15 @@ public class MapEventDebugCommands
 
         try
         {
-            fixture.Receiver.TemporaryBattleEquipment = new Equipment(ownerTroop.Equipment);
-            fixture.Receiver.TemporaryBattleEquipment.FillFrom(ownerTroop.Equipment);
-            if (!objectManager.TryGetId(
-                    fixture.Receiver.TemporaryBattleEquipment,
-                    out var temporaryBattleEquipmentId))
+            if (!objectManager.TryGetId(ownerTroop.Equipment, out _))
             {
                 throw new InvalidOperationException(
-                    "The temporary joust equipment was not registered.");
+                    "The mounted joust equipment was not registered.");
             }
 
-            fixture.TemporaryBattleEquipmentId = temporaryBattleEquipmentId;
+            fixture.Receiver.MountedBattleEquipment = ownerTroop.Equipment;
             fixture.Receiver.Leader._battleEquipment =
-                fixture.Receiver.TemporaryBattleEquipment;
+                fixture.Receiver.MountedBattleEquipment;
 
             StageMountedBattleParty(fixture.Receiver, receiverTroop, MountedBattleReceiverTroops, fixture.Receiver.Party.Position);
             var ownerPosition = new CampaignVec2(
@@ -795,10 +790,7 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.mounted_battle_fixture_verify <fixtureToken>";
         if (restoredMountedBattleFixture != null && restoredMountedBattleFixture.Token == args[0])
         {
-            if (!TryGetObjectManager(out var objectManager))
-                return "Unable to resolve ObjectManager.";
-
-            bool verified = IsMountedBattleFixtureRestored(restoredMountedBattleFixture, objectManager);
+            bool verified = IsMountedBattleFixtureRestored(restoredMountedBattleFixture);
             restoredMountedBattleFixture.Restored = verified;
             return FormatMountedBattleFixture(
                 verified ? "verified" : "verification-failed",
@@ -1011,7 +1003,7 @@ public class MapEventDebugCommands
 
         var failures = new List<string>();
         TryFinalizeMountedBattleMapEvents(fixture, failures);
-        TryRestoreMountedBattleEquipment(fixture, objectManager, failures);
+        TryRestoreMountedBattleEquipment(fixture, failures);
         if (TryResolveMountedBattleParty(objectManager, fixture.Receiver, out var receiverError))
         {
             try
@@ -1055,7 +1047,7 @@ public class MapEventDebugCommands
             failures.Add(exception.Message);
         }
 
-        fixture.Restored = failures.Count == 0 && IsMountedBattleFixtureRestored(fixture, objectManager);
+        fixture.Restored = failures.Count == 0 && IsMountedBattleFixtureRestored(fixture);
         if (!fixture.Restored && failures.Count == 0)
             failures.Add("The restored state does not match the captured baseline.");
 
@@ -1065,30 +1057,15 @@ public class MapEventDebugCommands
 
     private static void TryRestoreMountedBattleEquipment(
         MountedBattleFixture fixture,
-        IObjectManager objectManager,
         List<string> failures)
     {
-        Equipment temporary = fixture.Receiver.TemporaryBattleEquipment;
-        if (temporary == null)
+        if (fixture.Receiver.MountedBattleEquipment == null)
             return;
 
         try
         {
             fixture.Receiver.Leader._battleEquipment =
                 fixture.Receiver.OriginalBattleEquipment;
-            if (objectManager.Contains(temporary))
-            {
-                MessageBroker.Instance.Publish(
-                    fixture.Receiver.Leader,
-                    new InstanceDestroyed<Equipment>(temporary));
-            }
-            if (objectManager.Contains(temporary))
-            {
-                failures.Add(
-                    "The temporary joust equipment is still registered after restoration.");
-                return;
-            }
-
         }
         catch (Exception exception)
         {
@@ -1202,13 +1179,11 @@ public class MapEventDebugCommands
         network.SendAll(restore);
     }
 
-    private static bool IsMountedBattleFixtureRestored(MountedBattleFixture fixture, IObjectManager objectManager) =>
+    private static bool IsMountedBattleFixtureRestored(MountedBattleFixture fixture) =>
         IsMountedBattlePartyRestored(fixture.Receiver) &&
         IsMountedBattlePartyRestored(fixture.Owner) &&
         fixture.Receiver.Leader?._battleEquipment ==
             fixture.Receiver.OriginalBattleEquipment &&
-        (fixture.Receiver.TemporaryBattleEquipment == null ||
-         !objectManager.Contains(fixture.Receiver.TemporaryBattleEquipment)) &&
         fixture.Receiver.Party?.MapEvent == fixture.Receiver.OriginalMapEvent &&
         fixture.Owner.Party?.MapEvent == fixture.Owner.OriginalMapEvent &&
         (fixture.MapEvent == null || fixture.MapEvent.IsFinalized || fixture.MapEvent == fixture.Receiver.OriginalMapEvent) &&
@@ -1332,11 +1307,6 @@ public class MapEventDebugCommands
         var receiver = fixture.Receiver.Party;
         var owner = fixture.Owner.Party;
         string[] activeMissionControllers = GetActiveMissionControllers(fixture);
-        bool temporaryBattleEquipmentRegistered =
-            fixture.Receiver.TemporaryBattleEquipment != null &&
-            TryGetObjectManager(out var equipmentObjectManager) &&
-            equipmentObjectManager.Contains(
-                fixture.Receiver.TemporaryBattleEquipment);
         var result = new
         {
             token = fixture.Token,
@@ -1352,14 +1322,12 @@ public class MapEventDebugCommands
             ownerHealthyHorsemen = owner == null ? 0 : HealthyTroopCount(owner.MemberRoster, MountedBattleOwnerTroopId),
             horsemanSlots = fixture.HorsemanSlots,
             joustEquipmentStaged =
-                fixture.Receiver.TemporaryBattleEquipment != null &&
+                fixture.Receiver.MountedBattleEquipment != null &&
                 fixture.Receiver.Leader?._battleEquipment ==
-                    fixture.Receiver.TemporaryBattleEquipment,
+                    fixture.Receiver.MountedBattleEquipment,
             receiverBattleEquipmentRestored =
                 fixture.Receiver.Leader?._battleEquipment ==
                     fixture.Receiver.OriginalBattleEquipment,
-            temporaryBattleEquipmentId = fixture.TemporaryBattleEquipmentId,
-            temporaryBattleEquipmentRegistered,
             activeMissionControllerIds = activeMissionControllers,
             receiverRosterRestored = IsMountedBattlePartyRestored(fixture.Receiver),
             ownerRosterRestored = IsMountedBattlePartyRestored(fixture.Owner),
