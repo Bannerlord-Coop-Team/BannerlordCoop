@@ -255,6 +255,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         {
             if (savedPlayerDetectedTrack?.PlayerId == null || savedPlayerDetectedTrack.DetectedTracks == null) continue;
 
+            playerDetectedTracks[savedPlayerDetectedTrack.PlayerId] = new();
             foreach (var detectedTrack in savedPlayerDetectedTrack.DetectedTracks)
             {
                 playerDetectedTracks[savedPlayerDetectedTrack.PlayerId].Add(detectedTrack);
@@ -320,10 +321,9 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
 
     public List<MapTrackData> InitializePlayerVisibleTracks(MapTracksCampaignBehavior behavior, MobileParty playerParty)
     {
-        // Don't grant scouting xp when initializing tracks on join
-        DetectTracksForPlayerParty(behavior, playerParty, false);
-
         if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId)) return new List<MapTrackData>();
+
+        // Use existing tracks if present
         if (!playerDetectedTracks.TryGetValue(playerPartyId, out var detectedTracks)) return new List<MapTrackData>();
 
         return detectedTracks.Select(ToMapTrackData).ToList();
