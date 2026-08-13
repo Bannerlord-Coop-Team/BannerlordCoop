@@ -3,7 +3,6 @@ using Common;
 using Common.LiveTesting;
 using Common.Logging;
 using Common.LogicStates;
-using Common.Util;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using GameInterface;
@@ -457,7 +456,7 @@ namespace Coop.LiveTesting
                     attempted = true,
                     started,
                 });
-            }, true, false);
+            }, true);
         }
 
         private LiveTestResponse CreateStatusResponse(string requestId)
@@ -579,8 +578,7 @@ namespace Coop.LiveTesting
         private LiveTestResponse ExecuteOnGameThread(
             LiveTestRequest request,
             Func<LiveTestResponse> operation,
-            bool timeoutOutcomeUncertain,
-            bool suspendPatches = true)
+            bool timeoutOutcomeUncertain)
         {
             LiveTestResponse response = null;
             Exception operationException = null;
@@ -591,17 +589,7 @@ namespace Coop.LiveTesting
                 {
                     try
                     {
-                        if (suspendPatches)
-                        {
-                            using (AllowedThread.Suspend())
-                            {
-                                response = operation();
-                            }
-                        }
-                        else
-                        {
-                            response = operation();
-                        }
+                        response = operation();
                     }
                     catch (Exception exception)
                     {

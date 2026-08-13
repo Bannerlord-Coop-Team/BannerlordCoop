@@ -23,6 +23,9 @@ public interface ITimeControlInterface : IGameAbstraction
     TimeControlEnum GetTimeControl();
     void ClientSetTimeControl(TimeControlEnum newMode);
     void ServerSetTimeControl(TimeControlEnum timeMode);
+#if DEBUG
+    void ServerSetTimeControlForLiveTest(TimeControlEnum timeMode);
+#endif
 }
 
 internal class TimeControlInterface : ITimeControlInterface
@@ -98,7 +101,9 @@ internal class TimeControlInterface : ITimeControlInterface
     /// </summary>
     /// <param name="requestedMode">The time control mode being requested</param>
     /// <returns>The highest mode the policies permit for the request</returns>
-    internal TimeControlEnum LimitTimeControl(TimeControlEnum requestedMode)
+    internal TimeControlEnum LimitTimeControl(
+        TimeControlEnum requestedMode,
+        bool bypassFastForwardPolicies = false)
     {
         if (requestedMode != TimeControlEnum.Pause &&
             TryGetDisallowingPolicy(unpausePolicies, out var unpausePolicy))
@@ -112,6 +117,7 @@ internal class TimeControlInterface : ITimeControlInterface
         }
 
         if (requestedMode == TimeControlEnum.Play_2x &&
+            !bypassFastForwardPolicies &&
             TryGetDisallowingPolicy(fastForwardPolicies, out var fastForwardPolicy))
         {
             Logger.Information(
@@ -159,6 +165,20 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <param name="timeMode"></param>
     public void ServerSetTimeControl(TimeControlEnum timeMode)
     {
+        ApplyServerTimeControl(timeMode, false);
+    }
+
+#if DEBUG
+    public void ServerSetTimeControlForLiveTest(TimeControlEnum timeMode)
+    {
+        ApplyServerTimeControl(timeMode, true);
+    }
+#endif
+
+    private void ApplyServerTimeControl(
+        TimeControlEnum timeMode,
+        bool bypassFastForwardPolicies)
+    {
         if (ModInformation.IsClient)
         {
             Logger.Warning("Client attempted to set time mode. This is only allowed on the server. {CallStack}", Environment.StackTrace);
@@ -169,13 +189,14 @@ internal class TimeControlInterface : ITimeControlInterface
             ? "<unavailable>"
             : GetTimeControl().ToString();
         var requestedMode = timeMode;
-        timeMode = LimitTimeControl(timeMode);
+        timeMode = LimitTimeControl(timeMode, bypassFastForwardPolicies);
 
         Logger.Information(
-            "Applying server time control: current={CurrentMode} requested={RequestedMode} effective={EffectiveMode}",
+            "Applying server time control: current={CurrentMode} requested={RequestedMode} effective={EffectiveMode} liveTestFastForwardBypass={LiveTestFastForwardBypass}",
             currentMode,
             requestedMode,
-            timeMode);
+            timeMode,
+            bypassFastForwardPolicies);
 
         network.SendAll(new NetworkChangeTimeControlMode(timeMode));
 
