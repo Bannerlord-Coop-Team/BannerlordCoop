@@ -212,9 +212,28 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Attacker].Clear();
 
         var settings = CreateSandBoxBattleWaveSpawnSettings();
-        _missionAgentSpawnLogic._battleSize = sizing.BattleSize;
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            sizing.DefenderOwned,
+            sizing.AttackerOwned,
+            sizing.BattleSize,
+            settings.MaximumBattleSideRatio,
+            settings.DefenderAdvantageFactor);
+        var authoritativeSettings = new MissionSpawnSettings(
+            MissionSpawnSettings.InitialSpawnMethod.FreeAllocation,
+            settings.ReinforcementTroopsTimingMethod,
+            settings.ReinforcementTroopsSpawnMethod,
+            settings.GlobalReinforcementInterval,
+            settings.ReinforcementBatchPercentage,
+            settings.DesiredReinforcementPercentage,
+            settings.ReinforcementWavePercentage,
+            settings.MaximumReinforcementWaveCount,
+            settings.DefenderReinforcementBatchPercentage,
+            settings.AttackerReinforcementBatchPercentage,
+            settings.DefenderAdvantageFactor,
+            settings.MaximumBattleSideRatio);
         _missionAgentSpawnLogic.InitWithSinglePhase(sizing.DefenderOwned, sizing.AttackerOwned,
-            sizing.DefenderOwned, sizing.AttackerOwned, spawnDefenders: true, spawnAttackers: true, in settings);
+            targets.Defenders, targets.Attackers, spawnDefenders: true, spawnAttackers: true,
+            in authoritativeSettings);
 
         GuaranteePlayerInitialSlots();
         ClampPhasesToOwnedShare(BattleSideEnum.Defender, _defenderSupplier);
