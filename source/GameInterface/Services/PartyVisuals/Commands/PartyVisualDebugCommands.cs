@@ -101,10 +101,10 @@ internal class PartyVisualDebugCommands
                     isBossParty: false,
                     pt: null,
                     settlement.GatePosition);
+                stagedParties.Add(party);
                 party.IsVisible = true;
                 party.IsInspected = true;
                 party.SetMoveModeHold();
-                stagedParties.Add(party);
             }
         }
         catch
@@ -133,9 +133,7 @@ internal class PartyVisualDebugCommands
     private static int RestoreFixtureParties()
     {
         int removedPartyCount = 0;
-        List<MobileParty> fixtureParties = MobileParty.All
-            .Where(party => party?.StringId?.StartsWith(FixturePartyIdPrefix, StringComparison.Ordinal) == true)
-            .ToList();
+        List<MobileParty> fixtureParties = GetFixturePartiesForRestore(stagedParties, MobileParty.All);
         for (int index = fixtureParties.Count - 1; index >= 0; index--)
         {
             MobileParty party = fixtureParties[index];
@@ -148,6 +146,17 @@ internal class PartyVisualDebugCommands
         stagedParties.Clear();
         fixtureBaselineEligiblePartyCount = -1;
         return removedPartyCount;
+    }
+
+    internal static List<MobileParty> GetFixturePartiesForRestore(
+        IEnumerable<MobileParty> retainedParties,
+        IEnumerable<MobileParty> campaignParties)
+    {
+        return retainedParties
+            .Concat(campaignParties.Where(party =>
+                party?.StringId?.StartsWith(FixturePartyIdPrefix, StringComparison.Ordinal) == true))
+            .Distinct()
+            .ToList();
     }
 
     private static string GetFixtureState(bool includeBaseline)
@@ -177,9 +186,15 @@ internal class PartyVisualDebugCommands
 
     private static int GetLiveFixturePartyCount()
     {
-        return MobileParty.All.Count(party =>
-            party?.IsActive == true &&
-            party.StringId?.StartsWith(FixturePartyIdPrefix, StringComparison.Ordinal) == true);
+        return GetLiveFixturePartyCount(stagedParties, MobileParty.All);
+    }
+
+    internal static int GetLiveFixturePartyCount(
+        IEnumerable<MobileParty> retainedParties,
+        IEnumerable<MobileParty> campaignParties)
+    {
+        return GetFixturePartiesForRestore(retainedParties, campaignParties)
+            .Count(party => party?.IsActive == true);
     }
 #endif
 }
