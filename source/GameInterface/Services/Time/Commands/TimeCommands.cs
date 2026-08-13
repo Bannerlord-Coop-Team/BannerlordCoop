@@ -32,7 +32,14 @@ internal class TimeCommands
             return "set_time_mode must be run on the server/host.";
         }
 
-        if (strings.Count != 1 ||
+#if DEBUG
+        bool forceForLiveTest = strings.Count == 2 &&
+            strings[1].Equals("force-live-test", StringComparison.OrdinalIgnoreCase);
+#else
+        const bool forceForLiveTest = false;
+#endif
+
+        if ((strings.Count != 1 && !forceForLiveTest) ||
             !Enum.TryParse(strings[0], true, out TimeControlEnum timeMode))
         {
             return "Usage: coop.debug.set_time_mode <Pause|Play_1x|Play_2x>";
@@ -42,6 +49,14 @@ internal class TimeCommands
         {
             return "Failed to get time control interface";
         }
+
+#if DEBUG
+        if (forceForLiveTest)
+        {
+            timeControlInterface.ServerSetTimeControlForLiveTest(timeMode);
+            return $"Time control force-set for live testing to {timeControlInterface.GetTimeControl()}";
+        }
+#endif
 
         timeControlInterface.ServerSetTimeControl(timeMode);
         return $"Time control set to {timeControlInterface.GetTimeControl()}";

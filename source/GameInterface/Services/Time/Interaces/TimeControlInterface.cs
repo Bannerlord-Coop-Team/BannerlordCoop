@@ -32,6 +32,9 @@ public interface ITimeControlInterface : IGameAbstraction
     IAutomaticPauseLease ServerAcquireAutomaticPause();
     void ClientSetTimeControl(TimeControlEnum newMode);
     void ServerSetTimeControl(TimeControlEnum timeMode);
+#if DEBUG
+    void ServerSetTimeControlForLiveTest(TimeControlEnum timeMode);
+#endif
 }
 
 internal class TimeControlInterface : ITimeControlInterface
@@ -122,7 +125,9 @@ internal class TimeControlInterface : ITimeControlInterface
     /// </summary>
     /// <param name="requestedMode">The time control mode being requested</param>
     /// <returns>The highest mode the policies permit for the request</returns>
-    internal TimeControlEnum LimitTimeControl(TimeControlEnum requestedMode)
+    internal TimeControlEnum LimitTimeControl(
+        TimeControlEnum requestedMode,
+        bool bypassFastForwardPolicies = false)
     {
         lock (timeControlLock)
         {
@@ -138,6 +143,7 @@ internal class TimeControlInterface : ITimeControlInterface
             }
 
             if (requestedMode == TimeControlEnum.Play_2x &&
+                !bypassFastForwardPolicies &&
                 TryGetDisallowingPolicy(fastForwardPolicies, out var fastForwardPolicy))
             {
                 Logger.Information(
@@ -185,6 +191,20 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <param name="timeMode"></param>
     public void ServerSetTimeControl(TimeControlEnum timeMode)
     {
+        ApplyServerTimeControl(timeMode, false);
+    }
+
+#if DEBUG
+    public void ServerSetTimeControlForLiveTest(TimeControlEnum timeMode)
+    {
+        ApplyServerTimeControl(timeMode, true);
+    }
+#endif
+
+    private void ApplyServerTimeControl(
+        TimeControlEnum timeMode,
+        bool bypassFastForwardPolicies)
+    {
         if (ModInformation.IsClient)
         {
             Logger.Warning("Client attempted to set time mode. This is only allowed on the server. {CallStack}", Environment.StackTrace);
@@ -193,13 +213,13 @@ internal class TimeControlInterface : ITimeControlInterface
 
         lock (timeControlLock)
         {
-            var effectiveMode = LimitTimeControl(timeMode);
+            var effectiveMode = LimitTimeControl(timeMode, bypassFastForwardPolicies);
             if (timeMode == TimeControlEnum.Pause || effectiveMode != TimeControlEnum.Pause)
             {
                 InvalidateAutomaticPauses();
             }
 
-            ApplyServerTimeControl(timeMode, effectiveMode);
+            ApplyResolvedServerTimeControl(timeMode, effectiveMode, bypassFastForwardPolicies);
         }
     }
 
@@ -220,7 +240,7 @@ internal class TimeControlInterface : ITimeControlInterface
             automaticPauseResumeMode = previousMode;
             try
             {
-                ApplyServerTimeControl(TimeControlEnum.Pause, TimeControlEnum.Pause);
+                ApplyResolvedServerTimeControl(TimeControlEnum.Pause, TimeControlEnum.Pause, false);
                 return pauseLease;
             }
             catch
@@ -262,7 +282,7 @@ internal class TimeControlInterface : ITimeControlInterface
 
             CompleteAutomaticPauseLease(pauseLease);
             automaticPauseResumeMode = null;
-            ApplyServerTimeControl(requestedMode, effectiveMode);
+            ApplyResolvedServerTimeControl(requestedMode, effectiveMode, false);
             return true;
         }
     }
@@ -278,17 +298,21 @@ internal class TimeControlInterface : ITimeControlInterface
         automaticPauseResumeMode = null;
     }
 
-    private void ApplyServerTimeControl(TimeControlEnum requestedMode, TimeControlEnum effectiveMode)
+    private void ApplyResolvedServerTimeControl(
+        TimeControlEnum requestedMode,
+        TimeControlEnum effectiveMode,
+        bool bypassFastForwardPolicies)
     {
         var currentMode = Campaign.Current == null
-            ? (TimeControlEnum?)null
-            : GetTimeControl();
+            ? "<unavailable>"
+            : GetTimeControl().ToString();
 
         Logger.Information(
-            "Applying server time control: current={CurrentMode} requested={RequestedMode} effective={EffectiveMode}",
-            currentMode?.ToString() ?? "<unavailable>",
+            "Applying server time control: current={CurrentMode} requested={RequestedMode} effective={EffectiveMode} liveTestFastForwardBypass={LiveTestFastForwardBypass}",
+            currentMode,
             requestedMode,
-            effectiveMode);
+            effectiveMode,
+            bypassFastForwardPolicies);
 
         network.SendAll(new NetworkChangeTimeControlMode(effectiveMode));
 

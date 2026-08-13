@@ -4,4 +4,7 @@
          advertised through Steam; the SDK may append source-revision metadata to that label. -->
     <CoopVersion>0.1.2</CoopVersion>
   </PropertyGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+  </ItemGroup>
 </Project>

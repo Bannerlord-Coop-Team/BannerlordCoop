@@ -137,6 +137,30 @@ public class TimeControlInterfaceTests : IDisposable
     }
 
     [Fact]
+    public void LimitTimeControl_WhenLiveTestBypassesFastForwardPolicy_PreservesUnpausePolicy()
+    {
+        // Arrange
+        var timeControlInterface = CreateTimeControlInterface();
+        var allowUnpause = true;
+        timeControlInterface.AddUnpausePolicy(() => allowUnpause);
+        timeControlInterface.AddFastForwardPolicy(() => false);
+
+        // Act / Assert
+        Assert.Equal(
+            TimeControlEnum.Play_2x,
+            timeControlInterface.LimitTimeControl(
+                TimeControlEnum.Play_2x,
+                bypassFastForwardPolicies: true));
+
+        allowUnpause = false;
+        Assert.Equal(
+            TimeControlEnum.Pause,
+            timeControlInterface.LimitTimeControl(
+                TimeControlEnum.Play_2x,
+                bypassFastForwardPolicies: true));
+    }
+
+    [Fact]
     public void LimitTimeControl_WhenNoPoliciesBlock_ReturnsRequestedMode()
     {
         // Arrange

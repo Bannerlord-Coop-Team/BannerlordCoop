@@ -47,7 +47,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISiegeEventInterface siegeEventInterface;
-    private readonly Dictionary<MobileParty, MapEvent> deferredMapEventParking = new();
+    private readonly Dictionary<MobileParty, (MapEvent MapEvent, string ControllerId)> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
         IMessageBroker messageBroker,
@@ -121,7 +121,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         var mapEvent = party.MapEvent;
         if (mapEvent != null)
         {
-            deferredMapEventParking[party] = mapEvent;
+            deferredMapEventParking[party] = (mapEvent, player.ControllerId);
             messageBroker.Publish(this, new PlayerDisconnectedFromMapEvent(player.ControllerId, mapEvent));
             Logger.Information(
                 "Keeping party {PartyId} active in MapEvent {MapEventId} because {Reason}",
@@ -196,14 +196,20 @@ internal class PlayerPartyVisibilityHandler : IHandler
         if (ModInformation.IsClient) return;
 
         foreach (var party in deferredMapEventParking
-            .Where(entry => ReferenceEquals(entry.Value, payload.What.MapEvent))
+            .Where(entry => ReferenceEquals(entry.Value.MapEvent, payload.What.MapEvent))
             .Select(entry => entry.Key)
             .ToArray())
         {
             if (party.MapEvent != null) continue;
 
+            var controllerId = deferredMapEventParking[party].ControllerId;
             deferredMapEventParking.Remove(party);
-            if (!party.IsActive || !playerManager.IsOwnerOfPartyDisconnected(party)) continue;
+            if (!party.IsActive ||
+                !playerManager.TryGetPlayer(controllerId, out var player) ||
+                playerManager.IsConnected(player))
+            {
+                continue;
+            }
 
             LeaveSiegeBeforeParking(party);
             party.IsActive = false;

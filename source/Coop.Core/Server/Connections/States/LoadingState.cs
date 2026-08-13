@@ -33,6 +33,13 @@ public class LoadingState : ConnectionStateBase
     private readonly ISendCoalescer coalescer;
     private volatile JoinPhase phase;
     private int initialBaselinesSent;
+#if DEBUG
+    private int totalBaselinesSent;
+
+    internal string DebugJoinState =>
+        $"phase={phase} initialBaselinesSent={initialBaselinesSent} " +
+        $"totalBaselinesSent={totalBaselinesSent} joinCatchUpPending={IsJoinCatchUpPending}";
+#endif
 
     public LoadingState(
         IConnectionLogic connectionLogic,
@@ -130,6 +137,9 @@ public class LoadingState : ConnectionStateBase
             coalescer.Flush(network);
             connectionMessageQueue.Flush(peer);
             if (!isFinal) initialBaselinesSent++;
+#if DEBUG
+            totalBaselinesSent++;
+#endif
             phase = waiting;
             campaignBaselineSender.Send(peer);
         }, context: context);
