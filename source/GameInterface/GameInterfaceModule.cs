@@ -13,6 +13,7 @@ using GameInterface.Services.Armies;
 using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Chat;
+using GameInterface.Services.CampaignService;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Heroes;
@@ -65,6 +66,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
 #if DEBUG
         builder.RegisterType<MobilePartyLoadStateDiagnostic>().As<IMobilePartyLoadStateDiagnostic>().InstancePerDependency();
+        builder.RegisterType<CampaignLoadPhaseDiagnostic>().As<ICampaignLoadPhaseDiagnostic>().InstancePerDependency();
 #endif
         builder.RegisterType<BarterClientPresentation>().As<IBarterClientPresentation>().InstancePerDependency();
         builder.RegisterType<SafePassagePartyResolver>().AsSelf().As<ISafePassagePartyResolver>().InstancePerDependency();
