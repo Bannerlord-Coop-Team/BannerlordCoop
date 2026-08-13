@@ -3,6 +3,8 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -18,16 +20,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -37,6 +43,19 @@ namespace GameInterface.Services.SiegeEvents.Commands;
 public class SiegeDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeDebugCommand>();
+
+#if DEBUG
+    private static SiegeVictorySaveFixture siegeVictorySaveFixture;
+
+    private sealed class SiegeVictorySaveFixture
+    {
+        public string ControllerId;
+        public MobileParty PlayerParty;
+        public Settlement Settlement;
+        public MapEvent MapEvent;
+        public bool VictoryRequested;
+    }
+#endif
 
     /// <summary>
     /// Creates a player-led siege and sends a multi-party defending army to interrupt it. Server only.
@@ -864,6 +883,202 @@ public class SiegeDebugCommand
         var mapEventId = objectManager.TryGetId(mapEvent, out string id) ? id : mapEvent.StringId;
         return $"Started AI siege assault by {attacker.Name} against {settlement.Name} (MapEvent {mapEventId})";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("victory_save_fixture_capture", "coop.debug.siege")]
+    public static string CaptureVictorySaveFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 2)
+            return "Usage: coop.debug.siege.victory_save_fixture_capture <controllerId> <settlementId>";
+        if (GetVictorySaveFixture() != null)
+            return "A siege-victory save fixture is already pending restoration.";
+        if (!TryResolveVictorySaveFixtureServices(out var objectManager, out var playerManager,
+                out _, out _, out var error))
+            return error;
+        if (!playerManager.TryGetPlayer(args[0], out var player) || !playerManager.IsConnected(player))
+            return $"No connected player has controller id {args[0]}.";
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+            return $"Unable to resolve player party {player.MobilePartyId}.";
+        if (!objectManager.TryGetObject<Settlement>(args[1], out var settlement) || !settlement.IsFortification)
+            return $"Fortification with id {args[1]} not found.";
+        if (!playerParty.IsActive || playerParty.LeaderHero == null || playerParty.MapFaction == null)
+            return $"Player {args[0]} must have an active led party with a map faction.";
+        if (playerParty.MapEvent != null || playerParty.BesiegerCamp != null || playerParty.CurrentSettlement != null)
+            return $"Player {args[0]} must be outside settlements, sieges, and map events.";
+        if (settlement.SiegeEvent != null || settlement.Party.MapEvent != null)
+            return $"{settlement.Name} must not already be in a siege or map event.";
+        if (settlement.MapFaction == null || settlement.OwnerClan?.Leader == null)
+            return $"{settlement.Name} must have a faction and owner.";
+
+        siegeVictorySaveFixture = new SiegeVictorySaveFixture
+        {
+            ControllerId = args[0],
+            PlayerParty = playerParty,
+            Settlement = settlement,
+        };
+
+        return FormatVictorySaveFixtureState("captured", objectManager, playerManager);
+    }
+
+    [CommandLineArgumentFunction("victory_save_fixture_complete", "coop.debug.siege")]
+    public static string CompleteVictorySaveFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.siege.victory_save_fixture_complete";
+        var fixture = GetVictorySaveFixture();
+        if (fixture == null)
+            return "Capture the siege-victory save fixture first.";
+        if (fixture.VictoryRequested)
+            return "The siege-victory transition was already requested.";
+        if (!TryResolveVictorySaveFixtureServices(out var objectManager, out var playerManager,
+                out var messageBroker, out var siegeEventInterface, out var error))
+            return error;
+        if (!playerManager.TryGetPlayer(fixture.ControllerId, out var player) ||
+            !playerManager.IsConnected(player))
+            return $"Player {fixture.ControllerId} disconnected before the siege victory.";
+        if (fixture.PlayerParty.MapEvent != null || fixture.PlayerParty.BesiegerCamp != null ||
+            fixture.PlayerParty.CurrentSettlement != null || fixture.Settlement.SiegeEvent != null ||
+            fixture.Settlement.Party.MapEvent != null)
+            return "The captured siege-victory fixture is no longer clean.";
+
+        if (!fixture.PlayerParty.MapFaction.IsAtWarWith(fixture.Settlement.MapFaction))
+            DeclareWarAction.ApplyByDefault(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction);
+        if (!fixture.PlayerParty.MapFaction.IsAtWarWith(fixture.Settlement.MapFaction))
+            return $"Unable to put {fixture.PlayerParty.MapFaction.Name} at war with {fixture.Settlement.MapFaction.Name}.";
+
+        fixture.PlayerParty.Position = fixture.Settlement.GatePosition;
+        fixture.PlayerParty.SetMoveModeHold();
+        siegeEventInterface.StartSiegeEvent(fixture.PlayerParty, fixture.Settlement);
+        if (fixture.Settlement.SiegeEvent?.BesiegerCamp?.LeaderParty != fixture.PlayerParty)
+            return "Failed to start the player-led siege.";
+
+        StartBattleAction.ApplyStartAssaultAgainstWalls(fixture.PlayerParty, fixture.Settlement);
+        fixture.MapEvent = fixture.Settlement.Party.MapEvent;
+        if (fixture.MapEvent?.IsSiegeAssault != true || fixture.MapEvent.AttackerSide?.LeaderParty?.MobileParty != fixture.PlayerParty)
+            return "Failed to start the player-led siege assault.";
+        if (!objectManager.TryGetId(fixture.MapEvent, out string mapEventId))
+            return "Unable to resolve the siege assault map event id.";
+
+        fixture.VictoryRequested = true;
+        var hostEpoch = ContainerProvider.TryResolve<IBattleHostRegistry>(out var hostRegistry) &&
+            hostRegistry.TryGet(mapEventId, out var hostAssignment)
+            ? hostAssignment.Epoch
+            : 0;
+        messageBroker.Publish(
+            typeof(SiegeDebugCommand),
+            new AuthoritativeBattleConclusionRequested(mapEventId, BattleState.AttackerVictory, hostEpoch));
+
+        if (fixture.PlayerParty.CurrentSettlement != fixture.Settlement)
+            return "The real siege-victory transition did not place the player party inside the captured settlement.";
+        if (!Patches.SiegeAftermathPatches.PendingAftermaths.ContainsKey(fixture.Settlement))
+            return "The real siege-victory transition did not park the player's pending aftermath.";
+
+        return FormatVictorySaveFixtureState("victory-complete", objectManager, playerManager);
+    }
+
+    [CommandLineArgumentFunction("victory_save_fixture_state", "coop.debug.siege")]
+    public static string GetVictorySaveFixtureState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.siege.victory_save_fixture_state";
+        TryResolveVictorySaveFixtureServices(out var objectManager, out var playerManager,
+            out _, out _, out _);
+        return FormatVictorySaveFixtureState("state", objectManager, playerManager);
+    }
+
+    [CommandLineArgumentFunction("victory_save_fixture_restore", "coop.debug.siege")]
+    public static string RestoreVictorySaveFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.siege.victory_save_fixture_restore";
+        if (GetVictorySaveFixture() == null)
+            return "No siege-victory save fixture is active.";
+
+        // A real capture replaces settlement ownership and garrison state, so restore from the unchanged input save.
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            Thread.Sleep(250);
+            GameThread.RunSafe(Utilities.QuitGame, context: nameof(RestoreVictorySaveFixture));
+        });
+        return "Fixture shutdown requested; relaunch from the unchanged baseline save.";
+    }
+
+    private static bool TryResolveVictorySaveFixtureServices(
+        out IObjectManager objectManager,
+        out IPlayerManager playerManager,
+        out IMessageBroker messageBroker,
+        out ISiegeEventInterface siegeEventInterface,
+        out string error)
+    {
+        objectManager = null;
+        playerManager = null;
+        messageBroker = null;
+        siegeEventInterface = null;
+        error = null;
+        if (!ContainerProvider.TryGetContainer(out var container) ||
+            !container.TryResolve(out objectManager) ||
+            !container.TryResolve(out playerManager) ||
+            !container.TryResolve(out messageBroker) ||
+            !container.TryResolve(out siegeEventInterface))
+        {
+            error = "Unable to resolve siege-victory fixture services.";
+            return false;
+        }
+        return true;
+    }
+
+    private static string FormatVictorySaveFixtureState(
+        string phase,
+        IObjectManager objectManager,
+        IPlayerManager playerManager)
+    {
+        var fixture = GetVictorySaveFixture();
+        var party = fixture?.PlayerParty;
+        var settlement = fixture?.Settlement;
+        var mapEvent = fixture?.MapEvent ?? party?.MapEvent ?? settlement?.Party?.MapEvent;
+        var state = new
+        {
+            role = ModInformation.IsServer ? "server" : "client",
+            phase,
+            fixtureActive = fixture != null,
+            controllerId = fixture?.ControllerId,
+            connected = fixture != null && playerManager?.TryGetPlayer(fixture.ControllerId, out var player) == true &&
+                playerManager.IsConnected(player),
+            party = party?.StringId,
+            settlement = settlement?.StringId,
+            currentSettlement = party?.CurrentSettlement?.StringId,
+            ownerClan = settlement?.OwnerClan?.StringId,
+            lastCapturedBy = settlement?.Town?.LastCapturedBy?.StringId,
+            siegeActive = settlement?.SiegeEvent != null,
+            mapEventId = mapEvent != null && objectManager?.TryGetId(mapEvent, out string id) == true ? id : null,
+            battleState = mapEvent?.BattleState.ToString(),
+            finalized = mapEvent?.IsFinalized ?? false,
+            pendingAftermath = settlement != null && Patches.SiegeAftermathPatches.PendingAftermaths.ContainsKey(settlement),
+            victoryRequested = fixture?.VictoryRequested ?? false,
+        };
+        return $"Siege-victory save fixture {phase}: controller={state.controllerId ?? "none"} " +
+            $"settlement={state.settlement ?? "none"} currentSettlement={state.currentSettlement ?? "none"} " +
+            $"owner={state.ownerClan ?? "none"} pendingAftermath={state.pendingAftermath}" +
+            Environment.NewLine + $"LIVE_TEST_JSON={JsonSerializer.Serialize(state)}";
+    }
+
+    private static SiegeVictorySaveFixture GetVictorySaveFixture()
+    {
+        var fixture = siegeVictorySaveFixture;
+        if (fixture != null && !ReferenceEquals(Settlement.Find(fixture.Settlement.StringId), fixture.Settlement))
+        {
+            siegeVictorySaveFixture = null;
+            fixture = null;
+        }
+        return fixture;
+    }
+#endif
 
     // coop.debug.siege.list
     /// <summary>
