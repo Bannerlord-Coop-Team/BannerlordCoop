@@ -131,38 +131,50 @@ public class MapEventDebugCommands
         private readonly int successfulTownSieges2;
         private readonly int? faction1PoliticalStagnation;
         private readonly int? faction2PoliticalStagnation;
+        private readonly bool faction1WasAtWarWithFaction2;
+        private readonly bool faction2WasAtWarWithFaction1;
 
         public bool WasAtWar { get; }
+        public bool StanceLinkExisted { get; }
 
         private MountedBattleStanceSnapshot(
             IFaction faction1,
             IFaction faction2,
-            StanceLink stance)
+            StanceLink stance,
+            bool stanceLinkExisted)
         {
-            this.faction1 = stance.Faction1;
-            this.faction2 = stance.Faction2;
-            stanceType = stance._stanceType;
-            behaviorPriority = stance.BehaviorPriority;
-            warStartDate = stance._warStartDate;
-            peaceDeclarationDate = stance._peaceDeclarationDate;
-            troopCasualties1 = stance._troopCasualties1;
-            troopCasualties2 = stance._troopCasualties2;
-            shipCasualties1 = stance.ShipCasualties1;
-            shipCasualties2 = stance.ShipCasualties2;
-            successfulSieges1 = stance._successfulSieges1;
-            successfulSieges2 = stance._successfulSieges2;
-            successfulRaids1 = stance._successfulRaids1;
-            successfulRaids2 = stance._successfulRaids2;
-            totalTributePaidFrom1To2 = stance._totalTributePaidFrom1To2;
-            dailyTributeFrom1To2 = stance._dailyTributeFrom1To2;
-            dailyTributeInstallments = stance._dailyTributeInstallments;
-            successfulTownSieges1 = stance._successfulTownSieges1;
-            successfulTownSieges2 = stance._successfulTownSieges2;
+            this.faction1 = stanceLinkExisted ? stance.Faction1 : faction1;
+            this.faction2 = stanceLinkExisted ? stance.Faction2 : faction2;
+            if (stanceLinkExisted)
+            {
+                stanceType = stance._stanceType;
+                behaviorPriority = stance.BehaviorPriority;
+                warStartDate = stance._warStartDate;
+                peaceDeclarationDate = stance._peaceDeclarationDate;
+                troopCasualties1 = stance._troopCasualties1;
+                troopCasualties2 = stance._troopCasualties2;
+                shipCasualties1 = stance.ShipCasualties1;
+                shipCasualties2 = stance.ShipCasualties2;
+                successfulSieges1 = stance._successfulSieges1;
+                successfulSieges2 = stance._successfulSieges2;
+                successfulRaids1 = stance._successfulRaids1;
+                successfulRaids2 = stance._successfulRaids2;
+                totalTributePaidFrom1To2 = stance._totalTributePaidFrom1To2;
+                dailyTributeFrom1To2 = stance._dailyTributeFrom1To2;
+                dailyTributeInstallments = stance._dailyTributeInstallments;
+                successfulTownSieges1 = stance._successfulTownSieges1;
+                successfulTownSieges2 = stance._successfulTownSieges2;
+            }
             faction1PoliticalStagnation =
                 (this.faction1 as Kingdom)?.PoliticalStagnation;
             faction2PoliticalStagnation =
                 (this.faction2 as Kingdom)?.PoliticalStagnation;
-            WasAtWar = stance.IsAtWar;
+            faction1WasAtWarWithFaction2 =
+                this.faction1.FactionsAtWarWith?.Contains(this.faction2) == true;
+            faction2WasAtWarWithFaction1 =
+                this.faction2.FactionsAtWarWith?.Contains(this.faction1) == true;
+            WasAtWar = stanceLinkExisted && stance.IsAtWar;
+            StanceLinkExisted = stanceLinkExisted;
         }
 
         public static bool TryCapture(
@@ -172,16 +184,15 @@ public class MapEventDebugCommands
         {
             snapshot = null;
             var stances = FactionManager.Instance._stances._stances;
-            if (!stances.TryGetValue(GetStanceKey(faction1, faction2),
-                    out StanceLink stance))
-            {
-                return false;
-            }
+            bool stanceLinkExisted = stances.TryGetValue(
+                GetStanceKey(faction1, faction2),
+                out StanceLink stance);
 
             snapshot = new MountedBattleStanceSnapshot(
                 faction1,
                 faction2,
-                stance);
+                stance,
+                stanceLinkExisted);
             return true;
         }
 
@@ -192,6 +203,21 @@ public class MapEventDebugCommands
 
         public void Restore()
         {
+            if (!StanceLinkExisted)
+            {
+                var stances = FactionManager.Instance._stances._stances;
+                stances.Remove(GetStanceKey(faction1, faction2));
+                SetFactionAtWarWith(
+                    faction1,
+                    faction2,
+                    faction1WasAtWarWithFaction2);
+                SetFactionAtWarWith(
+                    faction2,
+                    faction1,
+                    faction2WasAtWarWithFaction1);
+                return;
+            }
+
             ApplyStanceType(stanceType);
             RestoreFields();
         }
@@ -209,6 +235,14 @@ public class MapEventDebugCommands
             }
 
             stance._stanceType = targetStanceType;
+            if (!StanceLinkExisted)
+            {
+                bool atWar = targetStanceType == StanceType.War;
+                SetFactionAtWarWith(faction1, faction2, atWar);
+                SetFactionAtWarWith(faction2, faction1, atWar);
+                return;
+            }
+
             faction1.UpdateFactionsAtWarWith();
             faction2.UpdateFactionsAtWarWith();
         }
@@ -251,6 +285,14 @@ public class MapEventDebugCommands
         public bool IsRestored()
         {
             var stances = FactionManager.Instance._stances._stances;
+            if (!StanceLinkExisted)
+            {
+                return !stances.ContainsKey(GetStanceKey(faction1, faction2)) &&
+                       (faction1.FactionsAtWarWith?.Contains(faction2) == true) ==
+                           faction1WasAtWarWithFaction2 &&
+                       (faction2.FactionsAtWarWith?.Contains(faction1) == true) ==
+                           faction2WasAtWarWithFaction1;
+            }
             if (!stances.TryGetValue(
                     GetStanceKey(faction1, faction2),
                     out StanceLink stance))
@@ -349,7 +391,10 @@ public class MapEventDebugCommands
                 faction1PoliticalStagnation.GetValueOrDefault(),
                 faction2PoliticalStagnation.HasValue,
                 faction2PoliticalStagnation.GetValueOrDefault(),
-                restoreExactSnapshot);
+                restoreExactSnapshot,
+                !StanceLinkExisted,
+                faction1WasAtWarWithFaction2,
+                faction2WasAtWarWithFaction1);
             return true;
         }
 
@@ -359,6 +404,37 @@ public class MapEventDebugCommands
             faction1.Id < faction2.Id
                 ? (faction1, faction2)
                 : (faction2, faction1);
+
+        private static void SetFactionAtWarWith(
+            IFaction faction,
+            IFaction otherFaction,
+            bool atWar)
+        {
+            if (faction is Clan clan)
+            {
+                if (!atWar)
+                {
+                    clan._factionsAtWarWith?.Remove(otherFaction);
+                    return;
+                }
+
+                clan._factionsAtWarWith ??= new MBList<IFaction>();
+                if (!clan._factionsAtWarWith.Contains(otherFaction))
+                    clan._factionsAtWarWith.Add(otherFaction);
+            }
+            else if (faction is Kingdom kingdom)
+            {
+                if (!atWar)
+                {
+                    kingdom._factionsAtWarWith?.Remove(otherFaction);
+                    return;
+                }
+
+                kingdom._factionsAtWarWith ??= new MBList<IFaction>();
+                if (!kingdom._factionsAtWarWith.Contains(otherFaction))
+                    kingdom._factionsAtWarWith.Add(otherFaction);
+            }
+        }
     }
 #endif
     private static LateJoinModeFixture lateJoinModeFixture;
@@ -529,9 +605,7 @@ public class MapEventDebugCommands
                 receiver.Party.MapFaction,
                 owner.Party.MapFaction,
                 out var stance))
-        {
-            return "The mounted battle fixture requires an existing diplomatic stance link.";
-        }
+            return "Unable to capture the mounted battle diplomatic stance.";
         if (!objectManager.TryGetObjectWithLogging(MountedBattleReceiverTroopId, out CharacterObject receiverTroop) ||
             !objectManager.TryGetObjectWithLogging(MountedBattleOwnerTroopId, out CharacterObject ownerTroop))
         {

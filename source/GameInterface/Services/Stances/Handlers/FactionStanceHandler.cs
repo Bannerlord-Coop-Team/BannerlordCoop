@@ -8,6 +8,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Stances.Handlers
 {
@@ -147,6 +148,21 @@ namespace GameInterface.Services.Stances.Handlers
             IFaction faction1,
             IFaction faction2)
         {
+            if (restore.StanceLinkWasAbsent)
+            {
+                FactionManager.Instance._stances._stances.Remove(
+                    GetMountedBattleStanceKey(faction1, faction2));
+                SetMountedBattleFactionAtWarWith(
+                    faction1,
+                    faction2,
+                    restore.Faction1WasAtWarWithFaction2);
+                SetMountedBattleFactionAtWarWith(
+                    faction2,
+                    faction1,
+                    restore.Faction2WasAtWarWithFaction1);
+                return;
+            }
+
             StanceLink stance = FactionManager.Instance.GetStanceLinkInternal(
                 faction1,
                 faction2);
@@ -175,6 +191,14 @@ namespace GameInterface.Services.Stances.Handlers
                 faction1,
                 faction2);
             stance._stanceType = (StanceType)restore.StanceType;
+            if (restore.StanceLinkWasAbsent)
+            {
+                bool atWar = stance._stanceType == StanceType.War;
+                SetMountedBattleFactionAtWarWith(faction1, faction2, atWar);
+                SetMountedBattleFactionAtWarWith(faction2, faction1, atWar);
+                return;
+            }
+
             faction1.UpdateFactionsAtWarWith();
             faction2.UpdateFactionsAtWarWith();
         }
@@ -245,6 +269,16 @@ namespace GameInterface.Services.Stances.Handlers
             IFaction faction1,
             IFaction faction2)
         {
+            if (restore.StanceLinkWasAbsent)
+            {
+                return !FactionManager.Instance._stances._stances.ContainsKey(
+                           GetMountedBattleStanceKey(faction1, faction2)) &&
+                       (faction1.FactionsAtWarWith?.Contains(faction2) == true) ==
+                           restore.Faction1WasAtWarWithFaction2 &&
+                       (faction2.FactionsAtWarWith?.Contains(faction1) == true) ==
+                           restore.Faction2WasAtWarWithFaction1;
+            }
+
             StanceLink stance = FactionManager.Instance.GetStanceLinkInternal(
                 faction1,
                 faction2);
@@ -312,6 +346,44 @@ namespace GameInterface.Services.Stances.Handlers
                        faction2,
                        restore.HasFaction2PoliticalStagnation,
                        restore.Faction2PoliticalStagnation);
+        }
+
+        private static (IFaction, IFaction) GetMountedBattleStanceKey(
+            IFaction faction1,
+            IFaction faction2) =>
+            faction1.Id < faction2.Id
+                ? (faction1, faction2)
+                : (faction2, faction1);
+
+        private static void SetMountedBattleFactionAtWarWith(
+            IFaction faction,
+            IFaction otherFaction,
+            bool atWar)
+        {
+            if (faction is Clan clan)
+            {
+                if (!atWar)
+                {
+                    clan._factionsAtWarWith?.Remove(otherFaction);
+                    return;
+                }
+
+                clan._factionsAtWarWith ??= new MBList<IFaction>();
+                if (!clan._factionsAtWarWith.Contains(otherFaction))
+                    clan._factionsAtWarWith.Add(otherFaction);
+            }
+            else if (faction is Kingdom kingdom)
+            {
+                if (!atWar)
+                {
+                    kingdom._factionsAtWarWith?.Remove(otherFaction);
+                    return;
+                }
+
+                kingdom._factionsAtWarWith ??= new MBList<IFaction>();
+                if (!kingdom._factionsAtWarWith.Contains(otherFaction))
+                    kingdom._factionsAtWarWith.Add(otherFaction);
+            }
         }
 
         private static bool TryGetMountedBattleStanceOrientation(

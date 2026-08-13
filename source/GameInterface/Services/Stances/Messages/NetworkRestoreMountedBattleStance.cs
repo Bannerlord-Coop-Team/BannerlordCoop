@@ -33,6 +33,9 @@ public sealed class NetworkRestoreMountedBattleStance : ICommand
     [ProtoMember(23)] public bool HasFaction2PoliticalStagnation { get; }
     [ProtoMember(24)] public int Faction2PoliticalStagnation { get; }
     [ProtoMember(25)] public bool RestoreExactSnapshot { get; }
+    [ProtoMember(26)] public bool StanceLinkWasAbsent { get; }
+    [ProtoMember(27)] public bool Faction1WasAtWarWithFaction2 { get; }
+    [ProtoMember(28)] public bool Faction2WasAtWarWithFaction1 { get; }
 
     public NetworkRestoreMountedBattleStance(
         string fixtureToken,
@@ -59,7 +62,10 @@ public sealed class NetworkRestoreMountedBattleStance : ICommand
         int faction1PoliticalStagnation,
         bool hasFaction2PoliticalStagnation,
         int faction2PoliticalStagnation,
-        bool restoreExactSnapshot = true)
+        bool restoreExactSnapshot = true,
+        bool stanceLinkWasAbsent = false,
+        bool faction1WasAtWarWithFaction2 = false,
+        bool faction2WasAtWarWithFaction1 = false)
     {
         FixtureToken = fixtureToken;
         Faction1Id = faction1Id;
@@ -86,6 +92,9 @@ public sealed class NetworkRestoreMountedBattleStance : ICommand
         HasFaction2PoliticalStagnation = hasFaction2PoliticalStagnation;
         Faction2PoliticalStagnation = faction2PoliticalStagnation;
         RestoreExactSnapshot = restoreExactSnapshot;
+        StanceLinkWasAbsent = stanceLinkWasAbsent;
+        Faction1WasAtWarWithFaction2 = faction1WasAtWarWithFaction2;
+        Faction2WasAtWarWithFaction1 = faction2WasAtWarWithFaction1;
     }
 }
 #endif
