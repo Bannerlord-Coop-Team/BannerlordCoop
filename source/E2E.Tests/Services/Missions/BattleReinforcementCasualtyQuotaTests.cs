@@ -47,7 +47,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     {
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, objectManager, new BattleAgentBudget());
         supplier.SetReserve(new[] { new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount)) },
-            sideTotal: reserveCount, playerOwnedParties: 0);
+            sideTotal: reserveCount, playerOwnedParties: 0, authoritativeBattleSize: 1000);
         return supplier;
     }
 
@@ -64,7 +64,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
             supplier.SetReserve(new[]
             {
                 new PartyReserve("unresolvable-party", suppliedCount: 10, entries: Entries(characterId, count: 10)),
-            }, sideTotal: 10, playerOwnedParties: 0);
+            }, sideTotal: 10, playerOwnedParties: 0, authoritativeBattleSize: 1000);
 
             var origins = supplier.ClaimRecoveryTroops(
                 "unresolvable-party",

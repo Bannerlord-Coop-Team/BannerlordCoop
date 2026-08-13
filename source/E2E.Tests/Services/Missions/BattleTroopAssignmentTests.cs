@@ -164,7 +164,7 @@ public class CoopTroopSupplierControllableCountTests
     {
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { new PartyReserve("own", 0, Entries(5, seedBase: 500)) },
-            sideTotal: 5, playerOwnedParties: 0);
+            sideTotal: 5, playerOwnedParties: 0, authoritativeBattleSize: 1000);
 
         Assert.Equal(5, supplier.GetNumberOfPlayerControllableTroops());
     }
@@ -178,7 +178,7 @@ public class CoopTroopSupplierControllableCountTests
         {
             new PartyReserve("p1", 0, Entries(3, seedBase: 100)),
             new PartyReserve("p2", 0, Entries(2, seedBase: 200)),
-        }, sideTotal: 5, playerOwnedParties: 0);
+        }, sideTotal: 5, playerOwnedParties: 0, authoritativeBattleSize: 1000);
 
         Assert.Equal(5, supplier.GetNumberOfPlayerControllableTroops());
     }

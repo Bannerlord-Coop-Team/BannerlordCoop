@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -339,7 +340,7 @@ internal class BattleHostHandler : IHandler
     private void SendOwnedReserves(string mapEventId, MapEvent mapEvent, NetPeer requester, string requesterId, bool includeEmptySides)
     {
         if (requester == null) return;
-        SendSideReserves(requester, mapEventId,
+        SendSideReserves(requester, mapEventId, mapEvent,
             BuildOwnedReserves(mapEventId, mapEvent, requesterId, includeEmptySides), flushRequested: false);
     }
 
@@ -383,14 +384,20 @@ internal class BattleHostHandler : IHandler
         return sides;
     }
 
-    private void SendSideReserves(NetPeer receiver, string mapEventId, List<SideReserve> reserves, bool flushRequested)
+    private void SendSideReserves(NetPeer receiver, string mapEventId, MapEvent mapEvent,
+        List<SideReserve> reserves, bool flushRequested)
     {
         if (receiver == null) return;
         long allocationRevision = ++reserveSnapshotRevision;
+        int configuredBattleSize = mapEvent.IsSiegeAssault
+            ? BannerlordConfig.GetRealBattleSizeForSiege()
+            : BannerlordConfig.GetRealBattleSize();
+        int battleSize = Math.Min(configuredBattleSize,
+            DefaultBattleMissionAgentSpawnLogic.MaxNumberOfTroopsForMission);
         foreach (var sideReserve in reserves)
             network.Send(receiver, new NetworkBattleTroopReserve(
                 mapEventId, (int)sideReserve.Side, sideReserve.Parties, sideReserve.TotalTroops,
-                sideReserve.PlayerOwnedPartyCount, allocationRevision, flushRequested));
+                sideReserve.PlayerOwnedPartyCount, allocationRevision, battleSize, flushRequested));
     }
 
     // [Server, game thread] A late party changes the complete side totals and, when it is AI-owned, expands
@@ -493,7 +500,7 @@ internal class BattleHostHandler : IHandler
         {
             // Nothing to flush, or no peer to defer a grant for: refresh unflagged (legacy semantics) and
             // let the caller serve immediately from the ledger.
-            SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: false);
+            SendSideReserves(host.Peer, mapEventId, mapEvent, refresh, flushRequested: false);
             Logger.Information("[BattleHost] Refreshed host {Host}'s reserve scope for {MapEventId} after {Controller} returned",
                 host.ControllerId, mapEventId, requesterId);
             return false;
@@ -511,7 +518,7 @@ internal class BattleHostHandler : IHandler
         };
         runtimeState.PendingReturns.Add(pending);
 
-        SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: true);
+        SendSideReserves(host.Peer, mapEventId, mapEvent, refresh, flushRequested: true);
         Logger.Information("[BattleHost] Refreshed host {Host}'s reserve scope for {MapEventId} after {Controller} returned; the return grant awaits {Acks} flush ack(s)",
             host.ControllerId, mapEventId, requesterId, refresh.Count);
         return true;
@@ -981,7 +988,7 @@ internal class BattleHostHandler : IHandler
         var host = runtimeState.HostEndpoint;
         network.Send(host.Peer, new NetworkBattleReserveOwnershipExpanded(mapEventId));
         var refresh = BuildOwnedReserves(mapEventId, mapEvent, hostControllerId, includeEmptySides: true);
-        SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: false);
+        SendSideReserves(host.Peer, mapEventId, mapEvent, refresh, flushRequested: false);
         Logger.Information("[BattleHost] Pushed {Dropped}'s remaining reserves to host {Host} in {MapEventId}",
             droppedControllerId, hostControllerId, mapEventId);
     }

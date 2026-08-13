@@ -65,8 +65,12 @@ public class NetworkBattleTroopReserve : IEvent
     [ProtoMember(7)]
     public readonly long AllocationRevision;
 
+    /// <summary>The server's battle-size setting for this battle, shared by every mission owner.</summary>
+    [ProtoMember(8)]
+    public readonly int BattleSize;
+
     public NetworkBattleTroopReserve(string mapEventId, int side, PartyReserve[] parties, int sideTotalTroops,
-        int playerOwnedPartyCount, long allocationRevision, bool flushRequested = false)
+        int playerOwnedPartyCount, long allocationRevision, int battleSize, bool flushRequested = false)
     {
         MapEventId = mapEventId;
         Side = side;
@@ -75,5 +79,6 @@ public class NetworkBattleTroopReserve : IEvent
         SideTotalTroops = sideTotalTroops;
         PlayerOwnedPartyCount = playerOwnedPartyCount;
         AllocationRevision = allocationRevision;
+        BattleSize = battleSize;
     }
 }

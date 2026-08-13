@@ -201,6 +201,9 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
         Assert.Equal(2, peerFeeds.Length);
         Assert.Single(hostFeeds.Select(message => message.AllocationRevision).Distinct());
         Assert.Single(peerFeeds.Select(message => message.AllocationRevision).Distinct());
+        Assert.True(hostFeeds[0].BattleSize > 0);
+        Assert.Single(hostFeeds.Select(message => message.BattleSize).Distinct());
+        Assert.Single(peerFeeds.Select(message => message.BattleSize).Distinct());
         Assert.Contains(hostFeeds.Single(message => message.Side == (int)BattleSideEnum.Defender).Parties,
             party => party.PartyId == lateMapEventPartyId);
         Assert.Single(host.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>()

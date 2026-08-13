@@ -102,7 +102,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         var sizing = ReadSizing();
         if (ShouldContinueHolding(sizing)) return;
 
-        if (!HasLocalPlayerOrigin())
+        if (!sizing.HasValidBattleSize || !HasLocalPlayerOrigin())
         {
             AbortInvalidBattle(sizing);
             return;
@@ -184,10 +184,23 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         // proportion to the two numbers it is given, so a client sizing from what it happens to own measures
         // a side that is divided between players at a fraction of its strength: its opponent gets capped
         // against that fraction, and the divided side ends up fielding more men than the larger one.
-        // Falls back to owned totals when the server sent none.
         int defenderOwned = _defenderSupplier.SideTotalTroops;
         int attackerOwned = _attackerSupplier.SideTotalTroops;
-        return new SideSizing(defenderPopulated, attackerPopulated, defenderOwned, attackerOwned);
+        int battleSize = ResolveBattleSize(defenderPopulated, _defenderSupplier.BattleSize,
+            attackerPopulated, _attackerSupplier.BattleSize);
+        return new SideSizing(defenderPopulated, attackerPopulated, defenderOwned, attackerOwned, battleSize);
+    }
+
+    internal static int ResolveBattleSize(bool defenderPopulated, int defenderBattleSize,
+        bool attackerPopulated, int attackerBattleSize)
+    {
+        if (defenderPopulated && attackerPopulated)
+            return defenderBattleSize > 0 && defenderBattleSize == attackerBattleSize ? defenderBattleSize : 0;
+        if (defenderPopulated)
+            return Math.Max(0, defenderBattleSize);
+        if (attackerPopulated)
+            return Math.Max(0, attackerBattleSize);
+        return 0;
     }
 
     // Re-run the engine's Init with the real totals (initial == total; Init applies the joint cap, wave split and
@@ -199,6 +212,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Attacker].Clear();
 
         var settings = CreateSandBoxBattleWaveSpawnSettings();
+        _missionAgentSpawnLogic._battleSize = sizing.BattleSize;
         _missionAgentSpawnLogic.InitWithSinglePhase(sizing.DefenderOwned, sizing.AttackerOwned,
             sizing.DefenderOwned, sizing.AttackerOwned, spawnDefenders: true, spawnAttackers: true, in settings);
 
@@ -222,14 +236,19 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         var defenderSnapshot = _defenderSupplier.CaptureAllocationSnapshot();
         var attackerSnapshot = _attackerSupplier.CaptureAllocationSnapshot();
         long allocationRevision = MatchingAllocationRevision(defenderSnapshot.Revision, attackerSnapshot.Revision);
-        if (allocationRevision <= _appliedAllocationRevision)
+        if (allocationRevision <= _appliedAllocationRevision
+            || defenderSnapshot.BattleSize <= 0
+            || defenderSnapshot.BattleSize != attackerSnapshot.BattleSize)
             return;
+
+        BattleSpawnGate.RestoreReserveSide(BattleSideEnum.Defender);
+        BattleSpawnGate.RestoreReserveSide(BattleSideEnum.Attacker);
 
         var settings = _missionAgentSpawnLogic.SpawnSettings;
         var targets = ReinforcementFielder.RecoveryTargets.Calculate(
             defenderSnapshot.SideTotalTroops,
             attackerSnapshot.SideTotalTroops,
-            _missionAgentSpawnLogic.BattleSize,
+            defenderSnapshot.BattleSize,
             settings.MaximumBattleSideRatio,
             settings.DefenderAdvantageFactor);
 
@@ -397,20 +416,25 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         public readonly bool AttackerPopulated;
         public readonly int DefenderOwned;
         public readonly int AttackerOwned;
+        public readonly int BattleSize;
 
-        public SideSizing(bool defenderPopulated, bool attackerPopulated, int defenderOwned, int attackerOwned)
+        public SideSizing(bool defenderPopulated, bool attackerPopulated, int defenderOwned, int attackerOwned,
+            int battleSize)
         {
             DefenderPopulated = defenderPopulated;
             AttackerPopulated = attackerPopulated;
             DefenderOwned = defenderOwned;
             AttackerOwned = attackerOwned;
+            BattleSize = battleSize;
         }
 
         // Both reserves landed: commit the joint sizing now (else keep holding both sides at zero).
         public bool Ready => DefenderPopulated && AttackerPopulated;
 
         // Ready and at least one side owns troops: run the real Init (a positive sum avoids Init's 0/0 NaN).
-        public bool SizeNow => Ready && DefenderOwned + AttackerOwned > 0;
+        public bool SizeNow => Ready && DefenderOwned + AttackerOwned > 0 && BattleSize > 0;
+
+        public bool HasValidBattleSize => BattleSize > 0;
 
         /// <summary>Whether a timeout can safely degrade to a one-sided sizing instead of empty/empty.</summary>
         public bool HasAnyOwnedTroops => DefenderOwned + AttackerOwned > 0;

@@ -314,12 +314,13 @@ public class ReinforcementFielder : IReinforcementFielder
         var mission = Mission.Current;
         var spawnLogic = mission.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();
         if (spawnLogic == null || !TryGetSuppliers(out var defenderSupplier, out var attackerSupplier)) return;
+        if (defenderSupplier.BattleSize <= 0 || defenderSupplier.BattleSize != attackerSupplier.BattleSize) return;
 
         var settings = spawnLogic.SpawnSettings;
         var targets = RecoveryTargets.Calculate(
             defenderSupplier.SideTotalTroops,
             attackerSupplier.SideTotalTroops,
-            spawnLogic.BattleSize,
+            defenderSupplier.BattleSize,
             settings.MaximumBattleSideRatio,
             settings.DefenderAdvantageFactor);
         int defenderOwnedTarget = defenderSupplier.OwnedShareOf(targets.Defenders);

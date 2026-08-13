@@ -38,15 +38,18 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         private readonly int receiverPlayerRank;
 
         public long Revision { get; }
+        public int BattleSize { get; }
         public int SideTotalTroops { get; }
         public int TotalTroops { get; }
         public int SuppliedTroops { get; }
 
-        internal AllocationSnapshot(long revision, int sideTotalTroops, int totalTroops, int suppliedTroops,
+        internal AllocationSnapshot(long revision, int battleSize, int sideTotalTroops, int totalTroops,
+            int suppliedTroops,
             int playerOwnedPartyCount, bool ownsReceiverPlayerParty, int receiverPlayerRank,
             int[] partyOffsets, int[] partyCounts)
         {
             Revision = revision;
+            BattleSize = battleSize;
             SideTotalTroops = sideTotalTroops;
             TotalTroops = totalTroops;
             SuppliedTroops = suppliedTroops;
@@ -120,6 +123,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private int sideTotalTroops;
     private int playerOwnedPartyCount;
     private long allocationRevision;
+    private int battleSize;
     private int reserveRevision;
     private int numWounded, numKilled, numRouted;
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
@@ -153,7 +157,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// </para>
     /// </summary>
     public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve,
-        int sideTotal, int playerOwnedParties, long snapshotRevision = 0)
+        int sideTotal, int playerOwnedParties, int authoritativeBattleSize, long snapshotRevision = 0)
     {
         var dropped = new List<(string PartyId, int Supplied)>();
         lock (gate)
@@ -161,6 +165,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             sideTotalTroops = Math.Max(0, sideTotal);
             playerOwnedPartyCount = Math.Max(0, playerOwnedParties);
             allocationRevision = snapshotRevision;
+            battleSize = Math.Max(0, authoritativeBattleSize);
 
             // Capture the current per-party pointers before rebuilding. A resend can carry a STALE pointer: the
             // server's ledger lags our local supply by up to one report interval, and on migration it re-sends
@@ -266,6 +271,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
             return new AllocationSnapshot(
                 allocationRevision,
+                battleSize,
                 sideTotalTroops,
                 total,
                 supplied,
@@ -375,6 +381,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     public int SideTotalTroops { get { lock (gate) { return sideTotalTroops; } } }
 
     public int PlayerOwnedPartyCount { get { lock (gate) { return playerOwnedPartyCount; } } }
+
+    public int BattleSize { get { lock (gate) { return battleSize; } } }
 
     /// <summary>
     /// This client's slice of a side-wide allocation, in proportion to the troops it owns. Every owner runs
