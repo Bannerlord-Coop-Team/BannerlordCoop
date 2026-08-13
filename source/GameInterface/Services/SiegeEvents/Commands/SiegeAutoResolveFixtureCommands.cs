@@ -74,7 +74,8 @@ internal static class SiegeAutoResolveFixtureCommands
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(players[0].MobilePartyId, out var playerParty))
             return Error($"Unable to resolve player party {players[0].MobilePartyId}.");
         if (!playerParty.IsActive || playerParty.MapEvent != null || playerParty.BesiegerCamp != null ||
-            playerParty.CurrentSettlement != null || playerParty.MapFaction == null)
+            playerParty.CurrentSettlement != null || playerParty.MapFaction == null ||
+            playerParty._attachedParties.Count > 0)
             return Error("The connected player party is not clean for the fixture.");
         if (playerParty.MapFaction == settlement.MapFaction)
             return Error("The connected player party belongs to Danustica's faction.");
@@ -469,11 +470,13 @@ internal static class SiegeAutoResolveFixtureCommands
 
     private static void PreparePlayerParty(MobileParty party, Settlement settlement)
     {
+        var leaderHero = party.LeaderHero;
         ClearRoster(party.MemberRoster);
-        if (party.LeaderHero != null)
+        if (leaderHero != null)
         {
-            party.MemberRoster.AddToCounts(party.LeaderHero.CharacterObject, 1);
-            party.LeaderHero.HitPoints = Math.Max(party.LeaderHero.HitPoints, 50);
+            party.MemberRoster.AddToCounts(leaderHero.CharacterObject, 1);
+            party.ChangePartyLeader(leaderHero);
+            leaderHero.HitPoints = Math.Max(leaderHero.HitPoints, 50);
         }
 
         var troop = settlement.Culture?.BasicTroop;
@@ -494,11 +497,13 @@ internal static class SiegeAutoResolveFixtureCommands
 
     private static void PrepareDefenderParty(MobileParty party, Settlement settlement)
     {
+        var leaderHero = party.LeaderHero;
         ClearRoster(party.MemberRoster);
-        if (party.LeaderHero != null)
+        if (leaderHero != null)
         {
-            party.MemberRoster.AddToCounts(party.LeaderHero.CharacterObject, 1);
-            party.LeaderHero.HitPoints = Math.Max(party.LeaderHero.HitPoints, 50);
+            party.MemberRoster.AddToCounts(leaderHero.CharacterObject, 1);
+            party.ChangePartyLeader(leaderHero);
+            leaderHero.HitPoints = Math.Max(leaderHero.HitPoints, 50);
         }
 
         var troop = settlement.Culture?.BasicTroop;
@@ -518,9 +523,15 @@ internal static class SiegeAutoResolveFixtureCommands
             mapEvent.FinalizeEvent();
 
         var camp = activeFixture.Settlement.SiegeEvent?.BesiegerCamp;
-        if (camp != null)
+        var siegeParties = activeFixture.Parties
+            .Select(snapshot => snapshot.Party)
+            .Concat(camp?._besiegerParties ?? Enumerable.Empty<MobileParty>())
+            .Distinct()
+            .ToArray();
+        foreach (var party in siegeParties)
         {
-            foreach (var party in camp._besiegerParties.ToArray())
+            party._besiegerCampResetStarted = false;
+            if (party.BesiegerCamp != null)
                 siegeEventInterface.BreakSiege(party);
         }
 
@@ -623,6 +634,10 @@ internal static class SiegeAutoResolveFixtureCommands
     {
         var output = new StringBuilder();
         output.Append("time=").Append(timeControl.GetTimeControl()).AppendLine();
+        output.Append("siege=").Append(activeFixture.Settlement.SiegeEvent != null)
+            .Append('|').Append(activeFixture.PlayerParty.BesiegerCamp != null)
+            .Append('|').Append(activeFixture.PlayerParty.MapEvent != null)
+            .AppendLine();
         AppendPartyBaseFingerprint(output, activeFixture.SettlementParty.Party);
 
         foreach (var snapshot in activeFixture.Parties.OrderBy(snapshot => snapshot.Party.StringId))
@@ -637,6 +652,7 @@ internal static class SiegeAutoResolveFixtureCommands
                 .Append('|').Append(party.RecentEventsMorale.ToString("R", CultureInfo.InvariantCulture))
                 .Append('|').Append(party.PartyTradeGold)
                 .Append('|').Append(party.LeaderHero?.StringId ?? string.Empty)
+                .Append('|').Append(party._besiegerCampResetStarted)
                 .Append('|').Append(FormatBehavior(behavior))
                 .AppendLine();
             AppendRosterFingerprint(output, "members", party.MemberRoster);
