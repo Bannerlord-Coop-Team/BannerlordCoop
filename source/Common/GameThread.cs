@@ -26,6 +26,26 @@ public class GameThread : IUpdateable
         new AsyncLocal<CancellationToken>();
     private int m_GameLoopThreadId;
 
+#if DEBUG
+    private static int m_UpdateDiagnosticGeneration;
+    private static string m_UpdateDiagnosticStage = "idle";
+
+    public static int UpdateDiagnosticGeneration => Volatile.Read(ref m_UpdateDiagnosticGeneration);
+    public static string UpdateDiagnosticStage => Volatile.Read(ref m_UpdateDiagnosticStage);
+
+    public static int BeginUpdateDiagnostic()
+    {
+        int generation = Interlocked.Increment(ref m_UpdateDiagnosticGeneration);
+        SetUpdateDiagnosticStage("harmony-prefix-completed");
+        return generation;
+    }
+
+    public static void SetUpdateDiagnosticStage(string stage)
+    {
+        Volatile.Write(ref m_UpdateDiagnosticStage, stage);
+    }
+#endif
+
     public int QueueLength
     {
         get
@@ -87,6 +107,9 @@ public class GameThread : IUpdateable
 
     public void Update(TimeSpan frameTime)
     {
+#if DEBUG
+        SetUpdateDiagnosticStage($"body-entered|instrument={Instrument}");
+#endif
         if (Thread.CurrentThread.ManagedThreadId != Instance.m_GameLoopThreadId)
         {
             throw new ArgumentException("Wrong thread!");
@@ -96,30 +119,54 @@ public class GameThread : IUpdateable
             new List<(Action, EventWaitHandle, string, CancellationToken)>();
 
         int backlog;
+#if DEBUG
+        SetUpdateDiagnosticStage("queue-lock-waiting");
+#endif
         lock (Instance.m_QueueLock)
         {
+#if DEBUG
+            SetUpdateDiagnosticStage("queue-lock-acquired");
+#endif
             backlog = m_Queue.Count;
             while (m_Queue.Count > 0)
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
         }
+#if DEBUG
+        SetUpdateDiagnosticStage($"queue-snapshot-ready|count={toBeRun.Count}");
+#endif
 
         if (!Instrument)
         {
             foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
             {
+#if DEBUG
+                SetUpdateDiagnosticStage($"task-started|label={task.Label ?? "(unlabeled)"}");
+#endif
                 RunQueuedTask(task);
+#if DEBUG
+                SetUpdateDiagnosticStage($"task-completed|label={task.Label ?? "(unlabeled)"}");
+#endif
             }
+#if DEBUG
+            SetUpdateDiagnosticStage("body-returning|instrument=False");
+#endif
             return;
         }
 
         long frameStart = Stopwatch.GetTimestamp();
         foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
         {
+#if DEBUG
+            SetUpdateDiagnosticStage($"instrumented-task-started|label={task.Label ?? "(unlabeled)"}");
+#endif
             if (task.Cancellation.IsCancellationRequested)
             {
                 task.Wait?.Set();
+#if DEBUG
+                SetUpdateDiagnosticStage($"instrumented-task-cancelled|label={task.Label ?? "(unlabeled)"}");
+#endif
                 continue;
             }
 
@@ -136,6 +183,9 @@ public class GameThread : IUpdateable
                 task.Wait?.Set();
             }
             long actionTicks = Stopwatch.GetTimestamp() - actionStart;
+#if DEBUG
+            SetUpdateDiagnosticStage($"instrumented-task-completed|label={task.Label ?? "(unlabeled)"}");
+#endif
 
             string label = task.Label ?? "(unlabeled)";
             m_PerLabel.TryGetValue(label, out (long Ticks, int Count) agg);
@@ -158,8 +208,17 @@ public class GameThread : IUpdateable
 
         if (m_ReportTimer.Elapsed >= ReportInterval)
         {
+#if DEBUG
+            SetUpdateDiagnosticStage("instrumentation-report-started");
+#endif
             ReportAndReset();
+#if DEBUG
+            SetUpdateDiagnosticStage("instrumentation-report-completed");
+#endif
         }
+#if DEBUG
+        SetUpdateDiagnosticStage("body-returning|instrument=True");
+#endif
     }
 
     private void ReportAndReset()

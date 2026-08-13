@@ -6,6 +6,7 @@ using SandBox;
 using Serilog;
 using System;
 using System.Reflection;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
@@ -42,17 +43,24 @@ internal static class CampaignLoadPhaseDiagnosticPatch
 
     internal static Type GetDedicatedServerHostType() => AccessTools.TypeByName(DedicatedServerHostTypeName);
 
-    internal static string GetDedicatedServerHostState()
+    internal static bool IsDedicatedServerServing()
+    {
+        object phase = AccessTools.Field(GetDedicatedServerHostType(), "_phase")?.GetValue(null);
+        return string.Equals(phase?.ToString(), "Serving", StringComparison.Ordinal);
+    }
+
+    internal static string GetDedicatedServerHostState(bool includeQueue = true)
     {
         Type hostType = GetDedicatedServerHostType();
         object phase = AccessTools.Field(hostType, "_phase")?.GetValue(null);
         object ticks = AccessTools.Field(hostType, "_ticks")?.GetValue(null);
         GameManagerBase manager = GameManagerBase.Current;
         MBGameManager gameManager = manager as MBGameManager;
+        string queue = includeQueue ? GameThread.Instance.QueueLength.ToString() : "not-sampled";
 
         return $"phase={phase ?? "<unknown>"}|ticks={ticks ?? "<unknown>"}|" +
             $"manager={manager?.GetType().FullName ?? "<null>"}|isLoaded={gameManager?.IsLoaded.ToString() ?? "<null>"}|" +
-            $"campaign={(Campaign.Current != null)}|queue={GameThread.Instance.QueueLength}";
+            $"campaign={(Campaign.Current != null)}|queue={queue}";
     }
 
     private static readonly ILogger Logger = LogManager.GetLogger(typeof(CampaignLoadPhaseDiagnosticPatch));
@@ -254,6 +262,8 @@ internal static class DedicatedServerHostOnLoadedDiagnosticPatch
 [HarmonyPatch(typeof(GameThread), nameof(GameThread.Update))]
 internal static class GameThreadUpdateDiagnosticPatch
 {
+    private static int WatcherStarted;
+
     [HarmonyPrefix]
     private static void Prefix()
     {
@@ -261,6 +271,13 @@ internal static class GameThreadUpdateDiagnosticPatch
 
         CampaignLoadPhaseDiagnosticPatch.RecordStarted(
             $"GameThread.Update|{CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState()}");
+
+        int generation = GameThread.BeginUpdateDiagnostic();
+        if (CampaignLoadPhaseDiagnosticPatch.IsDedicatedServerServing() &&
+            Interlocked.CompareExchange(ref WatcherStarted, 1, 0) == 0)
+        {
+            ThreadPool.QueueUserWorkItem(_ => ObserveStalledUpdate(generation));
+        }
     }
 
     [HarmonyPostfix]
@@ -268,8 +285,31 @@ internal static class GameThreadUpdateDiagnosticPatch
     {
         if (CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostType() == null) return;
 
+        GameThread.SetUpdateDiagnosticStage("harmony-postfix-entered");
         CampaignLoadPhaseDiagnosticPatch.RecordCompleted(
             $"GameThread.Update|{CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState()}");
+        GameThread.SetUpdateDiagnosticStage("harmony-postfix-completed");
+    }
+
+    private static void ObserveStalledUpdate(int generation)
+    {
+        while (true)
+        {
+            Thread.Sleep(TimeSpan.FromSeconds(2));
+            int currentGeneration = GameThread.UpdateDiagnosticGeneration;
+            string stage = GameThread.UpdateDiagnosticStage;
+            if (currentGeneration != generation)
+            {
+                generation = currentGeneration;
+                continue;
+            }
+            if (stage == "harmony-postfix-completed") continue;
+
+            CampaignLoadPhaseDiagnosticPatch.RecordStarted(
+                $"GameThread.Update.Stalled|generation={generation}|stage={stage}|" +
+                CampaignLoadPhaseDiagnosticPatch.GetDedicatedServerHostState(includeQueue: false));
+            return;
+        }
     }
 }
 
