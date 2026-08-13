@@ -322,6 +322,72 @@ public class MobilePartyBehaviorSnapshotTests
     }
 
     [Fact]
+    public void TryApplyJoinBaseline_InactiveParty_DoesNotCountTowardCoverage()
+    {
+        Campaign previousCampaign = Campaign.Current;
+        try
+        {
+            var inactiveParty = CreateParty();
+            inactiveParty.IsActive = false;
+            var campaign = ObjectHelper.SkipConstructor<Campaign>();
+            var campaignObjectManager = new CampaignObjectManager
+            {
+                Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
+            };
+            campaignObjectManager._mobileParties.Add(inactiveParty);
+            campaign.CampaignObjectManager = campaignObjectManager;
+            Campaign.Current = campaign;
+            var snapshot = new MobilePartyBehaviorSnapshot(Mock.Of<IObjectManager>());
+
+            bool applied = snapshot.TryApplyJoinBaseline(
+                Array.Empty<MobilePartyJoinState>(),
+                () => { });
+
+            Assert.True(applied);
+            Assert.Null(snapshot.LastJoinBaselineFailure);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    [Fact]
+    public void TryApplyJoinBaseline_MissingActiveParty_ReportsActiveCount()
+    {
+        Campaign previousCampaign = Campaign.Current;
+        try
+        {
+            var campaign = ObjectHelper.SkipConstructor<Campaign>();
+            var campaignObjectManager = new CampaignObjectManager
+            {
+                Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
+            };
+            campaignObjectManager._mobileParties.Add(CreateParty());
+            campaignObjectManager._mobileParties.Add(CreateParty());
+            var inactiveParty = CreateParty();
+            inactiveParty.IsActive = false;
+            campaignObjectManager._mobileParties.Add(inactiveParty);
+            campaign.CampaignObjectManager = campaignObjectManager;
+            Campaign.Current = campaign;
+            var snapshot = new MobilePartyBehaviorSnapshot(Mock.Of<IObjectManager>());
+
+            bool applied = snapshot.TryApplyJoinBaseline(
+                new MobilePartyJoinState[1],
+                () => { });
+
+            Assert.False(applied);
+            Assert.Equal(
+                "party count mismatch (baseline=1, client=2)",
+                snapshot.LastJoinBaselineFailure);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    [Fact]
     public void TryApplyJoinBaseline_MissingPartyId_ReportsStateIndex()
     {
         Campaign previousCampaign = Campaign.Current;
@@ -491,6 +557,7 @@ public class MobilePartyBehaviorSnapshotTests
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         party.Ai = new MobilePartyAi(party);
+        party.IsActive = true;
         party.PartyMoveMode = MoveModeType.Party;
         party.MoveTargetPoint = new CampaignVec2(new Vec2(10f, 20f), isOnLand: true);
         return party;

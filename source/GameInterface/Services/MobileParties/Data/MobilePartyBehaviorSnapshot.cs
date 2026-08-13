@@ -289,13 +289,19 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             return RejectJoinBaseline("the client campaign mobile-party collection is unavailable");
         if (settlements == null)
             return RejectJoinBaseline("the client campaign settlement collection is unavailable");
-        if (states.Length != parties.Count)
+        var liveParties = new HashSet<MobileParty>();
+        for (int i = 0; i < parties.Count; i++)
         {
-            return RejectJoinBaseline(
-                $"party count mismatch (baseline={states.Length}, client={parties.Count})");
+            MobileParty party = parties[i];
+            if (party?.IsActive == true) liveParties.Add(party);
         }
 
-        var liveParties = new HashSet<MobileParty>(parties);
+        if (states.Length != liveParties.Count)
+        {
+            return RejectJoinBaseline(
+                $"party count mismatch (baseline={states.Length}, client={liveParties.Count})");
+        }
+
         var liveSettlements = new HashSet<Settlement>(settlements);
         var seenParties = new HashSet<MobileParty>();
         var resolved = new ResolvedBehaviorUpdate[states.Length];
