@@ -145,6 +145,8 @@ jobs:
             "$release_date" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
 
       - name: Stage module
+        env:
+          RELEASE_DATE: ${{ steps.release.outputs.release_date }}
         run: |
           set -eu
           module=release-stage/Coop
