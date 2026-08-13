@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using Common.Logging;
 using HarmonyLib;
+using SandBox;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -176,6 +177,16 @@ internal static class AfterGameInitializationFinishedDiagnosticPatch
 
     [HarmonyPostfix]
     private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("MBGameManager.OnAfterGameInitializationFinished");
+}
+
+[HarmonyPatch(typeof(SandBoxGameManager), nameof(SandBoxGameManager.OnLoadFinished))]
+internal static class SandBoxGameManagerOnLoadFinishedDiagnosticPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => CampaignLoadPhaseDiagnosticPatch.RecordStarted("SandBoxGameManager.OnLoadFinished");
+
+    [HarmonyPostfix]
+    private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("SandBoxGameManager.OnLoadFinished");
 }
 
 [HarmonyPatch(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.InitializeDataCache))]
