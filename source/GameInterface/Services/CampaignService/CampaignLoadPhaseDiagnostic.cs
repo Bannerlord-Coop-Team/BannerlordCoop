@@ -32,19 +32,29 @@ internal class CampaignLoadPhaseDiagnostic : ICampaignLoadPhaseDiagnostic
         if (string.IsNullOrWhiteSpace(phase)) throw new ArgumentException("Phase is required", nameof(phase));
 
         string line = $"{state}|{phase}{Environment.NewLine}";
+        string temporaryFileName = BreadcrumbFileName + ".tmp";
         lock (SyncRoot)
         {
             using (var stream = new FileStream(
-                BreadcrumbFileName,
+                temporaryFileName,
                 FileMode.Create,
                 FileAccess.Write,
-                FileShare.Read,
+                FileShare.None,
                 4096,
                 FileOptions.WriteThrough))
             {
                 byte[] bytes = Encoding.GetBytes(line);
                 stream.Write(bytes, 0, bytes.Length);
                 stream.Flush(true);
+            }
+
+            if (File.Exists(BreadcrumbFileName))
+            {
+                File.Replace(temporaryFileName, BreadcrumbFileName, null);
+            }
+            else
+            {
+                File.Move(temporaryFileName, BreadcrumbFileName);
             }
         }
     }
