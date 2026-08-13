@@ -38,4 +38,16 @@ internal class BanditSpawnCampaignBehaviorPatches
 
         __result = (int)(__result * multiplier);
     }
+
+    [HarmonyPatch(nameof(BanditSpawnCampaignBehavior._numberOfMinimumBanditPartiesInAHideoutToInfestIt), MethodType.Getter)]
+    [HarmonyPostfix]
+    public static void NumberOfMinimumBanditPartiesInAHideoutToInfestItGetterPostfix(ref float __result)
+    {
+        // Use default if provided with a negative value
+        var multiplier = 1f;
+        if (ModConfigProvider.ModOptions.MaximumLootersMultiplier >= 0)
+            multiplier = ModConfigProvider.ModOptions.MaximumLootersMultiplier;
+
+        __result *= multiplier;
+    }
 }

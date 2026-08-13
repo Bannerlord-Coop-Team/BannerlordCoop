@@ -57,4 +57,22 @@ internal class DesertersCampaignBehaviorPatches
 
         return false;
     }
+
+    [HarmonyPatch(nameof(DesertersCampaignBehavior.GetDeserterSpawnPosition))]
+    [HarmonyPrefix]
+    public static bool GetDeserterSpawnPositionPrefix(DesertersCampaignBehavior __instance, ref CampaignVec2 __result, Settlement settlement)
+    {
+        // Calculate without using MobileParty.MainParty
+        CampaignVec2 campaignVec = NavigationHelper.FindPointAroundPosition(settlement.GatePosition, MobileParty.NavigationType.Default, __instance.DesertersSpawnRadiusAroundVillages, 0f, true, false);
+        for (int i = 0; i < 15; i++)
+        {
+            CampaignVec2 campaignVec2 = NavigationHelper.FindReachablePointAroundPosition(campaignVec, MobileParty.NavigationType.Default, __instance.DesertersSpawnRadiusAroundVillages, 0f, false);
+            if (NavigationHelper.IsPositionValidForNavigationType(campaignVec2, MobileParty.NavigationType.Default))
+            {
+                campaignVec = campaignVec2;
+            }
+        }
+        __result = campaignVec;
+        return false;
+    }
 }

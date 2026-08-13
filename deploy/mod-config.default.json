@@ -106,6 +106,7 @@
     // The higher the multiplier, the more looters/bandits in these parties.
     // This only applies to new parties, existing bandit parties in a save game will not increase in size.
     // The default is 1, which is equivalent to the vanilla party size.
+    // When quests are supported, bandit parties spawned by quests will not be affected.
     // Negative values will default back to 1.0
     "looterPartySizeMultiplier": 1.0,
 
