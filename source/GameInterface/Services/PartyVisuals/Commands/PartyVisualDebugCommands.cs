@@ -58,7 +58,7 @@ internal class PartyVisualDebugCommands
         if (args.Count != 0)
             return "Usage: coop.debug.partyvisuals.fixture_state";
 
-        return GetFixtureState();
+        return GetFixtureState(includeBaseline: true);
     }
 
     [CommandLineArgumentFunction("stage_over_limit_fixture", "coop.debug.partyvisuals")]
@@ -88,7 +88,7 @@ internal class PartyVisualDebugCommands
         fixtureBaselineEligiblePartyCount = GetEligiblePartyCount();
         int partiesToCreate = targetEligiblePartyCount - fixtureBaselineEligiblePartyCount;
         if (partiesToCreate <= 0)
-            return GetFixtureState();
+            return GetFixtureState(includeBaseline: true);
 
         try
         {
@@ -113,7 +113,7 @@ internal class PartyVisualDebugCommands
             throw;
         }
 
-        return GetFixtureState();
+        return GetFixtureState(includeBaseline: true);
     }
 
     [CommandLineArgumentFunction("restore_over_limit_fixture", "coop.debug.partyvisuals")]
@@ -126,7 +126,7 @@ internal class PartyVisualDebugCommands
             return "Usage: coop.debug.partyvisuals.restore_over_limit_fixture";
 
         int removedPartyCount = RestoreFixtureParties();
-        string state = GetFixtureState();
+        string state = GetFixtureState(includeBaseline: false);
         return $"removedPartyCount={removedPartyCount}{Environment.NewLine}{state}";
     }
 
@@ -150,7 +150,7 @@ internal class PartyVisualDebugCommands
         return removedPartyCount;
     }
 
-    private static string GetFixtureState()
+    private static string GetFixtureState(bool includeBaseline)
     {
         int eligiblePartyCount = GetEligiblePartyCount();
         int liveFixturePartyCount = GetLiveFixturePartyCount();
@@ -158,12 +158,12 @@ internal class PartyVisualDebugCommands
         {
             eligiblePartyCount,
             liveFixturePartyCount,
-            fixtureBaselineEligiblePartyCount,
+            fixtureBaselineEligiblePartyCount = includeBaseline ? fixtureBaselineEligiblePartyCount : -1,
             campaignPartyCount = Campaign.Current?.MobileParties?.Count ?? 0,
         });
 
         return $"eligiblePartyCount={eligiblePartyCount} liveFixturePartyCount={liveFixturePartyCount} " +
-               $"fixtureBaselineEligiblePartyCount={fixtureBaselineEligiblePartyCount}" + Environment.NewLine +
+               $"fixtureBaselineEligiblePartyCount={(includeBaseline ? fixtureBaselineEligiblePartyCount : -1)}" + Environment.NewLine +
                $"LIVE_TEST_JSON={structuredState}";
     }
 
