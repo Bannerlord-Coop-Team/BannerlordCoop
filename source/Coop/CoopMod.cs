@@ -529,7 +529,8 @@ namespace Coop
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
-                campaignGameStarter.AddBehavior(new FixedTownNpcConversationBehavior());
+                if (ContainerProvider.TryResolve<ICoopModulePathResolver>(out var modulePathResolver))
+                    campaignGameStarter.AddBehavior(new FixedTownNpcConversationBehavior(modulePathResolver));
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
                 campaignGameStarter.AddBehavior(new CoopTournamentCampaignBehavior());
             }
