@@ -243,7 +243,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
                 bool hadRoster = party._roster != null;
                 var entries = FlattenParty(party);
-                MovePlayerHeroFirst(party, entries);
+                PlacePlayerHeroFirstInReserve(party, entries);
                 ledger.SetReserve(mapEventId, partyId, entries);
                 builtParties.Add(partyId);
                 Logger.Information("[TroopSupply] Built reserve: party {PartyId} side {Side} -> {Count} troops (roster was {Roster})",
@@ -288,7 +288,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         return entries;
     }
 
-    private void MovePlayerHeroFirst(MapEventParty party, List<TroopReserveEntry> entries)
+    private void PlacePlayerHeroFirstInReserve(MapEventParty party, List<TroopReserveEntry> entries)
     {
         var mobileParty = party.Party?.MobileParty;
         if (mobileParty == null || !objectManager.TryGetId(mobileParty, out var mobilePartyId)) return;
