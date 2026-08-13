@@ -401,9 +401,11 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             payload);
 
         client.SimulateMessage(Server.NetPeer, result);
+        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(setup.MapEventId));
 
         client.Call(() =>
         {
+            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out _));
             Assert.NotNull(PlayerEncounter.Current);
             Assert.Equal(PlayerEncounterState.CaptureHeroes, PlayerEncounter.Current.EncounterState);
             Assert.Same(simulation, PlayerEncounter.Current.BattleSimulation);

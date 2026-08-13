@@ -8,6 +8,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -76,7 +77,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
-        var preservedParty = localPartyWasInvolved && IsBattleMissionActive()
+        var preservedParty = localPartyWasInvolved && IsBattlePresentationActive()
             ? MobileParty.MainParty?.Party
             : null;
         initializationBarrier.DestroyGraph(obj, preservedParty);
@@ -137,7 +138,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        if (IsBattleMissionActive())
+        if (IsBattlePresentationActive())
         {
             return;
         }
@@ -175,8 +176,14 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         ForceCloseCurrentEncounterMenu();
     }
 
-    private static bool IsBattleMissionActive() =>
-        MissionState.Current != null || Mission.Current != null;
+    private static bool IsBattlePresentationActive()
+    {
+        if (MissionState.Current != null || Mission.Current != null) return true;
+
+        return Game.Current?.GameStateManager?.GameStates
+            .OfType<MapState>()
+            .Any(state => state.IsSimulationActive) == true;
+    }
 
     private static bool HasEncounterMenuToClose()
     {
