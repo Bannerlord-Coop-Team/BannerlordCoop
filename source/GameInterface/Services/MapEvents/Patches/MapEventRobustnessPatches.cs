@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using HarmonyLib;
+using GameInterface.Services.MapEvents.Diagnostics;
 using GameInterface.Services.MapEvents.Initialization;
 using SandBox.ViewModelCollection.Map;
 using Serilog;
@@ -22,6 +23,8 @@ internal class MapEventRobustnessPatches
     {
         if (__result is null)
         {
+            MapEventCrashProbe.RecordMapEvent("MapEvent.TroopUpgradeTracker.get:null", __instance, 0);
+
             // The assignment below runs the generated AutoSync setter prefix, which reads this getter
             // to compare values. Let that nested read observe null instead of recursively restoring again.
             if (restoringTroopUpgradeTracker) return;
@@ -49,12 +52,24 @@ internal class MapEventRobustnessPatches
     }
 
     [HarmonyPatch(typeof(MapEventVisualsVM), nameof(MapEventVisualsVM.UpdateMapEventsAux))]
+    [HarmonyPrefix]
+    private static void Prefix_UpdateMapEventsAux()
+    {
+        MapEventCrashProbe.Record("MapEventVisualsVM.UpdateMapEventsAux:enter");
+    }
+
+    [HarmonyPatch(typeof(MapEventVisualsVM), nameof(MapEventVisualsVM.UpdateMapEventsAux))]
     [HarmonyFinalizer]
     private static Exception Finalizer_UpdateMapEventsAux(Exception __exception, MethodBase __originalMethod)
     {
         if (__exception != null)
         {
+            MapEventCrashProbe.RecordException("MapEventVisualsVM.UpdateMapEventsAux:exception", __exception);
             Logger.Error(__exception, "Failed to run {Method}", $"{__originalMethod.DeclaringType}.{__originalMethod.Name}");
+        }
+        else
+        {
+            MapEventCrashProbe.Record("MapEventVisualsVM.UpdateMapEventsAux:completed");
         }
 
         return null;

@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MapEvents.Diagnostics;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -140,12 +141,17 @@ internal class ParallelRobustnessPatches
             try
             {
                 MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
+                MapEventCrashProbe.RecordParty("MovingArmy.FillCurrentTickMoveData:enter", mobileParty, localVariables.HasMapEvent);
                 mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+                MapEventCrashProbe.RecordParty("MovingArmy.FillCurrentTickMoveData:completed", mobileParty, localVariables.HasMapEvent);
+                MapEventCrashProbe.RecordParty("MovingArmy.TryToMove:enter", mobileParty, localVariables.HasMapEvent);
                 mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
+                MapEventCrashProbe.RecordParty("MovingArmy.TryToMove:completed", mobileParty, localVariables.HasMapEvent);
                 mobileParty.ValidateSpeed();
             }
             catch (Exception ex)
             {
+                MapEventCrashProbe.RecordException("MovingArmy:exception", ex);
                 Logger.Error(ex, "Failed to tick moving party {stringId} in ParallelTickArmies", mobileParty.StringId);
             }
 
@@ -181,11 +187,16 @@ internal class ParallelRobustnessPatches
             try
             {
                 MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
+                MapEventCrashProbe.RecordParty("MovingParty.FillCurrentTickMoveData:enter", mobileParty, localVariables.HasMapEvent);
                 mobileParty.FillCurrentTickMoveDataForMovingMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+                MapEventCrashProbe.RecordParty("MovingParty.FillCurrentTickMoveData:completed", mobileParty, localVariables.HasMapEvent);
+                MapEventCrashProbe.RecordParty("MovingParty.TryToMove:enter", mobileParty, localVariables.HasMapEvent);
                 mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
+                MapEventCrashProbe.RecordParty("MovingParty.TryToMove:completed", mobileParty, localVariables.HasMapEvent);
             }
             catch(Exception ex)
             {
+                MapEventCrashProbe.RecordException("MovingParty:exception", ex);
                 Logger.Error(ex, "Failed to tick moving party {stringId} in ParallelTickMovingParties", mobileParty.StringId);
             }
         }
@@ -230,14 +241,42 @@ internal class ParallelRobustnessPatches
 
             try
             {
+                MapEventCrashProbe.RecordParty("StationaryParty.Tick:enter", mobileParty, localVariables.HasMapEvent);
                 mobileParty.TickForStationaryMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+                MapEventCrashProbe.RecordParty("StationaryParty.Tick:completed", mobileParty, localVariables.HasMapEvent);
             }
             catch (Exception ex)
             {
+                MapEventCrashProbe.RecordException("StationaryParty.Tick:exception", ex);
                 Logger.Error(ex, "Failed to tick stationary party {stringId} in ParallelTickStationaryParties", mobileParty.StringId);
             }
         }
 
         return false;
+    }
+}
+
+[HarmonyPatch(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.UpdateVisibilitiesAroundMainParty))]
+internal static class CampaignVisibilityCrashProbePatch
+{
+    [HarmonyPrefix]
+    private static void Prefix()
+    {
+        MapEventCrashProbe.Record("CampaignTickCacheDataStore.UpdateVisibilitiesAroundMainParty:enter");
+    }
+
+    [HarmonyFinalizer]
+    private static Exception Finalizer(Exception __exception)
+    {
+        if (__exception == null)
+        {
+            MapEventCrashProbe.Record("CampaignTickCacheDataStore.UpdateVisibilitiesAroundMainParty:completed");
+        }
+        else
+        {
+            MapEventCrashProbe.RecordException("CampaignTickCacheDataStore.UpdateVisibilitiesAroundMainParty:exception", __exception);
+        }
+
+        return __exception;
     }
 }

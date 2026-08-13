@@ -1,0 +1,24 @@
+Bannerlord Coop campaign-map crash diagnostic build
+
+Commit: recorded in the first "BannerlordCoop build" line of the runtime log
+Base: origin/development 69c2552f4dc20f95a4a6d4f5344ead5e5afa72c1
+Configuration: Debug (unsigned one-off diagnostic build)
+Marker: [MapEventCrashProbe]
+
+Purpose
+-------
+This build records a bounded ring of the most recent campaign MapEvent and
+mobile-party movement boundaries. It also emits a maximum of one probe warning
+per second to Coop_client.log so evidence survives a Proton crash even if the
+normal Bannerlord crash reporter cannot finish.
+
+Reproduction
+------------
+1. Back up and replace the existing Modules/Coop folder with this Coop folder.
+2. Use this same complete build on the host/server and the reporting client.
+3. Reproduce the campaign-map freeze/crash once, then stop relaunching.
+4. Return Coop_client.log, the matching Coop_server.log, and the complete crash
+   archive/dump if Bannerlord or Proton generated one.
+
+Search for [MapEventCrashProbe]. The last record before the crash is the most
+important, but the complete files are needed to interpret its context.
