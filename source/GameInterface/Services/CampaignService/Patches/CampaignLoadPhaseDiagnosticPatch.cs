@@ -145,6 +145,16 @@ internal static class InitializeForSavedGameDiagnosticPatch
     private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("Campaign.InitializeForSavedGame");
 }
 
+[HarmonyPatch(typeof(Campaign), nameof(Campaign.OnSessionStart))]
+internal static class OnSessionStartDiagnosticPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => CampaignLoadPhaseDiagnosticPatch.RecordStarted("Campaign.OnSessionStart");
+
+    [HarmonyPostfix]
+    private static void Postfix() => CampaignLoadPhaseDiagnosticPatch.RecordCompleted("Campaign.OnSessionStart");
+}
+
 [HarmonyPatch(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.InitializeDataCache))]
 internal static class InitializeDataCacheDiagnosticPatch
 {
