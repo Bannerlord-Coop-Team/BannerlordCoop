@@ -89,6 +89,22 @@ internal class IssueFinalizationHandler : IHandler
                 return;
             }
 
+            if (owner.Issue == null)
+            {
+                Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - no active issue to finalize",
+                    nameof(RequestIssueRemoved), reason, ownerId);
+                return;
+            }
+
+            if (reason == IssueFinalizeReason.RejectedAccept || reason == IssueFinalizeReason.AlternativeSolutionSuccess)
+            {
+                Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - this reason can only originate server-side",
+                    nameof(RequestIssueRemoved), reason, ownerId);
+                return;
+            }
+
+            var quest = owner.Issue.IssueQuest is { IsOngoing: true } ongoingQuest ? ongoingQuest : null;
+
             if (reason == IssueFinalizeReason.QuestSuccess)
             {
                 var validator = QuestTypeRegistry.Get(owner.Issue)?.ValidateQuestSuccess;
@@ -107,6 +123,29 @@ internal class IssueFinalizationHandler : IHandler
                         return;
                     }
                 }
+            }
+            else if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestFail
+                or IssueFinalizeReason.QuestTimeout or IssueFinalizeReason.QuestBetrayal)
+            {
+                if (quest == null)
+                {
+                    Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - no ongoing quest to finalize",
+                        nameof(RequestIssueRemoved), reason, ownerId);
+                    return;
+                }
+
+                if (reason == IssueFinalizeReason.QuestTimeout && !quest.QuestDueTime.IsPast)
+                {
+                    Logger.Error("Rejecting {Message} claiming QuestTimeout for owner {Owner} - due time has not passed",
+                        nameof(RequestIssueRemoved), ownerId);
+                    return;
+                }
+            }
+            else if (quest != null)
+            {
+                Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - an ongoing quest exists and must be finalized with a quest-specific reason",
+                    nameof(RequestIssueRemoved), reason, ownerId);
+                return;
             }
 
             IssueFinalizationSupport.FinalizeMirror(owner, reason);
