@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 
@@ -7,6 +7,7 @@ namespace Missions.Agents;
 public interface INetworkWorldItemRegistry
 {
     Guid GetOrCreateId(SpawnedItemEntity item);
+    bool TryGetId(SpawnedItemEntity item, out Guid itemId);
     void Register(Guid itemId, SpawnedItemEntity item);
     bool TryGet(Guid itemId, out SpawnedItemEntity item);
     IReadOnlyDictionary<Guid, SpawnedItemEntity> GetAll();
@@ -29,6 +30,19 @@ public sealed class NetworkWorldItemRegistry : INetworkWorldItemRegistry
             Guid itemId = item.Id.CreatedAtRuntime ? Guid.NewGuid() : FromSceneId(item.Id.Id);
             RegisterUnsafe(itemId, item);
             return itemId;
+        }
+    }
+
+    public bool TryGetId(SpawnedItemEntity item, out Guid itemId)
+    {
+        if (item == null)
+        {
+            itemId = Guid.Empty;
+            return false;
+        }
+        lock (gate)
+        {
+            return itemToId.TryGetValue(item, out itemId);
         }
     }
 

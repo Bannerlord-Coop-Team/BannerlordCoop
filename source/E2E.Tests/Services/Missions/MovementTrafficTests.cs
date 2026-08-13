@@ -116,6 +116,88 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_FrameRateRecoveryRetriesAfterRepeatedConfirmationFailures()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            _ = CreateMovementMission(fixture, peer);
+            var component = peer.Resolve<ICoopMissionComponent>();
+            component.AgentMovementHandler.Dispose();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var rateController = new FixedBulkSendCostMovementRateController(
+                new MovementRateController(
+                    network,
+                    peer.Resolve<IMessageBroker>(),
+                    peer.Resolve<IControllerIdProvider>(),
+                    peer.Resolve<IMissionContext>(),
+                    () => 0L,
+                    1L,
+                    () => 60,
+                    enableHeartbeat: false),
+                bulkSendMillisecondsPerPoll: 1d);
+            using var handler = new AgentMovementHandler(
+                network,
+                peer.Resolve<IPacketManager>(),
+                peer.Resolve<IMessageBroker>(),
+                peer.Resolve<INetworkAgentRegistry>(),
+                peer.Resolve<IControllerIdProvider>(),
+                peer.Resolve<IAgentEquipmentApplier>(),
+                peer.Resolve<IMovementBatchSender>(),
+                peer.Resolve<IPuppetMountStateRepairer>(),
+                peer.Resolve<IAgentVisualActionAccessor>(),
+                rateController,
+                peer.Resolve<IMissionContext>());
+            handler.Configure(MovementCadenceProfile.Battle);
+
+            PollMovementWindow(handler, framesPerSecond: 20);
+            Assert.Equal(10, handler.MovementRate.BulkHz);
+
+            foreach (int expectedRate in new[] { 15, 20, 30, 40 })
+            {
+                PollMovementEvaluations(
+                    handler,
+                    network,
+                    framesPerSecond: 60,
+                    evaluations: 4);
+
+                Assert.Equal(expectedRate, handler.MovementRate.BulkHz);
+            }
+
+            for (int i = 0; i < 3; i++)
+            {
+                PollMovementEvaluations(
+                    handler,
+                    network,
+                    framesPerSecond: 60,
+                    evaluations: 4);
+                Assert.Equal(60, handler.MovementRate.BulkHz);
+
+                PollMovementEvaluations(
+                    handler,
+                    network,
+                    framesPerSecond: 57,
+                    evaluations: 1);
+                Assert.InRange(handler.MovementRate.FramesPerSecond, 56.5f, 57.5f);
+                Assert.Equal(57, handler.MovementRate.BulkPollsPerSecond);
+                Assert.Equal(40, handler.MovementRate.PerformanceCeilingHz);
+                Assert.Equal(40, handler.MovementRate.BulkHz);
+            }
+
+            PollMovementEvaluations(
+                handler,
+                network,
+                framesPerSecond: 60,
+                evaluations: 4);
+
+            Assert.Equal(60, handler.MovementRate.BulkHz);
+        });
+    }
+
+    [Fact]
     public void PollMovement_SamplesPopulationImmediatelyAndThenOncePerSecond()
     {
         using var fixture = new MissionEngineFixture();
@@ -1118,6 +1200,31 @@ public class MovementTrafficTests : MissionTestEnvironment
                 .Controller(AgentControllerType.None));
     }
 
+    private static void PollMovementWindow(
+        IAgentMovementHandler handler,
+        int framesPerSecond)
+    {
+        float elapsedSeconds = 1f / framesPerSecond;
+        for (int i = 0; i < framesPerSecond; i++)
+            handler.PollMovement(elapsedSeconds);
+    }
+
+    private static void PollMovementEvaluations(
+        IAgentMovementHandler handler,
+        MockBattleNetwork network,
+        int framesPerSecond,
+        int evaluations)
+    {
+        int targetReports = network.NetworkSentMessages
+            .GetMessageCount<NetworkMovementReceiverCap>() + evaluations;
+        float elapsedSeconds = 1f / framesPerSecond;
+        while (network.NetworkSentMessages
+            .GetMessageCount<NetworkMovementReceiverCap>() < targetReports)
+        {
+            handler.PollMovement(elapsedSeconds);
+        }
+    }
+
     private static void AssertSerializedBatchesFitRelay(
         ProtoBufSerializer serializer,
         MockBattleNetwork network)
@@ -1212,6 +1319,64 @@ public class MovementTrafficTests : MissionTestEnvironment
         public void Reset()
         {
             SerializeCalls = 0;
+        }
+    }
+
+    private sealed class FixedBulkSendCostMovementRateController : IMovementRateController
+    {
+        private readonly IMovementRateController inner;
+        private readonly double bulkSendMillisecondsPerPoll;
+
+        public MovementRateSnapshot Snapshot => inner.Snapshot;
+
+        public FixedBulkSendCostMovementRateController(
+            IMovementRateController inner,
+            double bulkSendMillisecondsPerPoll)
+        {
+            this.inner = inner;
+            this.bulkSendMillisecondsPerPoll = bulkSendMillisecondsPerPoll;
+        }
+
+        public void Configure(MovementCadenceProfile profile) =>
+            inner.Configure(profile);
+
+        public MovementCadence AdvanceFrame(float elapsedSeconds) =>
+            inner.AdvanceFrame(elapsedSeconds);
+
+        public void ReportPopulation(
+            int activeAgents,
+            int locallyControlledAgents) =>
+            inner.ReportPopulation(activeAgents, locallyControlledAgents);
+
+        public void ReportSend(
+            double elapsedMilliseconds,
+            MovementTrafficFrame traffic,
+            bool includesAuthoritativeAgents) =>
+            inner.ReportSend(
+                includesAuthoritativeAgents
+                    ? bulkSendMillisecondsPerPoll
+                    : 0d,
+                traffic,
+                includesAuthoritativeAgents);
+
+        public void ReportReceive(
+            double queueMilliseconds,
+            double applyMilliseconds,
+            int snapshots) =>
+            inner.ReportReceive(queueMilliseconds, applyMilliseconds, snapshots);
+
+        public int GetReceiverCapHz(string controllerId) =>
+            inner.GetReceiverCapHz(controllerId);
+
+        public bool TrySetForcedBulkHz(int? hz, out string error) =>
+            inner.TrySetForcedBulkHz(hz, out error);
+
+        public bool TrySetForcedReceiverCapHz(int? hz, out string error) =>
+            inner.TrySetForcedReceiverCapHz(hz, out error);
+
+        public void Dispose()
+        {
+            inner.Dispose();
         }
     }
 

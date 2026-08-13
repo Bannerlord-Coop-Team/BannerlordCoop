@@ -52,13 +52,20 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
             throw new InvalidOperationException("Cannot capture a join baseline without a loaded campaign");
         }
 
-        var liveParties = new HashSet<MobileParty>(parties);
-        var liveSettlements = new HashSet<Settlement>(settlements);
-        var partyStates = new MobilePartyJoinState[parties.Count];
-        bool isComplete = true;
+        var activeParties = new List<MobileParty>(parties.Count);
         for (int i = 0; i < parties.Count; i++)
         {
             MobileParty party = parties[i];
+            if (party?.IsActive == true) activeParties.Add(party);
+        }
+
+        var liveParties = new HashSet<MobileParty>(activeParties);
+        var liveSettlements = new HashSet<Settlement>(settlements);
+        var partyStates = new MobilePartyJoinState[activeParties.Count];
+        bool isComplete = true;
+        for (int i = 0; i < activeParties.Count; i++)
+        {
+            MobileParty party = activeParties[i];
             if (!mobilePartyBehaviorSnapshot.TryCreateJoinState(
                 party,
                 liveParties,

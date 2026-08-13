@@ -17,6 +17,10 @@ public class GameInterface : IGameInterface
 {
     public const string HARMONY_STATIC_FIXES_CATEGORY = "HarmonyStaticFixes";
     public const string HARMONY_UI_LOADING_CATEGORY = "UILoadingPatches";
+
+    // Applied at boot by CoopMod so it is active before native first-time minor-faction initialization
+    public const string HARMONY_CONFIGURED_MINOR_FACTION_CATEGORY = "ConfiguredMinorFactionPatches";
+
     public const string HARMONY_GAME_STARTED_CATEGORY = "GameStartedPatches";
 
     private static bool gameStartedPatchesApplied;
