@@ -167,15 +167,23 @@ jobs:
 
           coop_version=$(sed -n 's/.*<CoopVersion>\([^<]*\)<\/CoopVersion>.*/\1/p' source/Directory.Build.props)
           game_version=$(sed -n 's/.*<GameVersion>\([^<]*\)<\/GameVersion>.*/\1/p' source/Coop/Coop.csproj)
+          nightly_module_id=CoopNightly
+          nightly_module_name="Coop Nightly $RELEASE_DATE"
           test -n "$coop_version"
           test -n "$game_version"
           # shellcheck disable=SC2016
           sed \
-            -e 's/${name}/Coop/g' \
+            -e "s/<Name value=\"Coop\"\/>/<Name value=\"$nightly_module_name\"\/>/g" \
+            -e "s/<Id value=\"Coop\"\/>/<Id value=\"$nightly_module_id\"\/>/" \
+            -e 's/<Module Id="CoopNightly"\/>/<Module Id="Coop"\/>/' \
             -e 's/${main_class}/CoopMod/g' \
             -e "s/\${version}/v$coop_version/g" \
             -e "s/\${game_version}/$game_version/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
+          test "$(grep -Fc "<Name value=\"$nightly_module_name\"/>" "$module/SubModule.xml")" -eq 2
+          grep -Fqx "    <Id value=\"$nightly_module_id\"/>" "$module/SubModule.xml"
+          grep -Fqx '        <Module Id="Coop"/>' "$module/SubModule.xml"
+          ! grep -Fq '<Module Id="CoopNightly"/>' "$module/SubModule.xml"
 
       - name: Upload unsigned module
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
