@@ -29,6 +29,8 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
     private static readonly Type TestIssueType = typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue);
 
+    private string lastConnectedEligibleTroopId;
+
     public GenericQuestTypeAcceptSecurityTests(ITestOutputHelper output)
     {
         TestQuestTypeFixture.EnsureVillageNeedsToolsRegistered();
@@ -114,20 +116,27 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
     {
         var controllerId = "player-A-" + Guid.NewGuid();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var eligibleTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
+                eligibleTroop.Level = 20;
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.MemberRoster.AddToCounts(eligibleTroop, 6);
                 party.CurrentSettlement = settlement;
+                owner.Gold = 1000000;
             }
 
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player(controllerId, fixture.HeroId, partyId, "", "")));
         });
+        lastConnectedEligibleTroopId = eligibleTroopId;
         TestEnvironment.ConnectRegisteredPlayer(Client, controllerId);
         Client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
         return controllerId;
@@ -268,9 +277,11 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, 6);
             }
 
             owner.Issue.StartIssueWithAlternativeSolution();

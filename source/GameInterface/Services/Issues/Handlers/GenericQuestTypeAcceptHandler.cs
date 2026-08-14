@@ -325,7 +325,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             byte[] fieldsBytes = null;
             try
             {
-                if (!ApplyValidatedSentTroops(owner, player, payload.What.SentTroops))
+                var validatedRoster = BuildValidatedSentTroops(player, payload.What.SentTroops);
+                if (validatedRoster.TotalHeroes == 0)
                 {
                     Logger.Error("Rejecting {Message} for owner {Owner} - requester's validated troop roster is empty",
                         nameof(RequestQuestTypeAcceptAlternative), ownerId);
@@ -333,7 +334,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     return;
                 }
 
-                state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
+                state = AlternativeSolutionStartRunner.StartOnServerFromClaim(owner, player, validatedRoster);
 
                 if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
                 {
@@ -360,7 +361,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         });
     }
 
-    private bool ApplyValidatedSentTroops(Hero owner, Player player, TroopRosterData claimedTroops)
+    private TroopRoster BuildValidatedSentTroops(Player player, TroopRosterData claimedTroops)
     {
         var claimedRoster = TroopRoster.CreateDummyTroopRoster();
         foreach (var element in troopRosterInterface.UnpackTroopRosterData(claimedTroops))
@@ -368,24 +369,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             claimedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
         }
 
-        var validatedRoster = player.MobilePartyId != null &&
+        return player.MobilePartyId != null &&
             objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)
             ? troopValidator.Validate(claimedRoster, party.MemberRoster, preserveTroopXp: true)
             : TroopRoster.CreateDummyTroopRoster();
-
-        if (validatedRoster.TotalHeroes == 0) return false;
-
-        using (new AllowedThread())
-        {
-            owner.Issue.AlternativeSolutionSentTroops.Clear();
-            foreach (var element in validatedRoster.GetTroopRoster())
-            {
-                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(
-                    element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
-            }
-        }
-
-        return true;
     }
 
     private void Handle_NetworkQuestTypeAlternativeAccepted(MessagePayload<NetworkQuestTypeAlternativeAccepted> payload)

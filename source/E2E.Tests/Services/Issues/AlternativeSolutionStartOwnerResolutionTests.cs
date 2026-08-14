@@ -46,6 +46,7 @@ public class AlternativeSolutionStartOwnerResolutionTests : IDisposable
         var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var trueOwnerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var trueOwnerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var eligibleTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
 
         Server.Call(() =>
         {
@@ -56,6 +57,7 @@ public class AlternativeSolutionStartOwnerResolutionTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(trueOwnerHeroId, out var trueOwner));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(trueOwnerPartyId, out var trueOwnerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
 
             using (new AllowedThread())
             {
@@ -69,6 +71,10 @@ public class AlternativeSolutionStartOwnerResolutionTests : IDisposable
                 owner.Occupation = Occupation.RuralNotable;
                 AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Value)).SetValue(item, 40);
                 companion.ChangeState(Hero.CharacterStates.Disabled);
+
+                eligibleTroop.Level = 20;
+                trueOwnerParty.MemberRoster.AddToCounts(eligibleTroop, 6);
+                trueOwner.Gold = 1000000;
             }
 
             var playerManager = Server.Resolve<IPlayerManager>();
