@@ -1,3 +1,4 @@
+using TaleWorlds.CampaignSystem.Party;
 using GameInterface.Services.Issues.Patches;
 ﻿namespace GameInterface.Services.Issues.Generic.Migrated.RuralNotableInnAndOut;
 
@@ -7,11 +8,19 @@ using Quest = SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnA
 [QuestTypeModule]
 internal static class RuralNotableInnAndOutQuestType
 {
+    private static bool ValidateQuestSuccess(Issue issue, MobileParty party)
+    {
+        if (issue.IssueQuest is not Quest quest) return false;
+
+        return quest._playerWonTheGame || quest._applyLesserReward;
+    }
+
     static RuralNotableInnAndOutQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("RuralNotableInnAndOut")
             .WithQuestSolutionAccept()
             .WithAlternativeAccept()
+            .WithQuestSuccessValidation(ValidateQuestSuccess)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
