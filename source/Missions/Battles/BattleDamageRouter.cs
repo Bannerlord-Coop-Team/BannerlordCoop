@@ -47,6 +47,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
     private readonly IGuardedHitWindow guardedHitWindow;
+    private readonly IAgentNativeMountState agentNativeMountState;
     private readonly Func<Agent, bool?> mountAuthorityProbe;
     private readonly object inboundDamageGate = new();
     private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
@@ -186,13 +187,15 @@ public class BattleDamageRouter : IBattleDamageRouter
 
     public BattleDamageRouter(IBattleNetwork network, IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent, IBattleSession session,
-        IGuardedHitWindow guardedHitWindow)
+        IGuardedHitWindow guardedHitWindow,
+        IAgentNativeMountState agentNativeMountState)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
         this.guardedHitWindow = guardedHitWindow;
+        this.agentNativeMountState = agentNativeMountState;
 
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
@@ -1019,6 +1022,18 @@ public class BattleDamageRouter : IBattleDamageRouter
             return;
         }
 
+        bool hasNativeMountedPair = !blow.BlowFlag.HasAnyFlag(BlowFlags.CanDismount)
+            || agentNativeMountState.HasMountedPair(victim);
+        if (RemoveIncompatibleDismountFlag(ref blow, hasNativeMountedPair))
+        {
+            Logger.Debug(
+                "[BattleDamage] Removed stale routed dismount reaction: victimId={VictimId} " +
+                "victimIndex={VictimIndex} attackerId={AttackerId}",
+                damage.VictimAgentId,
+                victim.Index,
+                damage.AttackerAgentId);
+        }
+
         Agent attacker = null;
         string attackerControllerId = null;
         if (damage.AttackerAgentId != Guid.Empty &&
@@ -1142,6 +1157,20 @@ public class BattleDamageRouter : IBattleDamageRouter
         {
             hero.HitPoints = Math.Max(1, (int)healthAfter);
         }
+    }
+
+    internal static bool RemoveIncompatibleDismountFlag(
+        ref Blow blow,
+        bool hasNativeMountedPair)
+    {
+        if (hasNativeMountedPair
+            || !blow.BlowFlag.HasAnyFlag(BlowFlags.CanDismount))
+        {
+            return false;
+        }
+
+        blow.BlowFlag &= ~BlowFlags.CanDismount;
+        return true;
     }
 
     private bool ShouldLogNoHealthReductionWarning(Guid victimId, out int suppressedHits)
