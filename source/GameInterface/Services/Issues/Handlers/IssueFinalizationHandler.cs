@@ -172,7 +172,7 @@ internal class IssueFinalizationHandler : IHandler
 
             try
             {
-                using (new MainHeroSubstitutionScope(truePlayerHero, ownerParty))
+                using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
                 {
                     IssueFinalizationSupport.FinalizeMirror(owner, reason);
                 }
