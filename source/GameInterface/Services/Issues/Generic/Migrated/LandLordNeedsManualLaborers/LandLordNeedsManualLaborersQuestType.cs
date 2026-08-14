@@ -10,6 +10,7 @@ internal static class LandLordNeedsManualLaborersQuestType
     static LandLordNeedsManualLaborersQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("LandLordNeedsManualLaborers")
+            .WithQuestSolutionAccept()
             .WithAlternativeAccept()
             .Build();
 

@@ -68,6 +68,18 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
     {
         if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return;
 
+        try
+        {
+            SyncDataInternal(dataStore, troopsRegistry);
+        }
+        catch (System.Exception e)
+        {
+            Logger.Error(e, "Failed to sync awaiting-alternative-solution-troops save data - registry may be left partially restored");
+        }
+    }
+
+    private static void SyncDataInternal(IDataStore dataStore, IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
+    {
         List<AwaitingAlternativeSolutionTroopsSaveData> saveData = null;
         if (dataStore.IsSaving)
         {

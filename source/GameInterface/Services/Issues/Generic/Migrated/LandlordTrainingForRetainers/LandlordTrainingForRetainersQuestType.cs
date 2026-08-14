@@ -20,6 +20,7 @@ internal static class LandlordTrainingForRetainersQuestType
     static LandlordTrainingForRetainersQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("LandlordTrainingForRetainers")
+            .WithQuestSolutionAccept()
             .WithAlternativeAccept()
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .Build();

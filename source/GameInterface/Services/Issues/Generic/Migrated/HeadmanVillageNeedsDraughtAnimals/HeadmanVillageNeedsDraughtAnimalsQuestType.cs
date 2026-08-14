@@ -20,6 +20,7 @@ internal static class HeadmanVillageNeedsDraughtAnimalsQuestType
     static HeadmanVillageNeedsDraughtAnimalsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("HeadmanVillageNeedsDraughtAnimals")
+            .WithQuestSolutionAccept()
             .WithAlternativeAccept()
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .Build();
