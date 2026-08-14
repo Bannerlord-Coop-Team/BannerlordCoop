@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface;
@@ -112,8 +114,31 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             Guid.NewGuid());
         MethodInfo target = AccessTools.Method(
             typeof(Mission),
+            nameof(Mission.OnTick),
+            new[] { typeof(float), typeof(float), typeof(bool), typeof(bool) });
+        MethodInfo asyncTick = AccessTools.Method(
+            typeof(Mission),
             nameof(Mission.TickAgentsAndTeamsAsync),
             new[] { typeof(float) });
+        MethodInfo directTick = AccessTools.Method(
+            typeof(Mission),
+            nameof(Mission.TickAgentsAndTeamsImp),
+            new[] { typeof(float), typeof(bool) });
+        MethodInfo applyInput = AccessTools.Method(
+            typeof(BattleDebugCommands),
+            nameof(BattleDebugCommands.ApplyJoustInputAtNativeTickBoundary));
+        List<CodeInstruction> transformed =
+            JoustInputBoundaryPatch.Transpiler(
+                PatchProcessor.GetOriginalInstructions(target)).ToList();
+
+        foreach (MethodInfo dispatch in new[] { asyncTick, directTick })
+        {
+            int dispatchIndex = transformed.FindIndex(
+                instruction => instruction.Calls(dispatch));
+            Assert.True(dispatchIndex >= 2);
+            Assert.Equal(OpCodes.Ldarg_0, transformed[dispatchIndex - 2].opcode);
+            Assert.True(transformed[dispatchIndex - 1].Calls(applyInput));
+        }
 
         try
         {
@@ -121,7 +146,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
             Patches patches = Harmony.GetPatchInfo(target);
             Assert.Contains(
-                patches.Prefixes,
+                patches.Transpilers,
                 patch =>
                     patch.owner == harmony.Id &&
                     patch.PatchMethod.DeclaringType ==
