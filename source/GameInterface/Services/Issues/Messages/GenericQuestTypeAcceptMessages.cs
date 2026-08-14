@@ -110,9 +110,12 @@ public readonly struct NetworkQuestTypeAcceptRejected : IServerToClientCommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly bool IsAlternative;
 
-    public NetworkQuestTypeAcceptRejected(string ownerId)
+    public NetworkQuestTypeAcceptRejected(string ownerId, bool isAlternative)
     {
         OwnerId = ownerId;
+        IsAlternative = isAlternative;
     }
 }

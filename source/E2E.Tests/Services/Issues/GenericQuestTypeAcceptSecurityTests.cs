@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -156,6 +157,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         });
 
         var rejection = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Assert.False(rejection.IsAlternative);
 
         Server.Call(() =>
         {
@@ -187,6 +189,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         });
 
         var rejection = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Assert.True(rejection.IsAlternative);
 
         Server.Call(() =>
         {
@@ -235,6 +238,75 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.Equal(owner.Issue.AlternativeSolutionReturnTimeForTroops, accepted.State.ReturnTime);
         });
+    }
+
+    [Fact]
+    public void RequestQuestTypeAcceptAlternative_EmptyValidatedRoster_RejectedWithoutMutatingIssueState()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var controllerId = ConnectPlayer(fixture);
+        OpenConversation(fixture, controllerId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+            Assert.True(Client.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+
+            var troopRosterInterface = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>();
+            var emptyTroops = troopRosterInterface.PackTroopRosterData(TroopRoster.CreateDummyTroopRoster());
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, emptyTroops));
+        });
+
+        var rejection = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Assert.True(rejection.IsAlternative);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(owner.Issue.IsOngoingWithoutQuest);
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
+        });
+    }
+
+    [Fact]
+    public void RequestQuestTypeAcceptQuest_AnotherPeerOpensConversationWithSameIssueGiver_DoesNotInvalidateFirstPeersTrackedAccept()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var controllerId = ConnectPlayer(fixture);
+        OpenConversation(fixture, controllerId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetId(owner, out var ownerId));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+
+            Server.Resolve<IIssueConversationTracker>().Register(ownerId, "player-B-" + Guid.NewGuid(), generation);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+            Assert.True(Client.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new RequestQuestTypeAcceptQuest(ownerId, generation));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.Equal(controllerId, ownerControllerId);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
     }
 
     [Fact]

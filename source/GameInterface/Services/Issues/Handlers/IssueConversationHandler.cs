@@ -75,7 +75,7 @@ internal class IssueConversationHandler : IHandler
             if (requester == null || !playerManager.TryGetPlayer(requester, out var player)) return;
 
             if (TryRegisterConversation(issueGiverId, player.ControllerId) &&
-                conversationTracker.TryGetTrackedRequester(issueGiverId, out _, out var generation))
+                conversationTracker.TryGetTrackedRequester(issueGiverId, player.ControllerId, out var generation))
             {
                 network.Send(requester, new NetworkIssueConversationAllowed(issueGiverId, generation));
             }

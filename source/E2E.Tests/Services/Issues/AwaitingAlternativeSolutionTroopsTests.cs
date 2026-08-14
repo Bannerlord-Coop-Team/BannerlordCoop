@@ -194,9 +194,8 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(playerManager.TryGetPlayer(controllerId, out var player), "player not found by controllerId");
 
             var conversationTracker = Server.Resolve<IIssueConversationTracker>();
-            Assert.True(conversationTracker.TryGetTrackedRequester(ownerId, out var trackedControllerId, out _),
-                $"no tracked requester for ownerId={ownerId}");
-            Assert.Equal(controllerId, trackedControllerId);
+            Assert.True(conversationTracker.TryGetTrackedRequester(ownerId, controllerId, out _),
+                $"no tracked requester for ownerId={ownerId}, controllerId={controllerId}");
         });
 
         Client.Call(() =>
