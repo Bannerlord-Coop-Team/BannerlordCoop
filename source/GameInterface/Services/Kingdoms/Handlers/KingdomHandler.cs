@@ -57,6 +57,7 @@ public class KingdomHandler : IHandler
         messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
         messageBroker.Subscribe<ChangeKingdomDecisionVote>(HandleChangeKingdomDecisionVote);
         messageBroker.Subscribe<ApplyKingdomDecisionVote>(HandleApplyKingdomDecisionVote);
+        messageBroker.Subscribe<ApplyKingdomDecisionRoundStatus>(HandleApplyKingdomDecisionRoundStatus);
         messageBroker.Subscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Subscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
@@ -425,6 +426,11 @@ public class KingdomHandler : IHandler
         });
     }
 
+    private void HandleApplyKingdomDecisionRoundStatus(MessagePayload<ApplyKingdomDecisionRoundStatus> obj)
+    {
+        RunKingdomMutation(() => decisionVoteManager.ApplyRoundStatus(obj.What.Status));
+    }
+
     private void HandleChangeKingdomDecisionVote(MessagePayload<ChangeKingdomDecisionVote> obj)
     {
         var payload = obj.What;
@@ -569,6 +575,7 @@ public class KingdomHandler : IHandler
         messageBroker.Unsubscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
         messageBroker.Unsubscribe<ChangeKingdomDecisionVote>(HandleChangeKingdomDecisionVote);
         messageBroker.Unsubscribe<ApplyKingdomDecisionVote>(HandleApplyKingdomDecisionVote);
+        messageBroker.Unsubscribe<ApplyKingdomDecisionRoundStatus>(HandleApplyKingdomDecisionRoundStatus);
         messageBroker.Unsubscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Unsubscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);

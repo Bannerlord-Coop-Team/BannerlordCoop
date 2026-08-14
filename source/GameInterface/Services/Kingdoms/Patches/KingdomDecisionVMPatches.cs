@@ -47,6 +47,15 @@ namespace GameInterface.Services.Kingdoms.Patches
             voteManager.RegisterDecisionItem(__instance.CurrentDecision);
         }
 
+        [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
+        [HarmonyPostfix]
+        private static void OnFrameTickPostfix(KingdomDecisionsVM __instance)
+        {
+            if (!TryGetVoteManager(out var voteManager)) return;
+
+            voteManager.RefreshDecisionWaitingStatus(__instance.CurrentDecision);
+        }
+
         internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
         {
             return ContainerProvider.TryResolve(out voteManager);
