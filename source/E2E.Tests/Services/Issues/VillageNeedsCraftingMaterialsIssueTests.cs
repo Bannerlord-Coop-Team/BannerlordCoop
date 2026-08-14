@@ -601,8 +601,10 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
-                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestSuccess));
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestSuccess, generation));
         });
 
         var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
@@ -641,8 +643,10 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
-                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.IssueOnly));
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.IssueOnly, generation));
         });
 
         var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
