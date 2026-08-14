@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.PartyVisuals.Patches;
 using SandBox.View.Map.Visuals;
+using System;
 using Xunit;
 
 namespace GameInterface.Tests.Services.PartyVisuals;
@@ -74,5 +75,38 @@ public class MobilePartyVisualManagerPatchesTests
 
         Assert.Equal(-1, dirtyCount);
         Assert.Same(grownBuffer, buffer);
+    }
+
+    [Fact]
+    public void PrepareDirtyPartyVisualBuffer_NavalArrayAboveBoundary_PreservesElementTypeAndValues()
+    {
+        int dirtyCount = 7;
+        Array buffer = new string[2500];
+        buffer.SetValue("retained", 2499);
+
+        Array resized = NavalMobilePartyVisualManagerPatches.PrepareDirtyPartyVisualBuffer(
+            ref dirtyCount,
+            buffer,
+            2556);
+
+        Assert.Equal(-1, dirtyCount);
+        Assert.IsType<string[]>(resized);
+        Assert.True(resized.Length >= 2556);
+        Assert.Equal("retained", resized.GetValue(2499));
+    }
+
+    [Fact]
+    public void PrepareDirtyPartyVisualBuffer_NavalArrayAlreadyLargeEnough_ReusesBuffer()
+    {
+        int dirtyCount = 3;
+        Array buffer = new object[5000];
+
+        Array result = NavalMobilePartyVisualManagerPatches.PrepareDirtyPartyVisualBuffer(
+            ref dirtyCount,
+            buffer,
+            2556);
+
+        Assert.Equal(-1, dirtyCount);
+        Assert.Same(buffer, result);
     }
 }

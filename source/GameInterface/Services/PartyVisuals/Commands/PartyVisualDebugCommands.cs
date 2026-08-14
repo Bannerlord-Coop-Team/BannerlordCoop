@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.PartyVisuals.Patches;
 using SandBox.View.Map.Managers;
 using System;
 using System.Collections.Generic;
@@ -37,16 +38,26 @@ internal class PartyVisualDebugCommands
         int visualCount = manager._visualsFlattened.Count;
         int bufferCapacity = manager._dirtyPartiesList.Length;
         int dirtyCount = manager._dirtyPartyVisualCount;
+        bool navalManagerActive = NavalMobilePartyVisualManagerPatches.TryGetBufferState(
+            out int navalVisualCount,
+            out int navalBufferCapacity,
+            out int navalDirtyCount);
         int campaignPartyCount = Campaign.Current?.MobileParties?.Count ?? 0;
         string structuredState = JsonSerializer.Serialize(new
         {
             visualCount,
             bufferCapacity,
             dirtyCount,
+            navalManagerActive,
+            navalVisualCount,
+            navalBufferCapacity,
+            navalDirtyCount,
             campaignPartyCount,
         });
 
         return $"visualCount={visualCount} bufferCapacity={bufferCapacity} dirtyCount={dirtyCount} " +
+               $"navalManagerActive={navalManagerActive} navalVisualCount={navalVisualCount} " +
+               $"navalBufferCapacity={navalBufferCapacity} navalDirtyCount={navalDirtyCount} " +
                $"campaignPartyCount={campaignPartyCount}" + Environment.NewLine +
                $"LIVE_TEST_JSON={structuredState}";
     }
