@@ -108,6 +108,7 @@ internal static class BattleDebugCommands
     private sealed class JoustDriverBehavior : MissionBehavior
     {
         private const string RequiredWeaponId = "western_spear_4_t4";
+        private const float AttackReleaseDistance = 8f;
 
         private readonly Agent rider;
         private readonly Agent target;
@@ -121,6 +122,7 @@ internal static class BattleDebugCommands
         private readonly Vec2 originalMovementInput;
         private bool attackHeld;
         private bool releasedAttack;
+        private float releasedAtDistance = -1f;
         private int drivenFrames;
         private int inputBoundaryWrites;
         private int skippedInputBoundaryWrites;
@@ -165,6 +167,8 @@ internal static class BattleDebugCommands
         public int DrivenFrames => drivenFrames;
         public bool AttackHeld => attackHeld;
         public bool ReleasedAttack => releasedAttack;
+        public float AttackReleaseThreshold => AttackReleaseDistance;
+        public float ReleasedAtDistance => releasedAtDistance;
         public int InputBoundaryWrites => inputBoundaryWrites;
         public int SkippedInputBoundaryWrites => skippedInputBoundaryWrites;
         public string LastInputBoundarySkipReason => lastInputBoundarySkipReason;
@@ -205,14 +209,27 @@ internal static class BattleDebugCommands
         public bool LastInputBoundaryWasGameThread =>
             lastInputBoundaryWasGameThread;
         public Agent.ActionStage ActionStage =>
-            rider?.GetCurrentActionStage(1) ?? Agent.ActionStage.None;
-        public float TargetDistance => rider == null || target == null
-            ? -1f
-            : rider.Position.Distance(target.Position);
-        public float MountedSpeed => rider?.MountAgent?
-            .GetRealGlobalVelocity().AsVec2.Length ?? 0f;
+            rider?.IsActive() == true
+                ? rider.GetCurrentActionStage(1)
+                : Agent.ActionStage.None;
+        public float TargetDistance => Active
+            ? rider.Position.Distance(target.Position)
+            : -1f;
+        public bool TargetActive =>
+            target?.IsActive() == true && target.Mission == Mission;
+        public AgentControllerType TargetController => TargetActive
+            ? target.Controller
+            : AgentControllerType.None;
+        public float TargetMountedSpeed =>
+            TargetActive && target.MountAgent?.IsActive() == true
+                ? target.MountAgent.GetRealGlobalVelocity().AsVec2.Length
+                : 0f;
+        public float MountedSpeed =>
+            ActiveMount?.GetRealGlobalVelocity().AsVec2.Length ?? 0f;
         public AgentControllerType Controller =>
-            rider?.Controller ?? AgentControllerType.None;
+            rider?.IsActive() == true
+                ? rider.Controller
+                : AgentControllerType.None;
         public bool Active =>
             rider != null &&
             rider.IsActive() &&
@@ -310,12 +327,16 @@ internal static class BattleDebugCommands
             rider.LookDirection = lookDirection;
 
             Agent.ActionStage stage = rider.GetCurrentActionStage(1);
+            float targetDistance = TargetDistance;
             if (!releasedAttack &&
+                targetDistance >= 0f &&
+                targetDistance <= AttackReleaseDistance &&
                 (stage == Agent.ActionStage.AttackReady ||
                  stage == Agent.ActionStage.AttackQuickReady))
             {
                 attackHeld = false;
                 releasedAttack = true;
+                releasedAtDistance = targetDistance;
             }
 
             Agent.MovementControlFlag preservedFlags =
@@ -827,9 +848,16 @@ internal static class BattleDebugCommands
             drivenFrames = driver?.DrivenFrames ?? 0,
             attackHeld = driver?.AttackHeld ?? false,
             attackReleased = driver?.ReleasedAttack ?? false,
+            attackReleaseThreshold =
+                driver?.AttackReleaseThreshold ?? 0f,
+            releasedAtDistance = driver?.ReleasedAtDistance ?? -1f,
             actionStage = driver?.ActionStage.ToString() ??
                 Agent.ActionStage.None.ToString(),
             targetDistance = driver?.TargetDistance ?? -1f,
+            targetActive = driver?.TargetActive ?? false,
+            targetController = driver?.TargetController.ToString() ??
+                AgentControllerType.None.ToString(),
+            targetMountedSpeed = driver?.TargetMountedSpeed ?? 0f,
             mountedSpeed = driver?.MountedSpeed ?? 0f,
             controller = driver?.Controller.ToString() ??
                 AgentControllerType.None.ToString(),
@@ -982,9 +1010,16 @@ internal static class BattleDebugCommands
                 driver?.MountMaximumSpeedLimit ?? 0f,
             attackHeld = driver?.AttackHeld ?? false,
             attackReleased = driver?.ReleasedAttack ?? false,
+            attackReleaseThreshold =
+                driver?.AttackReleaseThreshold ?? 0f,
+            releasedAtDistance = driver?.ReleasedAtDistance ?? -1f,
             actionStage = driver?.ActionStage.ToString() ??
                 Agent.ActionStage.None.ToString(),
             targetDistance = driver?.TargetDistance ?? -1f,
+            targetActive = driver?.TargetActive ?? false,
+            targetController = driver?.TargetController.ToString() ??
+                AgentControllerType.None.ToString(),
+            targetMountedSpeed = driver?.TargetMountedSpeed ?? 0f,
             mountedSpeed = driver?.MountedSpeed ?? 0f,
         };
         return "JOUST active=" + state.active +
