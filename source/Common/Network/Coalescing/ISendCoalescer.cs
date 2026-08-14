@@ -1,4 +1,6 @@
-﻿namespace Common.Network.Coalescing;
+﻿using LiteNetLib;
+
+namespace Common.Network.Coalescing;
 
 /// <summary>
 /// Buffers per-change network sends and collapses many updates to the same <see cref="CoalesceKey"/>
@@ -27,14 +29,24 @@ public interface ISendCoalescer
     void Enqueue(CoalesceKey key, ICoalescedPayload payload);
 
     /// <summary>
-    /// Broadcasts the merged message for every pending key and clears the buffer. Call once per server
-    /// tick, on the thread that sends object creates and destroys.
+    /// Buffers an update that will be sent only to <paramref name="peer"/> when flushed.
+    /// </summary>
+    void EnqueueToPeer(CoalesceKey key, ICoalescedPayload payload, NetPeer peer);
+
+    /// <summary>
+    /// Buffers an update that will be sent to every peer except <paramref name="excludedPeer"/> when flushed.
+    /// </summary>
+    void EnqueueToAllBut(CoalesceKey key, ICoalescedPayload payload, NetPeer excludedPeer);
+
+    /// <summary>
+    /// Sends the merged message for every pending key through its buffered delivery route and clears the
+    /// buffer. Call once per server tick, on the thread that sends object creates and destroys.
     /// </summary>
     void Flush(INetwork network);
 
     /// <summary>
-    /// Broadcasts and clears the pending updates for one instance only. Call before sending that
-    /// instance's destroy so its final state reaches clients ahead of the destroy.
+    /// Sends and clears the pending updates for one instance through their buffered delivery routes. Call
+    /// before sending that instance's destroy so its final state reaches clients ahead of the destroy.
     /// </summary>
     void FlushInstance(string instanceId, INetwork network);
 

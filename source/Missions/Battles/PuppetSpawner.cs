@@ -289,13 +289,28 @@ public class PuppetSpawner : IPuppetSpawner
             agent.SetIsAIPaused(false);
         }
 
-        registry.TryRegisterAgent(
+        bool agentRegistered = registry.TryRegisterAgent(
             data.OwnerControllerId,
             data.OriginalOwnerControllerId,
             data.MovementScopeId,
             data.AgentId,
             data.MovementId,
             agent);
+        if (!agentRegistered)
+        {
+            Logger.Error(
+                "[BattleDesync] Spawned puppet remained unregistered: kind=rider agentId={AgentId} " +
+                "owner={Owner} originalOwner={OriginalOwner} movementIdentity={Scope}/{MovementId} " +
+                "agentIndex={AgentIndex} character={CharacterId} ownAgent={OwnAgent}",
+                data.AgentId,
+                data.OwnerControllerId,
+                data.OriginalOwnerControllerId,
+                data.MovementScopeId,
+                data.MovementId,
+                agent.Index,
+                data.CharacterId,
+                isOwnAgent);
+        }
         if (data.IsRunningAway)
             puppetRoutApplier?.ApplyFleeing(agent);
         if (data.HasCurrentEquipment)
@@ -309,13 +324,30 @@ public class PuppetSpawner : IPuppetSpawner
         if (data.MountAgentId != Guid.Empty)
         {
             if (agent.MountAgent is Agent mount)
-                registry.TryRegisterAgent(
+            {
+                bool mountRegistered = registry.TryRegisterAgent(
                     data.OwnerControllerId,
                     data.MountOriginalOwnerControllerId,
                     data.MountMovementScopeId,
                     data.MountAgentId,
                     data.MountMovementId,
                     mount);
+                if (!mountRegistered)
+                {
+                    Logger.Error(
+                        "[BattleDesync] Spawned puppet remained unregistered: kind=mount agentId={AgentId} " +
+                        "riderAgentId={RiderAgentId} owner={Owner} originalOwner={OriginalOwner} " +
+                        "movementIdentity={Scope}/{MovementId} agentIndex={AgentIndex} character={CharacterId}",
+                        data.MountAgentId,
+                        data.AgentId,
+                        data.OwnerControllerId,
+                        data.MountOriginalOwnerControllerId,
+                        data.MountMovementScopeId,
+                        data.MountMovementId,
+                        mount.Index,
+                        data.CharacterId);
+                }
+            }
             else
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
         }

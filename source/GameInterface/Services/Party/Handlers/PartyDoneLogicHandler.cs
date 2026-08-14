@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
@@ -183,6 +184,8 @@ internal class PartyDoneLogicHandler : IHandler
                 logger.Error("Rejected Party screen prisoner actions because transfer history did not match the signed right-prisoner delta");
                 return;
             }
+
+            var applicableTakenPrisonersRoster = FilterIneligibleTakenHeroes(takenPrisonersRoster);
             if (message.ApplyReleasedAndTakenPrisonerActions)
             {
                 rightPrisonerRosterData = FilterTakenHeroAdditions(
@@ -217,8 +220,8 @@ internal class PartyDoneLogicHandler : IHandler
             PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
             ApplyRightOwnerPartyItemRoster(mainHero, message);
             if (message.ApplyReleasedAndTakenPrisonerActions)
-                ApplyReleasedAndTakenPrisonerActions(mainHero, releasedPrisonersRoster, takenPrisonersRoster);
-            NotifyTakenPrisonersChanged(takenPrisonersRoster);
+                ApplyReleasedAndTakenPrisonerActions(mainHero, releasedPrisonersRoster, applicableTakenPrisonersRoster);
+            NotifyTakenPrisonersChanged(applicableTakenPrisonersRoster);
             ApplyPartyRewardChanges(mainHero, message);
             ApplyUpgradedTroopHistory(mainHero, upgradedTroopHistory);
             ApplyPrisonerRecruitmentEffects(mainHero, message, recruitedPrisonersRoster);
@@ -366,6 +369,29 @@ internal class PartyDoneLogicHandler : IHandler
         return filtered.Length == delta.Data.Length
             ? delta
             : new TroopRosterData(filtered);
+    }
+
+    internal static FlattenedTroopRoster FilterIneligibleTakenHeroes(
+        FlattenedTroopRoster takenPrisonersRoster)
+    {
+        var filteredRoster = new FlattenedTroopRoster(4);
+        foreach (var element in takenPrisonersRoster)
+        {
+            var hero = element.Troop?.HeroObject;
+            if (hero != null && !TakePrisonerActionPatches.CanCaptureHero(hero))
+            {
+                logger.Warning(
+                    "Skipped stale Party screen prisoner capture for hero {HeroId} in state {HeroState} with death mark {DeathMark}",
+                    hero.StringId,
+                    hero.HeroState,
+                    hero.DeathMark);
+                continue;
+            }
+
+            filteredRoster[element.Descriptor] = element;
+        }
+
+        return filteredRoster;
     }
 
     internal static bool HasLeftPrisonerTransferDestination(
