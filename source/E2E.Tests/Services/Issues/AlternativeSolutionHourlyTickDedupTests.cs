@@ -29,6 +29,7 @@ public class AlternativeSolutionHourlyTickDedupTests : IDisposable
 
     public AlternativeSolutionHourlyTickDedupTests(ITestOutputHelper output)
     {
+        TestQuestTypeFixture.EnsureVillageNeedsToolsRegistered();
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
