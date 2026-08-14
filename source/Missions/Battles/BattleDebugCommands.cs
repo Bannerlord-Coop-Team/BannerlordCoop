@@ -310,7 +310,11 @@ internal static class BattleDebugCommands
         private readonly Vec2 originalMovementInput;
         private readonly Agent.MortalityState originalMortalityState;
         private readonly float originalHealth;
+        private float protectedRiderHealth;
         private bool riderLifeProtected;
+        private int preventedUnrelatedRiderDamageEvents;
+        private bool expectedRiderDamageObserved;
+        private bool expectedLethalRiderDamagePrevented;
         private bool attackHeld;
         private bool releasedAttack;
         private float releasedAtDistance = -1f;
@@ -355,14 +359,15 @@ internal static class BattleDebugCommands
             originalMovementFlags = rider.MovementFlags;
             originalMovementInput = rider.MovementInputVector;
             originalAiPaused = rider.IsPaused;
+            originalMortalityState = rider.CurrentMortalityState;
+            originalHealth = rider.Health;
+            protectedRiderHealth = originalHealth;
             if (expectedController == AgentControllerType.AI)
             {
                 originalTarget = rider.GetTargetAgent();
             }
             if (expectedController == AgentControllerType.Player)
             {
-                originalMortalityState = rider.CurrentMortalityState;
-                originalHealth = rider.Health;
                 riderLifeProtected = true;
                 rider.SetMortalityState(Agent.MortalityState.Immortal);
                 rider.Health = rider.HealthLimit;
@@ -438,6 +443,12 @@ internal static class BattleDebugCommands
         public int LastInputBoundaryThreadId => lastInputBoundaryThreadId;
         public bool LastInputBoundaryWasGameThread =>
             lastInputBoundaryWasGameThread;
+        public int PreventedUnrelatedRiderDamageEvents =>
+            preventedUnrelatedRiderDamageEvents;
+        public bool ExpectedRiderDamageObserved =>
+            expectedRiderDamageObserved;
+        public bool ExpectedLethalRiderDamagePrevented =>
+            expectedLethalRiderDamagePrevented;
         public Agent.ActionStage ActionStage =>
             rider?.IsActive() == true
                 ? rider.GetCurrentActionStage(1)
@@ -655,6 +666,45 @@ internal static class BattleDebugCommands
                 ReferenceEquals(affectorAgent, rider?.MountAgent);
         }
 
+        public override void OnAgentHit(
+            Agent affectedAgent,
+            Agent affectorAgent,
+            in MissionWeapon affectorWeapon,
+            in Blow blow,
+            in AttackCollisionData attackCollisionData)
+        {
+            if (expectedController != AgentControllerType.AI ||
+                blow.InflictedDamage <= 0 ||
+                !ReferenceEquals(affectedAgent, rider) ||
+                rider?.IsActive() != true ||
+                rider.Mission != Mission)
+            {
+                return;
+            }
+
+            Agent targetMount = target?.MountAgent;
+            bool expectedSource =
+                ReferenceEquals(affectorAgent, target) ||
+                (targetMount != null &&
+                 ReferenceEquals(affectorAgent, targetMount));
+            if (expectedSource)
+            {
+                expectedRiderDamageObserved = true;
+                if (rider.Health < 1f)
+                {
+                    rider.Health = Math.Min(rider.HealthLimit, 1f);
+                    expectedLethalRiderDamagePrevented = true;
+                }
+                protectedRiderHealth = rider.Health;
+                return;
+            }
+
+            rider.Health = Math.Min(
+                rider.HealthLimit,
+                protectedRiderHealth);
+            preventedUnrelatedRiderDamageEvents++;
+        }
+
         public void ApplyInputAtNativeTickBoundary(Mission mission)
         {
             if (expectedController != AgentControllerType.Player)
@@ -780,6 +830,10 @@ internal static class BattleDebugCommands
                 rider.Health = originalHealth;
                 rider.SetMortalityState(originalMortalityState);
                 riderLifeProtected = false;
+            }
+            else if (expectedController == AgentControllerType.AI)
+            {
+                rider.Health = originalHealth;
             }
             rider.MovementFlags = originalMovementFlags;
             rider.MovementInputVector = originalMovementInput;
@@ -1455,6 +1509,12 @@ internal static class BattleDebugCommands
                 driver?.TargetMissionMatchedAtRemoval ?? false,
             targetRemovedByRider =
                 driver?.TargetRemovedByRider ?? false,
+            preventedUnrelatedRiderDamageEvents =
+                driver?.PreventedUnrelatedRiderDamageEvents ?? 0,
+            expectedRiderDamageObserved =
+                driver?.ExpectedRiderDamageObserved ?? false,
+            expectedLethalRiderDamagePrevented =
+                driver?.ExpectedLethalRiderDamagePrevented ?? false,
             targetController = driver?.TargetController.ToString() ??
                 stagedTarget?.Controller.ToString() ??
                 AgentControllerType.None.ToString(),
@@ -1740,6 +1800,12 @@ internal static class BattleDebugCommands
                 driver?.TargetMissionMatchedAtRemoval ?? false,
             targetRemovedByRider =
                 driver?.TargetRemovedByRider ?? false,
+            preventedUnrelatedRiderDamageEvents =
+                driver?.PreventedUnrelatedRiderDamageEvents ?? 0,
+            expectedRiderDamageObserved =
+                driver?.ExpectedRiderDamageObserved ?? false,
+            expectedLethalRiderDamagePrevented =
+                driver?.ExpectedLethalRiderDamagePrevented ?? false,
             targetController = driver?.TargetController.ToString() ??
                 AgentControllerType.None.ToString(),
             targetMountedSpeed = driver?.TargetMountedSpeed ?? 0f,
