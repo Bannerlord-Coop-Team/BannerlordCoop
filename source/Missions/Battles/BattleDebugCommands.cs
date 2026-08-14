@@ -109,8 +109,10 @@ internal static class BattleDebugCommands
     {
         private const string RequiredWeaponId = "western_spear_4_t4";
         private const float AttackReleaseDistance = 8f;
-        private const float SteeringAlignedDotThreshold = 0.999f;
+        private const float SteeringDeadZoneRadians = 0.0174533f;
+        private const float SteeringFullAxisRadians = 0.5235988f;
         private const float SteeringCrossEpsilon = 0.0001f;
+        private const float MinimumForwardAxis = 0.25f;
 
         private readonly Agent rider;
         private readonly Agent target;
@@ -137,7 +139,9 @@ internal static class BattleDebugCommands
         private Vec2 lastMovementDirection;
         private Vec3 lastLookDirection;
         private Vec3 lastMountDirection;
+        private float lastForwardAxis;
         private float lastSteeringAxis;
+        private float lastSteeringAngle;
         private float lastSteeringCross;
         private float lastSteeringDot;
         private string lastSteeringMode = "not-applied";
@@ -198,7 +202,9 @@ internal static class BattleDebugCommands
         public Vec2 LastMovementDirection => lastMovementDirection;
         public Vec3 LastLookDirection => lastLookDirection;
         public Vec3 LastMountDirection => lastMountDirection;
+        public float LastForwardAxis => lastForwardAxis;
         public float LastSteeringAxis => lastSteeringAxis;
+        public float LastSteeringAngle => lastSteeringAngle;
         public float LastSteeringCross => lastSteeringCross;
         public float LastSteeringDot => lastSteeringDot;
         public string LastSteeringMode => lastSteeringMode;
@@ -298,22 +304,56 @@ internal static class BattleDebugCommands
                    ReferenceEquals(Mission.InputManager, input);
         }
 
+        public float GetPlayerForwardAxis()
+        {
+            CalculatePlayerMovementAxes(
+                out float forwardAxis,
+                out _);
+            return forwardAxis;
+        }
+
         public float GetPlayerSteeringAxis()
+        {
+            CalculatePlayerMovementAxes(
+                out _,
+                out float steeringAxis);
+            return steeringAxis;
+        }
+
+        private void CalculatePlayerMovementAxes(
+            out float forwardAxis,
+            out float steeringAxis)
         {
             Agent mount = ActiveMount;
             if (mount == null)
             {
-                SetSteeringState(0f, 0f, 0f, "mount-unavailable");
-                return 0f;
+                forwardAxis = 0f;
+                steeringAxis = 0f;
+                SetSteeringState(
+                    forwardAxis,
+                    steeringAxis,
+                    0f,
+                    0f,
+                    0f,
+                    "mount-unavailable");
+                return;
             }
 
-            Vec2 mountDirection = mount.LookDirection.AsVec2;
+            Vec2 mountDirection = mount.GetMovementDirection();
             Vec2 targetDirection = (target.Position - rider.Position).AsVec2;
             if (mountDirection.LengthSquared <= 0.0001f ||
                 targetDirection.LengthSquared <= 0.0001f)
             {
-                SetSteeringState(0f, 0f, 0f, "direction-unavailable");
-                return 0f;
+                forwardAxis = 0f;
+                steeringAxis = 0f;
+                SetSteeringState(
+                    forwardAxis,
+                    steeringAxis,
+                    0f,
+                    0f,
+                    0f,
+                    "direction-unavailable");
+                return;
             }
 
             mountDirection.Normalize();
@@ -324,33 +364,65 @@ internal static class BattleDebugCommands
             float dot =
                 (mountDirection.X * targetDirection.X) +
                 (mountDirection.Y * targetDirection.Y);
-            if (dot >= SteeringAlignedDotThreshold)
+            float forwardAlignment = Math.Min(1f, Math.Max(0f, dot));
+            forwardAxis = MinimumForwardAxis +
+                ((1f - MinimumForwardAxis) * forwardAlignment);
+
+            float signedAngle = (float)Math.Atan2(cross, dot);
+            float absoluteAngle = Math.Abs(signedAngle);
+            if (absoluteAngle <= SteeringDeadZoneRadians)
             {
-                SetSteeringState(0f, cross, dot, "aligned");
-                return 0f;
+                forwardAxis = 1f;
+                steeringAxis = 0f;
+                SetSteeringState(
+                    forwardAxis,
+                    steeringAxis,
+                    signedAngle,
+                    cross,
+                    dot,
+                    "aligned");
+                return;
             }
-            if (cross > SteeringCrossEpsilon)
+            if (Math.Abs(cross) <= SteeringCrossEpsilon && dot < 0f)
             {
-                SetSteeringState(-1f, cross, dot, "turn-left");
-                return -1f;
-            }
-            if (cross < -SteeringCrossEpsilon)
-            {
-                SetSteeringState(1f, cross, dot, "turn-right");
-                return 1f;
+                signedAngle = (float)Math.PI;
+                steeringAxis = -1f;
+                SetSteeringState(
+                    forwardAxis,
+                    steeringAxis,
+                    signedAngle,
+                    cross,
+                    dot,
+                    "opposite-left");
+                return;
             }
 
-            SetSteeringState(-1f, cross, dot, "opposite-left");
-            return -1f;
+            float magnitude = Math.Min(
+                1f,
+                absoluteAngle / SteeringFullAxisRadians);
+            steeringAxis = signedAngle > 0f ? -magnitude : magnitude;
+            SetSteeringState(
+                forwardAxis,
+                steeringAxis,
+                signedAngle,
+                cross,
+                dot,
+                signedAngle > 0f
+                    ? "proportional-left"
+                    : "proportional-right");
         }
 
         private void SetSteeringState(
+            float forwardAxis,
             float axis,
+            float angle,
             float cross,
             float dot,
             string mode)
         {
+            lastForwardAxis = forwardAxis;
             lastSteeringAxis = axis;
+            lastSteeringAngle = angle;
             lastSteeringCross = cross;
             lastSteeringDot = dot;
             lastSteeringMode = mode;
@@ -488,7 +560,13 @@ internal static class BattleDebugCommands
             lastLookDirection = rider.LookDirection;
             Agent mount = rider.MountAgent;
             if (mount != null)
-                lastMountDirection = mount.LookDirection;
+            {
+                Vec2 mountDirection = mount.GetMovementDirection();
+                lastMountDirection = new Vec3(
+                    mountDirection.X,
+                    mountDirection.Y,
+                    0f);
+            }
         }
 
         public void Restore()
@@ -573,7 +651,7 @@ internal static class BattleDebugCommands
 
         if (gameAxisKey == "MovementAxisY")
         {
-            value = 1f;
+            value = driver.GetPlayerForwardAxis();
             return true;
         }
         if (gameAxisKey == "MovementAxisX")
@@ -1153,7 +1231,10 @@ internal static class BattleDebugCommands
             mountDirectionX = driver?.LastMountDirection.X ?? 0f,
             mountDirectionY = driver?.LastMountDirection.Y ?? 0f,
             mountDirectionZ = driver?.LastMountDirection.Z ?? 0f,
+            forwardAxis = driver?.LastForwardAxis ?? 0f,
             steeringAxis = driver?.LastSteeringAxis ?? 0f,
+            steeringAngleRadians =
+                driver?.LastSteeringAngle ?? 0f,
             steeringCross = driver?.LastSteeringCross ?? 0f,
             steeringDot = driver?.LastSteeringDot ?? 0f,
             steeringMode = driver?.LastSteeringMode ?? "inactive",
