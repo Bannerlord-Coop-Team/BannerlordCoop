@@ -426,18 +426,22 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
 
         var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var eligibleTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.MemberRoster.AddToCounts(eligibleTroop, 6);
                 party.CurrentSettlement = settlement;
             }
 
@@ -452,9 +456,11 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, 6);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
         });
@@ -481,7 +487,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("player-A", ownerControllerId);
-            Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
+            Assert.Equal(7, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
         });
     }
 
@@ -490,18 +496,22 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
 
         var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var eligibleTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.MemberRoster.AddToCounts(eligibleTroop, 6);
                 party.CurrentSettlement = settlement;
             }
 
@@ -518,9 +528,11 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, 6);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
         });
