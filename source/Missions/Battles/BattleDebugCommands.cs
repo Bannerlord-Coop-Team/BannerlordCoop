@@ -121,6 +121,16 @@ internal static class BattleDebugCommands
         private bool attackHeld;
         private bool releasedAttack;
         private int drivenFrames;
+        private int inputBoundaryWrites;
+        private int skippedInputBoundaryWrites;
+        private string lastInputBoundarySkipReason = "not-applied";
+        private Vec2 lastInputVector;
+        private Agent.MovementControlFlag lastMovementFlags;
+        private Vec2 lastMovementDirection;
+        private Vec3 lastLookDirection;
+        private Vec3 lastMountDirection;
+        private int lastInputBoundaryThreadId;
+        private bool lastInputBoundaryWasGameThread;
 
         public JoustDriverBehavior(
             Agent rider,
@@ -154,6 +164,17 @@ internal static class BattleDebugCommands
         public int DrivenFrames => drivenFrames;
         public bool AttackHeld => attackHeld;
         public bool ReleasedAttack => releasedAttack;
+        public int InputBoundaryWrites => inputBoundaryWrites;
+        public int SkippedInputBoundaryWrites => skippedInputBoundaryWrites;
+        public string LastInputBoundarySkipReason => lastInputBoundarySkipReason;
+        public Vec2 LastInputVector => lastInputVector;
+        public Agent.MovementControlFlag LastMovementFlags => lastMovementFlags;
+        public Vec2 LastMovementDirection => lastMovementDirection;
+        public Vec3 LastLookDirection => lastLookDirection;
+        public Vec3 LastMountDirection => lastMountDirection;
+        public int LastInputBoundaryThreadId => lastInputBoundaryThreadId;
+        public bool LastInputBoundaryWasGameThread =>
+            lastInputBoundaryWasGameThread;
         public Agent.ActionStage ActionStage =>
             rider?.GetCurrentActionStage(1) ?? Agent.ActionStage.None;
         public float TargetDistance => rider == null || target == null
@@ -173,15 +194,61 @@ internal static class BattleDebugCommands
 
         public override void OnMissionTick(float dt)
         {
-            if (!Active || rider.Controller != expectedController)
+            if (expectedController != AgentControllerType.AI ||
+                !Active ||
+                rider.Controller != expectedController)
+            {
+                return;
+            }
+
+            rider.SetIsAIPaused(false);
+            rider.SetTargetAgent(target);
+            ApplyInput();
+        }
+
+        public void ApplyInputAtNativeTickBoundary(Mission mission)
+        {
+            if (expectedController != AgentControllerType.Player)
                 return;
 
-            drivenFrames++;
-            if (expectedController == AgentControllerType.AI)
+            lastInputBoundaryThreadId =
+                System.Threading.Thread.CurrentThread.ManagedThreadId;
+            lastInputBoundaryWasGameThread = GameThread.Instance.IsGameThread;
+            if (!lastInputBoundaryWasGameThread)
             {
-                rider.SetIsAIPaused(false);
-                rider.SetTargetAgent(target);
+                SkipInputBoundary("not-game-thread");
+                return;
             }
+            if (!ReferenceEquals(Mission, mission))
+            {
+                SkipInputBoundary("mission-mismatch");
+                return;
+            }
+            if (!Active)
+            {
+                SkipInputBoundary("inactive");
+                return;
+            }
+            if (rider.Controller != expectedController)
+            {
+                SkipInputBoundary("controller-mismatch");
+                return;
+            }
+
+            ApplyInput();
+            inputBoundaryWrites++;
+            lastInputBoundarySkipReason = null;
+        }
+
+        private void SkipInputBoundary(string reason)
+        {
+            skippedInputBoundaryWrites++;
+            lastInputBoundarySkipReason = reason;
+        }
+
+        private void ApplyInput()
+        {
+            drivenFrames++;
             Vec3 offset = target.Position - rider.Position;
             Vec2 heading = offset.AsVec2;
             if (heading.LengthSquared <= 0.0001f)
@@ -217,6 +284,14 @@ internal static class BattleDebugCommands
                 (attackHeld
                     ? Agent.MovementControlFlag.AttackUp
                     : Agent.MovementControlFlag.None);
+
+            lastInputVector = rider.MovementInputVector;
+            lastMovementFlags = rider.MovementFlags;
+            lastMovementDirection = rider.GetMovementDirection();
+            lastLookDirection = rider.LookDirection;
+            Agent mount = rider.MountAgent;
+            if (mount != null)
+                lastMountDirection = mount.LookDirection;
         }
 
         public void Restore()
@@ -274,6 +349,11 @@ internal static class BattleDebugCommands
 
             return false;
         }
+    }
+
+    internal static void ApplyJoustInputAtNativeTickBoundary(Mission mission)
+    {
+        joustDriver?.ApplyInputAtNativeTickBoundary(mission);
     }
 
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
@@ -781,6 +861,37 @@ internal static class BattleDebugCommands
             riderAgentId = driver?.RiderId ?? Guid.Empty,
             targetAgentId = driver?.TargetId ?? Guid.Empty,
             drivenFrames = driver?.DrivenFrames ?? 0,
+            inputBoundaryWrites = driver?.InputBoundaryWrites ?? 0,
+            skippedInputBoundaryWrites =
+                driver?.SkippedInputBoundaryWrites ?? 0,
+            inputBoundarySkipReason =
+                driver?.LastInputBoundarySkipReason ?? "inactive",
+            inputBoundaryThreadId =
+                driver?.LastInputBoundaryThreadId ?? 0,
+            inputBoundaryWasGameThread =
+                driver?.LastInputBoundaryWasGameThread ?? false,
+            missionHash = driver?.Mission?.GetHashCode() ?? 0,
+            currentMissionHash = Mission.Current?.GetHashCode() ?? 0,
+            missionMatchesCurrent =
+                driver != null &&
+                ReferenceEquals(driver.Mission, Mission.Current),
+            controller = driver?.Controller.ToString() ??
+                AgentControllerType.None.ToString(),
+            movementInputX = driver?.LastInputVector.X ?? 0f,
+            movementInputY = driver?.LastInputVector.Y ?? 0f,
+            movementFlags =
+                (uint)(driver?.LastMovementFlags ??
+                       Agent.MovementControlFlag.None),
+            movementDirectionX =
+                driver?.LastMovementDirection.X ?? 0f,
+            movementDirectionY =
+                driver?.LastMovementDirection.Y ?? 0f,
+            lookDirectionX = driver?.LastLookDirection.X ?? 0f,
+            lookDirectionY = driver?.LastLookDirection.Y ?? 0f,
+            lookDirectionZ = driver?.LastLookDirection.Z ?? 0f,
+            mountDirectionX = driver?.LastMountDirection.X ?? 0f,
+            mountDirectionY = driver?.LastMountDirection.Y ?? 0f,
+            mountDirectionZ = driver?.LastMountDirection.Z ?? 0f,
             attackHeld = driver?.AttackHeld ?? false,
             attackReleased = driver?.ReleasedAttack ?? false,
             actionStage = driver?.ActionStage.ToString() ??

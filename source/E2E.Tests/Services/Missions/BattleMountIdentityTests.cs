@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using HarmonyLib;
 using Missions;
 using Missions.Agents;
 using Missions.Agents.Handlers;
@@ -97,6 +100,39 @@ public class BattleMountIdentityTests : MissionTestEnvironment
     }
 
 #if DEBUG
+    [Fact]
+    public void MissionModule_RegistersLiveTestInputPatchCategory()
+    {
+        HarmonyPatchCategoryRegistration registration = Assert.Single(
+            MissionModule.CreatePatchCategoryRegistrations(),
+            candidate => candidate.Category ==
+                MissionModule.LiveTestInputPatchCategory);
+        var harmony = new Harmony(
+            $"{nameof(MissionModule_RegistersLiveTestInputPatchCategory)}." +
+            Guid.NewGuid());
+        MethodInfo target = AccessTools.Method(
+            typeof(Mission),
+            nameof(Mission.TickAgentsAndTeamsImp),
+            new[] { typeof(float), typeof(bool) });
+
+        try
+        {
+            registration.Apply(harmony);
+
+            Patches patches = Harmony.GetPatchInfo(target);
+            Assert.Contains(
+                patches.Prefixes,
+                patch =>
+                    patch.owner == harmony.Id &&
+                    patch.PatchMethod.DeclaringType ==
+                        typeof(JoustInputBoundaryPatch));
+        }
+        finally
+        {
+            harmony.Unpatch(target, HarmonyPatchType.All, harmony.Id);
+        }
+    }
+
     [Fact]
     public void RegisteredMountHit_DebugTelemetryNamesRiderAndMountOnBothPeers()
     {
