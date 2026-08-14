@@ -35,7 +35,7 @@ public class BattleSimulationUpdatePatch
         {
             if (ModInformation.IsServer) return;
 
-            if (BattleSimulationReplay.TryCancel(out var mapEventId))
+            if (BattleSimulationReplay.TryRequestCancellation(out var mapEventId))
             {
                 MessageBroker.Instance.Publish(typeof(BattleSimulationEndPatch), new RequestCancelBattleSimulation(mapEventId));
             }

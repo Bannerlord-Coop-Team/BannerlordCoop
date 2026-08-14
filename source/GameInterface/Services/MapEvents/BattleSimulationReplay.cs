@@ -64,6 +64,7 @@ internal static class BattleSimulationReplay
     private static bool finishRequested;
     private static bool skipRequested;
     private static bool isSpectator;
+    private static bool cancellationRequested;
 
     /// <summary>True while a playback is active for the given map event (initiator or spectator).</summary>
     public static bool IsActiveFor(string id) => mapEventId != null && mapEventId == id;
@@ -82,6 +83,7 @@ internal static class BattleSimulationReplay
         finishRequested = false;
         skipRequested = false;
         isSpectator = spectator;
+        cancellationRequested = false;
     }
 
     /// <summary>
@@ -96,6 +98,7 @@ internal static class BattleSimulationReplay
         finishRequested = false;
         skipRequested = false;
         isSpectator = false;
+        cancellationRequested = false;
     }
 
     /// <summary>Queue a round streamed from the server (applied on the next tick).</summary>
@@ -131,8 +134,11 @@ internal static class BattleSimulationReplay
             simulation.BattleObserver?.BattleResultsReady();
             mapEventId = null;
             isSpectator = false;
+            cancellationRequested = false;
             return;
         }
+
+        if (cancellationRequested) return;
 
         // A spectator only mirrors the rounds the initiator's pacing produces; it never drives the simulation.
         if (isSpectator)
@@ -185,13 +191,21 @@ internal static class BattleSimulationReplay
 
     // Ends an unfinished local playback and returns its MapEventId;
     // Spectators and simulations already completed by the server do not request cancellation.
-    public static bool TryCancel(out string cancelledMapEventId)
+    public static bool TryRequestCancellation(out string cancelledMapEventId)
     {
         cancelledMapEventId = null;
 
-        if (mapEventId == null || finishRequested || isSpectator) return false;
-        
+        if (mapEventId == null || finishRequested || isSpectator || cancellationRequested) return false;
+
+        cancellationRequested = true;
         cancelledMapEventId = mapEventId;
+        return true;
+    }
+
+    public static bool ConfirmCancellation(string cancelledMapEventId)
+    {
+        if (!IsActiveFor(cancelledMapEventId)) return false;
+
         Reset();
         return true;
     }
