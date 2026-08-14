@@ -36,6 +36,18 @@ internal class IssueManagerQuestCompletedReasonCapture
 }
 
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+internal class IssueFinalizedOwnershipGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance)
+    {
+        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
+
+        return IssueFinalizeAuthorityGuard.IsActive;
+    }
+}
+
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
 internal class IssueFinalizedPatches
 {
     [HarmonyPostfix]
