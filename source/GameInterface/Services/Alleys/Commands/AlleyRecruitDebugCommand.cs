@@ -410,11 +410,14 @@ public class AlleyRecruitDebugCommand
         var inventoryLogic = inventoryState?.InventoryLogic;
         if (inventoryState?.InventoryMode != InventoryScreenHelper.InventoryMode.Trade || inventoryLogic == null)
             return "Open the Danustica trade screen before staging a purchase.";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<ItemObject>(itemId, out var item))
+            return $"Unable to resolve item '{itemId}'.";
 
         var element = inventoryLogic
             .GetElementsInRoster(InventoryLogic.InventorySide.OtherInventory)
             .FirstOrDefault(candidate =>
-                candidate.EquipmentElement.Item?.StringId == itemId &&
+                candidate.EquipmentElement.Item == item &&
                 candidate.EquipmentElement.ItemModifier == null &&
                 candidate.Amount > 0);
         if (element.EquipmentElement.Item == null)
