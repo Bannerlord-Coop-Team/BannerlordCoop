@@ -63,3 +63,25 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
         network.SendAll(new RequestAlternativeSolutionCompletion(ownerId));
     }
 }
+
+[HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.RegisterEvents))]
+internal class ServerSideAwaitingTroopsReturnTickPatch
+{
+    private static readonly ConditionalWeakTable<IssuesCampaignBehavior, object> listenerRegistered = new();
+
+    [HarmonyPostfix]
+    private static void RegisterEventsPostfix(IssuesCampaignBehavior __instance)
+    {
+        if (listenerRegistered.TryGetValue(__instance, out _)) return;
+        listenerRegistered.Add(__instance, null);
+
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+    }
+
+    private static void OnHourlyTick()
+    {
+        if (!ModInformation.IsServer) return;
+
+        IssueManagerAlternativeSolutionTroopsPatches.TryCheckIfTroopsCanReturnToMainParty();
+    }
+}
