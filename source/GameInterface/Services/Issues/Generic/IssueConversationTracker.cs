@@ -5,30 +5,27 @@ namespace GameInterface.Services.Issues.Generic;
 public interface IIssueConversationTracker
 {
     void Register(string issueGiverId, string controllerId, int generation);
-    bool TryGetTrackedRequester(string issueGiverId, out string controllerId, out int generation);
+    bool TryGetTrackedRequester(string issueGiverId, string controllerId, out int generation);
 }
 
 internal sealed class IssueConversationTracker : IIssueConversationTracker
 {
-    private readonly Dictionary<string, (string ControllerId, int Generation)> tracked = new();
+    private readonly Dictionary<(string IssueGiverId, string ControllerId), int> tracked = new();
 
     public void Register(string issueGiverId, string controllerId, int generation)
     {
         if (issueGiverId == null || controllerId == null) return;
 
-        tracked[issueGiverId] = (controllerId, generation);
+        tracked[(issueGiverId, controllerId)] = generation;
     }
 
-    public bool TryGetTrackedRequester(string issueGiverId, out string controllerId, out int generation)
+    public bool TryGetTrackedRequester(string issueGiverId, string controllerId, out int generation)
     {
-        if (issueGiverId != null && tracked.TryGetValue(issueGiverId, out var entry))
+        if (issueGiverId != null && controllerId != null && tracked.TryGetValue((issueGiverId, controllerId), out generation))
         {
-            controllerId = entry.ControllerId;
-            generation = entry.Generation;
             return true;
         }
 
-        controllerId = null;
         generation = 0;
         return false;
     }

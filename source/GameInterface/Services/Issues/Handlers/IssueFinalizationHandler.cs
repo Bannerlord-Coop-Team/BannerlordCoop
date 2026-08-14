@@ -2,12 +2,14 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -22,19 +24,22 @@ internal class IssueFinalizationHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly IIssueOwnershipRegistry ownershipRegistry;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
     public IssueFinalizationHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
-        IIssueOwnershipRegistry ownershipRegistry)
+        IIssueOwnershipRegistry ownershipRegistry,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
         this.ownershipRegistry = ownershipRegistry;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<IssueFinalizedTriggered>(Handle_IssueFinalizedTriggered);
         messageBroker.Subscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
@@ -60,7 +65,8 @@ internal class IssueFinalizationHandler : IHandler
         }
         else
         {
-            network.SendAll(new RequestIssueRemoved(ownerId, reason));
+            generationRegistry.TryGetGeneration(owner, out var generation);
+            network.SendAll(new RequestIssueRemoved(ownerId, reason, generation));
         }
     }
 
@@ -70,6 +76,7 @@ internal class IssueFinalizationHandler : IHandler
 
         var ownerId = payload.What.OwnerId;
         var reason = payload.What.Reason;
+        var requestedGeneration = payload.What.Generation;
         var requester = payload.Who as NetPeer;
         GameThread.RunSafe(() =>
         {
@@ -86,6 +93,13 @@ internal class IssueFinalizationHandler : IHandler
             {
                 Logger.Error("Rejecting {Message} from {Requester}, who is not the recorded owner of {Owner}",
                     nameof(RequestIssueRemoved), player.ControllerId, ownerId);
+                return;
+            }
+
+            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
+                    nameof(RequestIssueRemoved), ownerId);
                 return;
             }
 
@@ -148,7 +162,25 @@ internal class IssueFinalizationHandler : IHandler
                 return;
             }
 
-            IssueFinalizationSupport.FinalizeMirror(owner, reason);
+            MobileParty ownerParty = null;
+            if (player.MobilePartyId != null)
+            {
+                objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
+            }
+
+            try
+            {
+                using (new MainHeroSubstitutionScope(owner, ownerParty))
+                {
+                    IssueFinalizationSupport.FinalizeMirror(owner, reason);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to finalize {Message} claiming {Reason} for owner {Owner} - not broadcasting",
+                    nameof(RequestIssueRemoved), reason, ownerId);
+                return;
+            }
 
             network.SendAll(new NetworkIssueRemoved(ownerId, reason));
         });
