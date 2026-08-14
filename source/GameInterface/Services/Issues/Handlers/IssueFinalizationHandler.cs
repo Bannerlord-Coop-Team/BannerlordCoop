@@ -162,6 +162,15 @@ internal class IssueFinalizationHandler : IHandler
                     return;
                 }
             }
+            else if (reason == IssueFinalizeReason.IssueOnly)
+            {
+                if (!owner.Issue.IsOngoingWithoutQuest)
+                {
+                    Logger.Error("Rejecting {Message} claiming IssueOnly for owner {Owner} - a solution is already in progress and must be finalized through its own completion path",
+                        nameof(RequestIssueRemoved), ownerId);
+                    return;
+                }
+            }
             else if (quest != null)
             {
                 Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - an ongoing quest exists and must be finalized with a quest-specific reason",
