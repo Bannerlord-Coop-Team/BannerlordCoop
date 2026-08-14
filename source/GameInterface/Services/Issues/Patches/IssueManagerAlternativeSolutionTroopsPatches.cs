@@ -64,16 +64,22 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
     [HarmonyPrefix]
     private static bool CheckIfTroopsCanReturnToMainPartyPrefix()
     {
-        if (!IsLocalMainHeroSafelyAvailable() || MobileParty.MainParty == null) return false;
-        if (_inquiryInFlight) return false;
+        TryCheckIfTroopsCanReturnToMainParty();
+        return false;
+    }
 
-        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return false;
+    internal static void TryCheckIfTroopsCanReturnToMainParty()
+    {
+        if (!IsLocalMainHeroSafelyAvailable() || MobileParty.MainParty == null) return;
+        if (_inquiryInFlight) return;
+
+        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
         var localControllerId = controllerIdProvider.ControllerId;
-        if (string.IsNullOrEmpty(localControllerId)) return false;
+        if (string.IsNullOrEmpty(localControllerId)) return;
 
-        if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return false;
-        if (!troopsRegistry.TryGet(localControllerId, out var troops)) return false;
-        if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
+        if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return;
+        if (!troopsRegistry.TryGet(localControllerId, out var troops)) return;
+        if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return;
 
         TextObject textObject = BuildReturnedTroopsInquiryText(troops);
 
@@ -89,8 +95,6 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
                 _inquiryInFlight = false;
                 MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId));
             }, null), pauseGameActiveState: true);
-
-        return false;
     }
 
     private static bool IsLocalMainHeroSafelyAvailable() => Game.Current?.PlayerTroop != null;
