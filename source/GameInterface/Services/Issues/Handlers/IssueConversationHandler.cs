@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Handlers;
 
@@ -120,10 +121,20 @@ internal class IssueConversationHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(issueGiverId, out var issueGiver)) return false;
         if (issueGiver.Issue == null || !issueGiver.Issue.IsOngoingWithoutQuest || !issueGiver.Issue.IssueStayAliveConditions()) return false;
         if (!IsMirrorEligible(issueGiver.Issue)) return false;
+        if (!IsRequesterPresentWithIssueGiver(controllerId, issueGiver)) return false;
 
         generationRegistry.TryGetGeneration(issueGiver, out var generation);
         conversationTracker.Register(issueGiverId, controllerId, generation);
         return true;
+    }
+
+    private bool IsRequesterPresentWithIssueGiver(string controllerId, Hero issueGiver)
+    {
+        if (issueGiver.CurrentSettlement == null) return false;
+        if (!playerManager.TryGetPlayer(controllerId, out var player) || player.MobilePartyId == null) return false;
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return false;
+
+        return party.CurrentSettlement == issueGiver.CurrentSettlement;
     }
 
     private static bool IsMirrorEligible(TaleWorlds.CampaignSystem.Issues.IssueBase issue)

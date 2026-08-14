@@ -158,9 +158,11 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
             using (new AllowedThread())
             {
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.CurrentSettlement = settlement;
             }
 
             var playerManager = Server.Resolve<IPlayerManager>();
