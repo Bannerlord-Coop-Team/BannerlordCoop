@@ -141,6 +141,10 @@ internal static class BattleDebugCommands
         private float lastSteeringCross;
         private float lastSteeringDot;
         private string lastSteeringMode = "not-applied";
+        private bool targetRemovalObserved;
+        private string targetRemovalState = "NotObserved";
+        private bool targetMissionMatchedAtRemoval;
+        private bool targetRemovedByRider;
         private int lastInputBoundaryThreadId;
         private bool lastInputBoundaryWasGameThread;
 
@@ -242,11 +246,27 @@ internal static class BattleDebugCommands
             rider?.IsActive() == true
                 ? rider.GetCurrentActionStage(1)
                 : Agent.ActionStage.None;
+        public bool TargetAgentActive => target?.IsActive() == true;
+        public bool TargetMissionMatches =>
+            target != null && ReferenceEquals(target.Mission, Mission);
+        public float TargetHealth =>
+            TargetAgentActive ? target.Health : 0f;
+        public float TargetHealthLimit =>
+            TargetAgentActive ? target.HealthLimit : 0f;
+        public string TargetMortalityState =>
+            TargetAgentActive
+                ? target.CurrentMortalityState.ToString()
+                : "Unavailable";
+        public bool TargetRemovalObserved => targetRemovalObserved;
+        public string TargetRemovalState => targetRemovalState;
+        public bool TargetMissionMatchedAtRemoval =>
+            targetMissionMatchedAtRemoval;
+        public bool TargetRemovedByRider => targetRemovedByRider;
         public float TargetDistance => Active
             ? rider.Position.Distance(target.Position)
             : -1f;
         public bool TargetActive =>
-            target?.IsActive() == true && target.Mission == Mission;
+            TargetAgentActive && TargetMissionMatches;
         public AgentControllerType TargetController => TargetActive
             ? target.Controller
             : AgentControllerType.None;
@@ -348,6 +368,29 @@ internal static class BattleDebugCommands
             rider.SetIsAIPaused(false);
             rider.SetTargetAgent(target);
             ApplyInput();
+        }
+
+        public override void OnAgentRemoved(
+            Agent affectedAgent,
+            Agent affectorAgent,
+            AgentState agentState,
+            KillingBlow killingBlow)
+        {
+            base.OnAgentRemoved(
+                affectedAgent,
+                affectorAgent,
+                agentState,
+                killingBlow);
+            if (!ReferenceEquals(affectedAgent, target))
+                return;
+
+            targetRemovalObserved = true;
+            targetRemovalState = agentState.ToString();
+            targetMissionMatchedAtRemoval =
+                ReferenceEquals(affectedAgent.Mission, Mission);
+            targetRemovedByRider =
+                ReferenceEquals(affectorAgent, rider) ||
+                ReferenceEquals(affectorAgent, rider?.MountAgent);
         }
 
         public void ApplyInputAtNativeTickBoundary(Mission mission)
@@ -958,6 +1001,21 @@ internal static class BattleDebugCommands
                 Agent.ActionStage.None.ToString(),
             targetDistance = driver?.TargetDistance ?? -1f,
             targetActive = driver?.TargetActive ?? false,
+            targetAgentActive = driver?.TargetAgentActive ?? false,
+            targetMissionMatches =
+                driver?.TargetMissionMatches ?? false,
+            targetHealth = driver?.TargetHealth ?? 0f,
+            targetHealthLimit = driver?.TargetHealthLimit ?? 0f,
+            targetMortalityState =
+                driver?.TargetMortalityState ?? "Unavailable",
+            targetRemovalObserved =
+                driver?.TargetRemovalObserved ?? false,
+            targetRemovalState =
+                driver?.TargetRemovalState ?? "NotObserved",
+            targetMissionMatchedAtRemoval =
+                driver?.TargetMissionMatchedAtRemoval ?? false,
+            targetRemovedByRider =
+                driver?.TargetRemovedByRider ?? false,
             targetController = driver?.TargetController.ToString() ??
                 AgentControllerType.None.ToString(),
             targetMountedSpeed = driver?.TargetMountedSpeed ?? 0f,
@@ -1130,6 +1188,21 @@ internal static class BattleDebugCommands
                 Agent.ActionStage.None.ToString(),
             targetDistance = driver?.TargetDistance ?? -1f,
             targetActive = driver?.TargetActive ?? false,
+            targetAgentActive = driver?.TargetAgentActive ?? false,
+            targetMissionMatches =
+                driver?.TargetMissionMatches ?? false,
+            targetHealth = driver?.TargetHealth ?? 0f,
+            targetHealthLimit = driver?.TargetHealthLimit ?? 0f,
+            targetMortalityState =
+                driver?.TargetMortalityState ?? "Unavailable",
+            targetRemovalObserved =
+                driver?.TargetRemovalObserved ?? false,
+            targetRemovalState =
+                driver?.TargetRemovalState ?? "NotObserved",
+            targetMissionMatchedAtRemoval =
+                driver?.TargetMissionMatchedAtRemoval ?? false,
+            targetRemovedByRider =
+                driver?.TargetRemovedByRider ?? false,
             targetController = driver?.TargetController.ToString() ??
                 AgentControllerType.None.ToString(),
             targetMountedSpeed = driver?.TargetMountedSpeed ?? 0f,
