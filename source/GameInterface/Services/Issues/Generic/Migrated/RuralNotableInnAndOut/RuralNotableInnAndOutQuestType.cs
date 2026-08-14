@@ -1,5 +1,4 @@
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.Issues.Patches;
 ﻿namespace GameInterface.Services.Issues.Generic.Migrated.RuralNotableInnAndOut;
 
 using Issue = SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue;
@@ -24,6 +23,5 @@ internal static class RuralNotableInnAndOutQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior));
     }
 }

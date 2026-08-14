@@ -2,7 +2,6 @@
 
 using Issue = TaleWorlds.CampaignSystem.Issues.LandlordTrainingForRetainersIssueBehavior.LandlordTrainingForRetainersIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandlordTrainingForRetainersIssueBehavior.LandlordTrainingForRetainersIssueQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.LandlordTrainingForRetainers;
 
@@ -26,6 +25,5 @@ internal static class LandlordTrainingForRetainersQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.LandlordTrainingForRetainersIssueBehavior));
     }
 }

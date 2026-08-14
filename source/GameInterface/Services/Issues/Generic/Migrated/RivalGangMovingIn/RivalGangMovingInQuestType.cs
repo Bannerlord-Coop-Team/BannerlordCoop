@@ -1,7 +1,6 @@
 ﻿using TaleWorlds.CampaignSystem.Party;
 using Issue = SandBox.Issues.RivalGangMovingInIssueBehavior.RivalGangMovingInIssue;
 using Quest = SandBox.Issues.RivalGangMovingInIssueBehavior.RivalGangMovingInIssueQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.RivalGangMovingIn;
 
@@ -24,6 +23,5 @@ internal static class RivalGangMovingInQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(SandBox.Issues.RivalGangMovingInIssueBehavior));
     }
 }

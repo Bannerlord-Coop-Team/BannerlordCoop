@@ -3,7 +3,6 @@ using TaleWorlds.CampaignSystem.Party;
 
 using Issue = TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssueQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.LordWantsRivalCaptured;
 
@@ -26,6 +25,5 @@ internal static class LordWantsRivalCapturedQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior));
     }
 }

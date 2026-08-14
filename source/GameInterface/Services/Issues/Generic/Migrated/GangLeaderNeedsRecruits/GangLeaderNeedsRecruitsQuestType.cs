@@ -1,6 +1,5 @@
 ﻿using Issue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsRecruitsIssueBehavior.GangLeaderNeedsRecruitsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsRecruitsIssueBehavior.GangLeaderNeedsRecruitsIssueQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsRecruits;
 
@@ -14,6 +13,5 @@ internal static class GangLeaderNeedsRecruitsQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsRecruitsIssueBehavior));
     }
 }

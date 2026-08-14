@@ -1,5 +1,4 @@
 ﻿using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.ArtisanCantSellProductsAtAFairPrice;
 
@@ -26,6 +25,5 @@ internal static class ArtisanCantSellProductsAtAFairPriceQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior));
     }
 }

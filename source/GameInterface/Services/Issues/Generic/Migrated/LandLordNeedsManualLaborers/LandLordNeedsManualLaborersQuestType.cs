@@ -1,4 +1,3 @@
-using GameInterface.Services.Issues.Patches;
 ﻿namespace GameInterface.Services.Issues.Generic.Migrated.LandLordNeedsManualLaborers;
 
 using Issue = TaleWorlds.CampaignSystem.Issues.LandLordNeedsManualLaborersIssueBehavior.LandLordNeedsManualLaborersIssue;
@@ -15,6 +14,5 @@ internal static class LandLordNeedsManualLaborersQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.LandLordNeedsManualLaborersIssueBehavior));
     }
 }

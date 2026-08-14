@@ -1,4 +1,3 @@
-using GameInterface.Services.Issues.Patches;
 ﻿namespace GameInterface.Services.Issues.Generic.Migrated.TheSpyParty;
 
 using Issue = SandBox.Issues.TheSpyPartyIssueQuestBehavior.TheSpyPartyIssue;
@@ -14,6 +13,5 @@ internal static class TheSpyPartyQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(SandBox.Issues.TheSpyPartyIssueQuestBehavior));
     }
 }

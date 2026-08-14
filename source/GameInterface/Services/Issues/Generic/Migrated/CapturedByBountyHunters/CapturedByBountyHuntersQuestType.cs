@@ -1,5 +1,4 @@
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.Issues.Patches;
 ﻿namespace GameInterface.Services.Issues.Generic.Migrated.CapturedByBountyHunters;
 
 using Issue = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue;
@@ -24,6 +23,5 @@ internal static class CapturedByBountyHuntersQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior));
     }
 }

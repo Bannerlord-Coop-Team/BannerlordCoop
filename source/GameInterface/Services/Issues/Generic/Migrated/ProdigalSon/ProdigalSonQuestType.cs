@@ -1,4 +1,3 @@
-using GameInterface.Services.Issues.Patches;
 ﻿namespace GameInterface.Services.Issues.Generic.Migrated.ProdigalSon;
 
 using Issue = SandBox.Issues.ProdigalSonIssueBehavior.ProdigalSonIssue;
@@ -15,6 +14,5 @@ internal static class ProdigalSonQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(SandBox.Issues.ProdigalSonIssueBehavior));
     }
 }

@@ -1,5 +1,4 @@
 ﻿using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.VillageNeedsTools;
 
@@ -26,6 +25,5 @@ internal static class VillageNeedsToolsQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior));
     }
 }

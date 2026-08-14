@@ -1,7 +1,6 @@
 ﻿using TaleWorlds.CampaignSystem.Party;
 using Issue = TaleWorlds.CampaignSystem.Issues.TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.TheConquestOfSettlement;
 
@@ -23,6 +22,5 @@ internal static class TheConquestOfSettlementQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.TheConquestOfSettlementIssueBehavior));
     }
 }
