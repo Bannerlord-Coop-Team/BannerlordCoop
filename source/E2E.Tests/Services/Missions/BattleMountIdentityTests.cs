@@ -112,8 +112,8 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             Guid.NewGuid());
         MethodInfo target = AccessTools.Method(
             typeof(Mission),
-            nameof(Mission.TickAgentsAndTeamsImp),
-            new[] { typeof(float), typeof(bool) });
+            nameof(Mission.TickAgentsAndTeamsAsync),
+            new[] { typeof(float) });
 
         try
         {

@@ -6,8 +6,8 @@ namespace Missions.Battles;
 
 [HarmonyPatch(
     typeof(Mission),
-    nameof(Mission.TickAgentsAndTeamsImp),
-    new[] { typeof(float), typeof(bool) })]
+    nameof(Mission.TickAgentsAndTeamsAsync),
+    new[] { typeof(float) })]
 [HarmonyPatchCategory(MissionModule.LiveTestInputPatchCategory)]
 internal static class JoustInputBoundaryPatch
 {
