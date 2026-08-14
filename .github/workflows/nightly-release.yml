@@ -393,8 +393,8 @@ jobs:
         env:
           RCLONE_CONFIG_R2_TYPE: s3
           RCLONE_CONFIG_R2_PROVIDER: Cloudflare
-          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_NIGHTLY_ACCESS_KEY_ID }}
-          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_NIGHTLY_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PATRON_NIGHTLY_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PATRON_NIGHTLY_SECRET_ACCESS_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           RELEASE_DATE: ${{ needs.build.outputs.release_date }}
           FILE_NAME: ${{ needs.build.outputs.file_name }}
