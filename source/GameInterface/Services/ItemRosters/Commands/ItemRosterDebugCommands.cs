@@ -234,12 +234,10 @@ namespace GameInterface.Services.ItemRosters.Commands
             if (fixture.PlayerParty.CurrentSettlement == null)
                 EnterSettlementAction.ApplyForParty(fixture.PlayerParty, fixture.Settlement);
             fixture.EnteredSettlement = fixture.PlayerParty.CurrentSettlement == fixture.Settlement;
-            return JsonResult(new
-            {
-                ok = fixture.EnteredSettlement,
-                phase = "entered-trade-settlement",
-                settlementId = fixture.PlayerParty.CurrentSettlement?.StringId,
-            });
+            if (!fixture.EnteredSettlement)
+                return JsonResult(new { ok = false, error = "The player did not enter Danustica." });
+
+            return BuildFixtureReference(fixture, "entered-trade-settlement");
         }
 
         [CommandLineArgumentFunction("holistic_trade", "coop.debug.itemrosters")]
