@@ -413,6 +413,16 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
     }
 
+    private static void RollbackAlternativeAccept(Hero owner)
+    {
+        if (owner?.Issue == null) return;
+
+        using (new AllowedThread())
+        {
+            owner.Issue.AlternativeSolutionSentTroops.Clear();
+        }
+    }
+
     private void Handle_NetworkQuestTypeAcceptRejected(MessagePayload<NetworkQuestTypeAcceptRejected> payload)
     {
         var ownerId = payload.What.OwnerId;
@@ -424,7 +434,14 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             if (isAlternative)
             {
-                descriptor?.RejectAlternativeAccept?.Invoke(owner);
+                if (descriptor?.RejectAlternativeAccept != null)
+                {
+                    descriptor.RejectAlternativeAccept(owner);
+                }
+                else
+                {
+                    RollbackAlternativeAccept(owner);
+                }
             }
             else if (descriptor?.RejectQuestSolutionAccept != null)
             {
