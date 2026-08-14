@@ -876,7 +876,20 @@ public class MapEventDebugCommands
             return false;
         if (!CanStageMountedBattleParty(party))
         {
-            error = $"Player {controllerId} must lead an active party on the map, outside settlements and map events.";
+            var readiness = new
+            {
+                state = "party-not-ready",
+                controllerId,
+                ready = false,
+                isActive = party.IsActive,
+                hasPartyBase = party.Party != null,
+                hasMapEvent = party.MapEvent != null,
+                settlementId = party.CurrentSettlement?.StringId,
+                hasMapFaction = party.MapFaction != null,
+            };
+            error = $"Player {controllerId} must lead an active party on the map, outside settlements and map events." +
+                    Environment.NewLine +
+                    "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(readiness);
             return false;
         }
         if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
