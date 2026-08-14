@@ -9,6 +9,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.Time.Interfaces;
 using LiteNetLib;
 using Moq;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -72,6 +73,13 @@ public class JoinCampaignBaselineSenderTests
                 .Returns(true);
             var timeControl = new Mock<ITimeControlInterface>();
             timeControl.Setup(service => service.GetTimeControl()).Returns(TimeControlEnum.Pause);
+            var troopXpBaselineProvider = new Mock<IPlayerPartyTroopXpBaselineProvider>();
+            TroopRosterXpBaseline[] troopXpBaselines = Array.Empty<TroopRosterXpBaseline>();
+            troopXpBaselineProvider
+                .Setup(service => service.TryCapture(
+                    It.IsAny<NetPeer>(),
+                    out troopXpBaselines))
+                .Returns(true);
             NetworkJoinCampaignBaseline sent = default;
             network
                 .Setup(service => service.SendImmediate(
@@ -83,7 +91,8 @@ public class JoinCampaignBaselineSenderTests
                 network.Object,
                 mapTimeTracker.Object,
                 snapshot.Object,
-                timeControl.Object);
+                timeControl.Object,
+                troopXpBaselineProvider.Object);
 
             sender.Send(null!);
 

@@ -145,6 +145,8 @@ jobs:
             "$release_date" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
 
       - name: Stage module
+        env:
+          RELEASE_DATE: ${{ steps.release.outputs.release_date }}
         run: |
           set -eu
           module=release-stage/Coop
@@ -180,10 +182,13 @@ jobs:
             -e "s/\${version}/v$coop_version/g" \
             -e "s/\${game_version}/$game_version/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
-          test "$(grep -Fc "<Name value=\"$nightly_module_name\"/>" "$module/SubModule.xml")" -eq 2
-          grep -Fqx "    <Id value=\"$nightly_module_id\"/>" "$module/SubModule.xml"
-          grep -Fqx '        <Module Id="Coop"/>' "$module/SubModule.xml"
-          ! grep -Fq '<Module Id="CoopNightly"/>' "$module/SubModule.xml"
+          normalized_submodule=$(mktemp)
+          trap 'rm -f "$normalized_submodule"' EXIT
+          tr -d '\r' < "$module/SubModule.xml" > "$normalized_submodule"
+          test "$(grep -Fc "<Name value=\"$nightly_module_name\"/>" "$normalized_submodule")" -eq 2
+          grep -Fqx "    <Id value=\"$nightly_module_id\"/>" "$normalized_submodule"
+          grep -Fqx '        <Module Id="Coop"/>' "$normalized_submodule"
+          ! grep -Fq '<Module Id="CoopNightly"/>' "$normalized_submodule"
 
       - name: Upload unsigned module
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

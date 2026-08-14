@@ -529,7 +529,8 @@ namespace Coop
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
-                campaignGameStarter.AddBehavior(new FixedTownNpcConversationBehavior());
+                if (ContainerProvider.TryResolve<ICoopModulePathResolver>(out var modulePathResolver))
+                    campaignGameStarter.AddBehavior(new FixedTownNpcConversationBehavior(modulePathResolver));
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
                 campaignGameStarter.AddBehavior(new CoopTournamentCampaignBehavior());
             }
@@ -672,7 +673,9 @@ namespace Coop
         {
             // The auto-load-save start path owns this process's startup.
             if (ManagedServerConfig.HasAutoLoadSave) return;
+#if DEBUG
             if (!isServer && isDeferredClientJoin) return;
+#endif
 
             if (isAutoConnect && !_autoStarted &&
                 GameStateManager.Current?.ActiveState is InitialState)

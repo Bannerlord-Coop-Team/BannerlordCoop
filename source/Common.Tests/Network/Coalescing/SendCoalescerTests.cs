@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using LiteNetLib;
 using Moq;
+using System.Runtime.Serialization;
 
 namespace Common.Tests.Network.Coalescing;
 
@@ -30,6 +32,9 @@ public class SendCoalescerTests
     private static int ValueOf(IMessage message) => Assert.IsType<TestMessage>(message).Value;
 
     private static string TagOf(IMessage message) => Assert.IsType<TestMessage>(message).Tag;
+
+    private static NetPeer NewPeer() =>
+        (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
 
     [Fact]
     public void LatestWins_CollapsesToTheLastValue()
@@ -155,6 +160,107 @@ public class SendCoalescerTests
         Assert.Collection(sent,
             first => Assert.Equal("firstUpdated", TagOf(first)),
             second => Assert.Equal("second", TagOf(second)));
+    }
+
+    [Fact]
+    public void Flush_TargetedEntrySendsOnlyToItsPeer()
+    {
+        var peer = NewPeer();
+        var network = new Mock<INetwork>();
+        IMessage sent = null!;
+        network.Setup(n => n.Send(peer, It.IsAny<IMessage>()))
+            .Callback<NetPeer, IMessage>((_, message) => sent = message);
+        var coalescer = new SendCoalescer();
+
+        coalescer.EnqueueToPeer(
+            new CoalesceKey("hero", "h1", "Power"),
+            new LatestWinsPayload(new TestMessage("target", 7)),
+            peer);
+        coalescer.Flush(network.Object);
+
+        Assert.Equal("target", TagOf(sent));
+        network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+        network.Verify(n => n.SendAllBut(It.IsAny<NetPeer>(), It.IsAny<IMessage>()), Times.Never);
+    }
+
+    [Fact]
+    public void Flush_AllButEntryExcludesItsPeer()
+    {
+        var peer = NewPeer();
+        var network = new Mock<INetwork>();
+        IMessage sent = null!;
+        network.Setup(n => n.SendAllBut(peer, It.IsAny<IMessage>()))
+            .Callback<NetPeer, IMessage>((_, message) => sent = message);
+        var coalescer = new SendCoalescer();
+
+        coalescer.EnqueueToAllBut(
+            new CoalesceKey("hero", "h1", "Power"),
+            new LatestWinsPayload(new TestMessage("observer", 8)),
+            peer);
+        coalescer.Flush(network.Object);
+
+        Assert.Equal("observer", TagOf(sent));
+        network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+        network.Verify(n => n.Send(It.IsAny<NetPeer>(), It.IsAny<IMessage>()), Times.Never);
+    }
+
+    [Fact]
+    public void Flush_PreservesEachEntriesDeliveryRouteAndOrder()
+    {
+        var peer = NewPeer();
+        var sends = new List<string>();
+        var network = new Mock<INetwork>();
+        network.Setup(n => n.SendAll(It.IsAny<IMessage>()))
+            .Callback<IMessage>(message => sends.Add("all:" + TagOf(message)));
+        network.Setup(n => n.Send(peer, It.IsAny<IMessage>()))
+            .Callback<NetPeer, IMessage>((_, message) => sends.Add("peer:" + TagOf(message)));
+        network.Setup(n => n.SendAllBut(peer, It.IsAny<IMessage>()))
+            .Callback<NetPeer, IMessage>((_, message) => sends.Add("except:" + TagOf(message)));
+        var coalescer = new SendCoalescer();
+
+        coalescer.Enqueue(new CoalesceKey("all", "h1"),
+            new LatestWinsPayload(new TestMessage("first", 1)));
+        coalescer.EnqueueToPeer(new CoalesceKey("peer", "h1"),
+            new LatestWinsPayload(new TestMessage("second", 2)), peer);
+        coalescer.EnqueueToAllBut(new CoalesceKey("except", "h1"),
+            new LatestWinsPayload(new TestMessage("third", 3)), peer);
+        coalescer.Flush(network.Object);
+
+        Assert.Equal(new[] { "all:first", "peer:second", "except:third" }, sends);
+    }
+
+    [Fact]
+    public void Enqueue_SameKeyWithDifferentRouteThrows()
+    {
+        var coalescer = new SendCoalescer();
+        var key = new CoalesceKey("hero", "h1", "Power");
+        coalescer.Enqueue(key, new LatestWinsPayload(new TestMessage("all", 1)));
+
+        Assert.Throws<InvalidOperationException>(() => coalescer.EnqueueToPeer(
+            key,
+            new LatestWinsPayload(new TestMessage("peer", 2)),
+            NewPeer()));
+    }
+
+    [Fact]
+    public void FlushInstance_UsesTheBufferedTargetedRoute()
+    {
+        var peer = NewPeer();
+        var network = new Mock<INetwork>();
+        var coalescer = new SendCoalescer();
+        coalescer.EnqueueToPeer(
+            new CoalesceKey("hero", "h1", "Power"),
+            new LatestWinsPayload(new TestMessage("h1", 1)),
+            peer);
+        coalescer.Enqueue(
+            new CoalesceKey("hero", "h2", "Power"),
+            new LatestWinsPayload(new TestMessage("h2", 2)));
+
+        coalescer.FlushInstance("h1", network.Object);
+
+        network.Verify(n => n.Send(peer, It.Is<IMessage>(message => TagOf(message) == "h1")), Times.Once);
+        network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+        Assert.True(coalescer.HasPending);
     }
 
     [Fact]
