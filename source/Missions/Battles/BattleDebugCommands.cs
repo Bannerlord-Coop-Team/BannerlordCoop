@@ -120,6 +120,9 @@ internal static class BattleDebugCommands
         private readonly bool originalAiPaused;
         private readonly Agent.MovementControlFlag originalMovementFlags;
         private readonly Vec2 originalMovementInput;
+        private readonly Agent.MortalityState originalMortalityState;
+        private readonly float originalHealth;
+        private bool riderLifeProtected;
         private bool attackHeld;
         private bool releasedAttack;
         private float releasedAtDistance = -1f;
@@ -156,6 +159,14 @@ internal static class BattleDebugCommands
             {
                 originalTarget = rider.GetTargetAgent();
             }
+            if (expectedController == AgentControllerType.Player)
+            {
+                originalMortalityState = rider.CurrentMortalityState;
+                originalHealth = rider.Health;
+                riderLifeProtected = true;
+                rider.SetMortalityState(Agent.MortalityState.Immortal);
+                rider.Health = rider.HealthLimit;
+            }
             attackHeld = true;
         }
 
@@ -187,6 +198,15 @@ internal static class BattleDebugCommands
             }
         }
 
+        public bool RiderActive => rider?.IsActive() == true;
+        public float RiderHealth => RiderActive ? rider.Health : 0f;
+        public float RiderHealthLimit =>
+            RiderActive ? rider.HealthLimit : 0f;
+        public string RiderMortalityState =>
+            RiderActive
+                ? rider.CurrentMortalityState.ToString()
+                : "Unavailable";
+        public bool MountActive => ActiveMount != null;
         public bool RiderPaused =>
             rider?.IsActive() == true && rider.IsPaused;
         public Agent.EventControlFlag RiderEventControlFlags =>
@@ -365,6 +385,12 @@ internal static class BattleDebugCommands
             if (rider == null || !rider.IsActive() || rider.Mission != Mission)
                 return;
 
+            if (riderLifeProtected)
+            {
+                rider.Health = originalHealth;
+                rider.SetMortalityState(originalMortalityState);
+                riderLifeProtected = false;
+            }
             rider.MovementFlags = originalMovementFlags;
             rider.MovementInputVector = originalMovementInput;
             if (expectedController == AgentControllerType.AI)
@@ -992,6 +1018,12 @@ internal static class BattleDebugCommands
             mountDirectionX = driver?.LastMountDirection.X ?? 0f,
             mountDirectionY = driver?.LastMountDirection.Y ?? 0f,
             mountDirectionZ = driver?.LastMountDirection.Z ?? 0f,
+            riderActive = driver?.RiderActive ?? false,
+            riderHealth = driver?.RiderHealth ?? 0f,
+            riderHealthLimit = driver?.RiderHealthLimit ?? 0f,
+            riderMortalityState =
+                driver?.RiderMortalityState ?? "Unavailable",
+            mountActive = driver?.MountActive ?? false,
             riderPaused = driver?.RiderPaused ?? false,
             riderEventControlFlags =
                 (uint)(driver?.RiderEventControlFlags ??
