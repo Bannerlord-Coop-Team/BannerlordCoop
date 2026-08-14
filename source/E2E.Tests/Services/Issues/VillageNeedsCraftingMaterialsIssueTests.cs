@@ -207,8 +207,12 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
 
-            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+            using (new QuestSolutionStartAuthorityGuard())
+            {
+                Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+            }
             quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "host-controller");
         });
 
         Server.Call(() =>
@@ -592,13 +596,23 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
 
         VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest quest = null;
-        Server.Call(() =>
+        foreach (var instance in AllInstances)
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
-            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
-            quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
-        });
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                using (new QuestSolutionStartAuthorityGuard())
+                {
+                    Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+                }
+                var instanceQuest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+                if (instance == Server)
+                {
+                    Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
+                    quest = instanceQuest;
+                }
+            });
+        }
 
         Server.Call(() =>
         {

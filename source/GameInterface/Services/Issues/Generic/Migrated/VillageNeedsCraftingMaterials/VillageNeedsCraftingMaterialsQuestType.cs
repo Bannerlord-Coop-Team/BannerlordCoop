@@ -60,6 +60,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         {
             if (owner?.Issue is not Issue || !owner.Issue.IsOngoingWithoutQuest) return;
 
+            using (new QuestSolutionStartAuthorityGuard())
             using (new Generic.Dispatch.IssueDispatchReplayGuard())
             {
                 Campaign.Current.IssueManager.StartIssueQuest(owner);
@@ -79,6 +80,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         {
             if (owner?.Issue is not Issue) return;
 
+            using (new QuestSolutionStartAuthorityGuard())
             using (new AllowedThread())
             {
                 if (owner.Issue.IsOngoingWithoutQuest)
