@@ -1,4 +1,5 @@
 using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -8,12 +9,15 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Handlers;
 
 internal class IssueConversationHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<IssueConversationHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -39,6 +43,7 @@ internal class IssueConversationHandler : IHandler
         messageBroker.Subscribe<IssueConversationOpenedLocally>(Handle_IssueConversationOpenedLocally);
         messageBroker.Subscribe<RequestIssueConversationOpened>(Handle_RequestIssueConversationOpened);
         messageBroker.Subscribe<NetworkIssueConversationAllowed>(Handle_NetworkIssueConversationAllowed);
+        messageBroker.Subscribe<NetworkIssueConversationDenied>(Handle_NetworkIssueConversationDenied);
     }
 
     public void Dispose()
@@ -46,6 +51,7 @@ internal class IssueConversationHandler : IHandler
         messageBroker.Unsubscribe<IssueConversationOpenedLocally>(Handle_IssueConversationOpenedLocally);
         messageBroker.Unsubscribe<RequestIssueConversationOpened>(Handle_RequestIssueConversationOpened);
         messageBroker.Unsubscribe<NetworkIssueConversationAllowed>(Handle_NetworkIssueConversationAllowed);
+        messageBroker.Unsubscribe<NetworkIssueConversationDenied>(Handle_NetworkIssueConversationDenied);
     }
 
     private void Handle_IssueConversationOpenedLocally(MessagePayload<IssueConversationOpenedLocally> payload)
@@ -72,7 +78,13 @@ internal class IssueConversationHandler : IHandler
         var requester = payload.Who as NetPeer;
         GameThread.RunSafe(() =>
         {
-            if (requester == null || !playerManager.TryGetPlayer(requester, out var player)) return;
+            if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
+            {
+                Logger.Error("Rejecting {Message} from an unregistered/unknown requester for issue-giver {IssueGiver}",
+                    nameof(RequestIssueConversationOpened), issueGiverId);
+                if (requester != null) network.Send(requester, new NetworkIssueConversationDenied(issueGiverId));
+                return;
+            }
 
             if (TryRegisterConversation(issueGiverId, player.ControllerId) &&
                 conversationTracker.TryGetTrackedRequester(issueGiverId, player.ControllerId, out var generation))
@@ -95,6 +107,11 @@ internal class IssueConversationHandler : IHandler
 
             conversationTracker.Register(data.IssueGiverId, controllerIdProvider.ControllerId, data.Generation);
         });
+    }
+
+    private void Handle_NetworkIssueConversationDenied(MessagePayload<NetworkIssueConversationDenied> payload)
+    {
+        Logger.Warning("Server denied a tracked conversation with issue-giver {IssueGiver}", payload.What.IssueGiverId);
     }
 
     private bool TryRegisterConversation(string issueGiverId, string controllerId)

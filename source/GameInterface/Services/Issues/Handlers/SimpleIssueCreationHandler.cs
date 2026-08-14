@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Handlers;
@@ -72,9 +73,17 @@ internal class SimpleIssueCreationHandler : IHandler
 
             if (owner.Issue != null) return;
 
-            if (!SimpleIssueFactoryRegistry.TryConstructAndRegister(data.IssueKey, owner))
+            try
             {
-                Logger.Error("Received NetworkSimpleIssueCreated with unknown IssueKey {Key} for owner {Owner}", data.IssueKey, data.OwnerId);
+                if (!SimpleIssueFactoryRegistry.TryConstructAndRegister(data.IssueKey, owner))
+                {
+                    Logger.Error("Received NetworkSimpleIssueCreated with unknown IssueKey {Key} for owner {Owner}", data.IssueKey, data.OwnerId);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to construct issue for {Message} with IssueKey {Key} for owner {Owner}",
+                    nameof(NetworkSimpleIssueCreated), data.IssueKey, data.OwnerId);
             }
         });
     }
