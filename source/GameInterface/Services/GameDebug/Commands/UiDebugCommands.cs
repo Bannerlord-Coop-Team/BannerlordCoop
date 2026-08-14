@@ -8,6 +8,7 @@ using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
@@ -15,6 +16,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
@@ -163,6 +165,85 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
 
         return "Cleared the local settlement encounter and returned to the campaign map.";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("map_click_offset", "coop.debug.ui")]
+    public static string MapClickOffset(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (args.Count != 2 ||
+            !float.TryParse(args[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetX) ||
+            !float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetY))
+            return "Usage: coop.debug.ui.map_click_offset <offsetX> <offsetY>";
+
+        var mapScreen = MapScreen.Instance;
+        var mainParty = MobileParty.MainParty;
+        if (mapScreen == null || mainParty == null)
+            return "Failed: campaign map or main party is unavailable.";
+        if (PlayerEncounter.Current != null || mainParty.CurrentSettlement != null)
+            return "Leave the active settlement encounter before clicking the campaign map.";
+        if (mainParty.MapEvent != null)
+            return "Cannot click-to-move while the main party is in a map event.";
+
+        var current = mainParty.Position;
+        var offsets = new[]
+        {
+            new Vec2(offsetX, offsetY),
+            new Vec2(-offsetY, offsetX),
+            new Vec2(-offsetX, -offsetY),
+            new Vec2(offsetY, -offsetX),
+        };
+        CampaignVec2 target = default;
+        bool targetFound = false;
+        foreach (var offset in offsets)
+        {
+            var candidate = new CampaignVec2(
+                new Vec2(current.X + offset.x, current.Y + offset.y),
+                current.IsOnLand);
+            if (!candidate.Face.IsValid() ||
+                !mapScreen.MapScene.DoesPathExistBetweenFaces(
+                    candidate.Face.FaceIndex,
+                    mainParty.CurrentNavigationFace.FaceIndex,
+                    false))
+                continue;
+
+            target = candidate;
+            targetFound = true;
+            break;
+        }
+        if (!targetFound)
+            return "No nearby navigable map-click target was found.";
+
+        mapScreen.HandleLeftMouseButtonClick(null, target, target.Face, false);
+
+        return
+            $"Issued a real campaign-map click from {current.X:R},{current.Y:R} " +
+            $"to {target.X:R},{target.Y:R}; time={Campaign.Current.TimeControlMode}; " +
+            $"behavior={mainParty.DefaultBehavior}; target={mainParty.TargetPosition.X:R},{mainParty.TargetPosition.Y:R}.";
+    }
+
+    [CommandLineArgumentFunction("map_movement_state", "coop.debug.ui")]
+    public static string MapMovementState(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.map_movement_state";
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null || Campaign.Current == null)
+            return "Failed: no active campaign or main party.";
+
+        return
+            $"position={mainParty.Position.X:R},{mainParty.Position.Y:R}|" +
+            $"target={mainParty.TargetPosition.X:R},{mainParty.TargetPosition.Y:R}|" +
+            $"behavior={mainParty.DefaultBehavior}|" +
+            $"settlement={mainParty.CurrentSettlement?.StringId ?? "none"}|" +
+            $"encounter={PlayerEncounter.EncounterSettlement?.StringId ?? "none"}|" +
+            $"time={Campaign.Current.TimeControlMode}";
+    }
+#endif
 
     [CommandLineArgumentFunction("switch_menu", "coop.debug.ui")]
     public static string SwitchMenu(List<string> args)
