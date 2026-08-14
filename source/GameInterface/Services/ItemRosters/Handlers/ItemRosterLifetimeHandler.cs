@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -45,15 +46,16 @@ namespace GameInterface.Services.ItemRosters.Handlers
 
         private void Handle(MessagePayload<NetworkCreateItemRoster> payload)
         {
-            var newItemRotster = ObjectHelper.SkipConstructor<ItemRoster>();
-
-            var data = payload.What;
-
-            if (objectManager.AddExisting(data.RosterId, newItemRotster) == false)
+            GameThread.RunSafe(() =>
             {
-                Logger.Error("Failed to add {type} to manager with id {id}", typeof(ItemRoster), data.RosterId);
-                return;
-            }
+                var newItemRoster = ObjectHelper.SkipConstructor<ItemRoster>();
+                var data = payload.What;
+
+                if (objectManager.AddExisting(data.RosterId, newItemRoster) == false)
+                {
+                    Logger.Error("Failed to add {type} to manager with id {id}", typeof(ItemRoster), data.RosterId);
+                }
+            }, context: nameof(NetworkCreateItemRoster));
         }
     }
 }
