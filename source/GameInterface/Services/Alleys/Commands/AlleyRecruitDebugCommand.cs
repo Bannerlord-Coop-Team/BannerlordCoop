@@ -17,7 +17,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -323,10 +322,7 @@ public class AlleyRecruitDebugCommand
     public static string RecruitInventory(List<string> args)
     {
         if (ModInformation.IsServer) return "Run this command on the owning client.";
-        if (args.Count == 0)
-            return "Usage: coop.debug.alley.recruit_inventory <open|trade|purchase|complete|state> [itemId]";
-        if (!args[0].Equals("purchase", StringComparison.OrdinalIgnoreCase) && args.Count != 1)
-            return "Usage: coop.debug.alley.recruit_inventory <open|trade|purchase|complete|state> [itemId]";
+        if (args.Count != 1) return "Usage: coop.debug.alley.recruit_inventory <open|trade|complete|state>";
 
         switch (args[0].ToLowerInvariant())
         {
@@ -340,10 +336,6 @@ public class AlleyRecruitDebugCommand
                 InventoryScreenHelper.ActivateTradeWithCurrentSettlement();
                 RepairLocalPlayerInventoryContext();
                 return "ALLEY_RECRUIT_TRADE_OPENED settlement=town_ES1";
-            case "purchase":
-                if (args.Count != 2)
-                    return "Usage: coop.debug.alley.recruit_inventory purchase <itemId>";
-                return StageDanusticaPurchase(args[1]);
             case "complete":
                 if (!(GameStateManager.Current?.ActiveState is InventoryState))
                     return "No inventory or trade screen is active.";
@@ -358,7 +350,7 @@ public class AlleyRecruitDebugCommand
                        $"mode={inventoryState?.InventoryMode.ToString() ?? "none"} " +
                        $"settlement={Settlement.CurrentSettlement?.StringId ?? "none"}";
             default:
-                return "Usage: coop.debug.alley.recruit_inventory <open|trade|purchase|complete|state> [itemId]";
+                return "Usage: coop.debug.alley.recruit_inventory <open|trade|complete|state>";
         }
     }
 
@@ -402,46 +394,6 @@ public class AlleyRecruitDebugCommand
 
         inventoryLogic.OwnerCharacter = character;
         inventoryLogic.InitialEquipmentCharacter = character;
-    }
-
-    private static string StageDanusticaPurchase(string itemId)
-    {
-        var inventoryState = GameStateManager.Current?.ActiveState as InventoryState;
-        var inventoryLogic = inventoryState?.InventoryLogic;
-        if (inventoryState?.InventoryMode != InventoryScreenHelper.InventoryMode.Trade || inventoryLogic == null)
-            return "Open the Danustica trade screen before staging a purchase.";
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !objectManager.TryGetObjectWithLogging<ItemObject>(itemId, out var item))
-            return $"Unable to resolve item '{itemId}'.";
-
-        var element = inventoryLogic
-            .GetElementsInRoster(InventoryLogic.InventorySide.OtherInventory)
-            .FirstOrDefault(candidate =>
-                candidate.EquipmentElement.Item == item &&
-                candidate.EquipmentElement.ItemModifier == null &&
-                candidate.Amount > 0);
-        if (element.EquipmentElement.Item == null)
-            return $"The Danustica market does not contain unmodified item '{itemId}'.";
-
-        var price = inventoryLogic.GetCostOfItemRosterElement(
-            element,
-            InventoryLogic.InventorySide.OtherInventory);
-        if (price <= 0 || Hero.MainHero.Gold < inventoryLogic.TotalAmount + price)
-            return $"The Danustica purchase is not affordable: item={itemId} price={price}.";
-
-        var previousDebt = inventoryLogic.TotalAmount;
-        inventoryLogic.AddTransferCommand(TransferCommand.Transfer(
-            1,
-            InventoryLogic.InventorySide.OtherInventory,
-            InventoryLogic.InventorySide.PlayerInventory,
-            element,
-            EquipmentIndex.None,
-            EquipmentIndex.None,
-            null));
-        if (inventoryLogic.TotalAmount != previousDebt + price)
-            return $"The Danustica purchase was not staged: item={itemId} price={price}.";
-
-        return $"ALLEY_RECRUIT_TRADE_PURCHASE_STAGED item={itemId} price={price} debt={inventoryLogic.TotalAmount}";
     }
 
     private static bool TryGetAlley(string settlementId, string indexArg, out Alley alley, out string error)
