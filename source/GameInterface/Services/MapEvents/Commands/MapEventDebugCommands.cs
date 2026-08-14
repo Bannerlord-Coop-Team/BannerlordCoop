@@ -876,6 +876,7 @@ public class MapEventDebugCommands
             return false;
         if (!CanStageMountedBattleParty(party))
         {
+            objectManager.TryGetObject(player.HeroId, out Hero diagnosticHero);
             var readiness = new
             {
                 state = "party-not-ready",
@@ -886,6 +887,11 @@ public class MapEventDebugCommands
                 hasMapEvent = party.MapEvent != null,
                 settlementId = party.CurrentSettlement?.StringId,
                 hasMapFaction = party.MapFaction != null,
+                heroExists = diagnosticHero != null,
+                heroIsPrisoner = diagnosticHero?.IsPrisoner ?? false,
+                hasPrisonerParty = diagnosticHero?.PartyBelongedToAsPrisoner != null,
+                leaderMatches = diagnosticHero != null && party.LeaderHero == diagnosticHero,
+                heroPartyMatches = diagnosticHero != null && diagnosticHero.PartyBelongedTo == party,
             };
             error = $"Player {controllerId} must lead an active party on the map, outside settlements and map events." +
                     Environment.NewLine +
