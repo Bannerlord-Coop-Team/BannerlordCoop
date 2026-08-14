@@ -85,6 +85,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Subscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Subscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
         messageBroker.Subscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Subscribe<NetworkBattleSimulationCancelled>(Handle_NetworkBattleSimulationCancelled);
         messageBroker.Subscribe<NetworkCancelBattleSimulation>(Handle_NetworkCancelBattleSimulation);
         messageBroker.Subscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -100,6 +101,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Unsubscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Unsubscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
         messageBroker.Unsubscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Unsubscribe<NetworkBattleSimulationCancelled>(Handle_NetworkBattleSimulationCancelled);
         messageBroker.Unsubscribe<NetworkCancelBattleSimulation>(Handle_NetworkCancelBattleSimulation);
         messageBroker.Unsubscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -263,7 +265,7 @@ internal class BattleSimulationRunHandler : IHandler
 
         if (ServerBattleModeArbiter.ReleaseSimulation(mapEventId))
         {
-            network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
+            network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
             network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
         }
         mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
@@ -689,6 +691,20 @@ internal class BattleSimulationRunHandler : IHandler
 
             BattleSimulationReplay.RequestFinish();
         }, context: nameof(Handle_NetworkBattleSimulationFinished));
+    }
+
+    /// <summary>
+    /// Server confirmed that the unfinished simulation was canceled. Discard the matching
+    /// initiating or spectator replay without invoking normal battle-result handling.
+    /// </summary>
+    private void Handle_NetworkBattleSimulationCancelled(MessagePayload<NetworkBattleSimulationCancelled> payload)
+    {
+        if (ModInformation.IsServer) return;
+        
+        GameThread.RunSafe(() =>
+        {
+            BattleSimulationReplay.ConfirmCancellation(payload.What.MapEventId);
+        }, context: nameof(Handle_NetworkBattleSimulationCancelled));
     }
 
     /// <summary>
