@@ -392,4 +392,31 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
     }
+
+    [Fact]
+    public void DialogueTriggeredAccept_DoesNotCommitLocallyUntilTheServerApproves()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var controllerId = ConnectPlayer(fixture);
+        OpenConversation(fixture, controllerId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Campaign.Current.IssueManager.StartIssueQuest(owner);
+            Assert.Null(owner.Issue.IssueQuest);
+        });
+
+        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptQuest>());
+
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+        Assert.Equal(controllerId, accepted.OwnerControllerId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(owner.Issue.IsSolvingWithQuest);
+        });
+    }
 }

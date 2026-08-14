@@ -170,6 +170,7 @@ public class IssueFinalizationSecurityTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
             using (new AllowedThread())
             {
                 owner.Issue.StartIssueWithQuest();
@@ -198,6 +199,7 @@ public class IssueFinalizationSecurityTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
             using (new AllowedThread())
             {
                 owner.Issue.StartIssueWithQuest();
