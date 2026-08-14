@@ -2367,9 +2367,12 @@ public class VillageHostileActionTests : MapEventTestBase
                         hostileAction.MapEventId)),
                 MapEventDisabledMethods);
 
-            var finished = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+            var cancelled = Assert.Single(
+                Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
 
-            Assert.Equal(hostileAction.MapEventId, finished.MapEventId);
+            Assert.Equal(hostileAction.MapEventId, cancelled.MapEventId);
+            Assert.Empty(
+                Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
 
             var unclaimed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
 
