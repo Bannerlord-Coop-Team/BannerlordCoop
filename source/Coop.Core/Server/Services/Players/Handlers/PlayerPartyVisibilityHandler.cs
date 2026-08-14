@@ -108,6 +108,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         // playerManager's peer link is only needed to resolve the party above, drop it now regardless
         // of what happens below, so a stale peer never resolves to the wrong party
         playerManager.ClearPeer(peer);
+        messageBroker.Publish(this, new PlayerConnectionStateChanged());
 
         GameThread.RunSafe(() =>
         {
