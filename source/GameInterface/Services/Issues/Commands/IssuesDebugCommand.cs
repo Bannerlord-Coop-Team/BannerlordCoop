@@ -134,25 +134,28 @@ public static class IssuesDebugCommand
 
         try
         {
-            switch (outcome)
+            using (new IssueFinalizeAuthorityGuard())
             {
-                case "success":
-                    quest.CompleteQuestWithSuccess();
-                    break;
-                case "cancel":
-                    quest.CompleteQuestWithCancel();
-                    break;
-                case "fail":
-                    quest.CompleteQuestWithFail();
-                    break;
-                case "timeout":
-                    quest.CompleteQuestWithTimeOut();
-                    break;
-                case "betrayal":
-                    quest.CompleteQuestWithBetrayal();
-                    break;
-                default:
-                    return $"Unknown outcome '{outcome}'. {usage}";
+                switch (outcome)
+                {
+                    case "success":
+                        quest.CompleteQuestWithSuccess();
+                        break;
+                    case "cancel":
+                        quest.CompleteQuestWithCancel();
+                        break;
+                    case "fail":
+                        quest.CompleteQuestWithFail();
+                        break;
+                    case "timeout":
+                        quest.CompleteQuestWithTimeOut();
+                        break;
+                    case "betrayal":
+                        quest.CompleteQuestWithBetrayal();
+                        break;
+                    default:
+                        return $"Unknown outcome '{outcome}'. {usage}";
+                }
             }
         }
         catch (Exception ex)
