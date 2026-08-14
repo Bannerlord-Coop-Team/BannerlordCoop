@@ -38,6 +38,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
 
     public AwaitingAlternativeSolutionTroopsTests(ITestOutputHelper output)
     {
+        TestQuestTypeFixture.EnsureVillageNeedsToolsRegistered();
         TestEnvironment = new E2ETestEnvironment(output);
     }
 

@@ -31,6 +31,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
     public GenericQuestTypeAcceptSecurityTests(ITestOutputHelper output)
     {
+        TestQuestTypeFixture.EnsureVillageNeedsToolsRegistered();
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
