@@ -265,6 +265,8 @@ internal static class BattleDebugCommands
 
             rider.SetIsAIPaused(false);
             ApplyInput();
+            mission.SetLastMovementKeyPressed(
+                Agent.MovementControlFlag.Forward);
             inputBoundaryWrites++;
             lastInputBoundarySkipReason = null;
         }
@@ -310,7 +312,9 @@ internal static class BattleDebugCommands
                 ~(Agent.MovementControlFlag.MoveMask |
                   Agent.MovementControlFlag.AttackMask);
             rider.MovementFlags = preservedFlags |
-                Agent.MovementControlFlag.Forward |
+                (expectedController == AgentControllerType.AI
+                    ? Agent.MovementControlFlag.Forward
+                    : Agent.MovementControlFlag.None) |
                 (attackHeld
                     ? Agent.MovementControlFlag.AttackUp
                     : Agent.MovementControlFlag.None);
