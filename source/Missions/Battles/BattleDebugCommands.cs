@@ -262,8 +262,8 @@ internal static class BattleDebugCommands
                 lookDirection = new Vec3(heading.X, heading.Y, 0f);
             lookDirection.Normalize();
 
-            rider.MovementInputVector = new Vec2(0f, 1f);
             rider.SetMovementDirection(in heading);
+            rider.MovementInputVector = new Vec2(0f, 1f);
             rider.LookDirection = lookDirection;
 
             Agent.ActionStage stage = rider.GetCurrentActionStage(1);
