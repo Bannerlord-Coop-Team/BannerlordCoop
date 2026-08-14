@@ -6,7 +6,7 @@
 
         <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
 
-        <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="1160" HeightSizePolicy="Fixed" SuggestedHeight="650"
+        <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="1160" HeightSizePolicy="Fixed" SuggestedHeight="724"
                    HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="20" PositionXOffset="-60"
                    StackLayout.LayoutMethod="HorizontalLeftToRight">
           <Children>
@@ -161,7 +161,74 @@
                                          Command.Click="ActionSearchSteamLobbies" Parameter.Text="@SearchButtonText"/>
                       </Children>
                     </ListPanel>
+                    <!-- Filter Buttons -->
+                    <ListPanel Id="LobbyFilterControls"
+                               WidthSizePolicy="StretchToParent"
+                               HeightSizePolicy="Fixed"
+                               SuggestedHeight="64"
+                               MarginBottom="10"
+                               StackLayout.LayoutMethod="HorizontalLeftToRight">
+                      <Children>
+                        <TextWidget WidthSizePolicy="Fixed"
+                                    SuggestedWidth="120"
+                                    HeightSizePolicy="StretchToParent"
+                                    Brush="Clan.TabControl.Text"
+                                    Brush.FontSize="24"
+                                    Brush.TextHorizontalAlignment="Left"
+                                    Brush.TextVerticalAlignment="Center"
+                                    Text="@PasswordFilterLabelText"/>
 
+                        <Standard.Button Id="PasswordFilterButton"
+                                         WidthSizePolicy="Fixed"
+                                         SuggestedWidth="320"
+                                         HeightSizePolicy="Fixed"
+                                         SuggestedHeight="65"
+                                         VerticalAlignment="Center"
+                                         IsDisabled="@IsSearchSteamLobbiesDisabled"
+                                         Command.Click="ActionCycleSteamLobbyPasswordFilter"
+                                         Parameter.Text="@PasswordFilterButtonText"/>
+
+                        <TextWidget WidthSizePolicy="Fixed"
+                                    SuggestedWidth="230"
+                                    HeightSizePolicy="StretchToParent"
+                                    MarginLeft="30"
+                                    Brush="Clan.TabControl.Text"
+                                    Brush.FontSize="24"
+                                    Brush.TextHorizontalAlignment="Right"
+                                    Brush.TextVerticalAlignment="Center"
+                                    Text="@MinimumPlayersFilterLabelText"/>
+
+						  <BrushWidget WidthSizePolicy="Fixed"
+                                SuggestedWidth="110"
+                                HeightSizePolicy="Fixed"
+                                SuggestedHeight="58"
+                                VerticalAlignment="Center"
+                                MarginLeft="14"
+                                Brush="SaveLoad.Search.Button"
+                                UpdateChildrenStates="true">
+							  <Children>
+								  <IntegerInputTextWidget Id="MinimumPlayersFilterInput"
+														  UpdateChildrenStates="true"
+														  WidthSizePolicy="StretchToParent"
+														  HeightSizePolicy="StretchToParent"
+														  MarginLeft="6"
+														  MarginRight="6"
+														  MarginTop="6"
+														  MarginBottom="6"
+														  Brush="ScoreboardPanels_2"
+														  Brush.AlphaFactor="1"
+														  Brush.FontSize="24"
+														  Brush.TextHorizontalAlignment="Center"
+														  Brush.TextVerticalAlignment="Center"
+														  IntText="@MinimumSteamLobbyPlayers"
+														  MinInt="0"
+														  MaxInt="999"
+														  EnableClamp="true"/>
+							  </Children>
+						  </BrushWidget>
+                      </Children>
+                    </ListPanel>
+                    <!-- End of Filter Buttons -->
                     <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52"
                                 IsVisible="@IsSteamLobbyStatusVisible" Brush="Clan.TabControl.Text"
                                 Brush.FontSize="24" Brush.FontColor="#B8B8B8FF"
