@@ -109,6 +109,8 @@ internal static class BattleDebugCommands
     {
         private const string RequiredWeaponId = "western_spear_4_t4";
         private const float AttackReleaseDistance = 8f;
+        private const float SteeringAlignedDotThreshold = 0.999f;
+        private const float SteeringCrossEpsilon = 0.0001f;
 
         private readonly Agent rider;
         private readonly Agent target;
@@ -135,6 +137,10 @@ internal static class BattleDebugCommands
         private Vec2 lastMovementDirection;
         private Vec3 lastLookDirection;
         private Vec3 lastMountDirection;
+        private float lastSteeringAxis;
+        private float lastSteeringCross;
+        private float lastSteeringDot;
+        private string lastSteeringMode = "not-applied";
         private int lastInputBoundaryThreadId;
         private bool lastInputBoundaryWasGameThread;
 
@@ -188,6 +194,10 @@ internal static class BattleDebugCommands
         public Vec2 LastMovementDirection => lastMovementDirection;
         public Vec3 LastLookDirection => lastLookDirection;
         public Vec3 LastMountDirection => lastMountDirection;
+        public float LastSteeringAxis => lastSteeringAxis;
+        public float LastSteeringCross => lastSteeringCross;
+        public float LastSteeringDot => lastSteeringDot;
+        public string LastSteeringMode => lastSteeringMode;
         private Agent ActiveMount
         {
             get
@@ -266,6 +276,64 @@ internal static class BattleDebugCommands
                    ReferenceEquals(rider, Agent.Main) &&
                    ReferenceEquals(Mission, Mission.Current) &&
                    ReferenceEquals(Mission.InputManager, input);
+        }
+
+        public float GetPlayerSteeringAxis()
+        {
+            Agent mount = ActiveMount;
+            if (mount == null)
+            {
+                SetSteeringState(0f, 0f, 0f, "mount-unavailable");
+                return 0f;
+            }
+
+            Vec2 mountDirection = mount.LookDirection.AsVec2;
+            Vec2 targetDirection = (target.Position - rider.Position).AsVec2;
+            if (mountDirection.LengthSquared <= 0.0001f ||
+                targetDirection.LengthSquared <= 0.0001f)
+            {
+                SetSteeringState(0f, 0f, 0f, "direction-unavailable");
+                return 0f;
+            }
+
+            mountDirection.Normalize();
+            targetDirection.Normalize();
+            float cross =
+                (mountDirection.X * targetDirection.Y) -
+                (mountDirection.Y * targetDirection.X);
+            float dot =
+                (mountDirection.X * targetDirection.X) +
+                (mountDirection.Y * targetDirection.Y);
+            if (dot >= SteeringAlignedDotThreshold)
+            {
+                SetSteeringState(0f, cross, dot, "aligned");
+                return 0f;
+            }
+            if (cross > SteeringCrossEpsilon)
+            {
+                SetSteeringState(-1f, cross, dot, "turn-left");
+                return -1f;
+            }
+            if (cross < -SteeringCrossEpsilon)
+            {
+                SetSteeringState(1f, cross, dot, "turn-right");
+                return 1f;
+            }
+
+            SetSteeringState(-1f, cross, dot, "opposite-left");
+            return -1f;
+        }
+
+        private void SetSteeringState(
+            float axis,
+            float cross,
+            float dot,
+            string mode)
+        {
+            lastSteeringAxis = axis;
+            lastSteeringCross = cross;
+            lastSteeringDot = dot;
+            lastSteeringMode = mode;
         }
 
         public override void OnMissionTick(float dt)
@@ -455,14 +523,23 @@ internal static class BattleDebugCommands
     {
         value = 0f;
         JoustDriverBehavior driver = joustDriver;
-        if (gameAxisKey != "MovementAxisY" ||
-            driver?.CanOverridePlayerInput(input) != true)
+        if (driver?.CanOverridePlayerInput(input) != true)
         {
             return false;
         }
 
-        value = 1f;
-        return true;
+        if (gameAxisKey == "MovementAxisY")
+        {
+            value = 1f;
+            return true;
+        }
+        if (gameAxisKey == "MovementAxisX")
+        {
+            value = driver.GetPlayerSteeringAxis();
+            return true;
+        }
+
+        return false;
     }
 
     internal static bool ShouldHoldJoustAttack(
@@ -1018,6 +1095,10 @@ internal static class BattleDebugCommands
             mountDirectionX = driver?.LastMountDirection.X ?? 0f,
             mountDirectionY = driver?.LastMountDirection.Y ?? 0f,
             mountDirectionZ = driver?.LastMountDirection.Z ?? 0f,
+            steeringAxis = driver?.LastSteeringAxis ?? 0f,
+            steeringCross = driver?.LastSteeringCross ?? 0f,
+            steeringDot = driver?.LastSteeringDot ?? 0f,
+            steeringMode = driver?.LastSteeringMode ?? "inactive",
             riderActive = driver?.RiderActive ?? false,
             riderHealth = driver?.RiderHealth ?? 0f,
             riderHealthLimit = driver?.RiderHealthLimit ?? 0f,
