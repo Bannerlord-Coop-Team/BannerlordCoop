@@ -172,6 +172,34 @@ internal static class BattleDebugCommands
         public Vec2 LastMovementDirection => lastMovementDirection;
         public Vec3 LastLookDirection => lastLookDirection;
         public Vec3 LastMountDirection => lastMountDirection;
+        private Agent ActiveMount
+        {
+            get
+            {
+                if (rider?.IsActive() != true) return null;
+                Agent mount = rider.MountAgent;
+                return mount?.IsActive() == true ? mount : null;
+            }
+        }
+
+        public bool RiderPaused =>
+            rider?.IsActive() == true && rider.IsPaused;
+        public Agent.EventControlFlag RiderEventControlFlags =>
+            rider?.IsActive() == true
+                ? rider.EventControlFlags
+                : (Agent.EventControlFlag)0;
+        public float RiderMaximumSpeedLimit =>
+            rider?.IsActive() == true ? rider.GetMaximumSpeedLimit() : 0f;
+        public AgentControllerType MountController =>
+            ActiveMount?.Controller ?? AgentControllerType.None;
+        public bool MountPaused => ActiveMount?.IsPaused ?? false;
+        public Vec2 MountInputVector =>
+            ActiveMount?.MovementInputVector ?? Vec2.Zero;
+        public Agent.MovementControlFlag MountMovementFlags =>
+            ActiveMount?.MovementFlags ??
+            Agent.MovementControlFlag.None;
+        public float MountMaximumSpeedLimit =>
+            ActiveMount?.GetMaximumSpeedLimit() ?? 0f;
         public int LastInputBoundaryThreadId => lastInputBoundaryThreadId;
         public bool LastInputBoundaryWasGameThread =>
             lastInputBoundaryWasGameThread;
@@ -893,6 +921,22 @@ internal static class BattleDebugCommands
             mountDirectionX = driver?.LastMountDirection.X ?? 0f,
             mountDirectionY = driver?.LastMountDirection.Y ?? 0f,
             mountDirectionZ = driver?.LastMountDirection.Z ?? 0f,
+            riderPaused = driver?.RiderPaused ?? false,
+            riderEventControlFlags =
+                (uint)(driver?.RiderEventControlFlags ??
+                       (Agent.EventControlFlag)0),
+            riderMaximumSpeedLimit =
+                driver?.RiderMaximumSpeedLimit ?? 0f,
+            mountController = driver?.MountController.ToString() ??
+                AgentControllerType.None.ToString(),
+            mountPaused = driver?.MountPaused ?? false,
+            mountMovementInputX = driver?.MountInputVector.X ?? 0f,
+            mountMovementInputY = driver?.MountInputVector.Y ?? 0f,
+            mountMovementFlags =
+                (uint)(driver?.MountMovementFlags ??
+                       Agent.MovementControlFlag.None),
+            mountMaximumSpeedLimit =
+                driver?.MountMaximumSpeedLimit ?? 0f,
             attackHeld = driver?.AttackHeld ?? false,
             attackReleased = driver?.ReleasedAttack ?? false,
             actionStage = driver?.ActionStage.ToString() ??
