@@ -569,7 +569,7 @@ internal static class BattleDebugCommands
                     ? Agent.MovementControlFlag.Forward
                     : Agent.MovementControlFlag.None) |
                 (attackHeld
-                    ? Agent.MovementControlFlag.AttackUp
+                    ? Agent.MovementControlFlag.AttackDown
                     : Agent.MovementControlFlag.None);
 
             lastInputVector = rider.MovementInputVector;
