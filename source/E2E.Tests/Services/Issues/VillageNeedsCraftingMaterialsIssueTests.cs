@@ -261,10 +261,18 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture.HeroId);
 
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+            }
+
             var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("player-A", "", "", "", "")));
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
 
@@ -321,10 +329,18 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         CreateIssueOnServer(fixture.HeroId);
         ForcePromisedPaymentEverywhere(fixture.HeroId);
 
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+            }
+
             var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("player-A", "", "", "", "")));
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
             Assert.True(playerManager.AddPlayer(new Player("player-B", "", "", "", "")));
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
@@ -414,9 +430,11 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
             using (new AllowedThread())
             {
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.CurrentSettlement = settlement;
             }
 
             var playerManager = Server.Resolve<IPlayerManager>();
@@ -476,9 +494,11 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
             using (new AllowedThread())
             {
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.CurrentSettlement = settlement;
             }
 
             var playerManager = Server.Resolve<IPlayerManager>();
