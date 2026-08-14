@@ -1,5 +1,4 @@
 ﻿using TaleWorlds.CampaignSystem.Issues;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.MerchantArmyOfPoachers;
 
@@ -17,6 +16,5 @@ internal static class MerchantArmyOfPoachersQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(MerchantArmyOfPoachersIssueBehavior));
     }
 }

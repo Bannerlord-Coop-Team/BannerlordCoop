@@ -1,7 +1,6 @@
 ﻿using TaleWorlds.CampaignSystem.Party;
 using Issue = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.LandLordCompanyOfTrouble;
 
@@ -23,6 +22,5 @@ internal static class LandLordCompanyOfTroubleQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior));
     }
 }

@@ -2,7 +2,6 @@
 
 using Issue = TaleWorlds.CampaignSystem.Issues.LordsNeedsTutorIssueBehavior.LordsNeedsTutorIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LordsNeedsTutorIssueBehavior.LordsNeedsTutorIssueQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.LordsNeedsTutor;
 
@@ -24,6 +23,5 @@ internal static class LordsNeedsTutorQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.LordsNeedsTutorIssueBehavior));
     }
 }

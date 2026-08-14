@@ -1,5 +1,4 @@
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.Issues.Patches;
 ﻿namespace GameInterface.Services.Issues.Generic.Migrated.LandLordTheArtOfTheTrade;
 
 using Issue = TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue;
@@ -24,6 +23,5 @@ internal static class LandLordTheArtOfTheTradeQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior));
     }
 }

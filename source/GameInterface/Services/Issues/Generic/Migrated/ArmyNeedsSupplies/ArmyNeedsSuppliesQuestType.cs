@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Issues.Patches;
-
-namespace GameInterface.Services.Issues.Generic.Migrated.ArmyNeedsSupplies;
+﻿namespace GameInterface.Services.Issues.Generic.Migrated.ArmyNeedsSupplies;
 
 using Issue = TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior.ArmyNeedsSuppliesIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior.ArmyNeedsSuppliesIssueQuest;
@@ -15,6 +13,5 @@ internal static class ArmyNeedsSuppliesQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior));
     }
 }

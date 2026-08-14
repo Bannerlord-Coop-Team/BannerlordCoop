@@ -1,5 +1,4 @@
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.Issues.Patches;
 ﻿namespace GameInterface.Services.Issues.Generic.Migrated.Smugglers;
 
 using Issue = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssue;
@@ -24,6 +23,5 @@ internal static class SmugglersQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior));
     }
 }

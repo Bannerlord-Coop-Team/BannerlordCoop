@@ -1,6 +1,5 @@
 ﻿using Issue = SandBox.Issues.SnareTheWealthyIssueBehavior.SnareTheWealthyIssue;
 using Quest = SandBox.Issues.SnareTheWealthyIssueBehavior.SnareTheWealthyIssueQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.SnareTheWealthy;
 
@@ -14,6 +13,5 @@ internal static class SnareTheWealthyQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(SandBox.Issues.SnareTheWealthyIssueBehavior));
     }
 }

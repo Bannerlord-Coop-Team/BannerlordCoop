@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Issues.Patches;
-
-namespace GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
+﻿namespace GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 
 using Issue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssueQuest;
@@ -16,6 +14,5 @@ internal static class GangLeaderNeedsWeaponsQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior));
     }
 }

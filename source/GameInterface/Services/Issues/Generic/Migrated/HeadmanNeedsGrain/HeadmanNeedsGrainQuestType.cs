@@ -1,6 +1,5 @@
 ﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.HeadmanNeedsGrain;
 
@@ -27,6 +26,5 @@ internal static class HeadmanNeedsGrainQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior));
     }
 }

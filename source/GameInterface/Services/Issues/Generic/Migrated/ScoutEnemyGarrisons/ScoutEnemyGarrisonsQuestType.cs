@@ -1,7 +1,6 @@
 ﻿using TaleWorlds.CampaignSystem.Party;
 using Issue = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
-using GameInterface.Services.Issues.Patches;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.ScoutEnemyGarrisons;
 
@@ -23,6 +22,5 @@ internal static class ScoutEnemyGarrisonsQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior));
     }
 }

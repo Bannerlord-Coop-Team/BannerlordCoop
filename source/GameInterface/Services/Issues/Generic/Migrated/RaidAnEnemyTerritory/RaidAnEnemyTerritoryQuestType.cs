@@ -1,5 +1,4 @@
 ﻿using GameInterface.Services.Issues.Generic;
-using GameInterface.Services.Issues.Patches;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -26,6 +25,5 @@ internal static class RaidAnEnemyTerritoryQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
-        DisableAllIssueBehaviorsExceptAllowlist.Allowlist.Add(typeof(RaidAnEnemyTerritoryIssueBehavior));
     }
 }
