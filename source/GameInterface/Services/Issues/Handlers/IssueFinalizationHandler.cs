@@ -78,6 +78,14 @@ internal class IssueFinalizationHandler : IHandler
         var reason = payload.What.Reason;
         var requestedGeneration = payload.What.Generation;
         var requester = payload.Who as NetPeer;
+
+        if (!Enum.IsDefined(typeof(IssueFinalizeReason), reason))
+        {
+            Logger.Error("Rejecting {Message} claiming an undefined reason value ({Reason}) for owner {Owner}",
+                nameof(RequestIssueRemoved), reason, ownerId);
+            return;
+        }
+
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
