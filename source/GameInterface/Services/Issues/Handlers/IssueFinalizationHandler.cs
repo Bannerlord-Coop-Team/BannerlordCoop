@@ -121,6 +121,13 @@ internal class IssueFinalizationHandler : IHandler
 
             if (reason == IssueFinalizeReason.QuestSuccess)
             {
+                if (quest == null)
+                {
+                    Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - no ongoing quest to finalize",
+                        nameof(RequestIssueRemoved), ownerId);
+                    return;
+                }
+
                 var validator = QuestTypeRegistry.Get(owner.Issue)?.ValidateQuestSuccess;
                 if (validator != null)
                 {
@@ -195,7 +202,20 @@ internal class IssueFinalizationHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
-            IssueFinalizationSupport.FinalizeMirror(owner, reason);
+
+            Hero truePlayerHero = null;
+            MobileParty ownerParty = null;
+            if (ownershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwnerControllerId) &&
+                playerManager.TryGetPlayer(recordedOwnerControllerId, out var player))
+            {
+                if (player.HeroId != null) objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out truePlayerHero);
+                if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
+            }
+
+            using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
+            {
+                IssueFinalizationSupport.FinalizeMirror(owner, reason);
+            }
         });
     }
 }

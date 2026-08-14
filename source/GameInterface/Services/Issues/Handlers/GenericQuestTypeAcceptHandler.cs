@@ -158,20 +158,30 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
 
             byte[] fieldsBytes = null;
-            if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
+            try
             {
-                var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => canAccept);
-                if (!accepted)
+                if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
                 {
-                    Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
-                    network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
-                    return;
+                    var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => canAccept);
+                    if (!accepted)
+                    {
+                        Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
+                        network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
+                        return;
+                    }
+                    fieldsBytes = bytes;
                 }
-                fieldsBytes = bytes;
+                else
+                {
+                    owner.Issue.StartIssueWithQuest();
+                }
             }
-            else
+            catch (Exception e)
             {
-                owner.Issue.StartIssueWithQuest();
+                Logger.Error(e, "Failed to apply {Message} for owner {Owner} - not broadcasting",
+                    nameof(RequestQuestTypeAcceptQuest), ownerId);
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
+                return;
             }
 
             ownershipRegistry.SetOwner(owner, player.ControllerId);
@@ -338,7 +348,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
         var validatedRoster = player.MobilePartyId != null &&
             objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)
-            ? troopValidator.Validate(claimedRoster, party.MemberRoster)
+            ? troopValidator.Validate(claimedRoster, party.MemberRoster, preserveTroopXp: true)
             : TroopRoster.CreateDummyTroopRoster();
 
         if (validatedRoster.TotalHeroes == 0) return false;

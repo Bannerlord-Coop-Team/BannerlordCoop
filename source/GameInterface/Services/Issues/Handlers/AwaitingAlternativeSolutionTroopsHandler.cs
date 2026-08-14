@@ -127,7 +127,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
             claimedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
         }
 
-        var validatedRoster = troopValidator.Validate(claimedRoster, issue.AlternativeSolutionSentTroops);
+        var validatedRoster = troopValidator.Validate(claimedRoster, issue.AlternativeSolutionSentTroops, preserveTroopXp: true);
         depositedGenerationByOwnerId[payload.What.OwnerId] = currentGeneration;
         troopsRegistry.Deposit(player.ControllerId, validatedRoster);
     }
