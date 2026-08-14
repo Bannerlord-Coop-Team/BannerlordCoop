@@ -570,6 +570,36 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
+    public void IssueFinalized_OrganicUnguardedCall_DoesNotClearOwnershipOrConversationTrackingSinceNothingWasActuallyFinalized()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            Client.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
+            Client.Resolve<IIssueConversationTracker>().Register(ownerId, "player-A", 0);
+
+            owner.Issue.IssueFinalized();
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            Assert.True(Client.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var controllerId));
+            Assert.Equal("player-A", controllerId);
+            Assert.True(Client.Resolve<IIssueConversationTracker>().TryGetTrackedRequester(ownerId, "player-A", out _));
+
+            Assert.NotNull(owner.Issue);
+        });
+    }
+
+    [Fact]
     public void RequestQuestTypeAcceptAlternative_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer()
     {
         var fixture = SetupIssueOwner();
