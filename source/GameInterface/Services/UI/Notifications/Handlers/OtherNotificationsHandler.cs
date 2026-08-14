@@ -64,6 +64,9 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NotifyHeroJoinedParty>(Handle_NotifyHeroJoinedParty);
         messageBroker.Subscribe<NetworkNotifyHeroJoinedParty>(Handle_NetworkNotifyHeroJoinedParty);
 
+        messageBroker.Subscribe<NotifyStillbornDelivery>(Handle_NotifyStillbornDelivery);
+        messageBroker.Subscribe<NetworkNotifyStillbornDelivery>(Handle_NetworkNotifyStillbornDelivery);
+
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
@@ -98,6 +101,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyHeroJoinedParty>(Handle_NotifyHeroJoinedParty);
         messageBroker.Unsubscribe<NetworkNotifyHeroJoinedParty>(Handle_NetworkNotifyHeroJoinedParty);
+
+        messageBroker.Unsubscribe<NotifyStillbornDelivery>(Handle_NotifyStillbornDelivery);
+        messageBroker.Unsubscribe<NetworkNotifyStillbornDelivery>(Handle_NetworkNotifyStillbornDelivery);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -379,6 +385,28 @@ internal class OtherNotificationsHandler : IHandler
             TextObject textObject = GameTexts.FindText("str_companion_added", null);
             StringHelpers.SetCharacterProperties("COMPANION", companion.CharacterObject, textObject, false);
             MBInformationManager.AddQuickInformation(textObject, 0, null, null, "");
+        });
+    }
+
+    private void Handle_NotifyStillbornDelivery(MessagePayload<NotifyStillbornDelivery> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.MotherCharacter, out var motherCharacterId)) return;
+
+            network.SendAll(new NetworkNotifyStillbornDelivery(motherCharacterId));
+        });
+    }
+
+    private void Handle_NetworkNotifyStillbornDelivery(MessagePayload<NetworkNotifyStillbornDelivery> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<CharacterObject>(obj.What.MotherCharacterId, out var motherCharacter)) return;
+
+            TextObject textObject = new TextObject("{=pw4cUPEn}{MOTHER.LINK} has delivered stillborn.", null);
+            StringHelpers.SetCharacterProperties("MOTHER", motherCharacter, textObject, false);
+            InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
         });
     }
 
