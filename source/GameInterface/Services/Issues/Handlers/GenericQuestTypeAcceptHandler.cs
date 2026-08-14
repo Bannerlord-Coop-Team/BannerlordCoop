@@ -94,16 +94,30 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
-            byte[] fieldsBytes = null;
-            if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
-            {
-                var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => true);
-                if (!accepted) return;
-                fieldsBytes = bytes;
-            }
+            if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player)) return;
 
-            ownershipRegistry.SetOwner(owner, hostControllerId);
-            network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, hostControllerId, fieldsBytes));
+            try
+            {
+                byte[] fieldsBytes = null;
+                var started = QuestSolutionStartRunner.RunGuarded(player, () =>
+                {
+                    if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
+                    {
+                        var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => true);
+                        fieldsBytes = bytes;
+                        return accepted;
+                    }
+                    return owner.Issue.StartIssueWithQuest();
+                });
+                if (!started) return;
+
+                ownershipRegistry.SetOwner(owner, hostControllerId);
+                network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, hostControllerId, fieldsBytes));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to start the host's own quest-solution accept for owner {Owner} - not broadcasting", ownerId);
+            }
         }
         else
         {
@@ -160,20 +174,21 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             byte[] fieldsBytes = null;
             try
             {
-                if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
+                var started = QuestSolutionStartRunner.RunGuarded(player, () =>
                 {
-                    var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => canAccept);
-                    if (!accepted)
+                    if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
                     {
-                        Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
-                        network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
-                        return;
+                        var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => canAccept);
+                        fieldsBytes = bytes;
+                        return accepted;
                     }
-                    fieldsBytes = bytes;
-                }
-                else
+                    return owner.Issue.StartIssueWithQuest();
+                });
+                if (!started)
                 {
-                    owner.Issue.StartIssueWithQuest();
+                    Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
+                    network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
+                    return;
                 }
             }
             catch (Exception e)
