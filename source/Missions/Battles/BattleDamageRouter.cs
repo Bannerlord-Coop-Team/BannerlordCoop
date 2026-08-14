@@ -68,6 +68,20 @@ public class BattleDamageRouter : IBattleDamageRouter
     private long routedDamageDebugSequence;
     private const int RoutedDamageDebugHistoryLimit = 2048;
 
+    public sealed class RoutedDamageDebugVector
+    {
+        public RoutedDamageDebugVector(Vec3 value)
+        {
+            X = value.X;
+            Y = value.Y;
+            Z = value.Z;
+        }
+
+        public float X { get; }
+        public float Y { get; }
+        public float Z { get; }
+    }
+
     public sealed class RoutedDamageDebugSnapshot
     {
         public long Sequence { get; set; }
@@ -91,8 +105,8 @@ public class BattleDamageRouter : IBattleDamageRouter
         public float HealthAfter { get; set; }
         public string CollisionResult { get; set; }
         public string VictimHitBodyPart { get; set; }
-        public Vec3 CollisionPosition { get; set; }
-        public Vec3 BlowDirection { get; set; }
+        public RoutedDamageDebugVector CollisionPosition { get; set; }
+        public RoutedDamageDebugVector BlowDirection { get; set; }
         public float AttackProgress { get; set; }
         public float MountedSpeed { get; set; }
         public float TargetDrift { get; set; }
@@ -678,9 +692,10 @@ public class BattleDamageRouter : IBattleDamageRouter
                 pending.Hit.CollisionData.CollisionResult.ToString(),
             VictimHitBodyPart =
                 pending.Hit.CollisionData.VictimHitBodyPart.ToString(),
-            CollisionPosition =
-                pending.Hit.CollisionData.CollisionGlobalPosition,
-            BlowDirection = pending.Hit.Blow.Direction,
+            CollisionPosition = new RoutedDamageDebugVector(
+                pending.Hit.CollisionData.CollisionGlobalPosition),
+            BlowDirection = new RoutedDamageDebugVector(
+                pending.Hit.Blow.Direction),
             AttackProgress = pending.Hit.CollisionData.AttackProgress,
             MountedSpeed = nativeAttacker?.MountAgent?
                 .GetRealGlobalVelocity().AsVec2.Length ?? 0f,
@@ -747,8 +762,10 @@ public class BattleDamageRouter : IBattleDamageRouter
             CollisionResult = damage.CollisionData.CollisionResult.ToString(),
             VictimHitBodyPart =
                 damage.CollisionData.VictimHitBodyPart.ToString(),
-            CollisionPosition = damage.CollisionData.CollisionGlobalPosition,
-            BlowDirection = damage.Blow.Direction,
+            CollisionPosition = new RoutedDamageDebugVector(
+                damage.CollisionData.CollisionGlobalPosition),
+            BlowDirection = new RoutedDamageDebugVector(
+                damage.Blow.Direction),
             AttackProgress = damage.CollisionData.AttackProgress,
             MountedSpeed = attacker?.MountAgent?
                 .GetRealGlobalVelocity().AsVec2.Length ?? 0f,

@@ -16,6 +16,8 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Battles;
 using Missions.Messages;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -155,6 +157,28 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         finally
         {
             harmony.Unpatch(target, HarmonyPatchType.All, harmony.Id);
+        }
+    }
+
+    [Fact]
+    public void RoutedDamageDebugSnapshot_JsonUsesOnlyUppercaseVectorCoordinates()
+    {
+        var snapshot = new BattleDamageRouter.RoutedDamageDebugSnapshot
+        {
+            CollisionPosition = new BattleDamageRouter.RoutedDamageDebugVector(
+                new Vec3(1f, 2f, 3f)),
+            BlowDirection = new BattleDamageRouter.RoutedDamageDebugVector(
+                new Vec3(4f, 5f, 6f)),
+        };
+
+        JObject json = JObject.Parse(JsonConvert.SerializeObject(snapshot));
+
+        foreach (string field in new[] { "CollisionPosition", "BlowDirection" })
+        {
+            var vector = Assert.IsType<JObject>(json[field]);
+            Assert.Equal(
+                new[] { "X", "Y", "Z" },
+                vector.Properties().Select(property => property.Name));
         }
     }
 
