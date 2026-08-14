@@ -64,7 +64,18 @@ public class NetworkJoinCampaignBaselineTests
         var expected = new NetworkJoinCampaignBaseline(
             987654321L,
             TimeControlEnum.Play_2x,
-            new[] { state });
+            new[] { state },
+            troopXpBaselines: new[]
+            {
+                new TroopRosterXpBaseline("member_roster", new[]
+                {
+                    new TroopXpBaselineEntry("member_troop", 123),
+                }),
+                new TroopRosterXpBaseline("prison_roster", new[]
+                {
+                    new TroopXpBaselineEntry("prisoner_troop", 456),
+                }),
+            });
 
         var received = RoundTrip(expected);
 
@@ -72,6 +83,21 @@ public class NetworkJoinCampaignBaselineTests
         Assert.Equal(expected.TimeControlMode, received.TimeControlMode);
         Assert.True(received.IsComplete);
         Assert.Single(received.PartyStates);
+        Assert.Collection(received.TroopXpBaselines,
+            members =>
+            {
+                Assert.Equal("member_roster", members.RosterId);
+                var entry = Assert.Single(members.Entries);
+                Assert.Equal("member_troop", entry.CharacterId);
+                Assert.Equal(123, entry.Xp);
+            },
+            prisoners =>
+            {
+                Assert.Equal("prison_roster", prisoners.RosterId);
+                var entry = Assert.Single(prisoners.Entries);
+                Assert.Equal("prisoner_troop", entry.CharacterId);
+                Assert.Equal(456, entry.Xp);
+            });
     }
 
     [Fact]
