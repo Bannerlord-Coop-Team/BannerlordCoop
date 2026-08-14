@@ -130,6 +130,7 @@ internal static class BattleDebugCommands
         private readonly Vec3 originalRiderLookDirection;
         private readonly Vec3 originalMountPosition;
         private readonly Agent originalTarget;
+        private readonly RidingOrder.RidingOrderEnum originalRidingOrder;
 
         public IncomingAiJoustStage(
             Agent rider,
@@ -160,6 +161,8 @@ internal static class BattleDebugCommands
             originalRiderLookDirection = rider.LookDirection;
             originalMountPosition = mount.Position;
             originalTarget = rider.GetTargetAgent();
+            originalRidingOrder =
+                (RidingOrder.RidingOrderEnum)rider.GetRidingOrder();
         }
 
         public Agent Rider => rider;
@@ -167,6 +170,10 @@ internal static class BattleDebugCommands
         public Guid RiderId => riderId;
         public Guid TargetId => targetId;
         public EquipmentIndex OriginalMainHand => originalMainHand;
+        public int OriginalRidingOrder => (int)originalRidingOrder;
+        public int CurrentRidingOrder => rider?.IsActive() == true
+            ? rider.GetRidingOrder()
+            : -1;
         public float RequestedDistance { get; private set; }
         public Vec3 StagedMountPosition { get; private set; }
         public Vec2 StagedDirection { get; private set; }
@@ -273,6 +280,7 @@ internal static class BattleDebugCommands
                     isMultiplier: false);
                 rider.MovementFlags = originalRiderMovementFlags;
                 rider.MovementInputVector = originalRiderMovementInput;
+                rider.SetRidingOrder(originalRidingOrder);
                 rider.SetTargetAgent(originalTarget);
             }
             if (mount != null && mount.IsActive())
@@ -305,6 +313,7 @@ internal static class BattleDebugCommands
         private readonly EquipmentIndex originalMainHand;
         private readonly AgentControllerType expectedController;
         private readonly Agent originalTarget;
+        private readonly RidingOrder.RidingOrderEnum originalRidingOrder;
         private readonly bool originalAiPaused;
         private readonly Agent.MovementControlFlag originalMovementFlags;
         private readonly Vec2 originalMovementInput;
@@ -365,6 +374,8 @@ internal static class BattleDebugCommands
             if (expectedController == AgentControllerType.AI)
             {
                 originalTarget = rider.GetTargetAgent();
+                originalRidingOrder =
+                    (RidingOrder.RidingOrderEnum)rider.GetRidingOrder();
             }
             if (expectedController == AgentControllerType.Player)
             {
@@ -414,6 +425,14 @@ internal static class BattleDebugCommands
         }
 
         public bool RiderActive => rider?.IsActive() == true;
+        public Agent Rider => rider;
+        public int OriginalRidingOrder =>
+            expectedController == AgentControllerType.AI
+                ? (int)originalRidingOrder
+                : -1;
+        public int CurrentRidingOrder => RiderActive
+            ? rider.GetRidingOrder()
+            : -1;
         public float RiderHealth => RiderActive ? rider.Health : 0f;
         public float RiderHealthLimit =>
             RiderActive ? rider.HealthLimit : 0f;
@@ -638,6 +657,7 @@ internal static class BattleDebugCommands
                 return;
             }
 
+            rider.SetRidingOrder(RidingOrder.RidingOrderEnum.Free);
             rider.SetIsAIPaused(false);
             rider.SetTargetAgent(target);
             ApplyInput();
@@ -839,6 +859,7 @@ internal static class BattleDebugCommands
             rider.MovementInputVector = originalMovementInput;
             if (expectedController == AgentControllerType.AI)
             {
+                rider.SetRidingOrder(originalRidingOrder);
                 rider.SetTargetAgent(originalTarget);
             }
             rider.SetIsAIPaused(originalAiPaused);
@@ -855,6 +876,25 @@ internal static class BattleDebugCommands
                     Agent.WeaponWieldActionType.WithAnimationUninterruptible,
                     isWieldedOnSpawn: false);
             }
+        }
+
+        public void ActivateAiRidingOrderGuard()
+        {
+            if (expectedController == AgentControllerType.AI)
+                rider.SetRidingOrder(RidingOrder.RidingOrderEnum.Free);
+        }
+
+        public void ApplyAiRidingOrderAtNativeTickBoundary(Mission mission)
+        {
+            if (expectedController != AgentControllerType.AI ||
+                !ReferenceEquals(Mission, mission) ||
+                !Active ||
+                rider.Controller != expectedController)
+            {
+                return;
+            }
+
+            rider.SetRidingOrder(RidingOrder.RidingOrderEnum.Free);
         }
 
         public override void OnRemoveBehavior()
@@ -889,6 +929,8 @@ internal static class BattleDebugCommands
 
     internal static void ApplyJoustInputAtNativeTickBoundary(Mission mission)
     {
+        incomingAiJoustDriver?
+            .ApplyAiRidingOrderAtNativeTickBoundary(mission);
         joustDriver?.ApplyInputAtNativeTickBoundary(mission);
     }
 
@@ -1340,14 +1382,32 @@ internal static class BattleDebugCommands
             }
 
             stage.RestoreForStart();
-            incomingAiJoustDriver = new JoustDriverBehavior(
+            var stagedDriver = new JoustDriverBehavior(
                 stage.Rider,
                 stage.Target,
                 stage.RiderId,
                 stage.TargetId,
                 stage.OriginalMainHand,
                 AgentControllerType.AI);
-            Mission.Current.AddMissionBehavior(incomingAiJoustDriver);
+            bool stagedBehaviorAdded = false;
+            try
+            {
+                Mission.Current.AddMissionBehavior(stagedDriver);
+                stagedBehaviorAdded = true;
+                stagedDriver.ActivateAiRidingOrderGuard();
+            }
+            catch (Exception exception)
+            {
+                if (stagedBehaviorAdded)
+                    Mission.Current.RemoveMissionBehavior(stagedDriver);
+                else
+                    stagedDriver.Restore();
+                stage.Restore();
+                incomingAiJoustStage = null;
+                return "INCOMING_AI_JOUST start failed: " +
+                       exception.GetType().Name;
+            }
+            incomingAiJoustDriver = stagedDriver;
             incomingAiJoustStage = null;
             return FormatIncomingAiJoustState();
         }
@@ -1394,14 +1454,30 @@ internal static class BattleDebugCommands
                 isWieldedOnSpawn: false);
         }
 
-        incomingAiJoustDriver = new JoustDriverBehavior(
+        var driver = new JoustDriverBehavior(
             riderInfo.Agent,
             targetInfo.Agent,
             riderInfo.AgentId,
             targetInfo.AgentId,
             originalMainHand,
             AgentControllerType.AI);
-        mission.AddMissionBehavior(incomingAiJoustDriver);
+        bool behaviorAdded = false;
+        try
+        {
+            mission.AddMissionBehavior(driver);
+            behaviorAdded = true;
+            driver.ActivateAiRidingOrderGuard();
+        }
+        catch (Exception exception)
+        {
+            if (behaviorAdded)
+                mission.RemoveMissionBehavior(driver);
+            else
+                driver.Restore();
+            return "INCOMING_AI_JOUST start failed: " +
+                   exception.GetType().Name;
+        }
+        incomingAiJoustDriver = driver;
         return FormatIncomingAiJoustState();
     }
 
@@ -1435,20 +1511,64 @@ internal static class BattleDebugCommands
         {
             IncomingAiJoustStage stage = incomingAiJoustStage;
             if (stage == null)
-                return "INCOMING_AI_JOUST inactive";
+            {
+                return FormatIncomingAiJoustStopState(
+                    "inactive",
+                    Guid.Empty,
+                    -1,
+                    -1);
+            }
 
+            int originalRidingOrder = stage.OriginalRidingOrder;
+            Guid riderAgentId = stage.RiderId;
             stage.Restore();
+            int restoredRidingOrder = stage.CurrentRidingOrder;
             incomingAiJoustStage = null;
-            return "INCOMING_AI_JOUST stopped";
+            return FormatIncomingAiJoustStopState(
+                "stopped",
+                riderAgentId,
+                originalRidingOrder,
+                restoredRidingOrder);
         }
 
+        Agent rider = driver.Rider;
+        Guid driverRiderAgentId = driver.RiderId;
+        int driverOriginalRidingOrder = driver.OriginalRidingOrder;
         Mission mission = driver.Mission;
         if (mission != null)
             mission.RemoveMissionBehavior(driver);
         else
             driver.Restore();
+        int driverRestoredRidingOrder = rider?.IsActive() == true
+            ? rider.GetRidingOrder()
+            : -1;
         incomingAiJoustDriver = null;
-        return "INCOMING_AI_JOUST stopped";
+        return FormatIncomingAiJoustStopState(
+            "stopped",
+            driverRiderAgentId,
+            driverOriginalRidingOrder,
+            driverRestoredRidingOrder);
+    }
+
+    private static string FormatIncomingAiJoustStopState(
+        string state,
+        Guid riderAgentId,
+        int originalRidingOrder,
+        int restoredRidingOrder)
+    {
+        var result = new
+        {
+            state,
+            riderAgentId,
+            originalRidingOrder,
+            restoredRidingOrder,
+            ridingOrderRestored = state == "inactive" ||
+                (originalRidingOrder >= 0 &&
+                 restoredRidingOrder == originalRidingOrder),
+        };
+        return "INCOMING_AI_JOUST " + state +
+               Environment.NewLine +
+               "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(result);
     }
 
     private static string FormatIncomingAiJoustState()
@@ -1463,6 +1583,10 @@ internal static class BattleDebugCommands
             staged = stage?.Active == true,
             riderAgentId = driver?.RiderId ?? stage?.RiderId ?? Guid.Empty,
             targetAgentId = driver?.TargetId ?? stage?.TargetId ?? Guid.Empty,
+            originalRidingOrder = driver?.OriginalRidingOrder ??
+                stage?.OriginalRidingOrder ?? -1,
+            ridingOrder = driver?.CurrentRidingOrder ??
+                stage?.CurrentRidingOrder ?? -1,
             requestedStageDistance = stage?.RequestedDistance ?? -1f,
             stagedDistance = stage?.ActualDistance ?? -1f,
             stagedMountPositionX = stage?.StagedMountPosition.X ?? 0f,
