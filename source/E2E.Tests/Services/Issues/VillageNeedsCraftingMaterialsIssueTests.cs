@@ -600,6 +600,56 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
+    public void RequestQuestTypeAcceptAlternative_RejectedForTheGenuineClaimant_ClearsItsLocallyPopulatedRoster()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+
+        var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.CurrentSettlement = settlement;
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+            }
+            owner.Issue.StartIssueWithAlternativeSolution();
+        });
+
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Assert.Equal(fixture.HeroId, rejected.OwnerId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.Equal(0, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
+        });
+    }
+
+    [Fact]
     public void RequestQuestTypeAcceptAlternative_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer()
     {
         var fixture = SetupIssueOwner();
