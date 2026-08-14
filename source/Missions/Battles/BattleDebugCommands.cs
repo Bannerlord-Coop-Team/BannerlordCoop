@@ -148,10 +148,10 @@ internal static class BattleDebugCommands
             this.expectedController = expectedController;
             originalMovementFlags = rider.MovementFlags;
             originalMovementInput = rider.MovementInputVector;
+            originalAiPaused = rider.IsPaused;
             if (expectedController == AgentControllerType.AI)
             {
                 originalTarget = rider.GetTargetAgent();
-                originalAiPaused = rider.IsPaused;
             }
             attackHeld = true;
         }
@@ -263,6 +263,7 @@ internal static class BattleDebugCommands
                 return;
             }
 
+            rider.SetIsAIPaused(false);
             ApplyInput();
             inputBoundaryWrites++;
             lastInputBoundarySkipReason = null;
@@ -333,8 +334,8 @@ internal static class BattleDebugCommands
             if (expectedController == AgentControllerType.AI)
             {
                 rider.SetTargetAgent(originalTarget);
-                rider.SetIsAIPaused(originalAiPaused);
             }
+            rider.SetIsAIPaused(originalAiPaused);
             if (originalMainHand == EquipmentIndex.None)
             {
                 rider.TryToSheathWeaponInHand(
