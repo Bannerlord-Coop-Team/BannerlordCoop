@@ -109,6 +109,7 @@ internal static class BattleDebugCommands
     {
         private const string RequiredWeaponId = "western_spear_4_t4";
         private const float AttackReleaseDistance = 8f;
+        private const float AttackRearmDistance = 10f;
         private const float SteeringDeadZoneRadians = 0.0174533f;
         private const float SteeringFullAxisRadians = 0.5235988f;
         private const float SteeringCrossEpsilon = 0.0001f;
@@ -130,6 +131,8 @@ internal static class BattleDebugCommands
         private bool attackHeld;
         private bool releasedAttack;
         private float releasedAtDistance = -1f;
+        private float maximumReleasedAtDistance = -1f;
+        private int attackReleaseCount;
         private int drivenFrames;
         private int inputBoundaryWrites;
         private int skippedInputBoundaryWrites;
@@ -193,7 +196,11 @@ internal static class BattleDebugCommands
         public bool AttackHeld => attackHeld;
         public bool ReleasedAttack => releasedAttack;
         public float AttackReleaseThreshold => AttackReleaseDistance;
+        public float AttackRearmThreshold => AttackRearmDistance;
         public float ReleasedAtDistance => releasedAtDistance;
+        public float MaximumReleasedAtDistance =>
+            maximumReleasedAtDistance;
+        public int AttackReleaseCount => attackReleaseCount;
         public int InputBoundaryWrites => inputBoundaryWrites;
         public int SkippedInputBoundaryWrites => skippedInputBoundaryWrites;
         public string LastInputBoundarySkipReason => lastInputBoundarySkipReason;
@@ -531,7 +538,14 @@ internal static class BattleDebugCommands
 
             Agent.ActionStage stage = rider.GetCurrentActionStage(1);
             float targetDistance = TargetDistance;
-            if (!releasedAttack &&
+            if (releasedAttack &&
+                !attackHeld &&
+                stage == Agent.ActionStage.None &&
+                targetDistance > AttackRearmDistance)
+            {
+                attackHeld = true;
+            }
+            if (attackHeld &&
                 targetDistance >= 0f &&
                 targetDistance <= AttackReleaseDistance &&
                 (stage == Agent.ActionStage.AttackReady ||
@@ -540,6 +554,10 @@ internal static class BattleDebugCommands
                 attackHeld = false;
                 releasedAttack = true;
                 releasedAtDistance = targetDistance;
+                maximumReleasedAtDistance = Math.Max(
+                    maximumReleasedAtDistance,
+                    targetDistance);
+                attackReleaseCount++;
             }
 
             Agent.MovementControlFlag preservedFlags =
@@ -1074,7 +1092,12 @@ internal static class BattleDebugCommands
             attackReleased = driver?.ReleasedAttack ?? false,
             attackReleaseThreshold =
                 driver?.AttackReleaseThreshold ?? 0f,
+            attackRearmThreshold =
+                driver?.AttackRearmThreshold ?? 0f,
             releasedAtDistance = driver?.ReleasedAtDistance ?? -1f,
+            maximumReleasedAtDistance =
+                driver?.MaximumReleasedAtDistance ?? -1f,
+            attackReleaseCount = driver?.AttackReleaseCount ?? 0,
             actionStage = driver?.ActionStage.ToString() ??
                 Agent.ActionStage.None.ToString(),
             targetDistance = driver?.TargetDistance ?? -1f,
@@ -1264,7 +1287,12 @@ internal static class BattleDebugCommands
             attackReleased = driver?.ReleasedAttack ?? false,
             attackReleaseThreshold =
                 driver?.AttackReleaseThreshold ?? 0f,
+            attackRearmThreshold =
+                driver?.AttackRearmThreshold ?? 0f,
             releasedAtDistance = driver?.ReleasedAtDistance ?? -1f,
+            maximumReleasedAtDistance =
+                driver?.MaximumReleasedAtDistance ?? -1f,
+            attackReleaseCount = driver?.AttackReleaseCount ?? 0,
             actionStage = driver?.ActionStage.ToString() ??
                 Agent.ActionStage.None.ToString(),
             targetDistance = driver?.TargetDistance ?? -1f,
