@@ -48,6 +48,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) &&
             ownershipRegistry.TryGetOwnerControllerId(owner, out _)) return;
 
+        using (new IssueFinalizeAuthorityGuard())
         using (new AllowedThread())
         {
             owner.Issue.CompleteIssueWithCancel();

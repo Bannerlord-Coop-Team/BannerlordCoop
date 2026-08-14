@@ -492,6 +492,84 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
+    public void AlternativeSolutionCompletionRunner_CompleteOnServer_ActuallyFinalizesTheServersOwnIssue()
+    {
+        var fixture = SetupIssueOwner();
+
+        var villageId = TestEnvironment.CreateRegisteredObject<Village>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Village>(villageId, out var village));
+            using (new AllowedThread())
+            {
+                settlement.SetSettlementComponent(village);
+                village.Bound = settlement;
+                village.Hearth = 650f;
+                owner.Occupation = Occupation.RuralNotable;
+            }
+        });
+
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+
+        var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var eligibleTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.MemberRoster.AddToCounts(eligibleTroop, 6);
+                party.CurrentSettlement = settlement;
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, 6);
+            }
+            owner.Issue.StartIssueWithAlternativeSolution();
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(owner.Issue.IsSolvingWithAlternative);
+            var issue = (IssueBase)owner.Issue;
+
+            using (new AllowedThread())
+            {
+                AlternativeSolutionCompletionRunner.CompleteOnServer(owner, issue);
+            }
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var ownerAfter));
+            Assert.Null(ownerAfter.Issue);
+        });
+    }
+
+    [Fact]
     public void RequestQuestTypeAcceptAlternative_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer()
     {
         var fixture = SetupIssueOwner();
