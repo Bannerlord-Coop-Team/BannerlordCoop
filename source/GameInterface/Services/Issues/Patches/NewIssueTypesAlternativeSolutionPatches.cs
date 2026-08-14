@@ -1,4 +1,5 @@
 using Common;
+using Common.Logging;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
@@ -6,6 +7,7 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -18,6 +20,8 @@ namespace GameInterface.Services.Issues.Patches;
 [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.RegisterEvents))]
 internal class NewIssueTypesAlternativeSolutionCompletionPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<NewIssueTypesAlternativeSolutionCompletionPatches>();
+
     private static readonly ConditionalWeakTable<IssuesCampaignBehavior, object> listenerRegistered = new();
 
     [HarmonyPostfix]
@@ -45,7 +49,14 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
             if (QuestTypeRegistry.Get(kvp.Value)?.SupportsAlternativeAccept != true) continue;
             if (!ownershipRegistry.IsLocalPeerOwner(kvp.Key)) continue;
 
-            TryTriggerOwnedAlternativeSolutionCompletion(kvp.Value);
+            try
+            {
+                TryTriggerOwnedAlternativeSolutionCompletion(kvp.Value);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to trigger owned alternative-solution completion for owner {Owner} - skipping, other due issues this tick are unaffected", kvp.Key);
+            }
         }
     }
 
