@@ -703,7 +703,16 @@ internal class BattleSimulationRunHandler : IHandler
         
         GameThread.RunSafe(() =>
         {
+            if (!BattleSimulationReplay.IsActiveFor(payload.What.MapEventId)) return;
+
+            bool isSpectator = BattleSimulationReplay.IsSpectator;
+            
             BattleSimulationReplay.ConfirmCancellation(payload.What.MapEventId);
+
+            if (isSpectator && Game.Current?.GameStateManager?.ActiveState is MapState mapState )
+            {
+                mapState.EndBattleSimulation();
+            }
         }, context: nameof(Handle_NetworkBattleSimulationCancelled));
     }
 
