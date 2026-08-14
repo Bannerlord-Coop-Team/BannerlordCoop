@@ -1,21 +1,22 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
-using Common;
 using Common.Util;
 using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using SandBox.GauntletUI;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ScreenSystem;
-using SandBox.GauntletUI;
 
 namespace Coop.Core.Client.Services.Kingdoms.Handlers;
 
@@ -62,6 +63,8 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<RulingClanChanged>(HandleRulingClanChanged);
         messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Subscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
+        messageBroker.Subscribe<KingdomUnresolvedDecisionRequest>(HandleKingdomUnresolvedDecisionRequest);
+        messageBroker.Subscribe<ClientKingdomUnresolvedDecision>(HandleClientKingdomUnresolvedDecision);
     }
 
     private void HandleKingdomCreationRequested(MessagePayload<KingdomCreationRequested> obj)
@@ -411,6 +414,24 @@ public class ClientKingdomHandler : IHandler
         network.SendAll(new NetworkRulingClanChanged(kingdomId, clanId));
     }
 
+    private void HandleKingdomUnresolvedDecisionRequest(MessagePayload<KingdomUnresolvedDecisionRequest> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.PlayerKingdom, out var playerKingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.TargetKingdom, out var targetKingdomId)) return;
+
+        network.SendAll(new KingdomUnresolvedDecision(playerKingdomId, targetKingdomId));
+    }
+    private void HandleClientKingdomUnresolvedDecision(MessagePayload<ClientKingdomUnresolvedDecision> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            KingdomDiplomacyVMPatches._peaceDecisionResult =
+            obj.What.Result == UnresolvedDecisionResult.HasPeaceOffer
+            ? UnresolvedDecisionResult.HasPeaceOffer
+            : UnresolvedDecisionResult.NoPeaceOffer;
+        });
+    }
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
@@ -426,6 +447,8 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<RulingClanChanged>(HandleRulingClanChanged);
         messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Unsubscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
+        messageBroker.Unsubscribe<KingdomUnresolvedDecisionRequest>(HandleKingdomUnresolvedDecisionRequest);
+        messageBroker.Unsubscribe<ClientKingdomUnresolvedDecision>(HandleClientKingdomUnresolvedDecision);
     }
 
     private readonly struct PendingSettlementRestore

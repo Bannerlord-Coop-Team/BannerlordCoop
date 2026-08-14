@@ -690,7 +690,9 @@ namespace GameInterface.Services.Kingdoms
                 outcomeKey,
                 notificationText));
 
-            if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex))
+            // Redirect p2p peace offers to the target kingdom instead of applying peace immediately.
+            if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex)
+                && !CoopKingdomElection.TryRedirectPlayerPeaceOffer(state.Decision, chosenOutcome))
             {
                 state.Election.ApplyChosenOutcomeCoop();
             }

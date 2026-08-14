@@ -1,6 +1,6 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
-using Common;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Kingdoms.Messages;
@@ -8,14 +8,16 @@ using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.Kingdoms.Handlers;
 
@@ -57,6 +59,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<NetworkAddDecision>(HandleNetworkAddDecision);
         messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
         messageBroker.Subscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
+        messageBroker.Subscribe<KingdomUnresolvedDecision>(HandleKingdomUnresolvedDecision);
     }
 
     private void HandleNetworkRequestCreateKingdom(MessagePayload<NetworkRequestCreateKingdom> obj)
@@ -300,6 +303,26 @@ public class ServerKingdomHandler : IHandler
     {
         return objectManager.TryGetIdWithLogging(kingdom, out kingdomId);
     }
+    private void HandleKingdomUnresolvedDecision(MessagePayload<KingdomUnresolvedDecision> obj)
+    {
+        if (!(obj.Who is NetPeer peer)) return;
+        var payload = obj.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.PlayerKingdomId, out var playerKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.TargetKingdomId, out var targetKingdom)) return;
+
+            UnresolvedDecisionResult result =
+            targetKingdom.UnresolvedDecisions
+            .OfType<MakePeaceKingdomDecision>()
+            .Any(d => d.Kingdom == targetKingdom
+            && d.FactionToMakePeaceWith == playerKingdom
+            && !d.ShouldBeCancelled())
+            ? UnresolvedDecisionResult.HasPeaceOffer
+            : UnresolvedDecisionResult.NoPeaceOffer;
+            network.Send(peer, new ClientKingdomUnresolvedDecision(result));
+        });
+    }
 
     public void Dispose()
     {
@@ -314,6 +337,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
         messageBroker.Unsubscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
         messageBroker.Unsubscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
+        messageBroker.Unsubscribe<KingdomUnresolvedDecision>(HandleKingdomUnresolvedDecision);
     }
 
     private readonly struct PendingSettlementRestore

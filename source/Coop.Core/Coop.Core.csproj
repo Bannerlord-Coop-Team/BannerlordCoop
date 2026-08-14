@@ -103,6 +103,7 @@
 	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Server\Services\Kingdoms\Messages\KingdomUnresolvedDecision.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkAddDecision.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkKingdomNameChanged.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />

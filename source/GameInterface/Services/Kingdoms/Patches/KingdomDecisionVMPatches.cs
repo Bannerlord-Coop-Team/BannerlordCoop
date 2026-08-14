@@ -1,14 +1,16 @@
-﻿using GameInterface;
-using GameInterface.Services.Kingdoms;
+﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.Kingdoms.Extentions;
+using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Policies;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -50,6 +52,22 @@ namespace GameInterface.Services.Kingdoms.Patches
         internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
         {
             return ContainerProvider.TryResolve(out voteManager);
+        }
+
+        // Bypass vanilla's single-clan shortcut so the receiving player gets the normal peace decision UI and vote.
+        [HarmonyPatch(typeof(KingdomDecisionsVM), nameof(KingdomDecisionsVM.RefreshWith))]
+        [HarmonyPrefix]
+        private static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
+        {
+            if (!CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || !decision.IsSingleClanDecision())
+                return true;
+
+            __instance._shouldCheckForDecision = false;
+            DecisionItemBaseVM decisionItem = __instance.GetDecisionItemBasedOnType(decision);
+
+            __instance.CurrentDecision = decisionItem;
+            __instance.CurrentDecision.SetDoneInputKey(__instance.DoneInputKey);
+            return false;
         }
     }
 
@@ -161,8 +179,9 @@ namespace GameInterface.Services.Kingdoms.Patches
     }
 
     [HarmonyPatch(typeof(KingdomDiplomacyVM))]
-    internal class KingdomDiplomacyVMPatches
+    public class KingdomDiplomacyVMPatches
     {
+        public static UnresolvedDecisionResult _peaceDecisionResult;
         [HarmonyPatch(nameof(KingdomDiplomacyVM.RefreshValues))]
         [HarmonyPostfix]
         internal static void RefreshValuesPostfix(KingdomDiplomacyVM __instance)
@@ -233,6 +252,46 @@ namespace GameInterface.Services.Kingdoms.Patches
             yield return Clan.PlayerClan.Kingdom.UnresolvedDecisions
                 .OfType<TradeAgreementDecision>()
                 .FirstOrDefault(decision => decision.TargetKingdom == faction);
+        }
+
+        /// <summary>
+        /// Kingdom.UnresolveDecisions is not uniformly synchronized,
+        /// so we have to send a request to the server,
+        /// to ask if there is a peace offer in the enemy's unresolved decisions.
+        [HarmonyPatch(nameof(KingdomDiplomacyVM.GetIsProposingPeaceEnabledWithReason))]
+        [HarmonyPrefix]
+        private static bool GetIsProposingPeaceEnabledWithReasonPrefix(
+        KingdomDiplomacyVM __instance,
+        KingdomWarItemVM item,
+        float actionInfluenceCost,
+        ref TextObject disabledReason,
+        ref bool __result)
+        {
+            if (item == null || Clan.PlayerClan?.Kingdom == null)
+                return true;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = item.Faction2 as Kingdom;
+
+            if (targetKingdom == null)
+                return true;
+
+            MessageBroker.Instance.Publish(__instance, new KingdomUnresolvedDecisionRequest(playerKingdom, targetKingdom));
+
+            _peaceDecisionResult = UnresolvedDecisionResult.Waiting;
+
+            GameThread.WaitWhilePumping(() =>
+            _peaceDecisionResult != UnresolvedDecisionResult.Waiting,
+            DateTime.UtcNow.AddSeconds(5));
+
+            if (_peaceDecisionResult == UnresolvedDecisionResult.NoPeaceOffer)
+            {
+                return true;
+            }
+            __result = false;
+            disabledReason = new TextObject("You have already offered peace to this kingdom.");
+            _peaceDecisionResult = UnresolvedDecisionResult.Waiting;
+            return false;
         }
     }
 
