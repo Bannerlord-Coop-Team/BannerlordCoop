@@ -577,8 +577,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     // Player heroes handled separately
                     if (hero.IsPlayerHero()) continue;
 
-                    bool heroIsDead = hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInBattle 
-                        || hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInLabor;
+                    bool heroIsDead = hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None;
 
                     if (heroIsDead || hero.Occupation == Occupation.Special) continue;
 

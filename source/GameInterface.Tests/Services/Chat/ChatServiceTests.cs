@@ -1,3 +1,4 @@
+using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using GameInterface.Services.Chat;
@@ -5,6 +6,10 @@ using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
+using GameInterface.Services.UI.CoopOptions.Providers.ChatTab.Sections;
+using GameInterface.Services.UI.Messages;
 using Moq;
 using Xunit;
 
@@ -55,14 +60,42 @@ public class ChatServiceTests
         playerManager.VerifyGet(manager => manager.Players, Times.Never);
     }
 
+    [Fact]
+    public void VisibilityOption_LoadsAndAppliesWithoutRecreatingService()
+    {
+        var options = new CoopOptionsData();
+        options.SetSection(
+            ChatOptionsTabProvider.TabId,
+            ChatSection.SectionId,
+            new ChatSectionOptions { ShowChat = false });
+        var optionsStore = new Mock<ICoopOptionsStore>();
+        optionsStore.Setup(store => store.LoadOrDefault()).Returns(options);
+        using var messageBroker = new MessageBroker();
+        using var service = CreateService(optionsStore: optionsStore, messageBroker: messageBroker);
+
+        Assert.False(service.IsChatEnabled);
+
+        messageBroker.Publish(this, new ChatVisibilitySelected(true));
+
+        Assert.True(service.IsChatEnabled);
+    }
+
     private static ChatService CreateService(
         Mock<INetwork>? network = null,
         Mock<IPlayerManager>? playerManager = null,
-        Mock<IChatPlayerNameResolver>? playerNameResolver = null)
+        Mock<IChatPlayerNameResolver>? playerNameResolver = null,
+        Mock<ICoopOptionsStore>? optionsStore = null,
+        IMessageBroker? messageBroker = null)
     {
         network ??= new Mock<INetwork>();
         playerManager ??= new Mock<IPlayerManager>();
         playerNameResolver ??= new Mock<IChatPlayerNameResolver>();
+        if (optionsStore == null)
+        {
+            optionsStore = new Mock<ICoopOptionsStore>();
+            optionsStore.Setup(store => store.LoadOrDefault()).Returns(new CoopOptionsData());
+        }
+        messageBroker ??= new MessageBroker();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns("local");
 
@@ -70,7 +103,9 @@ public class ChatServiceTests
             network.Object,
             playerManager.Object,
             playerNameResolver.Object,
-            controllerIdProvider.Object);
+            controllerIdProvider.Object,
+            optionsStore.Object,
+            messageBroker);
     }
 
     private static Player Player(string controllerId)

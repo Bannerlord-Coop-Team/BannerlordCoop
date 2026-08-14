@@ -1,7 +1,11 @@
+using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
+using GameInterface.Services.UI.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +26,7 @@ public sealed class ChatService : IChatService, IDisposable
     private readonly IPlayerManager playerManager;
     private readonly IChatPlayerNameResolver playerNameResolver;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IMessageBroker messageBroker;
     private readonly ChatVM viewModel;
     private readonly ChatOverlay overlay;
 
@@ -29,15 +34,20 @@ public sealed class ChatService : IChatService, IDisposable
         INetwork network,
         IPlayerManager playerManager,
         IChatPlayerNameResolver playerNameResolver,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        ICoopOptionsStore optionsStore,
+        IMessageBroker messageBroker)
     {
         this.network = network;
         this.playerManager = playerManager;
         this.playerNameResolver = playerNameResolver;
         this.controllerIdProvider = controllerIdProvider;
+        this.messageBroker = messageBroker;
 
         viewModel = new ChatVM(message => network.SendAll(message), () => controllerIdProvider.ControllerId);
-        overlay = new ChatOverlay(viewModel, RequestParticipants);
+        var showChat = ChatOptionsTabProvider.GetShowChatOrDefault(optionsStore.LoadOrDefault());
+        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat);
+        messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
     }
 
     public void Initialize()
@@ -72,11 +82,19 @@ public sealed class ChatService : IChatService, IDisposable
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
         overlay.Dispose();
     }
+
+    internal bool IsChatEnabled => overlay.IsEnabled;
 
     internal void RequestParticipants()
     {
         network.SendAll(new NetworkRequestChatParticipants());
+    }
+
+    private void HandleChatVisibilitySelected(MessagePayload<ChatVisibilitySelected> payload)
+    {
+        overlay.SetEnabled(payload.What.ShowChat);
     }
 }

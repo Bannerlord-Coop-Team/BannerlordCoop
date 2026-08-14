@@ -15,6 +15,15 @@ using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI;
+/// <summary>
+/// Available password-status filters for hosted steam lobbies
+/// </summary>
+public enum SteamLobbyPasswordFilter
+{
+    Any,
+    NoPassword,
+    PasswordRequired,
+}
 
 /// <summary>View model for direct connection and public standalone Steam-lobby discovery.</summary>
 public class CoopConnectMenuVM : ViewModel, IDisposable
@@ -31,6 +40,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     private CoopConnectionTabVM selectedTab;
     private string steamLobbyHostSearchText = string.Empty;
+    private SteamLobbyPasswordFilter steamLobbyPasswordFilter;
+    private int minimumSteamLobbyPlayers;
     private string steamLobbyStatusText = string.Empty;
     private bool isRefreshingSteamLobbies;
     private bool disposed;
@@ -60,6 +71,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         : ((filteredSteamLobbyCount - 1) / SteamLobbyPageSize) + 1;
     public string HostSearchLabelText => "Host Name";
     public string HostSearchPlaceholderText => "Type a host name...";
+    public string PasswordFilterLabelText => "Password";
+    public string MinimumPlayersFilterLabelText => "Minimum Players";
     public string HostColumnText => "Host Name";
     public string ConnectedPlayersColumnText => "Connected Players";
     public string PasswordColumnText => "Access";
@@ -79,6 +92,14 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     [DataSourceProperty]
     public HintViewModel PasswordHint { get; } = new HintViewModel(new TextObject(
         "The session password set by the host. Leave empty if the host has not set one."));
+
+    [DataSourceProperty]
+    public string PasswordFilterButtonText => SteamLobbyPasswordFilter switch
+    {
+        SteamLobbyPasswordFilter.NoPassword => "No Password",
+        SteamLobbyPasswordFilter.PasswordRequired => "Password Required",
+        _ => "Any Password",
+    };
 
     public string connectIP = "localhost";
     public string connectPort = "4200";
@@ -110,6 +131,41 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     [DataSourceProperty]
     public MBBindingList<SteamLobbyListItemVM> SteamLobbies { get; }
 
+    [DataSourceProperty]
+    public SteamLobbyPasswordFilter SteamLobbyPasswordFilter
+    {
+        get => steamLobbyPasswordFilter;
+        private set
+        {
+            if (steamLobbyPasswordFilter == value) return;
+            steamLobbyPasswordFilter = value;
+            OnPropertyChanged(nameof(SteamLobbyPasswordFilter));
+            OnPropertyChanged(nameof(PasswordFilterButtonText));
+
+            if (!disposed && !IsRefreshingSteamLobbies)
+            {
+                ApplySteamLobbyHostFilter(resetPage: true);
+            }
+        }
+    }
+    [DataSourceProperty]
+    public int MinimumSteamLobbyPlayers
+    {
+        get => minimumSteamLobbyPlayers;
+        set
+        {
+            value = Math.Max(0, value);
+            if (minimumSteamLobbyPlayers == value) return;
+
+            minimumSteamLobbyPlayers = value;
+            OnPropertyChanged(nameof(MinimumSteamLobbyPlayers));
+
+            if (!disposed && !IsRefreshingSteamLobbies)
+            {
+                ApplySteamLobbyHostFilter(resetPage: true);
+            }
+        }
+    }
     [DataSourceProperty]
     public string SteamLobbyHostSearchText
     {
@@ -241,6 +297,17 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
+    public void ActionCycleSteamLobbyPasswordFilter()
+    {
+        if (disposed || IsRefreshingSteamLobbies) return;
+
+        SteamLobbyPasswordFilter = SteamLobbyPasswordFilter switch
+        {
+            SteamLobbyPasswordFilter.Any => SteamLobbyPasswordFilter.NoPassword,
+            SteamLobbyPasswordFilter.NoPassword => SteamLobbyPasswordFilter.PasswordRequired,
+            _ => SteamLobbyPasswordFilter.Any,
+        };
+    }
     public void ActionRefreshSteamLobbies()
     {
         if (disposed || IsRefreshingSteamLobbies) return;
@@ -425,7 +492,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         string searchText = SteamLobbyHostSearchText.Trim();
         var filteredLobbies = discoveredSteamLobbies
             .Where(lobby => searchText.Length == 0 ||
-                lobby.HostText.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+                            lobby.HostText.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+            .Where(MatchesSteamLobbyPasswordFilter)
+            .Where(lobby => lobby.ConnectedPlayers >= MinimumSteamLobbyPlayers)
             .ToList();
 
         filteredSteamLobbyCount = filteredLobbies.Count;
@@ -460,8 +529,18 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
         else
         {
-            SteamLobbyStatusText = $"No hosts match '{searchText}'.";
+            SteamLobbyStatusText = "No hosted Steam lobbies match the current filters.";
         }
+    }
+
+    private bool MatchesSteamLobbyPasswordFilter(SteamLobbyListItemVM lobby)
+    {
+        return SteamLobbyPasswordFilter switch
+        {
+            SteamLobbyPasswordFilter.NoPassword => !lobby.PasswordRequired,
+            SteamLobbyPasswordFilter.PasswordRequired => lobby.PasswordRequired,
+            _ => true,
+        };
     }
 
     private void ClearSteamLobbyDisplay()

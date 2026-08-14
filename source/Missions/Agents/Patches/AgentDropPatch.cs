@@ -11,6 +11,7 @@ namespace Missions.Agents.Patches
     /// Patch on DropItem for WeaponDropHandler
     /// </summary>
     [HarmonyPatch(typeof(Agent), "DropItem")]
+    [HarmonyPatchCategory(MissionModule.WeaponDropPatchCategory)]
     public class AgentDropPatch
     {
         static void Prefix(out HashSet<SpawnedItemEntity> __state)

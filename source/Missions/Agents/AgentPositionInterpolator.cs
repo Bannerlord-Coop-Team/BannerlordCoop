@@ -1,4 +1,7 @@
-﻿using Missions.Agents.Packets;
+﻿using Common.Logging;
+using Missions.Agents.Packets;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -55,6 +58,8 @@ public interface IAgentPositionInterpolator
 /// </summary>
 public class AgentPositionInterpolator : IAgentPositionInterpolator
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AgentPositionInterpolator>();
+
     // Snap only when the replicated owner is far enough away that local locomotion has clearly diverged.
     private const float RiderSnapDistance = 6f;
     private const float MountSnapDistance = 12f;
@@ -64,14 +69,21 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float MountedFollowRate = 12f;
     private const float MountedPositionEpsilon = 0.0001f;
     private const float MountedGuardPositionTolerance = 0.15f;
-
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
         new Dictionary<Agent, long>();
+    private readonly INetworkAgentRegistry agentRegistry;
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
     private long updateSequence;
+
+    public AgentPositionInterpolator() : this(null) { }
+
+    internal AgentPositionInterpolator(INetworkAgentRegistry agentRegistry)
+    {
+        this.agentRegistry = agentRegistry;
+    }
 
     public void SetRiderTarget(Agent agent, AgentData data)
     {
@@ -226,6 +238,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
+            // A point-owned puppet's facing belongs to the point it is using — a look write per
+            // native cycle is exactly the churn that spun seated NPCs.
+            if (LocationPoseLock.IsPointOwned(agent))
+                continue;
+
             TargetFrame target = pair.Value;
             if (agent.MountAgent != null && target.HasMountSnapPosition)
             {
@@ -245,6 +262,12 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         elapsed += dt;
         if (_targets.Count == 0) return;
 
+        int trackedBefore = _targets.Count;
+        int staleTargets = 0;
+        float oldestStaleAge = 0f;
+        Agent oldestStaleAgent = null;
+        TargetFrame oldestStaleTarget = default;
+
         foreach (var pair in _targets)
         {
             Agent agent = pair.Key;
@@ -257,9 +280,17 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             }
 
             // A stale target (owner stopped reporting) expires instead of pinning the puppet to an old position.
-            if (elapsed - pair.Value.UpdatedAt > StaleTargetSeconds)
+            float targetAge = elapsed - pair.Value.UpdatedAt;
+            if (targetAge > StaleTargetSeconds)
             {
                 _evict.Add(agent);
+                staleTargets++;
+                if (oldestStaleAgent == null || targetAge > oldestStaleAge)
+                {
+                    oldestStaleAge = targetAge;
+                    oldestStaleAgent = agent;
+                    oldestStaleTarget = pair.Value;
+                }
                 continue;
             }
 
@@ -270,6 +301,14 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
+            // A settlement puppet USING a scene point (seated, at an animation point) is owned by
+            // that point: the point's own machinery aligns it, animates it and holds it — on this
+            // client exactly as on the host, because the puppet uses the SAME local point
+            // (replicated semantically via NetworkNpcPointUse). Driving movement here would only
+            // fight it. When the use ends, the point plays its leave action and this seek resumes.
+            if (LocationPoseLock.IsPointOwned(agent))
+                continue;
+
             // A mount tolerates more slack before we snap; an on-foot rider is held tighter.
             float snapDistance = agent.IsMount ? MountSnapDistance : RiderSnapDistance;
             if (agent.Position.Distance(pair.Value.Position) <= snapDistance)
@@ -278,6 +317,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 Teleport(agent, pair.Value);
             pair.Value.AgentState.Apply(agent);
         }
+
+        if (staleTargets > 0)
+            LogStaleTargets(staleTargets, trackedBefore, oldestStaleAge, oldestStaleAgent, oldestStaleTarget);
 
         if (_evict.Count > 0)
         {
@@ -290,6 +332,50 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         }
     }
 
+    private void LogStaleTargets(
+        int staleTargets,
+        int trackedBefore,
+        float oldestAge,
+        Agent sampleAgent,
+        TargetFrame sampleTarget)
+    {
+        Guid agentId = Guid.Empty;
+        string authority = null;
+        string movementScope = null;
+        ushort movementId = 0;
+        if (agentRegistry != null && agentRegistry.TryGetAgentInfo(sampleAgent, out var info))
+        {
+            agentId = info.AgentId;
+            authority = info.CurrentAuthority;
+            movementScope = info.MovementScopeId;
+            movementId = info.MovementId;
+        }
+
+        Logger.Warning(
+            "[BattleDesync] Expired {StaleTargets} active movement target(s): trackedBefore={TrackedBefore} " +
+            "oldestAge={OldestAge:0.000}s sampleAgentId={AgentId} sampleAuthority={Authority} " +
+            "sampleMovementIdentity={MovementScope}/{MovementId} sampleIndex={AgentIndex} sampleName={AgentName} " +
+            "sampleHealth={Health:0.0} sampleController={Controller} sampleAiControlled={AiControlled} " +
+            "sampleSpeed={Speed:0.00} sampleDistance={Distance:0.00} samplePosition={Position} " +
+            "sampleTarget={Target} sampleSequence={Sequence}",
+            staleTargets,
+            trackedBefore,
+            oldestAge,
+            agentId,
+            authority,
+            movementScope,
+            movementId,
+            sampleAgent.Index,
+            sampleAgent.Name,
+            sampleAgent.Health,
+            sampleAgent.Controller,
+            sampleAgent.IsAIControlled,
+            sampleAgent.GetRealGlobalVelocity().AsVec2.Length,
+            sampleAgent.Position.Distance(sampleTarget.Position),
+            sampleAgent.Position,
+            sampleTarget.Position,
+            sampleTarget.UpdateSequence);
+    }
     private static void MoveTowardTarget(Agent agent, TargetFrame target)
     {
         Vec2 targetPosition = target.Position.AsVec2;
