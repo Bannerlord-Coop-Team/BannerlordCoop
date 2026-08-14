@@ -6,6 +6,7 @@ using Missions.Agents.Packets;
 using Newtonsoft.Json;
 #if DEBUG
 using Missions.Diagnostics;
+using TaleWorlds.InputSystem;
 #endif
 using System;
 using System.Collections.Generic;
@@ -220,6 +221,16 @@ internal static class BattleDebugCommands
             target.IsActive() &&
             target.Mission == Mission;
 
+        public bool CanOverridePlayerInput(InputContext input)
+        {
+            return expectedController == AgentControllerType.Player &&
+                   Active &&
+                   rider.Controller == expectedController &&
+                   ReferenceEquals(rider, Agent.Main) &&
+                   ReferenceEquals(Mission, Mission.Current) &&
+                   ReferenceEquals(Mission.InputManager, input);
+        }
+
         public override void OnMissionTick(float dt)
         {
             if (expectedController != AgentControllerType.AI ||
@@ -388,6 +399,33 @@ internal static class BattleDebugCommands
     internal static void ApplyJoustInputAtNativeTickBoundary(Mission mission)
     {
         joustDriver?.ApplyInputAtNativeTickBoundary(mission);
+    }
+
+    internal static bool TryGetJoustMovementAxis(
+        InputContext input,
+        string gameAxisKey,
+        out float value)
+    {
+        value = 0f;
+        JoustDriverBehavior driver = joustDriver;
+        if (gameAxisKey != "MovementAxisY" ||
+            driver?.CanOverridePlayerInput(input) != true)
+        {
+            return false;
+        }
+
+        value = 1f;
+        return true;
+    }
+
+    internal static bool ShouldHoldJoustAttack(
+        InputContext input,
+        int gameKey)
+    {
+        JoustDriverBehavior driver = joustDriver;
+        return gameKey == 9 &&
+               driver?.AttackHeld == true &&
+               driver.CanOverridePlayerInput(input);
     }
 
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]

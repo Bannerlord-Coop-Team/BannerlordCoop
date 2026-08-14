@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using TaleWorlds.InputSystem;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -50,6 +51,51 @@ internal static class JoustInputBoundaryPatch
         {
             throw new InvalidOperationException(
                 $"Expected two Mission agent-tick dispatches, found {boundaryCount}.");
+        }
+    }
+}
+
+[HarmonyPatch(
+    typeof(InputContext),
+    nameof(InputContext.GetGameKeyAxis),
+    new[] { typeof(string) })]
+[HarmonyPatchCategory(MissionModule.LiveTestInputPatchCategory)]
+internal static class JoustMovementAxisInputPatch
+{
+    [HarmonyPostfix]
+    internal static void Postfix(
+        InputContext __instance,
+        string gameKey,
+        ref float __result)
+    {
+        if (BattleDebugCommands.TryGetJoustMovementAxis(
+                __instance,
+                gameKey,
+                out float value))
+        {
+            __result = value;
+        }
+    }
+}
+
+[HarmonyPatch(
+    typeof(InputContext),
+    nameof(InputContext.IsGameKeyDown),
+    new[] { typeof(int) })]
+[HarmonyPatchCategory(MissionModule.LiveTestInputPatchCategory)]
+internal static class JoustAttackInputPatch
+{
+    [HarmonyPostfix]
+    internal static void Postfix(
+        InputContext __instance,
+        int gameKey,
+        ref bool __result)
+    {
+        if (BattleDebugCommands.ShouldHoldJoustAttack(
+                __instance,
+                gameKey))
+        {
+            __result = true;
         }
     }
 }
