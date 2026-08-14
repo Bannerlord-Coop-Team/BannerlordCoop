@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Factions>
+  <Faction
+    id="coop_team"
+    initial_home_settlement="Settlement.town_S1"
+    banner_key="11.247.166.1528.1528.764.764.1.0.0.111.250.171.483.483.749.758.0.0.0"
+    color="FF192026"
+    color2="FFFFFFFF"
+    culture="Culture.sturgia"
+    default_party_template="PartyTemplate.kingdom_hero_party_mercenary_sturgia_template"
+    settlement_banner_mesh="encounter_flag_f"
+    is_minor_faction="true"
+    is_clan_type_mercenary="true"
+    name="{=!}Coop Team"
+    tier="4">
+    <minor_faction_character_templates>
+      <template id="NPCCharacter.coop_team_lord_another_joke" />
+      <template id="NPCCharacter.coop_team_lord_hasted" />
+      <template id="NPCCharacter.coop_team_lord_curzek" />
+      <template id="NPCCharacter.coop_team_lord_shotup" />
+    </minor_faction_character_templates>
+  </Faction>
+</Factions>

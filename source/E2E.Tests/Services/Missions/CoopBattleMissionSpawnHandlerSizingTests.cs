@@ -201,6 +201,20 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             defenderMissingReserveAccepted: true));
     }
 
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void EndConditionHold_HideoutControllersRetainNativeOwnership(
+        bool hasHideoutMissionController,
+        bool hasHideoutAmbushMissionController,
+        bool expected)
+    {
+        Assert.Equal(expected, CoopBattleController.ShouldManageBattleEndLogic(
+            hasHideoutMissionController,
+            hasHideoutAmbushMissionController));
+    }
+
     [Fact]
     public void MigrationRecoveryTargets_LargeArmyReserves_StayWithinJointBattleSize()
     {

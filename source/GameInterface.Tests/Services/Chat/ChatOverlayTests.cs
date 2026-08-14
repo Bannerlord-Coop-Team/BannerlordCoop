@@ -58,14 +58,55 @@ public class ChatOverlayTests
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]
     [InlineData(false, false, true)]
-    public void CloseInput_IsAvailableWheneverChatIsOpen(
-        bool escapePressed,
-        bool controllerCancelPressed,
+    public void CloseInput_UsesCancelReleaseAndTogglePress(
+        bool escapeReleased,
+        bool controllerCancelReleased,
         bool controllerTogglePressed)
     {
         Assert.True(ChatOverlay.ShouldCloseInput(
-            escapePressed,
-            controllerCancelPressed,
+            escapeReleased,
+            controllerCancelReleased,
             controllerTogglePressed));
+    }
+
+    [Theory]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, true, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, false, false)]
+    public void CloseKeyPress_CapturesPassiveChatUntilRelease(
+        bool inputFocused,
+        bool escapePressed,
+        bool controllerCancelPressed,
+        bool expected)
+    {
+        Assert.Equal(expected, ChatOverlay.ShouldCaptureCloseInput(
+            inputFocused,
+            escapePressed,
+            controllerCancelPressed));
+    }
+
+    [Theory]
+    [InlineData(true, true, false, true, false, true)]
+    [InlineData(true, true, false, false, true, true)]
+    [InlineData(false, true, false, true, false, false)]
+    [InlineData(true, false, false, true, false, false)]
+    [InlineData(true, true, true, true, false, false)]
+    [InlineData(true, true, true, false, true, false)]
+    [InlineData(true, true, false, false, false, false)]
+    public void Presentation_IsLimitedToUnobstructedGameplay(
+        bool isEnabled,
+        bool isGameplayScreen,
+        bool isConversationActive,
+        bool isGameplayLayerFocused,
+        bool isChatLayerFocused,
+        bool expected)
+    {
+        Assert.Equal(expected, ChatOverlay.ShouldShowPresentation(
+            isEnabled,
+            isGameplayScreen,
+            isConversationActive,
+            isGameplayLayerFocused,
+            isChatLayerFocused));
     }
 }

@@ -156,7 +156,19 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
             int numberDelta = cur.number - init.number;
             int woundedDelta = cur.wounded - init.wounded;
-            int xpDelta = cur.xp - init.xp;
+            int currentXp = cur.xp;
+            if (cur.number == 0)
+            {
+                currentXp = 0;
+            }
+
+            int initialXp = init.xp;
+            if (init.number == 0)
+            {
+                initialXp = 0;
+            }
+
+            int xpDelta = currentXp - initialXp;
             if (numberDelta == 0 && woundedDelta == 0 && xpDelta == 0)
                 continue;
 
@@ -202,7 +214,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
                     finalWounded > finalNumber ||
                     finalXp < 0 ||
                     finalXp > int.MaxValue ||
-                    (finalNumber == 0 && finalXp != 0))
+                    (elementData.Xp != 0 && finalNumber == 0 && finalXp != 0))
                 {
                     Logger.Warning(
                         "Rejected troop roster delta for {CharacterId}: current=({CurrentNumber},{CurrentWounded},{CurrentXp}) delta=({NumberDelta},{WoundedDelta},{XpDelta})",

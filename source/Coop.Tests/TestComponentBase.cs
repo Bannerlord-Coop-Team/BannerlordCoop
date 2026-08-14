@@ -9,6 +9,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.Heroes.Interaces;
@@ -31,6 +32,7 @@ using Coop.Core.Server.Services.MobileParties;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI;
 using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.UI.JoinCancel;
 using GameInterface.Services.Villages.Interfaces;
 using Moq;
 using Serilog;
@@ -97,6 +99,7 @@ internal abstract class TestComponentBase
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
+        RegisterMock<IMapEventLoadCleaner>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
         RegisterMock<ITimeControlInterface>(builder);
@@ -104,6 +107,7 @@ internal abstract class TestComponentBase
         RegisterMock<IMapTimeTrackerInterface>(builder);
         RegisterMock<IJoinCampaignBaselineSender>(builder);
         RegisterMock<ILoadingInterface>(builder);
+        RegisterMock<IJoinAttemptOverlay>(builder);
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMobilePartyInterface>(builder);
@@ -121,6 +125,8 @@ internal abstract class TestComponentBase
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
+        // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
+        RegisterMock<ILocationHostRegistry>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);

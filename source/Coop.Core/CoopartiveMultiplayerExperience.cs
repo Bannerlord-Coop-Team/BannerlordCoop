@@ -52,6 +52,11 @@ namespace Coop.Core
         // A spawned server has to load the whole campaign save before it binds its port.
         public static readonly TimeSpan HostedServerStartTimeout = TimeSpan.FromMinutes(5);
 
+        public const string StartRefusedNotice =
+            "Another co-op session is still starting; try joining again shortly";
+        private const string HostClientStartFailedNotice =
+            "Could not start the co-op client; the standalone server remains open until you close it";
+
         public CoopartiveMultiplayerExperience(
             bool standaloneServerProcess = false,
             Action<string> setCrashPhase = null)
@@ -103,7 +108,10 @@ namespace Coop.Core
                 EnableSteamInvites = connectMessage.EnableSteamInvites,
             };
 
-            StartAsClient(configuration, advertisementConfig);
+            if (!StartAsClient(configuration, advertisementConfig, JoinIntent.PlayerDirect))
+            {
+                InformationManager.DisplayMessage(new InformationMessage(StartRefusedNotice));
+            }
         }
 
         private void Handle(MessagePayload<AttemptHost> obj)
@@ -198,7 +206,12 @@ namespace Coop.Core
 
             try
             {
-                StartAsClient(configuration, advertisementConfig);
+                if (!StartAsClient(configuration, advertisementConfig, JoinIntent.HostLoopback))
+                {
+                    hostedSession = false;
+                    InformationManager.DisplayMessage(new InformationMessage(HostClientStartFailedNotice));
+                    return;
+                }
 
                 container.Resolve<SteamJoinWatchdog>().Arm(configuration.Address, configuration.Port,
                     timeout: HostedServerStartTimeout,
@@ -212,8 +225,7 @@ namespace Coop.Core
                 Logger.Error(ex, "Hosted co-op session failed to start");
                 hostedSession = false;
                 DestroyContainer();
-                InformationManager.DisplayMessage(new InformationMessage(
-                    "Could not start the co-op client; the standalone server remains open until you close it"));
+                InformationManager.DisplayMessage(new InformationMessage(HostClientStartFailedNotice));
             }
         }
 
@@ -330,7 +342,12 @@ namespace Coop.Core
 
             try
             {
-                StartAsClient(configuration);
+                // A refusal leaves the process-wide tunnel and lobby to the start still in flight.
+                if (!StartAsClient(configuration, intent: JoinIntent.PlayerSteam))
+                {
+                    InformationManager.DisplayMessage(new InformationMessage(StartRefusedNotice));
+                    return;
+                }
 
                 container.Resolve<SteamJoinWatchdog>().Arm(prepared.Address, prepared.Port, prepared.Tunneled);
             }
@@ -560,20 +577,28 @@ namespace Coop.Core
             }
         }
 
-        public void StartAsClient(INetworkConfig configuration = null, SessionAdvertisementConfig advertisementConfig = null)
+        /// <returns>
+        /// <see langword="false"/> when the start was refused because another one is still in flight,
+        /// so callers do not act on a container that belongs to that other attempt.
+        /// </returns>
+        public bool StartAsClient(
+            INetworkConfig configuration = null,
+            SessionAdvertisementConfig advertisementConfig = null,
+            JoinIntent intent = JoinIntent.PlayerDirect)
         {
             lock (containerGate)
             {
-                StartAsClientCore(configuration, advertisementConfig);
+                return StartAsClientCore(configuration, advertisementConfig, intent);
             }
         }
 
-        private void StartAsClientCore(
+        private bool StartAsClientCore(
             INetworkConfig configuration,
-            SessionAdvertisementConfig advertisementConfig)
+            SessionAdvertisementConfig advertisementConfig,
+            JoinIntent intent)
         {
             // A second Host or Join click while patches are still applying would tear down the in-flight start
-            if (coopStarting) return;
+            if (coopStarting) return false;
 
             DestroyContainer();
             setCrashPhase("starting-client");
@@ -594,6 +619,11 @@ namespace Coop.Core
                 builder.RegisterInstance(advertisementConfig).AsSelf().SingleInstance();
             }
 
+            // Null config is the debug auto-connect entry point.
+            var joinConfig = configuration ?? this.configuration;
+            var presentation = JoinAttemptPresentation.For(intent, joinConfig.Address, joinConfig.Port);
+            builder.RegisterInstance(presentation).AsSelf().SingleInstance();
+
             container = builder.Build();
 
             GameInterface.ContainerProvider.SetContainer(container);
@@ -609,14 +639,17 @@ namespace Coop.Core
 
             if (loadingInterface.IsLoadingScreenAvailable)
             {
-                loadingInterface.ShowLoadingScreen("Connecting to Coop Server", "Applying patches...");
+                // Marshalled: Steam callbacks arrive off the game thread.
+                GameThread.RunSafe(
+                    () => loadingInterface.ShowLoadingScreen(presentation.Title, "Applying patches..."),
+                    context: "PrimeJoinAttemptLoadingScreen");
 
                 PatchAllOffGameThread(gameInterface, loadingInterface, () =>
                 {
                     setCrashPhase("connecting");
                     container.Resolve<ILogic>().Start();
                 });
-                return;
+                return true;
             }
 
             setCrashPhase("applying-patches");
@@ -626,6 +659,8 @@ namespace Coop.Core
             var logic = container.Resolve<ILogic>();
             setCrashPhase("connecting");
             logic.Start();
+
+            return true;
         }
 
         private void DestroyContainer()
