@@ -23,13 +23,15 @@ internal sealed class MainHeroSubstitutionScope : IDisposable
         previousPlayerFaction = campaign?.PlayerDefaultFaction;
         previousResolvedMainHero = ResolvedMainHeroContext.ResolvedMainHero;
 
+        if (playerHero == null) return;
+
         if (game != null)
-            game.PlayerTroop = playerHero?.CharacterObject;
+            game.PlayerTroop = playerHero.CharacterObject;
         if (campaign != null)
         {
             if (playerParty != null)
                 campaign.MainParty = playerParty;
-            if (playerHero?.Clan != null)
+            if (playerHero.Clan != null)
                 campaign.PlayerDefaultFaction = playerHero.Clan;
         }
         ResolvedMainHeroContext.ResolvedMainHero = playerHero;

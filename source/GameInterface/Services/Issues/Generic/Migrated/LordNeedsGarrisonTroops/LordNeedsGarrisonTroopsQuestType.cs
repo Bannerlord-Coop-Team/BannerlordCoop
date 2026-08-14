@@ -20,6 +20,7 @@ internal static class LordNeedsGarrisonTroopsQuestType
     static LordNeedsGarrisonTroopsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("LordNeedsGarrisonTroops")
+            .WithQuestSolutionAccept()
             .WithAlternativeAccept()
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .Build();

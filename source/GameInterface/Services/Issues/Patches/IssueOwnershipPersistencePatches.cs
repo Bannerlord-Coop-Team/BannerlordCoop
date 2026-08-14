@@ -1,5 +1,8 @@
+using Common.Logging;
 using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -10,6 +13,8 @@ namespace GameInterface.Services.Issues.Patches;
 [HarmonyPatch(typeof(IssuesCampaignBehavior))]
 internal class IssueOwnershipPersistencePatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(IssueOwnershipPersistencePatches));
+
     private const string SaveKey = "_coop_issue_ownership";
     private const string GenerationSaveKey = "_coop_issue_generation";
 
@@ -20,6 +25,18 @@ internal class IssueOwnershipPersistencePatches
         if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return;
         if (!ContainerProvider.TryResolve<IIssueGenerationRegistry>(out var generationRegistry)) return;
 
+        try
+        {
+            SyncDataInternal(dataStore, ownershipRegistry, generationRegistry);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to sync issue ownership/generation save data - registries may be left partially restored");
+        }
+    }
+
+    private static void SyncDataInternal(IDataStore dataStore, IIssueOwnershipRegistry ownershipRegistry, IIssueGenerationRegistry generationRegistry)
+    {
         List<IssueOwnershipSaveData> saveData = null;
         if (dataStore.IsSaving)
         {

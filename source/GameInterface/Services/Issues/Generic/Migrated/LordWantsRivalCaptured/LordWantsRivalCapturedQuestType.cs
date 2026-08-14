@@ -12,10 +12,10 @@ internal static class LordWantsRivalCapturedQuestType
 {
     private static bool ValidateQuestSuccess(Issue issue, MobileParty party)
     {
-        if (party == null) return false;
         if (issue.IssueQuest is not Quest quest) return false;
+        if (quest._targetHero?.IsDead == true) return true;
 
-        return party.PrisonRoster.GetTroopRoster().Any(x => x.Character.IsHero && x.Character.HeroObject == quest._targetHero);
+        return party != null && party.PrisonRoster.GetTroopRoster().Any(x => x.Character.IsHero && x.Character.HeroObject == quest._targetHero);
     }
 
     static LordWantsRivalCapturedQuestType()
