@@ -232,19 +232,26 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             var hostControllerId = payload.What.ControllerId;
             if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player)) return;
 
-            var state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
-
-            byte[] fieldsBytes = null;
-            if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
+            try
             {
-                var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
-                if (!accepted) return;
-                fieldsBytes = bytes;
-            }
+                var state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
 
-            ownershipRegistry.SetOwner(owner, hostControllerId);
-            var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, state, fieldsBytes, hostTroops));
+                byte[] fieldsBytes = null;
+                if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
+                {
+                    var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
+                    if (!accepted) return;
+                    fieldsBytes = bytes;
+                }
+
+                ownershipRegistry.SetOwner(owner, hostControllerId);
+                var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+                network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, state, fieldsBytes, hostTroops));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to start the host's own alternative-solution accept for owner {Owner} - not broadcasting", ownerId);
+            }
         }
         else
         {

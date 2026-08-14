@@ -33,20 +33,15 @@ public static class AlternativeSolutionStartRunner
         }
     }
 
-    private static IDisposable ResolveOwnerScope(Player truePlayer)
+    private static MainHeroSubstitutionScope ResolveOwnerScope(Player truePlayer)
     {
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return NullScope.Instance;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(truePlayer.HeroId, out var trueOwnerHero)) return NullScope.Instance;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            throw new InvalidOperationException("ResolveOwnerScope: IObjectManager is not resolvable");
+        if (!objectManager.TryGetObjectWithLogging<Hero>(truePlayer.HeroId, out var trueOwnerHero))
+            throw new InvalidOperationException($"ResolveOwnerScope: could not resolve true owner Hero {truePlayer.HeroId}");
 
         objectManager.TryGetObjectWithLogging<MobileParty>(truePlayer.MobilePartyId, out var trueOwnerParty);
 
         return new MainHeroSubstitutionScope(trueOwnerHero, trueOwnerParty);
-    }
-
-    private sealed class NullScope : IDisposable
-    {
-        public static readonly NullScope Instance = new();
-
-        public void Dispose() { }
     }
 }
