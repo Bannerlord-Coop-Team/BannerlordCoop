@@ -3,6 +3,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -49,6 +50,14 @@ internal class IssueFinalizedPatches
         }
 
         if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) ownershipRegistry.Clear(owner);
+
+        if (owner != null &&
+            ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+            ContainerProvider.TryResolve<IIssueConversationTracker>(out var conversationTracker) &&
+            objectManager.TryGetIdWithLogging(owner, out var ownerId))
+        {
+            conversationTracker.Clear(ownerId);
+        }
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;

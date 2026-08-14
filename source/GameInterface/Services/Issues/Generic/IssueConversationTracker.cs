@@ -6,6 +6,7 @@ public interface IIssueConversationTracker
 {
     void Register(string issueGiverId, string controllerId, int generation);
     bool TryGetTrackedRequester(string issueGiverId, string controllerId, out int generation);
+    void Clear(string issueGiverId);
 }
 
 internal sealed class IssueConversationTracker : IIssueConversationTracker
@@ -28,5 +29,21 @@ internal sealed class IssueConversationTracker : IIssueConversationTracker
 
         generation = 0;
         return false;
+    }
+
+    public void Clear(string issueGiverId)
+    {
+        if (issueGiverId == null) return;
+
+        var stale = new List<(string IssueGiverId, string ControllerId)>();
+        foreach (var key in tracked.Keys)
+        {
+            if (key.IssueGiverId == issueGiverId) stale.Add(key);
+        }
+
+        foreach (var key in stale)
+        {
+            tracked.Remove(key);
+        }
     }
 }
