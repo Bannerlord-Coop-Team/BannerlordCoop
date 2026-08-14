@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -26,8 +27,10 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPlayerManager playerManager;
     private readonly IIssueOwnershipRegistry ownershipRegistry;
+    private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry;
     private readonly IPrisonerSaleValidator troopValidator;
+    private readonly Dictionary<string, int> depositedGenerationByOwnerId = new();
 
     public AwaitingAlternativeSolutionTroopsHandler(
         IMessageBroker messageBroker,
@@ -36,6 +39,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
         ITroopRosterInterface troopRosterInterface,
         IPlayerManager playerManager,
         IIssueOwnershipRegistry ownershipRegistry,
+        IIssueGenerationRegistry generationRegistry,
         IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry,
         IPrisonerSaleValidator troopValidator)
     {
@@ -45,6 +49,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
         this.troopRosterInterface = troopRosterInterface;
         this.playerManager = playerManager;
         this.ownershipRegistry = ownershipRegistry;
+        this.generationRegistry = generationRegistry;
         this.troopsRegistry = troopsRegistry;
         this.troopValidator = troopValidator;
 
@@ -103,6 +108,19 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
             return;
         }
 
+        if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration))
+        {
+            Logger.Error("Rejecting {Message} for {Owner} - no tracked issue generation",
+                nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
+            return;
+        }
+
+        if (depositedGenerationByOwnerId.TryGetValue(payload.What.OwnerId, out var lastDepositedGeneration)
+            && lastDepositedGeneration == currentGeneration)
+        {
+            return;
+        }
+
         var claimedRoster = TroopRoster.CreateDummyTroopRoster();
         foreach (var element in troopRosterInterface.UnpackTroopRosterData(payload.What.Troops))
         {
@@ -110,6 +128,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
         }
 
         var validatedRoster = troopValidator.Validate(claimedRoster, issue.AlternativeSolutionSentTroops);
+        depositedGenerationByOwnerId[payload.What.OwnerId] = currentGeneration;
         troopsRegistry.Deposit(player.ControllerId, validatedRoster);
     }
 

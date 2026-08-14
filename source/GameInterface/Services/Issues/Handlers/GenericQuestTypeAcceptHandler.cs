@@ -341,7 +341,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             ? troopValidator.Validate(claimedRoster, party.MemberRoster)
             : TroopRoster.CreateDummyTroopRoster();
 
-        if (validatedRoster.TotalManCount == 0) return false;
+        if (validatedRoster.TotalHeroes == 0) return false;
 
         using (new AllowedThread())
         {

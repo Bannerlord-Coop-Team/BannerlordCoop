@@ -168,9 +168,11 @@ internal class IssueFinalizationHandler : IHandler
                 objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
             }
 
+            objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var truePlayerHero);
+
             try
             {
-                using (new MainHeroSubstitutionScope(owner, ownerParty))
+                using (new MainHeroSubstitutionScope(truePlayerHero, ownerParty))
                 {
                     IssueFinalizationSupport.FinalizeMirror(owner, reason);
                 }
