@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using Common;
 using Common.Util;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using Newtonsoft.Json;
@@ -71,10 +72,15 @@ internal static class PrisonerDonationFixtureCommands
             return $"Settlement '{args[0]}' is not a town.";
         if (settlement.Town.GarrisonParty == null)
             return $"Settlement '{args[0]}' has no garrison party.";
-        if (hero.Clan?.Kingdom == null)
-            return "The fixture player clan must belong to a kingdom so influence can be awarded.";
+        if (hero.Clan == null)
+            return "The fixture player hero must belong to a clan.";
+        if (party.ActualClan != hero.Clan)
+            return "The fixture player party and hero must belong to the same clan.";
         if (settlement.OwnerClan == null || settlement.OwnerClan == party.ActualClan)
             return "Danustica must be owned by a different clan for the donation influence test.";
+        var fixtureKingdom = hero.Clan.Kingdom ?? settlement.OwnerClan.Kingdom;
+        if (fixtureKingdom == null)
+            return "The fixture could not resolve a kingdom for the influence award.";
 
         fixture = new PrisonerDonationFixture(
             party,
@@ -83,6 +89,8 @@ internal static class PrisonerDonationFixtureCommands
             CaptureRosterState(party.PrisonRoster, troop),
             CaptureRosterState(settlement.Party.PrisonRoster, troop),
             hero.Clan.Influence,
+            hero.Clan.Kingdom,
+            fixtureKingdom,
             party.CurrentSettlement,
             party.Position);
 
@@ -102,6 +110,20 @@ internal static class PrisonerDonationFixtureCommands
             return "The prisoner-donation fixture mutation already ran.";
 
         fixture.Started = true;
+
+        if (fixture.PlayerClan.Kingdom == null)
+        {
+            if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+                return "Unable to resolve IKingdomMembershipState.";
+
+            kingdomMembershipState.MoveClanToKingdom(
+                previousKingdom: null,
+                kingdom: fixture.FixtureKingdom,
+                clan: fixture.PlayerClan,
+                publishCollectionChanges: true);
+            if (fixture.PlayerClan.Kingdom != fixture.FixtureKingdom)
+                return "The fixture player clan could not be staged in a kingdom.";
+        }
 
         if (fixture.PlayerParty.CurrentSettlement != fixture.Settlement)
         {
@@ -334,7 +356,6 @@ internal static class PrisonerDonationFixtureCommands
             activeFixture.Settlement.Party.PrisonRoster,
             activeFixture.Troop,
             activeFixture.SettlementPrisonerState);
-        activeFixture.PlayerParty.ActualClan.Influence = activeFixture.ClanInfluence;
 
         if (activeFixture.PlayerParty.CurrentSettlement != activeFixture.OriginalSettlement)
         {
@@ -349,6 +370,22 @@ internal static class PrisonerDonationFixtureCommands
                 activeFixture.PlayerParty.Position = activeFixture.OriginalPosition;
         }
 
+        if (activeFixture.PlayerClan.Kingdom != activeFixture.OriginalKingdom)
+        {
+            if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+                return "Unable to resolve IKingdomMembershipState during fixture restoration.";
+
+            kingdomMembershipState.MoveClanToKingdom(
+                activeFixture.PlayerClan.Kingdom,
+                activeFixture.OriginalKingdom,
+                activeFixture.PlayerClan,
+                publishCollectionChanges: true,
+                republishExistingCollections: true);
+            if (activeFixture.PlayerClan.Kingdom != activeFixture.OriginalKingdom)
+                return "The fixture player clan kingdom could not be restored.";
+        }
+
+        activeFixture.PlayerClan.Influence = activeFixture.ClanInfluence;
         fixture = null;
         return "LIVE_TEST_JSON=true";
     }
@@ -358,13 +395,13 @@ internal static class PrisonerDonationFixtureCommands
     {
         if (!ModInformation.IsClient)
             return "Run this command on the owning client.";
-        if (args.Count != 5 ||
+        if (args.Count != 6 ||
             !int.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var expectedPlayerCount) ||
             !int.TryParse(args[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var expectedSettlementCount) ||
             !float.TryParse(args[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var expectedInfluence))
         {
             return "Usage: coop.debug.party.prisoner_donation_fixture_verify " +
-                   "town_ES1 <heroRegistryId> <playerCount> <settlementCount> <influence>";
+                   "town_ES1 <heroRegistryId> <playerCount> <settlementCount> <influence> <kingdomId>";
         }
         var settlement = Settlement.Find(args[0]);
         if (settlement == null ||
@@ -378,9 +415,11 @@ internal static class PrisonerDonationFixtureCommands
 
         var playerCount = hero.PartyBelongedTo.PrisonRoster.GetTroopCount(troop);
         var settlementCount = settlement.Party.PrisonRoster.GetTroopCount(troop);
+        var kingdomId = hero.Clan?.Kingdom?.StringId ?? "none";
         var restored = playerCount == expectedPlayerCount &&
                        settlementCount == expectedSettlementCount &&
-                       hero.Clan.Influence == expectedInfluence;
+                       hero.Clan.Influence == expectedInfluence &&
+                       kingdomId == args[5];
 
         if (Game.Current.GameStateManager.ActiveState is PartyState)
             PartyScreenHelper.CloseScreen(isForced: true, fromCancel: true);
@@ -392,7 +431,8 @@ internal static class PrisonerDonationFixtureCommands
             : $"Fixture restoration failed: playerCount={playerCount}/{expectedPlayerCount} " +
               $"settlementCount={settlementCount}/{expectedSettlementCount} " +
               $"influence={hero.Clan.Influence.ToString("R", CultureInfo.InvariantCulture)}/" +
-              expectedInfluence.ToString("R", CultureInfo.InvariantCulture);
+              expectedInfluence.ToString("R", CultureInfo.InvariantCulture) + " " +
+              $"kingdom={kingdomId}/{args[5]}";
     }
 
     private static string FormatState(PrisonerDonationFixture activeFixture)
@@ -438,6 +478,7 @@ internal static class PrisonerDonationFixtureCommands
             playerCount = playerState.Number,
             settlementCount = settlementState.Number,
             influence = playerParty.ActualClan.Influence,
+            kingdomId = playerParty.ActualClan.Kingdom?.StringId ?? "none",
         });
     }
 
@@ -475,6 +516,9 @@ internal static class PrisonerDonationFixtureCommands
         public RosterState PlayerPrisonerState { get; }
         public RosterState SettlementPrisonerState { get; }
         public float ClanInfluence { get; }
+        public Clan PlayerClan { get; }
+        public Kingdom OriginalKingdom { get; }
+        public Kingdom FixtureKingdom { get; }
         public Settlement OriginalSettlement { get; }
         public CampaignVec2 OriginalPosition { get; }
         public bool Started { get; set; }
@@ -487,6 +531,8 @@ internal static class PrisonerDonationFixtureCommands
             RosterState playerPrisonerState,
             RosterState settlementPrisonerState,
             float clanInfluence,
+            Kingdom originalKingdom,
+            Kingdom fixtureKingdom,
             Settlement originalSettlement,
             CampaignVec2 originalPosition)
         {
@@ -496,6 +542,9 @@ internal static class PrisonerDonationFixtureCommands
             PlayerPrisonerState = playerPrisonerState;
             SettlementPrisonerState = settlementPrisonerState;
             ClanInfluence = clanInfluence;
+            PlayerClan = playerParty.ActualClan;
+            OriginalKingdom = originalKingdom;
+            FixtureKingdom = fixtureKingdom;
             OriginalSettlement = originalSettlement;
             OriginalPosition = originalPosition;
         }
