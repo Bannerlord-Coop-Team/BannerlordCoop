@@ -18,8 +18,10 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -403,10 +405,36 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         var mapEvent = party?.MapEvent;
         if (mapEvent == null || IsPending(mapEvent)) return;
         if (Campaign.Current?.MapEventManager?.MapEvents.Contains(mapEvent) == true) return;
+        if (IsBattleSimulationActive()) return;
 
+        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent);
         party._mapEventSide = null;
-        if (!CloseStaleDestroyedEncounter(mapEvent))
-            ClearEngageOrder(party.MobileParty);
+        if (!continuedEncounter && CloseStaleDestroyedEncounter(mapEvent)) return;
+
+        ClearEngageOrder(party.MobileParty);
+    }
+
+    private static bool IsBattleSimulationActive() =>
+        Game.Current?.GameStateManager?.GameStates
+            .OfType<MapState>()
+            .Any(state => state.IsSimulationActive) == true;
+
+    private static bool ContinueDestroyedSimulationDefeat(MapEvent mapEvent)
+    {
+        var encounter = PlayerEncounter.Current;
+        if (PlayerCaptivity.IsCaptive ||
+            encounter?.EncounterState != PlayerEncounterState.End ||
+            encounter.BattleSimulation == null ||
+            mapEvent.WinningSide == PartyBase.MainParty.Side ||
+            !References(encounter, mapEvent))
+        {
+            return false;
+        }
+
+        // Mirror vanilla's simulated-defeat branch before detaching the destroyed map event.
+        encounter.EncounterState = PlayerEncounterState.Begin;
+        GameMenu.SwitchToMenu("encounter");
+        return true;
     }
 
     private void ClearEngageOrder(MobileParty party)
