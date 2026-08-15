@@ -152,7 +152,7 @@ internal class IssueFinalizationHandler : IHandler
         {
             using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
             {
-                IssueFinalizationSupport.FinalizeMirror(owner, reason);
+                IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: false);
             }
         }
         catch (Exception e)
@@ -272,17 +272,23 @@ internal class IssueFinalizationHandler : IHandler
                     return;
                 }
 
-                if (reason is IssueFinalizeReason.QuestTimeout or IssueFinalizeReason.QuestFail && !quest.QuestDueTime.IsPast)
+                if (reason == IssueFinalizeReason.QuestTimeout && !quest.QuestDueTime.IsPast)
                 {
                     Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - due time has not passed",
                         nameof(RequestIssueRemoved), reason, ownerId);
                     return;
                 }
 
-                if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestBetrayal)
+                if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestBetrayal or IssueFinalizeReason.QuestFail)
                 {
                     var descriptor = QuestTypeRegistry.Get(owner.Issue);
-                    var validator = reason == IssueFinalizeReason.QuestCancel ? descriptor?.ValidateQuestCancel : descriptor?.ValidateQuestBetrayal;
+                    var validator = reason switch
+                    {
+                        IssueFinalizeReason.QuestCancel => descriptor?.ValidateQuestCancel,
+                        IssueFinalizeReason.QuestBetrayal => descriptor?.ValidateQuestBetrayal,
+                        IssueFinalizeReason.QuestFail => descriptor?.ValidateQuestFail,
+                        _ => null,
+                    };
                     if (validator == null || !validator(owner.Issue))
                     {
                         Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - quest type has no registered validator or condition not met",
@@ -332,7 +338,7 @@ internal class IssueFinalizationHandler : IHandler
 
             using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
             {
-                IssueFinalizationSupport.FinalizeMirror(owner, reason);
+                IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true);
             }
         });
     }

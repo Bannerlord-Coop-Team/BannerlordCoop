@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using System;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
@@ -456,16 +457,35 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private void RollbackFailedAlternativeAcceptStart(Hero owner, string controllerId)
     {
         if (owner?.Issue == null) return;
+        if (!objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
 
-        using (new IssueFinalizeAuthorityGuard())
-        using (new AllowedThread())
+        if (!string.IsNullOrEmpty(controllerId))
         {
-            if (!string.IsNullOrEmpty(controllerId))
-            {
-                ownershipRegistry.SetOwner(owner, controllerId);
-            }
-            owner.Issue.CompleteIssueWithCancel();
+            ownershipRegistry.SetOwner(owner, controllerId);
         }
+
+        Hero trueOwnerHero = null;
+        MobileParty ownerParty = null;
+        if (!string.IsNullOrEmpty(controllerId) && playerManager.TryGetPlayer(controllerId, out var player))
+        {
+            if (player.HeroId != null) objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out trueOwnerHero);
+            if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
+        }
+
+        try
+        {
+            using (new MainHeroSubstitutionScope(trueOwnerHero ?? owner, ownerParty))
+            {
+                IssueFinalizationSupport.FinalizeMirror(owner, IssueFinalizeReason.RejectedAccept, suppressReplicationPatches: false);
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to roll back a partially-started alternative-solution accept for owner {Owner} - the issue may be left in an inconsistent state", ownerId);
+            return;
+        }
+
+        network.SendAll(new NetworkIssueRemoved(ownerId, IssueFinalizeReason.RejectedAccept));
     }
 
     private void Handle_NetworkQuestTypeAcceptRejected(MessagePayload<NetworkQuestTypeAcceptRejected> payload)
