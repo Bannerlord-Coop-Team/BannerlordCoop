@@ -144,7 +144,6 @@ internal static class VillageNeedsCraftingMaterialsQuestType
     static VillageNeedsCraftingMaterialsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("VillageNeedsCraftingMaterials")
-            .WithCreationCapture(CreationCaptureStrategy)
             .WithQuestSolutionAccept(QuestSolutionAcceptMirror)
             .WithAlternativeAccept()
             .WithCreationTrigger(OnGenuineCreation)
