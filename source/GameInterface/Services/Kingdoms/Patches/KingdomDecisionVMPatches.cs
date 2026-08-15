@@ -1,7 +1,4 @@
-﻿using Common;
-using Common.Messaging;
-using GameInterface.Services.Kingdoms.Extentions;
-using GameInterface.Services.Kingdoms.Messages;
+﻿using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -181,7 +178,6 @@ namespace GameInterface.Services.Kingdoms.Patches
     [HarmonyPatch(typeof(KingdomDiplomacyVM))]
     public class KingdomDiplomacyVMPatches
     {
-        public static UnresolvedDecisionResult _peaceDecisionResult;
         [HarmonyPatch(nameof(KingdomDiplomacyVM.RefreshValues))]
         [HarmonyPostfix]
         internal static void RefreshValuesPostfix(KingdomDiplomacyVM __instance)
@@ -193,6 +189,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         internal static void OnSetWarItemPostfix(KingdomDiplomacyVM __instance, KingdomWarItemVM item)
         {
+            if (PeaceOfferIsPending(__instance, item)) return;
             DisableDiplomacyResolveActionsIfAlreadyVoted(__instance, item);
         }
 
@@ -228,6 +225,17 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
         }
 
+        internal static bool PeaceOfferIsPending(KingdomDiplomacyVM diplomacyVm, KingdomWarItemVM diplomacyItem)
+        {
+            if (diplomacyVm?.Actions == null || diplomacyItem == null) return false;
+            if (Clan.PlayerClan?.Kingdom == null) return false;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = diplomacyItem.Faction2 as Kingdom;
+            if (targetKingdom == null) return false;
+
+            return PeaceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId);
+        }
         private static IEnumerable<KingdomDecision> GetResolveDecisions(KingdomDiplomacyItemVM diplomacyItem)
         {
             if (Clan.PlayerClan?.Kingdom?.UnresolvedDecisions == null) yield break;
@@ -276,21 +284,13 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (targetKingdom == null)
                 return true;
 
-            MessageBroker.Instance.Publish(__instance, new KingdomUnresolvedDecisionRequest(playerKingdom, targetKingdom));
-
-            _peaceDecisionResult = UnresolvedDecisionResult.Waiting;
-
-            GameThread.WaitWhilePumping(() =>
-            _peaceDecisionResult != UnresolvedDecisionResult.Waiting,
-            DateTime.UtcNow.AddSeconds(5));
-
-            if (_peaceDecisionResult == UnresolvedDecisionResult.NoPeaceOffer)
+            if (!playerKingdom._unresolvedDecisions.OfType<MakePeaceKingdomDecision>().Any(d => d.Kingdom == playerKingdom && d.FactionToMakePeaceWith == targetKingdom)
+                && !PeaceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId))
             {
                 return true;
             }
             __result = false;
             disabledReason = new TextObject("You have already offered peace to this kingdom.");
-            _peaceDecisionResult = UnresolvedDecisionResult.Waiting;
             return false;
         }
     }
@@ -330,5 +330,19 @@ namespace GameInterface.Services.Kingdoms.Patches
                 action.Hint.HintText = AlreadyVotedHint;
             }
         }
+    }
+    public static class PeaceOfferPendingRegistry
+    {
+        internal static readonly Dictionary<(string, string), bool> _pending = new();
+
+        public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
+        {
+            var key = (requestingKingdomId, targetKingdomId);
+            if (isPending) _pending[key] = true;
+            else _pending.Remove(key);
+        }
+
+        public static bool IsPending(string requestingKingdomId, string targetKingdomId)
+            => _pending.TryGetValue((requestingKingdomId, targetKingdomId), out var val) && val;
     }
 }

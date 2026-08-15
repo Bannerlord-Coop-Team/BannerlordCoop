@@ -63,8 +63,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<RulingClanChanged>(HandleRulingClanChanged);
         messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Subscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
-        messageBroker.Subscribe<KingdomUnresolvedDecisionRequest>(HandleKingdomUnresolvedDecisionRequest);
-        messageBroker.Subscribe<ClientKingdomUnresolvedDecision>(HandleClientKingdomUnresolvedDecision);
+        messageBroker.Subscribe<NetworkPeaceOfferPendingStatusChanged>(Handle_NetworkPeaceOfferPendingStatusChanged);
     }
 
     private void HandleKingdomCreationRequested(MessagePayload<KingdomCreationRequested> obj)
@@ -414,24 +413,17 @@ public class ClientKingdomHandler : IHandler
         network.SendAll(new NetworkRulingClanChanged(kingdomId, clanId));
     }
 
-    private void HandleKingdomUnresolvedDecisionRequest(MessagePayload<KingdomUnresolvedDecisionRequest> obj)
+    public void Handle_NetworkPeaceOfferPendingStatusChanged(MessagePayload<NetworkPeaceOfferPendingStatusChanged> payload)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.PlayerKingdom, out var playerKingdomId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.TargetKingdom, out var targetKingdomId)) return;
-
-        network.SendAll(new KingdomUnresolvedDecision(playerKingdomId, targetKingdomId));
-    }
-    private void HandleClientKingdomUnresolvedDecision(MessagePayload<ClientKingdomUnresolvedDecision> obj)
-    {
+        if (ModInformation.IsServer) return;
+        var obj = payload.What;
         GameThread.RunSafe(() =>
         {
-            KingdomDiplomacyVMPatches._peaceDecisionResult =
-            obj.What.Result == UnresolvedDecisionResult.HasPeaceOffer
-            ? UnresolvedDecisionResult.HasPeaceOffer
-            : UnresolvedDecisionResult.NoPeaceOffer;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.RequestingKingdomId, out var requestingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.TargetKingdomId, out var targetKingdom)) return;
+            PeaceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, obj.IsPending);
         });
     }
-
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
@@ -447,8 +439,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<RulingClanChanged>(HandleRulingClanChanged);
         messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Unsubscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
-        messageBroker.Unsubscribe<KingdomUnresolvedDecisionRequest>(HandleKingdomUnresolvedDecisionRequest);
-        messageBroker.Unsubscribe<ClientKingdomUnresolvedDecision>(HandleClientKingdomUnresolvedDecision);
+        messageBroker.Unsubscribe<NetworkPeaceOfferPendingStatusChanged>(Handle_NetworkPeaceOfferPendingStatusChanged);
     }
 
     private readonly struct PendingSettlementRestore
