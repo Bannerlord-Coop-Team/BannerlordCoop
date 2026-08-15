@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Common.Network;
 using Coop.Core.Client;
 using Coop.Core.Common.Session;
 using GameInterface.Registry;
@@ -17,11 +16,9 @@ internal class ClientTestComponent : TestComponentBase
         builder.RegisterModule<RegistryModule>();
 
         // Overrides ClientModule's registration, which is pinned to one intent.
-        builder.Register(c =>
-        {
-            var config = c.Resolve<INetworkConfig>();
-            return JoinAttemptPresentation.For(intent, config.Address, config.Port);
-        }).AsSelf().InstancePerLifetimeScope();
+        builder.RegisterInstance(JoinAttemptPresentation.For(intent))
+            .AsSelf()
+            .SingleInstance();
 
         Container = BuildContainer(builder);
     }
