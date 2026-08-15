@@ -158,10 +158,7 @@ internal class IssueFinalizationHandler : IHandler
         catch (Exception e)
         {
             Logger.Error(e, "Failed to finalize {Reason} for owner {Owner} - not broadcasting", reason, ownerId);
-            return;
         }
-
-        network.SendAll(new NetworkIssueRemoved(ownerId, reason));
     }
 
     private void Handle_RequestIssueRemoved(MessagePayload<RequestIssueRemoved> payload)
