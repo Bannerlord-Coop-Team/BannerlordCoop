@@ -137,20 +137,24 @@ internal class IssueFinalizationHandler : IHandler
                 }
 
                 var validator = QuestTypeRegistry.Get(owner.Issue)?.ValidateQuestSuccess;
-                if (validator != null)
+                if (validator == null)
                 {
-                    MobileParty party = null;
-                    if (player.MobilePartyId != null)
-                    {
-                        objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party);
-                    }
+                    Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - quest type has no registered ValidateQuestSuccess, completion cannot be re-derived server-side",
+                        nameof(RequestIssueRemoved), ownerId);
+                    return;
+                }
 
-                    if (!validator(owner.Issue, party))
-                    {
-                        Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - completion condition not met for the requester's real party",
-                            nameof(RequestIssueRemoved), ownerId);
-                        return;
-                    }
+                MobileParty party = null;
+                if (player.MobilePartyId != null)
+                {
+                    objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party);
+                }
+
+                if (!validator(owner.Issue, party))
+                {
+                    Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - completion condition not met for the requester's real party",
+                        nameof(RequestIssueRemoved), ownerId);
+                    return;
                 }
             }
             else if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestFail
