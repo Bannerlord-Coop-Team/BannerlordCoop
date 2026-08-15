@@ -6,6 +6,7 @@ using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
@@ -111,6 +112,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.InteractionsPlayerData,
             completedTransfer.TradePlayerData,
             completedTransfer.InventoryPlayerData,
+            completedTransfer.AgingPlayerData,
             completedTransfer.AttachmentIdMap,
             completedTransfer.ServerOptions));
     }
@@ -133,6 +135,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             InteractionsPlayerData = firstChunk.InteractionsPlayerData;
             TradePlayerData = firstChunk.TradePlayerData;
             InventoryPlayerData = firstChunk.InventoryPlayerData;
+            AgingPlayerData = firstChunk.AgingPlayerData;
             AttachmentIdMap = firstChunk.AttachmentIdMap;
             ServerOptions = firstChunk.ServerOptions;
         }
@@ -148,6 +151,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public InteractionsPlayerData InteractionsPlayerData { get; }
         public TradePlayerData TradePlayerData { get; }
         public InventoryPlayerData InventoryPlayerData { get; }
+        public AgingPlayerData AgingPlayerData { get; }
         public AttachmentIdMap AttachmentIdMap { get; }
         public ServerOptions ServerOptions { get; }
 

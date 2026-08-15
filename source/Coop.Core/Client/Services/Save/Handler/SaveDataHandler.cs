@@ -11,6 +11,7 @@ using GameInterface.Services.ObjectManager.Messages;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Workshops.Messages;
+using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler;
 
@@ -63,6 +64,7 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientInteractionsData(saveDataMessage.InteractionsPlayerData));
         messageBroker.Publish(this, new InitializeClientTradeData(saveDataMessage.TradePlayerData));
         messageBroker.Publish(this, new InitializeClientInventoryData(saveDataMessage.InventoryPlayerData));
+        messageBroker.Publish(this, new InitializeClientAgingData(saveDataMessage.AgingPlayerData));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));
         // Add any other CoopSession data initialisations for clients here
     }

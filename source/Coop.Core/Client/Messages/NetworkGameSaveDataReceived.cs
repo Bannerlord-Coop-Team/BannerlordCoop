@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
@@ -39,8 +40,10 @@ public record NetworkGameSaveDataReceived : IEvent
     [ProtoMember(9)]
     public InventoryPlayerData InventoryPlayerData { get; }
     [ProtoMember(10)]
-    public AttachmentIdMap AttachmentIdMap { get; }
+    public AgingPlayerData AgingPlayerData { get; }
     [ProtoMember(11)]
+    public AttachmentIdMap AttachmentIdMap { get; }
+    [ProtoMember(12)]
     public ServerOptions ServerOptions { get; }
 
     public NetworkGameSaveDataReceived(
@@ -53,6 +56,7 @@ public record NetworkGameSaveDataReceived : IEvent
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
+        AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions)
     {
@@ -65,6 +69,7 @@ public record NetworkGameSaveDataReceived : IEvent
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
+        AgingPlayerData = agingPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
     }

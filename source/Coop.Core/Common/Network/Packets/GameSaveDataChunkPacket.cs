@@ -2,6 +2,7 @@
 using GameInterface.Services.Alleys;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
@@ -68,9 +69,12 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     public readonly InventoryPlayerData InventoryPlayerData;
 
     [ProtoMember(15)]
-    public readonly AttachmentIdMap AttachmentIdMap;
+    public readonly AgingPlayerData AgingPlayerData;
 
     [ProtoMember(16)]
+    public readonly AttachmentIdMap AttachmentIdMap;
+
+    [ProtoMember(17)]
     public readonly ServerOptions ServerOptions;
 
     public GameSaveDataChunkPacket(
@@ -88,6 +92,7 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
+        AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions)
     {
@@ -105,6 +110,7 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
+        AgingPlayerData = agingPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
     }

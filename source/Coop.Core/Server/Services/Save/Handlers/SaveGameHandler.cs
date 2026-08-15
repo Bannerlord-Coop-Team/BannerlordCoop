@@ -100,7 +100,8 @@ internal class SaveGameHandler : IHandler
             current?.AlleyPlayerData ?? empty.AlleyPlayerData,
             current?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
             current?.TradePlayerData ?? empty.TradePlayerData,
-            current?.InventoryPlayerData ?? empty.InventoryPlayerData);
+            current?.InventoryPlayerData ?? empty.InventoryPlayerData,
+            current?.AgingPlayerData ?? empty.AgingPlayerData);
 
         coopSessionProvider.CoopSession = session;
 
@@ -122,7 +123,8 @@ internal class SaveGameHandler : IHandler
             loaded?.AlleyPlayerData ?? empty.AlleyPlayerData,
             loaded?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
             loaded?.TradePlayerData ?? empty.TradePlayerData,
-            loaded?.InventoryPlayerData ?? empty.InventoryPlayerData);
+            loaded?.InventoryPlayerData ?? empty.InventoryPlayerData,
+            loaded?.AgingPlayerData ?? empty.AgingPlayerData);
 
         coopSessionProvider.CoopSession = savedSession;
     }

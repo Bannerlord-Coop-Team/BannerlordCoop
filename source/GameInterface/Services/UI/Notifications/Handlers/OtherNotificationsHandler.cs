@@ -67,6 +67,9 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NotifyStillbornDelivery>(Handle_NotifyStillbornDelivery);
         messageBroker.Subscribe<NetworkNotifyStillbornDelivery>(Handle_NetworkNotifyStillbornDelivery);
 
+        messageBroker.Subscribe<NotifyCaughtIllness>(Handle_NotifyCaughtIllness);
+        messageBroker.Subscribe<NetworkNotifyCaughtIllness>(Handle_NetworkNotifyCaughtIllness);
+
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
@@ -104,6 +107,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyStillbornDelivery>(Handle_NotifyStillbornDelivery);
         messageBroker.Unsubscribe<NetworkNotifyStillbornDelivery>(Handle_NetworkNotifyStillbornDelivery);
+
+        messageBroker.Unsubscribe<NotifyCaughtIllness>(Handle_NotifyCaughtIllness);
+        messageBroker.Unsubscribe<NetworkNotifyCaughtIllness>(Handle_NetworkNotifyCaughtIllness);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -407,6 +413,28 @@ internal class OtherNotificationsHandler : IHandler
             TextObject textObject = new TextObject("{=pw4cUPEn}{MOTHER.LINK} has delivered stillborn.", null);
             StringHelpers.SetCharacterProperties("MOTHER", motherCharacter, textObject, false);
             InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
+        });
+    }
+
+    private void Handle_NotifyCaughtIllness(MessagePayload<NotifyCaughtIllness> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.PlayerHero, out var playerHeroId)) return;
+
+            network.SendAll(new NetworkNotifyCaughtIllness(playerHeroId));
+        });
+    }
+
+    private void Handle_NetworkNotifyCaughtIllness(MessagePayload<NetworkNotifyCaughtIllness> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.PlayerHeroId, out var playerHero)) return;
+
+            if (playerHero != Hero.MainHero) return;
+
+            InformationManager.ShowInquiry(new InquiryData(new TextObject("{=2duoimiP}Caught Illness", null).ToString(), new TextObject("{=vo3MqtMn}You are at death's door, wracked by fever, drifting in and out of consciousness. The healers do not believe that you can recover. You should resolve your final affairs and determine a heir for your clan while you still have the strength to speak.", null).ToString(), true, false, new TextObject("{=yQtzabbe}Close", null).ToString(), "", null, null, "event:/ui/notification/quest_fail", 0f, null, null, null), false, false);
         });
     }
 

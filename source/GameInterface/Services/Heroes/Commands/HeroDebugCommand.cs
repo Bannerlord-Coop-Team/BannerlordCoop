@@ -242,6 +242,43 @@ public class HeroDebugCommand
         return $"Set gold to {gold} for {heroes.Count} hero(es) named '{heroName}'";
     }
 
+    [CommandLineArgumentFunction("set_age", "coop.debug.hero")]
+    public static string SetAge(List<string> args)
+    {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_age")) return error;
+
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.hero.set_age <heroName> <age>";
+        }
+
+        if (int.TryParse(args[args.Count - 1], out int age) == false)
+        {
+            return $"{args[args.Count - 1]} is not a valid integer";
+        }
+
+        // Everything before the age value is treated as the hero name (supports multi-word names)
+        string heroName = string.Join(" ", args.Take(args.Count - 1));
+
+        var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
+            .Where(h => h.Name?.ToString() == heroName)
+            .ToList();
+
+        if (heroes.Count == 0)
+        {
+            return $"Unable to find hero with name: {heroName}";
+        }
+
+        foreach (var hero in heroes)
+        {
+            var ageInTicks = CampaignTime.TimeTicksPerYear * age;
+
+            hero.SetBirthDay(new CampaignTime(CampaignTime.CurrentTicks - ageInTicks));
+        }
+
+        return $"Set age to {age} for {heroes.Count} hero(es) named '{heroName}'";
+    }
+
     [CommandLineArgumentFunction("gold_state", "coop.debug.hero")]
     public static string GoldState(List<string> args)
     {
