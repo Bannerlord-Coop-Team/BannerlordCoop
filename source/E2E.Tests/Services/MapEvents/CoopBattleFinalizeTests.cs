@@ -439,8 +439,6 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
             var encounter = SetMockPlayerEncounter(client, mapEventId: setup.MapEventId);
             encounter.BattleSimulation = ObjectHelper.SkipConstructor<BattleSimulation>();
-            AccessTools.Field(typeof(BattleSimulation), "_mapEvent")
-                .SetValue(encounter.BattleSimulation, destroyedMapEvent);
             encounter.PlayerSide = BattleSideEnum.Attacker;
             encounter.EncounterState = PlayerEncounterState.End;
 
@@ -455,6 +453,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.Same(destroyedMapEvent, MobileParty.MainParty.MapEvent);
             Assert.True(mapState.IsSimulationActive);
             Assert.Equal(playerCaptive, PlayerCaptivity.IsCaptive);
+            Assert.Null(encounter.BattleSimulation.MapEvent);
         }, MapEventDisabledMethods);
 
         client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(setup.MapEventId));
@@ -475,7 +474,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             MobileParty.MainParty.Party._mapEventSide = null;
             Assert.Null(MobileParty.MainParty.MapEvent);
             Assert.Null(PlayerEncounter.Battle);
-            Assert.Same(destroyedMapEvent, PlayerEncounter.Current.BattleSimulation.MapEvent);
+            Assert.Null(PlayerEncounter.Current.BattleSimulation.MapEvent);
             mapState.EndBattleSimulation();
             client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
 

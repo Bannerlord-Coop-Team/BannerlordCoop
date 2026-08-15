@@ -53,6 +53,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private readonly IObjectManager objectManager;
     private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
     private HashSet<PartyBase> pendingParties = new HashSet<PartyBase>();
+    private DeferredEncounterCleanup deferredEncounterCleanup;
     private bool disposed;
 
     public MapEventInitializationBarrier(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
@@ -73,6 +74,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         messageBroker.Unsubscribe<NetworkMapEventInitialized>(HandleCommit);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         states.Clear();
+        deferredEncounterCleanup = null;
         PublishPendingParties();
     }
 
@@ -381,6 +383,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (mapEvent == null) return;
         if (!states.TryGetValue(mapEvent, out var state)) state = new State(mapEvent);
         Capture(state, mapEvent);
+        if (preservedParty != null)
+            deferredEncounterCleanup = new DeferredEncounterCleanup(mapEvent, preservedParty);
         Campaign.Current?.MapEventManager?._mapEvents.Remove(mapEvent);
         foreach (var mapEventParty in state.Owned.OfType<MapEventParty>())
         {
@@ -401,9 +405,10 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     {
         if (ModInformation.IsServer || MissionState.Current != null || Mission.Current != null) return;
 
-        var party = MobileParty.MainParty?.Party;
+        var cleanup = deferredEncounterCleanup;
+        var party = cleanup?.Party ?? MobileParty.MainParty?.Party;
         var encounter = PlayerEncounter.Current;
-        var mapEvent = party?.MapEvent;
+        var mapEvent = cleanup?.MapEvent ?? party?.MapEvent;
         if (mapEvent == null && !PlayerCaptivity.IsCaptive &&
             encounter?.EncounterState == PlayerEncounterState.End)
         {
@@ -413,9 +418,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (Campaign.Current?.MapEventManager?.MapEvents.Contains(mapEvent) == true) return;
         if (IsBattleSimulationActive()) return;
 
-        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent);
+        if (cleanup != null)
+            deferredEncounterCleanup = null;
+        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent, cleanup);
         party._mapEventSide = null;
-        if (!continuedEncounter && CloseStaleDestroyedEncounter(mapEvent)) return;
+        if (!continuedEncounter && CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
 
         ClearEngageOrder(party.MobileParty);
     }
@@ -425,14 +432,20 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             .OfType<MapState>()
             .Any(state => state.IsSimulationActive) == true;
 
-    private static bool ContinueDestroyedSimulationDefeat(MapEvent mapEvent)
+    private static bool ContinueDestroyedSimulationDefeat(
+        MapEvent mapEvent,
+        DeferredEncounterCleanup cleanup)
     {
         var encounter = PlayerEncounter.Current;
+        bool matchesDeferredSimulation = cleanup != null &&
+            ReferenceEquals(encounter, cleanup.Encounter) &&
+            ReferenceEquals(encounter?.BattleSimulation, cleanup.BattleSimulation);
         if (PlayerCaptivity.IsCaptive ||
             encounter?.EncounterState != PlayerEncounterState.End ||
             encounter.BattleSimulation == null ||
-            mapEvent.WinningSide == encounter.PlayerSide ||
-            !References(encounter, mapEvent))
+            (matchesDeferredSimulation
+                ? !cleanup.WasPlayerDefeated
+                : mapEvent.WinningSide == encounter.PlayerSide || !References(encounter, mapEvent)))
         {
             return false;
         }
@@ -452,7 +465,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         messageBroker.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
-    private bool CloseStaleDestroyedEncounter(MapEvent mapEvent)
+    private bool CloseStaleDestroyedEncounter(MapEvent mapEvent, DeferredEncounterCleanup cleanup)
     {
         if (PlayerCaptivity.IsCaptive)
             return false;
@@ -464,7 +477,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
-        if (!References(encounter, mapEvent))
+        if (!References(encounter, mapEvent) && !ReferenceEquals(encounter, cleanup?.Encounter))
             return false;
 
         if (IsBattleResultEncounter(encounter))
@@ -621,6 +634,24 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         public void Add(object instance)
         {
             if (instance != null) Owned.Add(instance);
+        }
+    }
+
+    private sealed class DeferredEncounterCleanup
+    {
+        public readonly MapEvent MapEvent;
+        public readonly PartyBase Party;
+        public readonly PlayerEncounter Encounter;
+        public readonly BattleSimulation BattleSimulation;
+        public readonly bool WasPlayerDefeated;
+
+        public DeferredEncounterCleanup(MapEvent mapEvent, PartyBase party)
+        {
+            MapEvent = mapEvent;
+            Party = party;
+            Encounter = PlayerEncounter.Current;
+            BattleSimulation = Encounter?.BattleSimulation;
+            WasPlayerDefeated = BattleSimulation != null && mapEvent.WinningSide != Encounter.PlayerSide;
         }
     }
 }
