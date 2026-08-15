@@ -1,14 +1,13 @@
-﻿using GameInterface;
-using GameInterface.Services.Kingdoms;
+﻿using Common;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Policies;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -325,6 +324,56 @@ namespace GameInterface.Services.Kingdoms.Patches
             {
                 action.Hint.HintText = AlreadyVotedHint;
             }
+        }
+    }
+    internal interface IClientClanStrengthRefresher
+    {
+        void Refresh(IFaction faction);
+    }
+
+    internal class ClientClanStrengthRefresher : IClientClanStrengthRefresher
+    {
+        public void Refresh(IFaction faction)
+        {
+            if (ModInformation.IsServer) return;
+
+            if (faction is Kingdom kingdom)
+            {
+                foreach (var clan in kingdom.Clans)
+                {
+                    clan.UpdateCurrentStrength();
+                }
+            }
+            else if (faction is Clan clan)
+            {
+                clan.UpdateCurrentStrength();
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(KingdomWarItemVM), nameof(KingdomWarItemVM.UpdateDiplomacyProperties))]
+    internal class KingdomWarItemVMPatches
+    {
+        [HarmonyPrefix]
+        private static void Prefix(KingdomWarItemVM __instance)
+        {
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(__instance.Faction1);
+            refresher.Refresh(__instance.Faction2);
+        }
+    }
+
+    [HarmonyPatch(typeof(KingdomTruceItemVM), nameof(KingdomTruceItemVM.UpdateDiplomacyProperties))]
+    internal class KingdomTruceItemVMPatches
+    {
+        [HarmonyPrefix]
+        private static void Prefix(KingdomTruceItemVM __instance)
+        {
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(__instance.Faction1);
+            refresher.Refresh(__instance.Faction2);
         }
     }
 }
