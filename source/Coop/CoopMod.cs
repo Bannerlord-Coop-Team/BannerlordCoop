@@ -108,12 +108,6 @@ namespace Coop
             }
 
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
-#if DEBUG
-            isDeferredClientJoin = args.Any(a =>
-                    a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase)) &&
-                LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
-            isLiveTestRun = LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
-#endif
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
@@ -128,6 +122,13 @@ namespace Coop
 
             SetupLogging();
             InitializeCrashReporting();
+            
+#if DEBUG
+            isDeferredClientJoin = args.Any(a =>
+                                       a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase)) &&
+                                   LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
+            isLiveTestRun = LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
+#endif
 
             // Creates the handler during launch
             if (!isServer)
