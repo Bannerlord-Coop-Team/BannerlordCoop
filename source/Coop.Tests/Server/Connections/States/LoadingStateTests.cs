@@ -3,6 +3,7 @@ using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Network.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
@@ -81,6 +82,7 @@ namespace Coop.Tests.Server.Connections.States
             var state = connectionLogic.SetState<LoadingState>();
             StartReplay(state);
             Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
+            Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerConnectionStateChanged>());
             Assert.Equal(1, SignalCount(JoinSyncSignal.ReplayComplete));
             baselineSender.Verify(sender => sender.Send(playerPeer), Times.Never);
 
@@ -120,6 +122,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Assert
             Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerConnectionStateChanged>());
 
             Assert.False(serverComponent.TestNetwork.SentNetworkMessages.ContainsKey(playerPeer.Id));
             Assert.IsType<LoadingState>(connectionLogic.State);

@@ -20,6 +20,9 @@ public class GameInterface : IGameInterface
     // Applied at boot by CoopMod, not by PatchAll: the loading-window keepalive must already be live while a host waits on PatchAll itself
     public const string HARMONY_UI_LOADING_CATEGORY = "UILoadingPatches";
 
+    // Applied at boot by CoopMod so it is active before native first-time minor-faction initialization
+    public const string HARMONY_CONFIGURED_MINOR_FACTION_CATEGORY = "ConfiguredMinorFactionPatches";
+
     // Applied from CoopMod.OnGameStart because these patches compile types whose initializers require Game.Current
     public const string HARMONY_GAME_STARTED_CATEGORY = "GameStartedPatches";
 

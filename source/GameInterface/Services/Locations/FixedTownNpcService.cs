@@ -1,3 +1,4 @@
+using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -8,7 +9,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
-using TaleWorlds.ModuleManager;
 
 namespace GameInterface.Services.Locations;
 
@@ -28,8 +28,11 @@ internal sealed class FixedTownNpcService
     private readonly IObjectManager objectManager;
     private readonly Lazy<IReadOnlyList<FixedTownNpcDefinition>> definitions;
 
-    public FixedTownNpcService(ILogger logger, IObjectManager objectManager)
-        : this(logger, objectManager, () => ModuleHelper.GetXmlPath("Coop", XmlName))
+    public FixedTownNpcService(
+        ILogger logger,
+        IObjectManager objectManager,
+        ICoopModulePathResolver modulePathResolver)
+        : this(logger, objectManager, GetPathProvider(modulePathResolver))
     {
     }
 
@@ -39,6 +42,13 @@ internal sealed class FixedTownNpcService
         this.objectManager = objectManager;
         definitions = new Lazy<IReadOnlyList<FixedTownNpcDefinition>>(
             () => ReadDefinitions(pathProvider(), logger));
+    }
+
+    private static Func<string> GetPathProvider(ICoopModulePathResolver modulePathResolver)
+    {
+        if (modulePathResolver == null) throw new ArgumentNullException(nameof(modulePathResolver));
+
+        return () => modulePathResolver.GetXmlPath(XmlName);
     }
 
     public void Populate(Settlement settlement)

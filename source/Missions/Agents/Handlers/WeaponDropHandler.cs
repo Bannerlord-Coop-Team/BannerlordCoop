@@ -74,15 +74,15 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     private void WeaponDropReceive(MessagePayload<NetworkWeaponDropped> obj)
     {
-        if (!networkAgentRegistry.TryGetAgentInfo(obj.What.AgentId, out var agentInfo))
-        {
-            Logger.Warning("No agent found for {guid} in {class}", obj.What.AgentId, typeof(WeaponDropHandler));
-            return;
-        }
-
-        var agent = agentInfo.Agent;
         GameThread.RunSafe(() =>
         {
+            if (!networkAgentRegistry.TryGetAgentInfo(obj.What.AgentId, out var agentInfo))
+            {
+                Logger.Warning("No agent found for {guid} in {class}", obj.What.AgentId, typeof(WeaponDropHandler));
+                return;
+            }
+
+            var agent = agentInfo.Agent;
             if (agent.GetWeaponEntityFromEquipmentSlot(obj.What.EquipmentIndex) == null)
             {
                 Logger.Error($"Tried to drop a weapon from an empty slot ({obj.What.EquipmentIndex})");
