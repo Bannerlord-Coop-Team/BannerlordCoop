@@ -111,7 +111,6 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
                 var agent = info.Agent;
                 coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
                 registry.RemoveAgent(info.AgentId);
-                partyAgentMap.Forget(info.AgentId);
 
                 // A party id can carry a stale NPC binding when a host's ambient spawn batch raced its
                 // companion join record. It is still a departing party agent and must never be adopted.

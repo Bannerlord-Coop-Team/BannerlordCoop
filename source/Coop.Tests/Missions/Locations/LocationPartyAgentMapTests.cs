@@ -7,16 +7,16 @@ namespace Coop.Tests.Missions.Locations;
 public class LocationPartyAgentMapTests
 {
     [Fact]
-    public void RecordAndForget_TracksPartyIdentity()
+    public void Record_TracksPartyIdentityForMissionLifetime()
     {
         var map = new LocationPartyAgentMap();
         Guid agentId = Guid.NewGuid();
 
         map.Record(agentId);
-        Assert.True(map.Contains(agentId));
+        map.Record(agentId);
 
-        map.Forget(agentId);
-        Assert.False(map.Contains(agentId));
+        Assert.True(map.Contains(agentId));
+        Assert.False(map.Contains(Guid.Empty));
     }
 
     [Theory]

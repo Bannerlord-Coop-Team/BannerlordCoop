@@ -349,7 +349,6 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         if (agent == null || !_ownedCompanionIds.TryGetValue(agent, out Guid agentId)) return false;
 
         _ownedCompanionIds.Remove(agent);
-        partyAgentMap.Forget(agentId);
         coopMissionComponent.AgentRegistry.RemoveAgent(agentId);
         network.SendAll(new NetworkDespawnLocationAgents(
             new[] { agentId },
@@ -541,7 +540,6 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         if (newAgent == null)
         {
             Logger.Error("[LocationSync] Failed to spawn remote agent {AgentID} — removing agent.", agentData.AgentId);
-            partyAgentMap.Forget(agentData.AgentId);
             agentRegistry.RemoveAgent(agentData.AgentId);
             return;
         }

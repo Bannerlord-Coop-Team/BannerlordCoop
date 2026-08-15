@@ -176,7 +176,6 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
                 coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
                 registry.RemoveAgent(id);
                 bindingMap.Forget(id);
-                partyAgentMap.Forget(id);
                 pendingPointUses.Remove(id);
                 removed++;
             }
