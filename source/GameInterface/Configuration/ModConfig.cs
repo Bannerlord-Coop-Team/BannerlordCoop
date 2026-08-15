@@ -61,7 +61,7 @@ internal sealed class ModConfig : IModConfig
             ["persuasionSuccessChance"] = "VeryEasy",
             ["clanMemberDeathChance"] = "VeryEasy",
             ["battleDeath"] = "VeryEasy",
-            ["birthAndDeath"] = true,
+            ["birthAndDeath"] = false,
             ["autoAllocateClanMemberPerks"] = false,
         };
 

@@ -12,8 +12,8 @@
   // Levels: "VeryEasy" | "Easy" | "Realistic".
   "difficulty": {
     // Damage players take. VeryEasy is Bannerlord's new-campaign default.
-    // VeryEasy: -50% Damage
-    // Easy: -25% Damage
+    // VeryEasy: -75% Damage
+    // Easy: -50% Damage
     // Realistic: No change
     "playerReceivedDamage": "VeryEasy",
 
