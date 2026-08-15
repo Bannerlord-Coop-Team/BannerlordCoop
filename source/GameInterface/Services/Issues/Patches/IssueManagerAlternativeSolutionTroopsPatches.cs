@@ -109,12 +109,12 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
             isNegativeOptionShown: false, GameTexts.FindText("str_ok").ToString(), null, delegate
             {
                 MakeAlternativeTroopsReturn(troops);
+                MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId, troops));
                 if (ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registryAtDrainTime))
                 {
-                    registryAtDrainTime.Clear(localControllerId);
+                    registryAtDrainTime.Withdraw(localControllerId, troops);
                 }
                 _inquiryInFlight = false;
-                MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId));
             }, null), pauseGameActiveState: true);
     }
 
