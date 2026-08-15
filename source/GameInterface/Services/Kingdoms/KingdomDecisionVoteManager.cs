@@ -681,12 +681,15 @@ namespace GameInterface.Services.Kingdoms
             KingdomDecision.SupportStatus supportStatus = GetSupportStatusOfDecisionOutcome(chosenOutcome);
             state.Decision.SupportStatusOfFinalDecision = supportStatus;
             string notificationText = GetDecisionNotificationText(state.Decision, chosenOutcome, supportStatus);
-            if (state.Decision is MakePeaceKingdomDecision peaceDecision && CoopKingdomElection.TryRedirectPlayerPeaceOffer(state.Decision, chosenOutcome))
+
+            if (state.Decision is MakePeaceKingdomDecision peaceDecision && CoopKingdomElection.TryRedirectPlayerPeaceOffer(state.Decision, chosenOutcome)
+                && chosenOutcome is MakePeaceKingdomDecision.MakePeaceDecisionOutcome peaceOutcome && peaceOutcome.ShouldPeaceBeDeclared)
             {
                 messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
                     peaceDecision.Kingdom,
                     (Kingdom)peaceDecision.FactionToMakePeaceWith,
                     isPending: true));
+
                 if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
                 {
                     state.Decision.Kingdom.RemoveDecision(state.Decision);

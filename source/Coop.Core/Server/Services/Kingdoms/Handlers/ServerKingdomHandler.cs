@@ -59,7 +59,6 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
         messageBroker.Subscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
         messageBroker.Subscribe<PeaceOfferPendingStatusChanged>(Handle_PeaceOfferPendingStatusChanged);
-
     }
 
     private void HandleNetworkRequestCreateKingdom(MessagePayload<NetworkRequestCreateKingdom> obj)
