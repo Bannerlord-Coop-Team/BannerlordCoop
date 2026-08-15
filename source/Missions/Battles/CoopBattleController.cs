@@ -60,11 +60,6 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
-
-#if DEBUG
-    internal IBattleDamageRouter DebugDamageRouter => damageRouter;
-#endif
-
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;

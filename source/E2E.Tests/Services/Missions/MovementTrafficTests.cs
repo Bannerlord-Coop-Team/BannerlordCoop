@@ -84,53 +84,6 @@ public class MovementTrafficTests : MissionTestEnvironment
         });
     }
 
-#if DEBUG
-    [Fact]
-    public void PollMovement_BatchReuseTelemetryCountsOnlyPreexistingStorage()
-    {
-        using var fixture = new MissionEngineFixture();
-        var peer = Clients.First();
-        SetControllerId(peer, "peer");
-
-        peer.Call(() =>
-        {
-            var mock = CreateMovementMission(fixture, peer);
-            var registry = peer.Resolve<INetworkAgentRegistry>();
-            var component = peer.Resolve<ICoopMissionComponent>();
-            var handler = Assert.IsType<AgentMovementHandler>(
-                component.AgentMovementHandler);
-            var sender = Assert.IsType<MovementBatchSender>(
-                handler.DebugMovementBatchSender);
-            var mirrors = new List<MirrorAgent>();
-            sender.ResetDebugCounters();
-
-            for (int i = 0; i < 2; i++)
-            {
-                Agent agent = SpawnRider(mock);
-                Assert.True(AgentMirror.TryGet(agent, out var mirror));
-                mirrors.Add(mirror);
-                Assert.True(registry.TryRegisterAgent(
-                    "peer",
-                    Guid.NewGuid(),
-                    (ushort)(i + 1),
-                    agent));
-            }
-
-            component.AgentMovementHandler.PollMovement(0f);
-
-            Assert.Equal(1, sender.CreatedBatches);
-            Assert.Equal(0, sender.ReusedBatches);
-
-            foreach (MirrorAgent mirror in mirrors)
-                mirror.Position = new Vec3(1f, 0f, 0f);
-            component.AgentMovementHandler.PollMovement(0.025f);
-
-            Assert.Equal(1, sender.CreatedBatches);
-            Assert.Equal(1, sender.ReusedBatches);
-        });
-    }
-#endif
-
     [Fact]
     public void PollMovement_TournamentProfileUsesSixtyHertzCadence()
     {

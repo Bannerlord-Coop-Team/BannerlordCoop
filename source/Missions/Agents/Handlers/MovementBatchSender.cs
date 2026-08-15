@@ -10,16 +10,6 @@ namespace Missions.Agents.Handlers;
 
 public interface IMovementBatchSender
 {
-#if DEBUG
-    long ReusedBatches { get; }
-
-    long CreatedBatches { get; }
-
-    long RotatedSnapshotCopiesAvoided { get; }
-
-    void ResetDebugCounters();
-#endif
-
     void BeginFrame(float elapsedSeconds);
 
     MovementSendResult Send<T>(
@@ -98,22 +88,6 @@ public sealed class MovementBatchSender : IMovementBatchSender
     private readonly Func<IMovementTrafficBudget> trafficBudgetFactory;
     private readonly Dictionary<string, RecipientState> recipients =
         new Dictionary<string, RecipientState>(StringComparer.Ordinal);
-#if DEBUG
-    public long ReusedBatches { get; private set; }
-    public long CreatedBatches { get; private set; }
-    public long RotatedSnapshotCopiesAvoided { get; private set; }
-
-    internal void RecordReusedBatch() => ReusedBatches++;
-
-    internal void RecordCreatedBatch() => CreatedBatches++;
-
-    public void ResetDebugCounters()
-    {
-        ReusedBatches = 0;
-        CreatedBatches = 0;
-        RotatedSnapshotCopiesAvoided = 0;
-    }
-#endif
 
     private sealed class RecipientState
     {
@@ -258,10 +232,6 @@ public sealed class MovementBatchSender : IMovementBatchSender
         int offset = recipient.SendOffsets.TryGetValue(fairnessKey, out int previousOffset)
             ? previousOffset % batch.Data.Count
             : 0;
-#if DEBUG
-        if (offset != 0)
-            RotatedSnapshotCopiesAvoided += batch.Data.Count;
-#endif
         var fallbackKey = (typeof(T), batch.IdentityScopeId);
         MovementIdFormat idFormat =
             batch.IdentityScopeId == null || recipient.CanonicalIdFallbacks.Contains(fallbackKey)

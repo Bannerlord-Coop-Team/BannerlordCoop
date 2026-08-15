@@ -3,7 +3,6 @@ using Missions.Agents.Packets;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -35,15 +34,6 @@ public interface IAgentPositionInterpolator
         out Vec3 position,
         out Vec3 lookDirection,
         out long updateSequence);
-
-#if DEBUG
-    /// <summary>Read the visible mounted target's current drift and age for contact diagnostics.</summary>
-    bool TryGetMountedTargetTelemetry(
-        Agent agent,
-        out float drift,
-        out float targetAge);
-#endif
-
     /// <summary>[Game thread] Apply each tracked agent's latest native target frame.</summary>
     void Tick(float dt);
 
@@ -86,64 +76,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
     private long updateSequence;
-#if DEBUG
-    internal sealed class HotPathSnapshot
-    {
-        public float WindowSeconds { get; set; }
-        public long InterpolatorTicks { get; set; }
-        public double InterpolatorMilliseconds { get; set; }
-        public long MountedTargets { get; set; }
-        public long MountedCorrections { get; set; }
-        public long ContinuousStateAttempts { get; set; }
-        public long ContinuousStateWrites { get; set; }
-        public long LookAttempts { get; set; }
-        public long LookWrites { get; set; }
-        public double LookReplayMilliseconds { get; set; }
-        public float MaximumMountedDrift { get; set; }
-        public float MaximumMountedTargetAge { get; set; }
-    }
-
-    private readonly HotPathSnapshot hotPath = new HotPathSnapshot();
-    private long interpolatorStopwatchTicks;
-    private long lookReplayStopwatchTicks;
-
-    internal HotPathSnapshot TakeDebugSnapshot(float windowSeconds)
-    {
-        var snapshot = new HotPathSnapshot
-        {
-            WindowSeconds = windowSeconds,
-            InterpolatorTicks = hotPath.InterpolatorTicks,
-            InterpolatorMilliseconds = ToMilliseconds(
-                interpolatorStopwatchTicks),
-            MountedTargets = hotPath.MountedTargets,
-            MountedCorrections = hotPath.MountedCorrections,
-            ContinuousStateAttempts = hotPath.ContinuousStateAttempts,
-            ContinuousStateWrites = hotPath.ContinuousStateWrites,
-            LookAttempts = hotPath.LookAttempts,
-            LookWrites = hotPath.LookWrites,
-            LookReplayMilliseconds = ToMilliseconds(
-                lookReplayStopwatchTicks),
-            MaximumMountedDrift = hotPath.MaximumMountedDrift,
-            MaximumMountedTargetAge = hotPath.MaximumMountedTargetAge
-        };
-
-        hotPath.InterpolatorTicks = 0;
-        hotPath.MountedTargets = 0;
-        hotPath.MountedCorrections = 0;
-        hotPath.ContinuousStateAttempts = 0;
-        hotPath.ContinuousStateWrites = 0;
-        hotPath.LookAttempts = 0;
-        hotPath.LookWrites = 0;
-        hotPath.MaximumMountedDrift = 0f;
-        hotPath.MaximumMountedTargetAge = 0f;
-        interpolatorStopwatchTicks = 0;
-        lookReplayStopwatchTicks = 0;
-        return snapshot;
-    }
-
-    private static double ToMilliseconds(long stopwatchTicks) =>
-        stopwatchTicks * 1000d / Stopwatch.Frequency;
-#endif
 
     public AgentPositionInterpolator() : this(null) { }
 
@@ -278,33 +210,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         targetUpdateSequence = target.UpdateSequence;
         return true;
     }
-
-#if DEBUG
-    public bool TryGetMountedTargetTelemetry(
-        Agent agent,
-        out float drift,
-        out float targetAge)
-    {
-        drift = 0f;
-        targetAge = 0f;
-        if (agent == null)
-            return false;
-
-        Agent rider = agent.IsMount ? agent.RiderAgent : agent;
-        Agent mount = agent.IsMount ? agent : rider?.MountAgent;
-        if (rider == null || mount == null ||
-            !_targets.TryGetValue(rider, out TargetFrame target) ||
-            !target.HasMountSnapPosition)
-        {
-            return false;
-        }
-
-        drift = mount.Position.Distance(target.MountSnapPosition);
-        targetAge = Math.Max(0f, elapsed - target.UpdatedAt);
-        return true;
-    }
-#endif
-
     public void Clear()
     {
         _targets.Clear();
@@ -319,9 +224,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
     public void ReplayLookDirections()
     {
-#if DEBUG
-        long startedAt = Stopwatch.GetTimestamp();
-#endif
         foreach (var pair in _targets)
         {
             Agent agent = pair.Key;
@@ -340,35 +242,22 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             TargetFrame target = pair.Value;
             if (agent.MountAgent != null && target.HasMountSnapPosition)
             {
-                RecordLookWrite(
-                    target.MountedRiderState.ApplyLookDirection(agent));
-                RecordLookWrite(
-                    target.AgentState.ApplyLookDirection(agent.MountAgent));
+                target.MountedRiderState.ApplyLookDirection(agent);
+                target.AgentState.ApplyLookDirection(agent.MountAgent);
             }
             else
             {
-                RecordLookWrite(
-                    target.AgentState.ApplyLookDirection(agent));
+                target.AgentState.ApplyLookDirection(agent);
             }
         }
-#if DEBUG
-        lookReplayStopwatchTicks += Stopwatch.GetTimestamp() - startedAt;
-#endif
     }
 
     public void Tick(float dt)
     {
         if (dt <= 0f) return;
-#if DEBUG
-        long startedAt = Stopwatch.GetTimestamp();
-        hotPath.InterpolatorTicks++;
-#endif
         elapsed += dt;
         if (_targets.Count == 0)
         {
-#if DEBUG
-            interpolatorStopwatchTicks += Stopwatch.GetTimestamp() - startedAt;
-#endif
             return;
         }
 
@@ -407,9 +296,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             // Mounted riders are eased onto their horse's reported position directly, so they don't use snapDistance.
             if (agent.MountAgent != null)
             {
-#if DEBUG
-                hotPath.MountedTargets++;
-#endif
                 FollowMounted(agent, pair.Value, dt);
                 continue;
             }
@@ -428,8 +314,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 MoveTowardTarget(agent, pair.Value);
             else
                 Teleport(agent, pair.Value);
-            RecordContinuousState(
-                pair.Value.AgentState.Apply(agent));
+            pair.Value.AgentState.Apply(agent);
         }
 
         if (staleTargets > 0)
@@ -444,9 +329,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             }
             _evict.Clear();
         }
-#if DEBUG
-        interpolatorStopwatchTicks += Stopwatch.GetTimestamp() - startedAt;
-#endif
     }
 
     private void LogStaleTargets(
@@ -513,14 +395,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         Vec3 mountTarget = target.HasMountSnapPosition ? target.MountSnapPosition : target.Position;
         Vec3 cur = mount.Position;
         float distance = cur.Distance(mountTarget);
-#if DEBUG
-        hotPath.MaximumMountedDrift = Math.Max(
-            hotPath.MaximumMountedDrift,
-            distance);
-        hotPath.MaximumMountedTargetAge = Math.Max(
-            hotPath.MaximumMountedTargetAge,
-            elapsed - target.UpdatedAt);
-#endif
         bool hasGuardPresentation = HasGuardPresentation(rider);
         if (hasGuardPresentation)
         {
@@ -529,10 +403,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                     out long processedSequence) &&
                 processedSequence == target.UpdateSequence)
             {
-                RecordContinuousState(
-                    target.AgentState.Apply(mount));
-                RecordContinuousState(
-                    target.MountedRiderState.Apply(rider));
+                target.AgentState.Apply(mount);
+                target.MountedRiderState.Apply(rider);
                 return;
             }
 
@@ -540,19 +412,15 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 target.UpdateSequence;
             if (distance <= MountedGuardPositionTolerance)
             {
-                RecordContinuousState(
-                    target.AgentState.Apply(mount));
-                RecordContinuousState(
-                    target.MountedRiderState.Apply(rider));
+                target.AgentState.Apply(mount);
+                target.MountedRiderState.Apply(rider);
                 return;
             }
         }
         if (distance <= MountedPositionEpsilon)
         {
-            RecordContinuousState(
-                target.AgentState.Apply(mount));
-            RecordContinuousState(
-                target.MountedRiderState.Apply(rider));
+            target.AgentState.Apply(mount);
+            target.MountedRiderState.Apply(rider);
             return;
         }
 
@@ -564,14 +432,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             : cur + ((mountTarget - cur) * alpha);
 
         mount.TeleportToPosition(next);
-#if DEBUG
-        hotPath.MountedCorrections++;
-#endif
         // Teleporting a horse rewrites its rider's movement basis. Install both owner snapshots once afterward.
-        RecordContinuousState(
-            target.AgentState.Apply(mount));
-        RecordContinuousState(
-            target.MountedRiderState.Apply(rider));
+        target.AgentState.Apply(mount);
+        target.MountedRiderState.Apply(rider);
     }
 
     private static bool HasGuardPresentation(Agent rider)
@@ -702,55 +565,35 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                     agent.MovementFlags));
         }
 
-        public int Apply(Agent agent)
+        public void Apply(Agent agent)
         {
             if (agent == null ||
                 !agent.IsActive() ||
                 agent.Health <= 0f)
             {
-                return 0;
+                return;
             }
 
-            int writes = 0;
-            if (AgentData.ApplyMovementDirection(
-                    agent,
-                    MovementDirection)) writes++;
-            if (AgentData.ApplyLookDirection(agent, LookDirection)) writes++;
-            if (AgentData.ApplyMovementInput(agent, MovementInput)) writes++;
+            AgentData.ApplyMovementDirection(agent, MovementDirection);
+            AgentData.ApplyLookDirection(agent, LookDirection);
+            AgentData.ApplyMovementInput(agent, MovementInput);
             // Native continuous-state setters can consume or rewrite the move mask. Install it last so the
             // upcoming Agent tick sees the owner's translation and turn inputs.
-            if (AgentData.ApplyLocomotionMovementFlags(
-                    agent,
-                    (Agent.MovementControlFlag)MovementFlags)) writes++;
-            return writes;
+            AgentData.ApplyLocomotionMovementFlags(
+                agent,
+                (Agent.MovementControlFlag)MovementFlags);
         }
 
-        public bool ApplyLookDirection(Agent agent)
+        public void ApplyLookDirection(Agent agent)
         {
             if (agent == null ||
                 !agent.IsActive() ||
                 agent.Health <= 0f)
             {
-                return false;
+                return;
             }
 
-            return AgentData.ApplyLookDirection(agent, LookDirection);
+            AgentData.ApplyLookDirection(agent, LookDirection);
         }
-    }
-
-    private void RecordContinuousState(int writes)
-    {
-#if DEBUG
-        hotPath.ContinuousStateAttempts += 4;
-        hotPath.ContinuousStateWrites += writes;
-#endif
-    }
-
-    private void RecordLookWrite(bool wrote)
-    {
-#if DEBUG
-        hotPath.LookAttempts++;
-        if (wrote) hotPath.LookWrites++;
-#endif
     }
 }

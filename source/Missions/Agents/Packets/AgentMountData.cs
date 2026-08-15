@@ -185,18 +185,17 @@ namespace Missions.Agents.Packets
                 mountAgent.SetMaximumSpeedLimit(MountSpeed, isMultiplier: false);
         }
 
-        internal int ApplyContinuousState(Agent mountAgent)
+        internal void ApplyContinuousState(Agent mountAgent)
         {
-            int writes = 0;
-            if (AgentData.ApplyMovementDirection(
-                    mountAgent,
-                    MountMovementDirection)) writes++;
-            if (AgentData.ApplyLookDirection(
-                    mountAgent,
-                    MountLookDirection)) writes++;
-            if (AgentData.ApplyMovementInput(
-                    mountAgent,
-                    GetMovementInput())) writes++;
+            AgentData.ApplyMovementDirection(
+                mountAgent,
+                MountMovementDirection);
+            AgentData.ApplyLookDirection(
+                mountAgent,
+                MountLookDirection);
+            AgentData.ApplyMovementInput(
+                mountAgent,
+                GetMovementInput());
 
             bool stationaryTurn = MountSpeed <= StationarySpeedThreshold
                 && MountAction0TurnDirection != NoTurn;
@@ -210,10 +209,9 @@ namespace Missions.Agents.Packets
                     movementFlags,
                     MountAction0TurnDirection);
             }
-            if (AgentData.ApplyLocomotionMovementFlags(
-                    mountAgent,
-                    movementFlags)) writes++;
-            return writes;
+            AgentData.ApplyLocomotionMovementFlags(
+                mountAgent,
+                movementFlags);
         }
 
         internal Vec2 GetMovementInput()

@@ -13,7 +13,7 @@ namespace Missions.Agents.Packets
             return movementFlags & Agent.MovementControlFlag.MoveMask;
         }
 
-        internal static bool ApplyLocomotionMovementFlags(
+        internal static void ApplyLocomotionMovementFlags(
             Agent agent,
             Agent.MovementControlFlag movementFlags)
         {
@@ -24,13 +24,12 @@ namespace Missions.Agents.Packets
                 currentFlags |
                 GetLocomotionMovementFlags(movementFlags);
             if (currentMovementFlags == desiredMovementFlags)
-                return false;
+                return;
 
             agent.MovementFlags = desiredMovementFlags;
-            return true;
         }
 
-        internal static bool ApplyMovementDirection(
+        internal static void ApplyMovementDirection(
             Agent agent,
             Vec2 movementDirection)
         {
@@ -38,14 +37,13 @@ namespace Missions.Agents.Packets
             if (current.X == movementDirection.X &&
                 current.Y == movementDirection.Y)
             {
-                return false;
+                return;
             }
 
             agent.SetMovementDirection(movementDirection);
-            return true;
         }
 
-        internal static bool ApplyLookDirection(
+        internal static void ApplyLookDirection(
             Agent agent,
             Vec3 lookDirection)
         {
@@ -54,14 +52,13 @@ namespace Missions.Agents.Packets
                 current.Y == lookDirection.Y &&
                 current.Z == lookDirection.Z)
             {
-                return false;
+                return;
             }
 
             agent.LookDirection = lookDirection;
-            return true;
         }
 
-        internal static bool ApplyMovementInput(
+        internal static void ApplyMovementInput(
             Agent agent,
             Vec2 movementInput)
         {
@@ -69,11 +66,10 @@ namespace Missions.Agents.Packets
             if (current.X == movementInput.X &&
                 current.Y == movementInput.Y)
             {
-                return false;
+                return;
             }
 
             agent.MovementInputVector = movementInput;
-            return true;
         }
 
         public AgentData(
@@ -147,19 +143,14 @@ namespace Missions.Agents.Packets
             }
         }
 
-        internal int ApplyContinuousState(Agent agent)
+        internal void ApplyContinuousState(Agent agent)
         {
-            int writes = 0;
-            if (ApplyMovementDirection(agent, MovementDirection)) writes++;
-            if (ApplyLookDirection(agent, LookDirection)) writes++;
-            if (ApplyMovementInput(agent, GetMovementInput(agent))) writes++;
-            if (ApplyLocomotionMovementFlags(
-                    agent,
-                    (Agent.MovementControlFlag)MovementFlag))
-            {
-                writes++;
-            }
-            return writes;
+            ApplyMovementDirection(agent, MovementDirection);
+            ApplyLookDirection(agent, LookDirection);
+            ApplyMovementInput(agent, GetMovementInput(agent));
+            ApplyLocomotionMovementFlags(
+                agent,
+                (Agent.MovementControlFlag)MovementFlag);
         }
 
         internal Vec2 GetMovementInput(Agent agent)

@@ -79,13 +79,7 @@ public class NetworkAgentShootSerializationTests
             blow,
             default,
             missileShotSequence: 4_500_000_123L,
-            attackerWeapon: attackerWeapon
-#if DEBUG
-            , debugRoutedHitId: Guid.NewGuid(),
-            debugAttackerControllerId: "attacker",
-            debugAttackerIsAi: true
-#endif
-            );
+            attackerWeapon: attackerWeapon);
 
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(original, serializer);
@@ -98,10 +92,5 @@ public class NetworkAgentShootSerializationTests
         Assert.Equal(4_500_000_123L, result.MissileShotSequence);
         Assert.NotNull(result.AttackerWeapon);
         Assert.Equal(WeaponClass.Arrow, result.AttackerWeapon.WeaponClass);
-#if DEBUG
-        Assert.Equal(original.DebugRoutedHitId, result.DebugRoutedHitId);
-        Assert.Equal("attacker", result.DebugAttackerControllerId);
-        Assert.True(result.DebugAttackerIsAi);
-#endif
     }
 }

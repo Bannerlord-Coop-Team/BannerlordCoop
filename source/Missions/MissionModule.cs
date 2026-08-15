@@ -35,10 +35,6 @@ public class MissionModule : Module
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
     internal const string WeaponDropPatchCategory = "CoopWeaponDropPatches";
     internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
-#if DEBUG
-    internal const string LiveTestInputPatchCategory =
-        "CoopLiveTestInputPatches";
-#endif
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -251,10 +247,5 @@ public class MissionModule : Module
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AgentPickupPatch).Assembly,
             WeaponPickupPatchCategory);
-#if DEBUG
-        yield return new HarmonyPatchCategoryRegistration(
-            typeof(JoustInputBoundaryPatch).Assembly,
-            LiveTestInputPatchCategory);
-#endif
     }
 }

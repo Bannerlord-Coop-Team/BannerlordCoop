@@ -26,15 +26,6 @@ public interface IBattleDamageRouter : IDisposable
 {
     void Tick(float dt);
     void FlushForMissionEnd();
-#if DEBUG
-    BattleDamageRouter.RoutedDamageDebugSnapshot GetRoutedDamageDebugSnapshot(
-        Guid routedHitId);
-    BattleDamageRouter.RoutedDamageDebugSnapshot GetIncomingAiDamageSourceDebugSnapshot(
-        Guid victimRiderAgentId,
-        string attackerControllerId,
-        string victimControllerId,
-        long afterSequence);
-#endif
 }
 
 /// <inheritdoc cref="IBattleDamageRouter"/>
@@ -61,67 +52,6 @@ public class BattleDamageRouter : IBattleDamageRouter
     private float presentationTime;
     private bool disposed;
     private bool closing;
-
-#if DEBUG
-    private readonly Dictionary<Guid, RoutedDamageDebugRecord>
-        routedDamageDebugRecords = new Dictionary<Guid, RoutedDamageDebugRecord>();
-    private readonly Queue<Guid> routedDamageDebugHistory = new Queue<Guid>();
-    private long routedDamageDebugSequence;
-    private const int RoutedDamageDebugHistoryLimit = 2048;
-
-    public sealed class RoutedDamageDebugVector
-    {
-        public RoutedDamageDebugVector(Vec3 value)
-        {
-            X = value.X;
-            Y = value.Y;
-            Z = value.Z;
-        }
-
-        public float X { get; }
-        public float Y { get; }
-        public float Z { get; }
-    }
-
-    public sealed class RoutedDamageDebugSnapshot
-    {
-        public long Sequence { get; set; }
-        public Guid RoutedHitId { get; set; }
-        public Guid AttackerAgentId { get; set; }
-        public bool TargetIsMount { get; set; }
-        public Guid RiderAgentId { get; set; }
-        public Guid MountAgentId { get; set; }
-        public Guid VictimAgentId { get; set; }
-        public Guid ActualVictimAgentId { get; set; }
-        public string AttackerControllerId { get; set; }
-        public string VictimControllerId { get; set; }
-        public bool AttackerIsAi { get; set; }
-        public bool ContactTelemetryAvailable { get; set; }
-        public int AttackerIndex { get; set; }
-        public int VictimIndex { get; set; }
-        public int RoutedDamage { get; set; }
-        public int InputDamage { get; set; }
-        public float AppliedDamage { get; set; }
-        public float HealthBefore { get; set; }
-        public float HealthAfter { get; set; }
-        public string CollisionResult { get; set; }
-        public string VictimHitBodyPart { get; set; }
-        public RoutedDamageDebugVector CollisionPosition { get; set; }
-        public RoutedDamageDebugVector BlowDirection { get; set; }
-        public float AttackProgress { get; set; }
-        public float MountedSpeed { get; set; }
-        public float TargetDrift { get; set; }
-        public float TargetAge { get; set; }
-        public bool NetworkApplySent { get; set; }
-        public bool OwnerApplied { get; set; }
-    }
-
-    private sealed class RoutedDamageDebugRecord
-    {
-        public RoutedDamageDebugSnapshot Snapshot { get; set; }
-    }
-#endif
-
     private const int MinimumPresentationEpochs = 2;
     private const int MaxReconstructionHistory = 4096;
     private const double DamageTimeoutSeconds = 4d;
@@ -239,10 +169,6 @@ public class BattleDamageRouter : IBattleDamageRouter
         reconstructions.Clear();
         reconstructionHistory.Clear();
         noHealthReductionWarnings.Clear();
-#if DEBUG
-        routedDamageDebugRecords.Clear();
-        routedDamageDebugHistory.Clear();
-#endif
         while (inboundDamage.TryDequeue(out _)) { }
 
         if (BattleSpawnGate.MountAuthorityProbe == mountAuthorityProbe)
@@ -321,13 +247,6 @@ public class BattleDamageRouter : IBattleDamageRouter
     {
         if (disposed || closing)
             return;
-
-#if DEBUG
-        RecordMountedContactTelemetryForActors(
-            payload.What.Attacker,
-            payload.What.Victim);
-#endif
-
         var registry = coopMissionComponent.AgentRegistry;
         Guid attackerId = Guid.Empty;
         if (payload.What.Attacker != null
@@ -387,55 +306,6 @@ public class BattleDamageRouter : IBattleDamageRouter
 
         pendingLocalDamage.Enqueue(pending);
     }
-
-#if DEBUG
-    private void RecordMountedContactTelemetryForActors(
-        Agent attacker,
-        Agent victim)
-    {
-        IAgentMovementHandler movementHandler =
-            coopMissionComponent.AgentMovementHandler;
-        if (!(movementHandler is IAgentMovementDebugControl debugControl))
-        {
-            return;
-        }
-
-        bool hasAttacker = TryGetMountedContactTelemetry(
-            movementHandler.Interpolator,
-            attacker,
-            out float attackerDrift,
-            out float attackerTargetAge);
-        float victimDrift = 0f;
-        float victimTargetAge = 0f;
-        bool hasVictim = !ReferenceEquals(attacker, victim) &&
-            TryGetMountedContactTelemetry(
-                movementHandler.Interpolator,
-                victim,
-                out victimDrift,
-                out victimTargetAge);
-        if (!hasAttacker && !hasVictim)
-            return;
-
-        debugControl.RecordMountedContact(
-            Math.Max(attackerDrift, victimDrift),
-            Math.Max(attackerTargetAge, victimTargetAge));
-    }
-
-    private static bool TryGetMountedContactTelemetry(
-        IAgentPositionInterpolator interpolator,
-        Agent agent,
-        out float drift,
-        out float targetAge)
-    {
-        drift = 0f;
-        targetAge = 0f;
-        return interpolator.TryGetMountedTargetTelemetry(
-            agent,
-            out drift,
-            out targetAge);
-    }
-#endif
-
     private void DrainPendingLocalDamage(bool force = false)
     {
         int count = pendingLocalDamage.Count;
@@ -483,40 +353,13 @@ public class BattleDamageRouter : IBattleDamageRouter
                     hit.Blow.IsMissile,
                     pending.ShotSequence);
             }
-#if DEBUG
-            Guid routedHitId = Guid.NewGuid();
-#endif
             network.SendAll(new NetworkApplyBattleDamage(
                 victimInfo.AgentId,
                 pending.AttackerId,
                 hit.Blow,
                 hit.CollisionData,
                 missileShotSequence: pending.ShotSequence,
-                attackerWeapon: pending.AttackerWeapon
-#if DEBUG
-                , debugRoutedHitId: routedHitId,
-                debugAttackerControllerId:
-                    TryGetAgentControllerId(hit.Attacker),
-                debugAttackerIsAi: hit.Attacker?.IsAIControlled == true
-#endif
-                ));
-#if DEBUG
-            RecordRoutedDamageSent(
-                pending,
-                routedHitId,
-                hit.Victim?.IsMount ?? hit.IsMount,
-                hit.Victim?.IsMount == true &&
-                hit.Victim.RiderAgent is Agent registeredMountRider &&
-                registry.TryGetAgentInfo(registeredMountRider, out var mountRiderInfo)
-                    ? mountRiderInfo.AgentId
-                    : Guid.Empty,
-                hit.Victim?.IsMount == true
-                    ? victimInfo.AgentId
-                    : Guid.Empty,
-                victimInfo.AgentId,
-                victimInfo.AgentId,
-                hit.Victim);
-#endif
+                attackerWeapon: pending.AttackerWeapon));
             return;
         }
 
@@ -542,9 +385,6 @@ public class BattleDamageRouter : IBattleDamageRouter
                     hit.Blow.IsMissile,
                     pending.ShotSequence);
             }
-#if DEBUG
-            Guid routedHitId = Guid.NewGuid();
-#endif
             network.SendAll(new NetworkApplyBattleDamage(
                 riderInfo.AgentId,
                 pending.AttackerId,
@@ -552,26 +392,7 @@ public class BattleDamageRouter : IBattleDamageRouter
                 hit.CollisionData,
                 isMount: true,
                 missileShotSequence: pending.ShotSequence,
-                attackerWeapon: pending.AttackerWeapon
-#if DEBUG
-                , debugRoutedHitId: routedHitId,
-                debugAttackerControllerId:
-                    TryGetAgentControllerId(hit.Attacker),
-                debugAttackerIsAi: hit.Attacker?.IsAIControlled == true
-#endif
-                ));
-#if DEBUG
-            Guid mountAgentId = TryGetRegisteredAgentId(hit.Victim);
-            RecordRoutedDamageSent(
-                pending,
-                routedHitId,
-                true,
-                riderInfo.AgentId,
-                mountAgentId,
-                riderInfo.AgentId,
-                mountAgentId,
-                hit.Victim);
-#endif
+                attackerWeapon: pending.AttackerWeapon));
             return;
         }
 
@@ -587,238 +408,6 @@ public class BattleDamageRouter : IBattleDamageRouter
             hit.Victim?.IsMount ?? hit.IsMount,
             hit.Blow.IsMissile);
     }
-
-#if DEBUG
-    public RoutedDamageDebugSnapshot GetRoutedDamageDebugSnapshot(
-        Guid routedHitId)
-    {
-        if (routedDamageDebugRecords.TryGetValue(
-                routedHitId,
-                out RoutedDamageDebugRecord record))
-        {
-            return record.Snapshot;
-        }
-
-        RoutedDamageDebugSnapshot latest = null;
-        foreach (var candidate in routedDamageDebugRecords.Values)
-        {
-            if ((routedHitId == Guid.Empty ||
-                 candidate.Snapshot.AttackerAgentId == routedHitId) &&
-                (latest == null ||
-                 candidate.Snapshot.Sequence > latest.Sequence))
-            {
-                latest = candidate.Snapshot;
-            }
-        }
-
-        return latest;
-    }
-
-    public RoutedDamageDebugSnapshot GetIncomingAiDamageSourceDebugSnapshot(
-        Guid victimRiderAgentId,
-        string attackerControllerId,
-        string victimControllerId,
-        long afterSequence)
-    {
-        if (victimRiderAgentId == Guid.Empty ||
-            string.IsNullOrEmpty(attackerControllerId) ||
-            string.IsNullOrEmpty(victimControllerId))
-        {
-            return null;
-        }
-
-        RoutedDamageDebugSnapshot latest = null;
-        foreach (var candidate in routedDamageDebugRecords.Values)
-        {
-            RoutedDamageDebugSnapshot snapshot = candidate.Snapshot;
-            if (snapshot.Sequence > afterSequence &&
-                snapshot.AttackerIsAi &&
-                !snapshot.OwnerApplied &&
-                snapshot.ContactTelemetryAvailable &&
-                snapshot.AttackerControllerId == attackerControllerId &&
-                snapshot.VictimControllerId == victimControllerId &&
-                (snapshot.VictimAgentId == victimRiderAgentId ||
-                 snapshot.RiderAgentId == victimRiderAgentId) &&
-                (latest == null || snapshot.Sequence > latest.Sequence))
-            {
-                latest = snapshot;
-            }
-        }
-
-        return latest;
-    }
-
-    private void RecordRoutedDamageSent(
-        PendingLocalDamage pending,
-        Guid routedHitId,
-        bool targetIsMount,
-        Guid riderAgentId,
-        Guid mountAgentId,
-        Guid victimAgentId,
-        Guid actualVictimAgentId,
-        Agent nativeVictim)
-    {
-        Guid attackerAgentId = pending.AttackerId;
-        if (attackerAgentId == Guid.Empty)
-            return;
-
-        Agent nativeAttacker = pending.Hit.Attacker;
-        float targetDrift = 0f;
-        float targetAge = 0f;
-        bool contactTelemetryAvailable = TryGetMountedContactTelemetry(
-            coopMissionComponent.AgentMovementHandler.Interpolator,
-            nativeVictim,
-            out targetDrift,
-            out targetAge);
-        var snapshot = new RoutedDamageDebugSnapshot
-        {
-            Sequence = ++routedDamageDebugSequence,
-            RoutedHitId = routedHitId,
-            AttackerAgentId = attackerAgentId,
-            TargetIsMount = targetIsMount,
-            RiderAgentId = riderAgentId,
-            MountAgentId = mountAgentId,
-            VictimAgentId = victimAgentId,
-            ActualVictimAgentId = actualVictimAgentId,
-            AttackerControllerId = TryGetAgentControllerId(nativeAttacker),
-            VictimControllerId = TryGetAgentControllerId(nativeVictim),
-            AttackerIsAi = nativeAttacker?.IsAIControlled == true,
-            ContactTelemetryAvailable = contactTelemetryAvailable,
-            AttackerIndex = nativeAttacker?.Index ?? -1,
-            VictimIndex = nativeVictim?.Index ?? -1,
-            RoutedDamage = pending.Hit.Blow.InflictedDamage,
-            InputDamage = pending.Hit.Blow.InflictedDamage,
-            AppliedDamage = 0f,
-            HealthBefore = nativeVictim?.Health ?? -1f,
-            HealthAfter = nativeVictim?.Health ?? -1f,
-            CollisionResult =
-                pending.Hit.CollisionData.CollisionResult.ToString(),
-            VictimHitBodyPart =
-                pending.Hit.CollisionData.VictimHitBodyPart.ToString(),
-            CollisionPosition = new RoutedDamageDebugVector(
-                pending.Hit.CollisionData.CollisionGlobalPosition),
-            BlowDirection = new RoutedDamageDebugVector(
-                pending.Hit.Blow.Direction),
-            AttackProgress = pending.Hit.CollisionData.AttackProgress,
-            MountedSpeed = nativeAttacker?.MountAgent?
-                .GetRealGlobalVelocity().AsVec2.Length ?? 0f,
-            TargetDrift = targetDrift,
-            TargetAge = targetAge,
-            NetworkApplySent = true,
-            OwnerApplied = false,
-        };
-        StoreRoutedDamageDebugSnapshot(snapshot);
-    }
-
-    private void RecordRoutedDamageApplied(
-        NetworkApplyBattleDamage damage,
-        Agent attacker,
-        Agent victim,
-        int routedDamage,
-        int inputDamage,
-        float appliedDamage,
-        float healthBefore,
-        float healthAfter)
-    {
-        if (damage.AttackerAgentId == Guid.Empty ||
-            damage.DebugRoutedHitId == Guid.Empty)
-            return;
-
-        float targetDrift = 0f;
-        float targetAge = 0f;
-        bool contactTelemetryAvailable = TryGetMountedContactTelemetry(
-            coopMissionComponent.AgentMovementHandler.Interpolator,
-            victim,
-            out targetDrift,
-            out targetAge);
-        var snapshot = new RoutedDamageDebugSnapshot
-        {
-            Sequence = ++routedDamageDebugSequence,
-            RoutedHitId = damage.DebugRoutedHitId,
-            AttackerAgentId = damage.AttackerAgentId,
-            TargetIsMount = victim.IsMount,
-            RiderAgentId = damage.IsMount
-                ? damage.VictimAgentId
-                : TryGetRegisteredAgentId(victim.RiderAgent),
-            MountAgentId = victim.IsMount
-                ? TryGetRegisteredAgentId(victim)
-                : Guid.Empty,
-            VictimAgentId = damage.VictimAgentId,
-            ActualVictimAgentId = victim.IsMount
-                ? TryGetRegisteredAgentId(victim)
-                : damage.VictimAgentId,
-            AttackerControllerId = TryGetAgentControllerId(attacker) ??
-                TryGetControllerId(damage.AttackerAgentId) ??
-                damage.DebugAttackerControllerId,
-            VictimControllerId = TryGetAgentControllerId(victim) ??
-                TryGetControllerId(damage.VictimAgentId),
-            AttackerIsAi = attacker?.IsAIControlled == true ||
-                damage.DebugAttackerIsAi,
-            ContactTelemetryAvailable = contactTelemetryAvailable,
-            AttackerIndex = attacker?.Index ?? -1,
-            VictimIndex = victim?.Index ?? -1,
-            RoutedDamage = routedDamage,
-            InputDamage = inputDamage,
-            AppliedDamage = appliedDamage,
-            HealthBefore = healthBefore,
-            HealthAfter = healthAfter,
-            CollisionResult = damage.CollisionData.CollisionResult.ToString(),
-            VictimHitBodyPart =
-                damage.CollisionData.VictimHitBodyPart.ToString(),
-            CollisionPosition = new RoutedDamageDebugVector(
-                damage.CollisionData.CollisionGlobalPosition),
-            BlowDirection = new RoutedDamageDebugVector(
-                damage.Blow.Direction),
-            AttackProgress = damage.CollisionData.AttackProgress,
-            MountedSpeed = attacker?.MountAgent?
-                .GetRealGlobalVelocity().AsVec2.Length ?? 0f,
-            TargetDrift = targetDrift,
-            TargetAge = targetAge,
-            NetworkApplySent = true,
-            OwnerApplied = true,
-        };
-        StoreRoutedDamageDebugSnapshot(snapshot);
-    }
-
-    private Guid TryGetRegisteredAgentId(Agent agent) =>
-        agent != null && coopMissionComponent.AgentRegistry.TryGetAgentInfo(
-            agent,
-            out var info)
-                ? info.AgentId
-                : Guid.Empty;
-
-    private string TryGetAgentControllerId(Agent agent) =>
-        agent != null && coopMissionComponent.AgentRegistry.TryGetAgentInfo(
-            agent,
-            out var info)
-                ? info.CurrentAuthority
-                : null;
-
-    private string TryGetControllerId(Guid agentId) =>
-        agentId != Guid.Empty &&
-        coopMissionComponent.AgentRegistry.TryGetAgentInfo(
-            agentId,
-            out var info)
-                ? info.CurrentAuthority
-                : null;
-
-    private void StoreRoutedDamageDebugSnapshot(
-        RoutedDamageDebugSnapshot snapshot)
-    {
-        if (!routedDamageDebugRecords.ContainsKey(snapshot.RoutedHitId))
-            routedDamageDebugHistory.Enqueue(snapshot.RoutedHitId);
-        routedDamageDebugRecords[snapshot.RoutedHitId] =
-            new RoutedDamageDebugRecord { Snapshot = snapshot };
-
-        while (routedDamageDebugHistory.Count >
-               RoutedDamageDebugHistoryLimit)
-        {
-            routedDamageDebugRecords.Remove(
-                routedDamageDebugHistory.Dequeue());
-        }
-    }
-#endif
-
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
     {
         NetworkApplyBattleDamage damage = payload.What;
@@ -1068,11 +657,6 @@ public class BattleDamageRouter : IBattleDamageRouter
         {
             blow.OwnerId = -1;
         }
-
-#if DEBUG
-        RecordMountedContactTelemetryForActors(attacker, victim);
-#endif
-
         int routedDamage = blow.InflictedDamage;
         // The source calculated this blow against a puppet, so vanilla could not apply its main-agent multiplier.
         ApplyPlayerReceivedDamageMultiplier(victim, ref blow, ref collisionData);
@@ -1111,17 +695,6 @@ public class BattleDamageRouter : IBattleDamageRouter
         float appliedDamage = healthBefore - healthAfter;
         bool activeAfter = victim.IsActive();
         var mortalityAfter = victim.CurrentMortalityState;
-#if DEBUG
-        RecordRoutedDamageApplied(
-            damage,
-            attacker,
-            victim,
-            routedDamage,
-            inputDamage,
-            appliedDamage,
-            healthBefore,
-            healthAfter);
-#endif
         if (Logger.IsEnabled(LogEventLevel.Debug))
         {
             Logger.Debug(

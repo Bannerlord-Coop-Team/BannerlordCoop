@@ -56,10 +56,6 @@ internal interface IAgentMovementDebugControl
 
     float SyntheticReceivePressureRemainingSeconds { get; }
 
-    AgentMovementHandler.MovementHotPathSnapshot HotPath { get; }
-
-    void RecordMountedContact(float drift, float targetAge);
-
     bool TrySetSyntheticReceivePressure(
         float durationSeconds,
         double queueMilliseconds,
@@ -194,31 +190,20 @@ public class AgentMovementHandler : IAgentMovementHandler
             new Dictionary<string, MovementBatch<T>>();
         public MovementBatch<T> Legacy;
         private readonly bool isPriority;
-#if DEBUG
-        private readonly HashSet<MovementBatch<T>> reusedThisFrame =
-            new HashSet<MovementBatch<T>>();
-#endif
 
         public MovementBatchScratch(bool isPriority = false)
         {
             this.isPriority = isPriority;
         }
 
-        public MovementBatch<T> GetOrCreate(
-            CoopAgentInfo agentInfo,
-            IMovementBatchSender movementBatchSender)
+        public MovementBatch<T> GetOrCreate(CoopAgentInfo agentInfo)
         {
             if (agentInfo.MovementId == 0)
             {
                 if (Legacy != null)
-                {
-                    RecordReusedBatchOnce(Legacy, movementBatchSender);
                     return Legacy;
-                }
 
-                RecordCreatedBatch(movementBatchSender);
                 Legacy = new MovementBatch<T>(null, isPriority);
-                RecordSeenThisFrame(Legacy);
                 return Legacy;
             }
 
@@ -226,54 +211,16 @@ public class AgentMovementHandler : IAgentMovementHandler
                     agentInfo.MovementScopeId,
                     out MovementBatch<T> batch))
             {
-                RecordCreatedBatch(movementBatchSender);
                 batch = new MovementBatch<T>(
                     agentInfo.MovementScopeId,
                     isPriority);
                 Compact.Add(agentInfo.MovementScopeId, batch);
-                RecordSeenThisFrame(batch);
-            }
-            else
-            {
-                RecordReusedBatchOnce(batch, movementBatchSender);
             }
             return batch;
         }
 
-        private void RecordReusedBatchOnce(
-            MovementBatch<T> batch,
-            IMovementBatchSender movementBatchSender)
-        {
-#if DEBUG
-            if (reusedThisFrame.Add(batch))
-            {
-                (movementBatchSender as MovementBatchSender)?
-                    .RecordReusedBatch();
-            }
-#endif
-        }
-
-        private static void RecordCreatedBatch(
-            IMovementBatchSender movementBatchSender)
-        {
-#if DEBUG
-            (movementBatchSender as MovementBatchSender)?
-                .RecordCreatedBatch();
-#endif
-        }
-
-        private void RecordSeenThisFrame(MovementBatch<T> batch)
-        {
-#if DEBUG
-            reusedThisFrame.Add(batch);
-#endif
-        }
-
         public void Clear()
         {
-#if DEBUG
-            reusedThisFrame.Clear();
-#endif
             Legacy?.Clear();
             foreach (MovementBatch<T> batch in Compact.Values)
                 batch.Clear();
@@ -334,34 +281,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         public Agent Mount;
     }
 
-#if DEBUG
-    internal sealed class MovementHotPathSnapshot
-    {
-        public long WindowSequence { get; set; }
-        public float WindowSeconds { get; set; }
-        public long InterpolatorTicks { get; set; }
-        public double InterpolatorMilliseconds { get; set; }
-        public long MountedTargets { get; set; }
-        public long MountedCorrections { get; set; }
-        public long ContinuousStateAttempts { get; set; }
-        public long ContinuousStateWrites { get; set; }
-        public long LookAttempts { get; set; }
-        public long LookWrites { get; set; }
-        public double LookReplayMilliseconds { get; set; }
-        public long MountIdentityHits { get; set; }
-        public long MountIdentityResolutions { get; set; }
-        public long ReusedSentStates { get; set; }
-        public long CreatedSentStates { get; set; }
-        public long ReusedMovementBatches { get; set; }
-        public long CreatedMovementBatches { get; set; }
-        public long RotatedSnapshotCopiesAvoided { get; set; }
-        public float MaximumMountedDrift { get; set; }
-        public float MaximumMountedTargetAge { get; set; }
-        public long MountedContacts { get; set; }
-        public float MaximumMountedContactDrift { get; set; }
-        public float MaximumMountedContactTargetAge { get; set; }
-    }
-#endif
 
     private readonly struct CapturedMovement
     {
@@ -471,25 +390,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     private double syntheticReceiveQueueMilliseconds;
     private double syntheticReceiveApplyMilliseconds;
     private int syntheticReceiveSnapshots;
-    private long mountIdentityHits;
-    private long mountIdentityResolutions;
-    private long reusedSentStates;
-    private long createdSentStates;
-    private long mountedContacts;
-    private float maximumMountedContactDrift;
-    private float maximumMountedContactTargetAge;
-    private float hotPathWindowElapsed;
-    private float hotPathPendingElapsed;
-    private long hotPathWindowSequence;
-    private MovementHotPathSnapshot latestHotPath =
-        new MovementHotPathSnapshot();
-
-    internal long DebugMountIdentityHits => mountIdentityHits;
-
-    internal long DebugMountIdentityResolutions => mountIdentityResolutions;
-
-    internal IMovementBatchSender DebugMovementBatchSender =>
-        movementBatchSender;
 #endif
 
     public AgentMovementHandler(
@@ -609,24 +509,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     float IAgentMovementDebugControl.SyntheticReceivePressureRemainingSeconds =>
         syntheticReceivePressureRemainingSeconds;
 
-    MovementHotPathSnapshot IAgentMovementDebugControl.HotPath
-    {
-        get => latestHotPath;
-    }
-
-    void IAgentMovementDebugControl.RecordMountedContact(
-        float drift,
-        float targetAge)
-    {
-        mountedContacts++;
-        maximumMountedContactDrift = Math.Max(
-            maximumMountedContactDrift,
-            Math.Max(0f, drift));
-        maximumMountedContactTargetAge = Math.Max(
-            maximumMountedContactTargetAge,
-            Math.Max(0f, targetAge));
-    }
-
     bool IAgentMovementDebugControl.TrySetSyntheticReceivePressure(
         float durationSeconds,
         double queueMilliseconds,
@@ -683,59 +565,6 @@ public class AgentMovementHandler : IAgentMovementHandler
             0f,
             syntheticReceivePressureRemainingSeconds - elapsedSeconds);
     }
-
-    private void AdvanceHotPathWindow(float elapsedSeconds)
-    {
-        hotPathWindowElapsed += elapsedSeconds;
-        if (hotPathWindowElapsed < 1f)
-            return;
-
-        AgentPositionInterpolator.HotPathSnapshot interpolator =
-            _interpolator.TakeDebugSnapshot(hotPathWindowElapsed);
-        latestHotPath = new MovementHotPathSnapshot
-        {
-            WindowSequence = ++hotPathWindowSequence,
-            WindowSeconds = interpolator.WindowSeconds,
-            InterpolatorTicks = interpolator.InterpolatorTicks,
-            InterpolatorMilliseconds = interpolator.InterpolatorMilliseconds,
-            MountedTargets = interpolator.MountedTargets,
-            MountedCorrections = interpolator.MountedCorrections,
-            ContinuousStateAttempts = interpolator.ContinuousStateAttempts,
-            ContinuousStateWrites = interpolator.ContinuousStateWrites,
-            LookAttempts = interpolator.LookAttempts,
-            LookWrites = interpolator.LookWrites,
-            LookReplayMilliseconds = interpolator.LookReplayMilliseconds,
-            MountIdentityHits = mountIdentityHits,
-            MountIdentityResolutions = mountIdentityResolutions,
-            ReusedSentStates = reusedSentStates,
-            CreatedSentStates = createdSentStates,
-            ReusedMovementBatches = movementBatchSender.ReusedBatches,
-            CreatedMovementBatches = movementBatchSender.CreatedBatches,
-            RotatedSnapshotCopiesAvoided =
-                movementBatchSender.RotatedSnapshotCopiesAvoided,
-            MaximumMountedDrift = interpolator.MaximumMountedDrift,
-            MaximumMountedTargetAge = interpolator.MaximumMountedTargetAge,
-            MountedContacts = mountedContacts,
-            MaximumMountedContactDrift = maximumMountedContactDrift,
-            MaximumMountedContactTargetAge = maximumMountedContactTargetAge
-        };
-
-        hotPathWindowElapsed = 0f;
-        mountIdentityHits = 0;
-        mountIdentityResolutions = 0;
-        reusedSentStates = 0;
-        createdSentStates = 0;
-        mountedContacts = 0;
-        maximumMountedContactDrift = 0f;
-        maximumMountedContactTargetAge = 0f;
-        movementBatchSender.ResetDebugCounters();
-    }
-
-    internal void CompleteDebugFrame()
-    {
-        AdvanceHotPathWindow(hotPathPendingElapsed);
-        hotPathPendingElapsed = 0f;
-    }
 #endif
 
     // Capture every locally authoritative agent once, then apply per-recipient cadence and delta history.
@@ -746,9 +575,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         movementBatchSender.BeginFrame(dt);
         totalSimulationTime += dt;
 #if DEBUG
-        float debugElapsedSeconds = Math.Max(0f, dt);
-        ReportSyntheticReceivePressure(debugElapsedSeconds);
-        hotPathPendingElapsed += debugElapsedSeconds;
+        ReportSyntheticReceivePressure(Math.Max(0f, dt));
 #endif
         MovementCadence rate = movementRateController.AdvanceFrame(dt);
         float elapsedSeconds = Math.Max(0f, dt);
@@ -1042,9 +869,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
                 MarkMovementPending(recipient, agentId);
                 mountMovement
-                    .GetOrCreate(
-                        captured.AgentInfo,
-                        movementBatchSender)
+                    .GetOrCreate(captured.AgentInfo)
                     .Add(captured.AgentInfo, captured.MountData);
                 continue;
             }
@@ -1056,17 +881,13 @@ public class AgentMovementHandler : IAgentMovementHandler
             if (captured.IsPriority)
             {
                 priorityMovement
-                    .GetOrCreate(
-                        captured.AgentInfo,
-                        movementBatchSender)
+                    .GetOrCreate(captured.AgentInfo)
                     .Add(captured.AgentInfo, captured.AgentData);
             }
             else
             {
                 movement
-                    .GetOrCreate(
-                        captured.AgentInfo,
-                        movementBatchSender)
+                    .GetOrCreate(captured.AgentInfo)
                     .Add(captured.AgentInfo, captured.AgentData);
             }
         }
@@ -1183,16 +1004,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             sentState = new LastSentMovementState();
             recipient.LastSentMovement.Add(agentId, sentState);
-#if DEBUG
-            createdSentStates++;
-#endif
         }
-#if DEBUG
-        else
-        {
-            reusedSentStates++;
-        }
-#endif
         sentState.AgentData = current;
         sentState.MountData = null;
         sentState.IsMount = false;
@@ -1211,16 +1023,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             sentState = new LastSentMovementState();
             recipient.LastSentMovement.Add(agentId, sentState);
-#if DEBUG
-            createdSentStates++;
-#endif
         }
-#if DEBUG
-        else
-        {
-            reusedSentStates++;
-        }
-#endif
         sentState.AgentData = default;
         sentState.MountData = current;
         sentState.IsMount = true;
@@ -1990,16 +1793,10 @@ public class AgentMovementHandler : IAgentMovementHandler
             cached.Mount != null &&
             cached.Mount.IsActive())
         {
-#if DEBUG
-            mountIdentityHits++;
-#endif
             return cached.Mount;
         }
 
         resolvedMountIdentities.Remove(rider);
-#if DEBUG
-        mountIdentityResolutions++;
-#endif
 
         CoopAgentInfo info = null;
         bool found;
