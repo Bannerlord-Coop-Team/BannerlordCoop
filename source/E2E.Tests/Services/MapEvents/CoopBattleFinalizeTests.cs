@@ -439,6 +439,9 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
             var encounter = SetMockPlayerEncounter(client, mapEventId: setup.MapEventId);
             encounter.BattleSimulation = ObjectHelper.SkipConstructor<BattleSimulation>();
+            AccessTools.Field(typeof(BattleSimulation), "_mapEvent")
+                .SetValue(encounter.BattleSimulation, destroyedMapEvent);
+            encounter.PlayerSide = BattleSideEnum.Attacker;
             encounter.EncounterState = PlayerEncounterState.End;
 
             var mapState = Game.Current.GameStateManager.CreateState<MapState>();
@@ -468,11 +471,22 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.Same(destroyedMapEvent, MobileParty.MainParty.MapEvent);
             Assert.Equal(PlayerEncounterState.End, PlayerEncounter.Current.EncounterState);
 
+            PlayerEncounter.Current._mapEvent = null;
+            MobileParty.MainParty.Party._mapEventSide = null;
+            Assert.Null(MobileParty.MainParty.MapEvent);
+            Assert.Null(PlayerEncounter.Battle);
+            Assert.Same(destroyedMapEvent, PlayerEncounter.Current.BattleSimulation.MapEvent);
             mapState.EndBattleSimulation();
             client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
 
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
             Assert.NotNull(PlayerEncounter.Current);
+            Assert.Equal(expectedEncounterState, PlayerEncounter.Current.EncounterState);
+
+            var continuedEncounter = PlayerEncounter.Current;
+            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+
+            Assert.Same(continuedEncounter, PlayerEncounter.Current);
             Assert.Equal(expectedEncounterState, PlayerEncounter.Current.EncounterState);
         }, MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))));
     }

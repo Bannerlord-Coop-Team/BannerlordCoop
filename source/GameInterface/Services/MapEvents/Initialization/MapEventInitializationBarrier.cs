@@ -402,7 +402,13 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (ModInformation.IsServer || MissionState.Current != null || Mission.Current != null) return;
 
         var party = MobileParty.MainParty?.Party;
+        var encounter = PlayerEncounter.Current;
         var mapEvent = party?.MapEvent;
+        if (mapEvent == null && !PlayerCaptivity.IsCaptive &&
+            encounter?.EncounterState == PlayerEncounterState.End)
+        {
+            mapEvent = encounter.BattleSimulation?.MapEvent;
+        }
         if (mapEvent == null || IsPending(mapEvent)) return;
         if (Campaign.Current?.MapEventManager?.MapEvents.Contains(mapEvent) == true) return;
         if (IsBattleSimulationActive()) return;
@@ -425,7 +431,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (PlayerCaptivity.IsCaptive ||
             encounter?.EncounterState != PlayerEncounterState.End ||
             encounter.BattleSimulation == null ||
-            mapEvent.WinningSide == PartyBase.MainParty.Side ||
+            mapEvent.WinningSide == encounter.PlayerSide ||
             !References(encounter, mapEvent))
         {
             return false;
@@ -484,6 +490,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
     private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
         encounter?._mapEvent == mapEvent ||
+        encounter?.BattleSimulation?.MapEvent == mapEvent ||
         GetPlayerEncounterBattle() == mapEvent ||
         GetPlayerEncounterEncounteredBattle() == mapEvent;
 
