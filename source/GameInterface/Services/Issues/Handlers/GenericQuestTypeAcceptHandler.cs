@@ -457,12 +457,6 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private void RollbackFailedAlternativeAcceptStart(Hero owner, string controllerId)
     {
         if (owner?.Issue == null) return;
-        if (!objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
-
-        if (!string.IsNullOrEmpty(controllerId))
-        {
-            ownershipRegistry.SetOwner(owner, controllerId);
-        }
 
         Hero trueOwnerHero = null;
         MobileParty ownerParty = null;
@@ -472,20 +466,20 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
         }
 
-        try
+        using (new MainHeroSubstitutionScope(trueOwnerHero ?? owner, ownerParty))
+        using (new AllowedThread())
         {
-            using (new MainHeroSubstitutionScope(trueOwnerHero ?? owner, ownerParty))
+            var issue = owner.Issue;
+            var sentTroops = issue.AlternativeSolutionSentTroops;
+            if (MobileParty.MainParty != null && sentTroops.TotalManCount > 0)
             {
-                IssueFinalizationSupport.FinalizeMirror(owner, IssueFinalizeReason.RejectedAccept, suppressReplicationPatches: false);
+                MobileParty.MainParty.MemberRoster.Add(sentTroops);
             }
-        }
-        catch (Exception e)
-        {
-            Logger.Error(e, "Failed to roll back a partially-started alternative-solution accept for owner {Owner} - the issue may be left in an inconsistent state", ownerId);
-            return;
+            sentTroops.Clear();
+            issue._issueState = IssueBase.IssueState.Ongoing;
         }
 
-        network.SendAll(new NetworkIssueRemoved(ownerId, IssueFinalizeReason.RejectedAccept));
+        ownershipRegistry.Clear(owner);
     }
 
     private void Handle_NetworkQuestTypeAcceptRejected(MessagePayload<NetworkQuestTypeAcceptRejected> payload)
