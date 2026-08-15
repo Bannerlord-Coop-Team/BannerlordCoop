@@ -8,9 +8,11 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using Newtonsoft.Json;
+using SandBox.GauntletUI;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
@@ -18,6 +20,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 
@@ -286,6 +289,38 @@ internal static class PrisonerDonationFixtureCommands
         {
             logic.AddCommand(command);
             logic.RemoveZeroCounts();
+        }
+
+        return "LIVE_TEST_JSON=true";
+    }
+
+    [CommandLineArgumentFunction("prisoner_donation_screen_state", "coop.debug.party")]
+    public static string ScreenState(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+            return "Run this command on the owning client.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.party.prisoner_donation_screen_state";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
+            partyState.PartyScreenMode != PartyScreenHelper.PartyScreenMode.PrisonerManage)
+        {
+            return "The prisoner-donation Party screen is not active.";
+        }
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<CharacterObject>(FixtureTroopId, out var troop))
+        {
+            return $"Fixture troop '{FixtureTroopId}' not found.";
+        }
+
+        var logic = partyState.PartyScreenLogic;
+        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+        var row = partyVm?.MainPartyPrisoners.FirstOrDefault(vm => vm.Character == troop);
+        var rightRoster = logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right];
+        var sourceIndex = rightRoster.FindIndexOfTroop(troop);
+        if (row == null || sourceIndex < 0 ||
+            row.Troop.Number != rightRoster.GetElementNumber(sourceIndex))
+        {
+            return "The prisoner-donation Party screen has not rendered the fixture prisoner.";
         }
 
         return "LIVE_TEST_JSON=true";
