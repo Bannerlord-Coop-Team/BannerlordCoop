@@ -101,6 +101,8 @@ internal class IssueConversationHandler : IHandler
 
     private void Handle_NetworkIssueConversationAllowed(MessagePayload<NetworkIssueConversationAllowed> payload)
     {
+        if (ModInformation.IsServer) return;
+
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
@@ -112,6 +114,8 @@ internal class IssueConversationHandler : IHandler
 
     private void Handle_NetworkIssueConversationDenied(MessagePayload<NetworkIssueConversationDenied> payload)
     {
+        if (ModInformation.IsServer) return;
+
         Logger.Warning("Server denied a tracked conversation with issue-giver {IssueGiver}", payload.What.IssueGiverId);
     }
 
