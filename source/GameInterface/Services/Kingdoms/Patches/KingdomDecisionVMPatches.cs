@@ -271,9 +271,14 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
         }
     }
-    internal static class ClientClanStrengthRefresher
+    internal interface IClientClanStrengthRefresher
     {
-        internal static void Refresh(IFaction faction)
+        void Refresh(IFaction faction);
+    }
+
+    internal class ClientClanStrengthRefresher : IClientClanStrengthRefresher
+    {
+        public void Refresh(IFaction faction)
         {
             if (ModInformation.IsServer) return;
 
@@ -297,8 +302,10 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         private static void Prefix(KingdomWarItemVM __instance)
         {
-            ClientClanStrengthRefresher.Refresh(__instance.Faction1);
-            ClientClanStrengthRefresher.Refresh(__instance.Faction2);
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(__instance.Faction1);
+            refresher.Refresh(__instance.Faction2);
         }
     }
 
@@ -308,8 +315,10 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         private static void Prefix(KingdomTruceItemVM __instance)
         {
-            ClientClanStrengthRefresher.Refresh(__instance.Faction1);
-            ClientClanStrengthRefresher.Refresh(__instance.Faction2);
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(__instance.Faction1);
+            refresher.Refresh(__instance.Faction2);
         }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
-using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -18,10 +17,7 @@ internal class StanceLinkRegistry : AutoRegistryBase<StanceLink>
 
     public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
-    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
-    {
-        AccessTools.Method(typeof(FactionManager), nameof(FactionManager.RemoveFactionsFromCampaignWars))
-    };
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
     public override void RegisterAllObjects()
     {

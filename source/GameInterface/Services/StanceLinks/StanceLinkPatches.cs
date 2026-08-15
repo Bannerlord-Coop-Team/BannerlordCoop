@@ -1,7 +1,9 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.StanceLinks.Messages;
 using HarmonyLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 
@@ -33,6 +35,32 @@ internal class StanceLinkPatches
             MessageBroker.Instance.Publish(__instance, new RequestStanceLinkConstructed(stanceLink));
         }
         __result = stanceLink;
+        return false;
+    }
+    [HarmonyPatch(typeof(FactionManager), nameof(FactionManager.RemoveFactionsFromCampaignWars))]
+    [HarmonyPrefix]
+    private static bool Prefix(FactionManager __instance, IFaction faction1)
+    {
+        if (ModInformation.IsClient) return false;
+
+        if (faction1.MapFaction != faction1)
+        {
+            return false;
+        }
+        StanceLink[] removedStances = (from x in __instance._stances.GetStanceLinks()
+                                       where x.Faction1 == faction1 || x.Faction2 == faction1
+                                       select x).ToArray();
+
+        foreach (StanceLink stance in removedStances)
+        {
+            __instance.RemoveStance(stance);
+        }
+        foreach (IFaction faction2 in faction1.FactionsAtWarWith)
+        {
+            faction2.UpdateFactionsAtWarWith();
+        }
+        faction1.UpdateFactionsAtWarWith();
+        MessageBroker.Instance.Publish(__instance, new StanceLinkDeconstructed(faction1, removedStances));
         return false;
     }
 }

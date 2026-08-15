@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.StanceLinks.Messages;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.StanceLinks;
@@ -25,12 +26,16 @@ internal class StanceLinkHandler : IHandler
 
         messageBroker.Subscribe<RequestStanceLinkConstructed>(Handle_RequestStanceLinkConstructed);
         messageBroker.Subscribe<StanceLinkConstructed>(HandleStanceLinkConstructed);
+        messageBroker.Subscribe<StanceLinkDeconstructed>(Handle_StanceLinkDeconstructed);
+        messageBroker.Subscribe<NetworkStanceLinkDeconstructed>(Handle_NetworkStanceLinkDeconstructed);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<RequestStanceLinkConstructed>(Handle_RequestStanceLinkConstructed);
         messageBroker.Unsubscribe<StanceLinkConstructed>(HandleStanceLinkConstructed);
+        messageBroker.Unsubscribe<StanceLinkDeconstructed>(Handle_StanceLinkDeconstructed);
+        messageBroker.Unsubscribe<NetworkStanceLinkDeconstructed>(Handle_NetworkStanceLinkDeconstructed);
     }
 
     private void Handle_RequestStanceLinkConstructed(MessagePayload<RequestStanceLinkConstructed> payload)
@@ -69,11 +74,20 @@ internal class StanceLinkHandler : IHandler
 
             if (stanceLink == null)
             {
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
                     stanceLink = new StanceLink(obj.StanceType, faction1, faction2);
 
                     FactionManager.Instance.AddStance(faction1, faction2, stanceLink);
+                }
+                else
+                {
+                    using (new AllowedThread())
+                    {
+                        stanceLink = new StanceLink(obj.StanceType, faction1, faction2);
+
+                        FactionManager.Instance.AddStance(faction1, faction2, stanceLink);
+                    }
                 }
             }
 
@@ -90,6 +104,7 @@ internal class StanceLinkHandler : IHandler
             }
         });
     }
+
     internal static string GetStanceLinkKey(IFaction faction1, IFaction faction2)
     {
         return faction1.Id > faction2.Id
@@ -97,5 +112,44 @@ internal class StanceLinkHandler : IHandler
             : $"{faction2.StringId}_{faction1.StringId}";
     }
 
+    public void Handle_StanceLinkDeconstructed(MessagePayload<StanceLinkDeconstructed> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var obj = payload.What;
 
+        if (!objectManager.TryGetIdWithLogging(obj.Faction1, out var faction1Id)) return;
+
+        var removedStanceLinkIds = new List<string>();
+        foreach (var stanceLink in obj.RemovedStanceLink)
+        {
+            if (!objectManager.TryGetIdWithLogging(stanceLink, out var stanceLinkId)) continue;
+            removedStanceLinkIds.Add(stanceLinkId);
+            objectManager.Remove(stanceLink);
+        }
+
+        network.SendAll(new NetworkStanceLinkDeconstructed(faction1Id, removedStanceLinkIds.ToArray()));
+    }
+
+    public void Handle_NetworkStanceLinkDeconstructed(MessagePayload<NetworkStanceLinkDeconstructed> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<IFaction>(obj.Faction1Id, out var faction1)) return;
+
+            foreach (string stanceId in obj.RemovedStanceLinkIds)
+            {
+                if (!objectManager.TryGetObjectWithLogging<StanceLink>(stanceId, out var stance)) continue;
+                FactionManager.Instance.RemoveStance(stance);
+                objectManager.Remove(stance);
+            }
+
+            foreach (IFaction faction2 in faction1.FactionsAtWarWith)
+            {
+                faction2.UpdateFactionsAtWarWith();
+            }
+            faction1.UpdateFactionsAtWarWith();
+        });
+    }
 }
