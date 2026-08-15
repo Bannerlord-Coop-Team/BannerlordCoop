@@ -1,10 +1,11 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
+using Missions.Agents;
 using Missions.Messages;
 using Missions.Services.Network;
 using Serilog;
@@ -39,6 +40,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ICoopMissionComponent coopMissionComponent;
+    private readonly INetworkWorldItemRegistry worldItemRegistry;
     private readonly IBattleSession session;
     private readonly IMissionContext missionContext;
 
@@ -48,6 +50,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
+        INetworkWorldItemRegistry worldItemRegistry,
         IBattleSession session,
         IMissionContext missionContext)
     {
@@ -56,6 +59,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
+        this.worldItemRegistry = worldItemRegistry;
         this.session = session;
         this.missionContext = missionContext;
 
@@ -94,6 +98,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
 
         Logger.Information("[BattleSync] Requesting P2P battle instance mapEvent={MapEventId}", mapEventId);
 
+        worldItemRegistry.Clear();
         network.Start();
         network.ConnectToInstance(mapEventId);
         coopMissionComponent.AgentRegistry.Clear();
@@ -114,6 +119,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         }
 
         network.Stop();
+        worldItemRegistry.Clear();
 
         // Wipe the local membership mirror on our way out. Stopping the socket clears only the direct peer
         // mappings; the server-announced membership set (which the absent-controller sweep consults) would

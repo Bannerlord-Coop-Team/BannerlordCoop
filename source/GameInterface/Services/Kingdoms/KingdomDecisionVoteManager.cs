@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Data;
@@ -31,7 +31,7 @@ namespace GameInterface.Services.Kingdoms
         bool TryCreateVoteData(DecisionItemBaseVM decisionItem, out KingdomDecisionVoteData voteData, bool isFinal = false);
         bool TryPublishVote(DecisionOptionVM decisionOption);
         bool TryPublishFinalVote(DecisionItemBaseVM decisionItem);
-        void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem);
+        void CloseDecisionItem(DecisionItemBaseVM decisionItem);
         bool ShouldSuppressLocalDecision(KingdomDecision decision);
         bool ShouldDisableResolveDecision(KingdomDecision decision);
         bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
@@ -42,6 +42,7 @@ namespace GameInterface.Services.Kingdoms
         void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData);
         bool TryResolveDecision(KingdomDecision decision, bool force);
         bool HasEligiblePlayerClan(KingdomDecision decision);
+        bool TryPublishFinalVoteForElection(KingdomElection election);
         IReadOnlyList<KingdomDecisionVoteManager.KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom);
         void ApplyResolved(
             string kingdomId,
@@ -100,7 +101,9 @@ namespace GameInterface.Services.Kingdoms
             if (!TryGetDecisionIndex(decisionOption.Decision, out int decisionIndex)) return false;
             if (!TryGetKingdomId(decisionOption.Decision.Kingdom, out string kingdomId)) return false;
 
-            int outcomeIndex = decisionOption.IsOptionForAbstain ? -1 : GetOutcomeIndex(decisionOption.Option, decisionOption._kingdomDecisionMaker);
+            int outcomeIndex = decisionOption.IsOptionForAbstain
+                ? -1
+                : GetOutcomeIndex(decisionOption.Option, decisionOption._kingdomDecisionMaker);
             if (!decisionOption.IsOptionForAbstain && outcomeIndex < 0) return false;
 
             string outcomeKey = null;
@@ -171,7 +174,7 @@ namespace GameInterface.Services.Kingdoms
             if (decisionItem == null || decisionItem._currentSelectedOption == null) return false;
             if (HasLocalPlayerSubmittedVote(decisionItem.KingdomDecisionMaker?._decision))
             {
-                MarkLocalVoteSubmitted(decisionItem);
+                CloseDecisionItem(decisionItem);
                 return true;
             }
 
@@ -187,11 +190,11 @@ namespace GameInterface.Services.Kingdoms
             {
                 LocalSubmittedDecisions.Add(decisionItem.KingdomDecisionMaker._decision);
             }
-            MarkLocalVoteSubmitted(decisionItem);
+            CloseDecisionItem(decisionItem);
             return true;
         }
 
-        public void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem)
+        public void CloseDecisionItem(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null) return;
 
@@ -315,6 +318,40 @@ namespace GameInterface.Services.Kingdoms
         public bool HasEligiblePlayerClan(KingdomDecision decision)
         {
             return GetEligibleClanIds(decision).Count > 0;
+        }
+
+        public bool TryPublishFinalVoteForElection(KingdomElection election)
+        {
+            KingdomDecision decision = election?._decision;
+            if (decision == null || !IsLocalPlayerEligible(decision)) return false;
+            if (!TryGetDecisionIndex(decision, out int decisionIndex)) return false;
+            if (!TryGetKingdomId(decision.Kingdom, out string kingdomId)) return false;
+
+            DecisionOutcome chosenOutcome = election._chosenOutcome;
+            bool isAbstain = chosenOutcome == null;
+            int outcomeIndex = -1;
+            string outcomeKey = null;
+
+            if (!isAbstain)
+            {
+                outcomeIndex = GetOutcomeIndex(chosenOutcome, election);
+                if (outcomeIndex < 0) return false;
+                outcomeResolver.TryGetOutcomeKey(chosenOutcome, objectManager, out outcomeKey);
+            }
+
+            var voteData = new KingdomDecisionVoteData(
+                kingdomId,
+                decisionIndex,
+                outcomeIndex,
+                GetSupportWeightValue(isAbstain, Supporter.SupportWeights.FullyPush),
+                isAbstain,
+                true,
+                outcomeKey);
+
+            TryApplyLocalVote(decision, voteData);
+            MessageBroker.Instance.Publish(election, new KingdomDecisionVoteRequested(voteData));
+            LocalSubmittedDecisions.Add(decision);
+            return true;
         }
 
         public IReadOnlyList<KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom)

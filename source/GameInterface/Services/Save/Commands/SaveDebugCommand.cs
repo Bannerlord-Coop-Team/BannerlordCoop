@@ -1,53 +1,49 @@
 ﻿using Common;
-using GameInterface.Utils.Commands;
-using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Save.Commands
 {
     public class SaveDebugCommand
     {
+        private static readonly Regex SafeSaveName = new("^[A-Za-z0-9_-]{1,64}$");
+
 #if DEBUG
         private static int evidenceHoldMilliseconds;
+#endif
 
         [CommandLineArgumentFunction("save_as", "coop.debug.save")]
         public static string SaveAs(List<string> args)
         {
-            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.save.save_as")) return error;
-            if (args.Count != 1 ||
-                args[0].Length < 1 ||
-                args[0].Length > 64 ||
-                args[0].Any(character => !char.IsLetterOrDigit(character) && character != '_' && character != '-'))
-            {
+            if (!ModInformation.IsServer)
+                return "Command can only be run on the server.";
+            if (args.Count != 1 || !SafeSaveName.IsMatch(args[0]))
                 return "Usage: coop.debug.save.save_as <1-64 letters, digits, underscores, or hyphens>";
-            }
 
-            if (Campaign.Current?.SaveHandler == null) return "No active campaign / SaveHandler.";
-            if (Campaign.Current.SaveHandler.IsSaving) return "A save is already queued.";
-            if (MBSaveLoad.GetSaveFiles(null).Any(save =>
-                string.Equals(save.Name, args[0], StringComparison.OrdinalIgnoreCase)))
-            {
-                return $"Refusing to overwrite existing save '{args[0]}'.";
-            }
+            SaveHandler saveHandler = Campaign.Current?.SaveHandler;
+            if (saveHandler == null)
+                return "No active campaign / SaveHandler.";
+            if (saveHandler.IsSaving)
+                return "A save is already queued.";
 
-            Campaign.Current.SaveHandler.SaveAs(args[0]);
-            return $"SAVE_AS_QUEUED name={args[0]}";
+            saveHandler.SaveAs(args[0]);
+            return $"Enqueued save as {args[0]} on the server.";
         }
 
-        [CommandLineArgumentFunction("status", "coop.debug.save")]
-        public static string Status(List<string> args)
+        [CommandLineArgumentFunction("state", "coop.debug.save")]
+        public static string State(List<string> args)
         {
-            if (args.Count != 0) return "Usage: coop.debug.save.status";
-            if (Campaign.Current?.SaveHandler == null) return "SAVE_STATUS campaign=false isSaving=false";
+            if (args.Count != 0)
+                return "Usage: coop.debug.save.state";
 
-            return $"SAVE_STATUS campaign=true isSaving={Campaign.Current.SaveHandler.IsSaving}";
+            SaveHandler saveHandler = Campaign.Current?.SaveHandler;
+            return saveHandler == null
+                ? "saveHandler=unavailable"
+                : $"saveHandler=ready|isSaving={saveHandler.IsSaving}";
         }
-#endif
 
         /// <summary>
         /// Enqueues a native autosave (the same path SaveHandler uses on a timer) so the

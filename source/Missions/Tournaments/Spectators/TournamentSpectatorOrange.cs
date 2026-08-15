@@ -1,4 +1,5 @@
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Tournaments.Spectators;
 
@@ -33,4 +34,12 @@ public static class TournamentSpectatorOrange
 
     public static bool ShouldDisappearOnCollision(bool isSpectator, bool isOrange)
         => isSpectator && isOrange;
+
+    public static AgentFlag GetCombatFlags(AgentFlag currentFlags, bool hasUsableOrange)
+    {
+        AgentFlag combatFlags = currentFlags & ~AgentFlag.CanKick;
+        if (!hasUsableOrange)
+            combatFlags &= ~AgentFlag.CanAttack;
+        return combatFlags;
+    }
 }

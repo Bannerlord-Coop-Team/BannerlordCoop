@@ -1,12 +1,16 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using Missions;
+using Missions.Agents;
 using Missions.Battles;
 using Missions.Messages;
 using Missions.Services.Network;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -34,6 +38,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 client.Resolve<IControllerIdProvider>(),
                 client.Resolve<IBattleHostRegistry>());
             session.TryBegin(mapEventId);
+            var worldItemRegistry = new RecordingWorldItemRegistry();
 
             using var lifecycle = new BattleInstanceLifecycle(
                 client.Resolve<IBattleNetwork>(),
@@ -41,12 +46,31 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 broker,
                 objectManager: null,
                 coopMissionComponent: null,
-                session,
-                context);
+                worldItemRegistry: worldItemRegistry,
+                session: session,
+                missionContext: context);
 
             lifecycle.Leave();
 
             Assert.Empty(context.ControllersInMission);
+            Assert.Equal(1, worldItemRegistry.ClearCalls);
         });
+    }
+
+    private sealed class RecordingWorldItemRegistry : INetworkWorldItemRegistry
+    {
+        public int ClearCalls { get; private set; }
+
+        public Guid GetOrCreateId(SpawnedItemEntity item) => throw new NotSupportedException();
+        public bool TryGetId(SpawnedItemEntity item, out Guid itemId) => throw new NotSupportedException();
+        public void Register(Guid itemId, SpawnedItemEntity item) => throw new NotSupportedException();
+        public bool TryGet(Guid itemId, out SpawnedItemEntity item) => throw new NotSupportedException();
+        public IReadOnlyDictionary<Guid, SpawnedItemEntity> GetAll() => throw new NotSupportedException();
+        public void Remove(Guid itemId) => throw new NotSupportedException();
+
+        public void Clear()
+        {
+            ClearCalls++;
+        }
     }
 }

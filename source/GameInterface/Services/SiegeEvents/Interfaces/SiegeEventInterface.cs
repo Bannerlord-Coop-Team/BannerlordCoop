@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEvents.Interfaces;
@@ -29,6 +30,14 @@ public readonly struct PendingSiegeAftermathPrompt
         LeaderParty = leaderParty;
         Settlement = settlement;
     }
+}
+
+public enum SiegeTerminationRole
+{
+    None,
+    AttackerLeader,
+    AttackerMember,
+    Defender,
 }
 
 /// <summary>
@@ -54,6 +63,12 @@ public interface ISiegeEventInterface : IGameAbstraction
     void BreakSiege(MobileParty party);
 
     /// <summary>
+    /// Removes only this party from its besieger camp without applying vanilla's attached-party cascade.
+    /// Server side.
+    /// </summary>
+    void BreakSiegeForPartyOnly(MobileParty party);
+
+    /// <summary>
     /// Runs the player-local part of starting a siege: close the encounter and open the siege menus.
     /// </summary>
     void StartLocalPlayerSiegePreparation();
@@ -67,6 +82,30 @@ public interface ISiegeEventInterface : IGameAbstraction
     /// Runs the player-local part of leaving a siege camp.
     /// </summary>
     void FinishLocalPlayerSiegeLeave();
+
+    /// <summary>
+    /// Runs the player-local leave cleanup when the replicated battle removal already cleared the
+    /// derived siege state, using the captured settlement to refresh its visual.
+    /// </summary>
+    void FinishLocalPlayerSiegeLeave(Settlement settlement);
+
+    /// <summary>
+    /// Runs player-local leave cleanup with explicit control over whether an active encounter should
+    /// force the party out of its settlement.
+    /// </summary>
+    void FinishLocalPlayerSiegeLeave(
+        Settlement settlement,
+        bool forcePlayerOutFromSettlement);
+
+    /// <summary>
+    /// Creates the local location encounter before a break-in settlement entry is applied.
+    /// </summary>
+    void PrepareLocalPlayerBreakIn(Settlement settlement);
+
+    /// <summary>
+    /// Resumes the local break-in debrief after the server-authoritative settlement entry reached this client.
+    /// </summary>
+    void ContinueLocalPlayerBreakIn(Settlement settlement);
 
     /// <summary>
     /// Applies a player's parked siege aftermath choice. Server side.
@@ -92,9 +131,23 @@ public interface ISiegeEventInterface : IGameAbstraction
     void PromptSiegePreparation(MobileParty attackerParty, Settlement settlement);
 
     /// <summary>
-    /// Frees this player from the siege-preparation menus when the siege dissolved without a battle.
+    /// Frees this player from siege menus when the siege ended without a completed battle.
     /// </summary>
-    void PromptSiegeEnded(Settlement settlement, bool besiegerDefeated);
+    void PromptSiegeEnded(
+        Settlement settlement,
+        bool besiegerDefeated,
+        SiegeTerminationRole role,
+        bool interruptedActiveAssault = false);
+
+    /// <summary>
+    /// Whether a rendered mission still owns the screen while an interrupted assault is unwinding.
+    /// </summary>
+    bool IsCampaignMissionActive { get; }
+
+    /// <summary>
+    /// Requests that the rendered mission end before interrupted-assault encounter cleanup continues.
+    /// </summary>
+    void EndCampaignMission();
 
     /// <summary>
     /// Seat a winning inside defender on the siege-defeated menu after the assault, which the replicated
@@ -160,6 +213,17 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     private Settlement localAftermathChoiceSettlement;
     private Settlement localAftermathNarrationSettlement;
 
+    public bool IsCampaignMissionActive =>
+        TaleWorlds.MountAndBlade.MissionState.Current != null ||
+        TaleWorlds.MountAndBlade.Mission.Current != null;
+
+    public void EndCampaignMission()
+    {
+        var mission = TaleWorlds.MountAndBlade.Mission.Current ??
+            TaleWorlds.MountAndBlade.MissionState.Current?.CurrentMission;
+        mission?.EndMission();
+    }
+
     public void StartSiegeEvent(MobileParty besiegerParty, Settlement settlement)
     {
         // Vanilla's besiege consequence calls PlayerEncounter.Finish() first, which leaves the settlement when the
@@ -192,6 +256,22 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         party.BesiegerCamp = null;
     }
 
+    public void BreakSiegeForPartyOnly(MobileParty party)
+    {
+        if (party?.BesiegerCamp == null) return;
+
+        var attachedParties = party._attachedParties;
+        party._attachedParties = new MBList<MobileParty>();
+        try
+        {
+            party.BesiegerCamp = null;
+        }
+        finally
+        {
+            party._attachedParties = attachedParties;
+        }
+    }
+
     public void StartLocalPlayerSiegePreparation()
     {
         if (PlayerEncounter.Current != null)
@@ -220,15 +300,67 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     }
 
     public void FinishLocalPlayerSiegeLeave()
+        => FinishLocalPlayerSiegeLeave(null, forcePlayerOutFromSettlement: true);
+
+    public void FinishLocalPlayerSiegeLeave(Settlement settlement)
+        => FinishLocalPlayerSiegeLeave(settlement, forcePlayerOutFromSettlement: true);
+
+    public void FinishLocalPlayerSiegeLeave(
+        Settlement settlement,
+        bool forcePlayerOutFromSettlement)
     {
+        var party = MobileParty.MainParty;
+        bool nativeDeactivationExpected =
+            party?.BesiegerCamp?.SiegeEvent != null;
+        if (settlement == null)
+        {
+            settlement = party?.BesiegerCamp?.SiegeEvent?.BesiegedSettlement ??
+                party?.MapEvent?.MapEventSettlement;
+        }
+
+        if (party?.BesiegerCamp != null)
+        {
+            party.BesiegerCamp = null;
+        }
+
+        if (!nativeDeactivationExpected)
+            DeactivateLocalPlayerSiege(settlement);
+
         if (PlayerEncounter.Current != null)
         {
-            PlayerEncounter.Finish();
+            PlayerEncounter.Finish(forcePlayerOutFromSettlement);
         }
         else
         {
             GameMenu.ExitToLast();
+            if (Campaign.Current.CurrentMenuContext == null)
+                Campaign.Current.MapStateData.GameMenuId = null;
         }
+    }
+
+    public void PrepareLocalPlayerBreakIn(Settlement settlement)
+    {
+        PlayerEncounter.CreateLocationEncounter(settlement);
+    }
+
+    public void ContinueLocalPlayerBreakIn(Settlement settlement)
+    {
+        if (MobileParty.MainParty?.CurrentSettlement != settlement)
+        {
+            Logger.Error("Cannot continue the local break-in before the party enters {Settlement}", settlement?.StringId);
+            return;
+        }
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<EncounterGameMenuBehavior>();
+        if (behavior == null)
+        {
+            Logger.Error("Cannot continue the local break-in because the encounter menu behavior is unavailable");
+            return;
+        }
+
+        // Keep patches live so the nested encounter restart still waits for server approval.
+        SiegeEntryFlowPatches.RunApprovedBreakInContinuation(
+            () => behavior.break_in_debrief_continue_on_consequence(null));
     }
 
     public void ApplySiegeAftermathChoice(MobileParty party, Settlement settlement, int aftermathType)
@@ -420,27 +552,116 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         }
     }
 
-    public void PromptSiegeEnded(Settlement settlement, bool besiegerDefeated)
+    public void PromptSiegeEnded(
+        Settlement settlement,
+        bool besiegerDefeated,
+        SiegeTerminationRole role,
+        bool interruptedActiveAssault = false)
     {
-        // Frees an inside player parked on the siege-preparation menus, whose leave option derefs
-        // the now-torn-down SiegeEvent; the vanilla end menus have no init logic, so they are safe
-        // after the replicated teardown.
-        if (MobileParty.MainParty?.CurrentSettlement != settlement) return;
+        if (role == SiegeTerminationRole.None || MobileParty.MainParty == null) return;
 
         var currentMenu = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
-        if (currentMenu != "encounter_interrupted_siege_preparations" && currentMenu != "menu_siege_strategies") return;
 
         using (new AllowedThread())
         {
-            // The player joined the defense locally (PlayerSiege.StartPlayerSiege); clear its siege
-            // map state so the visuals and camera release with the menu.
-            if (PlayerSiege.PlayerSiegeEvent != null && PlayerSiege.BesiegedSettlement == settlement)
+            if (interruptedActiveAssault)
             {
-                PlayerSiege.FinalizePlayerSiege();
+                FinishInterruptedActiveAssault(settlement);
+            }
+            else
+            {
+                DeactivateLocalPlayerSiege(settlement);
             }
 
-            GameMenu.SwitchToMenu(besiegerDefeated ? "siege_attacker_defeated" : "siege_attacker_left");
+            if (role == SiegeTerminationRole.Defender)
+            {
+                if (MobileParty.MainParty.CurrentSettlement != settlement ||
+                    (!interruptedActiveAssault && !IsSiegePreparationMenu(currentMenu)))
+                    return;
+
+                SwitchOrActivateMenu(besiegerDefeated ? "siege_attacker_defeated" : "siege_attacker_left");
+                return;
+            }
+
+            if (MobileParty.MainParty.BesiegerCamp != null)
+                MobileParty.MainParty.BesiegerCamp = null;
+
+            if (!interruptedActiveAssault && !IsSiegePreparationMenu(currentMenu)) return;
+
+            if (role == SiegeTerminationRole.AttackerMember &&
+                MobileParty.MainParty.Army != null &&
+                MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty)
+            {
+                SwitchOrActivateMenu("army_wait");
+                return;
+            }
+
+            if (!interruptedActiveAssault)
+                GameMenu.ExitToLast();
         }
+    }
+
+    private static void FinishInterruptedActiveAssault(Settlement settlement)
+    {
+        var party = MobileParty.MainParty;
+        if (party?.Party?._mapEventSide != null)
+            party.Party._mapEventSide = null;
+
+        if (PlayerEncounter.Current != null)
+        {
+            PlayerEncounter.LeaveEncounter = true;
+            try
+            {
+                PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to finish the interrupted siege encounter at {Settlement}", settlement?.StringId);
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = null;
+            }
+        }
+        else
+        {
+            GameMenu.ExitToLast();
+            if (Campaign.Current.CurrentMenuContext == null)
+                Campaign.Current.MapStateData.GameMenuId = null;
+        }
+
+        if (party?.BesiegerCamp != null)
+            party.BesiegerCamp = null;
+
+        DeactivateLocalPlayerSiege(settlement);
+    }
+
+    private static void SwitchOrActivateMenu(string menuId)
+    {
+        if (Campaign.Current.CurrentMenuContext == null)
+        {
+            GameMenu.ActivateGameMenu(menuId);
+        }
+        else
+        {
+            GameMenu.SwitchToMenu(menuId);
+        }
+    }
+
+    private static bool IsSiegePreparationMenu(string menuId)
+        => menuId == "encounter_interrupted_siege_preparations" ||
+           menuId == "menu_siege_strategies" ||
+           menuId == "continue_siege_after_attack" ||
+           menuId == "join_siege_event";
+
+    private static void DeactivateLocalPlayerSiege(Settlement settlement)
+    {
+        settlement?.Party?.SetVisualAsDirty();
+
+        var mapState = Game.Current?.GameStateManager?.GameStates
+            .FirstOrDefault(state => state is TaleWorlds.CampaignSystem.GameState.MapState)
+            as TaleWorlds.CampaignSystem.GameState.MapState;
+        mapState?.OnPlayerSiegeDeactivated();
     }
 
     public void PromptSiegeDefenderVictory(Settlement settlement)

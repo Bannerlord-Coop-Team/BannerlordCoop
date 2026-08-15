@@ -8,32 +8,31 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.Smithing.Patches
+namespace GameInterface.Services.Smithing.Patches;
+
+[HarmonyPatch(typeof(CraftingCampaignBehavior))]
+internal class DoSmeltingPatch
 {
-    [HarmonyPatch(typeof(CraftingCampaignBehavior))]
-    internal class DoSmeltingPatch
+    private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
+
+    [HarmonyPatch(nameof(CraftingCampaignBehavior.DoSmelting))]
+    [HarmonyPrefix]
+    public static bool DoSmeltingPrefix(ref CraftingCampaignBehavior __instance, Hero currentCraftingHero, EquipmentElement equipmentElement)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        [HarmonyPatch("DoSmelting")]
-        [HarmonyPrefix]
-        public static bool DoSmelting(ref CraftingCampaignBehavior __instance, Hero currentCraftingHero, EquipmentElement equipmentElement)
-        {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        // Publish message with data
+        var message = new DoSmelting(currentCraftingHero, equipmentElement);
+        MessageBroker.Instance.Publish(__instance, message);
 
-            // Publish message with data
-            var message = new SmeltingDone(__instance, currentCraftingHero, equipmentElement);
-            MessageBroker.Instance.Publish(__instance, message);
+        // Need to check to prevent spam clicking giving more xp and research points
+        if (currentCraftingHero.PartyBelongedTo.ItemRoster.FindIndexOfElement(equipmentElement) < 0) return false;
 
-            // Need to check to prevent spam clicking giving more xp and research points
-            if (currentCraftingHero.PartyBelongedTo.ItemRoster.FindIndexOfElement(equipmentElement) < 0) return false;
+        // Patched separately for sending to server
+        __instance.AddResearchPoints(equipmentElement.Item.WeaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(equipmentElement.Item, currentCraftingHero));
 
-            // Patched separately for sending to server
-            __instance.AddResearchPoints(equipmentElement.Item.WeaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(equipmentElement.Item, currentCraftingHero));
-
-            // Skip original to override original client saving
-            return false;
-        }
+        // Skip original to override original client saving
+        return false;
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.Party.Messages;
 
@@ -10,13 +11,28 @@ internal readonly struct DonateToGarrison : ICommand
     public readonly string CurrentSettlementId;
 
     [ProtoMember(2)]
-    public readonly string LeftMemberRosterId;
+    public readonly List<DonateTroop> Troops;
 
     public DonateToGarrison(
         string currentSettlementId,
-        string leftMemberRosterId)
+        List<DonateTroop> troops)
     {
         CurrentSettlementId = currentSettlementId;
-        LeftMemberRosterId = leftMemberRosterId;
+        Troops = troops;
+    }
+}
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct DonateTroop
+{
+    [ProtoMember(1)]
+    public readonly string CharacterId;
+
+    [ProtoMember(2)]
+    public readonly int Count;
+
+    public DonateTroop(string characterId, int count)
+    {
+        CharacterId = characterId;
+        Count = count;
     }
 }

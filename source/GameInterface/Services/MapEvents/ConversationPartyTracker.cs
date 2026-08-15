@@ -12,8 +12,9 @@ namespace GameInterface.Services.MapEvents;
 /// Server-side registry of AI parties currently held in a conversation/encounter with a player.
 /// </summary>
 /// <remarks>
-/// Each player can engage one target. Hostile contenders may share a target, which stays held until the last
-/// engagement ends.
+/// One engagement per player, and one player per target: a party someone else already holds cannot be engaged,
+/// hostile or not. Every server-side consequence of a map conversation is authorised only as "this peer holds an
+/// engagement with this party", so a shared hold would let two players each apply the same one-shot outcome.
 /// </remarks>
 internal sealed class ConversationPartyTracker : IHandler
 {
@@ -107,26 +108,38 @@ internal sealed class ConversationPartyTracker : IHandler
         /// <summary>Whether the party's AI was already disabled before the hold, so release preserves that state.</summary>
         public readonly bool WasAiDisabled;
 
-        public Engagement(object engagerKey, string engagerPartyId, string partyId, bool engagerIsDefender, bool wasAiDisabled)
+        /// <summary>Conversation request that currently owns this engagement.</summary>
+        public readonly string RequestId;
+
+        public Engagement(
+            object engagerKey,
+            string engagerPartyId,
+            string partyId,
+            bool engagerIsDefender,
+            bool wasAiDisabled,
+            string requestId)
         {
             EngagerKey = engagerKey;
             EngagerPartyId = engagerPartyId;
             PartyId = partyId;
             EngagerIsDefender = engagerIsDefender;
             WasAiDisabled = wasAiDisabled;
+            RequestId = requestId;
         }
     }
 
     /// <summary>
-    /// Begins or refreshes an engagement. A player cannot replace a live engagement with a different target, and
-    /// every player sharing a target preserves the AI state recorded by its first engagement.
+    /// Begins or refreshes an engagement. A player cannot replace a live engagement with a different target, and a
+    /// target another player already holds is refused. Refreshing keeps the AI state recorded when the engagement
+    /// began, so releasing it restores what the party was doing before.
     /// </summary>
     public bool TryBeginEngagement(
         object engagerKey,
         string engagerPartyId,
         string partyId,
         bool wasAiDisabled,
-        bool engagerIsDefender = false)
+        bool engagerIsDefender = false,
+        string requestId = null)
     {
         if (engagerKey == null || partyId == null) return false;
 
@@ -142,19 +155,25 @@ internal sealed class ConversationPartyTracker : IHandler
                     engagerPartyId,
                     partyId,
                     current.EngagerIsDefender || engagerIsDefender,
-                    current.WasAiDisabled);
+                    current.WasAiDisabled,
+                    requestId);
                 return true;
             }
 
-            var existing = engagements.Values.FirstOrDefault(x => x.PartyId == partyId);
-            if (existing.PartyId != null) wasAiDisabled = existing.WasAiDisabled;
+            // One engager per party. Every server-side consequence of a map conversation is validated
+            // only as "this peer holds an engagement with this party" (LordBarterHandler,
+            // PeaceBarterHandler, MarriageBarterHandler, BanditBarterHandler), so a shared hold lets
+            // two players each apply the same one-shot outcome - e.g. two players persuading the same
+            // lord, both paying, and the lord defecting twice.
+            if (engagements.Values.Any(x => x.PartyId == partyId)) return false;
 
             engagements.Add(engagerKey, new Engagement(
                 engagerKey,
                 engagerPartyId,
                 partyId,
                 engagerIsDefender,
-                wasAiDisabled));
+                wasAiDisabled,
+                requestId));
             isEmpty = false;
             return true;
         }
@@ -177,7 +196,9 @@ internal sealed class ConversationPartyTracker : IHandler
         object engagerKey,
         out string partyId,
         out Engagement engagement,
-        out bool shouldReleaseParty)
+        out bool shouldReleaseParty,
+        string expectedRequestId = null,
+        bool requireRequestIdMatch = false)
     {
         partyId = null;
         engagement = default;
@@ -188,6 +209,7 @@ internal sealed class ConversationPartyTracker : IHandler
         lock (stateLock)
         {
             if (!engagements.TryGetValue(engagerKey, out engagement)) return false;
+            if (requireRequestIdMatch && engagement.RequestId != expectedRequestId) return false;
             var endedPartyId = partyId = engagement.PartyId;
             engagements.Remove(engagerKey);
             shouldReleaseParty = !engagements.Values.Any(x => x.PartyId == endedPartyId);

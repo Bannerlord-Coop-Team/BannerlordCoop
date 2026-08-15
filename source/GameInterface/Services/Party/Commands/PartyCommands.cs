@@ -76,8 +76,10 @@ internal class PartyCommands
     [CommandLineArgumentFunction("whoami", "coop.debug.mobileparty")]
     public static string WhoAmICommand(List<string> strings)
     {
+        if(!ModInformation.IsClient) return "Command can only be run on a client.";
+        
         var me = Hero.MainHero;
-        if (me == null) return "No main hero on this instance (the host has none; run this on a client).";
+        if (me == null) return "No main hero on this instance";
 
         return me.PartyBelongedTo != null
             ? "You are " + me.Name + " | hero id: " + me.StringId + " | party id: " + me.PartyBelongedTo.StringId
@@ -93,15 +95,21 @@ internal class PartyCommands
         if (strings.Count != 1)
             return "Usage: coop.debug.mobileparty.position <partyId>";
 
-        MobileParty party = Campaign.Current?.CampaignObjectManager.Find<MobileParty>(strings[0]);
-        if (party == null) return $"Party with id {strings[0]} not found";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found";
 
         CampaignVec2 position = party.Position;
+        var partyId = objectManager.TryGetId(party, out string resolvedPartyId)
+            ? resolvedPartyId
+            : strings[0];
         return
-            $"party={party.StringId}|" +
+            $"id={partyId}|party={party.StringId}|" +
             $"x={position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
             $"y={position.Y.ToString("R", CultureInfo.InvariantCulture)}|" +
-            $"isOnLand={position.IsOnLand}|moveMode={party.PartyMoveMode}";
+            $"isOnLand={position.IsOnLand}|" +
+            $"settlement={party.CurrentSettlement?.StringId ?? "none"}|" +
+            $"moveMode={party.PartyMoveMode}";
     }
 
     /// <summary>
@@ -390,6 +398,54 @@ internal class PartyCommands
         return $"PARTY_SCREEN_TROOP_SELECTED character={strings[0]} selected={row.IsSelected} " +
                $"upgradeTargets={row.Upgrades.Count} ready={row.NumOfReadyToUpgradeTroops} " +
                $"upgradeable={row.NumOfUpgradeableTroops}";
+    }
+
+    /// <summary>
+    /// Applies the same upgrade command created by the Party-screen row.
+    /// </summary>
+    [CommandLineArgumentFunction("upgrade_party_screen_troop", "coop.debug.mobileparty")]
+    public static string UpgradePartyScreenTroopCommand(List<string> strings)
+    {
+        if (ModInformation.IsServer) return "Command can only be run on a client.";
+        if (strings.Count < 1 || strings.Count > 2)
+            return "Usage: coop.debug.mobileparty.upgrade_party_screen_troop <character id> [upgrade target index]";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
+            return $"Character with id {strings[0]} not found.";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
+            return "No active party screen.";
+
+        int upgradeTarget = 0;
+        if (strings.Count == 2 && (!int.TryParse(strings[1], out upgradeTarget) || upgradeTarget < 0))
+            return "Upgrade target index must be a non-negative integer.";
+        if (upgradeTarget >= character.UpgradeTargets.Length)
+            return $"{strings[0]} has {character.UpgradeTargets.Length} upgrade targets.";
+
+        var logic = partyState.PartyScreenLogic;
+        int rosterIndex = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]
+            .FindIndexOfTroop(character);
+        if (rosterIndex < 0) return $"{strings[0]} is not in the right member roster.";
+
+        var troop = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]
+            .GetElementCopyAtIndex(rosterIndex);
+        int insertionIndex = logic.GetIndexToInsertTroop(
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Member,
+            troop);
+        var command = new PartyScreenLogic.PartyCommand();
+        command.FillForUpgradeTroop(
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Member,
+            character,
+            1,
+            upgradeTarget,
+            insertionIndex);
+        if (!logic.ValidateCommand(command))
+            return $"PARTY_SCREEN_UPGRADE_REJECTED character={strings[0]} target={upgradeTarget}";
+
+        logic.AddCommand(command);
+        return $"PARTY_SCREEN_UPGRADE_STAGED character={strings[0]} " +
+            $"target={character.UpgradeTargets[upgradeTarget].StringId} pending={logic.IsThereAnyChanges()}";
     }
 
     /// <summary>

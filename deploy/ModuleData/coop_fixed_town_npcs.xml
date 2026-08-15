@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<NPCCharacters>
+  <!--
+    Add or edit one NPCCharacter block per team member/supporter.
+
+    Coop placement attributes:
+      coop_settlement  Required settlement StringId, for example town_V1.
+      coop_location    Optional location id. Defaults to tavern.
+      coop_spawn_tag   Optional native scene spawn tag. Defaults to npc_common.
+      coop_dialogue    Optional greeting shown when the player talks to this NPC.
+      coop_enabled     Optional true/false switch. Defaults to true.
+
+    Bannerlord ignores the coop_* attributes and loads the remaining NPCCharacter data normally.
+    Keep these characters non-hero and non-template; the co-op server places them directly.
+    Distribute the edited module to the server and every client, then restart the game.
+
+    Copy-ready example:
+
+    <NPCCharacter
+      id="coop_fixed_npc_example"
+      name="{=!}Team Member"
+      default_group="Infantry"
+      level="1"
+      is_hero="false"
+      is_template="false"
+      occupation="Townsfolk"
+      culture="Culture.empire"
+      is_hidden_encyclopedia="true"
+      coop_settlement="town_V1"
+      coop_location="tavern"
+      coop_spawn_tag="npc_common"
+      coop_dialogue="Good to see you."
+      coop_enabled="true">
+      <face>
+        <face_key_template value="BodyProperty.townsman_empire" />
+      </face>
+      <skills />
+      <Equipments>
+        <EquipmentSet
+          id="npc_companion_equipment_template_empire"
+          equipmentType="Civilian" />
+      </Equipments>
+    </NPCCharacter>
+  -->
+  <NPCCharacter
+    id="coop_fixed_npc_hasted"
+    name="{=!}Hasted"
+    default_group="Infantry"
+    level="1"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.sturgia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_S7"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="You look confused. Good. The outfit is working."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_sturgia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.bearhead" />
+        <equipment slot="Cape" id="Item.leopard_pelt" />
+        <equipment slot="Body" id="Item.tassled_southern_robes" />
+        <equipment slot="Gloves" id="Item.decorated_imperial_gauntlets" />
+        <equipment slot="Leg" id="Item.decorated_imperial_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_another_joke"
+    name="{=!}AnotherJoke"
+    default_group="Infantry"
+    level="1"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.sturgia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_S7"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="They said one joke was enough. They were wrong."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_sturgia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.sturgian_lord_helmet_c" />
+        <equipment slot="Cape" id="Item.armored_bearskin" />
+        <equipment slot="Body" id="Item.northern_brass_lamellar_over_mail" />
+        <equipment slot="Gloves" id="Item.plated_strip_gauntlets" />
+        <equipment slot="Leg" id="Item.plated_strip_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+</NPCCharacters>

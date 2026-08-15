@@ -1,5 +1,7 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -50,5 +52,27 @@ public static class HeroExtensions
             return false;
 
         return controlledObjectInfo.IsControlled;
+    }
+
+    /// <summary>
+    /// Determine Whether this client owns a hero's health.
+    /// Use BattleSpawnGate.HeroAgentAuthorityProbe to determine if client has authority.
+    /// </summary>
+    public static bool IsHealthControlledByThisInstance(this Hero hero)
+    {
+        if (hero is null)
+        {
+            Logger.Error("{parameterName} was null", nameof(hero));
+            return false;
+        }
+
+        // Determine if this client has control of the hero from the mission layer
+        var agentAuthority = BattleSpawnGate.HeroAgentAuthorityProbe?.Invoke(hero);
+        if (agentAuthority.HasValue) return agentAuthority.Value;
+
+        // Fallback: Hero is this player's character
+        if (hero.IsControlledByThisInstance()) return true;
+
+        return false;
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using System.IO;
+using System.Security;
 
 namespace Coop.CrashReporter
 {
@@ -15,7 +16,8 @@ namespace Coop.CrashReporter
             string role,
             string build,
             string programDataRoot,
-            string outputRoot)
+            string outputRoot,
+            string gameBinariesDirectory = null)
         {
             ProcessId = processId;
             ProcessStartUtcTicks = processStartUtcTicks;
@@ -26,6 +28,7 @@ namespace Coop.CrashReporter
                 Path.GetFullPath(programDataRoot),
                 BannerlordDirectoryName);
             OutputRoot = Path.GetFullPath(outputRoot);
+            GameBinariesDirectory = NormalizeOptionalPath(gameBinariesDirectory);
         }
 
         public int ProcessId { get; }
@@ -35,6 +38,32 @@ namespace Coop.CrashReporter
         public string Build { get; }
         public string BannerlordDataRoot { get; }
         public string OutputRoot { get; }
+
+        /// <summary>
+        /// The game's bin/Win64_Shipping_Client directory as resolved by the module, or null when
+        /// the module could not resolve it. Only used to list installed files, so a bad value must
+        /// never fail option parsing.
+        /// </summary>
+        public string GameBinariesDirectory { get; }
+
+        private static string NormalizeOptionalPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException ||
+                exception is NotSupportedException ||
+                exception is PathTooLongException ||
+                exception is SecurityException)
+            {
+                return null;
+            }
+        }
 
         public static bool TryParse(string[] args, out CrashReporterOptions options)
         {
@@ -72,7 +101,8 @@ namespace Coop.CrashReporter
                     Environment.GetEnvironmentVariable("COOP_CRASH_ROLE") ?? "unknown",
                     Environment.GetEnvironmentVariable("COOP_CRASH_BUILD") ?? "unknown",
                     programDataRoot,
-                    outputRoot);
+                    outputRoot,
+                    Environment.GetEnvironmentVariable("COOP_CRASH_GAME_BINARIES"));
                 return true;
             }
             catch (Exception exception) when (

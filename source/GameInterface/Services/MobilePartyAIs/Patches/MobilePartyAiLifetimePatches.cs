@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MobilePartyAIs.Messages;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
@@ -15,24 +16,20 @@ class MobilePartyAiLifetimePatches
 {
     static readonly ILogger Logger = LogManager.GetLogger<MobilePartyAiLifetimePatches>();
 
-    //[HarmonyPatch(typeof(MobilePartyAi), MethodType.Constructor, typeof(MobileParty))]
-    //[HarmonyPrefix]
-    //static void CtorPrefix(MobilePartyAi __instance, MobileParty mobileParty)
-    //{
-    //    // Call original if we call this function
-    //    if (CallOriginalPolicy.IsOriginalAllowed()) return;
+    [HarmonyPatch(typeof(MobilePartyAi), MethodType.Constructor, typeof(MobileParty))]
+    [HarmonyPostfix]
+    private static void CtorPostfix(MobilePartyAi __instance, MobileParty mobileParty)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
-    //    if (ModInformation.IsClient)
-    //    {
-    //        Logger.Error("Client created managed {name}", typeof(MobileParty));
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created managed {name}", typeof(MobilePartyAi));
+            return;
+        }
 
-    //        return;
-    //    }
-
-    //    MessageBroker.Instance.Publish(__instance, new InstanceCreated<MobilePartyAi>(__instance, mobileParty));
-
-    //    return;
-    //}
+        MessageBroker.Instance.Publish(__instance, new MobilePartyAiCreated(__instance, mobileParty));
+    }
 
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.RemoveParty))]
     [HarmonyPostfix]

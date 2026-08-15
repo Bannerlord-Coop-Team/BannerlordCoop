@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
@@ -11,12 +12,14 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using Helpers;
 using LiteNetLib;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Party.Handlers;
 
@@ -28,18 +31,20 @@ internal class PartyScreenHelperHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly ISendCoalescer sendCoalescer;
 
     public PartyScreenHelperHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ITroopRosterInterface troopRosterInterface)
+        ITroopRosterInterface troopRosterInterface,
+        ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
-
+        this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NewClanPartyScreenClosed>(Handle_NewClanPartyScreenClosed);
         messageBroker.Subscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
         messageBroker.Subscribe<GarrisonDonated>(Handle_GarrisonDonated);
@@ -90,6 +95,13 @@ internal class PartyScreenHelperHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
 
+            // Don't create a party for a hero a player controls.
+            if (newLeaderHero.IsPlayerHero())
+            {
+                logger.Error($"Blocked clan party creation for player hero {newLeaderHero.Name}, {newLeaderHero.StringId}");
+                return;
+            }
+
             int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
             if (newLeaderHero.Gold < partyGoldLowerThreshold)
             {
@@ -110,6 +122,12 @@ internal class PartyScreenHelperHandler : IHandler
                 //rightOwnerParty.PrisonRoster.AddToCounts(troopRosterElement2.Character, -troopRosterElement2.Number, false, -troopRosterElement2.WoundedNumber, -troopRosterElement2.Xp, true, -1);
             }
 
+            // Flush troop roster to show actual member count on clients after refresh
+            if (objectManager.TryGetId(mobileParty.MemberRoster, out var rosterId))
+            {
+                sendCoalescer?.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
+            }
+
             network.Send(obj.Who as NetPeer, new RefreshPartiesList());
         });
     }
@@ -117,16 +135,28 @@ internal class PartyScreenHelperHandler : IHandler
     private void Handle_GarrisonDonated(MessagePayload<GarrisonDonated> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.CurrentSettlement, out var currentSettlementId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.LeftMemberRoster, out var leftMemberRosterId)) return;
+        var troops = new List<DonateTroop>();
 
-        var message = new DonateToGarrison(currentSettlementId, leftMemberRosterId);
+        for (int i = 0; i < obj.What.LeftMemberRoster.Count; i++)
+        {
+            var element = obj.What.LeftMemberRoster.GetElementCopyAtIndex(i);
+
+            if (!objectManager.TryGetIdWithLogging(element.Character, out var characterId))
+                continue;
+
+            troops.Add(new DonateTroop(
+                characterId,
+                element.Number));
+        }
+
+        var message = new DonateToGarrison(currentSettlementId, troops);
+
         network.SendAll(message);
     }
 
     private void Handle_DonateToGarrison(MessagePayload<DonateToGarrison> obj)
     {
         if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftMemberRosterId, out var leftMemberRoster)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -136,13 +166,23 @@ internal class PartyScreenHelperHandler : IHandler
                 currentSettlement.AddGarrisonParty();
                 garrisonParty = currentSettlement.Town.GarrisonParty;
             }
-            for (int i = 0; i < leftMemberRoster.Count; i++)
+            foreach (var troop in obj.What.Troops)
             {
-                TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
-                garrisonParty.AddElementToMemberRoster(elementCopyAtIndex.Character, elementCopyAtIndex.Number, false);
-                if (elementCopyAtIndex.Character.IsHero)
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(
+                    troop.CharacterId,
+                    out var character))
+                    continue;
+
+                garrisonParty.AddElementToMemberRoster(
+                    character,
+                    troop.Count,
+                    false);
+
+                if (character.IsHero)
                 {
-                    EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                    EnterSettlementAction.ApplyForCharacterOnly(
+                        character.HeroObject,
+                        currentSettlement);
                 }
             }
         });

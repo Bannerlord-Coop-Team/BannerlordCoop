@@ -3,7 +3,6 @@ using Common;
 using Common.LiveTesting;
 using Common.Logging;
 using Common.LogicStates;
-using Common.Util;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using GameInterface;
@@ -13,6 +12,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -27,19 +27,40 @@ namespace Coop.LiveTesting
 {
     internal sealed class LiveTestControlServer : IDisposable
     {
+        private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
+
         private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
 
         private readonly string logFilePath;
+        private readonly bool isServer;
+        private readonly bool deferredClientJoinEnabled;
+        private readonly Func<bool> startAsClient;
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
+        private readonly object screenshotGate = new object();
+        private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
+            new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
+        private readonly HashSet<string> screenshotPaths =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly string endpointDirectory;
+        private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
+        private int deferredClientJoinAttempted;
 
-        public LiveTestControlServer(bool isServer, string logFilePath)
+        public LiveTestControlServer(
+            bool isServer,
+            string logFilePath,
+            bool deferredClientJoinEnabled,
+            Func<bool> startAsClient)
         {
             if (string.IsNullOrWhiteSpace(logFilePath)) throw new ArgumentException("A log file path is required.", nameof(logFilePath));
+            if (startAsClient == null) throw new ArgumentNullException(nameof(startAsClient));
 
+            this.isServer = isServer;
             this.logFilePath = logFilePath;
+            this.deferredClientJoinEnabled = deferredClientJoinEnabled;
+            this.startAsClient = startAsClient;
 
             int processId;
             using (Process process = Process.GetCurrentProcess())
@@ -55,14 +76,35 @@ namespace Coop.LiveTesting
                 PlatformId = ReadArgument(arguments, "/platformId"),
                 RunToken = NormalizeRunToken(ReadArgument(arguments, "/cooptestrun")),
             };
+            if (processInfo.RunToken == null)
+                throw new InvalidOperationException("A valid /cooptestrun token is required for live testing.");
 
             string pipeName = LiveTestProtocol.GetPipeName(processId);
             pipeServer = new NamedPipeLiveTestServer(pipeName, GetProcessInfo, Handle);
+            endpointDirectory = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                EndpointDirectoryName,
+                processInfo.RunToken);
+            endpointRegistrationPath = System.IO.Path.Combine(
+                endpointDirectory,
+                processId.ToString(CultureInfo.InvariantCulture) + ".json");
         }
+
+        public static bool IsEnabled(string[] arguments) =>
+            NormalizeRunToken(ReadArgument(arguments, "/cooptestrun")) != null;
 
         public void Start()
         {
             pipeServer.Start();
+            try
+            {
+                WriteEndpointRegistration();
+            }
+            catch
+            {
+                pipeServer.Dispose();
+                throw;
+            }
             Logger.Information(
                 "[LiveTest] Listening on {PipeName} as {Role} (platform {PlatformId}, run {RunToken})",
                 LiveTestProtocol.GetPipeName(processInfo.Pid),
@@ -73,6 +115,7 @@ namespace Coop.LiveTesting
 
         public void Dispose()
         {
+            DeleteEndpointRegistration();
             pipeServer.Dispose();
         }
 
@@ -85,10 +128,16 @@ namespace Coop.LiveTesting
                         request,
                         () => CreateStatusResponse(request.Id),
                         false);
+                case "command-catalog":
+                    return HandleCommandCatalog(request);
                 case "command":
                     return HandleCommand(request);
                 case "screenshot":
                     return HandleScreenshot(request);
+                case "screenshot-status":
+                    return HandleScreenshotStatus(request);
+                case "join":
+                    return HandleDeferredClientJoin(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -98,6 +147,22 @@ namespace Coop.LiveTesting
                         $"Unknown live-test method '{request.Method}'.",
                         false);
             }
+        }
+
+        private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
+        {
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
+                {
+                    dispatcher = new LiveTestCommandDispatcher();
+                }
+
+                return Success(request.Id, new
+                {
+                    commands = dispatcher.GetCommandNames(),
+                });
+            }, false);
         }
 
         private LiveTestResponse HandleCommand(LiveTestRequest request)
@@ -120,6 +185,23 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
+                    if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
+                    {
+                        string output = Coop.JoinFixtureCommands.Start(arguments);
+                        bool hasFallbackStructuredResult = TryParseStructuredResult(
+                            output,
+                            out var fallbackStructuredResult);
+                        return Success(request.Id, new
+                        {
+                            name = command,
+                            arguments,
+                            found = true,
+                            output,
+                            hasStructuredResult = hasFallbackStructuredResult,
+                            structuredResult = fallbackStructuredResult,
+                        });
+                    }
+
                     return Failure(
                         request.Id,
                         "session_not_ready",
@@ -133,12 +215,17 @@ namespace Coop.LiveTesting
                     return Failure(request.Id, "command_not_found", result.Output, false);
                 }
 
+                bool hasStructuredResult = TryParseStructuredResult(
+                    result.Output,
+                    out var structuredResult);
                 return Success(request.Id, new
                 {
                     name = command,
                     arguments,
                     found = true,
                     output = result.Output,
+                    hasStructuredResult,
+                    structuredResult,
                 });
             }, true);
         }
@@ -166,6 +253,8 @@ namespace Coop.LiveTesting
                 return Failure(request.Id, "invalid_parameters", exception.Message, false);
             }
 
+            string captureId = Guid.NewGuid().ToString("N");
+
             return ExecuteOnGameThread(request, () =>
             {
                 string directory = System.IO.Path.GetDirectoryName(screenshotPath);
@@ -178,14 +267,119 @@ namespace Coop.LiveTesting
                         false);
                 }
 
-                Directory.CreateDirectory(directory);
-                Utilities.TakeScreenshot(screenshotPath);
+                lock (screenshotGate)
+                {
+                    if (!screenshotPaths.Add(screenshotPath))
+                    {
+                        return Failure(
+                            request.Id,
+                            "screenshot_path_reused",
+                            $"Screenshot path '{screenshotPath}' has already been used by this process.",
+                            false);
+                    }
+
+                    screenshotCaptures.Add(
+                        captureId,
+                        new ScreenshotCapture(screenshotPath));
+                }
+
+                try
+                {
+                    Directory.CreateDirectory(directory);
+                    if (File.Exists(screenshotPath))
+                    {
+                        File.Delete(screenshotPath);
+                    }
+
+                    Utilities.TakeScreenshot(screenshotPath);
+                }
+                catch
+                {
+                    lock (screenshotGate)
+                    {
+                        screenshotCaptures.Remove(captureId);
+                        screenshotPaths.Remove(screenshotPath);
+                    }
+                    throw;
+                }
+
                 return Success(request.Id, new
                 {
+                    captureId,
                     path = screenshotPath,
                     captureRequested = true,
                 });
             }, true);
+        }
+
+        private LiveTestResponse HandleScreenshotStatus(LiveTestRequest request)
+        {
+            if (!TryReadString(request.Parameters, "captureId", out var captureId) ||
+                captureId.Length != 32 ||
+                !captureId.All(IsLowerHexadecimal))
+            {
+                return Failure(
+                    request.Id,
+                    "invalid_parameters",
+                    "Screenshot status requires a 32-character lowercase hexadecimal capture id.",
+                    false);
+            }
+
+            ScreenshotCapture capture;
+            lock (screenshotGate)
+            {
+                if (!screenshotCaptures.TryGetValue(captureId, out capture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' was not found.",
+                        false);
+                }
+            }
+
+            ScreenshotFileObservation observation = ObserveScreenshot(capture.Path);
+            bool stable;
+            bool complete;
+            lock (screenshotGate)
+            {
+                if (!screenshotCaptures.TryGetValue(captureId, out var currentCapture) ||
+                    !ReferenceEquals(capture, currentCapture))
+                {
+                    return Failure(
+                        request.Id,
+                        "capture_not_found",
+                        $"Screenshot capture '{captureId}' was superseded.",
+                        false);
+                }
+
+                stable = observation.Exists &&
+                    observation.IsBmp &&
+                    observation.DeclaredLength == observation.Length &&
+                    observation.Length > 0 &&
+                    capture.HasObservation &&
+                    capture.LastLength == observation.Length &&
+                    capture.LastWriteUtc == observation.LastWriteUtc;
+                capture.HasObservation = observation.Exists;
+                capture.LastLength = observation.Length;
+                capture.LastWriteUtc = observation.LastWriteUtc;
+                capture.Complete |= stable;
+                complete = capture.Complete;
+            }
+
+            return Success(request.Id, new
+            {
+                captureId,
+                path = capture.Path,
+                exists = observation.Exists,
+                isBmp = observation.IsBmp,
+                stable,
+                complete,
+                length = observation.Length,
+                declaredLength = observation.DeclaredLength,
+                lengthMatchesHeader = observation.LengthMatchesHeader,
+                lastWriteUtc = observation.LastWriteUtc,
+            });
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)
@@ -208,6 +402,65 @@ namespace Coop.LiveTesting
             });
         }
 
+        private LiveTestResponse HandleDeferredClientJoin(LiveTestRequest request)
+        {
+            if (isServer)
+            {
+                return Failure(
+                    request.Id,
+                    "method_not_allowed",
+                    "Only a client process may join a co-op session.",
+                    false);
+            }
+
+            if (!deferredClientJoinEnabled)
+            {
+                return Failure(
+                    request.Id,
+                    "manual_join_not_enabled",
+                    "The client was not launched for a deferred live-test join.",
+                    false);
+            }
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (Volatile.Read(ref deferredClientJoinAttempted) != 0)
+                {
+                    return Failure(
+                        request.Id,
+                        "join_already_attempted",
+                        "The deferred client join was already attempted.",
+                        false);
+                }
+
+                if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
+                {
+                    return Failure(
+                        request.Id,
+                        "client_not_at_main_menu",
+                        "The client must be at the main menu with no campaign loaded before joining.",
+                        false);
+                }
+
+                if (Interlocked.Exchange(ref deferredClientJoinAttempted, 1) != 0)
+                {
+                    return Failure(
+                        request.Id,
+                        "join_already_attempted",
+                        "The deferred client join was already attempted.",
+                        false);
+                }
+
+                bool started = startAsClient();
+                Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
+                return Success(request.Id, new
+                {
+                    attempted = true,
+                    started,
+                });
+            }, true);
+        }
+
         private LiveTestResponse CreateStatusResponse(string requestId)
         {
             bool campaignLoaded = Campaign.Current != null;
@@ -215,6 +468,10 @@ namespace Coop.LiveTesting
             bool coopRunning = false;
             string coopState = null;
             int? registeredPlayers = null;
+            int? registeredPlayerCount = null;
+            int? connectedPlayerCount = null;
+            string[] registeredControllerIds = null;
+            string[] connectedControllerIds = null;
 
             if (campaignLoaded && ContainerProvider.TryResolve<ILogic>(out var logic))
             {
@@ -237,7 +494,22 @@ namespace Coop.LiveTesting
 
                 if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
                 {
-                    registeredPlayers = playerManager.Players.Count;
+                    var players = playerManager.Players
+                        .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
+                        .ToArray();
+                    registeredPlayers = players.Length;
+                    if (ModInformation.IsServer)
+                    {
+                        registeredPlayerCount = players.Length;
+                        registeredControllerIds = players
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedControllerIds = players
+                            .Where(playerManager.IsConnected)
+                            .Select(player => player.ControllerId)
+                            .ToArray();
+                        connectedPlayerCount = connectedControllerIds.Length;
+                    }
                 }
             }
 
@@ -294,6 +566,12 @@ namespace Coop.LiveTesting
                 coopRunning,
                 coopState,
                 registeredPlayers,
+                registeredPlayerCount,
+                connectedPlayerCount,
+                registeredControllerIds,
+                connectedControllerIds,
+                deferredClientJoinEnabled,
+                deferredClientJoinAttempted = Volatile.Read(ref deferredClientJoinAttempted) != 0,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
@@ -313,10 +591,7 @@ namespace Coop.LiveTesting
                 {
                     try
                     {
-                        using (AllowedThread.Suspend())
-                        {
-                            response = operation();
-                        }
+                        response = operation();
                     }
                     catch (Exception exception)
                     {
@@ -378,6 +653,153 @@ namespace Coop.LiveTesting
                 RunToken = processInfo.RunToken,
             };
         }
+
+        private void WriteEndpointRegistration()
+        {
+            Directory.CreateDirectory(endpointDirectory);
+            string temporaryPath = endpointRegistrationPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            string registration = JsonSerializer.Serialize(new
+            {
+                version = LiveTestProtocol.Version,
+                pid = processInfo.Pid,
+                role = processInfo.Role,
+                platformId = processInfo.PlatformId,
+                runToken = processInfo.RunToken,
+                processStartedUtc,
+                pipeName = LiveTestProtocol.GetPipeName(processInfo.Pid),
+            });
+
+            try
+            {
+                File.WriteAllText(temporaryPath, registration);
+                if (File.Exists(endpointRegistrationPath))
+                {
+                    File.Replace(temporaryPath, endpointRegistrationPath, null);
+                }
+                else
+                {
+                    File.Move(temporaryPath, endpointRegistrationPath);
+                }
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+        }
+
+        private void DeleteEndpointRegistration()
+        {
+            try
+            {
+                if (File.Exists(endpointRegistrationPath))
+                {
+                    File.Delete(endpointRegistrationPath);
+                }
+
+                if (Directory.Exists(endpointDirectory) &&
+                    Directory.GetFileSystemEntries(endpointDirectory).Length == 0)
+                {
+                    Directory.Delete(endpointDirectory);
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Warning(
+                    exception,
+                    "[LiveTest] Failed to remove endpoint registration {RegistrationPath}",
+                    endpointRegistrationPath);
+            }
+        }
+
+        private static bool TryParseStructuredResult(string output, out object structuredResult)
+        {
+            const string prefix = "LIVE_TEST_JSON=";
+            structuredResult = null;
+            string json = null;
+            int matches = 0;
+
+            using (var reader = new StringReader(output ?? string.Empty))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (!line.StartsWith(prefix, StringComparison.Ordinal)) continue;
+
+                    matches++;
+                    json = line.Substring(prefix.Length);
+                }
+            }
+
+            if (matches != 1 || string.IsNullOrWhiteSpace(json)) return false;
+
+            try
+            {
+                using (JsonDocument document = JsonDocument.Parse(json))
+                {
+                    structuredResult = document.RootElement.Clone();
+                }
+                return true;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+
+        private static ScreenshotFileObservation ObserveScreenshot(string path)
+        {
+            if (!File.Exists(path)) return ScreenshotFileObservation.Missing;
+
+            try
+            {
+                using (var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read))
+                {
+                    long length = stream.Length;
+                    var header = new byte[6];
+                    int headerLength = 0;
+                    while (headerLength < header.Length)
+                    {
+                        int bytesRead = stream.Read(
+                            header,
+                            headerLength,
+                            header.Length - headerLength);
+                        if (bytesRead == 0) break;
+                        headerLength += bytesRead;
+                    }
+                    bool isBmp = headerLength == header.Length &&
+                        header[0] == 'B' &&
+                        header[1] == 'M';
+                    long? declaredLength = isBmp
+                        ? (long?)BitConverter.ToUInt32(header, 2)
+                        : null;
+                    return new ScreenshotFileObservation(
+                        true,
+                        isBmp,
+                        length,
+                        declaredLength,
+                        File.GetLastWriteTimeUtc(path));
+                }
+            }
+            catch (IOException)
+            {
+                return new ScreenshotFileObservation(true, false, 0, null, null);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new ScreenshotFileObservation(true, false, 0, null, null);
+            }
+        }
+
+        private static bool IsLowerHexadecimal(char character) =>
+            (character >= '0' && character <= '9') ||
+            (character >= 'a' && character <= 'f');
 
         private static bool TryReadCommand(
             JsonElement parameters,
@@ -443,6 +865,47 @@ namespace Coop.LiveTesting
                 char.IsLetterOrDigit(character) || character == '-' || character == '_')
                 ? runToken
                 : null;
+        }
+
+        private sealed class ScreenshotCapture
+        {
+            public string Path { get; }
+            public bool HasObservation { get; set; }
+            public long LastLength { get; set; }
+            public DateTime? LastWriteUtc { get; set; }
+            public bool Complete { get; set; }
+
+            public ScreenshotCapture(string path)
+            {
+                Path = path;
+            }
+        }
+
+        private readonly struct ScreenshotFileObservation
+        {
+            public static readonly ScreenshotFileObservation Missing =
+                new ScreenshotFileObservation(false, false, 0, null, null);
+
+            public bool Exists { get; }
+            public bool IsBmp { get; }
+            public long Length { get; }
+            public long? DeclaredLength { get; }
+            public bool LengthMatchesHeader => DeclaredLength == Length;
+            public DateTime? LastWriteUtc { get; }
+
+            public ScreenshotFileObservation(
+                bool exists,
+                bool isBmp,
+                long length,
+                long? declaredLength,
+                DateTime? lastWriteUtc)
+            {
+                Exists = exists;
+                IsBmp = isBmp;
+                Length = length;
+                DeclaredLength = declaredLength;
+                LastWriteUtc = lastWriteUtc;
+            }
         }
     }
 }
