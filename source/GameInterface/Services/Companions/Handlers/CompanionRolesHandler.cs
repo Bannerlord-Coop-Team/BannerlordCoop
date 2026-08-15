@@ -9,6 +9,7 @@ using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
 using LiteNetLib;
@@ -39,6 +40,7 @@ internal class CompanionRolesHandler : IHandler
     private readonly INetwork network;
     private readonly ICompanionRolesCampaignBehaviorInterface companionRolesCampaignBehaviorInterface;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IPlayerManager playerManager;
     private readonly ISendCoalescer sendCoalescer;
     private readonly Dictionary<NetPeer, Dictionary<string, CompanionRescueCompleted>> completedRescueRequests =
         new Dictionary<NetPeer, Dictionary<string, CompanionRescueCompleted>>();
@@ -51,6 +53,7 @@ internal class CompanionRolesHandler : IHandler
         INetwork network,
         ICompanionRolesCampaignBehaviorInterface companionRolesCampaignBehaviorInterface,
         ITroopRosterInterface troopRosterInterface,
+        IPlayerManager playerManager,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -58,6 +61,7 @@ internal class CompanionRolesHandler : IHandler
         this.network = network;
         this.companionRolesCampaignBehaviorInterface = companionRolesCampaignBehaviorInterface;
         this.troopRosterInterface = troopRosterInterface;
+        this.playerManager = playerManager;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<ClanNameSelectionDone>(Handle_ClanNameSelectionDone);
@@ -446,7 +450,8 @@ internal class CompanionRolesHandler : IHandler
                     out var targetParty))
                     throw new InvalidOperationException("The requested target party could not be resolved.");
 
-                ValidateRescueOwnership(companion, targetParty, data.ExpectedClanId);
+                var expectedClan = ValidateRescueOwnership(companion, targetParty, data.ExpectedClanId);
+                ValidateRescueRequester(requester, expectedClan, targetParty);
                 int targetCount = targetParty.MemberRoster.GetTroopCount(companion.CharacterObject);
                 if (!companion.IsPrisoner && companion.PartyBelongedTo == targetParty &&
                     companion.HeroState == Hero.CharacterStates.Active && targetCount == 1)
@@ -550,6 +555,7 @@ internal class CompanionRolesHandler : IHandler
 
                 var targetParty = rightOwnerParty.MobileParty;
                 var expectedClan = ValidateRescueOwnership(companion, targetParty, data.ExpectedClanId);
+                ValidateRescueRequester(requester, expectedClan, targetParty);
                 var leftMemberElements = troopRosterInterface
                     .UnpackTroopRosterData(data.LeftMemberRosterData).ToArray();
                 var leftPrisonerElements = troopRosterInterface
@@ -667,6 +673,21 @@ internal class CompanionRolesHandler : IHandler
         if (targetParty.ActualClan != expectedClan || targetParty.LeaderHero?.Clan != expectedClan)
             throw new InvalidOperationException("The target party no longer belongs to the companion's clan.");
         return expectedClan;
+    }
+
+    private void ValidateRescueRequester(NetPeer requester, Clan expectedClan,
+        MobileParty targetParty)
+    {
+        if (!playerManager.TryGetPlayer(requester, out var player))
+            throw new InvalidOperationException("The requesting peer has no registered player.");
+        if (string.IsNullOrWhiteSpace(player.ClanId) ||
+            !objectManager.TryGetObjectWithLogging<Clan>(player.ClanId, out var playerClan) ||
+            playerClan != expectedClan)
+            throw new InvalidOperationException("The requesting player does not own the companion's clan.");
+        if (string.IsNullOrWhiteSpace(player.MobilePartyId) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty) ||
+            playerParty != targetParty)
+            throw new InvalidOperationException("The requesting player does not own the target party.");
     }
 
     private void ValidateCaptiveRescueState(Hero companion, int targetCount,

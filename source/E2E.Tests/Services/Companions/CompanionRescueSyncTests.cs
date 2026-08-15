@@ -6,6 +6,10 @@ using E2E.Tests.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Companions.Patches;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -195,6 +199,67 @@ public class CompanionRescueSyncTests : IDisposable
     }
 
     [Fact]
+    public void JoinPartyRescue_FromDifferentPlayer_ReturnsRejectionWithoutRelease()
+    {
+        var context = CreateCaptiveCompanion(Clients[0], "RescueOwner");
+        CreateCaptiveCompanion(Clients[1], "OtherRescueOwner");
+        var requester = Clients[1];
+        string requestId = Guid.NewGuid().ToString("N");
+        Server.NetworkSentMessages.Clear();
+        Server.InternalMessages.Clear();
+
+        requester.Call(() => requester.Resolve<INetwork>().SendAll(
+            new DoCompanionJoinedPartyByRescue(
+                context.HeroId,
+                context.TargetPartyId,
+                requestId,
+                context.ClanId,
+                context.CaptorPartyId)));
+
+        AssertRejected(requester, requestId, "does not own the companion's clan");
+        AssertRescueNotApplied(context);
+    }
+
+    [Fact]
+    public void LeadPartyRescue_FromDifferentPlayer_ReturnsRejectionWithoutPartyCreation()
+    {
+        var context = CreateCaptiveCompanion(Clients[0], "RescueOwner");
+        CreateCaptiveCompanion(Clients[1], "OtherRescueOwner");
+        var requester = Clients[1];
+        string requestId = Guid.NewGuid().ToString("N");
+        Server.NetworkSentMessages.Clear();
+        Server.InternalMessages.Clear();
+
+        SendLeadPartyRescue(requester, context, requestId);
+
+        AssertRejected(requester, requestId, "does not own the companion's clan");
+        AssertRescueNotApplied(context);
+        Assert.Empty(Server.NetworkSentMessages.OfType<NetworkAddWarParty>());
+    }
+
+    [Fact]
+    public void JoinPartyRescue_ToOtherSameClanParty_ReturnsRejectionWithoutRelease()
+    {
+        var context = CreateCaptiveCompanion();
+        string otherPartyId = CreateSameClanParty(context.ClanId);
+        var requester = Clients[0];
+        string requestId = Guid.NewGuid().ToString("N");
+        Server.NetworkSentMessages.Clear();
+        Server.InternalMessages.Clear();
+
+        requester.Call(() => requester.Resolve<INetwork>().SendAll(
+            new DoCompanionJoinedPartyByRescue(
+                context.HeroId,
+                otherPartyId,
+                requestId,
+                context.ClanId,
+                context.CaptorPartyId)));
+
+        AssertRejected(requester, requestId, "does not own the target party");
+        AssertRescueNotApplied(context);
+    }
+
+    [Fact]
     public void JoinPartyRescue_WithStaleClan_UiCompletionReturnsRejectionWithoutRelease()
     {
         var context = CreateCaptiveCompanion();
@@ -271,7 +336,8 @@ public class CompanionRescueSyncTests : IDisposable
         return false;
     }
 
-    private RescueContext CreateCaptiveCompanion()
+    private RescueContext CreateCaptiveCompanion(EnvironmentInstance requester = null,
+        string controllerId = "RescueOwner")
     {
         string targetPartyId = null;
         string clanId = null;
@@ -312,8 +378,119 @@ public class CompanionRescueSyncTests : IDisposable
         });
         testEnvironment.FlushCoalescer();
 
-        return new RescueContext(targetPartyId, clanId, captorPartyId,
+        var context = new RescueContext(targetPartyId, clanId, captorPartyId,
             heroId, characterId, originalWarPartyCount);
+        RegisterRescuePlayer(requester ?? Clients[0], controllerId, context);
+        return context;
+    }
+
+    private void RegisterRescuePlayer(EnvironmentInstance client, string controllerId,
+        RescueContext context)
+    {
+        client.Call(() =>
+        {
+            client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(context.TargetPartyId,
+                out var targetParty));
+            Assert.NotNull(targetParty.LeaderHero);
+            Assert.True(client.ObjectManager.TryGetId(targetParty.LeaderHero, out var heroId));
+            Assert.True(client.ObjectManager.TryGetId(targetParty.LeaderHero.CharacterObject,
+                out var characterId));
+            Assert.True(client.Resolve<IPlayerManager>().AddPlayer(new Player(
+                controllerId,
+                heroId,
+                context.TargetPartyId,
+                context.ClanId,
+                characterId)));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(context.TargetPartyId,
+                out var targetParty));
+            Assert.NotNull(targetParty.LeaderHero);
+            Assert.True(Server.ObjectManager.TryGetId(targetParty.LeaderHero, out var heroId));
+            Assert.True(Server.ObjectManager.TryGetId(targetParty.LeaderHero.CharacterObject,
+                out var characterId));
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(
+                controllerId,
+                heroId,
+                context.TargetPartyId,
+                context.ClanId,
+                characterId)));
+            playerManager.SetPeer(controllerId, client.NetPeer);
+        });
+    }
+
+    private string CreateSameClanParty(string clanId)
+    {
+        string partyId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            party.ActualClan = clan;
+            party.LeaderHero.Clan = clan;
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+        });
+        testEnvironment.FlushCoalescer();
+        return partyId;
+    }
+
+    private static void SendLeadPartyRescue(EnvironmentInstance requester,
+        RescueContext context, string requestId)
+    {
+        requester.Call(() =>
+        {
+            Assert.True(requester.ObjectManager.TryGetObject<Hero>(context.HeroId,
+                out var companion));
+            Assert.True(requester.ObjectManager.TryGetObject<MobileParty>(context.TargetPartyId,
+                out var targetParty));
+            Assert.True(requester.ObjectManager.TryGetId(targetParty.Party,
+                out var targetPartyBaseId));
+            var members = TroopRoster.CreateDummyTroopRoster();
+            members.AddToCounts(companion.CharacterObject, 1);
+            var prisoners = TroopRoster.CreateDummyTroopRoster();
+            var rosterInterface = requester.Resolve<ITroopRosterInterface>();
+
+            requester.Resolve<INetwork>().SendAll(new DoPartyScreenClosedFromRescuing(
+                rosterInterface.PackTroopRosterData(members),
+                rosterInterface.PackTroopRosterData(prisoners),
+                targetPartyBaseId,
+                requestId,
+                context.HeroId,
+                context.ClanId,
+                context.CaptorPartyId));
+        });
+    }
+
+    private static void AssertRejected(EnvironmentInstance requester, string requestId,
+        string expectedError)
+    {
+        var completion = requester.InternalMessages.OfType<CompanionRescueCompleted>()
+            .Single(message => message.RequestId == requestId);
+        Assert.Equal(CompanionRescueCompletionStatus.Rejected, completion.Status);
+        Assert.Contains(expectedError, completion.Error);
+    }
+
+    private void AssertRescueNotApplied(RescueContext context)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(context.HeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(context.TargetPartyId,
+                out var targetParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(context.CaptorPartyId,
+                out var captor));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(context.ClanId, out var clan));
+            Assert.True(companion.IsPrisoner);
+            Assert.Same(captor, companion.PartyBelongedToAsPrisoner);
+            Assert.Null(companion.PartyBelongedTo);
+            Assert.Equal(0, targetParty.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.DoesNotContain(clan.WarPartyComponents,
+                component => component?.MobileParty?.LeaderHero == companion);
+        });
     }
 
     private static void AssertTerminalPair(EnvironmentInstance requester, string heroId,
