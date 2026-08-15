@@ -1,6 +1,5 @@
 using System;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
-using GameInterface.Services.Issues.Generic.CreationCapture;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -80,13 +79,11 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
     where TIssue : IssueBase
     where TQuest : QuestBase
 {
-    private readonly object _creationCaptureStrategy;
     private readonly object _questSolutionAcceptMirrorStrategy;
     private readonly object _alternativeAcceptMirrorStrategy;
 
     internal QuestTypeDescriptor(
         string displayName,
-        object creationCaptureStrategy,
         object questSolutionAcceptMirrorStrategy,
         object alternativeAcceptMirrorStrategy,
         bool supportsQuestSolutionAccept,
@@ -120,13 +117,9 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             mirrorAlternativeAcceptBytes,
             rejectAlternativeAccept)
     {
-        _creationCaptureStrategy = creationCaptureStrategy;
         _questSolutionAcceptMirrorStrategy = questSolutionAcceptMirrorStrategy;
         _alternativeAcceptMirrorStrategy = alternativeAcceptMirrorStrategy;
     }
-
-    public ICreationCaptureStrategy<TIssue, TFields> GetCreationCapture<TFields>()
-        => _creationCaptureStrategy as ICreationCaptureStrategy<TIssue, TFields>;
 
     public IRaceArbitratedAcceptMirrorStrategy<TFields> GetQuestSolutionAcceptMirror<TFields>()
         => _questSolutionAcceptMirrorStrategy as IRaceArbitratedAcceptMirrorStrategy<TFields>;
@@ -147,7 +140,6 @@ public static class QuestDescriptorBuilder
         where TQuest : QuestBase
     {
         private readonly string _displayName;
-        private object _creationCapture;
         private object _questSolutionAccept;
         private object _alternativeAccept;
         private bool _supportsQuestSolutionAccept;
@@ -167,12 +159,6 @@ public static class QuestDescriptorBuilder
         internal Builder(string displayName)
         {
             _displayName = displayName;
-        }
-
-        public Builder<TIssue, TQuest> WithCreationCapture<TFields>(ICreationCaptureStrategy<TIssue, TFields> strategy)
-        {
-            _creationCapture = strategy;
-            return this;
         }
 
         public Builder<TIssue, TQuest> WithQuestSolutionAccept()
@@ -254,7 +240,7 @@ public static class QuestDescriptorBuilder
         }
 
         public QuestTypeDescriptor<TIssue, TQuest> Build()
-            => new(_displayName, _creationCapture, _questSolutionAccept, _alternativeAccept,
+            => new(_displayName, _questSolutionAccept, _alternativeAccept,
                 _supportsQuestSolutionAccept, _supportsAlternativeAccept,
                 _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept, _validateQuestSuccess,
                 _applyQuestSuccessConsequence,
