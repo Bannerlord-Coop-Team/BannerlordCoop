@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Network;
+using Common.Network.Messages;
 using Common.Tests.Utils;
 using Coop.Core.Server.Services.Players.Handlers;
 using Coop.Core.Server.Services.Save.Messages;
@@ -8,6 +9,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
+using LiteNetLib;
 using Moq;
 using System;
 using System.Runtime.Serialization;
@@ -141,6 +143,36 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
         siegeEventInterface.Verify(value => value.BreakSiegeForPartyOnly(party), Times.Once);
         Assert.False(party.IsActive);
+    }
+
+    [Fact]
+    public void PlayerDisconnected_AfterClearingPeer_PublishesConnectionStateChanged()
+    {
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var player = CreatePlayer();
+        var party = CreateParty();
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+
+        var objectManager = new Mock<IObjectManager>();
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party))
+            .Returns(true);
+
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerDisconnected(peer, default));
+
+        playerManager.Verify(manager => manager.ClearPeer(peer), Times.Once);
+        Assert.Single(broker.GetMessagesFromType<PlayerConnectionStateChanged>());
     }
 
     private static Player CreatePlayer() =>

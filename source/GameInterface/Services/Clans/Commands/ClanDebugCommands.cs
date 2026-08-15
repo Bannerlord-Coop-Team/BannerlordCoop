@@ -5,6 +5,7 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
 using SandBox.GauntletUI;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -71,7 +72,117 @@ namespace GameInterface.Services.GameDebug.Commands
             return $"CLAN_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is ClanState} " +
                 $"topScreen={clanScreen != null} dataSource={clanScreen?._dataSource != null} " +
                 $"parties={clanScreen?._dataSource?.ClanParties?._parties?.Count ?? -1} " +
+                $"partiesSelected={clanScreen?._dataSource?.IsPartiesSelected ?? false} " +
                 $"mainHero={Hero.MainHero?.StringId ?? "none"}";
+        }
+
+        [CommandLineArgumentFunction("select_parties", "coop.debug.clan")]
+        public static string SelectParties(List<string> args)
+        {
+            if (!ModInformation.IsClient) return "Command can only be run on a client.";
+            if (args.Count != 0) return "Usage: coop.debug.clan.select_parties";
+
+            var clanScreen = ScreenManager.TopScreen as GauntletClanScreen;
+            if (clanScreen?._dataSource == null) return "The Clan screen is unavailable.";
+
+            clanScreen._dataSource.SetSelectedCategory(1);
+            return $"CLAN_PARTIES_SELECTED parties={clanScreen._dataSource.ClanParties?._parties?.Count ?? -1}";
+        }
+
+        [CommandLineArgumentFunction("wage_state", "coop.debug.clan")]
+        public static string WageState(List<string> args)
+        {
+            if (!ModInformation.IsClient) return "Command can only be run on a client.";
+            if (args.Count > 1) return "Usage: coop.debug.clan.wage_state [clanId]";
+            if (Campaign.Current?.Models?.PartyWageModel == null) return "The party wage model is unavailable.";
+            if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+
+            Clan clan = Clan.PlayerClan;
+            if (args.Count == 1 && !objectManager.TryGetObject(args[0], out clan))
+                return $"Unable to find clan with id: {args[0]}";
+            if (clan == null) return "The target clan is unavailable.";
+
+            var parties = new List<(string Type, MobileParty Party)>();
+            parties.AddRange(clan.WarPartyComponents.Select(component => ("war-party", component.MobileParty)));
+            parties.AddRange(clan.Heroes
+                .SelectMany(hero => hero.OwnedCaravans)
+                .Select(component => ("caravan", component.MobileParty)));
+            parties.AddRange(clan.Settlements
+                .Where(settlement => settlement.Town != null)
+                .Select(settlement => ("garrison", settlement.Town.GarrisonParty)));
+
+            var seen = new HashSet<MobileParty>();
+            var output = new StringBuilder();
+            foreach (var (type, party) in parties)
+            {
+                if (party == null || !seen.Add(party)) continue;
+                AppendWageState(output, objectManager, type, party);
+            }
+
+            return output.Length == 0 ? "No Clan-screen parties were found." : output.ToString();
+        }
+
+        private static void AppendWageState(
+            StringBuilder output,
+            IObjectManager objectManager,
+            string type,
+            MobileParty party)
+        {
+            var issues = new List<string>();
+            var roster = party.MemberRoster;
+            if (roster == null)
+            {
+                issues.Add("member-roster-null");
+            }
+            else
+            {
+                for (int index = 0; index < roster.Count; index++)
+                {
+                    var element = roster.GetElementCopyAtIndex(index);
+                    CharacterObject character = element.Character;
+                    if (character == null)
+                    {
+                        issues.Add($"roster[{index}]-character-null");
+                    }
+                    else if (character.IsHero && character.HeroObject == null)
+                    {
+                        issues.Add($"roster[{index}]-hero-object-null:{character.StringId}");
+                    }
+                    else if (!character.IsHero && character.Culture == null)
+                    {
+                        issues.Add($"roster[{index}]-culture-null:{character.StringId}");
+                    }
+                }
+            }
+
+            Hero leader = party.LeaderHero;
+            if (leader != null && leader.Clan == null) issues.Add("leader-clan-null");
+            if (leader != null && leader.CharacterObject == null) issues.Add("leader-character-null");
+            if (party.IsGarrison && party.CurrentSettlement == null) issues.Add("garrison-settlement-null");
+            if (party.IsGarrison && party.CurrentSettlement?.Owner == null) issues.Add("garrison-owner-null");
+            if (party.IsGarrison && party.CurrentSettlement?.Owner?.Culture == null) issues.Add("garrison-owner-culture-null");
+            if (party.SiegeEvent != null && party.SiegeEvent.BesiegerCamp == null) issues.Add("besieger-camp-null");
+            if (party.EffectiveQuartermaster != null && party.EffectiveQuartermaster.CharacterObject == null)
+                issues.Add("quartermaster-character-null");
+
+            string partyId = objectManager.TryGetId(party, out string registeredId)
+                ? registeredId
+                : party.StringId;
+            string wage;
+            try
+            {
+                wage = roster == null
+                    ? "not-run"
+                    : Campaign.Current.Models.PartyWageModel.GetTotalWage(party, roster).ResultNumber.ToString();
+            }
+            catch (Exception ex)
+            {
+                wage = $"exception:{ex.GetType().Name}";
+            }
+
+            output.AppendLine(
+                $"CLAN_WAGE_STATE type={type} party={partyId} leader={leader?.StringId ?? "none"} " +
+                $"roster={roster?.Count ?? -1} wage={wage} issues={(issues.Count == 0 ? "none" : string.Join(",", issues))}");
         }
 
         [CommandLineArgumentFunction("refresh_burst", "coop.debug.clan")]
