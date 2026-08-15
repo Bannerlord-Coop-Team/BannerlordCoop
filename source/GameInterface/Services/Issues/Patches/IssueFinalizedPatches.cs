@@ -3,6 +3,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -35,6 +36,18 @@ internal class IssueManagerQuestCompletedReasonCapture
 }
 
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+internal class IssueFinalizedOwnershipGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance)
+    {
+        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
+
+        return IssueFinalizeAuthorityGuard.IsActive;
+    }
+}
+
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
 internal class IssueFinalizedPatches
 {
     [HarmonyPostfix]
@@ -48,7 +61,19 @@ internal class IssueFinalizedPatches
             IssueManagerQuestCompletedReasonCapture.PendingReasons.Remove(owner);
         }
 
-        IssueOwnershipRegistry.Clear(owner);
+        var wasGenuinelyFinalized = !DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance) || IssueFinalizeAuthorityGuard.IsActive;
+        if (wasGenuinelyFinalized)
+        {
+            if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) ownershipRegistry.Clear(owner);
+
+            if (owner != null &&
+                ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+                ContainerProvider.TryResolve<IIssueConversationTracker>(out var conversationTracker) &&
+                objectManager.TryGetIdWithLogging(owner, out var ownerId))
+            {
+                conversationTracker.Clear(ownerId);
+            }
+        }
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;

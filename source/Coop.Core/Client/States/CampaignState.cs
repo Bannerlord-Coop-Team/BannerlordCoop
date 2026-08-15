@@ -37,6 +37,20 @@ public class CampaignState : ClientStateBase
     private volatile bool waitingForWorldReady;
     private volatile bool joinCompletionQueued;
     private volatile int lastJoinPacketsRemaining = -1;
+#if DEBUG
+    private int baselineRequestsSent;
+    private int baselineApplicationFailures;
+
+    internal string DebugJoinState =>
+        $"state={nameof(CampaignState)} waitingForJoinCatchUp={waitingForJoinCatchUp} " +
+        $"baselineResponseExpected={baselineResponseExpected} " +
+        $"finalBaselineResponseExpected={finalBaselineResponseExpected} " +
+        $"successfulBaselines={successfulBaselines} baselineRequestsSent={baselineRequestsSent} " +
+        $"baselineApplicationFailures={baselineApplicationFailures} " +
+        $"waitingForTimeCatchUp={waitingForTimeCatchUp} finalTimeCatchUp={finalTimeCatchUp} " +
+        $"waitingForWorldReady={waitingForWorldReady} joinCompletionQueued={joinCompletionQueued} " +
+        $"joinPacketsRemaining={lastJoinPacketsRemaining}";
+#endif
 
     public CampaignState(
         IClientLogic logic,
@@ -130,6 +144,9 @@ public class CampaignState : ClientStateBase
         SetCatchUpLoadingMessage();
         if (!obj.What.Success)
         {
+#if DEBUG
+            baselineApplicationFailures++;
+#endif
             RequestBaseline(isFinalBaseline);
             return;
         }
@@ -154,6 +171,9 @@ public class CampaignState : ClientStateBase
 
     private void RequestBaseline(bool isFinalBaseline)
     {
+#if DEBUG
+        baselineRequestsSent++;
+#endif
         waitingForTimeCatchUp = false;
         finalTimeCatchUp = false;
         mapTimeTrackerInterface.ResetForCampaignJoin();

@@ -10,8 +10,9 @@ internal static class AcceptMirrorSupport
     {
         if (owner?.Issue == null || owner.Issue.IsOngoingWithoutQuest) return;
         if (owner.Issue.IssueQuest == null) return;
-        if (IssueOwnershipRegistry.IsLocalPeerOwner(owner)) return;
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(owner)) return;
 
+        using (new IssueFinalizeAuthorityGuard())
         using (new AllowedThread())
         {
             owner.Issue.CompleteIssueWithCancel();

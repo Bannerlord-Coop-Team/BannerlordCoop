@@ -96,7 +96,7 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
                 Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in pid, owner));
             }
 
-            IssueOwnershipRegistry.SetOwner(owner, controllerId);
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
         });
 
         Server.Call(() =>
@@ -105,6 +105,7 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
 
             using (new AllowedThread())
+            using (new AlternativeSolutionStartAuthorityGuard())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
                 owner.Issue.StartIssueWithAlternativeSolution();
@@ -142,7 +143,7 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
             Assert.Equal(serverMainHeroGoldBefore, Hero.MainHero.Gold);
             Assert.Equal(serverMainHeroCharacterBefore, Hero.MainHero.CharacterObject);
 
-            Assert.True(AwaitingAlternativeSolutionTroopsRegistry.TryGet(controllerId, out var deposited));
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
             Assert.True(deposited.TotalManCount >= 1);
         });
     }

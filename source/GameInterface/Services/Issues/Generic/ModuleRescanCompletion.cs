@@ -1,3 +1,5 @@
+using Common.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using GameInterface.Services.Issues.Interfaces;
@@ -15,6 +17,15 @@ public interface IModuleRescanCompletionRunner
 
 internal sealed class ModuleRescanCompletionRunner : IModuleRescanCompletionRunner
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ModuleRescanCompletionRunner>();
+
+    private readonly IIssueOwnershipRegistry ownershipRegistry;
+
+    public ModuleRescanCompletionRunner(IIssueOwnershipRegistry ownershipRegistry)
+    {
+        this.ownershipRegistry = ownershipRegistry;
+    }
+
     public void Run<TIssue>(ModuleRescanCompletion<TIssue> spec) where TIssue : IssueBase
     {
         if (spec?.TryTriggerOwnedCompletion == null) return;
@@ -28,9 +39,16 @@ internal sealed class ModuleRescanCompletionRunner : IModuleRescanCompletionRunn
 
         foreach (var kvp in snapshot)
         {
-            if (kvp.Value is TIssue && IssueOwnershipRegistry.IsLocalPeerOwner(kvp.Key))
+            if (kvp.Value is TIssue && ownershipRegistry.IsLocalPeerOwner(kvp.Key))
             {
-                spec.TryTriggerOwnedCompletion(kvp.Key);
+                try
+                {
+                    spec.TryTriggerOwnedCompletion(kvp.Key);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to trigger owned completion rescan for owner {Owner} - skipping, other due issues this tick are unaffected", kvp.Key);
+                }
             }
         }
     }

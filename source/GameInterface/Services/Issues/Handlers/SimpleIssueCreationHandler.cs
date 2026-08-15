@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Handlers;
@@ -18,12 +19,18 @@ internal class SimpleIssueCreationHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
-    public SimpleIssueCreationHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    public SimpleIssueCreationHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<SimpleIssueCreated>(Handle_SimpleIssueCreated);
         messageBroker.Subscribe<NetworkSimpleIssueCreated>(Handle_NetworkSimpleIssueCreated);
@@ -48,7 +55,7 @@ internal class SimpleIssueCreationHandler : IHandler
             return;
         }
 
-        var generation = IssueGenerationRegistry.Bump(issue.IssueOwner);
+        var generation = generationRegistry.Bump(issue.IssueOwner);
 
         network.SendAll(new NetworkSimpleIssueCreated(ownerId, key, generation));
     }
@@ -62,13 +69,21 @@ internal class SimpleIssueCreationHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
-            IssueGenerationRegistry.SetGeneration(owner, data.Generation);
+            generationRegistry.SetGeneration(owner, data.Generation);
 
             if (owner.Issue != null) return;
 
-            if (!SimpleIssueFactoryRegistry.TryConstructAndRegister(data.IssueKey, owner))
+            try
             {
-                Logger.Error("Received NetworkSimpleIssueCreated with unknown IssueKey {Key} for owner {Owner}", data.IssueKey, data.OwnerId);
+                if (!SimpleIssueFactoryRegistry.TryConstructAndRegister(data.IssueKey, owner))
+                {
+                    Logger.Error("Received NetworkSimpleIssueCreated with unknown IssueKey {Key} for owner {Owner}", data.IssueKey, data.OwnerId);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to construct issue for {Message} with IssueKey {Key} for owner {Owner}",
+                    nameof(NetworkSimpleIssueCreated), data.IssueKey, data.OwnerId);
             }
         });
     }

@@ -15,14 +15,10 @@ namespace GameInterface.Tests.Services.Issues;
 [Collection(ModInformationRoleCollection.Name)]
 public class VillageNeedsToolsIssueOwnershipTests : IDisposable
 {
-    public VillageNeedsToolsIssueOwnershipTests()
-    {
-        IssueOwnershipRegistry.ClearAll();
-    }
+    private readonly IIssueOwnershipRegistry registry = new IssueOwnershipRegistry();
 
     public void Dispose()
     {
-        IssueOwnershipRegistry.ClearAll();
         ContainerProvider.Clear();
     }
 
@@ -42,13 +38,13 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
     public void IsLocalPeerOwner_TrueOnlyOnTheMachineWhoseControllerIdMatchesTheRecordedOwner()
     {
         var issueGiver = NewHero();
-        IssueOwnershipRegistry.SetOwner(issueGiver, "player-A");
+        registry.SetOwner(issueGiver, "player-A");
 
         SetLocalControllerId("player-A");
-        Assert.True(IssueOwnershipRegistry.IsLocalPeerOwner(issueGiver));
+        Assert.True(registry.IsLocalPeerOwner(issueGiver));
 
         SetLocalControllerId("player-B");
-        Assert.False(IssueOwnershipRegistry.IsLocalPeerOwner(issueGiver));
+        Assert.False(registry.IsLocalPeerOwner(issueGiver));
     }
 
     [Fact]
@@ -57,17 +53,17 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
         var issueGiver = NewHero();
         SetLocalControllerId("player-A");
 
-        Assert.False(IssueOwnershipRegistry.IsLocalPeerOwner(issueGiver));
+        Assert.False(registry.IsLocalPeerOwner(issueGiver));
     }
 
     [Fact]
     public void IsLocalPeerOwner_FalseWhenNoControllerIdProviderCanBeResolved()
     {
         var issueGiver = NewHero();
-        IssueOwnershipRegistry.SetOwner(issueGiver, "player-A");
+        registry.SetOwner(issueGiver, "player-A");
         ContainerProvider.Clear();
 
-        Assert.False(IssueOwnershipRegistry.IsLocalPeerOwner(issueGiver));
+        Assert.False(registry.IsLocalPeerOwner(issueGiver));
     }
 
     [Fact]
@@ -75,20 +71,20 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
     {
         var issueGiver = NewHero();
 
-        IssueOwnershipRegistry.SetOwner(issueGiver, null);
-        IssueOwnershipRegistry.SetOwner(issueGiver, string.Empty);
+        registry.SetOwner(issueGiver, null);
+        registry.SetOwner(issueGiver, string.Empty);
 
-        Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(issueGiver, out _));
+        Assert.False(registry.TryGetOwnerControllerId(issueGiver, out _));
     }
 
     [Fact]
     public void SetOwner_OverwritesAPreviouslyRecordedOwnerForTheSameHero()
     {
         var issueGiver = NewHero();
-        IssueOwnershipRegistry.SetOwner(issueGiver, "player-A");
-        IssueOwnershipRegistry.SetOwner(issueGiver, "player-B");
+        registry.SetOwner(issueGiver, "player-A");
+        registry.SetOwner(issueGiver, "player-B");
 
-        Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(issueGiver, out var controllerId));
+        Assert.True(registry.TryGetOwnerControllerId(issueGiver, out var controllerId));
         Assert.Equal("player-B", controllerId);
     }
 
@@ -97,13 +93,13 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
     {
         var issueGiver = NewHero();
         var otherIssueGiver = NewHero();
-        IssueOwnershipRegistry.SetOwner(issueGiver, "player-A");
-        IssueOwnershipRegistry.SetOwner(otherIssueGiver, "player-B");
+        registry.SetOwner(issueGiver, "player-A");
+        registry.SetOwner(otherIssueGiver, "player-B");
 
-        IssueOwnershipRegistry.Clear(issueGiver);
+        registry.Clear(issueGiver);
 
-        Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(issueGiver, out _));
-        Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(otherIssueGiver, out var otherControllerId));
+        Assert.False(registry.TryGetOwnerControllerId(issueGiver, out _));
+        Assert.True(registry.TryGetOwnerControllerId(otherIssueGiver, out var otherControllerId));
         Assert.Equal("player-B", otherControllerId);
     }
 
@@ -112,25 +108,25 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
     {
         var heroA = NewHero();
         var heroB = NewHero();
-        IssueOwnershipRegistry.SetOwner(heroA, "player-A");
-        IssueOwnershipRegistry.SetOwner(heroB, "player-B");
+        registry.SetOwner(heroA, "player-A");
+        registry.SetOwner(heroB, "player-B");
 
-        var snapshot = IssueOwnershipRegistry.Snapshot().ToList();
+        var snapshot = registry.Snapshot().ToList();
         Assert.Equal(2, snapshot.Count);
         Assert.Contains(snapshot, kvp => kvp.Key == heroA && kvp.Value == "player-A");
         Assert.Contains(snapshot, kvp => kvp.Key == heroB && kvp.Value == "player-B");
 
-        IssueOwnershipRegistry.ClearAll();
-        Assert.Empty(IssueOwnershipRegistry.Snapshot());
+        registry.ClearAll();
+        Assert.Empty(registry.Snapshot());
 
         foreach (var kvp in snapshot)
         {
-            IssueOwnershipRegistry.SetOwner(kvp.Key, kvp.Value);
+            registry.SetOwner(kvp.Key, kvp.Value);
         }
 
-        Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(heroA, out var idA));
+        Assert.True(registry.TryGetOwnerControllerId(heroA, out var idA));
         Assert.Equal("player-A", idA);
-        Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(heroB, out var idB));
+        Assert.True(registry.TryGetOwnerControllerId(heroB, out var idB));
         Assert.Equal("player-B", idB);
     }
 }

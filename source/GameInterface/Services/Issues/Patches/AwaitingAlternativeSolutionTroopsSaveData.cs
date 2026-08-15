@@ -66,10 +66,24 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
     [HarmonyPostfix]
     private static void SyncDataPostfix(IDataStore dataStore)
     {
+        if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return;
+
+        try
+        {
+            SyncDataInternal(dataStore, troopsRegistry);
+        }
+        catch (System.Exception e)
+        {
+            Logger.Error(e, "Failed to sync awaiting-alternative-solution-troops save data - registry may be left partially restored");
+        }
+    }
+
+    private static void SyncDataInternal(IDataStore dataStore, IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
+    {
         List<AwaitingAlternativeSolutionTroopsSaveData> saveData = null;
         if (dataStore.IsSaving)
         {
-            saveData = AwaitingAlternativeSolutionTroopsRegistry.Snapshot()
+            saveData = troopsRegistry.Snapshot()
                 .Select(e => new AwaitingAlternativeSolutionTroopsSaveData(e.OwnerControllerId, e.Troops))
                 .ToList();
         }
@@ -77,20 +91,20 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
         dataStore.SyncData(SaveKey, ref saveData);
         if (!dataStore.IsLoading) return;
 
-        AwaitingAlternativeSolutionTroopsRegistry.ClearAll();
+        troopsRegistry.ClearAll();
         if (saveData != null)
         {
             foreach (var entry in saveData)
             {
                 if (entry?.OwnerControllerId == null || entry.Troops == null) continue;
-                AwaitingAlternativeSolutionTroopsRegistry.Restore(entry.OwnerControllerId, entry.Troops);
+                troopsRegistry.Restore(entry.OwnerControllerId, entry.Troops);
             }
         }
 
-        MigrateLegacyField();
+        MigrateLegacyField(troopsRegistry);
     }
 
-    private static void MigrateLegacyField()
+    private static void MigrateLegacyField(IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
     {
         if (ModInformation.IsClient) return;
         if (Campaign.Current?.IssueManager == null) return;
@@ -106,7 +120,7 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
                 "(no per-owner attribution - likely a single-player-imported or pre-fix save) onto the " +
                 "server's own ControllerId {ControllerId}.", legacyRoster.Count, controllerIdProvider.ControllerId);
 
-            AwaitingAlternativeSolutionTroopsRegistry.Deposit(controllerIdProvider.ControllerId, legacyRoster);
+            troopsRegistry.Deposit(controllerIdProvider.ControllerId, legacyRoster);
         }
         else
         {
