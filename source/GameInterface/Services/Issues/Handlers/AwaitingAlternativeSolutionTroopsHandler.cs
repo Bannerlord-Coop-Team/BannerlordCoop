@@ -181,7 +181,8 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDrain());
+        var packed = troopRosterInterface.PackTroopRosterData(payload.What.Troops);
+        network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDrain(packed));
     }
 
     private void Handle_RequestAwaitingAlternativeSolutionTroopsDrain(MessagePayload<RequestAwaitingAlternativeSolutionTroopsDrain> payload)
@@ -194,6 +195,12 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
             return;
         }
 
-        troopsRegistry.Clear(player.ControllerId);
+        var drainedRoster = TroopRoster.CreateDummyTroopRoster();
+        foreach (var element in troopRosterInterface.UnpackTroopRosterData(payload.What.Troops))
+        {
+            drainedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
+        }
+
+        troopsRegistry.Withdraw(player.ControllerId, drainedRoster);
     }
 }
