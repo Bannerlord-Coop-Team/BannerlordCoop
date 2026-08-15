@@ -38,9 +38,9 @@ internal class PrisonerCaptureCampaignBehaviorPatches
 
             // Replace MobileParty.MainParty usage
             if (mobileParty.IsLordParty
-                && (mobileParty.Army == null || (mobileParty.Army != null && mobileParty.Army.LeaderParty == mobileParty && !mobileParty.Army.IsPlayerArmy())
+                && (mobileParty.Army == null || (mobileParty.Army != null && mobileParty.Army.LeaderParty == mobileParty && !mobileParty.Army.IsPlayerArmy()))
                 && mobileParty.MapEvent == null
-                && __instance.SettlementHeroCaptureCommonCondition(mobileParty.LeaderHero)))
+                && __instance.SettlementHeroCaptureCommonCondition(mobileParty.LeaderHero))
             {
                 LeaveSettlementAction.ApplyForParty(mobileParty);
             }
