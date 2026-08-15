@@ -630,7 +630,11 @@ public class AgentMovementHandler : IAgentMovementHandler
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
 
-                var equipment = new AgentEquipmentData(agent);
+                // SpawnMonster also creates non-mountable livestock. Those agents use this movement path but
+                // have no native wield-state pointers, so equipment capture is only valid for humans.
+                if (!AgentEquipmentData.TryCapture(agent, out var equipment))
+                    continue;
+
                 if (!lastEquipment.TryGetValue(agentInfo.AgentId, out var previousEquipment))
                 {
                     lastEquipment[agentInfo.AgentId] = equipment;

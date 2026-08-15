@@ -1,3 +1,5 @@
+using Common.Util;
+using E2E.Tests.Environment.MockEngine;
 using Missions.Agents.Packets;
 using System.Collections.Generic;
 using System.Reflection;
@@ -25,6 +27,16 @@ public class AgentEquipmentDataTests
         SetWeaponSlots(equipment, (int)EquipmentIndex.NumAllWeaponSlots);
 
         Assert.True(HasSafeWeaponSlots(equipment));
+    }
+
+    [Fact]
+    public void NonHumanAgent_IsNotCapturedAsEquipment()
+    {
+        using var fixture = new MissionEngineFixture();
+        var animal = ObjectHelper.SkipConstructor<Agent>();
+        AgentMirror.Bind(animal, new MirrorAgent { IsHuman = false });
+
+        Assert.False(AgentEquipmentData.TryCapture(animal, out _));
     }
 
     [Fact]
