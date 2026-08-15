@@ -127,6 +127,12 @@ public class ValidateModuleState : ClientStateBase
 
     internal void Handle_NetworkModuleVersionsValidated(MessagePayload<NetworkModuleVersionsValidated> obj)
     {
+        if (!ModInformation.MatchesBuildVersion(obj.What.CoopBuildVersion))
+        {
+            RejectModuleValidation(GetIncompatibleBuildReason(obj.What.CoopBuildVersion));
+            return;
+        }
+
         // Reaching this handshake proves both sides run Coop; only a version mismatch should block it.
         if (obj.What.Matches || string.Equals(obj.What.Reason, UnsupportedCoopModuleReason, StringComparison.Ordinal))
         {
@@ -134,14 +140,31 @@ public class ValidateModuleState : ClientStateBase
         }
         else
         {
-            var reason = "Module validation failed!\nReason: " + obj.What.Reason;
-            messageBroker.Publish(this, new SendInformationMessage(reason));
-
-            // Carry the reason into the teardown pop-up: the information message above lands in the
-            // chat log, which is invisible behind the forced loading screen the player is watching.
-            disconnectReason = reason;
-            Logic.Disconnect();
+            RejectModuleValidation(obj.What.Reason);
         }
+    }
+
+    private static string GetIncompatibleBuildReason(string? serverBuildVersion)
+    {
+        if (string.IsNullOrEmpty(serverBuildVersion))
+        {
+            return $"Incompatible co-op mod build. This client uses '{ModInformation.BuildVersion}', " +
+                   "but the server did not report an exact build. Update the co-op mod on both sides.";
+        }
+
+        return $"Incompatible co-op mod build. This client uses '{ModInformation.BuildVersion}', " +
+               $"but the server uses '{serverBuildVersion}'. Update the co-op mod on both sides.";
+    }
+
+    private void RejectModuleValidation(string? reason)
+    {
+        var message = "Module validation failed!\nReason: " + reason;
+        messageBroker.Publish(this, new SendInformationMessage(message));
+
+        // Carry the reason into the teardown pop-up: the information message above lands in the
+        // chat log, which is invisible behind the forced loading screen the player is watching.
+        disconnectReason = message;
+        Logic.Disconnect();
     }
 
     internal void Handle_NetworkClientValidated(MessagePayload<NetworkClientValidated> obj)
