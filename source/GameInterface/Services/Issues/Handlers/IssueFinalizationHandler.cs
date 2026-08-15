@@ -241,10 +241,10 @@ internal class IssueFinalizationHandler : IHandler
                     return;
                 }
 
-                if (reason == IssueFinalizeReason.QuestTimeout && !quest.QuestDueTime.IsPast)
+                if (reason is IssueFinalizeReason.QuestTimeout or IssueFinalizeReason.QuestFail && !quest.QuestDueTime.IsPast)
                 {
-                    Logger.Error("Rejecting {Message} claiming QuestTimeout for owner {Owner} - due time has not passed",
-                        nameof(RequestIssueRemoved), ownerId);
+                    Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - due time has not passed",
+                        nameof(RequestIssueRemoved), reason, ownerId);
                     return;
                 }
             }
