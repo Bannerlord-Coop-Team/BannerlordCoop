@@ -385,4 +385,28 @@
   <string
     id="generic_backstory.coop_wanderer_member15"
     text="{=coop_temporary_wanderer_generic_backstory}I am a seasoned traveller and hired blade looking for a capable company." />
+  <string
+    id="prebackstory.coop_wanderer_ddba5c65"
+    text="{=!}You! Hey, you! Yeah you! Got any lemons?" />
+  <string
+    id="backstory_a.coop_wanderer_ddba5c65"
+    text="{=!}Sorry... I&apos;m sorry. My name is Novice. I&apos;m just a wretch who&apos;s been cursed with an obsession with lemons for as long as I can remember, and I don&apos;t remember much. I come from a land outside Calradia, but I don&apos;t recall where. I was supposed to be a soldier from birth. We&apos;re all chosen to be something at birth where I come from." />
+  <string
+    id="backstory_b.coop_wanderer_ddba5c65"
+    text="{=!}As part of being a soldier, we were taught to maintain our own armor and weapons to some degree. I never was interested in being a soldier, but I was really happy spending time at the smithy sharpening weapons and hammering out dents in plate armour. It&apos;s how I eat here in Calradia; I help the local smiths where I travel." />
+  <string
+    id="backstory_c.coop_wanderer_ddba5c65"
+    text="{=!}But my deviance from my purpose must&apos;ve displeased my lord; he used some sort of witch to cast foul curse on me, making me forget most of my past and cursing me with an insatiable desire for lemons. I was cast out and made to wander, looking for lemons for as long as I draw breath. I don&apos;t think there are any here in Calradia, but I must keep searching." />
+  <string
+    id="response_1.coop_wanderer_ddba5c65"
+    text="{=!}You poor fellow. I&apos;m sure you will find peace someday. And some lemons." />
+  <string
+    id="response_2.coop_wanderer_ddba5c65"
+    text="{=!}Magic? Lemons? Perhaps you just took a bad thump to the head one day." />
+  <string
+    id="backstory_d.coop_wanderer_ddba5c65"
+    text="{=!}Well, maybe you would consider taking me into your service? You look like you travel alot. We could find lemons and I could help you. I&apos;ve learned quite a bit about working metal in my unfortunate existence. I would certainly be of use to you." />
+  <string
+    id="generic_backstory.coop_wanderer_ddba5c65"
+    text="{=!}I&apos;m just an unfortunate wretch cursed with a desire for lemons. I was supposed to be a soldier but I was more adept at the forge working metal. This deviance displeased my lord and so I was cursed. Now I wander, plying my trade as I go." />
 </strings>

@@ -3,7 +3,6 @@ using Common;
 using Common.LiveTesting;
 using Common.Logging;
 using Common.LogicStates;
-using Common.Util;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using GameInterface;
@@ -33,6 +32,9 @@ namespace Coop.LiveTesting
         private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
 
         private readonly string logFilePath;
+        private readonly bool isServer;
+        private readonly bool deferredClientJoinEnabled;
+        private readonly Func<bool> startAsClient;
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
@@ -44,12 +46,21 @@ namespace Coop.LiveTesting
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
+        private int deferredClientJoinAttempted;
 
-        public LiveTestControlServer(bool isServer, string logFilePath)
+        public LiveTestControlServer(
+            bool isServer,
+            string logFilePath,
+            bool deferredClientJoinEnabled,
+            Func<bool> startAsClient)
         {
             if (string.IsNullOrWhiteSpace(logFilePath)) throw new ArgumentException("A log file path is required.", nameof(logFilePath));
+            if (startAsClient == null) throw new ArgumentNullException(nameof(startAsClient));
 
+            this.isServer = isServer;
             this.logFilePath = logFilePath;
+            this.deferredClientJoinEnabled = deferredClientJoinEnabled;
+            this.startAsClient = startAsClient;
 
             int processId;
             using (Process process = Process.GetCurrentProcess())
@@ -125,6 +136,8 @@ namespace Coop.LiveTesting
                     return HandleScreenshot(request);
                 case "screenshot-status":
                     return HandleScreenshotStatus(request);
+                case "join":
+                    return HandleDeferredClientJoin(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -142,11 +155,7 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
-                    return Failure(
-                        request.Id,
-                        "session_not_ready",
-                        "The co-op session command dispatcher is not available yet.",
-                        false);
+                    dispatcher = new LiveTestCommandDispatcher();
                 }
 
                 return Success(request.Id, new
@@ -176,6 +185,23 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
+                    if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
+                    {
+                        string output = Coop.JoinFixtureCommands.Start(arguments);
+                        bool hasFallbackStructuredResult = TryParseStructuredResult(
+                            output,
+                            out var fallbackStructuredResult);
+                        return Success(request.Id, new
+                        {
+                            name = command,
+                            arguments,
+                            found = true,
+                            output,
+                            hasStructuredResult = hasFallbackStructuredResult,
+                            structuredResult = fallbackStructuredResult,
+                        });
+                    }
+
                     return Failure(
                         request.Id,
                         "session_not_ready",
@@ -192,7 +218,6 @@ namespace Coop.LiveTesting
                 bool hasStructuredResult = TryParseStructuredResult(
                     result.Output,
                     out var structuredResult);
-
                 return Success(request.Id, new
                 {
                     name = command,
@@ -377,6 +402,65 @@ namespace Coop.LiveTesting
             });
         }
 
+        private LiveTestResponse HandleDeferredClientJoin(LiveTestRequest request)
+        {
+            if (isServer)
+            {
+                return Failure(
+                    request.Id,
+                    "method_not_allowed",
+                    "Only a client process may join a co-op session.",
+                    false);
+            }
+
+            if (!deferredClientJoinEnabled)
+            {
+                return Failure(
+                    request.Id,
+                    "manual_join_not_enabled",
+                    "The client was not launched for a deferred live-test join.",
+                    false);
+            }
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (Volatile.Read(ref deferredClientJoinAttempted) != 0)
+                {
+                    return Failure(
+                        request.Id,
+                        "join_already_attempted",
+                        "The deferred client join was already attempted.",
+                        false);
+                }
+
+                if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
+                {
+                    return Failure(
+                        request.Id,
+                        "client_not_at_main_menu",
+                        "The client must be at the main menu with no campaign loaded before joining.",
+                        false);
+                }
+
+                if (Interlocked.Exchange(ref deferredClientJoinAttempted, 1) != 0)
+                {
+                    return Failure(
+                        request.Id,
+                        "join_already_attempted",
+                        "The deferred client join was already attempted.",
+                        false);
+                }
+
+                bool started = startAsClient();
+                Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
+                return Success(request.Id, new
+                {
+                    attempted = true,
+                    started,
+                });
+            }, true);
+        }
+
         private LiveTestResponse CreateStatusResponse(string requestId)
         {
             bool campaignLoaded = Campaign.Current != null;
@@ -486,6 +570,8 @@ namespace Coop.LiveTesting
                 connectedPlayerCount,
                 registeredControllerIds,
                 connectedControllerIds,
+                deferredClientJoinEnabled,
+                deferredClientJoinAttempted = Volatile.Read(ref deferredClientJoinAttempted) != 0,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
@@ -505,10 +591,7 @@ namespace Coop.LiveTesting
                 {
                     try
                     {
-                        using (AllowedThread.Suspend())
-                        {
-                            response = operation();
-                        }
+                        response = operation();
                     }
                     catch (Exception exception)
                     {

@@ -438,4 +438,33 @@
       <EquipmentSet id="npc_companion_equipment_template_sturgia" />
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_ddba5c65"
+    name="{=!}Novice"
+    voice="curt"
+    age="30"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.vlandia"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_vlandia_8_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_vlandia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.battania_cloak" />
+        <equipment slot="Body" id="Item.battania_civil_a" />
+        <equipment slot="Gloves" id="Item.leather_gloves" />
+        <equipment slot="Leg" id="Item.battania_woodland_boots" />
+      </EquipmentRoster>
+      <EquipmentSet id="npc_companion_equipment_template_vlandia" />
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>

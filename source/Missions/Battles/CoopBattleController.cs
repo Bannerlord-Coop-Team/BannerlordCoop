@@ -94,6 +94,7 @@ public class CoopBattleController : CoopMissionController
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ICoopMissionComponent coopMissionComponent,
+        INetworkWorldItemRegistry worldItemRegistry,
         IBattleHostRegistry hostRegistry,
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
@@ -114,7 +115,15 @@ public class CoopBattleController : CoopMissionController
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
 
-        lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, missionContext);
+        lifecycle = new BattleInstanceLifecycle(
+            network,
+            relayNetwork,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            worldItemRegistry,
+            session,
+            missionContext);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, spawnBatchCodec);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);

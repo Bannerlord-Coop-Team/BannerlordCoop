@@ -111,6 +111,18 @@ internal class CompanionRolesPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.turn_companion_to_lord_on_condition))]
+    [HarmonyPrefix]
+    public static bool TurnCompanionToLordOnConditionPrefix(ref bool __result)
+    {
+        if (Hero.OneToOneConversationHero?.Clan != Hero.MainHero?.Clan)
+        {
+            __result = false;
+            return false;
+        }
+        return true;
+    }
+
     [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.end_rescue_companion))]
     [HarmonyPrefix]
     public static bool EndRescueCompanionPrefix(ref CompanionRolesCampaignBehavior __instance)

@@ -1,5 +1,7 @@
 ﻿using Autofac;
 using Common;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -8,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
@@ -18,19 +21,147 @@ namespace GameInterface.Services.Template.Commands;
 
 internal class SettlementCommands
 {
+#if DEBUG
+    private static CastleTeleportSnapshot castleTeleportSnapshot;
+
+    private sealed class CastleTeleportSnapshot
+    {
+        public Campaign Campaign { get; }
+        public MobileParty Party { get; }
+        public CampaignVec2 Position { get; }
+
+        public CastleTeleportSnapshot(Campaign campaign, MobileParty party, CampaignVec2 position)
+        {
+            Campaign = campaign;
+            Party = party;
+            Position = position;
+        }
+    }
+#endif
+
     [CommandLineArgumentFunction("enter_random_castle", "coop.debug.settlements")]
     public static string EnterRandomCastle(List<string> strings)
     {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (strings.Count > 1)
+            return "Usage: coop.debug.settlements.enter_random_castle [castleId]";
+
         var castles = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsCastle).ToArray();
+        var castle = strings.Count == 0
+            ? castles[new Random().Next(castles.Length)]
+            : castles.FirstOrDefault(settlement => settlement.StringId == strings[0]);
+        if (castle == null)
+            return $"Castle '{strings[0]}' was not found.";
 
-        Random random = new Random();
+        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, castle);
 
-        var randomCastle = castles[random.Next(castles.Length)];
-
-        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, randomCastle);
-
-        return $"Entering {randomCastle.Name} castle";
+        return $"Requested settlement encounter with {castle.Name} ({castle.StringId}).";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("teleport_main_party_to_castle", "coop.debug.settlements")]
+    public static string TeleportMainPartyToCastle(List<string> strings)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (strings.Count != 1)
+            return "Usage: coop.debug.settlements.teleport_main_party_to_castle <castleId>";
+
+        var castle = Campaign.Current.CampaignObjectManager.Settlements
+            .FirstOrDefault(settlement => settlement.IsCastle && settlement.StringId == strings[0]);
+        if (castle == null)
+            return $"Castle '{strings[0]}' was not found.";
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null)
+            return "Failed: no main party.";
+        if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
+            return "Leave the active settlement or map event before teleporting.";
+        if (TryGetCurrentCastleTeleportSnapshot(mainParty, out _))
+            return "Restore the previous castle teleport before starting another one.";
+
+        var originalPosition = mainParty.Position;
+        castleTeleportSnapshot = new CastleTeleportSnapshot(Campaign.Current, mainParty, originalPosition);
+        try
+        {
+            mainParty.Position = castle.GatePosition;
+            MessageBroker.Instance.Publish(
+                mainParty,
+                new PartyBehaviorChangeAttempted(
+                    mainParty,
+                    forcePosition: true,
+                    isCurrentlyAtSea: false,
+                    resetMovementToHold: true));
+        }
+        finally
+        {
+            // The later forced-position echo proves the dedicated server applied the request.
+            mainParty.Position = originalPosition;
+        }
+
+        return
+            $"Requested authoritative teleport to {castle.Name} ({castle.StringId}) gate " +
+            $"at {castle.GatePosition.X:R},{castle.GatePosition.Y:R}.";
+    }
+
+    [CommandLineArgumentFunction("restore_main_party_castle_teleport", "coop.debug.settlements")]
+    public static string RestoreMainPartyCastleTeleport(List<string> strings)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (strings.Count != 0)
+            return "Usage: coop.debug.settlements.restore_main_party_castle_teleport";
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null)
+            return "Failed: no main party.";
+        if (!TryGetCurrentCastleTeleportSnapshot(mainParty, out var snapshot))
+            return "No castle teleport is waiting to be restored.";
+        if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
+            return "Leave the active settlement or map event before restoring the teleport.";
+
+        var currentPosition = mainParty.Position;
+        var restorePosition = snapshot.Position;
+        castleTeleportSnapshot = null;
+        try
+        {
+            mainParty.Position = restorePosition;
+            MessageBroker.Instance.Publish(
+                mainParty,
+                new PartyBehaviorChangeAttempted(
+                    mainParty,
+                    forcePosition: true,
+                    isCurrentlyAtSea: restorePosition.IsOnLand == false,
+                    resetMovementToHold: true));
+        }
+        finally
+        {
+            mainParty.Position = currentPosition;
+        }
+
+        return
+            $"Requested authoritative castle-teleport restoration to " +
+            $"{restorePosition.X:R},{restorePosition.Y:R}.";
+    }
+
+    private static bool TryGetCurrentCastleTeleportSnapshot(
+        MobileParty mainParty,
+        out CastleTeleportSnapshot snapshot)
+    {
+        snapshot = castleTeleportSnapshot;
+        if (snapshot == null)
+            return false;
+
+        if (ReferenceEquals(snapshot.Campaign, Campaign.Current) &&
+            ReferenceEquals(snapshot.Party, mainParty))
+            return true;
+
+        castleTeleportSnapshot = null;
+        snapshot = null;
+        return false;
+    }
+#endif
 
     [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
     public static string GetTownName(List<string> strings)

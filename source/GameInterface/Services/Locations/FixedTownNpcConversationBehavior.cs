@@ -1,9 +1,9 @@
 using Common.Logging;
+using GameInterface.Services.Modules;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.ModuleManager;
 
 namespace GameInterface.Services.Locations;
 
@@ -14,6 +14,14 @@ public sealed class FixedTownNpcConversationBehavior : CampaignBehaviorBase
     private const int DialoguePriority = 10000;
 
     private static readonly ILogger Logger = LogManager.GetLogger<FixedTownNpcConversationBehavior>();
+    private readonly ICoopModulePathResolver modulePathResolver;
+
+    public FixedTownNpcConversationBehavior(ICoopModulePathResolver modulePathResolver)
+    {
+        if (modulePathResolver == null) throw new ArgumentNullException(nameof(modulePathResolver));
+
+        this.modulePathResolver = modulePathResolver;
+    }
 
     public override void RegisterEvents()
     {
@@ -24,9 +32,9 @@ public sealed class FixedTownNpcConversationBehavior : CampaignBehaviorBase
     {
     }
 
-    private static void AddDialogs(CampaignGameStarter starter)
+    private void AddDialogs(CampaignGameStarter starter)
     {
-        string path = ModuleHelper.GetXmlPath("Coop", FixedTownNpcService.XmlName);
+        string path = modulePathResolver.GetXmlPath(FixedTownNpcService.XmlName);
         foreach (var definition in FixedTownNpcService.ReadDefinitions(path, Logger))
         {
             if (string.IsNullOrWhiteSpace(definition.Dialogue)) continue;

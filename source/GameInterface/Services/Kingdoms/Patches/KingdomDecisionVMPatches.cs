@@ -1,4 +1,4 @@
-using GameInterface;
+﻿using GameInterface;
 using GameInterface.Services.Kingdoms;
 using HarmonyLib;
 using System;
@@ -84,6 +84,61 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             voteManager.UnregisterDecisionItem(__instance);
         }
+
+        [HarmonyPatch("RefreshWinPercentages")]
+        [HarmonyPrefix]
+        private static bool RefreshWinPercentagesPrefix(DecisionItemBaseVM __instance)
+        {
+            if (__instance?.DecisionOptionsList == null || __instance.KingdomDecisionMaker == null) return true;
+            if (__instance.DecisionOptionsList.Any(option => option.Sponsor != null)) return true;
+
+            __instance.KingdomDecisionMaker.DetermineOfficialSupport();
+
+            List<DecisionOptionVM> decisionOptions = __instance.DecisionOptionsList
+                .Where(option => !option.IsOptionForAbstain && option.Option != null)
+                .ToList();
+            if (decisionOptions.Count == 0) return false;
+
+            foreach (DecisionOptionVM decisionOption in decisionOptions)
+            {
+                decisionOption.WinPercentage = (int)TaleWorlds.Library.MathF.Round(
+                    decisionOption.Option.WinChance * 100f,
+                    2);
+            }
+
+            int assignedPercentage = decisionOptions.Sum(option => option.WinPercentage);
+            int remainingPercentage = 100 - assignedPercentage;
+            if (remainingPercentage == 0) return false;
+
+            if (assignedPercentage == 0)
+            {
+                int evenPercentage = 100 / decisionOptions.Count;
+                foreach (DecisionOptionVM decisionOption in decisionOptions)
+                {
+                    decisionOption.WinPercentage = evenPercentage;
+                }
+
+                remainingPercentage = 100 - (evenPercentage * decisionOptions.Count);
+                decisionOptions[0].WinPercentage += remainingPercentage;
+                return false;
+            }
+
+            int distributedPercentage = 0;
+            foreach (DecisionOptionVM decisionOption in decisionOptions.Where(option => option.WinPercentage > 0))
+            {
+                int adjustment = TaleWorlds.Library.MathF.Floor(
+                    (float)remainingPercentage * decisionOption.WinPercentage / assignedPercentage);
+                decisionOption.WinPercentage += adjustment;
+                distributedPercentage += adjustment;
+            }
+
+            DecisionOptionVM strongestOption = decisionOptions
+                .OrderByDescending(option => option.WinPercentage)
+                .First();
+            strongestOption.WinPercentage += remainingPercentage - distributedPercentage;
+            return false;
+        }
+
         [HarmonyPatch("InitValues")]
         [HarmonyPostfix]
         private static void InitValuesPostfix(DecisionItemBaseVM __instance)

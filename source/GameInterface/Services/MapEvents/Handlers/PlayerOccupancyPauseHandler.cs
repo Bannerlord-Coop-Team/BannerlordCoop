@@ -1,8 +1,8 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network.Messages;
 using GameInterface.Configuration;
-using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -15,11 +15,8 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MapEvents.Handlers;
 
 /// <summary>
-/// [Server] Pauses the campaign once every player is "occupied" — in a map event OR a settlement — so time stops
-/// when nobody is free on the map. Driven by <see cref="PartyOccupancyChanged"/>, which the setter postfixes
-/// (<see cref="MobileParties.Patches.PartyOccupancyPatches"/>) raise whenever any party's map-event or settlement
-/// membership changes. There is no unpause here (that is left to the players / other policies); it only sends the
-/// pause when the occupancy condition becomes true.
+/// [Server] Pauses the campaign once every player is "occupied" in a map event or settlement, then restores the
+/// speed this handler paused when a player becomes free on the campaign map.
 /// </summary>
 internal class PlayerOccupancyPauseHandler : IHandler
 {
@@ -29,6 +26,7 @@ internal class PlayerOccupancyPauseHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ITimeControlInterface timeControlInterface;
+    private IAutomaticPauseLease occupancyPauseLease;
 
     public PlayerOccupancyPauseHandler(
         IMessageBroker messageBroker,
@@ -42,27 +40,69 @@ internal class PlayerOccupancyPauseHandler : IHandler
         this.timeControlInterface = timeControlInterface;
 
         messageBroker.Subscribe<PartyOccupancyChanged>(Handle_PartyOccupancyChanged);
+        messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyOccupancyChanged>(Handle_PartyOccupancyChanged);
+        messageBroker.Unsubscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
     }
 
     private void Handle_PartyOccupancyChanged(MessagePayload<PartyOccupancyChanged> payload)
     {
-        if (ModInformation.IsClient || !ModConfigProvider.ModOptions.AutoPauseEnabled)
+        if (ModInformation.IsClient)
             return;
 
-        if (!AllPlayersOccupied())
+        ReevaluateOccupancy(payload.What.MobileParty?.StringId ?? "<null>");
+    }
+
+    private void Handle_PlayerConnectionStateChanged(MessagePayload<PlayerConnectionStateChanged> payload)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        GameThread.RunSafe(
+            () => ReevaluateOccupancy("player connection state changed"),
+            context: nameof(PlayerOccupancyPauseHandler));
+    }
+
+    private void ReevaluateOccupancy(string trigger)
+    {
+        bool allPlayersOccupied = AllPlayersOccupied();
+        if (allPlayersOccupied && !ModConfigProvider.ModOptions.AutoPauseEnabled)
+            return;
+
+        if (!UpdateOccupancyTimeControl(allPlayersOccupied))
             return;
 
         Logger.Information(
-            "Pausing campaign because every connected player is occupied: triggerParty={TriggerParty} players={@Players}",
-            payload.What.MobileParty?.StringId ?? "<null>",
+            "Occupancy pause ownership {State}: trigger={Trigger} mode={Mode} players={@Players}",
+            allPlayersOccupied ? "acquired" : "released",
+            trigger,
+            timeControlInterface.GetTimeControl(),
             DescribeConnectedPlayers());
+    }
 
-        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+    internal bool UpdateOccupancyTimeControl(bool allPlayersOccupied)
+    {
+        if (allPlayersOccupied)
+        {
+            if (occupancyPauseLease != null)
+                return false;
+
+            occupancyPauseLease = timeControlInterface.ServerAcquireAutomaticPause();
+            return true;
+        }
+
+        if (occupancyPauseLease == null)
+            return false;
+
+        if (!occupancyPauseLease.TryRelease())
+            return false;
+
+        occupancyPauseLease = null;
+        return true;
     }
 
     private string[] DescribeConnectedPlayers()

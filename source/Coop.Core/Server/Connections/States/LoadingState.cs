@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties;
 using LiteNetLib;
@@ -32,6 +33,13 @@ public class LoadingState : ConnectionStateBase
     private readonly ISendCoalescer coalescer;
     private volatile JoinPhase phase;
     private int initialBaselinesSent;
+#if DEBUG
+    private int totalBaselinesSent;
+
+    internal string DebugJoinState =>
+        $"phase={phase} initialBaselinesSent={initialBaselinesSent} " +
+        $"totalBaselinesSent={totalBaselinesSent} joinCatchUpPending={IsJoinCatchUpPending}";
+#endif
 
     public LoadingState(
         IConnectionLogic connectionLogic,
@@ -80,6 +88,7 @@ public class LoadingState : ConnectionStateBase
             if (!IsCurrent(JoinPhase.CampaignEntryQueued)) return;
 
             messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+            messageBroker.Publish(this, new PlayerConnectionStateChanged());
             connectionMessageQueue.Flush(peer);
             phase = JoinPhase.WaitingForReplayApplied;
             network.SendImmediate(peer, new NetworkJoinSync(JoinSyncSignal.ReplayComplete));
@@ -128,6 +137,9 @@ public class LoadingState : ConnectionStateBase
             coalescer.Flush(network);
             connectionMessageQueue.Flush(peer);
             if (!isFinal) initialBaselinesSent++;
+#if DEBUG
+            totalBaselinesSent++;
+#endif
             phase = waiting;
             campaignBaselineSender.Send(peer);
         }, context: context);
