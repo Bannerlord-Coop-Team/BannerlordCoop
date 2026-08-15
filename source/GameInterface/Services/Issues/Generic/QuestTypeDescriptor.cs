@@ -6,6 +6,16 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Generic;
 
+public static class QuestSuccessProofContext
+{
+    [ThreadStatic]
+    private static byte _current;
+
+    public static byte Current => _current;
+
+    public static void Set(byte value) => _current = value;
+}
+
 public abstract class QuestTypeDescriptor
 {
     public Type IssueType { get; }
@@ -23,6 +33,8 @@ public abstract class QuestTypeDescriptor
     public Action<Hero, string> OnGenuineAlternativeAccept { get; }
 
     public Func<IssueBase, MobileParty, bool> ValidateQuestSuccess { get; }
+
+    public Func<IssueBase, byte> CaptureQuestSuccessProof { get; }
 
     public Func<IssueBase, bool> ValidateQuestCancel { get; }
 
@@ -52,6 +64,7 @@ public abstract class QuestTypeDescriptor
         Action<Hero, string> onGenuineQuestSolutionAccept,
         Action<Hero, string> onGenuineAlternativeAccept,
         Func<IssueBase, MobileParty, bool> validateQuestSuccess,
+        Func<IssueBase, byte> captureQuestSuccessProof,
         Func<IssueBase, bool> validateQuestCancel,
         Func<IssueBase, bool> validateQuestBetrayal,
         Action<QuestBase> applyQuestSuccessConsequence,
@@ -71,6 +84,7 @@ public abstract class QuestTypeDescriptor
         OnGenuineQuestSolutionAccept = onGenuineQuestSolutionAccept;
         OnGenuineAlternativeAccept = onGenuineAlternativeAccept;
         ValidateQuestSuccess = validateQuestSuccess;
+        CaptureQuestSuccessProof = captureQuestSuccessProof;
         ValidateQuestCancel = validateQuestCancel;
         ValidateQuestBetrayal = validateQuestBetrayal;
         ApplyQuestSuccessConsequence = applyQuestSuccessConsequence;
@@ -100,6 +114,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         Action<Hero, string> onGenuineQuestSolutionAccept,
         Action<Hero, string> onGenuineAlternativeAccept,
         Func<TIssue, MobileParty, bool> validateQuestSuccess,
+        Func<TIssue, byte> captureQuestSuccessProof,
         Func<TIssue, bool> validateQuestCancel,
         Func<TIssue, bool> validateQuestBetrayal,
         Action<TQuest> applyQuestSuccessConsequence,
@@ -119,6 +134,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             onGenuineQuestSolutionAccept,
             onGenuineAlternativeAccept,
             validateQuestSuccess == null ? (Func<IssueBase, MobileParty, bool>)null : (issue, party) => issue is TIssue typed && validateQuestSuccess(typed, party),
+            captureQuestSuccessProof == null ? (Func<IssueBase, byte>)null : issue => issue is TIssue typed ? captureQuestSuccessProof(typed) : (byte)0,
             validateQuestCancel == null ? (Func<IssueBase, bool>)null : issue => issue is TIssue typed && validateQuestCancel(typed),
             validateQuestBetrayal == null ? (Func<IssueBase, bool>)null : issue => issue is TIssue typed && validateQuestBetrayal(typed),
             applyQuestSuccessConsequence == null ? (Action<QuestBase>)null : quest => { if (quest is TQuest typed) applyQuestSuccessConsequence(typed); },
@@ -160,6 +176,7 @@ public static class QuestDescriptorBuilder
         private Action<Hero, string> _onGenuineQuestSolutionAccept;
         private Action<Hero, string> _onGenuineAlternativeAccept;
         private Func<TIssue, MobileParty, bool> _validateQuestSuccess;
+        private Func<TIssue, byte> _captureQuestSuccessProof;
         private Func<TIssue, bool> _validateQuestCancel;
         private Func<TIssue, bool> _validateQuestBetrayal;
         private Action<TQuest> _applyQuestSuccessConsequence;
@@ -247,6 +264,12 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
+        public Builder<TIssue, TQuest> WithQuestSuccessProofCapture(Func<TIssue, byte> captureQuestSuccessProof)
+        {
+            _captureQuestSuccessProof = captureQuestSuccessProof;
+            return this;
+        }
+
         public Builder<TIssue, TQuest> WithQuestCancelValidation(Func<TIssue, bool> validateQuestCancel)
         {
             _validateQuestCancel = validateQuestCancel;
@@ -269,6 +292,7 @@ public static class QuestDescriptorBuilder
             => new(_displayName, _questSolutionAccept, _alternativeAccept,
                 _supportsQuestSolutionAccept, _supportsAlternativeAccept,
                 _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept, _validateQuestSuccess,
+                _captureQuestSuccessProof,
                 _validateQuestCancel, _validateQuestBetrayal,
                 _applyQuestSuccessConsequence,
                 _tryArbitrateQuestSolutionAcceptBytes, _mirrorQuestSolutionAcceptBytes, _rejectQuestSolutionAccept,

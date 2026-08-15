@@ -69,7 +69,10 @@ internal class IssueFinalizationHandler : IHandler
         else
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
-            network.SendAll(new RequestIssueRemoved(ownerId, reason, generation));
+            var successProof = reason == IssueFinalizeReason.QuestSuccess
+                ? QuestTypeRegistry.Get(owner.Issue)?.CaptureQuestSuccessProof?.Invoke(owner.Issue) ?? 0
+                : (byte)0;
+            network.SendAll(new RequestIssueRemoved(ownerId, reason, generation, successProof));
         }
     }
 
@@ -224,7 +227,11 @@ internal class IssueFinalizationHandler : IHandler
                     objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party);
                 }
 
-                if (!validator(owner.Issue, party))
+                QuestSuccessProofContext.Set(payload.What.SuccessProof);
+                var validated = validator(owner.Issue, party);
+                QuestSuccessProofContext.Set(0);
+
+                if (!validated)
                 {
                     Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - completion condition not met for the requester's real party",
                         nameof(RequestIssueRemoved), ownerId);

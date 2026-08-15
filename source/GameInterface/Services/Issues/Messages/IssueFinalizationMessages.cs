@@ -49,12 +49,15 @@ public readonly struct RequestIssueRemoved : ICommand
     public readonly IssueFinalizeReason Reason;
     [ProtoMember(3)]
     public readonly int Generation;
+    [ProtoMember(4)]
+    public readonly byte SuccessProof;
 
-    public RequestIssueRemoved(string ownerId, IssueFinalizeReason reason, int generation)
+    public RequestIssueRemoved(string ownerId, IssueFinalizeReason reason, int generation, byte successProof = 0)
     {
         OwnerId = ownerId;
         Reason = reason;
         Generation = generation;
+        SuccessProof = successProof;
     }
 }
 
