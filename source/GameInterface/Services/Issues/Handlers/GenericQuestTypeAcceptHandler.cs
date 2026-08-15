@@ -247,26 +247,33 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             var hostControllerId = payload.What.ControllerId;
             if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player)) return;
 
+            AlternativeSolutionVanillaState state;
             try
             {
-                var state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
-
-                byte[] fieldsBytes = null;
-                if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
-                {
-                    var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
-                    if (!accepted) return;
-                    fieldsBytes = bytes;
-                }
-
-                ownershipRegistry.SetOwner(owner, hostControllerId);
-                var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-                network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, state, fieldsBytes, hostTroops));
+                state = AlternativeSolutionStartRunner.StartOnServer(owner, player);
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to start the host's own alternative-solution accept for owner {Owner} - not broadcasting", ownerId);
+                Logger.Error(e, "Failed to start the host's own alternative-solution accept for owner {Owner} - rolling back", ownerId);
+                RollbackFailedAlternativeAcceptStart(owner, hostControllerId);
+                return;
             }
+
+            byte[] fieldsBytes = null;
+            if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
+            {
+                var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
+                if (!accepted)
+                {
+                    RollbackFailedAlternativeAcceptStart(owner, hostControllerId);
+                    return;
+                }
+                fieldsBytes = bytes;
+            }
+
+            ownershipRegistry.SetOwner(owner, hostControllerId);
+            var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, state, fieldsBytes, hostTroops));
         }
         else
         {
@@ -321,19 +328,31 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            TroopRoster validatedRoster;
+            try
+            {
+                validatedRoster = BuildValidatedSentTroops(player, payload.What.SentTroops);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message} for owner {Owner} - malformed or version-mismatched payload",
+                    nameof(RequestQuestTypeAcceptAlternative), ownerId);
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                return;
+            }
+
+            if (validatedRoster.TotalHeroes == 0)
+            {
+                Logger.Error("Rejecting {Message} for owner {Owner} - requester's validated troop roster is empty",
+                    nameof(RequestQuestTypeAcceptAlternative), ownerId);
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                return;
+            }
+
             AlternativeSolutionVanillaState state;
             byte[] fieldsBytes = null;
             try
             {
-                var validatedRoster = BuildValidatedSentTroops(player, payload.What.SentTroops);
-                if (validatedRoster.TotalHeroes == 0)
-                {
-                    Logger.Error("Rejecting {Message} for owner {Owner} - requester's validated troop roster is empty",
-                        nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                    network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
-                    return;
-                }
-
                 state = AlternativeSolutionStartRunner.StartOnServerFromClaim(owner, player, validatedRoster);
 
                 if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
@@ -341,6 +360,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
                     if (!accepted)
                     {
+                        RollbackFailedAlternativeAcceptStart(owner, player.ControllerId);
                         network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
                         return;
                     }
@@ -349,8 +369,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to apply {Message} for owner {Owner} - malformed or version-mismatched payload",
+                Logger.Error(e, "Failed to start {Message} for owner {Owner} after troop validation - rolling back",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
+                RollbackFailedAlternativeAcceptStart(owner, player.ControllerId);
                 network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
                 return;
             }
@@ -425,6 +446,21 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 MobileParty.MainParty.MemberRoster.Add(sentTroops);
             }
             sentTroops.Clear();
+        }
+    }
+
+    private void RollbackFailedAlternativeAcceptStart(Hero owner, string controllerId)
+    {
+        if (owner?.Issue == null) return;
+
+        using (new IssueFinalizeAuthorityGuard())
+        using (new AllowedThread())
+        {
+            if (!string.IsNullOrEmpty(controllerId))
+            {
+                ownershipRegistry.SetOwner(owner, controllerId);
+            }
+            owner.Issue.CompleteIssueWithCancel();
         }
     }
 
