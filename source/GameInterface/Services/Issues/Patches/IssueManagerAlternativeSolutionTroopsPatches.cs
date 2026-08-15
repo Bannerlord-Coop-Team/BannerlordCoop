@@ -36,16 +36,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         var troops = issue?.AlternativeSolutionSentTroops;
         if (troops == null || troops.Count == 0) return false;
 
-        bool modelGatePasses = IsLocalMainHeroSafelyAvailable() && MobileParty.MainParty != null
-            && Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution();
-
         if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return false;
-
-        if (ownershipRegistry.IsLocalPeerOwner(issue.IssueOwner) && modelGatePasses)
-        {
-            MakeAlternativeTroopsReturn(troops);
-            return false;
-        }
 
         if (!ownershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var ownerControllerId))
         {
