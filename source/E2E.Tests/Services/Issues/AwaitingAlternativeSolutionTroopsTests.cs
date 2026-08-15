@@ -400,6 +400,53 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     }
 
     [Fact]
+    public void RequestAwaitingAlternativeSolutionTroopsDeposit_RejectedByServer_RollsBackTheClientsSpeculativeLocalDeposit()
+    {
+        var controllerId = "player-A-" + Guid.NewGuid();
+
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(controllerId, fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, controllerId);
+        Client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+
+            var troops = TroopRoster.CreateDummyTroopRoster();
+            using (new AllowedThread())
+            {
+                troops.AddToCounts(companion.CharacterObject, 1);
+            }
+
+            Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Deposit(controllerId, troops);
+            Assert.True(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
+
+            MessageBroker.Instance.Publish(owner, new AwaitingAlternativeSolutionTroopsDepositedLocally(owner, controllerId, troops));
+        });
+
+        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDeposit>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDepositRejected>());
+
+        Server.Call(() =>
+        {
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
+        });
+        Client.Call(() =>
+        {
+            Assert.False(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
+        });
+    }
+
+    [Fact]
     public void TryToMakeTroopsReturn_HeadlessServer_NoCrash_TroopsDeposited()
     {
         var controllerId = "player-A-" + Guid.NewGuid();
