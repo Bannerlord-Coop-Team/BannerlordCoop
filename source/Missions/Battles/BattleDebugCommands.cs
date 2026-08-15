@@ -299,7 +299,7 @@ internal static class BattleDebugCommands
     private sealed class JoustDriverBehavior : MissionBehavior
     {
         private const string RequiredWeaponId = "western_spear_4_t4";
-        private const float AttackReleaseDistance = 6f;
+        private const float AttackReleaseDistance = 4f;
         private const float AttackRearmDistance = 10f;
         private const float SteeringDeadZoneRadians = 0.0174533f;
         private const float SteeringFullAxisRadians = 0.5235988f;
