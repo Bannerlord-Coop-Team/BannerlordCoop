@@ -176,22 +176,22 @@ public class AgentMovementHandler : IAgentMovementHandler
         public bool HasBulkPoll;
         public float LastBulkPollTime;
         public bool SendMountMovementFirst;
-        public readonly MovementBatchScratch<AgentData> Movement =
-            new MovementBatchScratch<AgentData>();
-        public readonly MovementBatchScratch<AgentData> PriorityMovement =
-            new MovementBatchScratch<AgentData>(isPriority: true);
-        public readonly MovementBatchScratch<AgentMountData> MountMovement =
-            new MovementBatchScratch<AgentMountData>();
+        public readonly ReusableMovementBatches<AgentData> Movement =
+            new ReusableMovementBatches<AgentData>();
+        public readonly ReusableMovementBatches<AgentData> PriorityMovement =
+            new ReusableMovementBatches<AgentData>(isPriority: true);
+        public readonly ReusableMovementBatches<AgentMountData> MountMovement =
+            new ReusableMovementBatches<AgentMountData>();
     }
 
-    private sealed class MovementBatchScratch<T>
+    private sealed class ReusableMovementBatches<T>
     {
         public readonly Dictionary<string, MovementBatch<T>> Compact =
             new Dictionary<string, MovementBatch<T>>();
         public MovementBatch<T> Legacy;
         private readonly bool isPriority;
 
-        public MovementBatchScratch(bool isPriority = false)
+        public ReusableMovementBatches(bool isPriority = false)
         {
             this.isPriority = isPriority;
         }
@@ -844,10 +844,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         bool includeAuthoritativeAgents,
         bool includePriorityAgent)
     {
-        MovementBatchScratch<AgentData> movement = recipient.Movement;
-        MovementBatchScratch<AgentData> priorityMovement =
+        ReusableMovementBatches<AgentData> movement = recipient.Movement;
+        ReusableMovementBatches<AgentData> priorityMovement =
             recipient.PriorityMovement;
-        MovementBatchScratch<AgentMountData> mountMovement =
+        ReusableMovementBatches<AgentMountData> mountMovement =
             recipient.MountMovement;
         movement.Clear();
         priorityMovement.Clear();
