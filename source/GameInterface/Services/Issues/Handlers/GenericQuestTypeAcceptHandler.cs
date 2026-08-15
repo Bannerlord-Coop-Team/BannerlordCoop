@@ -419,7 +419,12 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
         using (new AllowedThread())
         {
-            owner.Issue.AlternativeSolutionSentTroops.Clear();
+            var sentTroops = owner.Issue.AlternativeSolutionSentTroops;
+            if (MobileParty.MainParty != null && sentTroops.TotalManCount > 0)
+            {
+                MobileParty.MainParty.MemberRoster.Add(sentTroops);
+            }
+            sentTroops.Clear();
         }
     }
 
