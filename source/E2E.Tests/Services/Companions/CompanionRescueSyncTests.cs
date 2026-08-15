@@ -79,13 +79,9 @@ public class CompanionRescueSyncTests : IDisposable
     {
         var context = CreateCaptiveCompanion();
         var requester = Clients[0];
-        string requestId = Guid.NewGuid().ToString("N");
         var request = new DoCompanionJoinedPartyByRescue(
             context.HeroId,
-            context.TargetPartyId,
-            requestId,
-            context.ClanId,
-            context.CaptorPartyId);
+            context.TargetPartyId);
         Server.NetworkSentMessages.Clear();
         Server.InternalMessages.Clear();
 
@@ -173,19 +169,16 @@ public class CompanionRescueSyncTests : IDisposable
         var context = CreateCaptiveCompanion(Clients[0], "RescueOwner");
         CreateCaptiveCompanion(Clients[1], "OtherRescueOwner");
         var requester = Clients[1];
-        string requestId = Guid.NewGuid().ToString("N");
         Server.NetworkSentMessages.Clear();
         Server.InternalMessages.Clear();
 
         requester.Call(() => requester.Resolve<INetwork>().SendAll(
             new DoCompanionJoinedPartyByRescue(
                 context.HeroId,
-                context.TargetPartyId,
-                requestId,
-                context.ClanId,
-                context.CaptorPartyId)));
+                context.TargetPartyId)));
 
-        AssertRejected(requester, requestId, "does not own the companion's clan");
+        AssertRejected(requester, context.HeroId, CompanionRescueRequestKind.JoinParty,
+            "does not own the companion's clan");
         AssertRescueNotApplied(context);
     }
 
@@ -195,13 +188,13 @@ public class CompanionRescueSyncTests : IDisposable
         var context = CreateCaptiveCompanion(Clients[0], "RescueOwner");
         CreateCaptiveCompanion(Clients[1], "OtherRescueOwner");
         var requester = Clients[1];
-        string requestId = Guid.NewGuid().ToString("N");
         Server.NetworkSentMessages.Clear();
         Server.InternalMessages.Clear();
 
-        SendLeadPartyRescue(requester, context, requestId);
+        SendLeadPartyRescue(requester, context);
 
-        AssertRejected(requester, requestId, "does not own the companion's clan");
+        AssertRejected(requester, context.HeroId, CompanionRescueRequestKind.LeadParty,
+            "does not own the companion's clan");
         AssertRescueNotApplied(context);
         Assert.Empty(Server.NetworkSentMessages.OfType<NetworkAddWarParty>());
     }
@@ -212,19 +205,16 @@ public class CompanionRescueSyncTests : IDisposable
         var context = CreateCaptiveCompanion();
         string otherPartyId = CreateSameClanParty(context.ClanId);
         var requester = Clients[0];
-        string requestId = Guid.NewGuid().ToString("N");
         Server.NetworkSentMessages.Clear();
         Server.InternalMessages.Clear();
 
         requester.Call(() => requester.Resolve<INetwork>().SendAll(
             new DoCompanionJoinedPartyByRescue(
                 context.HeroId,
-                otherPartyId,
-                requestId,
-                context.ClanId,
-                context.CaptorPartyId)));
+                otherPartyId)));
 
-        AssertRejected(requester, requestId, "does not own the target party");
+        AssertRejected(requester, context.HeroId, CompanionRescueRequestKind.JoinParty,
+            "does not own the target party");
         AssertRescueNotApplied(context);
     }
 
@@ -280,15 +270,15 @@ public class CompanionRescueSyncTests : IDisposable
             oneToOneConversationHero = null;
         }
 
-        var request = Assert.Single(requester.NetworkSentMessages
+        Assert.Single(requester.NetworkSentMessages
             .OfType<DoCompanionJoinedPartyByRescue>());
-        Assert.Equal(context.ClanId, request.ExpectedClanId);
         Assert.Empty(requester.NetworkSentMessages.OfType<RescueCompanion>());
 
         var completion = requester.InternalMessages.OfType<CompanionRescueCompleted>()
-            .Single(message => message.RequestId == request.RequestId);
+            .Single(message => message.CompanionHeroId == context.HeroId &&
+                message.Kind == CompanionRescueRequestKind.JoinParty);
         Assert.Equal(CompanionRescueCompletionStatus.Rejected, completion.Status);
-        Assert.Contains("owning clan changed", completion.Error);
+        Assert.Contains("target party no longer belongs", completion.Error);
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(context.HeroId, out var companion));
@@ -408,7 +398,7 @@ public class CompanionRescueSyncTests : IDisposable
     }
 
     private static void SendLeadPartyRescue(EnvironmentInstance requester,
-        RescueContext context, string requestId)
+        RescueContext context)
     {
         requester.Call(() =>
         {
@@ -427,18 +417,15 @@ public class CompanionRescueSyncTests : IDisposable
                 rosterInterface.PackTroopRosterData(members),
                 rosterInterface.PackTroopRosterData(prisoners),
                 targetPartyBaseId,
-                requestId,
-                context.HeroId,
-                context.ClanId,
-                context.CaptorPartyId));
+                context.HeroId));
         });
     }
 
-    private static void AssertRejected(EnvironmentInstance requester, string requestId,
-        string expectedError)
+    private static void AssertRejected(EnvironmentInstance requester, string heroId,
+        CompanionRescueRequestKind kind, string expectedError)
     {
         var completion = requester.InternalMessages.OfType<CompanionRescueCompleted>()
-            .Single(message => message.RequestId == requestId);
+            .Single(message => message.CompanionHeroId == heroId && message.Kind == kind);
         Assert.Equal(CompanionRescueCompletionStatus.Rejected, completion.Status);
         Assert.Contains(expectedError, completion.Error);
     }

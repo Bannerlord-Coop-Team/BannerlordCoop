@@ -144,27 +144,12 @@ public readonly struct DoCompanionJoinedPartyByRescue : IEvent
     [ProtoMember(2)]
     public readonly string MainPartyId;
 
-    [ProtoMember(3)]
-    public readonly string RequestId;
-
-    [ProtoMember(4)]
-    public readonly string ExpectedClanId;
-
-    [ProtoMember(5)]
-    public readonly string ExpectedCaptorPartyId;
-
     public DoCompanionJoinedPartyByRescue(
         string oneToOneConversationHeroId,
-        string mainPartyId,
-        string requestId,
-        string expectedClanId,
-        string expectedCaptorPartyId)
+        string mainPartyId)
     {
         OneToOneConversationHeroId = oneToOneConversationHeroId;
         MainPartyId = mainPartyId;
-        RequestId = requestId;
-        ExpectedClanId = expectedClanId;
-        ExpectedCaptorPartyId = expectedCaptorPartyId;
     }
 }
 
@@ -181,33 +166,18 @@ public readonly struct DoPartyScreenClosedFromRescuing : IEvent
     public readonly string RightOwnerPartyId;
 
     [ProtoMember(4)]
-    public readonly string RequestId;
-
-    [ProtoMember(5)]
     public readonly string CompanionHeroId;
-
-    [ProtoMember(6)]
-    public readonly string ExpectedClanId;
-
-    [ProtoMember(7)]
-    public readonly string ExpectedCaptorPartyId;
 
     public DoPartyScreenClosedFromRescuing(
         TroopRosterData leftMemberRosterData,
         TroopRosterData leftPrisonRosterData,
         string rightOwnerPartyId,
-        string requestId,
-        string companionHeroId,
-        string expectedClanId,
-        string expectedCaptorPartyId)
+        string companionHeroId)
     {
         LeftMemberRosterData = leftMemberRosterData;
         LeftPrisonRosterData = leftPrisonRosterData;
         RightOwnerPartyId = rightOwnerPartyId;
-        RequestId = requestId;
         CompanionHeroId = companionHeroId;
-        ExpectedClanId = expectedClanId;
-        ExpectedCaptorPartyId = expectedCaptorPartyId;
     }
 }
 
@@ -215,28 +185,23 @@ public readonly struct DoPartyScreenClosedFromRescuing : IEvent
 internal readonly struct CompanionRescueCompleted : ICommand
 {
     [ProtoMember(1)]
-    public readonly string RequestId;
-
-    [ProtoMember(2)]
     public readonly string CompanionHeroId;
 
-    [ProtoMember(3)]
+    [ProtoMember(2)]
     public readonly CompanionRescueRequestKind Kind;
 
-    [ProtoMember(4)]
+    [ProtoMember(3)]
     public readonly CompanionRescueCompletionStatus Status;
 
-    [ProtoMember(5)]
+    [ProtoMember(4)]
     public readonly string Error;
 
     public CompanionRescueCompleted(
-        string requestId,
         string companionHeroId,
         CompanionRescueRequestKind kind,
         CompanionRescueCompletionStatus status,
         string error)
     {
-        RequestId = requestId;
         CompanionHeroId = companionHeroId;
         Kind = kind;
         Status = status;

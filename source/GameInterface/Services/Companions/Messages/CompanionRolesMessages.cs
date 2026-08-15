@@ -86,20 +86,17 @@ public readonly struct PartyScreenClosedFromRescuing : IEvent
 
 internal readonly struct CompanionRescueCompletionReceived : IEvent
 {
-    public readonly string RequestId;
     public readonly string CompanionHeroId;
     public readonly CompanionRescueRequestKind Kind;
     public readonly CompanionRescueCompletionStatus Status;
     public readonly string Error;
 
     public CompanionRescueCompletionReceived(
-        string requestId,
         string companionHeroId,
         CompanionRescueRequestKind kind,
         CompanionRescueCompletionStatus status,
         string error)
     {
-        RequestId = requestId;
         CompanionHeroId = companionHeroId;
         Kind = kind;
         Status = status;

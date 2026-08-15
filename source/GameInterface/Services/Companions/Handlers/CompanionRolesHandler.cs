@@ -401,15 +401,10 @@ internal class CompanionRolesHandler : IHandler
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.OneToOneConversationHero, out var oneToOneConversationHeroId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.MainParty, out var mainPartyId)) return;
-        if (!TryGetRescueContextIds(obj.What.OneToOneConversationHero,
-            out var expectedClanId, out var expectedCaptorPartyId)) return;
 
         var message = new DoCompanionJoinedPartyByRescue(
             oneToOneConversationHeroId,
-            mainPartyId,
-            Guid.NewGuid().ToString("N"),
-            expectedClanId,
-            expectedCaptorPartyId
+            mainPartyId
         );
 
         network.SendAll(message);
@@ -433,7 +428,6 @@ internal class CompanionRolesHandler : IHandler
             string error = null;
             try
             {
-                ValidateRequestId(data.RequestId);
                 if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId,
                     out var companion))
                     throw new InvalidOperationException("The requested companion could not be resolved.");
@@ -441,8 +435,8 @@ internal class CompanionRolesHandler : IHandler
                     out var targetParty))
                     throw new InvalidOperationException("The requested target party could not be resolved.");
 
-                var expectedClan = ValidateRescueOwnership(companion, targetParty, data.ExpectedClanId);
-                ValidateRescueRequester(requester, expectedClan, targetParty);
+                var companionClan = ValidateRescueOwnership(companion, targetParty);
+                ValidateRescueRequester(requester, companionClan, targetParty);
                 int targetCount = targetParty.MemberRoster.GetTroopCount(companion.CharacterObject);
                 if (!companion.IsPrisoner && companion.PartyBelongedTo == targetParty &&
                     companion.HeroState == Hero.CharacterStates.Active && targetCount == 1)
@@ -451,7 +445,7 @@ internal class CompanionRolesHandler : IHandler
                 }
                 else
                 {
-                    ValidateCaptiveRescueState(companion, targetCount, data.ExpectedCaptorPartyId);
+                    ValidateCaptiveRescueState(companion, targetCount);
 
                     EndCaptivityAction.ApplyByReleasedAfterBattle(companion);
                     companion.ChangeState(Hero.CharacterStates.Active);
@@ -468,12 +462,12 @@ internal class CompanionRolesHandler : IHandler
             catch (Exception exception)
             {
                 error = exception.Message;
-                logger.Error(exception, "Rejected companion join rescue {RequestId} for {HeroId}",
-                    data.RequestId, data.OneToOneConversationHeroId);
+                logger.Error(exception, "Rejected companion join rescue for {HeroId}",
+                    data.OneToOneConversationHeroId);
             }
             finally
             {
-                CompleteRescueRequest(requester, data.RequestId, data.OneToOneConversationHeroId,
+                CompleteRescueRequest(requester, data.OneToOneConversationHeroId,
                     CompanionRescueRequestKind.JoinParty, status, error);
             }
         }, context: nameof(DoCompanionJoinedPartyByRescue));
@@ -499,17 +493,12 @@ internal class CompanionRolesHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.What.RightOwnerParty, out var rightOwnerPartyId)) return;
         if (!objectManager.TryGetIdWithLogging(companion, out var companionHeroId)) return;
-        if (!TryGetRescueContextIds(companion,
-            out var expectedClanId, out var expectedCaptorPartyId)) return;
 
         var message = new DoPartyScreenClosedFromRescuing(
             leftMemberData,
             leftPrisonerData,
             rightOwnerPartyId,
-            Guid.NewGuid().ToString("N"),
-            companionHeroId,
-            expectedClanId,
-            expectedCaptorPartyId
+            companionHeroId
         );
 
         network.SendAll(message);
@@ -533,7 +522,6 @@ internal class CompanionRolesHandler : IHandler
             string error = null;
             try
             {
-                ValidateRequestId(data.RequestId);
                 if (!objectManager.TryGetObjectWithLogging<Hero>(data.CompanionHeroId,
                     out var companion))
                     throw new InvalidOperationException("The requested companion could not be resolved.");
@@ -542,8 +530,8 @@ internal class CompanionRolesHandler : IHandler
                     throw new InvalidOperationException("The requested target party could not be resolved.");
 
                 var targetParty = rightOwnerParty.MobileParty;
-                var expectedClan = ValidateRescueOwnership(companion, targetParty, data.ExpectedClanId);
-                ValidateRescueRequester(requester, expectedClan, targetParty);
+                var companionClan = ValidateRescueOwnership(companion, targetParty);
+                ValidateRescueRequester(requester, companionClan, targetParty);
                 var leftMemberElements = troopRosterInterface
                     .UnpackTroopRosterData(data.LeftMemberRosterData).ToArray();
                 var leftPrisonerElements = troopRosterInterface
@@ -558,7 +546,7 @@ internal class CompanionRolesHandler : IHandler
                     throw new InvalidOperationException("The rescue party roster contains another hero.");
 
                 int targetCount = targetParty.MemberRoster.GetTroopCount(companion.CharacterObject);
-                var existingParties = FindCompanionLedParties(expectedClan, companion);
+                var existingParties = FindCompanionLedParties(companionClan, companion);
                 if (!companion.IsPrisoner && companion.HeroState == Hero.CharacterStates.Active &&
                     targetCount == 0 && existingParties.Length == 1 &&
                     companion.PartyBelongedTo == existingParties[0])
@@ -569,8 +557,8 @@ internal class CompanionRolesHandler : IHandler
                 {
                     if (existingParties.Length != 0)
                         throw new InvalidOperationException("The companion already has a clan war party in a non-terminal state.");
-                    ValidateCaptiveRescueState(companion, targetCount, data.ExpectedCaptorPartyId);
-                    int originalWarPartyCount = expectedClan.WarPartyComponents.Count;
+                    ValidateCaptiveRescueState(companion, targetCount);
+                    int originalWarPartyCount = companionClan.WarPartyComponents.Count;
 
                     companionRolesCampaignBehaviorInterface.PartyScreenClosed(
                         companion,
@@ -580,11 +568,11 @@ internal class CompanionRolesHandler : IHandler
                         false
                     );
 
-                    var createdParties = FindCompanionLedParties(expectedClan, companion);
+                    var createdParties = FindCompanionLedParties(companionClan, companion);
                     if (companion.IsPrisoner || companion.HeroState != Hero.CharacterStates.Active ||
                         targetParty.MemberRoster.GetTroopCount(companion.CharacterObject) != 0 ||
                         createdParties.Length != 1 || companion.PartyBelongedTo != createdParties[0] ||
-                        expectedClan.WarPartyComponents.Count != originalWarPartyCount + 1)
+                        companionClan.WarPartyComponents.Count != originalWarPartyCount + 1)
                         throw new InvalidOperationException("The lead-party rescue did not reach its terminal state.");
 
                     status = CompanionRescueCompletionStatus.Accepted;
@@ -593,12 +581,12 @@ internal class CompanionRolesHandler : IHandler
             catch (Exception exception)
             {
                 error = exception.Message;
-                logger.Error(exception, "Rejected companion lead-party rescue {RequestId} for {HeroId}",
-                    data.RequestId, data.CompanionHeroId);
+                logger.Error(exception, "Rejected companion lead-party rescue for {HeroId}",
+                    data.CompanionHeroId);
             }
             finally
             {
-                CompleteRescueRequest(requester, data.RequestId, data.CompanionHeroId,
+                CompleteRescueRequest(requester, data.CompanionHeroId,
                     CompanionRescueRequestKind.LeadParty, status, error);
             }
         }, context: nameof(DoPartyScreenClosedFromRescuing));
@@ -611,12 +599,11 @@ internal class CompanionRolesHandler : IHandler
         {
             if (data.Status == CompanionRescueCompletionStatus.Rejected)
             {
-                logger.Error("Companion rescue {RequestId} for {HeroId} was rejected: {Error}",
-                    data.RequestId, data.CompanionHeroId, data.Error);
+                logger.Error("Companion rescue for {HeroId} was rejected: {Error}",
+                    data.CompanionHeroId, data.Error);
             }
 
             messageBroker.Publish(this, new CompanionRescueCompletionReceived(
-                data.RequestId,
                 data.CompanionHeroId,
                 data.Kind,
                 data.Status,
@@ -624,53 +611,24 @@ internal class CompanionRolesHandler : IHandler
         }, context: nameof(CompanionRescueCompleted));
     }
 
-    private bool TryGetRescueContextIds(Hero companion,
-        out string expectedClanId, out string expectedCaptorPartyId)
+    private static Clan ValidateRescueOwnership(Hero companion, MobileParty targetParty)
     {
-        expectedClanId = null;
-        expectedCaptorPartyId = null;
-        if (companion.CompanionOf == null)
-        {
-            logger.Error("Cannot request rescue for {Hero}; the companion has no owning clan",
-                companion.Name);
-            return false;
-        }
-        if (!objectManager.TryGetIdWithLogging(companion.CompanionOf, out expectedClanId))
-            return false;
-        if (companion.PartyBelongedToAsPrisoner != null &&
-            !objectManager.TryGetIdWithLogging(companion.PartyBelongedToAsPrisoner,
-                out expectedCaptorPartyId))
-            return false;
-        return true;
-    }
-
-    private static void ValidateRequestId(string requestId)
-    {
-        if (string.IsNullOrWhiteSpace(requestId))
-            throw new InvalidOperationException("The companion rescue request has no correlation id.");
-    }
-
-    private Clan ValidateRescueOwnership(Hero companion, MobileParty targetParty,
-        string expectedClanId)
-    {
-        if (string.IsNullOrWhiteSpace(expectedClanId) ||
-            !objectManager.TryGetObjectWithLogging<Clan>(expectedClanId, out var expectedClan))
-            throw new InvalidOperationException("The expected companion clan could not be resolved.");
-        if (companion.CompanionOf != expectedClan)
-            throw new InvalidOperationException("The companion's owning clan changed before rescue completion.");
-        if (targetParty.ActualClan != expectedClan || targetParty.LeaderHero?.Clan != expectedClan)
+        var companionClan = companion.CompanionOf;
+        if (companionClan == null)
+            throw new InvalidOperationException("The companion has no owning clan.");
+        if (targetParty.ActualClan != companionClan || targetParty.LeaderHero?.Clan != companionClan)
             throw new InvalidOperationException("The target party no longer belongs to the companion's clan.");
-        return expectedClan;
+        return companionClan;
     }
 
-    private void ValidateRescueRequester(NetPeer requester, Clan expectedClan,
+    private void ValidateRescueRequester(NetPeer requester, Clan companionClan,
         MobileParty targetParty)
     {
         if (!playerManager.TryGetPlayer(requester, out var player))
             throw new InvalidOperationException("The requesting peer has no registered player.");
         if (string.IsNullOrWhiteSpace(player.ClanId) ||
             !objectManager.TryGetObjectWithLogging<Clan>(player.ClanId, out var playerClan) ||
-            playerClan != expectedClan)
+            playerClan != companionClan)
             throw new InvalidOperationException("The requesting player does not own the companion's clan.");
         if (string.IsNullOrWhiteSpace(player.MobilePartyId) ||
             !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty) ||
@@ -678,8 +636,7 @@ internal class CompanionRolesHandler : IHandler
             throw new InvalidOperationException("The requesting player does not own the target party.");
     }
 
-    private void ValidateCaptiveRescueState(Hero companion, int targetCount,
-        string expectedCaptorPartyId)
+    private static void ValidateCaptiveRescueState(Hero companion, int targetCount)
     {
         if (targetCount != 0)
             throw new InvalidOperationException("The target roster already contains the companion in a non-terminal state.");
@@ -687,12 +644,6 @@ internal class CompanionRolesHandler : IHandler
             throw new InvalidOperationException("The companion is no longer captive and the rescue is not completed.");
         if (companion.PartyBelongedTo != null)
             throw new InvalidOperationException("The captive companion still belongs to an active party.");
-        if (string.IsNullOrWhiteSpace(expectedCaptorPartyId) ||
-            !objectManager.TryGetObjectWithLogging<PartyBase>(expectedCaptorPartyId,
-                out var expectedCaptorParty))
-            throw new InvalidOperationException("The expected captor party could not be resolved.");
-        if (companion.PartyBelongedToAsPrisoner != expectedCaptorParty)
-            throw new InvalidOperationException("The companion's captor changed before rescue completion.");
     }
 
     private static MobileParty[] FindCompanionLedParties(Clan clan, Hero companion)
@@ -706,11 +657,11 @@ internal class CompanionRolesHandler : IHandler
             .ToArray();
     }
 
-    private void CompleteRescueRequest(NetPeer requester, string requestId, string companionHeroId,
+    private void CompleteRescueRequest(NetPeer requester, string companionHeroId,
         CompanionRescueRequestKind kind, CompanionRescueCompletionStatus status, string error)
     {
         var completion = new CompanionRescueCompleted(
-            requestId, companionHeroId, kind, status, error);
+            companionHeroId, kind, status, error);
         SendRescueCompletion(requester, completion);
     }
 
