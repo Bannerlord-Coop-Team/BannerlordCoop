@@ -1,9 +1,14 @@
+using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Interfaces;
 using Helpers;
 using HarmonyLib;
 using Serilog;
@@ -48,7 +53,32 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         troopsRegistry.Deposit(ownerControllerId, troops);
         MessageBroker.Instance.Publish(issue, new AwaitingAlternativeSolutionTroopsDepositedLocally(issue.IssueOwner, ownerControllerId, troops));
 
+        NotifyTrueOwnerOfConfirmedDeposit(issue.IssueOwner, ownerControllerId, troops);
+
         return false;
+    }
+
+    private static void NotifyTrueOwnerOfConfirmedDeposit(Hero issueOwner, string ownerControllerId, TroopRoster troops)
+    {
+        if (!ModInformation.IsServer) return;
+
+        if (ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)
+            && controllerIdProvider.ControllerId == ownerControllerId)
+        {
+            return;
+        }
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return;
+        if (!playerManager.TryGetPeer(ownerControllerId, out var peer)) return;
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
+        if (!objectManager.TryGetIdWithLogging(issueOwner, out var ownerId)) return;
+
+        if (!ContainerProvider.TryResolve<ITroopRosterInterface>(out var troopRosterInterface)) return;
+        if (!ContainerProvider.TryResolve<INetwork>(out var network)) return;
+
+        var packed = troopRosterInterface.PackTroopRosterData(troops);
+        network.Send(peer, new NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(ownerId, packed));
     }
 
     [HarmonyPatch(typeof(IssueManager), "CheckIfTroopsCanReturnToMainParty")]

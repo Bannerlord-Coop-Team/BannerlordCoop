@@ -61,3 +61,18 @@ public readonly struct NetworkAwaitingAlternativeSolutionTroopsDepositRejected :
         OwnerId = ownerId;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly TroopRosterData Troops;
+
+    public NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(string ownerId, TroopRosterData troops)
+    {
+        OwnerId = ownerId;
+        Troops = troops;
+    }
+}
