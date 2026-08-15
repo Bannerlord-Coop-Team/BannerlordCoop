@@ -120,10 +120,6 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         MessageBroker.Instance.Publish(issue.IssueOwner, new VillageCraftingIssueCreated(issue));
     }
 
-    public static bool TryTriggerOwnedAlternativeSolutionCompletion(Hero owner) =>
-        AlternativeSolutionCompletionRunner.TryTriggerOwnedCompletion(owner,
-            o => MessageBroker.Instance.Publish(o, new VillageCraftingIssueAlternativeSolutionCompletionRequested(o)));
-
     private static bool ValidateQuestSuccess(Issue issue, MobileParty party)
     {
         if (party == null) return false;

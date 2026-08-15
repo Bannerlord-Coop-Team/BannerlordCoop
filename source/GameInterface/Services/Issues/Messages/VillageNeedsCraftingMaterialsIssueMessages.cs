@@ -32,25 +32,3 @@ public readonly struct NetworkVillageCraftingIssueCreated : IServerToClientComma
         Generation = generation;
     }
 }
-
-public readonly struct VillageCraftingIssueAlternativeSolutionCompletionRequested : IEvent
-{
-    public readonly Hero Owner;
-
-    public VillageCraftingIssueAlternativeSolutionCompletionRequested(Hero owner)
-    {
-        Owner = owner;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public readonly struct RequestVillageCraftingIssueAlternativeSolutionCompletion : ICommand
-{
-    [ProtoMember(1)]
-    public readonly string OwnerId;
-
-    public RequestVillageCraftingIssueAlternativeSolutionCompletion(string ownerId)
-    {
-        OwnerId = ownerId;
-    }
-}

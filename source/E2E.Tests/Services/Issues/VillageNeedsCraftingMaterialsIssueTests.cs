@@ -13,6 +13,7 @@ using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -864,5 +865,41 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
                 Assert.Null(owner.Issue);
             });
         }
+    }
+
+    [Fact]
+    public void OnHourlyTick_OneDueOwnedIssue_SendsExactlyOneCompletionRequest()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Client.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
+
+            using (new AllowedThread())
+            {
+                owner.Issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                owner.Issue.IsTriedToSolveBefore = true;
+                owner.Issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.Now - CampaignTime.Days(1f);
+            }
+
+            new IssuesCampaignBehavior().RegisterEvents();
+            new VillageNeedsCraftingMaterialsIssueBehavior().RegisterEvents();
+            CampaignEvents.Instance.HourlyTick();
+        });
+
+        var requests = Client.NetworkSentMessages.GetMessages<RequestAlternativeSolutionCompletion>();
+        Assert.Single(requests);
     }
 }
