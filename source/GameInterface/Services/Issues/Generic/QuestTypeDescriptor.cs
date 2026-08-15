@@ -25,6 +25,8 @@ public abstract class QuestTypeDescriptor
 
     public Func<IssueBase, MobileParty, bool> ValidateQuestSuccess { get; }
 
+    public Action<QuestBase> ApplyQuestSuccessConsequence { get; }
+
     public Func<Hero, Func<Hero, bool>, (bool Accepted, byte[] FieldsBytes)> TryArbitrateQuestSolutionAcceptBytes { get; }
 
     public Action<Hero, byte[]> MirrorQuestSolutionAcceptBytes { get; }
@@ -47,6 +49,7 @@ public abstract class QuestTypeDescriptor
         Action<Hero, string> onGenuineQuestSolutionAccept,
         Action<Hero, string> onGenuineAlternativeAccept,
         Func<IssueBase, MobileParty, bool> validateQuestSuccess,
+        Action<QuestBase> applyQuestSuccessConsequence,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -63,6 +66,7 @@ public abstract class QuestTypeDescriptor
         OnGenuineQuestSolutionAccept = onGenuineQuestSolutionAccept;
         OnGenuineAlternativeAccept = onGenuineAlternativeAccept;
         ValidateQuestSuccess = validateQuestSuccess;
+        ApplyQuestSuccessConsequence = applyQuestSuccessConsequence;
         TryArbitrateQuestSolutionAcceptBytes = tryArbitrateQuestSolutionAcceptBytes;
         MirrorQuestSolutionAcceptBytes = mirrorQuestSolutionAcceptBytes;
         RejectQuestSolutionAccept = rejectQuestSolutionAccept;
@@ -91,6 +95,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         Action<Hero, string> onGenuineQuestSolutionAccept,
         Action<Hero, string> onGenuineAlternativeAccept,
         Func<TIssue, MobileParty, bool> validateQuestSuccess,
+        Action<TQuest> applyQuestSuccessConsequence,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -107,6 +112,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             onGenuineQuestSolutionAccept,
             onGenuineAlternativeAccept,
             validateQuestSuccess == null ? (Func<IssueBase, MobileParty, bool>)null : (issue, party) => issue is TIssue typed && validateQuestSuccess(typed, party),
+            applyQuestSuccessConsequence == null ? (Action<QuestBase>)null : quest => { if (quest is TQuest typed) applyQuestSuccessConsequence(typed); },
             tryArbitrateQuestSolutionAcceptBytes,
             mirrorQuestSolutionAcceptBytes,
             rejectQuestSolutionAccept,
@@ -150,6 +156,7 @@ public static class QuestDescriptorBuilder
         private Action<Hero, string> _onGenuineQuestSolutionAccept;
         private Action<Hero, string> _onGenuineAlternativeAccept;
         private Func<TIssue, MobileParty, bool> _validateQuestSuccess;
+        private Action<TQuest> _applyQuestSuccessConsequence;
         private Func<Hero, Func<Hero, bool>, (bool, byte[])> _tryArbitrateQuestSolutionAcceptBytes;
         private Action<Hero, byte[]> _mirrorQuestSolutionAcceptBytes;
         private Action<Hero> _rejectQuestSolutionAccept;
@@ -240,10 +247,17 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
+        public Builder<TIssue, TQuest> WithQuestSuccessConsequence(Action<TQuest> applyQuestSuccessConsequence)
+        {
+            _applyQuestSuccessConsequence = applyQuestSuccessConsequence;
+            return this;
+        }
+
         public QuestTypeDescriptor<TIssue, TQuest> Build()
             => new(_displayName, _creationCapture, _questSolutionAccept, _alternativeAccept,
                 _supportsQuestSolutionAccept, _supportsAlternativeAccept,
                 _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept, _validateQuestSuccess,
+                _applyQuestSuccessConsequence,
                 _tryArbitrateQuestSolutionAcceptBytes, _mirrorQuestSolutionAcceptBytes, _rejectQuestSolutionAccept,
                 _tryArbitrateAlternativeAcceptBytes, _mirrorAlternativeAcceptBytes, _rejectAlternativeAccept);
     }

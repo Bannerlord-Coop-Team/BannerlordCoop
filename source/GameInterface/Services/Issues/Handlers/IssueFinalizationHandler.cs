@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -42,6 +43,7 @@ internal class IssueFinalizationHandler : IHandler
         this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<IssueFinalizedTriggered>(Handle_IssueFinalizedTriggered);
+        messageBroker.Subscribe<QuestSuccessTriggered>(Handle_QuestSuccessTriggered);
         messageBroker.Subscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Subscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
     }
@@ -49,6 +51,7 @@ internal class IssueFinalizationHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<IssueFinalizedTriggered>(Handle_IssueFinalizedTriggered);
+        messageBroker.Unsubscribe<QuestSuccessTriggered>(Handle_QuestSuccessTriggered);
         messageBroker.Unsubscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Unsubscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
     }
@@ -68,6 +71,77 @@ internal class IssueFinalizationHandler : IHandler
             generationRegistry.TryGetGeneration(owner, out var generation);
             network.SendAll(new RequestIssueRemoved(ownerId, reason, generation));
         }
+    }
+
+    private void Handle_QuestSuccessTriggered(MessagePayload<QuestSuccessTriggered> payload)
+    {
+        var owner = payload.What.Owner;
+        if (owner == null || !objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
+
+        if (ModInformation.IsServer)
+        {
+            var hostControllerId = payload.What.ControllerId;
+            if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player))
+            {
+                Logger.Error("Rejecting the host's own {Message} for owner {Owner} - could not resolve host's own Player",
+                    nameof(QuestSuccessTriggered), ownerId);
+                return;
+            }
+
+            if (owner.Issue?.IssueQuest is not { IsOngoing: true })
+            {
+                Logger.Error("Rejecting the host's own {Message} for owner {Owner} - no ongoing quest to finalize",
+                    nameof(QuestSuccessTriggered), ownerId);
+                return;
+            }
+
+            MobileParty hostParty = null;
+            if (player.MobilePartyId != null)
+            {
+                objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out hostParty);
+            }
+
+            var validator = QuestTypeRegistry.Get(owner.Issue)?.ValidateQuestSuccess;
+            if (validator != null && !validator(owner.Issue, hostParty))
+            {
+                Logger.Error("Rejecting the host's own {Message} for owner {Owner} - completion condition not met for the host's real party",
+                    nameof(QuestSuccessTriggered), ownerId);
+                return;
+            }
+
+            FinalizeAndBroadcast(owner, ownerId, player, IssueFinalizeReason.QuestSuccess);
+        }
+        else
+        {
+            generationRegistry.TryGetGeneration(owner, out var generation);
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestSuccess, generation));
+        }
+    }
+
+    private void FinalizeAndBroadcast(Hero owner, string ownerId, Player player, IssueFinalizeReason reason)
+    {
+        MobileParty ownerParty = null;
+        if (player.MobilePartyId != null)
+        {
+            objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
+        }
+
+        objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var truePlayerHero);
+
+        try
+        {
+            using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
+            {
+                IssueFinalizationSupport.FinalizeMirror(owner, reason);
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to finalize {Reason} for owner {Owner} - not broadcasting", reason, ownerId);
+            return;
+        }
+
+        network.SendAll(new NetworkIssueRemoved(ownerId, reason));
     }
 
     private void Handle_RequestIssueRemoved(MessagePayload<RequestIssueRemoved> payload)
@@ -190,29 +264,7 @@ internal class IssueFinalizationHandler : IHandler
                 return;
             }
 
-            MobileParty ownerParty = null;
-            if (player.MobilePartyId != null)
-            {
-                objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
-            }
-
-            objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var truePlayerHero);
-
-            try
-            {
-                using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
-                {
-                    IssueFinalizationSupport.FinalizeMirror(owner, reason);
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to finalize {Message} claiming {Reason} for owner {Owner} - not broadcasting",
-                    nameof(RequestIssueRemoved), reason, ownerId);
-                return;
-            }
-
-            network.SendAll(new NetworkIssueRemoved(ownerId, reason));
+            FinalizeAndBroadcast(owner, ownerId, player, reason);
         });
     }
 
