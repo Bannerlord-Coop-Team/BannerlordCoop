@@ -32,7 +32,15 @@ internal static class IssueFinalizationSupport
                 switch (reason)
                 {
                     case IssueFinalizeReason.QuestSuccess:
-                        quest.CompleteQuestWithSuccess();
+                        var applyConsequence = QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestSuccessConsequence;
+                        if (applyConsequence != null)
+                        {
+                            applyConsequence(quest);
+                        }
+                        else
+                        {
+                            quest.CompleteQuestWithSuccess();
+                        }
                         return;
                     case IssueFinalizeReason.QuestCancel:
                         quest.CompleteQuestWithCancel();
