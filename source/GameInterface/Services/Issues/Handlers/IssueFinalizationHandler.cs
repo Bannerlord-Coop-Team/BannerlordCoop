@@ -247,6 +247,18 @@ internal class IssueFinalizationHandler : IHandler
                         nameof(RequestIssueRemoved), reason, ownerId);
                     return;
                 }
+
+                if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestBetrayal)
+                {
+                    var descriptor = QuestTypeRegistry.Get(owner.Issue);
+                    var validator = reason == IssueFinalizeReason.QuestCancel ? descriptor?.ValidateQuestCancel : descriptor?.ValidateQuestBetrayal;
+                    if (validator == null || !validator(owner.Issue))
+                    {
+                        Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - quest type has no registered validator or condition not met",
+                            nameof(RequestIssueRemoved), reason, ownerId);
+                        return;
+                    }
+                }
             }
             else if (reason == IssueFinalizeReason.IssueOnly)
             {

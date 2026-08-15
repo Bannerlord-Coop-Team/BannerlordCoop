@@ -140,6 +140,22 @@ public class QuestTypeRegistryTests : IDisposable
         Assert.Null(withoutTriggers.OnGenuineCreation);
     }
 
+    [Fact]
+    public void Descriptor_CarriesTheCancelAndBetrayalValidators_NullWhenNeverWired()
+    {
+        var withValidators = QuestDescriptorBuilder.For<FakeIssueA, FakeQuestA>("FakeA")
+            .WithQuestCancelValidation(issue => true)
+            .WithQuestBetrayalValidation(issue => true)
+            .Build();
+
+        Assert.NotNull(withValidators.ValidateQuestCancel);
+        Assert.NotNull(withValidators.ValidateQuestBetrayal);
+
+        var withoutValidators = QuestDescriptorBuilder.For<FakeIssueB, FakeQuestB>("FakeB").Build();
+        Assert.Null(withoutValidators.ValidateQuestCancel);
+        Assert.Null(withoutValidators.ValidateQuestBetrayal);
+    }
+
     private sealed class FakeQuestSolutionStrategy : IRaceArbitratedAcceptMirrorStrategy<int>
     {
         public bool ReplayCalled;
