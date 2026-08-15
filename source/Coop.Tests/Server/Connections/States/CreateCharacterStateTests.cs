@@ -12,6 +12,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Moq;
 using System;
@@ -150,6 +151,15 @@ namespace Coop.Tests.Server.Connections.States
         {
             // Arrange
             var hero = SetupUnpackedHero();
+            var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            Player registeredPlayer = null;
+            playerManagerMock
+                .Setup(p => p.AddPlayer(It.IsAny<Player>()))
+                .Callback<Player>(player => registeredPlayer = player)
+                .Returns(true);
+            playerManagerMock
+                .Setup(p => p.RemovePlayer(It.IsAny<Player>()))
+                .Returns(true);
             serverComponent.Container.Resolve<Mock<IHeroInterface>>()
                 .Setup(h => h.SetupServerHero(hero))
                 .Throws(new InvalidOperationException("setup failed"));
@@ -165,6 +175,18 @@ namespace Coop.Tests.Server.Connections.States
             Assert.DoesNotContain(
                 serverComponent.TestNetwork.ImmediateSends,
                 send => send.Payload is NetworkHeroRecieved);
+            playerManagerMock.Verify(p => p.RemovePlayer(registeredPlayer), Times.Once);
+
+            var remoteMessages = serverComponent.TestNetwork.GetPeerMessages(differentPeer).ToList();
+            Assert.Collection(
+                remoteMessages,
+                message => Assert.IsType<NetworkNewPlayerHeroCreated>(message),
+                message =>
+                {
+                    var removed = Assert.IsType<NetworkPlayerRemoved>(message);
+                    Assert.Equal(registeredPlayer.ControllerId, removed.ControllerId);
+                    Assert.Equal(registeredPlayer.HeroId, removed.HeroId);
+                });
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
         }
 

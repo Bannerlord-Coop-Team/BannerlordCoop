@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -103,6 +104,12 @@ public class CreateCharacterState : ConnectionStateBase
                 exception,
                 "Failed to set up hero for {ControllerId}; disconnecting the joining peer",
                 controllerId);
+
+            if (!playerManager.RemovePlayer(player))
+                Logger.Error("Failed to roll back player registration for {ControllerId}", controllerId);
+
+            // Existing clients created this graph before setup ran, so remove their registration on the same channel.
+            network.SendAllBut(netPeer, new NetworkPlayerRemoved(controllerId, player.HeroId));
             ConnectionLogic.Peer.Disconnect();
             return;
         }
