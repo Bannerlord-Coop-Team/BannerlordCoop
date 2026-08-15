@@ -332,6 +332,44 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
     }
 
     [Fact]
+    public void StartOnServer_ThenRolledBackAsAFailedAccept_ReturnsHeldTroopsInsteadOfLosingThem()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var controllerId = ConnectPlayer(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var eligibleTroop));
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(controllerId, out var player));
+
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, 6);
+            }
+
+            AlternativeSolutionStartRunner.StartOnServer(owner, player);
+            Assert.True(owner.Issue.IsSolvingWithAlternative);
+
+            using (new IssueFinalizeAuthorityGuard())
+            using (new AllowedThread())
+            {
+                Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
+                owner.Issue.CompleteIssueWithCancel();
+            }
+
+            Assert.Null(owner.Issue);
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var returned));
+            Assert.Equal(7, returned.TotalManCount);
+        });
+    }
+
+    [Fact]
     public void RequestQuestTypeAcceptAlternative_GenuineAccept_BroadcastStateIsServerComputedNotClientSupplied()
     {
         var fixture = SetupVillageOwner();
