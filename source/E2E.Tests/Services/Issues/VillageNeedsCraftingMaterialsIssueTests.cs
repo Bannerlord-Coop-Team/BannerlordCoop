@@ -755,6 +755,23 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     public void RequestVillageIssueRemoved_FinalizesTheRealQuestAndBroadcastsRemovalToEveryPeer()
     {
         var fixture = SetupIssueOwner();
+
+        var villageId = TestEnvironment.CreateRegisteredObject<Village>();
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
+                using (new AllowedThread())
+                {
+                    settlement.SetSettlementComponent(village);
+                    village.Bound = settlement;
+                    village.Hearth = 650f;
+                }
+            });
+        }
+
         CreateIssueOnServer(fixture.HeroId);
         ForcePromisedPaymentEverywhere(fixture.HeroId);
 
@@ -766,7 +783,6 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
 
-        VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest quest = null;
         foreach (var instance in AllInstances)
         {
             instance.Call(() =>
@@ -776,23 +792,27 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
                 {
                     Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
                 }
-                var instanceQuest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+                Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
                 if (instance == Server)
                 {
                     Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
-                    quest = instanceQuest;
                 }
             });
         }
 
-        Server.Call(() =>
+        foreach (var instance in AllInstances)
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            using (new AllowedThread())
+            instance.Call(() =>
             {
-                party.ItemRoster.AddToCounts(quest._requestedItem, quest._requestedItemAmount);
-            }
-        });
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                var instanceQuest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+                using (new AllowedThread())
+                {
+                    party.ItemRoster.AddToCounts(instanceQuest._requestedItem, instanceQuest._requestedItemAmount);
+                }
+            });
+        }
 
         foreach (var instance in AllInstances)
         {
@@ -825,6 +845,111 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
                 Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
             });
         }
+    }
+
+    [Fact]
+    public void RealPlayerLocalSuccessClick_RewardIsGrantedAuthoritativelyOnServerNotJustOnTheClickingClient()
+    {
+        var fixture = SetupIssueOwner();
+
+        var villageId = TestEnvironment.CreateRegisteredObject<Village>();
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
+                using (new AllowedThread())
+                {
+                    settlement.SetSettlementComponent(village);
+                    village.Bound = settlement;
+                    village.Hearth = 650f;
+                }
+            });
+        }
+
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId, 500);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                using (new QuestSolutionStartAuthorityGuard())
+                {
+                    Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+                }
+                if (instance == Server)
+                {
+                    Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
+                }
+            });
+        }
+
+        ItemObject requestedItem = null;
+        int requestedItemAmount = 0;
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                var instanceQuest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+                using (new AllowedThread())
+                {
+                    party.ItemRoster.AddToCounts(instanceQuest._requestedItem, instanceQuest._requestedItemAmount);
+                }
+                if (instance == Server)
+                {
+                    requestedItem = instanceQuest._requestedItem;
+                    requestedItemAmount = instanceQuest._requestedItemAmount;
+                }
+            });
+        }
+
+        var goldBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            goldBefore = owner.Gold;
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+
+            quest.Success();
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.Null(owner.Issue);
+                Assert.Equal(0, party.ItemRoster.GetItemNumber(requestedItem));
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.Equal(goldBefore + 500, owner.Gold);
+        });
     }
 
     [Fact]

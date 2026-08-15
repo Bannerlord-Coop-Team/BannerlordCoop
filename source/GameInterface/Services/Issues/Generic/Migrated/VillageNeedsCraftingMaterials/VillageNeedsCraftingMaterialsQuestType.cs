@@ -10,6 +10,7 @@ using HarmonyLib;
 using ProtoBuf;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -128,6 +129,18 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         return party.ItemRoster.GetItemNumber(quest._requestedItem) >= quest._requestedItemAmount;
     }
 
+    private static void ApplyQuestSuccessConsequence(Quest quest)
+    {
+        quest.AddLog(quest.QuestSuccessLogText, false);
+        var itemRosterElement = new ItemRosterElement(quest._requestedItem, quest._requestedItemAmount, null);
+        GiveItemAction.ApplyForParties(PartyBase.MainParty, quest.QuestGiver.CurrentSettlement.Party, itemRosterElement);
+        GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest.RewardGold, false);
+        quest.QuestGiver.AddPower(10f);
+        quest.RelationshipChangeWithQuestGiver = 5;
+        quest.QuestGiver.CurrentSettlement.Village.Hearth += 30f;
+        quest.CompleteQuestWithSuccess();
+    }
+
     static VillageNeedsCraftingMaterialsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("VillageNeedsCraftingMaterials")
@@ -136,6 +149,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithAlternativeAccept()
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestSuccessValidation(ValidateQuestSuccess)
+            .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
