@@ -49,3 +49,15 @@ public readonly struct RequestAwaitingAlternativeSolutionTroopsDeposit : IComman
 public readonly struct RequestAwaitingAlternativeSolutionTroopsDrain : ICommand
 {
 }
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkAwaitingAlternativeSolutionTroopsDepositRejected : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+
+    public NetworkAwaitingAlternativeSolutionTroopsDepositRejected(string ownerId)
+    {
+        OwnerId = ownerId;
+    }
+}
