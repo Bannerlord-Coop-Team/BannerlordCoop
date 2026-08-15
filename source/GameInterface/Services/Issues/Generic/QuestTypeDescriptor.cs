@@ -135,15 +135,15 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             displayName,
             supportsQuestSolutionAccept,
             supportsAlternativeAccept,
-            onGenuineCreation == null ? (Action<IssueBase>)null : issue => { if (issue is TIssue typed) onGenuineCreation(typed); },
+            NarrowAction(onGenuineCreation),
             onGenuineQuestSolutionAccept,
             onGenuineAlternativeAccept,
-            validateQuestSuccess == null ? (Func<IssueBase, MobileParty, bool>)null : (issue, party) => issue is TIssue typed && validateQuestSuccess(typed, party),
-            captureQuestSuccessProof == null ? (Func<IssueBase, byte>)null : issue => issue is TIssue typed ? captureQuestSuccessProof(typed) : (byte)0,
-            validateQuestCancel == null ? (Func<IssueBase, bool>)null : issue => issue is TIssue typed && validateQuestCancel(typed),
-            validateQuestBetrayal == null ? (Func<IssueBase, bool>)null : issue => issue is TIssue typed && validateQuestBetrayal(typed),
-            validateQuestFail == null ? (Func<IssueBase, bool>)null : issue => issue is TIssue typed && validateQuestFail(typed),
-            applyQuestSuccessConsequence == null ? (Action<QuestBase>)null : quest => { if (quest is TQuest typed) applyQuestSuccessConsequence(typed); },
+            NarrowSuccessValidator(validateQuestSuccess),
+            NarrowCapture(captureQuestSuccessProof),
+            NarrowPredicate(validateQuestCancel),
+            NarrowPredicate(validateQuestBetrayal),
+            NarrowPredicate(validateQuestFail),
+            NarrowQuestAction(applyQuestSuccessConsequence),
             tryArbitrateQuestSolutionAcceptBytes,
             mirrorQuestSolutionAcceptBytes,
             rejectQuestSolutionAccept,
@@ -154,6 +154,21 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         _questSolutionAcceptMirrorStrategy = questSolutionAcceptMirrorStrategy;
         _alternativeAcceptMirrorStrategy = alternativeAcceptMirrorStrategy;
     }
+
+    private static Action<IssueBase> NarrowAction(Action<TIssue> action)
+        => action == null ? null : issue => { if (issue is TIssue typed) action(typed); };
+
+    private static Func<IssueBase, bool> NarrowPredicate(Func<TIssue, bool> predicate)
+        => predicate == null ? null : issue => issue is TIssue typed && predicate(typed);
+
+    private static Func<IssueBase, MobileParty, bool> NarrowSuccessValidator(Func<TIssue, MobileParty, bool> validator)
+        => validator == null ? null : (issue, party) => issue is TIssue typed && validator(typed, party);
+
+    private static Func<IssueBase, byte> NarrowCapture(Func<TIssue, byte> capture)
+        => capture == null ? null : issue => issue is TIssue typed ? capture(typed) : (byte)0;
+
+    private static Action<QuestBase> NarrowQuestAction(Action<TQuest> action)
+        => action == null ? null : quest => { if (quest is TQuest typed) action(typed); };
 
     public IRaceArbitratedAcceptMirrorStrategy<TFields> GetQuestSolutionAcceptMirror<TFields>()
         => _questSolutionAcceptMirrorStrategy as IRaceArbitratedAcceptMirrorStrategy<TFields>;
