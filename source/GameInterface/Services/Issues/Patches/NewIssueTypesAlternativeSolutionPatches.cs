@@ -76,7 +76,7 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
 }
 
 [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.RegisterEvents))]
-internal class ServerSideAwaitingTroopsReturnTickPatch
+internal class AwaitingTroopsReturnTickPatch
 {
     private static readonly ConditionalWeakTable<IssuesCampaignBehavior, object> listenerRegistered = new();
 
@@ -91,8 +91,6 @@ internal class ServerSideAwaitingTroopsReturnTickPatch
 
     private static void OnHourlyTick()
     {
-        if (!ModInformation.IsServer) return;
-
         IssueManagerAlternativeSolutionTroopsPatches.TryCheckIfTroopsCanReturnToMainParty();
     }
 }
