@@ -206,6 +206,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
     private void Handle_NetworkQuestTypeQuestAccepted(MessagePayload<NetworkQuestTypeQuestAccepted> payload)
     {
+        if (ModInformation.IsServer) return;
+
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
@@ -398,6 +400,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
     private void Handle_NetworkQuestTypeAlternativeAccepted(MessagePayload<NetworkQuestTypeAlternativeAccepted> payload)
     {
+        if (ModInformation.IsServer) return;
+
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
@@ -466,6 +470,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
     private void Handle_NetworkQuestTypeAcceptRejected(MessagePayload<NetworkQuestTypeAcceptRejected> payload)
     {
+        if (ModInformation.IsServer) return;
+
         var ownerId = payload.What.OwnerId;
         var isAlternative = payload.What.IsAlternative;
         GameThread.RunSafe(() =>

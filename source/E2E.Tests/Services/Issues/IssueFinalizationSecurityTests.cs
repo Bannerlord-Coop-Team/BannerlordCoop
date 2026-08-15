@@ -364,4 +364,26 @@ public class IssueFinalizationSecurityTests : IDisposable
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
     }
+
+    [Fact]
+    public void ForgedNetworkIssueRemoved_SentDirectlyToServer_IgnoredInsteadOfFinalizingTheRealIssue()
+    {
+        var fixture = SetupVillageOwner();
+        var owned = SetupOwnedIssue(fixture);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new NetworkIssueRemoved(ownerId, IssueFinalizeReason.IssueOnly));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+        });
+    }
 }

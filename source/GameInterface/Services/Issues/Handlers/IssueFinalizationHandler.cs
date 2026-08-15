@@ -270,6 +270,8 @@ internal class IssueFinalizationHandler : IHandler
 
     private void Handle_NetworkIssueRemoved(MessagePayload<NetworkIssueRemoved> payload)
     {
+        if (ModInformation.IsServer) return;
+
         var ownerId = payload.What.OwnerId;
         var reason = payload.What.Reason;
         GameThread.RunSafe(() =>
