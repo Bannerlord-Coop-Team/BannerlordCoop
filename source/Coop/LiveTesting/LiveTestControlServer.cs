@@ -41,8 +41,6 @@ namespace Coop.LiveTesting
         private readonly object screenshotGate = new object();
         private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
             new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
-        private readonly HashSet<string> screenshotPaths =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
@@ -267,15 +265,23 @@ namespace Coop.LiveTesting
                         false);
                 }
 
+                Directory.CreateDirectory(directory);
+                if (File.Exists(screenshotPath))
+                {
+                    File.Delete(screenshotPath);
+                }
+
                 lock (screenshotGate)
                 {
-                    if (!screenshotPaths.Add(screenshotPath))
+                    foreach (string previousCaptureId in screenshotCaptures
+                        .Where(pair => string.Equals(
+                            pair.Value.Path,
+                            screenshotPath,
+                            StringComparison.OrdinalIgnoreCase))
+                        .Select(pair => pair.Key)
+                        .ToArray())
                     {
-                        return Failure(
-                            request.Id,
-                            "screenshot_path_reused",
-                            $"Screenshot path '{screenshotPath}' has already been used by this process.",
-                            false);
+                        screenshotCaptures.Remove(previousCaptureId);
                     }
 
                     screenshotCaptures.Add(
@@ -285,12 +291,6 @@ namespace Coop.LiveTesting
 
                 try
                 {
-                    Directory.CreateDirectory(directory);
-                    if (File.Exists(screenshotPath))
-                    {
-                        File.Delete(screenshotPath);
-                    }
-
                     Utilities.TakeScreenshot(screenshotPath);
                 }
                 catch
@@ -298,7 +298,6 @@ namespace Coop.LiveTesting
                     lock (screenshotGate)
                     {
                         screenshotCaptures.Remove(captureId);
-                        screenshotPaths.Remove(screenshotPath);
                     }
                     throw;
                 }
@@ -373,11 +372,10 @@ namespace Coop.LiveTesting
                 path = capture.Path,
                 exists = observation.Exists,
                 isBmp = observation.IsBmp,
-                declaredLength = observation.DeclaredLength,
-                lengthMatchesHeader = observation.LengthMatchesHeader,
                 stable,
                 complete,
                 length = observation.Length,
+                declaredLength = observation.DeclaredLength,
                 lastWriteUtc = observation.LastWriteUtc,
             });
         }
@@ -698,6 +696,7 @@ namespace Coop.LiveTesting
                 {
                     File.Delete(endpointRegistrationPath);
                 }
+
                 if (Directory.Exists(endpointDirectory) &&
                     Directory.GetFileSystemEntries(endpointDirectory).Length == 0)
                 {
@@ -758,24 +757,26 @@ namespace Coop.LiveTesting
                     path,
                     FileMode.Open,
                     FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete))
+                    FileShare.Read))
                 {
                     long length = stream.Length;
-                    bool isBmp = length >= 6 &&
-                        stream.ReadByte() == 'B' &&
-                        stream.ReadByte() == 'M';
-                    long? declaredLength = null;
-                    if (isBmp)
+                    var header = new byte[6];
+                    int headerLength = 0;
+                    while (headerLength < header.Length)
                     {
-                        int byte0 = stream.ReadByte();
-                        int byte1 = stream.ReadByte();
-                        int byte2 = stream.ReadByte();
-                        int byte3 = stream.ReadByte();
-                        declaredLength = (long)((uint)byte0 |
-                            ((uint)byte1 << 8) |
-                            ((uint)byte2 << 16) |
-                            ((uint)byte3 << 24));
+                        int bytesRead = stream.Read(
+                            header,
+                            headerLength,
+                            header.Length - headerLength);
+                        if (bytesRead == 0) break;
+                        headerLength += bytesRead;
                     }
+                    bool isBmp = headerLength == header.Length &&
+                        header[0] == 'B' &&
+                        header[1] == 'M';
+                    uint declaredLength = isBmp
+                        ? BitConverter.ToUInt32(header, 2)
+                        : 0;
                     return new ScreenshotFileObservation(
                         true,
                         isBmp,
@@ -786,11 +787,11 @@ namespace Coop.LiveTesting
             }
             catch (IOException)
             {
-                return new ScreenshotFileObservation(true, false, 0, null, null);
+                return new ScreenshotFileObservation(true, false, 0, 0, null);
             }
             catch (UnauthorizedAccessException)
             {
-                return new ScreenshotFileObservation(true, false, 0, null, null);
+                return new ScreenshotFileObservation(true, false, 0, 0, null);
             }
         }
 
@@ -881,20 +882,19 @@ namespace Coop.LiveTesting
         private readonly struct ScreenshotFileObservation
         {
             public static readonly ScreenshotFileObservation Missing =
-                new ScreenshotFileObservation(false, false, 0, null, null);
+                new ScreenshotFileObservation(false, false, 0, 0, null);
 
             public bool Exists { get; }
             public bool IsBmp { get; }
             public long Length { get; }
-            public long? DeclaredLength { get; }
-            public bool LengthMatchesHeader => DeclaredLength == Length;
+            public uint DeclaredLength { get; }
             public DateTime? LastWriteUtc { get; }
 
             public ScreenshotFileObservation(
                 bool exists,
                 bool isBmp,
                 long length,
-                long? declaredLength,
+                uint declaredLength,
                 DateTime? lastWriteUtc)
             {
                 Exists = exists;
