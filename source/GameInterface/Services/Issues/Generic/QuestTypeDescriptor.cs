@@ -1,11 +1,20 @@
 using System;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
-using GameInterface.Services.Issues.Generic.CreationCapture;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Generic;
+
+public static class QuestSuccessProofContext
+{
+    [ThreadStatic]
+    private static byte _current;
+
+    public static byte Current => _current;
+
+    public static void Set(byte value) => _current = value;
+}
 
 public abstract class QuestTypeDescriptor
 {
@@ -24,6 +33,14 @@ public abstract class QuestTypeDescriptor
     public Action<Hero, string> OnGenuineAlternativeAccept { get; }
 
     public Func<IssueBase, MobileParty, bool> ValidateQuestSuccess { get; }
+
+    public Func<IssueBase, byte> CaptureQuestSuccessProof { get; }
+
+    public Func<IssueBase, bool> ValidateQuestCancel { get; }
+
+    public Func<IssueBase, bool> ValidateQuestBetrayal { get; }
+
+    public Action<QuestBase> ApplyQuestSuccessConsequence { get; }
 
     public Func<Hero, Func<Hero, bool>, (bool Accepted, byte[] FieldsBytes)> TryArbitrateQuestSolutionAcceptBytes { get; }
 
@@ -47,6 +64,10 @@ public abstract class QuestTypeDescriptor
         Action<Hero, string> onGenuineQuestSolutionAccept,
         Action<Hero, string> onGenuineAlternativeAccept,
         Func<IssueBase, MobileParty, bool> validateQuestSuccess,
+        Func<IssueBase, byte> captureQuestSuccessProof,
+        Func<IssueBase, bool> validateQuestCancel,
+        Func<IssueBase, bool> validateQuestBetrayal,
+        Action<QuestBase> applyQuestSuccessConsequence,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -63,6 +84,10 @@ public abstract class QuestTypeDescriptor
         OnGenuineQuestSolutionAccept = onGenuineQuestSolutionAccept;
         OnGenuineAlternativeAccept = onGenuineAlternativeAccept;
         ValidateQuestSuccess = validateQuestSuccess;
+        CaptureQuestSuccessProof = captureQuestSuccessProof;
+        ValidateQuestCancel = validateQuestCancel;
+        ValidateQuestBetrayal = validateQuestBetrayal;
+        ApplyQuestSuccessConsequence = applyQuestSuccessConsequence;
         TryArbitrateQuestSolutionAcceptBytes = tryArbitrateQuestSolutionAcceptBytes;
         MirrorQuestSolutionAcceptBytes = mirrorQuestSolutionAcceptBytes;
         RejectQuestSolutionAccept = rejectQuestSolutionAccept;
@@ -76,13 +101,11 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
     where TIssue : IssueBase
     where TQuest : QuestBase
 {
-    private readonly object _creationCaptureStrategy;
     private readonly object _questSolutionAcceptMirrorStrategy;
     private readonly object _alternativeAcceptMirrorStrategy;
 
     internal QuestTypeDescriptor(
         string displayName,
-        object creationCaptureStrategy,
         object questSolutionAcceptMirrorStrategy,
         object alternativeAcceptMirrorStrategy,
         bool supportsQuestSolutionAccept,
@@ -91,6 +114,10 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         Action<Hero, string> onGenuineQuestSolutionAccept,
         Action<Hero, string> onGenuineAlternativeAccept,
         Func<TIssue, MobileParty, bool> validateQuestSuccess,
+        Func<TIssue, byte> captureQuestSuccessProof,
+        Func<TIssue, bool> validateQuestCancel,
+        Func<TIssue, bool> validateQuestBetrayal,
+        Action<TQuest> applyQuestSuccessConsequence,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -107,6 +134,10 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             onGenuineQuestSolutionAccept,
             onGenuineAlternativeAccept,
             validateQuestSuccess == null ? (Func<IssueBase, MobileParty, bool>)null : (issue, party) => issue is TIssue typed && validateQuestSuccess(typed, party),
+            captureQuestSuccessProof == null ? (Func<IssueBase, byte>)null : issue => issue is TIssue typed ? captureQuestSuccessProof(typed) : (byte)0,
+            validateQuestCancel == null ? (Func<IssueBase, bool>)null : issue => issue is TIssue typed && validateQuestCancel(typed),
+            validateQuestBetrayal == null ? (Func<IssueBase, bool>)null : issue => issue is TIssue typed && validateQuestBetrayal(typed),
+            applyQuestSuccessConsequence == null ? (Action<QuestBase>)null : quest => { if (quest is TQuest typed) applyQuestSuccessConsequence(typed); },
             tryArbitrateQuestSolutionAcceptBytes,
             mirrorQuestSolutionAcceptBytes,
             rejectQuestSolutionAccept,
@@ -114,13 +145,9 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             mirrorAlternativeAcceptBytes,
             rejectAlternativeAccept)
     {
-        _creationCaptureStrategy = creationCaptureStrategy;
         _questSolutionAcceptMirrorStrategy = questSolutionAcceptMirrorStrategy;
         _alternativeAcceptMirrorStrategy = alternativeAcceptMirrorStrategy;
     }
-
-    public ICreationCaptureStrategy<TIssue, TFields> GetCreationCapture<TFields>()
-        => _creationCaptureStrategy as ICreationCaptureStrategy<TIssue, TFields>;
 
     public IRaceArbitratedAcceptMirrorStrategy<TFields> GetQuestSolutionAcceptMirror<TFields>()
         => _questSolutionAcceptMirrorStrategy as IRaceArbitratedAcceptMirrorStrategy<TFields>;
@@ -141,7 +168,6 @@ public static class QuestDescriptorBuilder
         where TQuest : QuestBase
     {
         private readonly string _displayName;
-        private object _creationCapture;
         private object _questSolutionAccept;
         private object _alternativeAccept;
         private bool _supportsQuestSolutionAccept;
@@ -150,6 +176,10 @@ public static class QuestDescriptorBuilder
         private Action<Hero, string> _onGenuineQuestSolutionAccept;
         private Action<Hero, string> _onGenuineAlternativeAccept;
         private Func<TIssue, MobileParty, bool> _validateQuestSuccess;
+        private Func<TIssue, byte> _captureQuestSuccessProof;
+        private Func<TIssue, bool> _validateQuestCancel;
+        private Func<TIssue, bool> _validateQuestBetrayal;
+        private Action<TQuest> _applyQuestSuccessConsequence;
         private Func<Hero, Func<Hero, bool>, (bool, byte[])> _tryArbitrateQuestSolutionAcceptBytes;
         private Action<Hero, byte[]> _mirrorQuestSolutionAcceptBytes;
         private Action<Hero> _rejectQuestSolutionAccept;
@@ -160,12 +190,6 @@ public static class QuestDescriptorBuilder
         internal Builder(string displayName)
         {
             _displayName = displayName;
-        }
-
-        public Builder<TIssue, TQuest> WithCreationCapture<TFields>(ICreationCaptureStrategy<TIssue, TFields> strategy)
-        {
-            _creationCapture = strategy;
-            return this;
         }
 
         public Builder<TIssue, TQuest> WithQuestSolutionAccept()
@@ -240,10 +264,37 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
+        public Builder<TIssue, TQuest> WithQuestSuccessProofCapture(Func<TIssue, byte> captureQuestSuccessProof)
+        {
+            _captureQuestSuccessProof = captureQuestSuccessProof;
+            return this;
+        }
+
+        public Builder<TIssue, TQuest> WithQuestCancelValidation(Func<TIssue, bool> validateQuestCancel)
+        {
+            _validateQuestCancel = validateQuestCancel;
+            return this;
+        }
+
+        public Builder<TIssue, TQuest> WithQuestBetrayalValidation(Func<TIssue, bool> validateQuestBetrayal)
+        {
+            _validateQuestBetrayal = validateQuestBetrayal;
+            return this;
+        }
+
+        public Builder<TIssue, TQuest> WithQuestSuccessConsequence(Action<TQuest> applyQuestSuccessConsequence)
+        {
+            _applyQuestSuccessConsequence = applyQuestSuccessConsequence;
+            return this;
+        }
+
         public QuestTypeDescriptor<TIssue, TQuest> Build()
-            => new(_displayName, _creationCapture, _questSolutionAccept, _alternativeAccept,
+            => new(_displayName, _questSolutionAccept, _alternativeAccept,
                 _supportsQuestSolutionAccept, _supportsAlternativeAccept,
                 _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept, _validateQuestSuccess,
+                _captureQuestSuccessProof,
+                _validateQuestCancel, _validateQuestBetrayal,
+                _applyQuestSuccessConsequence,
                 _tryArbitrateQuestSolutionAcceptBytes, _mirrorQuestSolutionAcceptBytes, _rejectQuestSolutionAccept,
                 _tryArbitrateAlternativeAcceptBytes, _mirrorAlternativeAcceptBytes, _rejectAlternativeAccept);
     }

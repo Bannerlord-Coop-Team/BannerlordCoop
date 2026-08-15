@@ -26,23 +26,38 @@ internal class GenericQuestTypeCreationTriggerPatch
     }
 }
 
-[HarmonyPatch(typeof(IssueManager))]
+[HarmonyPatch(typeof(IssueBase))]
 internal class GenericQuestTypeQuestSolutionAcceptTriggerPatch
 {
     [HarmonyPriority(Priority.First)]
-    [HarmonyPatch(nameof(IssueManager.StartIssueQuest))]
+    [HarmonyPatch(nameof(IssueBase.StartIssueWithQuest))]
     [HarmonyPostfix]
-    private static void Postfix(Hero issueOwner, bool __result)
+    private static void Postfix(IssueBase __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed() || IssueDispatchReplayGuard.IsActive) return;
-        if (!__result) return;
+        if (QuestSolutionStartAuthorityGuard.IsActive) return;
 
-        var descriptor = QuestTypeRegistry.Get(issueOwner?.Issue);
+        var issueOwner = __instance.IssueOwner;
+        var descriptor = QuestTypeRegistry.Get(__instance);
         if (descriptor?.SupportsQuestSolutionAccept != true) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
         descriptor.OnGenuineQuestSolutionAccept?.Invoke(issueOwner, controllerIdProvider?.ControllerId);
         MessageBroker.Instance.Publish(issueOwner, new QuestTypeQuestSolutionAcceptTriggered(issueOwner, controllerIdProvider?.ControllerId));
+    }
+}
+
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithQuest))]
+internal class GenericQuestTypeQuestSolutionStartOwnershipGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance, ref bool __result)
+    {
+        if (QuestTypeRegistry.Get(__instance)?.SupportsQuestSolutionAccept != true) return true;
+        if (QuestSolutionStartAuthorityGuard.IsActive) return true;
+
+        __result = true;
+        return false;
     }
 }
 

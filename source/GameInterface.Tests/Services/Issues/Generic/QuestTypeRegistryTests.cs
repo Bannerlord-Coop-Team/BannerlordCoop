@@ -1,7 +1,6 @@
 using Common.Util;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
-using GameInterface.Services.Issues.Generic.CreationCapture;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -98,27 +97,15 @@ public class QuestTypeRegistryTests : IDisposable
     [Fact]
     public void Builder_CarriesTheStronglyTypedStrategiesThroughToTheDescriptor()
     {
-        var creationCapture = new FieldForceCreationCapture<FakeIssueA, int>(
-            typeof(DummyFieldHolder).GetField(nameof(DummyFieldHolder.Value)),
-            _ => null);
-
         var descriptor = QuestDescriptorBuilder.For<FakeIssueA, FakeQuestA>("FakeA")
-            .WithCreationCapture(creationCapture)
             .Build();
 
         Assert.Equal(typeof(FakeIssueA), descriptor.IssueType);
         Assert.Equal(typeof(FakeQuestA), descriptor.QuestType);
         Assert.Equal("FakeA", descriptor.DisplayName);
-        Assert.Same(creationCapture, descriptor.GetCreationCapture<int>());
 
-        Assert.Null(descriptor.GetCreationCapture<string>());
         Assert.Null(descriptor.GetQuestSolutionAcceptMirror<int>());
         Assert.Null(descriptor.GetAlternativeAcceptMirror<string>());
-    }
-
-    private class DummyFieldHolder
-    {
-        public int Value;
     }
 
     [Fact]
@@ -151,6 +138,22 @@ public class QuestTypeRegistryTests : IDisposable
         Assert.Null(withoutTriggers.OnGenuineQuestSolutionAccept);
         Assert.Null(withoutTriggers.OnGenuineAlternativeAccept);
         Assert.Null(withoutTriggers.OnGenuineCreation);
+    }
+
+    [Fact]
+    public void Descriptor_CarriesTheCancelAndBetrayalValidators_NullWhenNeverWired()
+    {
+        var withValidators = QuestDescriptorBuilder.For<FakeIssueA, FakeQuestA>("FakeA")
+            .WithQuestCancelValidation(issue => true)
+            .WithQuestBetrayalValidation(issue => true)
+            .Build();
+
+        Assert.NotNull(withValidators.ValidateQuestCancel);
+        Assert.NotNull(withValidators.ValidateQuestBetrayal);
+
+        var withoutValidators = QuestDescriptorBuilder.For<FakeIssueB, FakeQuestB>("FakeB").Build();
+        Assert.Null(withoutValidators.ValidateQuestCancel);
+        Assert.Null(withoutValidators.ValidateQuestBetrayal);
     }
 
     private sealed class FakeQuestSolutionStrategy : IRaceArbitratedAcceptMirrorStrategy<int>

@@ -1,6 +1,7 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using System;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
@@ -50,7 +51,14 @@ internal class AlternativeSolutionCompletionHandler : IHandler
         {
             if (!TryResolveAuthorizedOwner(requester, ownerId, out var owner, out var issue)) return;
 
-            AlternativeSolutionCompletionRunner.CompleteOnServer(owner, issue);
+            try
+            {
+                AlternativeSolutionCompletionRunner.CompleteOnServer(owner, issue);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to complete {Message} for owner {Owner}", nameof(RequestAlternativeSolutionCompletion), ownerId);
+            }
         });
     }
 
