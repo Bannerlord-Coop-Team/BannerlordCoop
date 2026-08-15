@@ -692,5 +692,4 @@ internal class CompanionRolesHandler : IHandler
             EndCaptivityAction.ApplyByReleasedAfterBattle(oneToOneConversationHero);
         }, context: nameof(RescueCompanion));
     }
-
 }
