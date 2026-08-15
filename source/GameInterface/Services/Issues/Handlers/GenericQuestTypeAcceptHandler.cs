@@ -127,6 +127,51 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
     }
 
+    private bool TryValidateAcceptRequest(
+        NetPeer requester, string ownerId, Hero owner, int requestedGeneration, bool isAlternative, string messageName,
+        out Player player, out QuestTypeDescriptor descriptor)
+    {
+        player = null;
+        if (requester == null || !playerManager.TryGetPlayer(requester, out player))
+        {
+            Logger.Error("Rejecting {Message} from an unregistered/unknown requester for owner {Owner}",
+                messageName, ownerId);
+            if (requester != null) network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative));
+            descriptor = null;
+            return false;
+        }
+
+        if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+        {
+            Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
+                messageName, ownerId);
+            network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative));
+            descriptor = null;
+            return false;
+        }
+
+        if (!conversationTracker.TryGetTrackedRequester(ownerId, player.ControllerId, out var trackedGeneration) ||
+            trackedGeneration != requestedGeneration)
+        {
+            Logger.Error("Rejecting {Message} for a requester with no tracked conversation with owner {Owner}",
+                messageName, ownerId);
+            network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative));
+            descriptor = null;
+            return false;
+        }
+
+        descriptor = QuestTypeRegistry.Get(owner.Issue);
+        var supports = isAlternative ? descriptor?.SupportsAlternativeAccept == true : descriptor?.SupportsQuestSolutionAccept == true;
+        var canAccept = supports && owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
+        if (!canAccept)
+        {
+            network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative));
+            return false;
+        }
+
+        return true;
+    }
+
     private void Handle_RequestQuestTypeAcceptQuest(MessagePayload<RequestQuestTypeAcceptQuest> payload)
     {
         if (ModInformation.IsClient) return;
@@ -138,37 +183,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
 
-            if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
+            if (!TryValidateAcceptRequest(requester, ownerId, owner, requestedGeneration, isAlternative: false,
+                nameof(RequestQuestTypeAcceptQuest), out var player, out var descriptor))
             {
-                Logger.Error("Rejecting {Message} from an unregistered/unknown requester for owner {Owner}",
-                    nameof(RequestQuestTypeAcceptQuest), ownerId);
-                if (requester != null) network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
-                return;
-            }
-
-            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
-            {
-                Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
-                    nameof(RequestQuestTypeAcceptQuest), ownerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
-                return;
-            }
-
-            if (!conversationTracker.TryGetTrackedRequester(ownerId, player.ControllerId, out var trackedGeneration) ||
-                trackedGeneration != requestedGeneration)
-            {
-                Logger.Error("Rejecting {Message} for a requester with no tracked conversation with owner {Owner}",
-                    nameof(RequestQuestTypeAcceptQuest), ownerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
-                return;
-            }
-
-            var descriptor = QuestTypeRegistry.Get(owner.Issue);
-            var canAccept = descriptor?.SupportsQuestSolutionAccept == true &&
-                owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
-            if (!canAccept)
-            {
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
                 return;
             }
 
@@ -179,7 +196,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 {
                     if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null)
                     {
-                        var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => canAccept);
+                        var (accepted, bytes) = descriptor.TryArbitrateQuestSolutionAcceptBytes(owner, _ => true);
                         fieldsBytes = bytes;
                         return accepted;
                     }
