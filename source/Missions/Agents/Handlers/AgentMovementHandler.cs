@@ -1740,7 +1740,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         if (BattleSpawnGate.IsCoopBattleActive) return;
 
         // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
-        // controller's PLAYER agent — its host-owned NPC puppets must survive for adopt-in-place migration,
+        // controller's player and companion agents; its host-owned NPC puppets survive for migration,
         // so this all-agents sweep would fade the whole crowd out with its host.
         if (LocationNpcGate.IsCoopLocationMissionActive) return;
 

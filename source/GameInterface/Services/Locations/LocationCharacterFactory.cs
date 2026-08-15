@@ -24,9 +24,6 @@ internal static class LocationCharacterFactory
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LocationCharacter>();
 
-    private static readonly string CompanionBehaviorsName =
-        $"{typeof(BehaviorSets).FullName}.{nameof(BehaviorSets.AddCompanionBehaviors)}";
-
     /// <summary>
     /// Extracts the synced fields of a roster entry into the internal added event.
     /// </summary>
@@ -90,24 +87,6 @@ internal static class LocationCharacterFactory
         }
 
         return locationCharacter;
-    }
-
-    /// <summary>
-    /// Builds the roster entry for a companion of a visiting player party. Vanilla never places
-    /// another party's companions, so the server creates these for every visitor itself.
-    /// </summary>
-    public static LocationCharacter CreateCompanion(Hero companion, MobileParty party, bool useCivilianEquipment)
-    {
-        return Create(
-            companion.CharacterObject,
-            party,
-            specialItem: null,
-            spawnTag: "sp_notable",
-            actionSetCode: null,
-            behaviorsMethodName: CompanionBehaviorsName,
-            characterRelation: (int)LocationCharacter.CharacterRelations.Neutral,
-            fixedLocation: true,
-            useCivilianEquipment: useCivilianEquipment);
     }
 
     /// <summary>
