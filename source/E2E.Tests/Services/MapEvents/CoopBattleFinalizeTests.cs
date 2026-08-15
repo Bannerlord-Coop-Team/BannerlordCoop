@@ -439,6 +439,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
             var encounter = SetMockPlayerEncounter(client, mapEventId: setup.MapEventId);
             encounter.BattleSimulation = ObjectHelper.SkipConstructor<BattleSimulation>();
+            encounter.BattleSimulation.IsSimulationFinished = true;
             encounter.PlayerSide = BattleSideEnum.Attacker;
             encounter.EncounterState = PlayerEncounterState.End;
 
@@ -476,8 +477,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.Null(PlayerEncounter.Battle);
             Assert.Null(PlayerEncounter.Current.BattleSimulation.MapEvent);
             mapState.EndBattleSimulation();
-            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
 
+            Assert.False(mapState.IsSimulationActive);
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
             Assert.NotNull(PlayerEncounter.Current);
             Assert.Equal(expectedEncounterState, PlayerEncounter.Current.EncounterState);

@@ -40,6 +40,7 @@ public interface IMapEventInitializationBarrier : IGameAbstraction
     void TrackParty(MapEvent mapEvent, MapEventParty party);
     void DeferVisual(GauntletMapEventVisual visual, CampaignVec2 position);
     void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null);
+    void CompleteDeferredEncounterCleanup();
 }
 
 internal sealed class MapEventInitializationBarrier : IMapEventInitializationBarrier, IDisposable
@@ -402,6 +403,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     }
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        CompleteDeferredEncounterCleanup();
+    }
+
+    public void CompleteDeferredEncounterCleanup()
     {
         if (ModInformation.IsServer || MissionState.Current != null || Mission.Current != null) return;
 

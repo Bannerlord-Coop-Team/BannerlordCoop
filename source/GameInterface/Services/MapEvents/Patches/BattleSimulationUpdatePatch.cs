@@ -1,6 +1,8 @@
 using Common;
+using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -22,5 +24,19 @@ public class BattleSimulationUpdatePatch
 
         BattleSimulationReplay.Tick(__instance, dt);
         return false;
+    }
+}
+
+[HarmonyPatch(typeof(MapState), nameof(MapState.EndBattleSimulation))]
+internal class BattleSimulationEndPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix()
+    {
+        if (ModInformation.IsServer) return;
+
+        // Scoreboard Done calls this directly, so finish retained teardown before the encounter menu resumes.
+        if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier))
+            barrier.CompleteDeferredEncounterCleanup();
     }
 }
