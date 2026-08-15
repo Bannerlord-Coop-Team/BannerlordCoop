@@ -1,14 +1,13 @@
-﻿using GameInterface;
-using GameInterface.Services.Kingdoms;
+﻿using Common;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Policies;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -84,6 +83,61 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             voteManager.UnregisterDecisionItem(__instance);
         }
+
+        [HarmonyPatch("RefreshWinPercentages")]
+        [HarmonyPrefix]
+        private static bool RefreshWinPercentagesPrefix(DecisionItemBaseVM __instance)
+        {
+            if (__instance?.DecisionOptionsList == null || __instance.KingdomDecisionMaker == null) return true;
+            if (__instance.DecisionOptionsList.Any(option => option.Sponsor != null)) return true;
+
+            __instance.KingdomDecisionMaker.DetermineOfficialSupport();
+
+            List<DecisionOptionVM> decisionOptions = __instance.DecisionOptionsList
+                .Where(option => !option.IsOptionForAbstain && option.Option != null)
+                .ToList();
+            if (decisionOptions.Count == 0) return false;
+
+            foreach (DecisionOptionVM decisionOption in decisionOptions)
+            {
+                decisionOption.WinPercentage = (int)TaleWorlds.Library.MathF.Round(
+                    decisionOption.Option.WinChance * 100f,
+                    2);
+            }
+
+            int assignedPercentage = decisionOptions.Sum(option => option.WinPercentage);
+            int remainingPercentage = 100 - assignedPercentage;
+            if (remainingPercentage == 0) return false;
+
+            if (assignedPercentage == 0)
+            {
+                int evenPercentage = 100 / decisionOptions.Count;
+                foreach (DecisionOptionVM decisionOption in decisionOptions)
+                {
+                    decisionOption.WinPercentage = evenPercentage;
+                }
+
+                remainingPercentage = 100 - (evenPercentage * decisionOptions.Count);
+                decisionOptions[0].WinPercentage += remainingPercentage;
+                return false;
+            }
+
+            int distributedPercentage = 0;
+            foreach (DecisionOptionVM decisionOption in decisionOptions.Where(option => option.WinPercentage > 0))
+            {
+                int adjustment = TaleWorlds.Library.MathF.Floor(
+                    (float)remainingPercentage * decisionOption.WinPercentage / assignedPercentage);
+                decisionOption.WinPercentage += adjustment;
+                distributedPercentage += adjustment;
+            }
+
+            DecisionOptionVM strongestOption = decisionOptions
+                .OrderByDescending(option => option.WinPercentage)
+                .First();
+            strongestOption.WinPercentage += remainingPercentage - distributedPercentage;
+            return false;
+        }
+
         [HarmonyPatch("InitValues")]
         [HarmonyPostfix]
         private static void InitValuesPostfix(DecisionItemBaseVM __instance)
@@ -270,6 +324,56 @@ namespace GameInterface.Services.Kingdoms.Patches
             {
                 action.Hint.HintText = AlreadyVotedHint;
             }
+        }
+    }
+    internal interface IClientClanStrengthRefresher
+    {
+        void Refresh(IFaction faction);
+    }
+
+    internal class ClientClanStrengthRefresher : IClientClanStrengthRefresher
+    {
+        public void Refresh(IFaction faction)
+        {
+            if (ModInformation.IsServer) return;
+
+            if (faction is Kingdom kingdom)
+            {
+                foreach (var clan in kingdom.Clans)
+                {
+                    clan.UpdateCurrentStrength();
+                }
+            }
+            else if (faction is Clan clan)
+            {
+                clan.UpdateCurrentStrength();
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(KingdomWarItemVM), nameof(KingdomWarItemVM.UpdateDiplomacyProperties))]
+    internal class KingdomWarItemVMPatches
+    {
+        [HarmonyPrefix]
+        private static void Prefix(KingdomWarItemVM __instance)
+        {
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(__instance.Faction1);
+            refresher.Refresh(__instance.Faction2);
+        }
+    }
+
+    [HarmonyPatch(typeof(KingdomTruceItemVM), nameof(KingdomTruceItemVM.UpdateDiplomacyProperties))]
+    internal class KingdomTruceItemVMPatches
+    {
+        [HarmonyPrefix]
+        private static void Prefix(KingdomTruceItemVM __instance)
+        {
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(__instance.Faction1);
+            refresher.Refresh(__instance.Faction2);
         }
     }
 }

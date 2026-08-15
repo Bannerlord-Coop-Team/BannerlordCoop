@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.ItemRosters.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TownMarketDatas.Patches;
 using HarmonyLib;
 using Serilog;
@@ -17,6 +18,10 @@ namespace GameInterface.Services.ItemRosters.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<ItemRosterPatch>();
 
+        internal static bool IsRegistered(ItemRoster itemRoster)
+            => ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+               objectManager.TryGetId(itemRoster, out _);
+
         [HarmonyPatch(nameof(ItemRoster.AddToCounts), new[] { typeof(EquipmentElement), typeof(int) })]
         [HarmonyPrefix]
         public static bool AddToCountsPrefix(ItemRoster __instance, ref int __result, EquipmentElement rosterElement, int number)
@@ -26,7 +31,8 @@ namespace GameInterface.Services.ItemRosters.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client changed managed {var}", nameof(ItemRoster.AddToCounts));
+                if (IsRegistered(__instance))
+                    Logger.Error("Client changed managed {var}", nameof(ItemRoster.AddToCounts));
                 return true;
             }
 
@@ -44,6 +50,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             if (__result == -1) return;
 
             if (ModInformation.IsClient) return;
+            if (!IsRegistered(__instance)) return;
 
             var message = new ItemRosterUpdated(
                 __instance,
@@ -63,8 +70,10 @@ namespace GameInterface.Services.ItemRosters.Patches
 
             if (ModInformation.IsClient)
             {
-                return false; // Disallow on clients
-            } 
+                return !IsRegistered(__instance);
+            }
+
+            if (!IsRegistered(__instance)) return true;
 
             MessageBroker.Instance.Publish(__instance, new ItemRosterCleared(__instance));
 

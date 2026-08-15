@@ -4,6 +4,19 @@ using ProtoBuf;
 
 namespace GameInterface.Services.Companions.Messages;
 
+internal enum CompanionRescueRequestKind
+{
+    JoinParty = 1,
+    LeadParty = 2,
+}
+
+internal enum CompanionRescueCompletionStatus
+{
+    Accepted = 1,
+    AlreadyCompleted = 2,
+    Rejected = 3,
+}
+
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct DoClanNameSelection : ICommand
 {
@@ -152,14 +165,47 @@ public readonly struct DoPartyScreenClosedFromRescuing : IEvent
     [ProtoMember(3)]
     public readonly string RightOwnerPartyId;
 
+    [ProtoMember(4)]
+    public readonly string CompanionHeroId;
+
     public DoPartyScreenClosedFromRescuing(
         TroopRosterData leftMemberRosterData,
         TroopRosterData leftPrisonRosterData,
-        string rightOwnerPartyId)
+        string rightOwnerPartyId,
+        string companionHeroId)
     {
         LeftMemberRosterData = leftMemberRosterData;
         LeftPrisonRosterData = leftPrisonRosterData;
         RightOwnerPartyId = rightOwnerPartyId;
+        CompanionHeroId = companionHeroId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct CompanionRescueCompleted : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string CompanionHeroId;
+
+    [ProtoMember(2)]
+    public readonly CompanionRescueRequestKind Kind;
+
+    [ProtoMember(3)]
+    public readonly CompanionRescueCompletionStatus Status;
+
+    [ProtoMember(4)]
+    public readonly string Error;
+
+    public CompanionRescueCompleted(
+        string companionHeroId,
+        CompanionRescueRequestKind kind,
+        CompanionRescueCompletionStatus status,
+        string error)
+    {
+        CompanionHeroId = companionHeroId;
+        Kind = kind;
+        Status = status;
+        Error = error;
     }
 }
 
