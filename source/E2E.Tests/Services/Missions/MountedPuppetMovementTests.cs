@@ -2078,7 +2078,6 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         });
     }
 
-
     [Fact]
     public void MovementPolling_RestoresAiOnlyWhenTheLocalHorseIsLocallyDriven()
     {

@@ -281,7 +281,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         public Agent Mount;
     }
 
-
     private readonly struct CapturedMovement
     {
         public readonly CoopAgentInfo AgentInfo;
