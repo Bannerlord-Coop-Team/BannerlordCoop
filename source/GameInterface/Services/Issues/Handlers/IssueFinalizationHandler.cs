@@ -104,12 +104,28 @@ internal class IssueFinalizationHandler : IHandler
                 objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out hostParty);
             }
 
-            var validator = QuestTypeRegistry.Get(owner.Issue)?.ValidateQuestSuccess;
-            if (validator != null && !validator(owner.Issue, hostParty))
+            var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            var validator = descriptor?.ValidateQuestSuccess;
+            if (validator != null)
             {
-                Logger.Error("Rejecting the host's own {Message} for owner {Owner} - completion condition not met for the host's real party",
-                    nameof(QuestSuccessTriggered), ownerId);
-                return;
+                var successProof = descriptor.CaptureQuestSuccessProof?.Invoke(owner.Issue) ?? 0;
+                QuestSuccessProofContext.Set(successProof);
+                bool validated;
+                try
+                {
+                    validated = validator(owner.Issue, hostParty);
+                }
+                finally
+                {
+                    QuestSuccessProofContext.Set(0);
+                }
+
+                if (!validated)
+                {
+                    Logger.Error("Rejecting the host's own {Message} for owner {Owner} - completion condition not met for the host's real party",
+                        nameof(QuestSuccessTriggered), ownerId);
+                    return;
+                }
             }
 
             FinalizeAndBroadcast(owner, ownerId, player, IssueFinalizeReason.QuestSuccess);
@@ -117,7 +133,8 @@ internal class IssueFinalizationHandler : IHandler
         else
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
-            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestSuccess, generation));
+            var successProof = QuestTypeRegistry.Get(owner.Issue)?.CaptureQuestSuccessProof?.Invoke(owner.Issue) ?? 0;
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestSuccess, generation, successProof));
         }
     }
 
@@ -228,8 +245,15 @@ internal class IssueFinalizationHandler : IHandler
                 }
 
                 QuestSuccessProofContext.Set(payload.What.SuccessProof);
-                var validated = validator(owner.Issue, party);
-                QuestSuccessProofContext.Set(0);
+                bool validated;
+                try
+                {
+                    validated = validator(owner.Issue, party);
+                }
+                finally
+                {
+                    QuestSuccessProofContext.Set(0);
+                }
 
                 if (!validated)
                 {
