@@ -139,6 +139,82 @@ public class IssueFinalizationSecurityTests : IDisposable
     }
 
     [Fact]
+    public void RequestIssueRemoved_ClaimingIssueOnlyWhileSolvingWithAlternative_Rejected()
+    {
+        var fixture = SetupVillageOwner();
+        var owned = SetupOwnedIssue(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            using (new AlternativeSolutionStartAuthorityGuard())
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                owner.Issue.StartIssueWithAlternativeSolution();
+            }
+            Assert.True(owner.Issue.IsSolvingWithAlternative);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.IssueOnly, owned.Generation));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IsSolvingWithAlternative);
+            Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
+        });
+    }
+
+    [Fact]
+    public void RequestIssueRemoved_ClaimingUndefinedReasonValueWhileSolvingWithAlternative_Rejected()
+    {
+        var fixture = SetupVillageOwner();
+        var owned = SetupOwnedIssue(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            using (new AlternativeSolutionStartAuthorityGuard())
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                owner.Issue.StartIssueWithAlternativeSolution();
+            }
+            Assert.True(owner.Issue.IsSolvingWithAlternative);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new RequestIssueRemoved(ownerId, (IssueFinalizeReason)200, owned.Generation));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IsSolvingWithAlternative);
+            Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
+        });
+    }
+
+    [Fact]
     public void RequestIssueRemoved_ClaimingQuestFailWithNoOngoingQuest_Rejected()
     {
         var fixture = SetupVillageOwner();
@@ -162,7 +238,7 @@ public class IssueFinalizationSecurityTests : IDisposable
     }
 
     [Fact]
-    public void RequestIssueRemoved_ClaimingQuestCancelWithARealOngoingQuest_Finalizes()
+    public void RequestIssueRemoved_ClaimingQuestCancelForAQuestTypeWithNoRegisteredValidator_Rejected()
     {
         var fixture = SetupVillageOwner();
         var owned = SetupOwnedIssue(fixture);
@@ -170,6 +246,7 @@ public class IssueFinalizationSecurityTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
             using (new AllowedThread())
             {
                 owner.Issue.StartIssueWithQuest();
@@ -186,7 +263,119 @@ public class IssueFinalizationSecurityTests : IDisposable
             network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestCancel, owned.Generation));
         });
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
+    }
+
+    [Fact]
+    public void RequestIssueRemoved_ClaimingQuestBetrayalForAQuestTypeWithNoRegisteredValidator_Rejected()
+    {
+        var fixture = SetupVillageOwner();
+        var owned = SetupOwnedIssue(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
+            using (new AllowedThread())
+            {
+                owner.Issue.StartIssueWithQuest();
+            }
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestBetrayal, owned.Generation));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
+    }
+
+    [Fact]
+    public void RequestIssueRemoved_ClaimingQuestFailBeforeDueTimeHasPassed_Rejected()
+    {
+        var fixture = SetupVillageOwner();
+        var owned = SetupOwnedIssue(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
+            using (new AllowedThread())
+            {
+                owner.Issue.StartIssueWithQuest();
+            }
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+            Assert.False(owner.Issue.IssueQuest.QuestDueTime.IsPast);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestFail, owned.Generation));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
+    }
+
+    [Fact]
+    public void RequestIssueRemoved_ClaimingQuestSuccessForAQuestTypeWithNoRegisteredValidator_Rejected()
+    {
+        var fixture = SetupVillageOwner();
+        var owned = SetupOwnedIssue(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
+            using (new AllowedThread())
+            {
+                owner.Issue.StartIssueWithQuest();
+            }
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestSuccess, owned.Generation));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
     }
 
     [Fact]
@@ -198,6 +387,7 @@ public class IssueFinalizationSecurityTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
             using (new AllowedThread())
             {
                 owner.Issue.StartIssueWithQuest();
@@ -214,5 +404,27 @@ public class IssueFinalizationSecurityTests : IDisposable
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    [Fact]
+    public void ForgedNetworkIssueRemoved_SentDirectlyToServer_IgnoredInsteadOfFinalizingTheRealIssue()
+    {
+        var fixture = SetupVillageOwner();
+        var owned = SetupOwnedIssue(fixture);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new NetworkIssueRemoved(ownerId, IssueFinalizeReason.IssueOnly));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+        });
     }
 }

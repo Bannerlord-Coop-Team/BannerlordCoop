@@ -1,3 +1,4 @@
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
@@ -63,7 +64,10 @@ public static class IssuesDebugCommand
         bool started;
         try
         {
-            started = Campaign.Current.IssueManager.StartIssueQuest(hero);
+            using (new QuestSolutionStartAuthorityGuard())
+            {
+                started = Campaign.Current.IssueManager.StartIssueQuest(hero);
+            }
         }
         catch (Exception ex)
         {
@@ -130,25 +134,28 @@ public static class IssuesDebugCommand
 
         try
         {
-            switch (outcome)
+            using (new IssueFinalizeAuthorityGuard())
             {
-                case "success":
-                    quest.CompleteQuestWithSuccess();
-                    break;
-                case "cancel":
-                    quest.CompleteQuestWithCancel();
-                    break;
-                case "fail":
-                    quest.CompleteQuestWithFail();
-                    break;
-                case "timeout":
-                    quest.CompleteQuestWithTimeOut();
-                    break;
-                case "betrayal":
-                    quest.CompleteQuestWithBetrayal();
-                    break;
-                default:
-                    return $"Unknown outcome '{outcome}'. {usage}";
+                switch (outcome)
+                {
+                    case "success":
+                        quest.CompleteQuestWithSuccess();
+                        break;
+                    case "cancel":
+                        quest.CompleteQuestWithCancel();
+                        break;
+                    case "fail":
+                        quest.CompleteQuestWithFail();
+                        break;
+                    case "timeout":
+                        quest.CompleteQuestWithTimeOut();
+                        break;
+                    case "betrayal":
+                        quest.CompleteQuestWithBetrayal();
+                        break;
+                    default:
+                        return $"Unknown outcome '{outcome}'. {usage}";
+                }
             }
         }
         catch (Exception ex)

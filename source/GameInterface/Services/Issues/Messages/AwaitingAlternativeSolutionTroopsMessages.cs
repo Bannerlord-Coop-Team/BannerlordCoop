@@ -23,10 +23,12 @@ public readonly struct AwaitingAlternativeSolutionTroopsDepositedLocally : IEven
 public readonly struct AwaitingAlternativeSolutionTroopsDrainedLocally : IEvent
 {
     public readonly string OwnerControllerId;
+    public readonly TroopRoster Troops;
 
-    public AwaitingAlternativeSolutionTroopsDrainedLocally(string ownerControllerId)
+    public AwaitingAlternativeSolutionTroopsDrainedLocally(string ownerControllerId, TroopRoster troops)
     {
         OwnerControllerId = ownerControllerId;
+        Troops = troops;
     }
 }
 
@@ -48,4 +50,38 @@ public readonly struct RequestAwaitingAlternativeSolutionTroopsDeposit : IComman
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestAwaitingAlternativeSolutionTroopsDrain : ICommand
 {
+    [ProtoMember(1)]
+    public readonly TroopRosterData Troops;
+
+    public RequestAwaitingAlternativeSolutionTroopsDrain(TroopRosterData troops)
+    {
+        Troops = troops;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkAwaitingAlternativeSolutionTroopsDepositRejected : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+
+    public NetworkAwaitingAlternativeSolutionTroopsDepositRejected(string ownerId)
+    {
+        OwnerId = ownerId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly TroopRosterData Troops;
+
+    public NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(string ownerId, TroopRosterData troops)
+    {
+        OwnerId = ownerId;
+        Troops = troops;
+    }
 }

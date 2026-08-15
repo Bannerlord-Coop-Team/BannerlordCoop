@@ -1,8 +1,21 @@
 using Common.Util;
 using GameInterface.Services.Issues.Messages;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Generic;
+
+public sealed class IssueFinalizeAuthorityGuard : IDisposable
+{
+    [ThreadStatic]
+    private static int _count;
+
+    public IssueFinalizeAuthorityGuard() => _count++;
+
+    public void Dispose() => _count = _count > 0 ? _count - 1 : 0;
+
+    public static bool IsActive => _count > 0;
+}
 
 internal static class IssueFinalizationSupport
 {
@@ -10,6 +23,7 @@ internal static class IssueFinalizationSupport
     {
         if (owner?.Issue == null) return;
 
+        using (new IssueFinalizeAuthorityGuard())
         using (new AllowedThread())
         {
             var quest = owner.Issue.IssueQuest;
@@ -18,7 +32,15 @@ internal static class IssueFinalizationSupport
                 switch (reason)
                 {
                     case IssueFinalizeReason.QuestSuccess:
-                        quest.CompleteQuestWithSuccess();
+                        var applyConsequence = QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestSuccessConsequence;
+                        if (applyConsequence != null)
+                        {
+                            applyConsequence(quest);
+                        }
+                        else
+                        {
+                            quest.CompleteQuestWithSuccess();
+                        }
                         return;
                     case IssueFinalizeReason.QuestCancel:
                         quest.CompleteQuestWithCancel();

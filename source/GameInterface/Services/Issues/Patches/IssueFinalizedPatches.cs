@@ -36,6 +36,18 @@ internal class IssueManagerQuestCompletedReasonCapture
 }
 
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+internal class IssueFinalizedOwnershipGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance)
+    {
+        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
+
+        return IssueFinalizeAuthorityGuard.IsActive;
+    }
+}
+
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
 internal class IssueFinalizedPatches
 {
     [HarmonyPostfix]
@@ -49,14 +61,18 @@ internal class IssueFinalizedPatches
             IssueManagerQuestCompletedReasonCapture.PendingReasons.Remove(owner);
         }
 
-        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) ownershipRegistry.Clear(owner);
-
-        if (owner != null &&
-            ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
-            ContainerProvider.TryResolve<IIssueConversationTracker>(out var conversationTracker) &&
-            objectManager.TryGetIdWithLogging(owner, out var ownerId))
+        var wasGenuinelyFinalized = !DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance) || IssueFinalizeAuthorityGuard.IsActive;
+        if (wasGenuinelyFinalized)
         {
-            conversationTracker.Clear(ownerId);
+            if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) ownershipRegistry.Clear(owner);
+
+            if (owner != null &&
+                ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+                ContainerProvider.TryResolve<IIssueConversationTracker>(out var conversationTracker) &&
+                objectManager.TryGetIdWithLogging(owner, out var ownerId))
+            {
+                conversationTracker.Clear(ownerId);
+            }
         }
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return;

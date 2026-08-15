@@ -47,6 +47,7 @@ public static class AlternativeSolutionCompletionRunner
     public static void CompleteOnServer(Hero owner, IssueBase issue)
     {
         using (new AlternativeSolutionCompletionAuthorityGuard())
+        using (new IssueFinalizeAuthorityGuard())
         using (ResolveTrueOwnerScope(owner))
         {
             IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = IssueFinalizeReason.AlternativeSolutionSuccess;
