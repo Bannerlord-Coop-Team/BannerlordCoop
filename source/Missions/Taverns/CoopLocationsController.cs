@@ -439,7 +439,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 characterObjectId,
                 agent.Position,
                 agent.Health,
-                isPlayer: ReferenceEquals(agent, mainAgent)));
+                isPlayer: ReferenceEquals(agent, mainAgent),
+                hasMount: agent.HasMount));
         }
 
         return new NetworkMissionJoinInfo(
@@ -535,7 +536,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             agentData.IsPlayer == true ? "Player" : "Agent",
             characterObject?.Name?.ToString() ?? "<unresolved>", agentData.AgentId, controllerId);
 
-        Agent newAgent = SpawnAgent(agentData.Position, characterObject, agentData.IsPlayer, agentData.Health);
+        Agent newAgent = SpawnAgent(agentData.Position, characterObject, agentData.HasMount, agentData.Health);
 
         if (newAgent == null)
         {
@@ -549,7 +550,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             agentData.AgentId, newAgent.Position, Mission.Current?.SceneName);
     }
 
-    public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isPlayer = false, float health = -1f)
+    public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool hasMount = false, float health = -1f)
     {
         // A remote player's hero CharacterObject often does not resolve to a fully-initialized
         // object on this client (live campaign: each player has a distinct, not-yet-synced hero),
@@ -576,9 +577,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 // The player may have left between receiving the join info and this running.
                 if (Mission.Current == null) return;
 
-                // The player rides in villages, but companions are roster-spawned on foot even there. Preserve
-                // that distinction so a remote companion puppet does not gain a horse its authoritative AI does
-                // not have. Towns, taverns and castle courtyards use civilian equipment and are always on-foot.
+                // The owner sends the live mount state because companions can spawn mounted in village centers.
                 bool isVillage = Settlement.CurrentSettlement?.IsVillage == true;
 
                 AgentBuildData agentBuildData = new AgentBuildData(character);
@@ -586,7 +585,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 agentBuildData.InitialPosition(startingPos);
                 agentBuildData.Team(Mission.Current.PlayerAllyTeam);
                 agentBuildData.InitialDirection(Vec2.Forward);
-                agentBuildData.NoHorses(!isPlayer || !isVillage);
+                agentBuildData.NoHorses(ShouldDisableHorses(hasMount));
                 agentBuildData.Equipment(isVillage ? character.FirstBattleEquipment : character.FirstCivilianEquipment);
                 agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
                 agentBuildData.Controller(AgentControllerType.None);
@@ -619,6 +618,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         return agent;
     }
+
+    internal static bool ShouldDisableHorses(bool hasMount) => !hasMount;
 
     // Cheap, non-throwing pre-filter for the common "unresolved remote hero" case, so the normal
     // path does not rely on a thrown exception (which trips first-chance break in the debugger).

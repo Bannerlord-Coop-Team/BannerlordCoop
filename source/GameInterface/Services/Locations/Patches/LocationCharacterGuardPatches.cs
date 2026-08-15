@@ -72,8 +72,8 @@ internal class LocationCharacterGuardPatches
     /// <summary>
     /// Vanilla normally delegates bodyguard selection to ClanMemberRolesCampaignBehavior, but that broad
     /// campaign behavior is intentionally disabled in co-op. Reproduce only its location-mission responsibility:
-    /// add the first eligible MainParty hero when the encounter has no player-party companion entry. Other
-    /// accompanying characters (for example quest followers) are preserved.
+    /// reconcile the MainParty bodyguard entry and add the first eligible hero when needed. Other accompanying
+    /// characters, such as quest followers, are preserved.
     /// </summary>
     private static void EnsureVanillaAccompanyingCharacter()
     {
@@ -84,14 +84,36 @@ internal class LocationCharacterGuardPatches
             LocationComplex locationComplex = LocationComplex.Current;
             if (encounter == null || mainParty?.MemberRoster == null || locationComplex == null) return;
 
-            foreach (AccompanyingCharacter existing in encounter.CharactersAccompanyingPlayer)
+            bool hasEligibleCompanion = false;
+            for (int index = encounter.CharactersAccompanyingPlayer.Count - 1; index >= 0; index--)
             {
-                if (existing?.LocationCharacter?.AgentOrigin is PartyAgentOrigin origin &&
-                    origin.Party == PartyBase.MainParty)
+                AccompanyingCharacter existing = encounter.CharactersAccompanyingPlayer[index];
+                LocationCharacter existingCharacter = existing?.LocationCharacter;
+                if (!(existingCharacter?.AgentOrigin is PartyAgentOrigin origin) ||
+                    origin.Party != PartyBase.MainParty) continue;
+
+                CharacterObject character = existingCharacter.Character;
+                Hero hero = character?.HeroObject;
+                bool isEligible = hero != null && IsEligibleVanillaCompanion(
+                    character.IsHero,
+                    hero == Hero.MainHero,
+                    hero.IsPrisoner,
+                    hero.IsWounded,
+                    hero.Age,
+                    Campaign.Current.Models.AgeModel.HeroComesOfAge);
+                if (ShouldRetainExistingCompanion(
+                        character != null && mainParty.MemberRoster.Contains(character), isEligible))
                 {
-                    return;
+                    hasEligibleCompanion = true;
+                    continue;
                 }
+
+                encounter.RemoveAccompanyingCharacter(existingCharacter);
+                Logger.Information("[LocationCompanion] Removed stale bodyguard entry for {Character}",
+                    character?.StringId ?? "<null>");
             }
+
+            if (hasEligibleCompanion) return;
 
             foreach (var element in mainParty.MemberRoster.GetTroopRoster())
             {
@@ -129,6 +151,9 @@ internal class LocationCharacterGuardPatches
             Logger.Warning(ex, "[LocationCompanion] Failed to reconstruct vanilla accompanying entry");
         }
     }
+
+    internal static bool ShouldRetainExistingCompanion(bool isInMainParty, bool isEligible)
+        => isInMainParty && isEligible;
 
     internal static bool IsEligibleVanillaCompanion(
         bool isHero,
