@@ -2,7 +2,6 @@
 using Common;
 using Common.Network;
 using Common.Network.Coalescing;
-using Common.Util;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
@@ -264,32 +263,15 @@ internal static class PrisonerDonationFixtureCommands
             return $"Fixture troop '{FixtureTroopId}' not found.";
 
         var logic = partyState.PartyScreenLogic;
-        var rightRoster = logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right];
-        var sourceIndex = rightRoster.FindIndexOfTroop(troop);
-        if (sourceIndex < 0)
-            return $"Fixture troop '{FixtureTroopId}' is not in the player prisoner roster.";
+        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+        var row = partyVm?.MainPartyPrisoners.FirstOrDefault(vm => vm.Character == troop);
+        if (row == null)
+            return $"Fixture troop '{FixtureTroopId}' is not rendered in the player prisoner roster.";
 
-        var element = rightRoster.GetElementCopyAtIndex(sourceIndex);
-        var targetIndex = logic.GetIndexToInsertTroop(
-            PartyScreenLogic.PartyRosterSide.Left,
-            PartyScreenLogic.TroopType.Prisoner,
-            element);
-        var command = new PartyScreenLogic.PartyCommand();
-        command.FillForTransferTroop(
-            PartyScreenLogic.PartyRosterSide.Right,
-            PartyScreenLogic.TroopType.Prisoner,
-            troop,
-            totalNumber: 1,
-            woundedNumber: 0,
-            targetIndex: targetIndex);
-        if (!logic.ValidateCommand(command))
+        partyVm.OnTransferTroop(row, -1, 1, row.Side);
+        partyVm.ExecuteRemoveZeroCounts();
+        if (!logic.IsThereAnyChanges())
             return "The prisoner donation transfer was rejected.";
-
-        using (new AllowedThread())
-        {
-            logic.AddCommand(command);
-            logic.RemoveZeroCounts();
-        }
 
         return "LIVE_TEST_JSON=true";
     }
