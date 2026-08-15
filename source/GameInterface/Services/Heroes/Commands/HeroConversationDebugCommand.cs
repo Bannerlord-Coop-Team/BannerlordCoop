@@ -1,7 +1,9 @@
 ﻿#if DEBUG
 using Common;
+using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
+using System.Globalization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -80,6 +82,26 @@ internal class HeroConversationDebugCommand
 
         return $"HERO_HAS_MET side={(ModInformation.IsServer ? "server" : "client")} " +
             $"heroId={args[0]} hasMet={hero.HasMet}";
+    }
+
+    [CommandLineArgumentFunction("meeting_state", "coop.debug.hero_conversation")]
+    public static string MeetingState(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Run coop.debug.hero_conversation.meeting_state on the server.";
+        if (args.Count != 2)
+            return "Usage: coop.debug.hero_conversation.meeting_state <playerHeroId> <metHeroId>";
+        if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var sessionProvider))
+            return $"Unable to get {nameof(ICoopSessionProvider)}";
+
+        long lastMeetingTicks = 0;
+        var playerLastMeetingTimes = sessionProvider.CoopSession?.HeroMeetingData?.PlayerLastMeetingTimes;
+        bool hasEntry = playerLastMeetingTimes != null &&
+            playerLastMeetingTimes.TryGetValue(args[0], out var meetingTimes) &&
+            meetingTimes != null &&
+            meetingTimes.TryGetValue(args[1], out lastMeetingTicks);
+
+        return $"HERO_MEETING_DATA playerHeroId={args[0]} metHeroId={args[1]} " +
+            $"hasEntry={hasEntry} lastMeetingTicks={(hasEntry ? lastMeetingTicks.ToString(CultureInfo.InvariantCulture) : "none")}";
     }
 
     private static bool TryGetHero(string heroId, out Hero hero, out string error)

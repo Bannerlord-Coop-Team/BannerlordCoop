@@ -4,9 +4,13 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.States;
 using Coop.Core.Server.Services.Save.Messages;
 using Coop.Tests.Mocks;
+using GameInterface.CoopSessionData;
+using GameInterface.CoopSessionData.Save.Data;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
 using System;
@@ -73,6 +77,25 @@ namespace Coop.Tests.Server.Connections.States
             string campaignId = "12345";
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, campaignId));
+            var heroMeetingData = new HeroMeetingData(new());
+            heroMeetingData.PlayerLastMeetingTimes["Hero_Player"] = new()
+            {
+                ["lord_6_1"] = 1351,
+            };
+            var session = new CoopSession(
+                string.Empty,
+                Array.Empty<Player>(),
+                null!,
+                null!,
+                null!,
+                null!,
+                null!,
+                null!,
+                null!,
+                heroMeetingData);
+            serverComponent.Container.Resolve<Mock<ICoopSessionProvider>>()
+                .SetupGet(provider => provider.CoopSession)
+                .Returns(session);
 
             // Act — entering the state packages the save and sends it to the joining peer.
             connectionLogic.SetState<TransferSaveState>();
@@ -84,6 +107,7 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(campaignId, packet.CampaignID);
             Assert.Equal(0, packet.ChunkIndex);
             Assert.Equal(1, packet.ChunkCount);
+            Assert.Equal(1351, packet.HeroMeetingData.PlayerLastMeetingTimes["Hero_Player"]["lord_6_1"]);
             serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
                 .Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
 
