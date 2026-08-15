@@ -267,6 +267,41 @@ public class IssueFinalizationSecurityTests : IDisposable
     }
 
     [Fact]
+    public void RequestIssueRemoved_ClaimingQuestSuccessForAQuestTypeWithNoRegisteredValidator_Rejected()
+    {
+        var fixture = SetupVillageOwner();
+        var owned = SetupOwnedIssue(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
+            using (new AllowedThread())
+            {
+                owner.Issue.StartIssueWithQuest();
+            }
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
+
+            var network = Client.Resolve<Common.Network.INetwork>();
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestSuccess, owned.Generation));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
+    }
+
+    [Fact]
     public void RequestIssueRemoved_StaleGeneration_Rejected()
     {
         var fixture = SetupVillageOwner();
