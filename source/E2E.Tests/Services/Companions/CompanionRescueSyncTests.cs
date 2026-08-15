@@ -75,7 +75,7 @@ public class CompanionRescueSyncTests : IDisposable
     }
 
     [Fact]
-    public void JoinPartyRescue_SameRequestReplayedAfterRecapture_ReturnsCachedResultWithoutRelease()
+    public void JoinPartyRescue_SameRequestSentTwice_ReturnsBothTerminalResults()
     {
         var context = CreateCaptiveCompanion();
         var requester = Clients[0];
@@ -90,37 +90,14 @@ public class CompanionRescueSyncTests : IDisposable
         Server.InternalMessages.Clear();
 
         requester.Call(() => requester.Resolve<INetwork>().SendAll(request));
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(context.HeroId, out var companion));
-            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(context.CaptorPartyId, out var captor));
-            TakePrisonerAction.Apply(captor, companion);
-            Assert.True(companion.IsPrisoner);
-            Assert.Same(captor, companion.PartyBelongedToAsPrisoner);
-        });
-        testEnvironment.FlushCoalescer();
-
         requester.Call(() => requester.Resolve<INetwork>().SendAll(request));
 
-        var completions = requester.InternalMessages.OfType<CompanionRescueCompleted>()
-            .Where(message => message.RequestId == requestId)
-            .ToArray();
-        Assert.Equal(2, completions.Length);
-        Assert.All(completions, completion =>
-        {
-            Assert.Equal(CompanionRescueCompletionStatus.Accepted, completion.Status);
-            Assert.Null(completion.Error);
-        });
+        AssertTerminalPair(requester, context.HeroId, CompanionRescueRequestKind.JoinParty);
         AssertSingleCaptivityRemoval(context);
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(context.HeroId, out var companion));
-            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(context.CaptorPartyId, out var captor));
-            Assert.True(companion.IsPrisoner);
-            Assert.Same(captor, companion.PartyBelongedToAsPrisoner);
-            Assert.Null(companion.PartyBelongedTo);
-        });
-        Assert.Equal(0, GetTroopCount(Server, context.TargetPartyId, context.CharacterId));
+        AssertSingleTargetAddition(context);
+        AssertJoinPartyState(Server, context, assertHeroState: true);
+        foreach (var client in Clients)
+            AssertJoinPartyState(client, context, assertHeroState: false);
     }
 
     [Fact]
@@ -158,7 +135,7 @@ public class CompanionRescueSyncTests : IDisposable
     }
 
     [Fact]
-    public void LeadPartyRescue_SameRequestSentTwice_ReturnsCachedAcceptedResult()
+    public void LeadPartyRescue_SameRequestSentTwice_ReturnsBothTerminalResults()
     {
         var context = CreateCaptiveCompanion();
         var requester = Clients[0];
@@ -182,15 +159,7 @@ public class CompanionRescueSyncTests : IDisposable
         requester.Call(() => requester.Resolve<INetwork>().SendAll(request));
         testEnvironment.FlushCoalescer();
 
-        var completions = requester.InternalMessages.OfType<CompanionRescueCompleted>()
-            .Where(message => message.RequestId == request.RequestId)
-            .ToArray();
-        Assert.Equal(2, completions.Length);
-        Assert.All(completions, completion =>
-        {
-            Assert.Equal(CompanionRescueCompletionStatus.Accepted, completion.Status);
-            Assert.Null(completion.Error);
-        });
+        AssertTerminalPair(requester, context.HeroId, CompanionRescueRequestKind.LeadParty);
         AssertSingleCaptivityRemoval(context);
         Assert.Single(Server.NetworkSentMessages.OfType<NetworkAddWarParty>());
         AssertLeadPartyState(Server, context, assertHeroState: true);

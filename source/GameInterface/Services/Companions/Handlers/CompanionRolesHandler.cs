@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
-using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
@@ -15,7 +14,6 @@ using GameInterface.Services.TroopRosters.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -42,8 +40,6 @@ internal class CompanionRolesHandler : IHandler
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPlayerManager playerManager;
     private readonly ISendCoalescer sendCoalescer;
-    private readonly Dictionary<NetPeer, Dictionary<string, CompanionRescueCompleted>> completedRescueRequests =
-        new Dictionary<NetPeer, Dictionary<string, CompanionRescueCompleted>>();
     private string pendingFireCompanionRequestId;
     private string pendingFireCompanionHeroId;
 
@@ -78,7 +74,6 @@ internal class CompanionRolesHandler : IHandler
         messageBroker.Subscribe<CompanionRescueCompleted>(Handle_CompanionRescueCompleted);
         messageBroker.Subscribe<CompanionRescued>(Handle_CompanionRescued);
         messageBroker.Subscribe<RescueCompanion>(Handle_RescueCompanion);
-        messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     public void Dispose()
@@ -97,7 +92,6 @@ internal class CompanionRolesHandler : IHandler
         messageBroker.Unsubscribe<CompanionRescueCompleted>(Handle_CompanionRescueCompleted);
         messageBroker.Unsubscribe<CompanionRescued>(Handle_CompanionRescued);
         messageBroker.Unsubscribe<RescueCompanion>(Handle_RescueCompanion);
-        messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     private void Handle_ClanNameSelectionDone(MessagePayload<ClanNameSelectionDone> obj)
@@ -435,9 +429,6 @@ internal class CompanionRolesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!string.IsNullOrWhiteSpace(data.RequestId) &&
-                TrySendCachedRescueCompletion(requester, data.RequestId)) return;
-
             var status = CompanionRescueCompletionStatus.Rejected;
             string error = null;
             try
@@ -538,9 +529,6 @@ internal class CompanionRolesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!string.IsNullOrWhiteSpace(data.RequestId) &&
-                TrySendCachedRescueCompletion(requester, data.RequestId)) return;
-
             var status = CompanionRescueCompletionStatus.Rejected;
             string error = null;
             try
@@ -718,31 +706,11 @@ internal class CompanionRolesHandler : IHandler
             .ToArray();
     }
 
-    private bool TrySendCachedRescueCompletion(NetPeer requester, string requestId)
-    {
-        if (!completedRescueRequests.TryGetValue(requester, out var peerResults) ||
-            !peerResults.TryGetValue(requestId, out var completion))
-            return false;
-
-        SendRescueCompletion(requester, completion);
-        return true;
-    }
-
     private void CompleteRescueRequest(NetPeer requester, string requestId, string companionHeroId,
         CompanionRescueRequestKind kind, CompanionRescueCompletionStatus status, string error)
     {
         var completion = new CompanionRescueCompleted(
             requestId, companionHeroId, kind, status, error);
-        if (!string.IsNullOrWhiteSpace(requestId))
-        {
-            if (!completedRescueRequests.TryGetValue(requester, out var peerResults))
-            {
-                peerResults = new Dictionary<string, CompanionRescueCompleted>();
-                completedRescueRequests.Add(requester, peerResults);
-            }
-            peerResults[requestId] = completion;
-        }
-
         SendRescueCompletion(requester, completion);
     }
 
@@ -774,12 +742,4 @@ internal class CompanionRolesHandler : IHandler
         }, context: nameof(RescueCompanion));
     }
 
-    private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> obj)
-    {
-        if (!ModInformation.IsServer) return;
-
-        var peer = obj.What.PlayerId;
-        GameThread.RunSafe(() => completedRescueRequests.Remove(peer),
-            context: nameof(PlayerDisconnected));
-    }
 }
