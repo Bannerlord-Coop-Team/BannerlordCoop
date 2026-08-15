@@ -1,10 +1,14 @@
 ﻿#if DEBUG
 using Common;
+using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using TaleWorlds.CampaignSystem;
@@ -15,6 +19,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Party.Commands;
 
@@ -348,6 +353,16 @@ internal static class PrisonerDonationFixtureCommands
             return "The prisoner-donation fixture is not active.";
 
         var activeFixture = fixture;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !ContainerProvider.TryResolve<INetwork>(out var network) ||
+            !ContainerProvider.TryResolve<ISendCoalescer>(out var sendCoalescer) ||
+            !objectManager.TryGetIdWithLogging(activeFixture.PlayerParty.PrisonRoster, out var playerRosterId) ||
+            !objectManager.TryGetIdWithLogging(activeFixture.Settlement.Party.PrisonRoster, out var settlementRosterId) ||
+            !objectManager.TryGetIdWithLogging(activeFixture.Troop, out var troopId))
+        {
+            return "Unable to resolve the prisoner-donation fixture restoration services.";
+        }
+
         RestoreRosterState(
             activeFixture.PlayerParty.PrisonRoster,
             activeFixture.Troop,
@@ -356,6 +371,20 @@ internal static class PrisonerDonationFixtureCommands
             activeFixture.Settlement.Party.PrisonRoster,
             activeFixture.Troop,
             activeFixture.SettlementPrisonerState);
+        RepublishRosterElement(
+            activeFixture.PlayerParty.PrisonRoster,
+            activeFixture.Troop,
+            playerRosterId,
+            troopId,
+            network,
+            sendCoalescer);
+        RepublishRosterElement(
+            activeFixture.Settlement.Party.PrisonRoster,
+            activeFixture.Troop,
+            settlementRosterId,
+            troopId,
+            network,
+            sendCoalescer);
 
         if (activeFixture.PlayerParty.CurrentSettlement != activeFixture.OriginalSettlement)
         {
@@ -506,6 +535,39 @@ internal static class PrisonerDonationFixtureCommands
             expected.Wounded - current.Wounded,
             expected.Xp - current.Xp,
             true);
+    }
+
+    private static void RepublishRosterElement(
+        TroopRoster roster,
+        CharacterObject troop,
+        string rosterId,
+        string troopId,
+        INetwork network,
+        ISendCoalescer sendCoalescer)
+    {
+        sendCoalescer.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
+
+        var index = roster.FindIndexOfTroop(troop);
+        var element = index >= 0
+            ? roster.GetElementCopyAtIndex(index)
+            : default;
+        network.SendAll(new NetworkTroopRosterSetWoundedNumber(
+            rosterId,
+            troopId,
+            index >= 0 ? element.WoundedNumber : 0));
+        network.SendAll(new NetworkTroopRosterSetNumber(
+            rosterId,
+            troopId,
+            index >= 0 ? element.Number : 0));
+        if (index >= 0)
+        {
+            network.SendAll(new NetworkTroopRosterElementBatch(
+                rosterId,
+                troopId,
+                new[] { TroopRosterElementOperation.SetXp(element.Xp) }));
+        }
+
+        network.SendAll(new NetworkTroopRosterRemoveZeroCounts(rosterId));
     }
 
     private sealed class PrisonerDonationFixture
