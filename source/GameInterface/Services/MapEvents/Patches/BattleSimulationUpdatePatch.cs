@@ -1,8 +1,7 @@
-using Common;
+﻿using Common;
 using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameState;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -27,15 +26,15 @@ public class BattleSimulationUpdatePatch
     }
 }
 
-[HarmonyPatch(typeof(MapState), nameof(MapState.EndBattleSimulation))]
-internal class BattleSimulationEndPatch
+[HarmonyPatch(typeof(BattleSimulation), nameof(BattleSimulation.OnFinished))]
+internal class BattleSimulationFinishedPatch
 {
     [HarmonyPostfix]
     private static void Postfix()
     {
         if (ModInformation.IsServer) return;
 
-        // Scoreboard Done calls this directly, so finish retained teardown before the encounter menu resumes.
+        // The scoreboard has restored the encounter menu, so the retained defeat can now continue through it.
         if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier))
             barrier.CompleteDeferredEncounterCleanup();
     }

@@ -479,6 +479,12 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             mapState.EndBattleSimulation();
 
             Assert.False(mapState.IsSimulationActive);
+            Assert.Equal(PlayerEncounterState.End, PlayerEncounter.Current.EncounterState);
+
+            AccessTools.Field(typeof(BattleSimulation), "_mapEvent")
+                .SetValue(PlayerEncounter.Current.BattleSimulation, destroyedMapEvent);
+            PlayerEncounter.Current.BattleSimulation.OnFinished();
+
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
             Assert.NotNull(PlayerEncounter.Current);
             Assert.Equal(expectedEncounterState, PlayerEncounter.Current.EncounterState);
@@ -488,7 +494,9 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
             Assert.Same(continuedEncounter, PlayerEncounter.Current);
             Assert.Equal(expectedEncounterState, PlayerEncounter.Current.EncounterState);
-        }, MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))));
+        }, MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))));
     }
 
     [Fact]
