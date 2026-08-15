@@ -48,6 +48,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IBattleSession session;
     private readonly IGuardedHitWindow guardedHitWindow;
     private readonly IAgentNativeMountState agentNativeMountState;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Func<Agent, bool?> mountAuthorityProbe;
     private readonly object inboundDamageGate = new();
     private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
@@ -202,7 +203,8 @@ public class BattleDamageRouter : IBattleDamageRouter
     public BattleDamageRouter(IBattleNetwork network, IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent, IBattleSession session,
         IGuardedHitWindow guardedHitWindow,
-        IAgentNativeMountState agentNativeMountState)
+        IAgentNativeMountState agentNativeMountState,
+        IPuppetMountStateRepairer puppetMountStateRepairer)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -210,6 +212,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         this.session = session;
         this.guardedHitWindow = guardedHitWindow;
         this.agentNativeMountState = agentNativeMountState;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
 
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
@@ -1093,8 +1096,16 @@ public class BattleDamageRouter : IBattleDamageRouter
         var mortalityBefore = victim.CurrentMortalityState;
         bool disableDying = mission.DisableDying;
         MissionMode missionMode = mission.Mode;
-        BattleSpawnGate.RunWithRoutedAttackerWeapon(damage.AttackerWeapon,
-            () => victim.RegisterBlow(blow, in collisionData));
+        Agent mountBeforeBlow = victim.IsMount ? null : victim.MountAgent;
+        try
+        {
+            BattleSpawnGate.RunWithRoutedAttackerWeapon(damage.AttackerWeapon,
+                () => victim.RegisterBlow(blow, in collisionData));
+        }
+        finally
+        {
+            puppetMountStateRepairer.PreserveRiderlessPuppet(mountBeforeBlow);
+        }
 
         float healthAfter = victim.Health;
         float appliedDamage = healthBefore - healthAfter;

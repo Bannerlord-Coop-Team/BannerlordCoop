@@ -145,7 +145,8 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent,
             session,
             guardedHitWindow,
-            agentNativeMountState);
+            agentNativeMountState,
+            puppetMountStateRepairer);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch

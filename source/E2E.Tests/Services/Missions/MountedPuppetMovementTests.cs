@@ -801,6 +801,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.None,
                 sourceHorseMirror.MovementFlags);
             Assert.Equal(AgentControllerType.None, sourceHorseMirror.Controller);
+            Assert.NotNull(sourceHorse.CommonAIComponent);
+            Assert.Single(
+                sourceHorseMirror.Components.OfType<CommonAIComponent>());
 
             network.NetworkSentPackets.Packets.Clear();
             for (int i = 0; i < 100; i++)
@@ -810,6 +813,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.None,
                 sourceHorseMirror.MovementFlags);
             Assert.Equal(AgentControllerType.AI, sourceHorseMirror.Controller);
+            Assert.NotNull(sourceHorse.CommonAIComponent);
+            Assert.Single(
+                sourceHorseMirror.Components.OfType<CommonAIComponent>());
             AgentMountData finalMount = network.NetworkSentPackets
                 .GetPackets<MountMovementPacket>()
                 .Last()
@@ -1949,6 +1955,44 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.Equal(AgentControllerType.AI, horseMirror.Controller);
             Assert.Equal(-1f, horseMirror.MaximumSpeedLimit);
             Assert.Equal(1, horseMirror.SetMaximumSpeedLimitCalls);
+        });
+    }
+
+    [Fact]
+    public void RemoteDismount_PreservesTheRemoteHorsesAiComponent()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var riderId = Guid.NewGuid();
+            var horseId = Guid.NewGuid();
+
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            Assert.True(registry.TryRegisterAgent("owner", riderId, rider));
+            Assert.True(registry.TryRegisterAgent("owner", horseId, horse));
+
+            AgentData data = CreateAgentData(
+                riderPosition: Vec3.Zero,
+                riderDirection: Vec2.Forward,
+                ownerSpeed: 0f,
+                mountData: null);
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(new[] { riderId }, new[] { data }));
+
+            Assert.Null(rider.MountAgent);
+            Assert.Null(horse.RiderAgent);
+            Assert.Equal(AgentControllerType.None, horse.Controller);
+            Assert.NotNull(horse.CommonAIComponent);
+            Assert.Single(horseMirror.Components.OfType<CommonAIComponent>());
         });
     }
 

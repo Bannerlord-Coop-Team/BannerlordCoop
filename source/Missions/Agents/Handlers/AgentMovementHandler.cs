@@ -1584,6 +1584,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         AgentControllerType originalController = mount.Controller;
         if (originalController != AgentControllerType.None)
             mount.Controller = AgentControllerType.None;
+        puppetMountStateRepairer.PreserveRiderlessPuppet(mount);
         _syntheticMountTurns[mount] =
             new SyntheticMountTurnState(
                 turnDirection,
@@ -1617,8 +1618,10 @@ public class AgentMovementHandler : IAgentMovementHandler
                 : ReferenceEquals(mount.RiderAgent, syntheticTurn.Rider)
                     && agentRegistry.IsLocallyControlled(syntheticTurn.Rider)))
         {
+            puppetMountStateRepairer.PrepareForAiControl(mount);
             mount.Controller = syntheticTurn.OriginalController;
         }
+        puppetMountStateRepairer.PreserveRiderlessPuppet(mount);
     }
 
     private static void AddToBatch<T>(
@@ -1943,7 +1946,11 @@ public class AgentMovementHandler : IAgentMovementHandler
     {
         if (mount == null || !mount.IsActive() || mount.Mission != Mission.Current) return;
         if (agentRegistry.TryGetAgentInfo(mount, out _)
-            && !agentRegistry.IsLocallyControlled(mount)) return;
+            && !agentRegistry.IsLocallyControlled(mount))
+        {
+            puppetMountStateRepairer.PreserveRiderlessPuppet(mount);
+            return;
+        }
         mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
         if (mount.Controller != AgentControllerType.AI)
         {

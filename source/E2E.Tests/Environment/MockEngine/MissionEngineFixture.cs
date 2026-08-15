@@ -508,6 +508,12 @@ public sealed class MissionEngineFixture : IDisposable
                 $"Missile index {blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex} not in the mock mission's missile set (models Mission.OnAgentHit)");
 
         victim.Health -= blow.InflictedDamage;
+        if (TryActiveMock(out var activeMock)
+            && activeMock.DismountRiderOnNextBlow)
+        {
+            activeMock.DismountRiderOnNextBlow = false;
+            __instance.MountAgent = null;
+        }
         if (victim.Health < 1f)
         {
             victim.Health = 0f;
