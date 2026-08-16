@@ -102,21 +102,5 @@ namespace Missions.Agents.Messages
             WorldItemId = worldItemId;
         }
     }
-
-    [ProtoContract(SkipConstructor = true)]
-    internal sealed class NetworkTriggerEmptyExtraSlotWeaponDrop : IEvent
-    {
-        [ProtoMember(1)]
-        public Guid AgentId { get; }
-
-        [ProtoMember(2)]
-        public Guid WorldItemId { get; }
-
-        public NetworkTriggerEmptyExtraSlotWeaponDrop(Guid agentId, Guid worldItemId)
-        {
-            AgentId = agentId;
-            WorldItemId = worldItemId;
-        }
-    }
 }
 #endif
