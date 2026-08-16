@@ -325,11 +325,9 @@ internal static class GarrisonTroopXpFixtureCommands
                 rightState.Number > 0 && rightRow?.Troop.Number == rightState.Number &&
                 rightRow.Troop.Xp == rightState.Xp && rightRow.NumOfReadyToUpgradeTroops > 0;
         }
-        if (!expectedStateReady)
-            return $"Manage Garrison has not reached the expected '{args[2]}' state.";
-
         return JsonResult(new
         {
+            ready = expectedStateReady,
             expectedState = args[2],
             settlementId = SettlementId,
             settlementName = Settlement.Find(SettlementId)?.Name.ToString(),
