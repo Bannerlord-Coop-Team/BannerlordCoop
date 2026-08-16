@@ -1,8 +1,10 @@
 using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Kingdoms.Extentions;
+using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -157,6 +159,13 @@ namespace GameInterface.Services.Kingdoms.Patches
                             bool isPlayerInvolved =
                                 (decision.DetermineChooser()?.Leader?.IsHumanPlayerCharacter ?? false)
                                 || decision.DetermineSupporters().Any(supporter => supporter.IsPlayer);
+                            if (decision is MakePeaceKingdomDecision d && CoopKingdomElection.IsPendingPlayerPeaceOffer(decision))
+                            {
+                                MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
+                                    (Kingdom)d.FactionToMakePeaceWith,
+                                    d.Kingdom,
+                                    isPending: false));
+                            }
                             CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, isPlayerInvolved);
                         }
                         else if (decision.TriggerTime.IsPast)
@@ -166,6 +175,13 @@ namespace GameInterface.Services.Kingdoms.Patches
                             if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
                             {
                                 kingdom.RemoveDecision(decision);
+                                if (decision is MakePeaceKingdomDecision d)
+                                {
+                                    MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
+                                        (Kingdom)d.FactionToMakePeaceWith,
+                                        d.Kingdom,
+                                        isPending: false));
+                                }
                                 CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, true);
                                 continue;
                             }

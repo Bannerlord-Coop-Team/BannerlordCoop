@@ -2,6 +2,8 @@ using Common;
 using GameInterface.Services.Kingdoms.Extentions;
 ﻿using Common.Logging;
 using GameInterface.Services.Clans.Handlers;
+using GameInterface.Services.Kingdoms.Extentions;
+﻿using Common;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -51,12 +53,20 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             voteManager.RegisterDecisionItem(__instance.CurrentDecision);
         }
+
+        internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
+        {
+            return ContainerProvider.TryResolve(out voteManager);
+        }
+
+        // Bypass vanilla's single-clan shortcut so the receiving player gets the normal peace decision UI and vote.
         [HarmonyPatch(typeof(KingdomDecisionsVM), nameof(KingdomDecisionsVM.RefreshWith))]
         [HarmonyPrefix]
         private static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
         {
-            if (CoopKingdomElection.IsPendingPlayerAllianceOffer(decision) || decision.IsSingleClanDecision())
+            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || decision.IsSingleClanDecision() || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
             {
+
                 __instance._shouldCheckForDecision = false;
                 DecisionItemBaseVM decisionItem = __instance.GetDecisionItemBasedOnType(decision);
 
@@ -65,11 +75,6 @@ namespace GameInterface.Services.Kingdoms.Patches
                 return false;
             }
             return true;
-        }
-
-        internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
-        {
-            return ContainerProvider.TryResolve(out voteManager);
         }
     }
 
@@ -236,7 +241,7 @@ namespace GameInterface.Services.Kingdoms.Patches
     }
 
     [HarmonyPatch(typeof(KingdomDiplomacyVM))]
-    internal class KingdomDiplomacyVMPatches
+    public class KingdomDiplomacyVMPatches
     {
         [HarmonyPatch(nameof(KingdomDiplomacyVM.RefreshValues))]
         [HarmonyPostfix]
@@ -249,6 +254,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         internal static void OnSetWarItemPostfix(KingdomDiplomacyVM __instance, KingdomWarItemVM item)
         {
+            if (PeaceOfferIsPending(__instance, item)) return;
             DisableDiplomacyResolveActionsIfAlreadyVoted(__instance, item);
         }
 
@@ -284,6 +290,17 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
         }
 
+        internal static bool PeaceOfferIsPending(KingdomDiplomacyVM diplomacyVm, KingdomWarItemVM diplomacyItem)
+        {
+            if (diplomacyVm?.Actions == null || diplomacyItem == null) return false;
+            if (Clan.PlayerClan?.Kingdom == null) return false;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = diplomacyItem.Faction2 as Kingdom;
+            if (targetKingdom == null) return false;
+
+            return PeaceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId);
+        }
         private static IEnumerable<KingdomDecision> GetResolveDecisions(KingdomDiplomacyItemVM diplomacyItem)
         {
             if (Clan.PlayerClan?.Kingdom?.UnresolvedDecisions == null) yield break;
@@ -308,6 +325,38 @@ namespace GameInterface.Services.Kingdoms.Patches
             yield return Clan.PlayerClan.Kingdom.UnresolvedDecisions
                 .OfType<TradeAgreementDecision>()
                 .FirstOrDefault(decision => decision.TargetKingdom == faction);
+        }
+
+        /// <summary>
+        /// Kingdom.UnresolveDecisions is not uniformly synchronized,
+        /// so we have to send a request to the server,
+        /// to ask if there is a peace offer in the enemy's unresolved decisions.
+        [HarmonyPatch(nameof(KingdomDiplomacyVM.GetIsProposingPeaceEnabledWithReason))]
+        [HarmonyPrefix]
+        private static bool GetIsProposingPeaceEnabledWithReasonPrefix(
+        KingdomDiplomacyVM __instance,
+        KingdomWarItemVM item,
+        float actionInfluenceCost,
+        ref TextObject disabledReason,
+        ref bool __result)
+        {
+            if (item == null || Clan.PlayerClan?.Kingdom == null)
+                return true;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = item.Faction2 as Kingdom;
+
+            if (targetKingdom == null)
+                return true;
+
+            if (!playerKingdom._unresolvedDecisions.OfType<MakePeaceKingdomDecision>().Any(d => d.Kingdom == playerKingdom && d.FactionToMakePeaceWith == targetKingdom)
+                && !PeaceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId))
+            {
+                return true;
+            }
+            __result = false;
+            disabledReason = new TextObject("You have already offered peace to this kingdom.");
+            return false;
         }
     }
 
@@ -347,6 +396,22 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
         }
     }
+
+    public static class PeaceOfferPendingRegistry
+    {
+        internal static readonly Dictionary<(string, string), bool> _pending = new();
+
+        public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
+        {
+            var key = (requestingKingdomId, targetKingdomId);
+            if (isPending) _pending[key] = true;
+            else _pending.Remove(key);
+        }
+
+        public static bool IsPending(string requestingKingdomId, string targetKingdomId)
+            => _pending.TryGetValue((requestingKingdomId, targetKingdomId), out var val) && val;
+    }
+
     internal interface IClientClanStrengthRefresher
     {
         void Refresh(IFaction faction);
@@ -395,6 +460,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             refresher.Refresh(__instance.Faction2);
         }
     }
+
     [HarmonyPatch(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost))]
     internal class GetCallToWarCostPatches
     {

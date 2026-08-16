@@ -704,6 +704,21 @@ namespace GameInterface.Services.Kingdoms
                 RemoveDecisionState(state.Decision);
                 return;
             }
+            if (state.Decision is MakePeaceKingdomDecision peaceDecision && CoopKingdomElection.TryRedirectPlayerPeaceOffer(state.Decision, chosenOutcome)
+                && chosenOutcome is MakePeaceKingdomDecision.MakePeaceDecisionOutcome peaceOutcome && peaceOutcome.ShouldPeaceBeDeclared)
+            {
+                messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
+                    peaceDecision.Kingdom,
+                    (Kingdom)peaceDecision.FactionToMakePeaceWith,
+                    isPending: true));
+
+                if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
+                {
+                    state.Decision.Kingdom.RemoveDecision(state.Decision);
+                }
+                RemoveDecisionState(state.Decision);
+                return;
+            }
             messageBroker?.Publish(state.Decision, new KingdomDecisionResolved(
                 state.KingdomId,
                 state.DecisionIndex,
@@ -721,6 +736,16 @@ namespace GameInterface.Services.Kingdoms
                 if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(d))
                 {
                     CoopKingdomElection._opponentProposedAllianceDecisions.Remove(d);
+                }
+            }
+            if (state.Decision is MakePeaceKingdomDecision decision)
+            {
+                if (decision.FactionToMakePeaceWith is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom())
+                {
+                    messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
+                        playerKingdom,
+                        decision.Kingdom,
+                        isPending: false));
                 }
             }
             if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
