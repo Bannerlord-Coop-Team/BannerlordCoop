@@ -482,6 +482,7 @@ public class KingdomHandler : IHandler
 
         RunKingdomMutation(() =>
         {
+            decisionVoteManager.CloseDecision(payload.KingdomId, payload.Index);
             decisionVoteManager.ClearDecisionState(payload.KingdomId, payload.Index);
         });
 

@@ -2202,10 +2202,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             RestoreReverseObjectManagerId(client1, kingdom, kingdomId);
             decisionItem.ExecuteFinalSelection();
 
-            Assert.Same(decisionItem, decisionsVm.CurrentDecision);
-            Assert.True(decisionItem.IsActive);
-            Assert.True(decisionItem._finalSelectionDone);
-            Assert.Contains("Vote submitted", decisionItem.DescriptionText);
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.False(decisionItem.IsActive);
         });
 
         Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());

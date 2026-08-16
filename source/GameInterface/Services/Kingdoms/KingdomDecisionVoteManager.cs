@@ -55,6 +55,7 @@ namespace GameInterface.Services.Kingdoms
             bool isPlayerDecision,
             string outcomeKey = null,
             string notificationText = null);
+        void CloseDecision(string kingdomId, int decisionIndex);
         void ClearDecisionState(string kingdomId, int decisionIndex);
     }
 
@@ -516,18 +517,22 @@ namespace GameInterface.Services.Kingdoms
         {
             if (string.IsNullOrWhiteSpace(kingdomId) || decisionIndex < 0) return;
 
-            TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision);
+            PendingRoundStatuses.RemoveAll(candidate => candidate.KingdomId == kingdomId);
+            if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision)) return;
+
+            RemoveDecisionState(decision);
+        }
+
+        public void CloseDecision(string kingdomId, int decisionIndex)
+        {
+            if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision)) return;
+
             foreach (DecisionItemBaseVM decisionItem in ActiveDecisionItems
                          .Where(item => item?.KingdomDecisionMaker?._decision == decision)
                          .ToList())
             {
                 CloseDecisionItem(decisionItem);
             }
-
-            PendingRoundStatuses.RemoveAll(candidate => candidate.KingdomId == kingdomId);
-            if (decision == null) return;
-
-            RemoveDecisionState(decision);
         }
 
         private void RemoveDecisionState(KingdomDecision decision)
