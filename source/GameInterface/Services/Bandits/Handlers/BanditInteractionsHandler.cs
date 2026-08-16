@@ -155,6 +155,9 @@ internal class BanditInteractionsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            // If list is empty the client will receive a null object. Guard to prevent a NRE
+            if (obj.What.CharactersIds == null) return;
+
             foreach (var characterId in obj.What.CharactersIds)
             {
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character)) continue;
@@ -205,7 +208,7 @@ internal class BanditInteractionsHandler : IHandler
                 for (int j = mobileParty.PrisonRoster.Count - 1; j > -1; j--)
                 {
                     CharacterObject characterAtIndex = mobileParty.PrisonRoster.GetCharacterAtIndex(j);
-                    if (characterAtIndex.HeroObject.Clan == playerClan)
+                    if (characterAtIndex.IsHero && characterAtIndex.HeroObject.Clan == playerClan)
                     {
                         if (data.DoBanditsJoinPlayerSide)
                         {
