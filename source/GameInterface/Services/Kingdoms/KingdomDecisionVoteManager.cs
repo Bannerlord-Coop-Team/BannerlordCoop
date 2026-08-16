@@ -272,7 +272,7 @@ namespace GameInterface.Services.Kingdoms
             string prefix = HasLocalPlayerSubmittedVote(decision) ? "Vote submitted. " : string.Empty;
             if (waitingClans.Count == 0)
             {
-                decisionItem.DescriptionText = prefix + "All votes received. Resolving...";
+                SetDecisionFeedback(decisionItem, prefix + "All votes received. Resolving...");
                 return;
             }
 
@@ -280,7 +280,7 @@ namespace GameInterface.Services.Kingdoms
                 0,
                 (int)Math.Ceiling((state.RoundDeadlineUtc.Value - DateTime.UtcNow).TotalSeconds));
             string waitingText = string.Join("; ", waitingClans.Select(FormatWaitingClan));
-            decisionItem.DescriptionText = $"{prefix}Voting ends in {remainingSeconds}s. Waiting for: {waitingText}.";
+            SetDecisionFeedback(decisionItem, $"{prefix}Voting ends in {remainingSeconds}s. Waiting for: {waitingText}.");
         }
 
         public void CloseDecisionItem(DecisionItemBaseVM decisionItem)
@@ -290,6 +290,7 @@ namespace GameInterface.Services.Kingdoms
             decisionItem._finalSelectionDone = true;
             decisionItem.IsActive = false;
             decisionItem.RefreshCanEndDecision();
+            CampaignEvents.KingdomDecisionConcluded.ClearListeners(decisionItem);
             decisionItem._onDecisionOver?.Invoke();
             UnregisterDecisionItem(decisionItem);
         }
@@ -515,9 +516,16 @@ namespace GameInterface.Services.Kingdoms
         {
             if (string.IsNullOrWhiteSpace(kingdomId) || decisionIndex < 0) return;
 
-            PendingRoundStatuses.RemoveAll(candidate => candidate.KingdomId == kingdomId);
+            TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision);
+            foreach (DecisionItemBaseVM decisionItem in ActiveDecisionItems
+                         .Where(item => item?.KingdomDecisionMaker?._decision == decision)
+                         .ToList())
+            {
+                CloseDecisionItem(decisionItem);
+            }
 
-            if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision)) return;
+            PendingRoundStatuses.RemoveAll(candidate => candidate.KingdomId == kingdomId);
+            if (decision == null) return;
 
             RemoveDecisionState(decision);
         }
@@ -1496,6 +1504,14 @@ namespace GameInterface.Services.Kingdoms
                 option.IsSupportOption3Enabled = false;
             }
             RefreshDecisionWaitingStatus(decisionItem);
+        }
+
+        private static void SetDecisionFeedback(DecisionItemBaseVM decisionItem, string feedback)
+        {
+            if (decisionItem == null) return;
+
+            decisionItem.TitleText = feedback;
+            decisionItem.DescriptionText = feedback;
         }
 
         private static string FormatWaitingClan(KingdomDecisionRoundClanStatusData clan)

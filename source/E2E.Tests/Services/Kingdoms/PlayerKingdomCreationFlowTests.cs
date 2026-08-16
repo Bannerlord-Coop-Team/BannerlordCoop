@@ -837,10 +837,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(decisionItem.IsActive);
             Assert.True(decisionItem._finalSelectionDone);
             Assert.False(decisionItem.CanEndDecision);
-            Assert.Contains("Vote submitted", decisionItem.DescriptionText);
-            Assert.Contains("Voting ends in", decisionItem.DescriptionText);
-            Assert.Contains("Waiting for", decisionItem.DescriptionText);
-            Assert.Contains(waitingHero.Name.ToString(), decisionItem.DescriptionText);
+            Assert.Contains("Vote submitted", decisionItem.TitleText);
+            Assert.Contains("Voting ends in", decisionItem.TitleText);
+            Assert.Contains("Waiting for", decisionItem.TitleText);
+            Assert.Contains(waitingHero.Name.ToString(), decisionItem.TitleText);
             Assert.All(decisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
 
             decisionItem.OnFinalize();
@@ -850,9 +850,45 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             Assert.True(reopenedDecisionItem._finalSelectionDone);
             Assert.False(reopenedDecisionItem.CanEndDecision);
-            Assert.Contains("Vote submitted", reopenedDecisionItem.DescriptionText);
-            Assert.Contains(waitingHero.Name.ToString(), reopenedDecisionItem.DescriptionText);
+            Assert.Contains("Vote submitted", reopenedDecisionItem.TitleText);
+            Assert.Contains(waitingHero.Name.ToString(), reopenedDecisionItem.TitleText);
             Assert.All(reopenedDecisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
+        });
+    }
+
+    [Fact]
+    public void KingdomDecisionRemoval_ClosesActiveModalBeforeRemovingDecisionState()
+    {
+        var client = Clients.Skip(1).First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+
+        var proposer = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        var player = CreateSyncedPlayerContext(SecondControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(proposer.ClanId, kingdomId);
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(proposer.ClanId, out var proposerClan));
+            PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
+            }
+
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+
+            Assert.NotNull(decisionsVm.CurrentDecision);
+            client.SimulateMessage(this, new NetworkRemoveDecision(kingdomId, 0));
+
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.Empty(kingdom.UnresolvedDecisions);
         });
     }
 
