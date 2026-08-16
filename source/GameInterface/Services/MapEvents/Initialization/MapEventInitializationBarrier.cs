@@ -453,9 +453,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (PlayerCaptivity.IsCaptive ||
             encounter?.EncounterState != PlayerEncounterState.End ||
             encounter.BattleSimulation == null ||
-            (matchesDeferredSimulation
-                ? !cleanup.WasPlayerDefeated
-                : mapEvent.WinningSide == encounter.PlayerSide || !References(encounter, mapEvent)))
+            (!matchesDeferredSimulation &&
+                (mapEvent.WinningSide == encounter.PlayerSide || !References(encounter, mapEvent))))
         {
             return false;
         }
@@ -653,7 +652,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         public readonly PartyBase Party;
         public readonly PlayerEncounter Encounter;
         public readonly BattleSimulation BattleSimulation;
-        public readonly bool WasPlayerDefeated;
 
         public DeferredEncounterCleanup(MapEvent mapEvent, PartyBase party)
         {
@@ -661,7 +659,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             Party = party;
             Encounter = PlayerEncounter.Current;
             BattleSimulation = Encounter?.BattleSimulation;
-            WasPlayerDefeated = BattleSimulation != null && mapEvent.WinningSide != Encounter.PlayerSide;
         }
     }
 }

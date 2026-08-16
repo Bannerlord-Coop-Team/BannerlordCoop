@@ -422,10 +422,14 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false, PlayerEncounterState.Begin)]
-    [InlineData(true, PlayerEncounterState.End)]
+    [InlineData(false, BattleState.DefenderVictory, PlayerEncounterState.Begin)]
+    // The result message has already put the defeated encounter in End; do not let a stale local
+    // map-event winner override that authoritative per-player result while the scoreboard closes.
+    [InlineData(false, BattleState.AttackerVictory, PlayerEncounterState.Begin)]
+    [InlineData(true, BattleState.DefenderVictory, PlayerEncounterState.End)]
     public void SiegeSimulationDefeat_DestroyDefersEncounterCleanupUntilScoreboardCloses(
         bool playerCaptive,
+        BattleState localBattleState,
         PlayerEncounterState expectedEncounterState)
     {
         var setup = SetupSiegeSimulationResultClient();
@@ -448,7 +452,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             mapState._battleSimulation = encounter.BattleSimulation;
             Game.Current.GameStateManager._gameStates.Add(mapState);
 
-            destroyedMapEvent._battleState = BattleState.DefenderVictory;
+            destroyedMapEvent._battleState = localBattleState;
             if (playerCaptive)
                 Campaign.Current.PlayerCaptivity._captorParty = destroyedMapEvent.DefenderSide.LeaderParty;
 
