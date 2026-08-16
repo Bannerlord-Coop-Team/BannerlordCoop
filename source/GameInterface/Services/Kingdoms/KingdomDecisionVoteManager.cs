@@ -682,6 +682,21 @@ namespace GameInterface.Services.Kingdoms
             state.Decision.SupportStatusOfFinalDecision = supportStatus;
             string notificationText = GetDecisionNotificationText(state.Decision, chosenOutcome, supportStatus);
 
+            if (state.Decision is MakePeaceKingdomDecision peaceDecision && CoopKingdomElection.TryRedirectPlayerPeaceOffer(state.Decision, chosenOutcome)
+                && chosenOutcome is MakePeaceKingdomDecision.MakePeaceDecisionOutcome peaceOutcome && peaceOutcome.ShouldPeaceBeDeclared)
+            {
+                messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
+                    peaceDecision.Kingdom,
+                    (Kingdom)peaceDecision.FactionToMakePeaceWith,
+                    isPending: true));
+
+                if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
+                {
+                    state.Decision.Kingdom.RemoveDecision(state.Decision);
+                }
+                RemoveDecisionState(state.Decision);
+                return;
+            }
             messageBroker?.Publish(state.Decision, new KingdomDecisionResolved(
                 state.KingdomId,
                 state.DecisionIndex,
@@ -693,6 +708,16 @@ namespace GameInterface.Services.Kingdoms
             if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex))
             {
                 state.Election.ApplyChosenOutcomeCoop();
+            }
+            if (state.Decision is MakePeaceKingdomDecision decision)
+            {
+                if (decision.FactionToMakePeaceWith is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom())
+                {
+                    messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
+                        playerKingdom,
+                        decision.Kingdom,
+                        isPending: false));
+                }
             }
             if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
             {
