@@ -232,7 +232,14 @@ namespace GameInterface.Services.Kingdoms
             {
                 if (decisionItem?.KingdomDecisionMaker?._decision == decision)
                 {
-                    RefreshDecisionWaitingStatus(decisionItem);
+                    if (HasLocalPlayerSubmittedVote(decision))
+                    {
+                        ShowSubmittedState(decisionItem);
+                    }
+                    else
+                    {
+                        RefreshDecisionWaitingStatus(decisionItem);
+                    }
                 }
             }
         }
@@ -310,7 +317,10 @@ namespace GameInterface.Services.Kingdoms
             RefreshEligibleClanIds(state, decision);
             ApplyPendingRemoteVotes(state);
 
-            return state.FinalVotes.ContainsKey(canonicalClanId);
+            if (state.FinalVotes.ContainsKey(canonicalClanId)) return true;
+
+            return state.RoundClans.TryGetValue(canonicalClanId, out KingdomDecisionRoundClanStatusData roundClan) &&
+                   roundClan.HasFinalVote;
         }
 
         public bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem)
@@ -478,6 +488,7 @@ namespace GameInterface.Services.Kingdoms
             if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision))
             {
                 PublishDecisionNotification(notificationText);
+                ClearDecisionState(kingdomId, decisionIndex);
                 return;
             }
             KingdomDecisionVoteState state = GetOrCreateState(decision);
@@ -503,6 +514,8 @@ namespace GameInterface.Services.Kingdoms
         public void ClearDecisionState(string kingdomId, int decisionIndex)
         {
             if (string.IsNullOrWhiteSpace(kingdomId) || decisionIndex < 0) return;
+
+            PendingRoundStatuses.RemoveAll(candidate => candidate.KingdomId == kingdomId);
 
             if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision)) return;
 
