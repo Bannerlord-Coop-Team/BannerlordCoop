@@ -426,8 +426,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
         if (cleanup != null)
             deferredEncounterCleanup = null;
-        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent, cleanup);
         party._mapEventSide = null;
+        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent, cleanup);
         if (!continuedEncounter && CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
 
         ClearEngageOrder(party.MobileParty);

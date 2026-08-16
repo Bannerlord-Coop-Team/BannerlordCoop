@@ -488,7 +488,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
             AccessTools.Field(typeof(BattleSimulation), "_mapEvent")
                 .SetValue(PlayerEncounter.Current.BattleSimulation, destroyedMapEvent);
-            PlayerEncounter.Current.BattleSimulation.OnFinished();
+            PlayerEncounter.Update();
 
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
             Assert.NotNull(PlayerEncounter.Current);
