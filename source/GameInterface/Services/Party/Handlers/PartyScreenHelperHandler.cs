@@ -49,8 +49,6 @@ internal class PartyScreenHelperHandler : IHandler
         messageBroker.Subscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
         messageBroker.Subscribe<GarrisonDonated>(Handle_GarrisonDonated);
         messageBroker.Subscribe<DonateToGarrison>(Handle_DonateToGarrison);
-        messageBroker.Subscribe<PrisonersDonated>(Handle_PrisonersDonated);
-        messageBroker.Subscribe<DonatePrisoners>(Handle_DonatePrisoners);
         messageBroker.Subscribe<GarrisonManaged>(Handle_GarrisonManaged);
         messageBroker.Subscribe<DoManageGarrison>(Handle_DoManageGarrison);
         messageBroker.Subscribe<PrisonersReleasedAndTaken>(Handle_PrisonersReleasedAndTaken);
@@ -63,8 +61,6 @@ internal class PartyScreenHelperHandler : IHandler
         messageBroker.Unsubscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
         messageBroker.Unsubscribe<GarrisonDonated>(Handle_GarrisonDonated);
         messageBroker.Unsubscribe<DonateToGarrison>(Handle_DonateToGarrison);
-        messageBroker.Unsubscribe<PrisonersDonated>(Handle_PrisonersDonated);
-        messageBroker.Unsubscribe<DonatePrisoners>(Handle_DonatePrisoners);
         messageBroker.Unsubscribe<GarrisonManaged>(Handle_GarrisonManaged);
         messageBroker.Unsubscribe<DoManageGarrison>(Handle_DoManageGarrison);
         messageBroker.Unsubscribe<PrisonersReleasedAndTaken>(Handle_PrisonersReleasedAndTaken);
@@ -185,35 +181,6 @@ internal class PartyScreenHelperHandler : IHandler
                         currentSettlement);
                 }
             }
-        });
-    }
-
-    private void Handle_PrisonersDonated(MessagePayload<PrisonersDonated> obj)
-    {
-        FlattenedTroop[] rightSidePrisonerRoster = FlattenedTroopSerializer.Serialize(obj.What.RightSidePrisonerRoster, objectManager);
-        if (!objectManager.TryGetIdWithLogging(obj.What.CurrentSettlement, out var currentSettlementId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.RightParty, out var rightPartyId)) return;
-
-        var message = new DonatePrisoners(rightSidePrisonerRoster, currentSettlementId, rightPartyId);
-        network.SendAll(message);
-    }
-
-    private void Handle_DonatePrisoners(MessagePayload<DonatePrisoners> obj)
-    {
-        FlattenedTroopRoster rightSidePrisonerRoster = FlattenedTroopSerializer.Deserialize(obj.What.RightSidePrisonerRoster, objectManager);
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.RightPartyId, out var rightParty)) return;
-
-        GameThread.RunSafe(() =>
-        {
-            foreach (CharacterObject characterObject in rightSidePrisonerRoster.Troops)
-            {
-                if (characterObject.IsHero)
-                {
-                    EnterSettlementAction.ApplyForPrisoner(characterObject.HeroObject, currentSettlement);
-                }
-            }
-            CampaignEventDispatcher.Instance.OnPrisonerDonatedToSettlement(rightParty.MobileParty, rightSidePrisonerRoster, currentSettlement);
         });
     }
 
