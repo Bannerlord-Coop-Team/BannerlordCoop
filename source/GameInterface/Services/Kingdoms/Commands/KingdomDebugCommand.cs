@@ -11,6 +11,7 @@ using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using SandBox.GauntletUI;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -20,8 +21,11 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Kingdoms.Commands;
@@ -121,6 +125,47 @@ public class KingdomDebugCommand
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out voteManager);
+    }
+
+    [CommandLineArgumentFunction("open", "coop.debug.kingdom")]
+    public static string OpenKingdomScreen(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.open";
+        if (Clan.PlayerClan?.Kingdom == null) return "The player clan is not in a kingdom.";
+        if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
+        if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
+
+        KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(
+            (IFaction)Clan.PlayerClan);
+        Game.Current.GameStateManager.PushState(kingdomState, 0);
+        return "KINGDOM_SCREEN_OPENED";
+    }
+
+    [CommandLineArgumentFunction("close", "coop.debug.kingdom")]
+    public static string CloseKingdomScreen(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.close";
+        if (!(Game.Current?.GameStateManager?.ActiveState is KingdomState))
+            return "No active Kingdom screen.";
+
+        Game.Current.GameStateManager.PopState(0);
+        return "KINGDOM_SCREEN_CLOSED";
+    }
+
+    [CommandLineArgumentFunction("screen_state", "coop.debug.kingdom")]
+    public static string KingdomScreenState(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.screen_state";
+
+        var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
+        return $"KINGDOM_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is KingdomState} " +
+            $"topScreen={kingdomScreen != null} dataSource={kingdomScreen?.DataSource != null} " +
+            $"clanShown={kingdomScreen?.DataSource?.Clan?.Show ?? false} " +
+            $"kingdom={kingdomScreen?.DataSource?.Kingdom?.Name} " +
+            $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}";
     }
 
     // coop.debug.kingdom.create Derthert Vlandia_Reborn

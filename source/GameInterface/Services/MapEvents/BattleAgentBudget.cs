@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -15,7 +15,7 @@ public interface IBattleAgentBudget
     /// <summary>The engine's rendered-agent ceiling (BR-110).</summary>
     int MaxRenderedAgents { get; }
 
-    /// <summary>Active agents currently in the mission — humans AND mounts, since both occupy render slots.</summary>
+    /// <summary>Native agent objects still owned by the mission, including removed agents awaiting deletion.</summary>
     int CountLiveAgents(Mission mission);
 
     /// <summary>Spawnable slots left under the engine limit for a given live agent count.</summary>
@@ -54,13 +54,7 @@ public class BattleAgentBudget : IBattleAgentBudget
     /// <inheritdoc/>
     public int CountLiveAgents(Mission mission)
     {
-        var agents = mission?.Agents;
-        if (agents == null) return 0;
-
-        int live = 0;
-        foreach (var agent in agents)
-            if (agent != null && agent.IsActive()) live++;
-        return live;
+        return mission?.AllAgents?.Count ?? 0;
     }
 
     /// <inheritdoc/>

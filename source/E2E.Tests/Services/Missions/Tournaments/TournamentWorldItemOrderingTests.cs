@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using HarmonyLib;
@@ -84,6 +84,62 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         }
     }
 
+    [Fact]
+    public void EmptyExtraSlot_DoesNotQueryNativeWeaponEntity()
+    {
+        var harmony = new Harmony("e2e.empty-extra-slot-weapon-drop");
+        PatchAgentEquipment(harmony);
+
+        try
+        {
+            var observer = Clients.First();
+            SetControllerId(observer, "observer");
+
+            observer.Call(() =>
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionEquipment equipment = CreateEquipmentWithWeapon();
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = observer.Resolve<INetworkWorldItemRegistry>();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+                Assert.True(equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+
+                using var messageBroker = new MessageBroker();
+                var handler = new WeaponDropHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    messageBroker,
+                    observer.Resolve<IBattleNetwork>());
+                try
+                {
+                    messageBroker.Publish(
+                        this,
+                        new NetworkWeaponDropped(
+                            agentId,
+                            EquipmentIndex.ExtraWeaponSlot,
+                            worldItemId));
+
+                    Assert.Equal(0, AgentEquipmentShim.GetWeaponEntityLookupCount(agent));
+                    Assert.Equal(0, AgentEquipmentShim.GetDropCount(agent));
+                    Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+                }
+                finally
+                {
+                    handler.Dispose();
+                }
+            });
+        }
+        finally
+        {
+            AgentEquipmentShim.Clear();
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
     private static MissionEquipment CreateEquipmentWithWeapon()
     {
         var equipment = new MissionEquipment();
@@ -145,6 +201,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         {
             public MissionEquipment Equipment { get; }
             public int DropCount { get; set; }
+            public int WeaponEntityLookupCount { get; set; }
 
             public State(MissionEquipment equipment)
             {
@@ -158,6 +215,9 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             States.Add(agent, new State(equipment));
 
         public static int GetDropCount(Agent agent) => States[agent].DropCount;
+
+        public static int GetWeaponEntityLookupCount(Agent agent) =>
+            States[agent].WeaponEntityLookupCount;
 
         public static void Clear() => States.Clear();
 
@@ -189,6 +249,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             ref WeakGameEntity __result)
         {
             if (!States.TryGetValue(__instance, out State state)) return true;
+            state.WeaponEntityLookupCount++;
             if (!state.Equipment[slotIndex].IsEmpty) return true;
             __result = default;
             return false;

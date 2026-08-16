@@ -1,5 +1,6 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.PartyComponents.Messages;
 
@@ -11,19 +12,19 @@ internal readonly struct NetworkUpdateCaravanPartyComponentInitArgs : IEvent
     [ProtoMember(2)]
     public readonly string CaravanLeaderId;
     [ProtoMember(3)]
-    public readonly string CaravanItemRosterId;
+    public readonly ItemRosterElement[] CaravanItems;
     [ProtoMember(4)]
     public readonly string PartyTemplateObjectId;
 
     public NetworkUpdateCaravanPartyComponentInitArgs(
         string caravanPartyComponentId,
         string caravanLeaderId,
-        string caravanItemRosterId,
+        ItemRosterElement[] caravanItems,
         string partyTemplateObjectId)
     {
         CaravanPartyComponentId = caravanPartyComponentId;
         CaravanLeaderId = caravanLeaderId;
-        CaravanItemRosterId = caravanItemRosterId;
+        CaravanItems = caravanItems;
         PartyTemplateObjectId = partyTemplateObjectId;
     }
 }
