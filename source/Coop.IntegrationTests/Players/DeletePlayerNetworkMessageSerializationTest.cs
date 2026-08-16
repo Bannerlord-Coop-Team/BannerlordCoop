@@ -48,7 +48,11 @@ public class DeletePlayerNetworkMessageSerializationTest
 
         var copy = RoundTrip(original);
 
-        Assert.Equal(player, copy.Player);
+        Assert.Equal(player.ControllerId, copy.Player.ControllerId);
+        Assert.Equal(player.HeroId, copy.Player.HeroId);
+        Assert.Equal(player.MobilePartyId, copy.Player.MobilePartyId);
+        Assert.Equal(player.ClanId, copy.Player.ClanId);
+        Assert.Equal(player.CharacterObjectId, copy.Player.CharacterObjectId);
         Assert.Equal(registrationIds, copy.RegistrationIds);
     }
 
