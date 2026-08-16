@@ -6,6 +6,7 @@ using GameInterface.Services.Clans.Handlers;
 using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -20,6 +21,7 @@ namespace GameInterface.Services.Alliances;
 [HarmonyPatch]
 internal class AllianceCampaignBehaviorPatches
 {
+    [ThreadStatic]
     public static Hero PendingPayingHero;
     private static readonly ILogger Logger = LogManager.GetLogger<VassalServiceHandler>();
     [HarmonyPatch(typeof(AllianceCampaignBehavior), nameof(AllianceCampaignBehavior.StartAlliance))]

@@ -1,9 +1,6 @@
-using Common;
 using GameInterface.Services.Kingdoms.Extentions;
 ﻿using Common.Logging;
 using GameInterface.Services.Clans.Handlers;
-using GameInterface.Services.Kingdoms.Extentions;
-﻿using Common;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -66,7 +63,6 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || decision.IsSingleClanDecision() || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
             {
-
                 __instance._shouldCheckForDecision = false;
                 DecisionItemBaseVM decisionItem = __instance.GetDecisionItemBasedOnType(decision);
 
@@ -262,6 +258,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         internal static void OnSetPeaceItemPostfix(KingdomDiplomacyVM __instance, KingdomTruceItemVM item)
         {
+            if (AllianceOfferPending(__instance, item)) return;
             DisableDiplomacyResolveActionsIfAlreadyVoted(__instance, item);
         }
 
@@ -301,6 +298,19 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             return PeaceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId);
         }
+
+        internal static bool AllianceOfferPending(KingdomDiplomacyVM diplomacyVm, KingdomTruceItemVM diplomacyItem)
+        {
+            if (diplomacyVm?.Actions == null || diplomacyItem == null) return false;
+            if (Clan.PlayerClan?.Kingdom == null) return false;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = diplomacyItem.Faction2 as Kingdom;
+            if (targetKingdom == null) return false;
+
+            return AllianceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId);
+        }
+
         private static IEnumerable<KingdomDecision> GetResolveDecisions(KingdomDiplomacyItemVM diplomacyItem)
         {
             if (Clan.PlayerClan?.Kingdom?.UnresolvedDecisions == null) yield break;
@@ -358,6 +368,34 @@ namespace GameInterface.Services.Kingdoms.Patches
             disabledReason = new TextObject("You have already offered peace to this kingdom.");
             return false;
         }
+
+        [HarmonyPatch(nameof(KingdomDiplomacyVM.GetIsProposingAllianceEnabledWithReason))]
+        [HarmonyPrefix]
+        private static bool GetIsProposingAllianceEnabledWithReasonPrefix(
+        KingdomDiplomacyVM __instance,
+        KingdomTruceItemVM item,
+        float actionInfluenceCost,
+        ref TextObject disabledReason,
+        ref bool __result)
+        {
+            if (item == null || Clan.PlayerClan?.Kingdom == null)
+                return true;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = item.Faction2 as Kingdom;
+
+            if (targetKingdom == null)
+                return true;
+
+            if (!playerKingdom._unresolvedDecisions.OfType<MakePeaceKingdomDecision>().Any(d => d.Kingdom == playerKingdom && d.FactionToMakePeaceWith == targetKingdom)
+                && !AllianceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId))
+            {
+                return true;
+            }
+            __result = false;
+            disabledReason = new TextObject("You have already offered an alliance to this kingdom.");
+            return false;
+        }
     }
 
     [HarmonyPatch(typeof(KingdomDiplomacyProposalActionItemVM))]
@@ -398,6 +436,21 @@ namespace GameInterface.Services.Kingdoms.Patches
     }
 
     public static class PeaceOfferPendingRegistry
+    {
+        internal static readonly Dictionary<(string, string), bool> _pending = new();
+
+        public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
+        {
+            var key = (requestingKingdomId, targetKingdomId);
+            if (isPending) _pending[key] = true;
+            else _pending.Remove(key);
+        }
+
+        public static bool IsPending(string requestingKingdomId, string targetKingdomId)
+            => _pending.TryGetValue((requestingKingdomId, targetKingdomId), out var val) && val;
+    }
+
+    public static class AllianceOfferPendingRegistry
     {
         internal static readonly Dictionary<(string, string), bool> _pending = new();
 

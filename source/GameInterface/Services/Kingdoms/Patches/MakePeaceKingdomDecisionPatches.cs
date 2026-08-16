@@ -33,6 +33,7 @@ internal static class PendingPlayerPeaceOfferCancellationPatch
             var allianceDecision = (StartAllianceDecision)__instance;
             __result = __instance.Kingdom.IsEliminated
                 || __instance.ProposerClan?.Kingdom != __instance.Kingdom
+                || !__instance.IsAllowed()
                 || allianceDecision.KingdomToStartAllianceWith == null
                 || allianceDecision.KingdomToStartAllianceWith.IsEliminated
                 || __instance.Kingdom.IsAtWarWith(allianceDecision.KingdomToStartAllianceWith);

@@ -64,6 +64,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Subscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
         messageBroker.Subscribe<NetworkPeaceOfferPendingStatusChanged>(Handle_NetworkPeaceOfferPendingStatusChanged);
+        messageBroker.Subscribe<NetworkAllianceOfferPendingStatusChanged>(Handle_NetworkAllianceOfferPendingStatusChanged);
     }
 
     private void HandleKingdomCreationRequested(MessagePayload<KingdomCreationRequested> obj)
@@ -424,6 +425,18 @@ public class ClientKingdomHandler : IHandler
             PeaceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, obj.IsPending);
         });
     }
+
+    private void Handle_NetworkAllianceOfferPendingStatusChanged(MessagePayload<NetworkAllianceOfferPendingStatusChanged> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var obj = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.RequestingKingdomId, out var requestingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.TargetKingdomId, out var targetKingdom)) return;
+            AllianceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, obj.IsPending);
+        });
+    }
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
@@ -440,6 +453,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Unsubscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
         messageBroker.Unsubscribe<NetworkPeaceOfferPendingStatusChanged>(Handle_NetworkPeaceOfferPendingStatusChanged);
+        messageBroker.Unsubscribe<NetworkAllianceOfferPendingStatusChanged>(Handle_NetworkAllianceOfferPendingStatusChanged);
     }
 
     private readonly struct PendingSettlementRestore

@@ -6,7 +6,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.Kingdoms.Extentions
 {
@@ -145,7 +144,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (decision is not MakePeaceKingdomDecision peaceDecision
                 || peaceDecision._isProposedByOpponent
                 || peaceDecision.FactionToMakePeaceWith is not Kingdom playerKingdom
-                || !playerKingdom.Clans.Any(clan => clan.IsPlayerClan()))
+                || !playerKingdom.IsPlayerKingdom())
             {
                 return false;
             }
@@ -188,7 +187,9 @@ namespace GameInterface.Services.Kingdoms.Extentions
 
         internal static bool IsPendingPlayerAllianceOffer(KingdomDecision decision)
         {
-            return decision is StartAllianceDecision && decision.Kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true;
+            return decision is StartAllianceDecision 
+                    && _opponentProposedAllianceDecisions.Contains(decision) 
+                    && decision.Kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true;
         }
 
         internal static bool TryRedirectPlayerAllianceOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)
@@ -196,7 +197,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (decision is not StartAllianceDecision allianceDecision
                 || _opponentProposedAllianceDecisions.Contains(allianceDecision)
                 || allianceDecision.KingdomToStartAllianceWith is not Kingdom playerKingdom
-                || !playerKingdom.Clans.Any(clan => clan.IsPlayerClan()))
+                || !playerKingdom.IsPlayerKingdom())
             {
                 return false;
             }
@@ -210,7 +211,8 @@ namespace GameInterface.Services.Kingdoms.Extentions
             Kingdom proposingKingdom = allianceDecision.Kingdom;
             bool offerAlreadyPending = playerKingdom.UnresolvedDecisions
                 .OfType<StartAllianceDecision>()
-                .Any(existing => existing.KingdomToStartAllianceWith == proposingKingdom);
+                .Any(existing => existing.KingdomToStartAllianceWith == proposingKingdom
+                && _opponentProposedAllianceDecisions.Contains(existing));
 
             if (offerAlreadyPending || playerKingdom.RulingClan == null)
             {
@@ -228,7 +230,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
         {
             if (decision is not ProposeCallToWarAgreementDecision callToWarDecision
                 || callToWarDecision.CalledKingdom is not Kingdom playerKingdom
-                || !playerKingdom.Clans.Any(clan => clan.IsPlayerClan()))
+                || !playerKingdom.IsPlayerKingdom())
             {
                 return false;
             }
