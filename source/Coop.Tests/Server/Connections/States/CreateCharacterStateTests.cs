@@ -152,6 +152,11 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var hero = SetupUnpackedHero();
             var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            var rollbackMock = serverComponent.Container.Resolve<Mock<IPlayerCreationRollback>>();
+            var registrationIds = new[] { "Hero_test", "MobileParty_test", "TroopRoster_MemberRoster_test" };
+            rollbackMock
+                .Setup(rollback => rollback.CaptureRegistrationIds(It.IsAny<Player>()))
+                .Returns(registrationIds);
             Player registeredPlayer = null;
             playerManagerMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
@@ -176,6 +181,8 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.TestNetwork.ImmediateSends,
                 send => send.Payload is NetworkHeroRecieved);
             playerManagerMock.Verify(p => p.RemovePlayer(registeredPlayer), Times.Once);
+            rollbackMock.Verify(rollback => rollback.CaptureRegistrationIds(registeredPlayer), Times.Once);
+            rollbackMock.Verify(rollback => rollback.Rollback(registeredPlayer, registrationIds), Times.Once);
 
             var remoteMessages = serverComponent.TestNetwork.GetPeerMessages(differentPeer).ToList();
             Assert.Collection(
@@ -183,9 +190,9 @@ namespace Coop.Tests.Server.Connections.States
                 message => Assert.IsType<NetworkNewPlayerHeroCreated>(message),
                 message =>
                 {
-                    var removed = Assert.IsType<NetworkPlayerRemoved>(message);
-                    Assert.Equal(registeredPlayer.ControllerId, removed.ControllerId);
-                    Assert.Equal(registeredPlayer.HeroId, removed.HeroId);
+                    var rollback = Assert.IsType<NetworkPlayerCreationRolledBack>(message);
+                    Assert.Equal(registeredPlayer, rollback.Player);
+                    Assert.Equal(registrationIds, rollback.RegistrationIds);
                 });
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
         }

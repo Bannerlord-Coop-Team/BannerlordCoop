@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Messages;
@@ -8,7 +9,6 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -26,6 +26,7 @@ public class CreateCharacterState : ConnectionStateBase
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerManager;
+    private readonly IPlayerCreationRollback playerCreationRollback;
     private readonly IExistingPlayerSender existingPlayerSender;
 
     public CreateCharacterState(
@@ -35,6 +36,7 @@ public class CreateCharacterState : ConnectionStateBase
         INetwork network,
         IHeroInterface heroInterface,
         IPlayerManager playerManager,
+        IPlayerCreationRollback playerCreationRollback,
         IExistingPlayerSender existingPlayerSender)
         : base(connectionLogic)
     {
@@ -43,6 +45,7 @@ public class CreateCharacterState : ConnectionStateBase
         this.network = network;
         this.heroInterface = heroInterface;
         this.playerManager = playerManager;
+        this.playerCreationRollback = playerCreationRollback;
         this.existingPlayerSender = existingPlayerSender;
         messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
     }
@@ -105,11 +108,19 @@ public class CreateCharacterState : ConnectionStateBase
                 "Failed to set up hero for {ControllerId}; disconnecting the joining peer",
                 controllerId);
 
-            if (!playerManager.RemovePlayer(player))
-                Logger.Error("Failed to roll back player registration for {ControllerId}", controllerId);
+            var registrationIds = System.Array.Empty<string>();
+            GameThread.RunSafe(() =>
+            {
+                if (!playerManager.RemovePlayer(player))
+                    Logger.Error("Failed to roll back player registration for {ControllerId}", controllerId);
 
-            // Existing clients created this graph before setup ran, so remove their registration on the same channel.
-            network.SendAllBut(netPeer, new NetworkPlayerRemoved(controllerId, player.HeroId));
+                registrationIds = playerCreationRollback.CaptureRegistrationIds(player);
+                playerCreationRollback.Rollback(player, registrationIds);
+            }, blocking: true, context: "CreateCharacterState.PlayerCreationRollback");
+
+            // Existing clients created this graph before setup ran. This final ordered message removes their
+            // player registration and every imported graph object after any setup-side cleanup broadcasts.
+            network.SendAllBut(netPeer, new NetworkPlayerCreationRolledBack(player, registrationIds));
             ConnectionLogic.Peer.Disconnect();
             return;
         }
