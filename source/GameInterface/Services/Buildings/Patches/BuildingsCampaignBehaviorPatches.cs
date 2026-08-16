@@ -1,4 +1,6 @@
 ﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.Buildings.Messages;
 using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -45,6 +47,12 @@ internal class BuildingsCampaignBehaviorPatches
             if (!town.CurrentBuilding.BuildingType.IsDailyProject)
             {
                 __instance.TickCurrentBuildingForTown(town);
+
+                // Update client's settlement management screen with latest tick
+                // Vanilla is normally paused on this screen so ticks won't update normally
+                var message = new RefreshPlayerSettlementManagementVM(town);
+                MessageBroker.Instance.Publish(__instance, message);
+
                 return false;
             }
             if (town.Governor != null && town.Governor.GetPerkValue(DefaultPerks.Charm.Virile) && MBRandom.RandomFloat <= DefaultPerks.Charm.Virile.SecondaryBonus)

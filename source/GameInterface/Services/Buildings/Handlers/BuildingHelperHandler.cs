@@ -2,18 +2,20 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Buildings.Messages;
+using GameInterface.Services.Buildings.Patches;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.UI.Notifications.Messages;
 using Helpers;
-using LiteNetLib;
+using SandBox.GauntletUI;
+using SandBox.GauntletUI.Menu;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Buildings.Handlers;
 
@@ -36,20 +38,30 @@ internal class BuildingHelperHandler : IHandler
 
         messageBroker.Subscribe<DefaultBuildingChanged>(Handle_DefaultBuildingChanged);
         messageBroker.Subscribe<ChangeDefaultBuilding>(Handle_ChangeDefaultBuilding);
+
         messageBroker.Subscribe<CurrentBuildingQueueChanged>(Handle_CurrentBuildingQueueChanged);
         messageBroker.Subscribe<ChangeCurrentBuildingQueue>(Handle_ChangeCurrentBuildingQueue);
+
         messageBroker.Subscribe<BuildingProcessBoostedWithGold>(Handle_BuildingProcessBoostedWithGold);
         messageBroker.Subscribe<BoostBuildingProcessWithGold>(Handle_BoostBuildingProcessWithGold);
+
+        messageBroker.Subscribe<RefreshPlayerSettlementManagementVM>(Handle_RefreshPlayerSettlementManagementVM);
+        messageBroker.Subscribe<NetworkRefreshPlayerSettlementManagementVM>(Handle_NetworkRefreshPlayerSettlementManagementVM);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<DefaultBuildingChanged>(Handle_DefaultBuildingChanged);
         messageBroker.Unsubscribe<ChangeDefaultBuilding>(Handle_ChangeDefaultBuilding);
+
         messageBroker.Unsubscribe<CurrentBuildingQueueChanged>(Handle_CurrentBuildingQueueChanged);
         messageBroker.Unsubscribe<ChangeCurrentBuildingQueue>(Handle_ChangeCurrentBuildingQueue);
+
         messageBroker.Unsubscribe<BuildingProcessBoostedWithGold>(Handle_BuildingProcessBoostedWithGold);
         messageBroker.Unsubscribe<BoostBuildingProcessWithGold>(Handle_BoostBuildingProcessWithGold);
+
+        messageBroker.Unsubscribe<RefreshPlayerSettlementManagementVM>(Handle_RefreshPlayerSettlementManagementVM);
+        messageBroker.Unsubscribe<NetworkRefreshPlayerSettlementManagementVM>(Handle_NetworkRefreshPlayerSettlementManagementVM);
     }
 
     private void Handle_DefaultBuildingChanged(MessagePayload<DefaultBuildingChanged> obj)
@@ -65,19 +77,12 @@ internal class BuildingHelperHandler : IHandler
     {
         var data = obj.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Building>(data.NewDefaultId, out var newDefault)) return;
-                if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+            if (!objectManager.TryGetObjectWithLogging<Building>(data.NewDefaultId, out var newDefault)) return;
+            if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
 
-                BuildingHelper.ChangeDefaultBuilding(newDefault, town);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply {Message}", nameof(ChangeDefaultBuilding));
-            }
+            BuildingHelper.ChangeDefaultBuilding(newDefault, town);
         });
     }
 
@@ -101,28 +106,27 @@ internal class BuildingHelperHandler : IHandler
     {
         var data = obj.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
+            if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+
+            var buildings = new List<Building>();
+            if (data.BuildingIds != null)
             {
-                var buildings = new List<Building>();
-                if (data.BuildingIds != null)
+                foreach (var buildingId in data.BuildingIds)
                 {
-                    foreach (var buildingId in data.BuildingIds)
-                    {
-                        if (!objectManager.TryGetObjectWithLogging<Building>(buildingId, out var currentBuilding)) continue;
+                    if (!objectManager.TryGetObjectWithLogging<Building>(buildingId, out var currentBuilding)) continue;
 
-                        buildings.Add(currentBuilding);
-                    }
+                    buildings.Add(currentBuilding);
                 }
-
-                if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
-
-                BuildingHelper.ChangeCurrentBuildingQueue(buildings, town);
             }
-            catch (Exception e)
+
+            BuildingHelper.ChangeCurrentBuildingQueue(buildings, town);
+
+            // Reject new buildings in queue if they have already been constructed
+            foreach (var building in buildings)
             {
-                Logger.Error(e, "Failed to apply {Message}", nameof(ChangeCurrentBuildingQueue));
+                BuildingHelper.CheckIfBuildingIsComplete(building);
             }
         });
     }
@@ -139,32 +143,53 @@ internal class BuildingHelperHandler : IHandler
     private void Handle_BoostBuildingProcessWithGold(MessagePayload<BoostBuildingProcessWithGold> obj)
     {
         var data = obj.What;
-        var peer = obj.Who as NetPeer;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
 
-                int difference = 0;
-                if (data.Gold < town.BoostBuildingProcess)
-                {
-                    difference = town.BoostBuildingProcess - data.Gold;
-                    GiveGoldAction.ApplyBetweenCharacters(null, hero, difference, false);
-                }
-                else if (data.Gold > town.BoostBuildingProcess)
-                {
-                    difference = data.Gold - town.BoostBuildingProcess;
-                    GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
-                }
-                town.BoostBuildingProcess = data.Gold;
-            }
-            catch (Exception e)
+            int difference = 0;
+            if (data.Gold < town.BoostBuildingProcess)
             {
-                Logger.Error(e, "Failed to apply {Message}", nameof(BoostBuildingProcessWithGold));
+                difference = town.BoostBuildingProcess - data.Gold;
+                GiveGoldAction.ApplyBetweenCharacters(null, hero, difference, false);
             }
+            else if (data.Gold > town.BoostBuildingProcess)
+            {
+                difference = data.Gold - town.BoostBuildingProcess;
+                GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
+            }
+            town.BoostBuildingProcess = data.Gold;
+        });
+    }
+
+    private void Handle_RefreshPlayerSettlementManagementVM(MessagePayload<RefreshPlayerSettlementManagementVM> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.Town, out var townId)) return;
+
+        var message = new NetworkRefreshPlayerSettlementManagementVM(townId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkRefreshPlayerSettlementManagementVM(MessagePayload<NetworkRefreshPlayerSettlementManagementVM> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+
+            // Client isn't in the settlement management screen
+            if (TownManagementViewPatches.Current?._dataSource == null) return;
+
+            // Client is in the settlement management screen but not looking at the updated town
+            if (TownManagementViewPatches.Current._dataSource._settlement != town.Settlement) return;
+
+            TownManagementViewPatches.Current._dataSource.RefreshCurrentDevelopment();
+            TownManagementViewPatches.Current._dataSource.RefreshTownManagementStats();
+
+            TownManagementViewPatches.Current._dataSource._projectSelection?.Refresh();
         });
     }
 }
