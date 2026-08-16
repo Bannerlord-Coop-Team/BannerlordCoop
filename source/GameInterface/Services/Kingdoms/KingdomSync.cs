@@ -33,6 +33,7 @@ namespace GameInterface.Services.Kingdoms
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.NotAttackableByPlayerUntilTime)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.PrimaryBannerColor)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.SecondaryBannerColor)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.CallToWarWallet)));
 
             // Fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom.PoliticalStagnation)));

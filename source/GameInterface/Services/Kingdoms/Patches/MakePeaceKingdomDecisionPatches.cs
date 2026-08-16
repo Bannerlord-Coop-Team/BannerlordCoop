@@ -1,5 +1,6 @@
 using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
@@ -16,19 +17,28 @@ internal static class PendingPlayerPeaceOfferCancellationPatch
     [HarmonyPrefix]
     private static bool ShouldBeCancelledPrefix(KingdomDecision __instance, ref bool __result)
     {
-        if (!CoopKingdomElection.IsPendingPlayerPeaceOffer(__instance))
+        if (CoopKingdomElection.IsPendingPlayerPeaceOffer(__instance))
         {
-            return true;
+            var peaceDecision = (MakePeaceKingdomDecision)__instance;
+            __result = __instance.Kingdom.IsEliminated
+                       || __instance.ProposerClan?.Kingdom != __instance.Kingdom
+                       || !__instance.IsAllowed()
+                       || peaceDecision.FactionToMakePeaceWith == null
+                       || peaceDecision.FactionToMakePeaceWith.IsEliminated
+                       || !__instance.Kingdom.IsAtWarWith(peaceDecision.FactionToMakePeaceWith);
+            return false;
         }
-
-        var peaceDecision = (MakePeaceKingdomDecision)__instance;
-        __result = __instance.Kingdom.IsEliminated
-                   || __instance.ProposerClan?.Kingdom != __instance.Kingdom
-                   || !__instance.IsAllowed()
-                   || peaceDecision.FactionToMakePeaceWith == null
-                   || peaceDecision.FactionToMakePeaceWith.IsEliminated
-                   || !__instance.Kingdom.IsAtWarWith(peaceDecision.FactionToMakePeaceWith);
-        return false;
+        if (CoopKingdomElection.IsPendingPlayerAllianceOffer(__instance))
+        {
+            var allianceDecision = (StartAllianceDecision)__instance;
+            __result = __instance.Kingdom.IsEliminated
+                || __instance.ProposerClan?.Kingdom != __instance.Kingdom
+                || allianceDecision.KingdomToStartAllianceWith == null
+                || allianceDecision.KingdomToStartAllianceWith.IsEliminated
+                || __instance.Kingdom.IsAtWarWith(allianceDecision.KingdomToStartAllianceWith);
+            return false;
+        }
+        return true;
     }
 }
 

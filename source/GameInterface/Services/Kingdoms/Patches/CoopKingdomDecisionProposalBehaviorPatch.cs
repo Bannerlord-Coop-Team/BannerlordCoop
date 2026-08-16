@@ -163,7 +163,7 @@ namespace GameInterface.Services.Kingdoms.Patches
                         {
                             // An unanswered inbound player peace offer expires as a decline.
                             // It must never fall through to the forced AI resolution path.
-                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision))
+                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
                             {
                                 kingdom.RemoveDecision(decision);
                                 CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, true);

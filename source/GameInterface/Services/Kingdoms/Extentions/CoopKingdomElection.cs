@@ -1,17 +1,19 @@
-﻿using System.Linq;
-using Common;
+﻿using Common;
 using GameInterface.Services.Clans.Extensions;
+using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.Kingdoms.Extentions
 {
     public class CoopKingdomElection : KingdomElection
     {
         private float? randomFloat;
-
+        public static readonly HashSet<KingdomDecision> _opponentProposedAllianceDecisions = new();
         public float RandomFloat
         {
             get
@@ -114,7 +116,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             // The synchronized kingdom decision is the player-facing prompt. Native's peace
             // notification checks process-local player singletons and must not run again when
             // the explicit co-op vote is resolved on the authoritative server.
-            if (IsPendingPlayerPeaceOffer(this._decision) || this._decision.OnShowDecision())
+            if (IsPendingPlayerPeaceOffer(this._decision) || this._decision.OnShowDecision() || IsPendingPlayerAllianceOffer(this._decision))
             {
                 this.ApplyChosenOutcome();
             }
@@ -123,7 +125,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
         private void ReadyToAiChooseCoop()
         {
             this._chosenOutcome = this.GetAiChoiceCoop(this._possibleOutcomes);
-            if (TryRedirectPlayerPeaceOffer(this._decision, this._chosenOutcome))
+            if (TryRedirectPlayerPeaceOffer(this._decision, this._chosenOutcome) || TryRedirectPlayerAllianceOffer(this._decision, this._chosenOutcome) || TryRedirectPlayerProposeCallToWarAgreementOffer(this._decision, this._chosenOutcome))
             {
                 return;
             }
@@ -184,6 +186,74 @@ namespace GameInterface.Services.Kingdoms.Extentions
                    && decision.Kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true;
         }
 
+        internal static bool IsPendingPlayerAllianceOffer(KingdomDecision decision)
+        {
+            return decision is StartAllianceDecision && decision.Kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true;
+        }
+
+        internal static bool TryRedirectPlayerAllianceOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)
+        {
+            if (decision is not StartAllianceDecision allianceDecision
+                || _opponentProposedAllianceDecisions.Contains(allianceDecision)
+                || allianceDecision.KingdomToStartAllianceWith is not Kingdom playerKingdom
+                || !playerKingdom.Clans.Any(clan => clan.IsPlayerClan()))
+            {
+                return false;
+            }
+            // Consume the original NPC decision on every instance. Only the authoritative
+            // server authors the target-side offer that is then replicated to clients.
+            if (chosenOutcome is not StartAllianceDecision.StartAllianceDecisionOutcome { ShouldAllianceBeStarted: true }
+                || ModInformation.IsClient)
+            {
+                return true;
+            }
+            Kingdom proposingKingdom = allianceDecision.Kingdom;
+            bool offerAlreadyPending = playerKingdom.UnresolvedDecisions
+                .OfType<StartAllianceDecision>()
+                .Any(existing => existing.KingdomToStartAllianceWith == proposingKingdom);
+
+            if (offerAlreadyPending || playerKingdom.RulingClan == null)
+            {
+                return true;
+            }
+
+            var playerDecision = new StartAllianceDecision(playerKingdom.RulingClan, proposingKingdom);
+            _opponentProposedAllianceDecisions.Add(playerDecision);
+            playerKingdom.AddDecision(playerDecision, ignoreInfluenceCost: true);
+
+            return true;
+        }
+
+        internal static bool TryRedirectPlayerProposeCallToWarAgreementOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)
+        {
+            if (decision is not ProposeCallToWarAgreementDecision callToWarDecision
+                || callToWarDecision.CalledKingdom is not Kingdom playerKingdom
+                || !playerKingdom.Clans.Any(clan => clan.IsPlayerClan()))
+            {
+                return false;
+            }
+            // Consume the original NPC decision on every instance. Only the authoritative
+            // server authors the target-side offer that is then replicated to clients.
+            if (chosenOutcome is not ProposeCallToWarAgreementDecision.ProposeCallToWarAgreementDecisionOutcome { ShouldCallToWar : true}
+                || ModInformation.IsClient)
+            {
+                return true;
+            }
+            Kingdom proposingKingdom = callToWarDecision.Kingdom;
+            bool offerAlreadyPending = playerKingdom.UnresolvedDecisions
+                .OfType<AcceptCallToWarAgreementDecision>()
+                .Any(existing => existing.CallingKingdom == proposingKingdom && existing.KingdomToCallToWarAgainst == callToWarDecision.KingdomToCallToWarAgainst);
+
+            if (offerAlreadyPending || playerKingdom.RulingClan == null)
+            {
+                return true;
+            }
+
+            var playerDecision = new AcceptCallToWarAgreementDecision(playerKingdom.RulingClan, proposingKingdom, callToWarDecision.KingdomToCallToWarAgainst);
+            playerKingdom.AddDecision(playerDecision, ignoreInfluenceCost: true);
+
+            return true;
+        }
         public DecisionOutcome GetAiChoiceCoop(MBReadOnlyList<DecisionOutcome> possibleOutcomes)
         {
             this.DetermineOfficialSupport();

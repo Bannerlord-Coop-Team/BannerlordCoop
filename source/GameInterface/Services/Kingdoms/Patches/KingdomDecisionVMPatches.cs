@@ -1,5 +1,9 @@
-﻿using Common;
+using Common;
+using GameInterface.Services.Kingdoms.Extentions;
+﻿using Common.Logging;
+using GameInterface.Services.Clans.Handlers;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,12 +15,14 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Policies;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
     [HarmonyPatch(typeof(KingdomDecisionsVM))]
     internal class KingdomDecisionsVMPatches
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<VassalServiceHandler>();
         [HarmonyPatch(nameof(KingdomDecisionsVM.HandleDecision))]
         [HarmonyPrefix]
         private static bool HandleDecisionPrefix(KingdomDecisionsVM __instance, KingdomDecision __0)
@@ -44,6 +50,21 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!TryGetVoteManager(out var voteManager)) return;
 
             voteManager.RegisterDecisionItem(__instance.CurrentDecision);
+        }
+        [HarmonyPatch(typeof(KingdomDecisionsVM), nameof(KingdomDecisionsVM.RefreshWith))]
+        [HarmonyPrefix]
+        private static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
+        {
+            if (CoopKingdomElection.IsPendingPlayerAllianceOffer(decision) || decision.IsSingleClanDecision())
+            {
+                __instance._shouldCheckForDecision = false;
+                DecisionItemBaseVM decisionItem = __instance.GetDecisionItemBasedOnType(decision);
+
+                __instance.CurrentDecision = decisionItem;
+                __instance.CurrentDecision.SetDoneInputKey(__instance.DoneInputKey);
+                return false;
+            }
+            return true;
         }
 
         internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
@@ -335,8 +356,6 @@ namespace GameInterface.Services.Kingdoms.Patches
     {
         public void Refresh(IFaction faction)
         {
-            if (ModInformation.IsServer) return;
-
             if (faction is Kingdom kingdom)
             {
                 foreach (var clan in kingdom.Clans)
@@ -374,6 +393,19 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             refresher.Refresh(__instance.Faction1);
             refresher.Refresh(__instance.Faction2);
+        }
+    }
+    [HarmonyPatch(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost))]
+    internal class GetCallToWarCostPatches
+    {
+        [HarmonyPrefix]
+        private static void Prefix(DefaultAllianceModel __instance, Kingdom callingKingdom, Kingdom calledKingdom, Kingdom kingdomToCallToWarAgainst)
+        {
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(callingKingdom);
+            refresher.Refresh(calledKingdom);
+            refresher.Refresh(kingdomToCallToWarAgainst);
         }
     }
 }
