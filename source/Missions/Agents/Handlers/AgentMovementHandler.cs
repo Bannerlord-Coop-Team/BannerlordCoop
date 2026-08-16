@@ -630,6 +630,16 @@ public class AgentMovementHandler : IAgentMovementHandler
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
 
+                // Reading the wielded indices dereferences the agent's MissionEquipment, and an agent
+                // can be alive while that backing array is still incomplete — location scenes (taverns,
+                // settlement interiors) hit this as props and NPCs stream in. Apply already refuses the
+                // native wield path in exactly that window; the sending side has to be as careful,
+                // because the throw escapes OnMissionTick, the frame never finishes, and the client
+                // freezes. Skipping the agent leaves its last known equipment in place rather than
+                // broadcasting an empty loadout.
+                if (!AgentEquipmentData.HasSafeWeaponSlots(agent.Equipment))
+                    continue;
+
                 var equipment = new AgentEquipmentData(agent);
                 if (!lastEquipment.TryGetValue(agentInfo.AgentId, out var previousEquipment))
                 {
