@@ -6,7 +6,9 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 
@@ -154,6 +156,62 @@ public class PlayerPartyTroopXpBaselineProviderTests : SyncTestBase
                 baseline => baseline.RosterId == Compact(worldAiMemberRosterId, typeof(TroopRoster)));
             Assert.DoesNotContain(baselines,
                 baseline => baseline.RosterId == Compact(otherPlayerMemberRosterId, typeof(TroopRoster)));
+        });
+    }
+
+    [Fact]
+    public void Capture_IncludesPlayerOwnedGarrisonMemberAndPrisonerXp()
+    {
+        EnvironmentInstance joiningClient = Clients.First();
+        string playerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        string playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        string memberId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string prisonerId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string garrisonPartyId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(memberId, out var member));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(prisonerId, out var prisoner));
+            playerParty.ActualClan = playerClan;
+
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var town = GameObjectCreator.CreateInitializedObject<Town>();
+            playerClan.InitMembers();
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = playerClan;
+            var garrisonParty = GarrisonPartyComponent.CreateGarrisonParty("Issue3039BaselineGarrison", settlement);
+
+            Assert.True(Server.ObjectManager.TryGetId(garrisonParty, out garrisonPartyId));
+            Assert.Null(garrisonParty.ActualClan);
+            garrisonParty.MemberRoster.AddToCounts(member, 3);
+            garrisonParty.PrisonRoster.AddToCounts(prisoner, 2);
+            SetFixtureXp(garrisonParty.MemberRoster, member, 654);
+            SetFixtureXp(garrisonParty.PrisonRoster, prisoner, 321);
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                new Player("joining-garrison-player", null, playerPartyId, playerClanId, null)));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(joiningClient, "joining-garrison-player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(garrisonPartyId, out var garrisonParty));
+            Assert.True(Server.ObjectManager.TryGetId(garrisonParty.MemberRoster, out var memberRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(garrisonParty.PrisonRoster, out var prisonRosterId));
+
+            var provider = Server.Resolve<IPlayerPartyTroopXpBaselineProvider>();
+            Assert.True(provider.TryCapture(joiningClient.NetPeer, out var baselines));
+
+            var members = Assert.Single(baselines,
+                baseline => baseline.RosterId == Compact(memberRosterId, typeof(TroopRoster)));
+            Assert.Equal(654, Assert.Single(members.Entries,
+                entry => entry.CharacterId == Compact(memberId, typeof(CharacterObject))).Xp);
+            var prisoners = Assert.Single(baselines,
+                baseline => baseline.RosterId == Compact(prisonRosterId, typeof(TroopRoster)));
+            Assert.Equal(321, Assert.Single(prisoners.Entries,
+                entry => entry.CharacterId == Compact(prisonerId, typeof(CharacterObject))).Xp);
         });
     }
 

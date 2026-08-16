@@ -498,7 +498,7 @@ namespace Coop.LiveTesting
                         .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
                         .ToArray();
                     registeredPlayers = players.Length;
-                    if (ModInformation.IsServer)
+                    if (logic is IServerLogic)
                     {
                         registeredPlayerCount = players.Length;
                         registeredControllerIds = players
