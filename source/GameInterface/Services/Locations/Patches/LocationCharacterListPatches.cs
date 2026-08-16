@@ -18,9 +18,9 @@ namespace GameInterface.Services.Locations.Patches;
 
 /// <summary>
 /// Patches for the methods mutating <see cref="Location"/>'s character list. The server broadcasts
-/// every mutation; clients are blocked from mutating hero entries (those are synced strictly) but
-/// keep mutating non-hero ambience locally, because the crowd-spawning behaviors are
-/// scene-dependent and can only run on the machine whose player is visiting.
+/// every mutation; clients are blocked from mutating server-owned hero entries but retain vanilla
+/// ownership of their own accompanying companions and non-hero ambience, because both lifecycles
+/// only run on the machine whose player is visiting.
 /// </summary>
 [HarmonyPatch(typeof(Location))]
 internal class LocationCharacterListPatches
@@ -36,7 +36,8 @@ internal class LocationCharacterListPatches
 
         if (ModInformation.IsClient)
         {
-            if (locationCharacter.Character.IsHero == false) return true;
+            if (locationCharacter.Character.IsHero == false ||
+                LocationCharacterGuardPatches.IsLocalPlayerPartyCharacter(locationCharacter)) return true;
 
             // Expected during normal client visits; the synced entry arrives from the server instead.
             Logger.Debug("Client add of hero {Hero} to location {Location} blocked",
@@ -67,7 +68,8 @@ internal class LocationCharacterListPatches
 
         if (ModInformation.IsClient)
         {
-            if (locationCharacter.Character.IsHero == false) return true;
+            if (locationCharacter.Character.IsHero == false ||
+                LocationCharacterGuardPatches.IsLocalPlayerPartyCharacter(locationCharacter)) return true;
 
             Logger.Debug("Client removal of hero {Hero} from location {Location} blocked",
                 locationCharacter.Character.StringId, __instance.StringId);

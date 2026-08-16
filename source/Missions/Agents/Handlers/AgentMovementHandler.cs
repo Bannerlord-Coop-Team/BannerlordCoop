@@ -630,7 +630,11 @@ public class AgentMovementHandler : IAgentMovementHandler
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
 
-                var equipment = new AgentEquipmentData(agent);
+                // SpawnMonster also creates non-mountable livestock. Those agents use this movement path but
+                // have no native wield-state pointers, so equipment capture is only valid for humans.
+                if (!AgentEquipmentData.TryCapture(agent, out var equipment))
+                    continue;
+
                 if (!lastEquipment.TryGetValue(agentInfo.AgentId, out var previousEquipment))
                 {
                     lastEquipment[agentInfo.AgentId] = equipment;
@@ -1740,7 +1744,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         if (BattleSpawnGate.IsCoopBattleActive) return;
 
         // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
-        // controller's PLAYER agent — its host-owned NPC puppets must survive for adopt-in-place migration,
+        // controller's player and companion agents; its host-owned NPC puppets survive for migration,
         // so this all-agents sweep would fade the whole crowd out with its host.
         if (LocationNpcGate.IsCoopLocationMissionActive) return;
 
