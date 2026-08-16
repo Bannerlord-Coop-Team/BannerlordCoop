@@ -168,6 +168,7 @@ public class LoadingState : ConnectionStateBase
             if (!IsCurrent(JoinPhase.CatchUpAppliedQueued)) return;
 
             connectionMessageQueue.CompleteCatchUp(peer);
+            messageBroker.Publish(this, new PlayerCampaignSynchronized(peer));
             ConnectionLogic.EnterCampaign();
         }, context: nameof(JoinSyncSignal.CatchUpApplied));
     }

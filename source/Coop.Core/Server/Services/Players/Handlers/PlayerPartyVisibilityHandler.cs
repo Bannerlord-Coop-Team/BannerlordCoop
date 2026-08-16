@@ -29,7 +29,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Core.Server.Services.Players.Handlers;
 /// <summary>
 /// Server-side: hides a disconnected player's party from the map and stops it being simulated, then
-/// restores it once the peer is back in the campaign. Parties in a MapEvent remain active so reconnect
+/// restores it once the peer has synchronized the campaign. Parties in a MapEvent remain active so reconnect
 /// saves preserve their battle membership.
 /// <see cref="MobileParty.IsActive"/> gates spotting/interaction/ticking (see
 /// PartyVisibilityServerPatches, MobilePartyVisualManagerPatches) and is an AutoSync property, so
@@ -63,7 +63,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
-        messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Subscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<SavedPlayerRegistrationsRestored>(Handle_SavedPlayerRegistrationsRestored);
     }
@@ -71,7 +71,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
-        messageBroker.Unsubscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Unsubscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<SavedPlayerRegistrationsRestored>(Handle_SavedPlayerRegistrationsRestored);
         deferredMapEventParking.Clear();
@@ -147,14 +147,16 @@ internal class PlayerPartyVisibilityHandler : IHandler
         Logger.Information("Parked party {PartyId} because {Reason}", party.StringId, reason);
     }
 
-    /// <summary> A peer (re)entered the campaign, un-park its party and rebuild its map figure.
-    private void Handle_PlayerCampaignEntered(MessagePayload<PlayerCampaignEntered> payload)
+    /// <summary> A peer finished campaign synchronization, un-park its party and rebuild its map figure.
+    private void Handle_PlayerCampaignSynchronized(MessagePayload<PlayerCampaignSynchronized> payload)
     {
         if (ModInformation.IsClient) return;
 
-        var peer = payload.What.playerId;
+        var peer = payload.What.PlayerId;
 
         if (!playerManager.TryGetPlayer(peer, out var player) ||
+            !playerManager.TryGetPeer(player.ControllerId, out var currentPeer) ||
+            !ReferenceEquals(currentPeer, peer) ||
             !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
         {
             Logger.Error("Could not resolve party for peer {Peer} on campaign entry", peer.Id);
