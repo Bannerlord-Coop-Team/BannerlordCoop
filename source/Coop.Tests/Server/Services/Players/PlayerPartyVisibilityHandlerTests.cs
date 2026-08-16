@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Network.Messages;
 using Common.Tests.Utils;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Players.Handlers;
 using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.Services.ObjectManager;
@@ -15,6 +16,7 @@ using System;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
 
@@ -143,6 +145,77 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
         siegeEventInterface.Verify(value => value.BreakSiegeForPartyOnly(party), Times.Once);
         Assert.False(party.IsActive);
+    }
+
+    [Fact]
+    public void CampaignEntry_LeavesSettlementPartyParkedUntilSynchronizationCompletes()
+    {
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var player = CreatePlayer();
+        var party = CreateParty(isActive: false);
+        var settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
+        party._currentSettlement = settlement;
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        playerManager
+            .Setup(manager => manager.TryGetPeer(player.ControllerId, out peer))
+            .Returns(true);
+
+        var objectManager = new Mock<IObjectManager>();
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party))
+            .Returns(true);
+
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerCampaignEntered(peer));
+        Assert.False(party.IsActive);
+
+        broker.Publish(this, new PlayerCampaignSynchronized(peer));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.True(party.IsActive);
+        Assert.Same(settlement, party.CurrentSettlement);
+    }
+
+    [Fact]
+    public void SynchronizationFromSupersededPeer_LeavesPartyParked()
+    {
+        var supersededPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var currentPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var player = CreatePlayer();
+        var party = CreateParty(isActive: false);
+
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(supersededPeer, out player))
+            .Returns(true);
+        playerManager
+            .Setup(manager => manager.TryGetPeer(player.ControllerId, out currentPeer))
+            .Returns(true);
+
+        var objectManager = new Mock<IObjectManager>();
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerCampaignSynchronized(supersededPeer));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.False(party.IsActive);
+        objectManager.VerifyNoOtherCalls();
     }
 
     [Fact]
