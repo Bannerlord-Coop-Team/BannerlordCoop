@@ -84,6 +84,26 @@ public readonly struct PartyScreenClosedFromRescuing : IEvent
     }
 }
 
+internal readonly struct CompanionRescueCompletionReceived : IEvent
+{
+    public readonly string CompanionHeroId;
+    public readonly CompanionRescueRequestKind Kind;
+    public readonly CompanionRescueCompletionStatus Status;
+    public readonly string Error;
+
+    public CompanionRescueCompletionReceived(
+        string companionHeroId,
+        CompanionRescueRequestKind kind,
+        CompanionRescueCompletionStatus status,
+        string error)
+    {
+        CompanionHeroId = companionHeroId;
+        Kind = kind;
+        Status = status;
+        Error = error;
+    }
+}
+
 public readonly struct CompanionRescued : IEvent
 {
     public readonly Hero OneToOneConversationHero;

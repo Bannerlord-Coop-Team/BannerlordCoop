@@ -38,7 +38,12 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
 
         categoryId = TestEnvironment.CreateRegisteredObject<ItemCategory>();
         itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-        itemRosterId = TestEnvironment.CreateRegisteredObject<ItemRoster>();
+        itemRosterId = "e2e_town_item_roster";
+        Server.CreateRegisteredObject<ItemRoster>(itemRosterId);
+        foreach (var client in Clients)
+        {
+            client.CreateRegisteredObject<ItemRoster>(itemRosterId);
+        }
 
         ConfigureTownRoster(Server);
         foreach (var client in Clients)

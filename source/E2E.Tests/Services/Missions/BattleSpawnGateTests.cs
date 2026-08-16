@@ -50,6 +50,11 @@ public class BattleSpawnGateTests : IDisposable
         Assert.True(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
         Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker));
 
+        BattleSpawnGate.RestoreReserveSide(BattleSideEnum.Defender);
+        Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+
+        BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Defender);
+
         BattleSpawnGate.BeginBattle("mapEvent-2");
 
         Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));

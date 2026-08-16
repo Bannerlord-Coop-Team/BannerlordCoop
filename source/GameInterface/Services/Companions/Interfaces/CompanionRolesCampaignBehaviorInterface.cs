@@ -1,6 +1,5 @@
 ﻿using Helpers;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -10,12 +9,14 @@ namespace GameInterface.Services.Companions.Interfaces;
 
 public interface ICompanionRolesCampaignBehaviorInterface : IGameAbstraction
 {
-    void PartyScreenClosed(IEnumerable<TroopRosterElement> leftMemberElements, IEnumerable<TroopRosterElement> leftPrisonerElements, PartyBase rightOwnerParty, bool fromCancel);
+    void PartyScreenClosed(Hero rescuedCompanion, IEnumerable<TroopRosterElement> leftMemberElements,
+        IEnumerable<TroopRosterElement> leftPrisonerElements, PartyBase rightOwnerParty, bool fromCancel);
 }
 
 public class CompanionRolesCampaignBehaviorInterface : ICompanionRolesCampaignBehaviorInterface
 {
     public void PartyScreenClosed(
+        Hero rescuedCompanion,
         IEnumerable<TroopRosterElement> leftMemberElements,
         IEnumerable<TroopRosterElement> leftPrisonerElements,
         PartyBase rightOwnerParty,
@@ -23,11 +24,7 @@ public class CompanionRolesCampaignBehaviorInterface : ICompanionRolesCampaignBe
     {
         if (fromCancel) return;
 
-        CharacterObject character = leftMemberElements.FirstOrDefault(delegate (TroopRosterElement x)
-        {
-            Hero heroObject = x.Character.HeroObject;
-            return heroObject != null && heroObject.CompanionOf != null;
-        }).Character;
+        CharacterObject character = rescuedCompanion.CharacterObject;
 
         EndCaptivityAction.ApplyByReleasedAfterBattle(character.HeroObject);
         character.HeroObject.ChangeState(Hero.CharacterStates.Active);

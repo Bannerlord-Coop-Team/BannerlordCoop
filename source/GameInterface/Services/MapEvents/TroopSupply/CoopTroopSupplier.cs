@@ -29,11 +29,88 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopTroopSupplier>();
 
+    public readonly struct AllocationSnapshot
+    {
+        private readonly int[] partyOffsets;
+        private readonly int[] partyCounts;
+        private readonly int playerOwnedPartyCount;
+        private readonly bool ownsReceiverPlayerParty;
+        private readonly int receiverPlayerRank;
+
+        public long Revision { get; }
+        public int BattleSize { get; }
+        public int SideTotalTroops { get; }
+        public int TotalTroops { get; }
+        public int SuppliedTroops { get; }
+
+        internal AllocationSnapshot(long revision, int battleSize, int sideTotalTroops, int totalTroops,
+            int suppliedTroops,
+            int playerOwnedPartyCount, bool ownsReceiverPlayerParty, int receiverPlayerRank,
+            int[] partyOffsets, int[] partyCounts)
+        {
+            Revision = revision;
+            BattleSize = battleSize;
+            SideTotalTroops = sideTotalTroops;
+            TotalTroops = totalTroops;
+            SuppliedTroops = suppliedTroops;
+            this.playerOwnedPartyCount = playerOwnedPartyCount;
+            this.ownsReceiverPlayerParty = ownsReceiverPlayerParty;
+            this.receiverPlayerRank = receiverPlayerRank;
+            this.partyOffsets = partyOffsets;
+            this.partyCounts = partyCounts;
+        }
+
+        public int OwnedShareOf(int sideAllocation)
+        {
+            if (sideAllocation <= 0 || TotalTroops <= 0) return 0;
+
+            int total = SideTotalTroops;
+            if (total <= 0) return 0;
+            if (TotalTroops >= total) return sideAllocation;
+
+            if (playerOwnedPartyCount > 0)
+            {
+                if (sideAllocation < playerOwnedPartyCount)
+                    return receiverPlayerRank >= 0 && receiverPlayerRank < sideAllocation ? 1 : 0;
+
+                int share = ApportionByInterval(sideAllocation - playerOwnedPartyCount, total);
+                if (ownsReceiverPlayerParty) share += 1;
+                return Math.Min(share, sideAllocation);
+            }
+
+            return Math.Min(ApportionByInterval(sideAllocation, total), sideAllocation);
+        }
+
+        private int ApportionByInterval(int allocation, int total)
+        {
+            if (allocation <= 0 || partyOffsets == null || partyCounts == null) return 0;
+
+            int share = 0;
+            for (int i = 0; i < partyCounts.Length; i++)
+            {
+                int count = partyCounts[i];
+                if (count <= 0) continue;
+
+                int start = ScaleToAllocation(partyOffsets[i], total, allocation);
+                int end = ScaleToAllocation(partyOffsets[i] + count, total, allocation);
+                share += end - start;
+            }
+            return share;
+        }
+
+        private static int ScaleToAllocation(int position, int total, int allocation)
+            => (int)((long)position * allocation / total);
+    }
+
     private sealed class PartyState
     {
         public string PartyId;
         public TroopReserveEntry[] Entries = Array.Empty<TroopReserveEntry>();
         public int Supplied;
+        /// <summary>Where this party starts within its side; see <see cref="PartyReserve.SideOffset"/>.</summary>
+        public int SideOffset;
+        /// <summary>Its position among the side's player-owned parties, or -1; see <see cref="PartyReserve.PlayerOwnedRank"/>.</summary>
+        public int PlayerOwnedRank;
     }
 
     private readonly object gate = new object();
@@ -43,6 +120,10 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private readonly Dictionary<int, string> seedToPartyId = new Dictionary<int, string>();
     private string playerPartyId;
     private bool populated;
+    private int sideTotalTroops;
+    private int playerOwnedPartyCount;
+    private long allocationRevision;
+    private int battleSize;
     private int reserveRevision;
     private int numWounded, numKilled, numRouted;
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
@@ -75,11 +156,17 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// definitively this supplier's last word on those parties.
     /// </para>
     /// </summary>
-    public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve)
+    public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve,
+        int sideTotal, int playerOwnedParties, int authoritativeBattleSize, long snapshotRevision = 0)
     {
         var dropped = new List<(string PartyId, int Supplied)>();
         lock (gate)
         {
+            sideTotalTroops = Math.Max(0, sideTotal);
+            playerOwnedPartyCount = Math.Max(0, playerOwnedParties);
+            allocationRevision = snapshotRevision;
+            battleSize = Math.Max(0, authoritativeBattleSize);
+
             // Capture the current per-party pointers before rebuilding. A resend can carry a STALE pointer: the
             // server's ledger lags our local supply by up to one report interval, and on migration it re-sends
             // our OWN party at that lagging value. Resuming from the server value alone would rewind a party we
@@ -106,6 +193,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                         PartyId = party.PartyId,
                         Entries = entries,
                         Supplied = supplied,
+                        SideOffset = party.SideOffset,
+                        PlayerOwnedRank = party.PlayerOwnedRank,
                     };
                     // Allocate this client's own party first. Otherwise an army's AI parties can fill the
                     // render cap before the local hero is reserved, leaving deployment without a player agent.
@@ -154,6 +243,45 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     /// <summary>Monotonic count of authoritative reserve snapshots applied to this supplier.</summary>
     public int ReserveRevision { get { lock (gate) { return reserveRevision; } } }
+
+    /// <summary>The server-authored complete two-side snapshot generation.</summary>
+    public long AllocationRevision { get { lock (gate) { return allocationRevision; } } }
+
+    public AllocationSnapshot CaptureAllocationSnapshot()
+    {
+        lock (gate)
+        {
+            int total = 0;
+            int supplied = 0;
+            int receiverPlayerRank = -1;
+            var partyOffsets = new int[parties.Count];
+            var partyCounts = new int[parties.Count];
+            for (int i = 0; i < parties.Count; i++)
+            {
+                var party = parties[i];
+                int count = party.Entries.Length;
+                partyOffsets[i] = party.SideOffset;
+                partyCounts[i] = count;
+                total += count;
+                supplied += party.Supplied;
+                if (party.PartyId != playerPartyId) continue;
+
+                receiverPlayerRank = party.PlayerOwnedRank;
+            }
+
+            return new AllocationSnapshot(
+                allocationRevision,
+                battleSize,
+                sideTotalTroops,
+                total,
+                supplied,
+                playerOwnedPartyCount,
+                playerPartyId != null,
+                receiverPlayerRank,
+                partyOffsets,
+                partyCounts);
+        }
+    }
 
     /// <summary>Remaining troop count for each party in the current authoritative reserve.</summary>
     public IReadOnlyList<(string partyId, int remaining)> GetRemainingByParty()
@@ -245,6 +373,24 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
     }
 
+    /// <summary>
+    /// Every troop on this side across ALL owners.
+    /// The spawn handler sizes the engine from this so each client computes the same split; the supplier then
+    /// contributes only its <see cref="OwnedShareOf"/> that allocation.
+    /// </summary>
+    public int SideTotalTroops { get { lock (gate) { return sideTotalTroops; } } }
+
+    public int PlayerOwnedPartyCount { get { lock (gate) { return playerOwnedPartyCount; } } }
+
+    public int BattleSize { get { lock (gate) { return battleSize; } } }
+
+    /// <summary>
+    /// This client's slice of a side-wide allocation, in proportion to the troops it owns. Every owner runs
+    /// the same sum, so the slices add up to the allocation instead of each owner serving all of it.
+    /// </summary>
+    public int OwnedShareOf(int sideAllocation)
+        => CaptureAllocationSnapshot().OwnedShareOf(sideAllocation);
+
     public int NumTroopsNotSupplied
     {
         get
@@ -277,6 +423,19 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     public IEnumerable<IAgentOriginBase> SupplyTroops(int numberToAllocate)
     {
+        // No apportionment here: the number arriving is ALREADY this client's share. Init is given the side
+        // totals so every client computes the same battle-size split, and CoopBattleMissionSpawnHandler then
+        // rewrites the phase numbers through OwnedShareOf once - so every request the engine derives from a
+        // phase is this client's slice, and the other owners' agents arrive replicated as before
+        // (OwnedAgentReplicator/PuppetSpawner).
+        //
+        // Taking the share again here would apply it twice, and the engine cannot tolerate being short-changed:
+        // CheckDeployment reserves InitialSpawnNumber - ReservedTroopsCount and SKIPS THE WHOLE SIDE (its
+        // plan-making included) while the count falls short. Returning a fraction of each request makes the gap
+        // close geometrically and never reach zero - live, a 65-troop target stalled at 64 with the side never
+        // planned, so the player's team never spawned and the player had no agent on the field.
+        if (numberToAllocate <= 0) return Array.Empty<IAgentOriginBase>();
+
         // BR-110: allocate no more troops than the engine has RENDER-SLOT capacity for — a mounted troop needs
         // two slots (rider + horse). The unallocated remainder stays UNSUPPLIED (wave-eligible), so the native
         // wave logic re-requests it as casualties free slots; the supplied pointer stays aligned with what can

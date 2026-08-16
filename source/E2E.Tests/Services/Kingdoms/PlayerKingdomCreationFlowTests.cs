@@ -1707,6 +1707,65 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void KingdomDecisionRefreshWinPercentages_NoSponsors_NormalizesOptions()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+
+            kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var decision = Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var election = new KingdomElection(decision);
+            var decisionItem = ObjectHelper.SkipConstructor<DecisionItemBaseVM>();
+            decisionItem.DecisionOptionsList = new MBBindingList<DecisionOptionVM>();
+            decisionItem.KingdomDecisionMaker = election;
+
+            foreach (DecisionOutcome outcome in election._possibleOutcomes)
+            {
+                outcome.SupporterList.Clear();
+
+                var option = ObjectHelper.SkipConstructor<DecisionOptionVM>();
+                option.Option = outcome;
+                decisionItem.DecisionOptionsList.Add(option);
+            }
+
+            decisionItem.RefreshWinPercentages();
+
+            Assert.Collection(
+                decisionItem.DecisionOptionsList,
+                option =>
+                {
+                    Assert.Null(option.Sponsor);
+                    Assert.Equal(50, option.WinPercentage);
+                },
+                option =>
+                {
+                    Assert.Null(option.Sponsor);
+                    Assert.Equal(50, option.WinPercentage);
+                });
+            Assert.Equal(100, decisionItem.DecisionOptionsList.Sum(option => option.WinPercentage));
+        });
+    }
+
+    [Fact]
     public void KingdomDecisionDebugCommand_ListsClientVoteState()
     {
         var client1 = Clients.First();

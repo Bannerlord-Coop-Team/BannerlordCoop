@@ -35,7 +35,11 @@ internal sealed class PlayerTroopXpRelevance : IPlayerTroopXpRelevance
         if (ReferenceEquals(party, playerParty)) return true;
         if (PlayerManager.TryGetControlledObjectInfo(party, out _)) return false;
 
-        return party.ActualClan != null && ReferenceEquals(party.ActualClan, playerParty.ActualClan);
+        var partyClan = party.IsGarrison
+            ? party.HomeSettlement?.OwnerClan
+            : party.ActualClan;
+
+        return partyClan != null && ReferenceEquals(partyClan, playerParty.ActualClan);
     }
 
     public IReadOnlyCollection<NetPeer> GetConnectedPeers(MobileParty party)

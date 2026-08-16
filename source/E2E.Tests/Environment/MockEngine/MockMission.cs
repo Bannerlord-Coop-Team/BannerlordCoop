@@ -137,4 +137,10 @@ public sealed class MockMission
     }
 
     public Agent FindAgentWithIndex(int index) => agentsByIndex.TryGetValue(index, out var a) ? a : null;
+
+    public void DeleteAgent(Agent agent)
+    {
+        if (AgentMirror.TryGet(agent, out var mirror))
+            agentsByIndex.Remove(mirror.Index);
+    }
 }

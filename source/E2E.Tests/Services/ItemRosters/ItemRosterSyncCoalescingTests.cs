@@ -20,7 +20,12 @@ namespace E2E.Tests.Services.ItemRosters
 
         public ItemRosterSyncCoalescingTests(ITestOutputHelper output) : base(output)
         {
-            ItemRosterId = TestEnvironment.CreateRegisteredObject<ItemRoster>();
+            ItemRosterId = "item_roster_sync_coalescing";
+            Server.CreateRegisteredObject<ItemRoster>(ItemRosterId);
+            foreach (var client in Clients)
+            {
+                client.CreateRegisteredObject<ItemRoster>(ItemRosterId);
+            }
             ItemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         }
 
