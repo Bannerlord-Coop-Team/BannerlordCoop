@@ -75,12 +75,20 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         if (Campaign.Current == null) return;
 
+        bool localBattleSimulationWasInvolved = PlayerEncounter.Current?.BattleSimulation?.MapEvent == obj;
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
-        var preservedParty = localPartyWasInvolved && IsBattlePresentationActive()
+        var preservedParty = localPartyWasInvolved &&
+            (IsBattlePresentationActive() || localBattleSimulationWasInvolved)
             ? MobileParty.MainParty?.Party
             : null;
         initializationBarrier.DestroyGraph(obj, preservedParty);
+        if (localBattleSimulationWasInvolved)
+        {
+            initializationBarrier.CompleteDeferredEncounterCleanup();
+            return;
+        }
+
         CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
     }
 
@@ -112,7 +120,10 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         var encounter = PlayerEncounter.Current;
         var battle = GetPlayerEncounterBattle();
         var encounteredBattle = GetPlayerEncounterEncounteredBattle();
-        if (encounter?._mapEvent == mapEvent || battle == mapEvent || encounteredBattle == mapEvent)
+        if (encounter?._mapEvent == mapEvent ||
+            encounter?.BattleSimulation?.MapEvent == mapEvent ||
+            battle == mapEvent ||
+            encounteredBattle == mapEvent)
             return true;
 
         var party = mainParty.Party;
