@@ -10,7 +10,9 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.TroopRosters
@@ -344,6 +346,78 @@ namespace E2E.Tests.Services.TroopRosters
                 companionParty.MemberRoster.SetElementXp(
                     companionParty.MemberRoster.FindIndexOfTroop(character), 250);
                 companionParty.MemberRoster.AddToCounts(character, 1, xpChange: 75);
+            });
+            FlushCoalescer();
+
+            var playerOperations = clanPlayer.InternalMessages
+                .GetMessages<NetworkTroopRosterElementBatch>()
+                .SelectMany(batch => batch.Operations)
+                .ToArray();
+            Assert.Collection(playerOperations,
+                setXp =>
+                {
+                    Assert.Equal(TroopRosterElementOperationKind.SetXp, setXp.Kind);
+                    Assert.Equal(250, setXp.Xp);
+                },
+                addCounts =>
+                {
+                    Assert.Equal(TroopRosterElementOperationKind.AddCounts, addCounts.Kind);
+                    Assert.Equal(1, addCounts.Count);
+                    Assert.Equal(75, addCounts.Xp);
+                });
+
+            var observerOperation = Assert.Single(observer.InternalMessages
+                .GetMessages<NetworkTroopRosterElementBatch>()
+                .SelectMany(batch => batch.Operations));
+            Assert.Equal(TroopRosterElementOperationKind.AddCounts, observerOperation.Kind);
+            Assert.Equal(1, observerOperation.Count);
+            Assert.Equal(0, observerOperation.Xp);
+        }
+
+        [Fact]
+        public void PlayerOwnedGarrison_ClanPlayerReceivesXpAndObserversReceiveOnlyCounts()
+        {
+            var clanPlayer = Clients.First();
+            var observer = Clients.Last();
+            string playerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            string clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+            string garrisonPartyId = null;
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+                playerParty.ActualClan = clan;
+
+                var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+                var town = GameObjectCreator.CreateInitializedObject<Town>();
+                clan.InitMembers();
+                settlement.SetSettlementComponent(town);
+                town.OwnerClan = clan;
+                var garrisonParty = GarrisonPartyComponent.CreateGarrisonParty("Issue3039Garrison", settlement);
+
+                Assert.True(Server.ObjectManager.TryGetId(garrisonParty, out garrisonPartyId));
+                Assert.True(garrisonParty.IsGarrison);
+                Assert.Null(garrisonParty.ActualClan);
+                Assert.Same(clan, garrisonParty.HomeSettlement.OwnerClan);
+                Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                    new Player("garrison-clan-player", null, playerPartyId, clanId, null)));
+                garrisonParty.MemberRoster.AddToCounts(character, 5);
+            });
+            TestEnvironment.ConnectRegisteredPlayer(clanPlayer, "garrison-clan-player");
+            FlushCoalescer();
+
+            clanPlayer.InternalMessages.Clear();
+            observer.InternalMessages.Clear();
+            Server.NetworkSentMessages.Clear();
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(garrisonPartyId, out var garrisonParty));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+                garrisonParty.MemberRoster.SetElementXp(
+                    garrisonParty.MemberRoster.FindIndexOfTroop(character), 250);
+                garrisonParty.MemberRoster.AddToCounts(character, 1, xpChange: 75);
             });
             FlushCoalescer();
 

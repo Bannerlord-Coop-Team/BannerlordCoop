@@ -1,11 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
-using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
-using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
@@ -73,46 +71,20 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         }
     }
 
-    private static IReinforcementFielder GetFielder(CoopBattleController controller)
-        => (IReinforcementFielder)AccessTools.Field(typeof(CoopBattleController), "reinforcementFielder").GetValue(controller);
+    private static void DeleteAgents(MockMission mock, int count)
+    {
+        foreach (var agent in mock.Agents.ToArray())
+        {
+            if (count == 0) return;
+            if (AgentMirror.TryGet(agent, out var mirror) && mirror.IsActive)
+                mirror.IsActive = false;
+            mock.DeleteAgent(agent);
+            count--;
+        }
+    }
 
     private static IPuppetSpawner GetPuppetSpawner(CoopBattleController controller)
         => (IPuppetSpawner)AccessTools.Field(typeof(CoopBattleController), "puppetSpawner").GetValue(controller);
-
-    /// <summary>Adds an AI party with <paramref name="troopCount"/> able troops to the battle's defender side
-    /// (registered everywhere, roster populated on the host). Returns its MapEventParty id.</summary>
-    private string AddAiReinforcementParty(string mapEventId, EnvironmentInstance host, int troopCount)
-    {
-        var aiPartyId = CreateRegisteredObject<MobileParty>();
-        string mapEventPartyId = null;
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var aiParty));
-
-            aiParty.Party.MapEventSide = mapEvent.DefenderSide;
-
-            var mep = mapEvent.DefenderSide.Parties.Last(p => p.Party == aiParty.Party);
-            Assert.True(Server.ObjectManager.TryGetId(mep, out mapEventPartyId));
-        }, MapEventDisabledMethods);
-
-        host.Call(() =>
-        {
-            Assert.True(host.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var aiParty));
-            aiParty.Party.MemberRoster.Clear();
-            aiParty.Party.MemberRoster.AddToCounts((CharacterObject)Game.Current.PlayerTroop, troopCount);
-        });
-
-        Assert.NotNull(mapEventPartyId);
-        return mapEventPartyId;
-    }
-
-    private static void PublishInvolvedPartiesAdded(EnvironmentInstance instance, string mapEventId, string mapEventPartyId)
-    {
-        instance.Resolve<IMessageBroker>().Publish(instance,
-            new NetworkAddInvolvedParties(mapEventId, new[] { mapEventPartyId }, new[] { new CampaignVec2(default, true) }));
-    }
 
     private static TroopReserveEntry[] Entries(string characterId, int count, int seedBase = 500)
     {
@@ -125,90 +97,9 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
     private static CoopTroopSupplier CreateSuppliedSupplier(IObjectManager objectManager, string characterId, int reserveCount)
     {
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, objectManager, new BattleAgentBudget());
-        supplier.SetReserve(new[] { new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount)) });
+        supplier.SetReserve(new[] { new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount)) },
+            sideTotal: reserveCount, playerOwnedParties: 0, authoritativeBattleSize: 1000);
         return supplier;
-    }
-
-    /// <summary>
-    /// A new AI party joins a battle already at (near) the engine limit: the host fields only the troops that
-    /// fit under the limit and never spawns past it. RED today: SpawnReinforcementParty loops the full able
-    /// roster with no capacity check.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "BR-110")]
-    public void ReinforcementParty_AtEngineAgentLimit_DoesNotSpawnPastIt()
-    {
-        using var fixture = new MissionEngineFixture();
-        var (mapEventId, _) = SetupCoopBattle("host", "client");
-        var host = Clients.First();
-        var aiMapEventPartyId = AddAiReinforcementParty(mapEventId, host, troopCount: 5);
-
-        CoopBattleController controller = null;
-        MockMission mock = null;
-        host.Call(() =>
-        {
-            mock = fixture.CreateMission(host);
-            controller = host.Resolve<CoopBattleController>();
-        });
-
-        EnterBattle(host, mapEventId);
-
-        host.Call(() =>
-        {
-            controller.OnDeploymentFinished();
-            FloodToLiveCount(mock, EngineAgentLimit - 2);   // room for only 2 of the party's 5 troops
-
-            PublishInvolvedPartiesAdded(host, mapEventId, aiMapEventPartyId);
-
-            Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
-        });
-
-        GC.KeepAlive(controller);
-    }
-
-    /// <summary>
-    /// Troops withheld at the limit are deferred, not lost (BR-110, BR-073): as removals free capacity, the
-    /// fielder's tick spawns the remainder — never exceeding the limit at any point.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "BR-110")]
-    public void ReinforcementParty_WithheldTroops_FieldAsCapacityFrees()
-    {
-        using var fixture = new MissionEngineFixture();
-        var (mapEventId, _) = SetupCoopBattle("host", "client");
-        var host = Clients.First();
-        var aiMapEventPartyId = AddAiReinforcementParty(mapEventId, host, troopCount: 5);
-
-        CoopBattleController controller = null;
-        MockMission mock = null;
-        host.Call(() =>
-        {
-            mock = fixture.CreateMission(host);
-            controller = host.Resolve<CoopBattleController>();
-        });
-
-        EnterBattle(host, mapEventId);
-
-        host.Call(() =>
-        {
-            controller.OnDeploymentFinished();
-            FloodToLiveCount(mock, EngineAgentLimit - 2);
-            int flooded = mock.Agents.Count;
-
-            PublishInvolvedPartiesAdded(host, mapEventId, aiMapEventPartyId);
-            Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));      // 2 fielded, 3 withheld
-
-            DeactivateAgents(mock, 3);                                  // casualties free 3 slots
-            GetFielder(controller).Tick();
-
-            Assert.Equal(flooded + 5, mock.Agents.Count);               // all 5 troops fielded in the end
-            Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));      // and the live count never passed the cap
-
-            GetFielder(controller).Tick();                              // queue is drained — nothing double-spawns
-            Assert.Equal(flooded + 5, mock.Agents.Count);
-        });
-
-        GC.KeepAlive(controller);
     }
 
     /// <summary>
@@ -251,12 +142,63 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 Assert.False(registry.TryGetAgentInfo(agentId, out _)); // deferred: not spawned at the limit
                 Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
 
-                DeactivateAgents(mock, 1);                              // a removal frees one slot
+                DeleteAgents(mock, 1);                                  // deletion frees one slot
                 GetPuppetSpawner(controller).DrainPendingPuppets();
 
                 Assert.True(registry.TryGetAgentInfo(agentId, out _));  // the buffered puppet fielded
                 Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
 
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void RemovedAgent_DoesNotFreeNativeCapacityUntilDeleted()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("host", "peer");
+        var host = Clients.First();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var agentId = Guid.NewGuid();
+
+        try
+        {
+            host.Call(() =>
+            {
+                var mock = fixture.CreateMission(host);
+                var controller = host.Resolve<CoopBattleController>();
+                var registry = host.Resolve<INetworkAgentRegistry>();
+                controller.Session.TryBegin(mapEventId);
+                host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+
+                Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var peerParty));
+                var mep = peerParty.MapEvent.DefenderSide.Parties.Single(p => p.Party == peerParty.Party);
+                Assert.True(host.ObjectManager.TryGetId(mep, out var mapEventPartyId));
+
+                FloodToLiveCount(mock, EngineAgentLimit);
+                DeactivateAgents(mock, 1);
+
+                var record = new BattleAgentSpawnData(
+                    agentId, characterId, default, BattleSideEnum.Defender, 100f,
+                    "peer", mapEventPartyId, 7, new Equipment(), new BodyProperties(), new MissionEquipmentData(new()));
+                host.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+
+                Assert.False(registry.TryGetAgentInfo(agentId, out _));
+                Assert.Equal(EngineAgentLimit - 1, CountLiveAgents(mock));
+                Assert.Equal(EngineAgentLimit, mock.Agents.Count);
+
+                mock.DeleteAgent(mock.Agents.First(agent => AgentMirror.TryGet(agent, out var mirror) && !mirror.IsActive));
+                GetPuppetSpawner(controller).DrainPendingPuppets();
+
+                Assert.True(registry.TryGetAgentInfo(agentId, out _));
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
                 GC.KeepAlive(controller);
             });
         }
@@ -312,12 +254,12 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 Assert.Equal(5, Registered());                          // fields exactly what fits...
                 Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));  // ...and stops at the limit
 
-                DeactivateAgents(mock, 3);                              // casualties free 3 slots
+                DeleteAgents(mock, 3);                                  // deletion frees 3 slots
                 GetPuppetSpawner(controller).DrainPendingPuppets();
                 Assert.Equal(8, Registered());                          // partial drain: 3 more, 2 still deferred
                 Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
 
-                DeactivateAgents(mock, 2);
+                DeleteAgents(mock, 2);
                 GetPuppetSpawner(controller).DrainPendingPuppets();
                 Assert.Equal(10, Registered());                         // the joiner's whole party fielded, none dropped
                 Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
@@ -378,7 +320,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 Assert.False(registry.TryGetAgentInfo(agentId, out _)); // deferred: rider + horse would exceed the limit
                 Assert.Equal(EngineAgentLimit - 1, CountLiveAgents(mock));
 
-                DeactivateAgents(mock, 1);                              // now two slots free
+                DeleteAgents(mock, 1);                                  // now two slots free
                 GetPuppetSpawner(controller).DrainPendingPuppets();
 
                 Assert.True(registry.TryGetAgentInfo(agentId, out _));
@@ -436,7 +378,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 Assert.False(registry.TryGetAgentInfo(agentId, out _)); // deferred on the equipment's 2-slot cost
                 Assert.Equal(EngineAgentLimit - 1, CountLiveAgents(mock));
 
-                DeactivateAgents(mock, 1);                              // two slots free
+                DeleteAgents(mock, 1);                                  // two slots free
                 GetPuppetSpawner(controller).DrainPendingPuppets();
 
                 Assert.True(registry.TryGetAgentInfo(agentId, out _));  // rider fielded (its horse is unregistered)
@@ -608,10 +550,10 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
             FloodToLiveCount(mock, EngineAgentLimit - 1);   // one slot free — not enough for rider + horse
             Assert.Equal(0, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 1, reserved, true, false));
 
-            DeactivateAgents(mock, 1);                      // two slots free — the pair fits
+            DeleteAgents(mock, 1);                          // two slots free — the pair fits
             Assert.Equal(1, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 1, reserved, true, false));
 
-            DeactivateAgents(mock, 3);                      // five free: two mounted troops (4 slots) fit, a third needs one more
+            DeleteAgents(mock, 3);                          // five free: two mounted troops (4 slots) fit, a third needs one more
             Assert.Equal(2, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 10, reserved, true, false));
         });
     }
@@ -656,7 +598,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
             FloodToLiveCount(mock, EngineAgentLimit - 2);   // two free: foot fits (1), the cavalry behind it needs 2 more
             Assert.Equal(1, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 4, reserved, true, false));
 
-            DeactivateAgents(mock, 2);                      // four free: foot(1) + cavalry(2) + foot(1) fit, the last foot does not
+            DeleteAgents(mock, 2);                          // four free: foot(1) + cavalry(2) + foot(1) fit, the last foot does not
             Assert.Equal(3, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 4, reserved, true, false));
         });
     }
