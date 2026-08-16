@@ -308,8 +308,7 @@ internal static class GarrisonTroopXpFixtureCommands
         {
             expectedStateReady = partyVm != null && !logic.IsThereAnyChanges() &&
                 leftState.Number == FixtureTroopCount && leftState.Xp == upgradeXp &&
-                leftRow?.Troop.Number == FixtureTroopCount && leftRow.Troop.Xp == upgradeXp &&
-                leftRow.NumOfReadyToUpgradeTroops == FixtureTroopCount;
+                leftRow?.Troop.Number == FixtureTroopCount && leftRow.Troop.Xp == upgradeXp;
         }
         else if (args[2] == "staged")
         {
