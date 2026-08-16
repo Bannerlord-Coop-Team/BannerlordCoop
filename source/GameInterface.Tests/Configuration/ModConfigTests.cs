@@ -1,4 +1,5 @@
 ﻿using GameInterface.Configuration;
+using GameInterface.Services.Save.Patches;
 using System;
 using System.IO;
 using Xunit;
@@ -283,6 +284,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(0.1f, options.SmithingStaminaRecoveryMultiplier);
         Assert.Equal(1f, options.MaximumLootersMultiplier);
         Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
+        Assert.Equal(3, options.AutoSaveCount);
     }
 
     /// <summary>
@@ -451,5 +453,44 @@ public class ModConfigTests : IDisposable
             Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
             Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
         }
+    }
+
+    [Theory]
+    [InlineData(0, 3, 1)]
+    [InlineData(1, 3, 2)]
+    [InlineData(3, 3, 1)]
+    [InlineData(4, 5, 5)]
+    [InlineData(5, 5, 1)]
+    public void NextAutoSaveIndex_WrapsAtCount(int current, int count, int expected)
+    {
+        Assert.Equal(expected, AutoSaveCountPatches.NextAutoSaveIndex(current, count));
+    }
+
+    [Theory]
+    [InlineData("saveauto1", "saveauto", 3, true)]
+    [InlineData("saveauto3", "saveauto", 3, true)]
+    [InlineData("saveauto4", "saveauto", 3, false)]
+    [InlineData("saveauto4", "saveauto", 5, true)]
+    [InlineData("save5", "saveauto", 3, false)]
+    public void IsAutoSaveNameReserved_MatchesPrefixWithinCount(
+        string name, string prefix, int count, bool expected)
+    {
+        Assert.Equal(expected, AutoSaveCountPatches.IsAutoSaveNameReserved(name, prefix, count));
+    }
+
+    [Theory]
+    [InlineData("saveauto3", "saveauto", 3, true, 3)]
+    [InlineData("saveauto4", "saveauto", 3, false, 0)]
+    [InlineData("saveauto9", "saveauto", 12, true, 9)]
+    [InlineData("saveauto0", "saveauto", 3, false, 0)]
+    [InlineData("saveauto", "saveauto", 3, false, 0)]
+    [InlineData("plain", "saveauto", 3, false, 0)]
+    public void TryParseAutoSaveSlot_ParsesIndexWithinCount(
+        string name, string prefix, int count, bool expected, int expectedIndex)
+    {
+        bool parsed = AutoSaveCountPatches.TryParseAutoSaveSlot(name, prefix, count, out int index);
+
+        Assert.Equal(expected, parsed);
+        Assert.Equal(expectedIndex, index);
     }
 }

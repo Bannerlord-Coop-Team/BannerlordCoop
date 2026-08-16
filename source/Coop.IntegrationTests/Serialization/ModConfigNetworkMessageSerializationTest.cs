@@ -73,6 +73,7 @@ namespace Coop.IntegrationTests.Serialization
                 PlayerKingdomClanTierRequired = 2,
                 SmithingStaminaRecoveryMultiplier = 2.5f,
                 MaximumLootersMultiplier = 0.25f,
+                AutoSaveCount = 8,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -86,6 +87,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(2, copy.PlayerKingdomClanTierRequired);
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0.25f, copy.MaximumLootersMultiplier);
+            Assert.Equal(8, copy.AutoSaveCount);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
@@ -109,6 +111,7 @@ namespace Coop.IntegrationTests.Serialization
             SmithingStaminaRecoveryOutsideSettlements = false,
             SmithingStaminaRecoveryMultiplier = 0f,
             MaximumLootersMultiplier = 0f,
+            AutoSaveCount = 0,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -127,6 +130,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.SmithingStaminaRecoveryOutsideSettlements);
             Assert.Equal(0f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0f, copy.MaximumLootersMultiplier);
+            Assert.Equal(0, copy.AutoSaveCount);
         }
 
         private static T RoundTrip<T>(T original)

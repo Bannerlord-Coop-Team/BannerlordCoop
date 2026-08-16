@@ -54,6 +54,8 @@ public readonly struct ModOptions
     public readonly bool EnableHeroExecutions { get; } = true;
     [ProtoMember(17)]
     public readonly bool EnablePlayerClanMemberExecutions { get; } = false;
+    [ProtoMember(18)]
+    public readonly int AutoSaveCount { get; } = 3;
 
     public ModOptions(ModOptionsData modOptionsData)
     {
@@ -74,5 +76,6 @@ public readonly struct ModOptions
         LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;      
         EnableHeroExecutions = modOptionsData.EnableHeroExecutions ?? EnableHeroExecutions;
         EnablePlayerClanMemberExecutions = modOptionsData.EnablePlayerClanMemberExecutions ?? EnablePlayerClanMemberExecutions;
+        AutoSaveCount = modOptionsData.AutoSaveCount ?? AutoSaveCount;
     }
 }

@@ -100,6 +100,8 @@ public sealed class ModOptionsData
 
     public bool? EnablePlayerClanMemberExecutions { get; set; }
 
+    public int? AutoSaveCount { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

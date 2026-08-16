@@ -119,5 +119,11 @@
     // This includes player companions and family members.
     // Default is false and won't have any effect if enableHeroExecutions is false.
     "enablePlayerClanMemberExecutions": false,
+
+    // Number of rotating autosave slots the server keeps (default 3).
+    // Each autosave overwrites the next slot in turn, so at most this many saveautoN
+    // files exist. Lowering the count leaves any higher-numbered saveauto files already
+    // on disk untouched. Values below 1 fall back to 3.
+    "autoSaveCount": 3,
   }
 }
