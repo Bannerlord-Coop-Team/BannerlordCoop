@@ -433,10 +433,14 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         ClearEngageOrder(party.MobileParty);
     }
 
-    private static bool IsBattleSimulationActive() =>
-        Game.Current?.GameStateManager?.GameStates
-            .OfType<MapState>()
-            .Any(state => state.IsSimulationActive) == true;
+    private static bool IsBattleSimulationActive()
+    {
+        var battleSimulation = PlayerEncounter.CurrentBattleSimulation;
+        return battleSimulation != null &&
+               Game.Current?.GameStateManager?.GameStates
+                   .OfType<MapState>()
+                   .Any(state => state._battleSimulation == battleSimulation) == true;
+    }
 
     private static bool ContinueDestroyedSimulationDefeat(
         MapEvent mapEvent,

@@ -523,6 +523,10 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             encounter.EncounterState = PlayerEncounterState.End;
             AccessTools.Field(typeof(BattleSimulation), "_mapEvent").SetValue(simulation, destroyedMapEvent);
 
+            var staleMapState = Game.Current.GameStateManager.CreateState<MapState>();
+            staleMapState._battleSimulation = ObjectHelper.SkipConstructor<BattleSimulation>();
+            Game.Current.GameStateManager._gameStates.Add(staleMapState);
+
             var mapState = Game.Current.GameStateManager.CreateState<MapState>();
             mapState._battleSimulation = simulation;
             Game.Current.GameStateManager._gameStates.Add(mapState);
@@ -548,12 +552,12 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.False(client.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out _));
             Assert.Equal(PlayerEncounterState.End, PlayerEncounter.Current.EncounterState);
 
-            AccessTools.Field(typeof(BattleSimulation), "_mapEvent").SetValue(simulation, null);
-            Game.Current.GameStateManager.GameStates.OfType<MapState>().Single().EndBattleSimulation();
-            client.Resolve<IMapEventInitializationBarrier>().CompleteDeferredEncounterCleanup();
+            Game.Current.GameStateManager.GameStates.OfType<MapState>().Last().EndBattleSimulation();
+            simulation.OnFinished();
 
             Assert.Equal(PlayerEncounterState.Begin, PlayerEncounter.Current.EncounterState);
         }, MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))));
     }
 
