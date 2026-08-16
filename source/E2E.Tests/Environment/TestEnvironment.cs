@@ -12,6 +12,7 @@ using GameInterface;
 using GameInterface.Policies;
 using Missions;
 using Missions.Agents.Handlers;
+using Missions.Battles;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -114,6 +115,8 @@ public class TestEnvironment
         builder.RegisterType<MockGuardReactionActionResolver>()
             .As<IGuardReactionActionResolver>()
             .InstancePerDependency();
+        builder.RegisterInstance(new FixedBattleSizeProvider(1000))
+            .As<IBattleSizeProvider>();
 
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
@@ -121,6 +124,18 @@ public class TestEnvironment
         //builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
         return builder;
+    }
+
+    private sealed class FixedBattleSizeProvider : IBattleSizeProvider
+    {
+        private readonly int battleSize;
+
+        public FixedBattleSizeProvider(int battleSize)
+        {
+            this.battleSize = battleSize;
+        }
+
+        public int GetBattleSize(TaleWorlds.CampaignSystem.MapEvents.MapEvent mapEvent) => battleSize;
     }
 }
 

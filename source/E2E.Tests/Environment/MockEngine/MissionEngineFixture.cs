@@ -37,8 +37,9 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
         Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
-        // The BR-110 agent budget counts the mission's live agents via Mission.Agents.
+        // The BR-110 budget counts native objects until deletion via Mission.AllAgents.
         Prefix(typeof(Mission), "get_Agents", nameof(Mission_get_Agents));
+        Prefix(typeof(Mission), "get_AllAgents", nameof(Mission_get_AllAgents));
         Prefix(typeof(Mission), "get_MainAgent", nameof(Mission_get_MainAgent));
         Prefix(typeof(Mission), "set_MainAgent", nameof(Mission_set_MainAgent));
         Prefix(typeof(Mission), nameof(Mission.FindAgentWithIndex), nameof(Mission_FindAgentWithIndex));
@@ -257,6 +258,9 @@ public sealed class MissionEngineFixture : IDisposable
         __result = new TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList(mock.Agents);
         return false;
     }
+
+    private static bool Mission_get_AllAgents(Mission __instance, ref TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList __result)
+        => Mission_get_Agents(__instance, ref __result);
 
     private static bool Mission_GetMissionBehavior(Mission __instance, ref DeploymentMissionController __result)
     {
