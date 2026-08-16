@@ -137,7 +137,7 @@ public class ModConfigTests : IDisposable
         _ = NewModConfig().Data;
 
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
@@ -157,7 +157,7 @@ public class ModConfigTests : IDisposable
         _ = NewModConfig().Data;
 
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
