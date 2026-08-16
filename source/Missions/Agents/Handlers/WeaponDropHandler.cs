@@ -39,6 +39,9 @@ public class WeaponDropHandler : IWeaponDropHandler
 
         messageBroker.Subscribe<WeaponDropped>(WeaponDropSend);
         messageBroker.Subscribe<NetworkWeaponDropped>(WeaponDropReceive);
+#if DEBUG
+        messageBroker.Subscribe<NetworkTriggerEmptyExtraSlotWeaponDrop>(TriggerEmptyExtraSlotWeaponDrop);
+#endif
         this.network = network;
     }
 
@@ -51,6 +54,9 @@ public class WeaponDropHandler : IWeaponDropHandler
     {
         messageBroker.Unsubscribe<WeaponDropped>(WeaponDropSend);
         messageBroker.Unsubscribe<NetworkWeaponDropped>(WeaponDropReceive);
+#if DEBUG
+        messageBroker.Unsubscribe<NetworkTriggerEmptyExtraSlotWeaponDrop>(TriggerEmptyExtraSlotWeaponDrop);
+#endif
     }
 
     private void WeaponDropSend(MessagePayload<WeaponDropped> obj)
@@ -102,4 +108,38 @@ public class WeaponDropHandler : IWeaponDropHandler
             worldItemRegistry.Register(obj.What.WorldItemId, droppedItem);
         });
     }
+
+#if DEBUG
+    private void TriggerEmptyExtraSlotWeaponDrop(
+        MessagePayload<NetworkTriggerEmptyExtraSlotWeaponDrop> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        GameThread.RunSafe(() =>
+        {
+            NetworkTriggerEmptyExtraSlotWeaponDrop request = payload.What;
+            if (!networkAgentRegistry.TryGetAgentInfo(request.AgentId, out var agentInfo) ||
+                !networkAgentRegistry.IsLocallyControlled(request.AgentId))
+            {
+                Logger.Warning("Ignored empty extra-slot weapon drop request for {AgentId}", request.AgentId);
+                return;
+            }
+
+            Agent agent = agentInfo.Agent;
+            if (!agent.IsActive() ||
+                agent.Mission != Mission.Current ||
+                Mission.Current?.IsSiegeBattle != true ||
+                !agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty)
+            {
+                Logger.Warning("Ignored empty extra-slot weapon drop request for unavailable agent {AgentId}", request.AgentId);
+                return;
+            }
+
+            network.SendAll(new NetworkWeaponDropped(
+                request.AgentId,
+                EquipmentIndex.ExtraWeaponSlot,
+                request.WorldItemId));
+        });
+    }
+#endif
 }

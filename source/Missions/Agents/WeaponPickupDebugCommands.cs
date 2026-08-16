@@ -1,8 +1,10 @@
 ﻿#if DEBUG
 using Common;
 using Common.Messaging;
+using Common.Network;
 using GameInterface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Battles;
@@ -148,23 +150,29 @@ internal static class WeaponPickupDebugCommands
         if (!TryResolveLocalEmptyExtraSlotAgent(out var info, out var error))
             return "WEAPON_DROP_CAPTURE error=" + error;
 
-        return $"LIVE_TEST_JSON={{\"agentId\":\"{info.AgentId:N}\",\"slot\":{(int)EquipmentIndex.ExtraWeaponSlot}," +
+        return $"LIVE_TEST_JSON={{\"agentId\":\"{info.AgentId:N}\",\"controllerId\":\"{info.CurrentAuthority}\",\"slot\":{(int)EquipmentIndex.ExtraWeaponSlot}," +
             $"\"siegeBattle\":true,\"slotEmpty\":true}}";
     }
 
     [CommandLineArgumentFunction("trigger_empty_extra_slot", "coop.debug.weapon_drop")]
     public static string TriggerEmptyExtraSlot(List<string> args)
     {
-        if (args.Count != 1 || !Guid.TryParse(args[0], out Guid agentId))
-            return "Usage: coop.debug.weapon_drop.trigger_empty_extra_slot <agentId>";
+        if (args.Count != 2 || !Guid.TryParse(args[0], out Guid agentId))
+            return "Usage: coop.debug.weapon_drop.trigger_empty_extra_slot <agentId> <controllerId>";
         if (!ModInformation.IsServer)
             return "WEAPON_DROP_TRIGGER error=server-only";
         if (emptyExtraSlotDropFixture != null)
         {
             return "WEAPON_DROP_TRIGGER error=fixture-mismatch";
         }
-        if (!ContainerProvider.TryResolve<IBattleNetwork>(out var network))
-            return "WEAPON_DROP_TRIGGER error=battle-network-unavailable";
+        string controllerId = args[1];
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPeer(controllerId, out var peer))
+        {
+            return $"WEAPON_DROP_TRIGGER error=controller-not-connected controller={controllerId}";
+        }
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+            return "WEAPON_DROP_TRIGGER error=network-unavailable";
 
         Guid worldItemId = Guid.NewGuid();
         emptyExtraSlotDropFixture = new EmptyExtraSlotDropFixture
@@ -173,12 +181,11 @@ internal static class WeaponPickupDebugCommands
             WorldItemId = worldItemId,
             Triggered = true,
         };
-        network.SendAll(new NetworkWeaponDropped(
+        network.SendImmediate(peer, new NetworkTriggerEmptyExtraSlotWeaponDrop(
             agentId,
-            EquipmentIndex.ExtraWeaponSlot,
             worldItemId));
         return $"LIVE_TEST_JSON={{\"agentId\":\"{agentId:N}\",\"worldItemId\":\"{worldItemId:N}\"," +
-            $"\"slot\":{(int)EquipmentIndex.ExtraWeaponSlot},\"sent\":true}}";
+            $"\"controllerId\":\"{controllerId}\",\"slot\":{(int)EquipmentIndex.ExtraWeaponSlot},\"sent\":true}}";
     }
 
     [CommandLineArgumentFunction("state", "coop.debug.weapon_drop")]
