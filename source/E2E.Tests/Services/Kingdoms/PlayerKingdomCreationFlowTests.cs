@@ -821,6 +821,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client1.Call(() =>
         {
             Assert.True(client1.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(client1.ObjectManager.TryGetObject<Hero>(player2.HeroId, out var waitingHero));
             var decision = Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
             var decisionsVm = new KingdomDecisionsVM(() => { });
             decisionsVm.RefreshWith(decision);
@@ -839,7 +840,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Contains("Vote submitted", decisionItem.DescriptionText);
             Assert.Contains("Voting ends in", decisionItem.DescriptionText);
             Assert.Contains("Waiting for", decisionItem.DescriptionText);
-            Assert.Contains(SecondControllerId, decisionItem.DescriptionText);
+            Assert.Contains(waitingHero.Name.ToString(), decisionItem.DescriptionText);
             Assert.All(decisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
 
             decisionItem.OnFinalize();
@@ -850,7 +851,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(reopenedDecisionItem._finalSelectionDone);
             Assert.False(reopenedDecisionItem.CanEndDecision);
             Assert.Contains("Vote submitted", reopenedDecisionItem.DescriptionText);
-            Assert.Contains(SecondControllerId, reopenedDecisionItem.DescriptionText);
+            Assert.Contains(waitingHero.Name.ToString(), reopenedDecisionItem.DescriptionText);
             Assert.All(reopenedDecisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
         });
     }
@@ -1393,7 +1394,13 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 isFinal: true);
             voteManager.ApplyRemoteVote(player1.ClanId, firstDecisionVote);
             voteManager.ApplyRemoteVote(player1.ClanId, secondDecisionVote);
-            Assert.True(voteManager.HasLocalPlayerSubmittedVote(secondDecision));
+            var secondDecisionDebugInfo = Assert.Single(
+                voteManager.GetDecisionDebugInfo(kingdom),
+                info => info.DecisionIndex == 1);
+            Assert.Contains(secondDecisionDebugInfo.ClientVotes, vote =>
+                vote.ClanId == player1.ClanId &&
+                vote.HasVote &&
+                vote.IsFinal);
 
             Assert.True(voteManager.TryResolveDecision(firstDecision, force: true));
 
@@ -1967,15 +1974,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
             var playerManager = Server.Resolve<IPlayerManager>();
-            var players = (Dictionary<string, Player>)AccessTools.Field(playerManager.GetType(), "_players").GetValue(playerManager);
-            Assert.True(players.ContainsKey(SecondControllerId));
-
-            players[SecondControllerId] = new Player(
-                SecondControllerId,
-                "missingHero",
-                player2.PartyId,
-                player2.ClanId,
-                player2.CharacterId);
+            Assert.True(playerManager.TryGetPlayer(SecondControllerId, out var registeredPlayer));
+            Assert.True(playerManager.ReplacePlayer(
+                registeredPlayer,
+                new Player(
+                    SecondControllerId,
+                    "missingHero",
+                    player2.PartyId,
+                    player2.ClanId,
+                    player2.CharacterId)));
 
             kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
         });
