@@ -5,6 +5,7 @@ using Missions.Agents.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -83,14 +84,20 @@ public class WeaponDropHandler : IWeaponDropHandler
             }
 
             var agent = agentInfo.Agent;
-            if (agent.GetWeaponEntityFromEquipmentSlot(obj.What.EquipmentIndex) == null)
+            EquipmentIndex equipmentIndex = obj.What.EquipmentIndex;
+            if (equipmentIndex < EquipmentIndex.WeaponItemBeginSlot ||
+                equipmentIndex >= EquipmentIndex.NumAllWeaponSlots ||
+                agent.Equipment[equipmentIndex].IsEmpty)
             {
-                Logger.Error($"Tried to drop a weapon from an empty slot ({obj.What.EquipmentIndex})");
+                Logger.Warning(
+                    "Ignored weapon drop for empty or invalid slot {EquipmentIndex} on agent {AgentId}",
+                    equipmentIndex,
+                    obj.What.AgentId);
                 return;
             }
 
             HashSet<SpawnedItemEntity> existingItems = WeaponDropItemTracker.Capture();
-            agent.DropItem(obj.What.EquipmentIndex);
+            agent.DropItem(equipmentIndex);
             SpawnedItemEntity droppedItem = WeaponDropItemTracker.FindDroppedItem(existingItems);
             worldItemRegistry.Register(obj.What.WorldItemId, droppedItem);
         });

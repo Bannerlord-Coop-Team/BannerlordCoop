@@ -45,6 +45,13 @@ internal static class WeaponPickupDebugCommands
         public short DroppedAmount { get; set; }
     }
 
+    private sealed class EmptyExtraSlotDropFixture
+    {
+        public Guid AgentId { get; set; }
+        public Guid WorldItemId { get; set; }
+        public bool Triggered { get; set; }
+    }
+
     private sealed class FixtureLifetimeBehavior : MissionBehavior
     {
         private readonly PickupFixture ownedFixture;
@@ -80,6 +87,7 @@ internal static class WeaponPickupDebugCommands
     }
 
     private static PickupFixture fixture;
+    private static EmptyExtraSlotDropFixture emptyExtraSlotDropFixture;
     private static AgentCameraBehavior cameraBehavior;
     private static Camera agentCamera;
     private static MatrixFrame agentCameraLocalFrame;
@@ -128,6 +136,180 @@ internal static class WeaponPickupDebugCommands
             $"local={registry.IsLocallyControlled(info.AgentId)} active={agent.IsActive()} " +
             $"main={(int)agent.GetPrimaryWieldedItemIndex()} off={(int)agent.GetOffhandWieldedItemIndex()} " +
             $"slots={slots} amounts={amounts} fixture={fixturePhase} worldItemActive={worldItemActive}";
+    }
+
+    [CommandLineArgumentFunction("capture_empty_extra_slot", "coop.debug.weapon_drop")]
+    public static string CaptureEmptyExtraSlot(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.weapon_drop.capture_empty_extra_slot";
+        if (!ModInformation.IsServer)
+            return "WEAPON_DROP_CAPTURE error=server-only";
+
+        Mission mission = Mission.Current;
+        if (mission == null || !mission.IsSiegeBattle)
+            return "WEAPON_DROP_CAPTURE error=not-in-siege";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "WEAPON_DROP_CAPTURE error=agent-registry-unavailable";
+
+        if (emptyExtraSlotDropFixture != null)
+        {
+            Guid existingAgentId = emptyExtraSlotDropFixture.AgentId;
+            if (!emptyExtraSlotDropFixture.Triggered &&
+                registry.TryGetAgentInfo(existingAgentId, out var existingInfo) &&
+                existingInfo.Agent != null &&
+                existingInfo.Agent.Mission == mission &&
+                existingInfo.Agent.IsActive() &&
+                registry.IsLocallyControlled(existingAgentId) &&
+                existingInfo.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty)
+            {
+                return $"LIVE_TEST_JSON={{\"agentId\":\"{existingAgentId:N}\",\"slot\":{(int)EquipmentIndex.ExtraWeaponSlot}," +
+                    $"\"siegeBattle\":true,\"slotEmpty\":true}}";
+            }
+
+            emptyExtraSlotDropFixture = null;
+        }
+
+        CoopAgentInfo info = registry.GetControllerIds()
+            .SelectMany(registry.GetAgents)
+            .FirstOrDefault(candidate =>
+                candidate.Agent != null &&
+                candidate.Agent.Mission == mission &&
+                candidate.Agent.IsActive() &&
+                registry.IsLocallyControlled(candidate.AgentId) &&
+                candidate.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+        if (info == null)
+            return "WEAPON_DROP_CAPTURE error=no-empty-extra-slot-agent";
+
+        emptyExtraSlotDropFixture = new EmptyExtraSlotDropFixture
+        {
+            AgentId = info.AgentId,
+        };
+        return $"LIVE_TEST_JSON={{\"agentId\":\"{info.AgentId:N}\",\"slot\":{(int)EquipmentIndex.ExtraWeaponSlot}," +
+            $"\"siegeBattle\":true,\"slotEmpty\":true}}";
+    }
+
+    [CommandLineArgumentFunction("trigger_empty_extra_slot", "coop.debug.weapon_drop")]
+    public static string TriggerEmptyExtraSlot(List<string> args)
+    {
+        if (args.Count != 1 || !Guid.TryParse(args[0], out Guid agentId))
+            return "Usage: coop.debug.weapon_drop.trigger_empty_extra_slot <agentId>";
+        if (!ModInformation.IsServer)
+            return "WEAPON_DROP_TRIGGER error=server-only";
+        if (emptyExtraSlotDropFixture == null ||
+            emptyExtraSlotDropFixture.AgentId != agentId ||
+            emptyExtraSlotDropFixture.Triggered)
+        {
+            return "WEAPON_DROP_TRIGGER error=fixture-mismatch";
+        }
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry) ||
+            !registry.TryGetAgentInfo(agentId, out var info) ||
+            info.Agent == null ||
+            info.Agent.Mission != Mission.Current ||
+            !info.Agent.IsActive() ||
+            !registry.IsLocallyControlled(agentId) ||
+            !info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty)
+        {
+            return $"WEAPON_DROP_TRIGGER error=agent-state-changed agent={agentId:N}";
+        }
+        if (!ContainerProvider.TryResolve<IBattleNetwork>(out var network))
+            return "WEAPON_DROP_TRIGGER error=battle-network-unavailable";
+
+        Guid worldItemId = Guid.NewGuid();
+        emptyExtraSlotDropFixture.WorldItemId = worldItemId;
+        emptyExtraSlotDropFixture.Triggered = true;
+        network.SendAll(new NetworkWeaponDropped(
+            agentId,
+            EquipmentIndex.ExtraWeaponSlot,
+            worldItemId));
+        return $"LIVE_TEST_JSON={{\"agentId\":\"{agentId:N}\",\"worldItemId\":\"{worldItemId:N}\"," +
+            $"\"slot\":{(int)EquipmentIndex.ExtraWeaponSlot},\"sent\":true}}";
+    }
+
+    [CommandLineArgumentFunction("state", "coop.debug.weapon_drop")]
+    public static string EmptyExtraSlotDropState(List<string> args)
+    {
+        if (args.Count != 2 ||
+            !Guid.TryParse(args[0], out Guid agentId) ||
+            !Guid.TryParse(args[1], out Guid worldItemId))
+        {
+            return "Usage: coop.debug.weapon_drop.state <agentId> <worldItemId>";
+        }
+        if (!ModInformation.IsClient)
+            return "WEAPON_DROP_STATE error=client-only";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry) ||
+            !registry.TryGetAgentInfo(agentId, out var info) ||
+            info.Agent == null)
+        {
+            return $"WEAPON_DROP_STATE error=agent-not-found agent={agentId:N}";
+        }
+        if (!ContainerProvider.TryResolve<INetworkWorldItemRegistry>(out var worldItemRegistry))
+            return "WEAPON_DROP_STATE error=world-item-registry-unavailable";
+
+        Agent agent = info.Agent;
+        bool active = agent.IsActive();
+        bool siegeBattle = agent.Mission == Mission.Current && Mission.Current?.IsSiegeBattle == true;
+        bool slotEmpty = agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
+        bool worldItemRegistered = worldItemRegistry.TryGet(worldItemId, out _);
+        if (!active || !siegeBattle || !slotEmpty || worldItemRegistered)
+        {
+            return $"WEAPON_DROP_STATE error=unexpected-state agent={agentId:N} " +
+                $"active={active} siegeBattle={siegeBattle} slotEmpty={slotEmpty} " +
+                $"worldItemRegistered={worldItemRegistered}";
+        }
+
+        return $"LIVE_TEST_JSON={{\"agentId\":\"{agentId:N}\",\"worldItemId\":\"{worldItemId:N}\"," +
+            $"\"responsive\":true,\"active\":{active.ToString().ToLowerInvariant()}," +
+            $"\"siegeBattle\":{siegeBattle.ToString().ToLowerInvariant()}," +
+            $"\"slotEmpty\":{slotEmpty.ToString().ToLowerInvariant()}," +
+            $"\"worldItemRegistered\":{worldItemRegistered.ToString().ToLowerInvariant()}}}";
+    }
+
+    [CommandLineArgumentFunction("restore_empty_extra_slot", "coop.debug.weapon_drop")]
+    public static string RestoreEmptyExtraSlot(List<string> args)
+    {
+        if (args.Count != 2 ||
+            !Guid.TryParse(args[0], out Guid agentId) ||
+            !Guid.TryParse(args[1], out Guid worldItemId))
+        {
+            return "Usage: coop.debug.weapon_drop.restore_empty_extra_slot <agentId> <worldItemId>";
+        }
+        if (!ModInformation.IsServer)
+            return "WEAPON_DROP_RESTORE error=server-only";
+        if (emptyExtraSlotDropFixture == null ||
+            emptyExtraSlotDropFixture.AgentId != agentId ||
+            emptyExtraSlotDropFixture.WorldItemId != worldItemId ||
+            !emptyExtraSlotDropFixture.Triggered)
+        {
+            return "WEAPON_DROP_RESTORE error=fixture-mismatch";
+        }
+
+        if (ContainerProvider.TryResolve<INetworkWorldItemRegistry>(out var worldItemRegistry))
+            worldItemRegistry.Remove(worldItemId);
+        emptyExtraSlotDropFixture = null;
+        return $"LIVE_TEST_JSON={{\"agentId\":\"{agentId:N}\",\"worldItemId\":\"{worldItemId:N}\"," +
+            $"\"restored\":true}}";
+    }
+
+    [CommandLineArgumentFunction("verify_empty_extra_slot", "coop.debug.weapon_drop")]
+    public static string VerifyEmptyExtraSlot(List<string> args)
+    {
+        if (args.Count != 1 || !Guid.TryParse(args[0], out Guid agentId))
+            return "Usage: coop.debug.weapon_drop.verify_empty_extra_slot <agentId>";
+        if (!ModInformation.IsServer)
+            return "WEAPON_DROP_VERIFY error=server-only";
+
+        bool restored = emptyExtraSlotDropFixture == null &&
+            ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry) &&
+            registry.TryGetAgentInfo(agentId, out var info) &&
+            info.Agent != null &&
+            info.Agent.Mission == Mission.Current &&
+            Mission.Current?.IsSiegeBattle == true &&
+            info.Agent.IsActive() &&
+            info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
+        return restored
+            ? "LIVE_TEST_JSON=true"
+            : $"WEAPON_DROP_VERIFY error=not-restored agent={agentId:N}";
     }
 
     [CommandLineArgumentFunction("fixture_drop", "coop.debug.weapon_pickup")]
