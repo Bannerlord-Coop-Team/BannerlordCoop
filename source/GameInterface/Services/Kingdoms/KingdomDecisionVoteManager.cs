@@ -1062,6 +1062,7 @@ namespace GameInterface.Services.Kingdoms
                 if (string.IsNullOrEmpty(player.ClanId)) continue;
                 if (!TryGetClan(player.ClanId, decision.Kingdom, out Clan clan)) continue;
                 if (clan.Kingdom != decision.Kingdom) continue;
+                if (clan.IsUnderMercenaryService) continue;
 
                 if (TryGetClanId(clan, out string clanId))
                 {
