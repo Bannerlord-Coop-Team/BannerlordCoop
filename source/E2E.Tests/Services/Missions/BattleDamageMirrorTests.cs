@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
@@ -101,6 +101,50 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
 
             Assert.True(AgentMirror.TryGet(agent, out var mirror));
             Assert.Equal(70f, mirror.Health); // 100 - 30: damage landed
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
+    public void RoutedDismount_PreservesTheRiderlessMountAiComponent()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "owner");
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            var controller = client.Resolve<CoopBattleController>();
+            var registry = client.Resolve<INetworkAgentRegistry>();
+
+            Agent rider = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+            Agent mount = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
+            var riderId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("owner", riderId, rider));
+            mock.DismountRiderOnNextBlow = true;
+
+            var blow = new Blow(0)
+            {
+                InflictedDamage = 10,
+                DamageType = DamageTypes.Pierce
+            };
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkApplyBattleDamage(
+                    riderId,
+                    Guid.Empty,
+                    blow,
+                    default));
+
+            Assert.Null(rider.MountAgent);
+            Assert.Null(mount.RiderAgent);
+            Assert.Equal(AgentControllerType.None, mount.Controller);
+            Assert.NotNull(mount.CommonAIComponent);
+            Assert.Single(mountMirror.Components.OfType<CommonAIComponent>());
             GC.KeepAlive(controller);
         });
     }

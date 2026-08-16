@@ -23,8 +23,53 @@ namespace Missions.Agents.Packets
             Agent.MovementControlFlag desiredMovementFlags =
                 currentFlags |
                 GetLocomotionMovementFlags(movementFlags);
-            if (currentMovementFlags != desiredMovementFlags)
-                agent.MovementFlags = desiredMovementFlags;
+            if (currentMovementFlags == desiredMovementFlags)
+                return;
+
+            agent.MovementFlags = desiredMovementFlags;
+        }
+
+        internal static void ApplyMovementDirection(
+            Agent agent,
+            Vec2 movementDirection)
+        {
+            Vec2 current = agent.GetMovementDirection();
+            if (current.X == movementDirection.X &&
+                current.Y == movementDirection.Y)
+            {
+                return;
+            }
+
+            agent.SetMovementDirection(movementDirection);
+        }
+
+        internal static void ApplyLookDirection(
+            Agent agent,
+            Vec3 lookDirection)
+        {
+            Vec3 current = agent.LookDirection;
+            if (current.X == lookDirection.X &&
+                current.Y == lookDirection.Y &&
+                current.Z == lookDirection.Z)
+            {
+                return;
+            }
+
+            agent.LookDirection = lookDirection;
+        }
+
+        internal static void ApplyMovementInput(
+            Agent agent,
+            Vec2 movementInput)
+        {
+            Vec2 current = agent.MovementInputVector;
+            if (current.X == movementInput.X &&
+                current.Y == movementInput.Y)
+            {
+                return;
+            }
+
+            agent.MovementInputVector = movementInput;
         }
 
         public AgentData(
@@ -85,31 +130,7 @@ namespace Missions.Agents.Packets
             // this packet's Position by AgentMovementHandler), so the ease is decoupled from the packet cadence.
             // Everything below is per-packet state that drives the puppet's own walk + animation.
 
-            agent.SetMovementDirection(MovementDirection);
-
-            // apply the agent's look direction
-            agent.LookDirection = LookDirection;
-
-            // The raw owner input is local-frame and unrepresentative for AI movement modes (native retreat
-            // drives the owner with no input), so an on-foot puppet fed it walks while its position target
-            // sprints — the walk-lag-snap desync. Human locomotion is procedural from the input, so derive
-            // the throttle from the owner's real ground speed; keep the owner's strafe direction when it has
-            // one. Mounted riders keep the raw input — the mount's pace rides its synced channel-0 gait.
-            if (agent.HasMount)
-            {
-                agent.MovementInputVector = InputVector;
-            }
-            else
-            {
-                float maxSpeed = agent.GetMaximumForwardUnlimitedSpeed();
-                float throttle = maxSpeed > 0f ? MBMath.ClampFloat(Speed / maxSpeed, 0f, 1f) : 0f;
-                agent.MovementInputVector = InputVector.LengthSquared > 0.0001f
-                    ? InputVector.Normalized() * throttle
-                    : new Vec2(0f, throttle);
-            }
-            ApplyLocomotionMovementFlags(
-                agent,
-                (Agent.MovementControlFlag)MovementFlag);
+            ApplyContinuousState(agent);
 
             // NOTE: actions/animations are NOT applied here anymore. They are events, not continuous state, so
             // they are synced separately and on-change by AgentActionHandler (reliable-ordered), not polled with
@@ -120,6 +141,32 @@ namespace Missions.Agents.Packets
             {
                 MountData?.ApplyMount(agent.MountAgent);
             }
+        }
+
+        internal void ApplyContinuousState(Agent agent)
+        {
+            ApplyMovementDirection(agent, MovementDirection);
+            ApplyLookDirection(agent, LookDirection);
+            ApplyMovementInput(agent, GetMovementInput(agent));
+            ApplyLocomotionMovementFlags(
+                agent,
+                (Agent.MovementControlFlag)MovementFlag);
+        }
+
+        internal Vec2 GetMovementInput(Agent agent)
+        {
+            // The raw owner input is local-frame and unrepresentative for AI movement modes (native retreat
+            // drives the owner with no input), so derive an on-foot puppet's throttle from ground speed.
+            if (agent.HasMount)
+                return InputVector;
+
+            float maxSpeed = agent.GetMaximumForwardUnlimitedSpeed();
+            float throttle = maxSpeed > 0f
+                ? MBMath.ClampFloat(Speed / maxSpeed, 0f, 1f)
+                : 0f;
+            return InputVector.LengthSquared > 0.0001f
+                ? InputVector.Normalized() * throttle
+                : new Vec2(0f, throttle);
         }
 
         [ProtoMember(1)]
