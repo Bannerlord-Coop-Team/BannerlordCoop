@@ -24,6 +24,12 @@ internal class PlayerLeaveSettlementPatch
         typeof(EncounterGameMenuBehavior).GetMethod("game_menu_castle_outside_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(EncounterGameMenuBehavior).GetMethod("army_encounter_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(HideoutCampaignBehavior).GetMethod("game_menu_hideout_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
+        // A village entered while it is looted opens the "village_looted" menu, whose single option is
+        // its own leave route. Without it here the press ran vanilla only: the menu closed and the
+        // player regained map control locally, but no request ever reached the server, so the server
+        // kept the party inside the settlement and never replicated a leave back — the map party stayed
+        // invisible and frozen until coop.unstuck released the settlement server-side by hand.
+        AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), "village_looted_leave_on_consequence"),
     };
 
     private static bool Prefix() => RequestLeave();
