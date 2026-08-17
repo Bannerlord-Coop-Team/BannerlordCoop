@@ -83,6 +83,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFinalizeCleanupPatch
     private static void Postfix(IssueBase __instance)
     {
         if (__instance is not GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue) return;
+        if (DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance) && !IssueFinalizeAuthorityGuard.IsActive) return;
 
         GangLeaderNeedsToOffloadStolenGoodsQuestType.AlternativeSolutionFreeze.Clear(__instance.IssueOwner);
     }
