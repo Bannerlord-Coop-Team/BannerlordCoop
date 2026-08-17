@@ -620,9 +620,9 @@ public class KingdomDebugCommand
             return message;
         }
 
-        if (args.Count < 4)
+        if (args.Count < 4 || args.Count > 5)
         {
-            return "Usage: coop.debug.kingdom.vote_decision <kingdomId> <decisionIndex> <outcomeIndex|abstain> <supportWeight>";
+            return "Usage: coop.debug.kingdom.vote_decision <kingdomId> <decisionIndex> <outcomeIndex|abstain> <supportWeight> [isFinal]";
         }
 
         bool isAbstain = args[2].Equals("abstain", StringComparison.OrdinalIgnoreCase);
@@ -641,6 +641,12 @@ public class KingdomDebugCommand
             return $"Support weight is invalid: {args[3]}. Use Choose, StayNeutral, SlightlyFavor, StronglyFavor, or FullyPush.";
         }
 
+        bool finalVote = false;
+        if (args.Count == 5 && !bool.TryParse(args[4], out finalVote))
+        {
+            return $"Unable to parse {args[4]} as a boolean.";
+        }
+
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
@@ -651,9 +657,9 @@ public class KingdomDebugCommand
         }
 
         MessageBroker.Instance.Publish(decision, new KingdomDecisionVoteRequested(
-            new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain)));
+            new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain, finalVote)));
 
-        return $"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}.";
+        return $"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}, final={finalVote}.";
     }
 
     // coop.debug.kingdom.resolve_decision
