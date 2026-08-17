@@ -1,0 +1,18 @@
+﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
+
+namespace GameInterface.Services.Kingdoms.Messages;
+
+public readonly struct AllianceOfferPendingStatusChanged : IEvent
+{
+    public readonly Kingdom RequestingKingdom;
+    public readonly Kingdom TargetKingdom;
+    public readonly bool IsPending;
+
+    public AllianceOfferPendingStatusChanged(Kingdom requestingKingdom, Kingdom targetKingdom, bool isPending)
+    {
+        RequestingKingdom = requestingKingdom;
+        TargetKingdom = targetKingdom;
+        IsPending = isPending;
+    }
+}

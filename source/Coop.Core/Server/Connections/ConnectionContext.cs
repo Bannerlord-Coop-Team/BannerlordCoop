@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
@@ -35,7 +36,8 @@ public class ConnectionContext
         IAttachmentIdMapper attachmentIdMapper,
         IExistingPlayerSender existingPlayerSender,
         IServerOptionsProvider serverOptionsProvider,
-        IJoinCampaignBaselineSender joinCampaignBaselineSender)
+        IJoinCampaignBaselineSender joinCampaignBaselineSender,
+        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -53,6 +55,7 @@ public class ConnectionContext
         ExistingPlayerSender = existingPlayerSender;
         ServerOptionsProvider = serverOptionsProvider;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
+        JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -71,4 +74,5 @@ public class ConnectionContext
     public IExistingPlayerSender ExistingPlayerSender { get; }
     public IServerOptionsProvider ServerOptionsProvider { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
+    public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
 }

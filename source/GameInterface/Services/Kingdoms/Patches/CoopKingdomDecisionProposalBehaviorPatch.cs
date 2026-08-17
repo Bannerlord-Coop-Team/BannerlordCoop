@@ -159,12 +159,27 @@ namespace GameInterface.Services.Kingdoms.Patches
                             bool isPlayerInvolved =
                                 (decision.DetermineChooser()?.Leader?.IsHumanPlayerCharacter ?? false)
                                 || decision.DetermineSupporters().Any(supporter => supporter.IsPlayer);
-                            if (decision is MakePeaceKingdomDecision d && CoopKingdomElection.IsPendingPlayerPeaceOffer(decision))
+                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
                             {
-                                MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
+                                if (decision is MakePeaceKingdomDecision d)
+                                {
+                                    MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
                                     (Kingdom)d.FactionToMakePeaceWith,
                                     d.Kingdom,
                                     isPending: false));
+                                }
+
+                                if (decision is StartAllianceDecision startalliancedecision)
+                                {
+                                    MessageBroker.Instance.Publish(null, new AllianceOfferPendingStatusChanged(
+                                        (Kingdom)startalliancedecision.KingdomToStartAllianceWith,
+                                        startalliancedecision.Kingdom,
+                                        isPending: false));
+                                    if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(startalliancedecision))
+                                    {
+                                        CoopKingdomElection._opponentProposedAllianceDecisions.Remove(startalliancedecision);
+                                    }
+                                }
                             }
                             CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, isPlayerInvolved);
                         }
@@ -172,7 +187,7 @@ namespace GameInterface.Services.Kingdoms.Patches
                         {
                             // An unanswered inbound player peace offer expires as a decline.
                             // It must never fall through to the forced AI resolution path.
-                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision))
+                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
                             {
                                 kingdom.RemoveDecision(decision);
                                 if (decision is MakePeaceKingdomDecision d)
@@ -181,6 +196,17 @@ namespace GameInterface.Services.Kingdoms.Patches
                                         (Kingdom)d.FactionToMakePeaceWith,
                                         d.Kingdom,
                                         isPending: false));
+                                }
+                                if (decision is StartAllianceDecision startalliancedecision)
+                                {
+                                    MessageBroker.Instance.Publish(null, new AllianceOfferPendingStatusChanged(
+                                        (Kingdom)startalliancedecision.KingdomToStartAllianceWith,
+                                        startalliancedecision.Kingdom,
+                                        isPending: false));
+                                    if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(startalliancedecision))
+                                    {
+                                        CoopKingdomElection._opponentProposedAllianceDecisions.Remove(startalliancedecision);
+                                    }
                                 }
                                 CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, true);
                                 continue;
