@@ -1,4 +1,6 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
+using Common.Util;
 using HarmonyLib;
 using GameInterface.Services.MapEvents.Initialization;
 using SandBox.ViewModelCollection.Map;
@@ -22,6 +24,10 @@ internal class MapEventRobustnessPatches
     {
         if (__result is null)
         {
+            // A client must wait for the authoritative registered tracker rather than creating an
+            // unregistered local replacement while a replicated reference is still in flight.
+            if (ModInformation.IsClient) return;
+
             // The assignment below runs the generated AutoSync setter prefix, which reads this getter
             // to compare values. Let that nested read observe null instead of recursively restoring again.
             if (restoringTroopUpgradeTracker) return;
@@ -39,11 +45,53 @@ internal class MapEventRobustnessPatches
             try
             {
                 __result = new TroopUpgradeTracker();
+                if (!__instance.IsFinalized)
+                    PopulateTrackerFromMapEvent(__instance, __result);
                 __instance.TroopUpgradeTracker = __result;
+                Logger.Information(
+                    "Restored {Property} for MapEvent {MapEventId} with {PartyCount} tracked parties",
+                    nameof(MapEvent.TroopUpgradeTracker),
+                    __instance.StringId,
+                    __result._mapEventParties.Count);
             }
             finally
             {
                 restoringTroopUpgradeTracker = false;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.TroopUpgradeTracker), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixTroopUpgradeTrackerSet(MapEvent __instance, TroopUpgradeTracker value)
+    {
+        // The initial graph commit repopulates the tracker in FinishClient. Only post-commit,
+        // network-applied replacement references need this local mirror of the server recovery.
+        if (!ModInformation.IsClient || !AllowedThread.IsThisThreadAllowed() || value is null ||
+            value._mapEventParties.Count != 0)
+        {
+            return;
+        }
+
+        if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) &&
+            barrier.IsPending(__instance))
+        {
+            return;
+        }
+
+        PopulateTrackerFromMapEvent(__instance, value);
+    }
+
+    private static void PopulateTrackerFromMapEvent(MapEvent mapEvent, TroopUpgradeTracker tracker)
+    {
+        if (mapEvent._sides is null) return;
+
+        foreach (var side in mapEvent._sides)
+        {
+            if (side?.Parties is null) continue;
+            foreach (var party in side.Parties)
+            {
+                if (party is not null) tracker.AddParty(party);
             }
         }
     }
