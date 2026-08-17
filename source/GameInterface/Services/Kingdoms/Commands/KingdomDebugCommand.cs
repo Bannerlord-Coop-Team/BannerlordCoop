@@ -142,6 +142,20 @@ public class KingdomDebugCommand
         return "KINGDOM_SCREEN_OPENED";
     }
 
+    [CommandLineArgumentFunction("open_decision", "coop.debug.kingdom")]
+    public static string OpenKingdomDecisionScreen(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+            return message;
+        if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
+        if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
+
+        KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(decision);
+        Game.Current.GameStateManager.PushState(kingdomState, 0);
+        return "KINGDOM_DECISION_SCREEN_OPENED";
+    }
+
     [CommandLineArgumentFunction("close", "coop.debug.kingdom")]
     public static string CloseKingdomScreen(List<string> args)
     {
@@ -163,6 +177,7 @@ public class KingdomDebugCommand
         var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
         return $"KINGDOM_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is KingdomState} " +
             $"topScreen={kingdomScreen != null} dataSource={kingdomScreen?.DataSource != null} " +
+            $"decisionActive={kingdomScreen?.DataSource?.Decision?.IsActive ?? false} " +
             $"clanShown={kingdomScreen?.DataSource?.Clan?.Show ?? false} " +
             $"kingdom={kingdomScreen?.DataSource?.Kingdom?.Name} " +
             $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}";
