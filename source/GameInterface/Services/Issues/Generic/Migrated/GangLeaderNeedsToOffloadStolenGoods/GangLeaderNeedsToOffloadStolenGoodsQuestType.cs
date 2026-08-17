@@ -77,7 +77,8 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
     private static void RejectAcceptanceCore(Hero owner)
     {
         if (owner?.Issue == null || owner.Issue.IsOngoingWithoutQuest) return;
-        if (IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out _)) return;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return;
+        if (ownershipRegistry.TryGetOwnerControllerId(owner, out _)) return;
 
         using (new AllowedThread())
         {
@@ -139,16 +140,17 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
         public void MirrorQuestAccepted(Hero owner, GangLeaderStolenGoodsQuestAcceptFields fields)
         {
-            if (owner?.Issue is not Issue) return;
+            if (owner?.Issue is not Issue issue) return;
 
             using (new AllowedThread())
             {
-                if (owner.Issue.IsOngoingWithoutQuest)
+                if (issue.IsOngoingWithoutQuest)
                 {
-                    Campaign.Current.IssueManager.StartIssueQuest(owner);
+                    issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                    issue.IsTriedToSolveBefore = true;
                 }
 
-                if (owner.Issue.IssueQuest is not Quest quest) return;
+                if (issue.IssueQuest is not Quest quest) return;
 
                 StolenTradeGoodAmountField.SetValue(quest, fields.StolenTradeGoodAmount);
                 StolenTradeGoodPriceField.SetValue(quest, fields.StolenTradeGoodPrice);
@@ -162,6 +164,27 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     private sealed class AlternativeAcceptMirrorStrategy : IAlternativeAcceptMirrorStrategy<GangLeaderStolenGoodsAlternativeAcceptPayload>
     {
+        public void ReplayAlternativeAccepted(Hero owner)
+        {
+            if (owner?.Issue is not Issue || !owner.Issue.IsOngoingWithoutQuest) return;
+
+            using (new Dispatch.IssueDispatchReplayGuard())
+            {
+                owner.Issue.StartIssueWithAlternativeSolution();
+            }
+        }
+
+        public bool TryCaptureAlternativeFields(Hero owner, out GangLeaderStolenGoodsAlternativeAcceptPayload payload)
+        {
+            payload = default;
+            if (owner?.Issue is not Issue issue) return false;
+
+            payload = new GangLeaderStolenGoodsAlternativeAcceptPayload(
+                issue.StolenTradeGoodAmount, issue.RewardGold, AlternativeSolutionVanillaStateSync.Capture(issue));
+            AlternativeSolutionFreeze.Freeze(owner, (payload.StolenTradeGoodAmount, payload.RewardGold));
+            return true;
+        }
+
         public void MirrorAlternativeAccepted(Hero owner, GangLeaderStolenGoodsAlternativeAcceptPayload payload)
         {
             if (owner?.Issue is not Issue issue) return;
@@ -207,24 +230,6 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         MessageBroker.Instance.Publish(issue.IssueOwner, new GangLeaderStolenGoodsIssueCreated(issue));
     }
 
-    private static void OnGenuineQuestSolutionAccept(Hero issueOwner, string controllerId)
-    {
-        if (!QuestSolutionAcceptMirror.TryCaptureQuestFields(issueOwner, out var fields)) return;
-
-        var bytes = GenericAcceptFieldsSerializer.Serialize(fields);
-        MessageBroker.Instance.Publish(issueOwner, new QuestTypeQuestSolutionAcceptTriggered(issueOwner, controllerId, bytes));
-    }
-
-    private static void OnGenuineAlternativeAccept(Hero issueOwner, string controllerId)
-    {
-        if (issueOwner?.Issue is not Issue issue) return;
-
-        var payload = new GangLeaderStolenGoodsAlternativeAcceptPayload(
-            issue.StolenTradeGoodAmount, issue.RewardGold, AlternativeSolutionVanillaStateSync.Capture(issue));
-        var bytes = GenericAcceptFieldsSerializer.Serialize(payload);
-        MessageBroker.Instance.Publish(issue, new QuestTypeAlternativeAcceptTriggered(issueOwner, controllerId, bytes));
-    }
-
     public static bool TryTriggerOwnedAlternativeSolutionCompletion(Hero owner) =>
         AlternativeSolutionCompletionRunner.TryTriggerOwnedCompletion(owner, RequestServerCompletion);
 
@@ -237,15 +242,15 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         network.SendAll(new RequestAlternativeSolutionCompletion(ownerId));
     }
 
+    private static bool ValidateQuestCancel(Issue issue) => true;
+
     static GangLeaderNeedsToOffloadStolenGoodsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("GangLeaderNeedsToOffloadStolenGoods")
-            .WithCreationCapture(CreationCaptureStrategy)
             .WithQuestSolutionAccept(QuestSolutionAcceptMirror)
             .WithAlternativeAccept(AlternativeAcceptMirror)
             .WithCreationTrigger(OnGenuineCreation)
-            .WithQuestSolutionAcceptTrigger(OnGenuineQuestSolutionAccept)
-            .WithAlternativeAcceptTrigger(OnGenuineAlternativeAccept)
+            .WithQuestCancelValidation(ValidateQuestCancel)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);

@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -19,15 +20,18 @@ internal class GangLeaderNeedsToOffloadStolenGoodsIssueHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
     public GangLeaderNeedsToOffloadStolenGoodsIssueHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<GangLeaderStolenGoodsIssueCreated>(Handle_GangLeaderStolenGoodsIssueCreated);
         messageBroker.Subscribe<NetworkGangLeaderStolenGoodsIssueCreated>(Handle_NetworkGangLeaderStolenGoodsIssueCreated);
@@ -56,7 +60,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsIssueHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(fields.IssueHideout, out var issueHideoutId)) return;
         if (!objectManager.TryGetIdWithLogging(fields.CounterOfferHero, out var counterOfferHeroId)) return;
 
-        var generation = IssueGenerationRegistry.Bump(issue.IssueOwner);
+        var generation = generationRegistry.Bump(issue.IssueOwner);
 
         network.SendAll(new NetworkGangLeaderStolenGoodsIssueCreated(
             ownerId, issueHideoutId, fields.RandomForStolenTradeGood, counterOfferHeroId, generation));
@@ -71,7 +75,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsIssueHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
-            IssueGenerationRegistry.SetGeneration(owner, data.Generation);
+            generationRegistry.SetGeneration(owner, data.Generation);
 
             if (owner.Issue != null) return;
 
