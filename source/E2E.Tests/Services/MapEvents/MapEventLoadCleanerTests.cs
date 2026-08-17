@@ -82,6 +82,83 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
+    public void FinalizePlayerMapEvents_CrossLinkedParticipantSide_RepairsAndCompletes()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-player-cross-linked-side", heroId, mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+            Assert.Contains(mapEvent.DefenderSide.Parties, party => ReferenceEquals(party.Party, defender.Party));
+
+            defender.Party._mapEventSide = mapEvent.AttackerSide;
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+            Assert.Null(defender.Party.MapEventSide);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void FinalizePlayerMapEvents_DuplicateParticipantEntry_PrunesAndCompletes()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-player-duplicate-entry", heroId, mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+
+            mapEvent.DefenderSide._battleParties.Add(new MapEventParty(defender.Party));
+            Assert.Equal(2, mapEvent.DefenderSide.Parties.Count(party => ReferenceEquals(party.Party, defender.Party)));
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+            Assert.Null(defender.Party.MapEventSide);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void FinalizePlayerMapEvents_PartyInAnotherEvent_PreservesAuthoritativeMembership()
+    {
+        var loadedEventContext = CreateServerMapEvent(commit: false);
+        var activeEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-player-foreign-event", heroId, loadedEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(loadedEventContext.MapEventId, out var loadedEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(activeEventContext.MapEventId, out var activeEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(loadedEventContext.DefenderPartyId, out var defender));
+
+            activeEvent.AttackerSide._battleParties.Add(new MapEventParty(defender.Party));
+            defender.Party._mapEventSide = activeEvent.AttackerSide;
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Equal(MapEventState.WaitingRemoval, loadedEvent.State);
+            Assert.DoesNotContain(loadedEvent.InvolvedParties, party => ReferenceEquals(party, defender.Party));
+            Assert.Same(activeEvent.AttackerSide, defender.Party.MapEventSide);
+            Assert.Contains(activeEvent.AttackerSide.Parties, party => ReferenceEquals(party.Party, defender.Party));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void FinalizePlayerMapEvents_UnregisteredPlayerPartyInCampaignObjectManager_FinalizesEvent()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);

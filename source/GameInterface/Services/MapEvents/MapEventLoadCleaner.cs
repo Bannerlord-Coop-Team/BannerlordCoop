@@ -8,6 +8,7 @@ using GameInterface.Services.Players;
 using Helpers;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -105,32 +106,92 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private void RepairPartySideLinks(MapEvent mapEvent)
     {
         var repairedLinks = 0;
+        var removedEntries = 0;
+        var sides = (mapEvent._sides ?? Array.Empty<MapEventSide>())
+            .Where(side => side != null)
+            .ToArray();
+        var memberships = new Dictionary<PartyBase, List<MapEventSide>>();
 
-        foreach (var side in mapEvent._sides ?? Array.Empty<MapEventSide>())
+        foreach (var side in sides)
         {
-            if (side?.Parties == null)
-                continue;
-
             foreach (var mapEventParty in side.Parties)
             {
                 var party = mapEventParty?.Party;
-                if (party == null || party.MapEventSide != null)
+                if (party == null)
                     continue;
 
-                // HandleMapEventEnd loops until side.Parties is empty and relies on the PartyBase
-                // setter to remove the current entry. A null backing link makes that setter a no-op,
-                // leaving the vanilla loop permanently stuck. Do not rewrite a non-null link because
-                // it may authoritatively belong to another event.
-                party._mapEventSide = side;
-                repairedLinks++;
+                if (!memberships.TryGetValue(party, out var partySides))
+                {
+                    partySides = new List<MapEventSide>();
+                    memberships.Add(party, partySides);
+                }
+
+                if (!partySides.Contains(side))
+                    partySides.Add(side);
             }
         }
 
-        if (repairedLinks > 0)
+        var canonicalSides = new Dictionary<PartyBase, MapEventSide>();
+        foreach (var membership in memberships)
+        {
+            var party = membership.Key;
+            var linkedSide = party.MapEventSide;
+
+            if (linkedSide != null && membership.Value.Contains(linkedSide))
+            {
+                canonicalSides.Add(party, linkedSide);
+                continue;
+            }
+
+            // A link to another live map event is authoritative. Drop this loaded event's stale
+            // membership instead of moving the party out of its current event.
+            if (linkedSide != null && !sides.Contains(linkedSide))
+                continue;
+
+            canonicalSides.Add(party, membership.Value[0]);
+        }
+
+        var retainedParties = new HashSet<PartyBase>();
+        foreach (var side in sides)
+        {
+            for (var i = side._battleParties.Count - 1; i >= 0; i--)
+            {
+                var party = side._battleParties[i]?.Party;
+                if (party != null &&
+                    canonicalSides.TryGetValue(party, out var canonicalSide) &&
+                    ReferenceEquals(canonicalSide, side) &&
+                    retainedParties.Add(party))
+                {
+                    continue;
+                }
+
+                side._battleParties.RemoveAt(i);
+                removedEntries++;
+            }
+
+            if (side._battleParties.Count > 0 &&
+                !side._battleParties.Any(entry => ReferenceEquals(entry?.Party, side.LeaderParty)))
+            {
+                side.LeaderParty = side._battleParties[0].Party;
+                side._mapFaction = side.LeaderParty.MapFaction;
+            }
+        }
+
+        foreach (var membership in canonicalSides)
+        {
+            if (ReferenceEquals(membership.Key.MapEventSide, membership.Value))
+                continue;
+
+            membership.Key._mapEventSide = membership.Value;
+            repairedLinks++;
+        }
+
+        if (repairedLinks > 0 || removedEntries > 0)
         {
             logger.Warning(
-                "Repaired {RepairedLinkCount} missing party-side links in loaded player map event {MapEventId} before finalization",
+                "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded player map event {MapEventId} before finalization",
                 repairedLinks,
+                removedEntries,
                 mapEvent.StringId);
         }
     }

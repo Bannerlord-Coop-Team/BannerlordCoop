@@ -45,8 +45,14 @@ internal class MapEventRobustnessPatches
             try
             {
                 __result = new TroopUpgradeTracker();
-                PopulateTrackerFromMapEvent(__instance, __result);
+                if (!__instance.IsFinalized)
+                    PopulateTrackerFromMapEvent(__instance, __result);
                 __instance.TroopUpgradeTracker = __result;
+                Logger.Information(
+                    "Restored {Property} for MapEvent {MapEventId} with {PartyCount} tracked parties",
+                    nameof(MapEvent.TroopUpgradeTracker),
+                    __instance.StringId,
+                    __result._mapEventParties.Count);
             }
             finally
             {

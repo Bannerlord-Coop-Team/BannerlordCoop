@@ -62,6 +62,24 @@ public class MapEventRobustnessPatchesTests : MapEventTestBase
         });
     }
 
+    [Fact]
+    public void Server_FinalizedMapEventTrackerRecovery_DoesNotRehydrateDiscardedParties()
+    {
+        var context = CreateServerMapEvent();
+
+        Server.Call(() =>
+        {
+            var mapEvent = GetMapEvent(Server, context.MapEventId);
+            mapEvent.State = MapEventState.WaitingRemoval;
+            using (new AllowedThread()) mapEvent.TroopUpgradeTracker = null;
+
+            var restored = mapEvent.TroopUpgradeTracker;
+
+            Assert.NotNull(restored);
+            Assert.Empty(restored._mapEventParties);
+        }, MapEventDisabledMethods);
+    }
+
     private static MapEvent GetMapEvent(EnvironmentInstance instance, string mapEventId)
     {
         Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
