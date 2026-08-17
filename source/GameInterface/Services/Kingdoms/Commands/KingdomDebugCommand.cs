@@ -25,6 +25,7 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -210,6 +211,22 @@ public class KingdomDebugCommand
             $"kingdom={kingdomScreen?.DataSource?.Kingdom?.Name} " +
             $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("confirm_decision", "coop.debug.kingdom")]
+    public static string ConfirmKingdomDecisionScreen(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+            return message;
+        if (!(ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen))
+            return "The kingdom decision screen is not active.";
+
+        InformationManager.HideInquiry();
+        kingdomScreen.DataSource.Decision.RefreshWith(decision);
+        return "KINGDOM_DECISION_CONFIRMED";
+    }
+#endif
 
     // coop.debug.kingdom.create Derthert Vlandia_Reborn
     /// <summary>
