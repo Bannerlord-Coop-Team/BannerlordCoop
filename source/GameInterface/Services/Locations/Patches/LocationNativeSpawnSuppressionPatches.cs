@@ -10,12 +10,14 @@ namespace GameInterface.Services.Locations.Patches;
 /// <see cref="LocationNpcGate.ShouldSuppressNativeSpawns"/> holds (SR-012/SR-013): a coop location
 /// mission is active and this client is not (yet) the confirmed NPC host. The host's assignment
 /// lifts the gate and the population director runs the pass explicitly; non-hosts receive the
-/// host's agents as replicated puppets instead.
+/// host's agents as replicated puppets instead. The sole exception is the local player's companion
+/// roster entries: their owning client spawns those natively and replicates them as party puppets.
 /// <para>
 /// Seam inventory is decompile-verified (doc/SettlementRequirements.md V1–V3, R2). Every target is
 /// void or null-tolerated at its call sites; <c>SpawnWanderingAgentWithInitialFrame</c> is
-/// deliberately NOT skipped (callers dereference its return) — it is only reachable through the
-/// suppressed entry points anyway. Skipping <c>SpawnLocationCharacters</c> wholesale also keeps the
+/// deliberately NOT skipped because callers dereference its return and the owner-side companion path
+/// invokes it directly. Ambient access to it remains behind the gated entry points. Skipping
+/// <c>SpawnLocationCharacters</c> wholesale also keeps the
 /// <c>LocationCharactersAreReadyToSpawn</c> roster event from firing on non-hosts (R1): their
 /// ambient roster entries are reconstructed from the host's spawn records, not rolled in parallel.
 /// </para>
@@ -31,12 +33,24 @@ internal class LocationNativeSpawnSuppressionPatches
     [HarmonyPatch(nameof(MissionAgentHandler.SpawnDefaultLocationCharacter))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    private static bool SkipSpawnDefaultLocationCharacter() => !LocationNpcGate.ShouldSuppressNativeSpawns;
+    private static bool SkipSpawnDefaultLocationCharacter(LocationCharacter locationCharacter)
+        => ShouldAllowDefaultLocationSpawn(
+            LocationCharacterGuardPatches.IsLocalPlayerPartyCharacter(locationCharacter),
+            LocationNpcGate.ShouldSuppressNativeSpawns);
+
+    internal static bool ShouldAllowDefaultLocationSpawn(bool isOwnedCompanion, bool suppressNativeSpawns)
+        => isOwnedCompanion || !suppressNativeSpawns;
 
     [HarmonyPatch(nameof(MissionAgentHandler.SpawnEnteringLocationCharacter))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    private static bool SkipSpawnEnteringLocationCharacter() => !LocationNpcGate.ShouldSuppressNativeSpawns;
+    private static bool SkipSpawnEnteringLocationCharacter(LocationCharacter locationCharacter)
+        => ShouldAllowEnteringLocationSpawn(
+            LocationCharacterGuardPatches.IsLocalPlayerPartyCharacter(locationCharacter),
+            LocationNpcGate.ShouldSuppressNativeSpawns);
+
+    internal static bool ShouldAllowEnteringLocationSpawn(bool isOwnedCompanion, bool suppressNativeSpawns)
+        => isOwnedCompanion || !suppressNativeSpawns;
 
     [HarmonyPatch(nameof(MissionAgentHandler.SpawnWanderingAgentWithDelay))]
     [HarmonyPrefix]

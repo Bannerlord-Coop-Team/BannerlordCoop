@@ -29,7 +29,7 @@ namespace Coop.LiveTesting
     {
         private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
 
-        private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
+        private static readonly ILogger Logger;
 
         private readonly string logFilePath;
         private readonly bool isServer;
@@ -47,6 +47,11 @@ namespace Coop.LiveTesting
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
         private int deferredClientJoinAttempted;
+        
+        static LiveTestControlServer()
+        {
+            Logger = LogManager.GetLogger<LiveTestControlServer>();
+        }
 
         public LiveTestControlServer(
             bool isServer,

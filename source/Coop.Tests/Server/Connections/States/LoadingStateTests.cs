@@ -103,8 +103,12 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(0, SignalCount(JoinSyncSignal.WorldReady));
             SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
             Assert.Equal(1, SignalCount(JoinSyncSignal.WorldReady));
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignSynchronized>());
             Assert.IsType<LoadingState>(connectionLogic.State);
             SendAndDrain(state, JoinSyncSignal.CatchUpApplied);
+            var synchronized = Assert.Single(
+                serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignSynchronized>());
+            Assert.Same(playerPeer, synchronized.PlayerId);
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
 
@@ -281,6 +285,8 @@ namespace Coop.Tests.Server.Connections.States
                 connectionLogic.Dispose();
             });
 
+            Assert.Empty(
+                serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignSynchronized>());
             Assert.Null(connectionLogic.State);
         }
 
