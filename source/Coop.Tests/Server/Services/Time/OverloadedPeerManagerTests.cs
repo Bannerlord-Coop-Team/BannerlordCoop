@@ -40,6 +40,9 @@ public class OverloadedPeerManagerTests
     {
         // Arrange
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
+        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
+        timeControlMock.Setup(t => t.ServerAcquireAutomaticPause())
+            .Returns(pauseLeaseMock.Object);
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var manager = serverComponent.Container.Resolve<IOverloadedPeerManager>();
 
@@ -50,7 +53,9 @@ public class OverloadedPeerManagerTests
         manager.CheckForOverloadedPeers();
 
         // Assert
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Once());
+        timeControlMock.Verify(
+            t => t.ServerAcquireAutomaticPause(),
+            Times.Once());
     }
 
     [Fact]
@@ -58,29 +63,64 @@ public class OverloadedPeerManagerTests
     {
         // Arrange
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
-        // Captured before pausing and restored on resume.
-        timeControlMock.Setup(t => t.GetTimeControl()).Returns(TimeControlEnum.Play_1x);
+        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
+        timeControlMock.Setup(t => t.ServerAcquireAutomaticPause())
+            .Returns(pauseLeaseMock.Object);
+        pauseLeaseMock.Setup(lease => lease.TryRelease())
+            .Returns(true);
 
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var manager = serverComponent.Container.Resolve<IOverloadedPeerManager>();
+        var unpausePolicy = timeControlMock.Invocations
+            .Where(invocation => invocation.Method.Name == nameof(ITimeControlInterface.AddUnpausePolicy))
+            .Select(invocation => (Func<bool>)invocation.Arguments[0])
+            .Single(policy => ReferenceEquals(policy.Target, manager));
 
         var peer = AddConnectedPeer(connections);
 
         // Overloaded -> pause.
         peer.SetQueueLength(AbovePauseThreshold);
         manager.CheckForOverloadedPeers();
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Once());
+        timeControlMock.Verify(
+            t => t.ServerAcquireAutomaticPause(),
+            Times.Once());
+        Assert.False(unpausePolicy());
 
         // Drained under the pause threshold but still above the resume threshold -> stay paused
         // (this is the hysteresis: no resume yet).
         peer.SetQueueLength(BetweenThresholds);
         manager.CheckForOverloadedPeers();
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_1x), Times.Never());
+        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Never());
 
         // Drained below the resume threshold -> resume at the pre-pause speed.
         peer.SetQueueLength(BelowResumeThreshold);
         manager.CheckForOverloadedPeers();
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_1x), Times.Once());
+        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Once());
+        Assert.True(unpausePolicy());
+    }
+
+    [Fact]
+    public void OverloadedPeer_WhenAnotherPolicyBlocksRestore_RetriesAfterPolicyAllowsIt()
+    {
+        var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
+        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
+        timeControlMock.Setup(t => t.ServerAcquireAutomaticPause())
+            .Returns(pauseLeaseMock.Object);
+        pauseLeaseMock.SetupSequence(lease => lease.TryRelease())
+            .Returns(false)
+            .Returns(true);
+        var connections = serverComponent.Container.Resolve<ConnectionCollection>();
+        var manager = serverComponent.Container.Resolve<IOverloadedPeerManager>();
+        var peer = AddConnectedPeer(connections);
+
+        peer.SetQueueLength(AbovePauseThreshold);
+        manager.CheckForOverloadedPeers();
+        peer.SetQueueLength(BelowResumeThreshold);
+
+        manager.CheckForOverloadedPeers();
+        manager.CheckForOverloadedPeers();
+
+        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Exactly(2));
     }
 
     [Fact]
@@ -100,14 +140,18 @@ public class OverloadedPeerManagerTests
         manager.CheckForOverloadedPeers();
 
         // Assert — the transfer must not trigger a redundant "catching up" pause.
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Never());
+        timeControlMock.Verify(
+            t => t.ServerAcquireAutomaticPause(),
+            Times.Never());
     }
 
     [Fact]
     public void InitialJoinCatchUp_PausesAfterTwentySecondsRegardlessOfPacketCount()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
-        timeControlMock.Setup(t => t.GetTimeControl()).Returns(TimeControlEnum.Play_1x);
+        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
+        timeControlMock.Setup(t => t.ServerAcquireAutomaticPause())
+            .Returns(pauseLeaseMock.Object);
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
         var peer = AddConnectedPeer(connections);
@@ -119,11 +163,15 @@ public class OverloadedPeerManagerTests
         manager.CheckForOverloadedPeers(
             startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay - TimeSpan.FromTicks(1));
 
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Never());
+        timeControlMock.Verify(
+            t => t.ServerAcquireAutomaticPause(),
+            Times.Never());
 
         manager.CheckForOverloadedPeers(startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay);
 
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Once());
+        timeControlMock.Verify(
+            t => t.ServerAcquireAutomaticPause(),
+            Times.Once());
         Assert.Contains(
             serverComponent.TestMessageBroker.GetMessagesFromType<SendInformationMessage>(),
             message => message.Text == "Game paused; a joining client needs to catch up");
@@ -133,7 +181,11 @@ public class OverloadedPeerManagerTests
     public void FinalJoinCatchUp_RemainsPausedUntilCatchUpCompletes()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
-        timeControlMock.Setup(t => t.GetTimeControl()).Returns(TimeControlEnum.Play_1x);
+        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
+        timeControlMock.Setup(t => t.ServerAcquireAutomaticPause())
+            .Returns(pauseLeaseMock.Object);
+        pauseLeaseMock.Setup(lease => lease.TryRelease())
+            .Returns(true);
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
         var peer = AddConnectedPeer(connections);
@@ -148,7 +200,7 @@ public class OverloadedPeerManagerTests
         manager.CheckForOverloadedPeers(
             startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(1));
 
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_1x), Times.Never());
+        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Never());
 
         var state = Assert.IsType<LoadingState>(connections.ConnectionStates[peer].State);
         SendAndDrain(state, peer, JoinSyncSignal.FinalBaselineApplied);
@@ -156,14 +208,18 @@ public class OverloadedPeerManagerTests
         manager.CheckForOverloadedPeers(
             startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(2));
 
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_1x), Times.Once());
+        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Once());
     }
 
     [Fact]
     public void FinalJoinCatchUp_DisconnectResumesPause()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
-        timeControlMock.Setup(t => t.GetTimeControl()).Returns(TimeControlEnum.Play_2x);
+        var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
+        timeControlMock.Setup(t => t.ServerAcquireAutomaticPause())
+            .Returns(pauseLeaseMock.Object);
+        pauseLeaseMock.Setup(lease => lease.TryRelease())
+            .Returns(true);
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
         var peer = AddConnectedPeer(connections);
@@ -179,7 +235,7 @@ public class OverloadedPeerManagerTests
         manager.CheckForOverloadedPeers(
             startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(1));
 
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_2x), Times.Once());
+        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Once());
     }
 
     [Fact]
@@ -198,7 +254,9 @@ public class OverloadedPeerManagerTests
         manager.CheckForOverloadedPeers(
             startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(1));
 
-        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Never());
+        timeControlMock.Verify(
+            t => t.ServerAcquireAutomaticPause(),
+            Times.Never());
     }
 
     private LiteNetLib.NetPeer AddConnectedPeer(ConnectionCollection connections)

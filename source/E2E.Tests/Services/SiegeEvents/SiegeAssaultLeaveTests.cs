@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using Helpers;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -228,7 +229,10 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
     private string SetClientOnlyCamp(EnvironmentInstance client, string partyId)
     {
-        var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(SiegeCreationDisabledMethods);
+        var disabledMethods = SiegeCreationDisabledMethods
+            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .ToList();
+        var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
         SetCamp(client, partyId, siegeEventId);
         return siegeEventId;
     }

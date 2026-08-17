@@ -3,7 +3,6 @@ using Common;
 using Common.LiveTesting;
 using Common.Logging;
 using Common.LogicStates;
-using Common.Util;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using GameInterface;
@@ -30,7 +29,7 @@ namespace Coop.LiveTesting
     {
         private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
 
-        private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
+        private static readonly ILogger Logger;
 
         private readonly string logFilePath;
         private readonly bool isServer;
@@ -42,10 +41,17 @@ namespace Coop.LiveTesting
         private readonly object screenshotGate = new object();
         private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
             new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
+        private readonly HashSet<string> screenshotPaths =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
         private int deferredClientJoinAttempted;
+        
+        static LiveTestControlServer()
+        {
+            Logger = LogManager.GetLogger<LiveTestControlServer>();
+        }
 
         public LiveTestControlServer(
             bool isServer,
@@ -266,23 +272,15 @@ namespace Coop.LiveTesting
                         false);
                 }
 
-                Directory.CreateDirectory(directory);
-                if (File.Exists(screenshotPath))
-                {
-                    File.Delete(screenshotPath);
-                }
-
                 lock (screenshotGate)
                 {
-                    foreach (string previousCaptureId in screenshotCaptures
-                        .Where(pair => string.Equals(
-                            pair.Value.Path,
-                            screenshotPath,
-                            StringComparison.OrdinalIgnoreCase))
-                        .Select(pair => pair.Key)
-                        .ToArray())
+                    if (!screenshotPaths.Add(screenshotPath))
                     {
-                        screenshotCaptures.Remove(previousCaptureId);
+                        return Failure(
+                            request.Id,
+                            "screenshot_path_reused",
+                            $"Screenshot path '{screenshotPath}' has already been used by this process.",
+                            false);
                     }
 
                     screenshotCaptures.Add(
@@ -292,6 +290,12 @@ namespace Coop.LiveTesting
 
                 try
                 {
+                    Directory.CreateDirectory(directory);
+                    if (File.Exists(screenshotPath))
+                    {
+                        File.Delete(screenshotPath);
+                    }
+
                     Utilities.TakeScreenshot(screenshotPath);
                 }
                 catch
@@ -299,6 +303,7 @@ namespace Coop.LiveTesting
                     lock (screenshotGate)
                     {
                         screenshotCaptures.Remove(captureId);
+                        screenshotPaths.Remove(screenshotPath);
                     }
                     throw;
                 }
@@ -377,6 +382,7 @@ namespace Coop.LiveTesting
                 complete,
                 length = observation.Length,
                 declaredLength = observation.DeclaredLength,
+                lengthMatchesHeader = observation.LengthMatchesHeader,
                 lastWriteUtc = observation.LastWriteUtc,
             });
         }
@@ -457,7 +463,7 @@ namespace Coop.LiveTesting
                     attempted = true,
                     started,
                 });
-            }, true, false);
+            }, true);
         }
 
         private LiveTestResponse CreateStatusResponse(string requestId)
@@ -497,7 +503,7 @@ namespace Coop.LiveTesting
                         .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
                         .ToArray();
                     registeredPlayers = players.Length;
-                    if (ModInformation.IsServer)
+                    if (logic is IServerLogic)
                     {
                         registeredPlayerCount = players.Length;
                         registeredControllerIds = players
@@ -579,8 +585,7 @@ namespace Coop.LiveTesting
         private LiveTestResponse ExecuteOnGameThread(
             LiveTestRequest request,
             Func<LiveTestResponse> operation,
-            bool timeoutOutcomeUncertain,
-            bool suspendPatches = true)
+            bool timeoutOutcomeUncertain)
         {
             LiveTestResponse response = null;
             Exception operationException = null;
@@ -591,17 +596,7 @@ namespace Coop.LiveTesting
                 {
                     try
                     {
-                        if (suspendPatches)
-                        {
-                            using (AllowedThread.Suspend())
-                            {
-                                response = operation();
-                            }
-                        }
-                        else
-                        {
-                            response = operation();
-                        }
+                        response = operation();
                     }
                     catch (Exception exception)
                     {
@@ -786,9 +781,9 @@ namespace Coop.LiveTesting
                     bool isBmp = headerLength == header.Length &&
                         header[0] == 'B' &&
                         header[1] == 'M';
-                    uint declaredLength = isBmp
-                        ? BitConverter.ToUInt32(header, 2)
-                        : 0;
+                    long? declaredLength = isBmp
+                        ? (long?)BitConverter.ToUInt32(header, 2)
+                        : null;
                     return new ScreenshotFileObservation(
                         true,
                         isBmp,
@@ -799,11 +794,11 @@ namespace Coop.LiveTesting
             }
             catch (IOException)
             {
-                return new ScreenshotFileObservation(true, false, 0, 0, null);
+                return new ScreenshotFileObservation(true, false, 0, null, null);
             }
             catch (UnauthorizedAccessException)
             {
-                return new ScreenshotFileObservation(true, false, 0, 0, null);
+                return new ScreenshotFileObservation(true, false, 0, null, null);
             }
         }
 
@@ -894,19 +889,20 @@ namespace Coop.LiveTesting
         private readonly struct ScreenshotFileObservation
         {
             public static readonly ScreenshotFileObservation Missing =
-                new ScreenshotFileObservation(false, false, 0, 0, null);
+                new ScreenshotFileObservation(false, false, 0, null, null);
 
             public bool Exists { get; }
             public bool IsBmp { get; }
             public long Length { get; }
-            public uint DeclaredLength { get; }
+            public long? DeclaredLength { get; }
+            public bool LengthMatchesHeader => DeclaredLength == Length;
             public DateTime? LastWriteUtc { get; }
 
             public ScreenshotFileObservation(
                 bool exists,
                 bool isBmp,
                 long length,
-                uint declaredLength,
+                long? declaredLength,
                 DateTime? lastWriteUtc)
             {
                 Exists = exists;
