@@ -30,7 +30,7 @@ public static class AlternativeSolutionCompletionRunner
     {
         if (owner?.Issue is not IssueBase issue) return false;
         if (!issue.IsSolvingWithAlternative || !issue.AlternativeSolutionReturnTimeForTroops.IsPast) return false;
-        if (!IssueOwnershipRegistry.IsLocalPeerOwner(owner)) return false;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) || !ownershipRegistry.IsLocalPeerOwner(owner)) return false;
 
         if (ModInformation.IsServer)
         {
@@ -46,32 +46,30 @@ public static class AlternativeSolutionCompletionRunner
 
     public static void CompleteOnServer(Hero owner, IssueBase issue)
     {
-        IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = IssueFinalizeReason.AlternativeSolutionSuccess;
-
         using (new AlternativeSolutionCompletionAuthorityGuard())
+        using (new IssueFinalizeAuthorityGuard())
         using (ResolveTrueOwnerScope(owner))
         {
+            IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = IssueFinalizeReason.AlternativeSolutionSuccess;
             issue.CompleteIssueWithAlternativeSolution();
         }
     }
 
-    private static IDisposable ResolveTrueOwnerScope(Hero issueOwner)
+    private static MainHeroSubstitutionScope ResolveTrueOwnerScope(Hero issueOwner)
     {
-        if (!IssueOwnershipRegistry.TryGetOwnerControllerId(issueOwner, out var controllerId)) return NullScope.Instance;
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return NullScope.Instance;
-        if (!playerManager.TryGetPlayer(controllerId, out var player)) return NullScope.Instance;
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return NullScope.Instance;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var trueOwnerHero)) return NullScope.Instance;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) || !ownershipRegistry.TryGetOwnerControllerId(issueOwner, out var controllerId))
+            throw new InvalidOperationException($"ResolveTrueOwnerScope: no recorded owner for issue owner {issueOwner}");
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            throw new InvalidOperationException("ResolveTrueOwnerScope: IPlayerManager is not resolvable");
+        if (!playerManager.TryGetPlayer(controllerId, out var player))
+            throw new InvalidOperationException($"ResolveTrueOwnerScope: no registered Player for controllerId {controllerId}");
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            throw new InvalidOperationException("ResolveTrueOwnerScope: IObjectManager is not resolvable");
+        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var trueOwnerHero))
+            throw new InvalidOperationException($"ResolveTrueOwnerScope: could not resolve true owner Hero {player.HeroId}");
 
         objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var trueOwnerParty);
 
         return new MainHeroSubstitutionScope(trueOwnerHero, trueOwnerParty);
-    }
-
-    private sealed class NullScope : IDisposable
-    {
-        public static readonly NullScope Instance = new();
-
-        public void Dispose() { }
     }
 }

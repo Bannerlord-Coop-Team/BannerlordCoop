@@ -140,4 +140,20 @@ internal static class ServerBattleModeArbiter
             modes.Clear();
         }
     }
+
+    /// <summary>
+    /// Prevents cancellation cleanup from accidentally releasing a different battle mode.
+    /// </summary>
+    public static bool ReleaseSimulation(string mapEventId)
+    {
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            if (!modes.TryGetValue(mapEventId, out var current) || current != Mode.Simulation) return false;
+            
+            modes.Remove(mapEventId);
+            return true;
+        }
+    }
 }

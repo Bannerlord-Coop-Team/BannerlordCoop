@@ -28,6 +28,18 @@ public readonly struct IssueFinalizedTriggered : IEvent
     }
 }
 
+public readonly struct QuestSuccessTriggered : IEvent
+{
+    public readonly Hero Owner;
+    public readonly string ControllerId;
+
+    public QuestSuccessTriggered(Hero owner, string controllerId)
+    {
+        Owner = owner;
+        ControllerId = controllerId;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestIssueRemoved : ICommand
 {
@@ -35,11 +47,17 @@ public readonly struct RequestIssueRemoved : ICommand
     public readonly string OwnerId;
     [ProtoMember(2)]
     public readonly IssueFinalizeReason Reason;
+    [ProtoMember(3)]
+    public readonly int Generation;
+    [ProtoMember(4)]
+    public readonly byte SuccessProof;
 
-    public RequestIssueRemoved(string ownerId, IssueFinalizeReason reason)
+    public RequestIssueRemoved(string ownerId, IssueFinalizeReason reason, int generation, byte successProof = 0)
     {
         OwnerId = ownerId;
         Reason = reason;
+        Generation = generation;
+        SuccessProof = successProof;
     }
 }
 

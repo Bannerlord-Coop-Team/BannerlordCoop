@@ -8,7 +8,6 @@ using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using GameInterface.Registry.Auto;
 using Helpers;
 using Serilog;
 using System;
@@ -439,20 +438,22 @@ public class KingdomHandler : IHandler
     private void HandleChangeKingdomPolicy(MessagePayload<ChangeKingdomPolicy> obj)
     {
         var payload = obj.What;
-
-        if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+        GameThread.RunSafe(() =>
         {
-            Logger.Debug("Kingdom not found in KingdomHandler with KingdomId: {id}", payload.KingdomId);
-            return;
-        }
+            if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+            {
+                Logger.Debug("Kingdom not found in KingdomHandler with KingdomId: {id}", payload.KingdomId);
+                return;
+            }
 
-        if (!objectManager.TryGetObject(payload.PolicyId, out PolicyObject policy))
-        {
-            Logger.Debug("PolicyObject not found in KingdomHandler with PolicyId: {id}", payload.PolicyId);
-            return;
-        }
+            if (!objectManager.TryGetObject(payload.PolicyId, out PolicyObject policy))
+            {
+                Logger.Debug("PolicyObject not found in KingdomHandler with PolicyId: {id}", payload.PolicyId);
+                return;
+            }
 
-        kingdomInterface.ChangeKingdomPolicy(kingdom, policy, payload.IsAdd);
+            kingdomInterface.ChangeKingdomPolicy(kingdom, policy, payload.IsAdd);
+        });
     }
 
     private void HandleRemoveDecision(MessagePayload<RemoveDecision> obj)
@@ -525,7 +526,10 @@ public class KingdomHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var kingdom)) return;
 
             Clan rulingClan = kingdom.RulingClan;
-            ChangeKingdomAction.ApplyByLeaveKingdom(rulingClan, true);
+            if (rulingClan?.Kingdom == kingdom)
+            {
+                ChangeKingdomAction.ApplyByLeaveKingdom(rulingClan, true);
+            }
             foreach (Kingdom kingdom2 in Kingdom.All)
             {
                 if (kingdom2.IsAtWarWith(kingdom))

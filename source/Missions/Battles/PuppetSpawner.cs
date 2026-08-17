@@ -147,7 +147,7 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         int slotsAvailable = agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current));
-        foreach (BattleAgentSpawnData data in agents)
+        foreach (BattleAgentSpawnData data in PlayerHeroesFirst(agents))
         {
             if (data == null || data.AgentId == Guid.Empty) continue;
 
@@ -289,13 +289,28 @@ public class PuppetSpawner : IPuppetSpawner
             agent.SetIsAIPaused(false);
         }
 
-        registry.TryRegisterAgent(
+        bool agentRegistered = registry.TryRegisterAgent(
             data.OwnerControllerId,
             data.OriginalOwnerControllerId,
             data.MovementScopeId,
             data.AgentId,
             data.MovementId,
             agent);
+        if (!agentRegistered)
+        {
+            Logger.Error(
+                "[BattleDesync] Spawned puppet remained unregistered: kind=rider agentId={AgentId} " +
+                "owner={Owner} originalOwner={OriginalOwner} movementIdentity={Scope}/{MovementId} " +
+                "agentIndex={AgentIndex} character={CharacterId} ownAgent={OwnAgent}",
+                data.AgentId,
+                data.OwnerControllerId,
+                data.OriginalOwnerControllerId,
+                data.MovementScopeId,
+                data.MovementId,
+                agent.Index,
+                data.CharacterId,
+                isOwnAgent);
+        }
         if (data.IsRunningAway)
             puppetRoutApplier?.ApplyFleeing(agent);
         if (data.HasCurrentEquipment)
@@ -309,13 +324,30 @@ public class PuppetSpawner : IPuppetSpawner
         if (data.MountAgentId != Guid.Empty)
         {
             if (agent.MountAgent is Agent mount)
-                registry.TryRegisterAgent(
+            {
+                bool mountRegistered = registry.TryRegisterAgent(
                     data.OwnerControllerId,
                     data.MountOriginalOwnerControllerId,
                     data.MountMovementScopeId,
                     data.MountAgentId,
                     data.MountMovementId,
                     mount);
+                if (!mountRegistered)
+                {
+                    Logger.Error(
+                        "[BattleDesync] Spawned puppet remained unregistered: kind=mount agentId={AgentId} " +
+                        "riderAgentId={RiderAgentId} owner={Owner} originalOwner={OriginalOwner} " +
+                        "movementIdentity={Scope}/{MovementId} agentIndex={AgentIndex} character={CharacterId}",
+                        data.MountAgentId,
+                        data.AgentId,
+                        data.OwnerControllerId,
+                        data.MountOriginalOwnerControllerId,
+                        data.MountMovementScopeId,
+                        data.MountMovementId,
+                        mount.Index,
+                        data.CharacterId);
+                }
+            }
             else
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
         }
@@ -425,8 +457,13 @@ public class PuppetSpawner : IPuppetSpawner
             if (pendingPuppets.Count == 0) return;
             int count = Math.Min(MaxBufferedSpawnsPerTick, pendingPuppets.Count);
             pending = new BattleAgentSpawnData[count];
-            pendingPuppets.CopyTo(0, pending, 0, count);
-            pendingPuppets.RemoveRange(0, count);
+            for (int i = 0; i < count; i++)
+            {
+                int heroIndex = pendingPuppets.FindIndex(IsPlayerHeroRecord);
+                int index = heroIndex >= 0 ? heroIndex : 0;
+                pending[i] = pendingPuppets[index];
+                pendingPuppets.RemoveAt(index);
+            }
         }
 
         // BR-110: count the live remaining capacity ONCE for the whole drain and decrement it as puppets spawn,
@@ -448,6 +485,21 @@ public class PuppetSpawner : IPuppetSpawner
                 Logger.Error(e, "[BattleSync] Failed to spawn buffered puppet {AgentId}; dropping it", data.AgentId);
             }
         }
+    }
+
+    private IEnumerable<BattleAgentSpawnData> PlayerHeroesFirst(IEnumerable<BattleAgentSpawnData> agents)
+    {
+        foreach (var data in agents)
+            if (IsPlayerHeroRecord(data)) yield return data;
+        foreach (var data in agents)
+            if (!IsPlayerHeroRecord(data)) yield return data;
+    }
+
+    private bool IsPlayerHeroRecord(BattleAgentSpawnData data)
+    {
+        if (data == null || string.IsNullOrEmpty(data.OwnerControllerId)) return false;
+        return playerManager.TryGetPlayer(data.OwnerControllerId, out var player)
+            && player.CharacterObjectId == data.CharacterId;
     }
 
     // The PartyBase for a battle party id (a MapEventParty object-manager id), used for a puppet's origin.

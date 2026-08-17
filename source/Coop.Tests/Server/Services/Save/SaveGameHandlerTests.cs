@@ -277,6 +277,7 @@ public class SaveGameHandlerTests
             empty.AlleyPlayerData,
             empty.InteractionsPlayerData,
             empty.TradePlayerData,
-            empty.InventoryPlayerData);
+            empty.InventoryPlayerData,
+            empty.HeroMeetingData);
     }
 }

@@ -3,7 +3,6 @@ using Common;
 using Common.LiveTesting;
 using Common.Logging;
 using Common.LogicStates;
-using Common.Util;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using GameInterface;
@@ -30,24 +29,43 @@ namespace Coop.LiveTesting
     {
         private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
 
-        private static readonly ILogger Logger = LogManager.GetLogger<LiveTestControlServer>();
+        private static readonly ILogger Logger;
 
         private readonly string logFilePath;
+        private readonly bool isServer;
+        private readonly bool deferredClientJoinEnabled;
+        private readonly Func<bool> startAsClient;
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
         private readonly object screenshotGate = new object();
         private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
             new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
+        private readonly HashSet<string> screenshotPaths =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
+        private int deferredClientJoinAttempted;
+        
+        static LiveTestControlServer()
+        {
+            Logger = LogManager.GetLogger<LiveTestControlServer>();
+        }
 
-        public LiveTestControlServer(bool isServer, string logFilePath)
+        public LiveTestControlServer(
+            bool isServer,
+            string logFilePath,
+            bool deferredClientJoinEnabled,
+            Func<bool> startAsClient)
         {
             if (string.IsNullOrWhiteSpace(logFilePath)) throw new ArgumentException("A log file path is required.", nameof(logFilePath));
+            if (startAsClient == null) throw new ArgumentNullException(nameof(startAsClient));
 
+            this.isServer = isServer;
             this.logFilePath = logFilePath;
+            this.deferredClientJoinEnabled = deferredClientJoinEnabled;
+            this.startAsClient = startAsClient;
 
             int processId;
             using (Process process = Process.GetCurrentProcess())
@@ -123,6 +141,8 @@ namespace Coop.LiveTesting
                     return HandleScreenshot(request);
                 case "screenshot-status":
                     return HandleScreenshotStatus(request);
+                case "join":
+                    return HandleDeferredClientJoin(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -140,11 +160,7 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
-                    return Failure(
-                        request.Id,
-                        "session_not_ready",
-                        "The co-op session command dispatcher is not available yet.",
-                        false);
+                    dispatcher = new LiveTestCommandDispatcher();
                 }
 
                 return Success(request.Id, new
@@ -174,6 +190,23 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
+                    if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
+                    {
+                        string output = Coop.JoinFixtureCommands.Start(arguments);
+                        bool hasFallbackStructuredResult = TryParseStructuredResult(
+                            output,
+                            out var fallbackStructuredResult);
+                        return Success(request.Id, new
+                        {
+                            name = command,
+                            arguments,
+                            found = true,
+                            output,
+                            hasStructuredResult = hasFallbackStructuredResult,
+                            structuredResult = fallbackStructuredResult,
+                        });
+                    }
+
                     return Failure(
                         request.Id,
                         "session_not_ready",
@@ -190,7 +223,6 @@ namespace Coop.LiveTesting
                 bool hasStructuredResult = TryParseStructuredResult(
                     result.Output,
                     out var structuredResult);
-
                 return Success(request.Id, new
                 {
                     name = command,
@@ -240,23 +272,15 @@ namespace Coop.LiveTesting
                         false);
                 }
 
-                Directory.CreateDirectory(directory);
-                if (File.Exists(screenshotPath))
-                {
-                    File.Delete(screenshotPath);
-                }
-
                 lock (screenshotGate)
                 {
-                    foreach (string previousCaptureId in screenshotCaptures
-                        .Where(pair => string.Equals(
-                            pair.Value.Path,
-                            screenshotPath,
-                            StringComparison.OrdinalIgnoreCase))
-                        .Select(pair => pair.Key)
-                        .ToArray())
+                    if (!screenshotPaths.Add(screenshotPath))
                     {
-                        screenshotCaptures.Remove(previousCaptureId);
+                        return Failure(
+                            request.Id,
+                            "screenshot_path_reused",
+                            $"Screenshot path '{screenshotPath}' has already been used by this process.",
+                            false);
                     }
 
                     screenshotCaptures.Add(
@@ -266,6 +290,12 @@ namespace Coop.LiveTesting
 
                 try
                 {
+                    Directory.CreateDirectory(directory);
+                    if (File.Exists(screenshotPath))
+                    {
+                        File.Delete(screenshotPath);
+                    }
+
                     Utilities.TakeScreenshot(screenshotPath);
                 }
                 catch
@@ -273,6 +303,7 @@ namespace Coop.LiveTesting
                     lock (screenshotGate)
                     {
                         screenshotCaptures.Remove(captureId);
+                        screenshotPaths.Remove(screenshotPath);
                     }
                     throw;
                 }
@@ -351,6 +382,7 @@ namespace Coop.LiveTesting
                 complete,
                 length = observation.Length,
                 declaredLength = observation.DeclaredLength,
+                lengthMatchesHeader = observation.LengthMatchesHeader,
                 lastWriteUtc = observation.LastWriteUtc,
             });
         }
@@ -373,6 +405,65 @@ namespace Coop.LiveTesting
             {
                 scheduled = newlyScheduled,
             });
+        }
+
+        private LiveTestResponse HandleDeferredClientJoin(LiveTestRequest request)
+        {
+            if (isServer)
+            {
+                return Failure(
+                    request.Id,
+                    "method_not_allowed",
+                    "Only a client process may join a co-op session.",
+                    false);
+            }
+
+            if (!deferredClientJoinEnabled)
+            {
+                return Failure(
+                    request.Id,
+                    "manual_join_not_enabled",
+                    "The client was not launched for a deferred live-test join.",
+                    false);
+            }
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (Volatile.Read(ref deferredClientJoinAttempted) != 0)
+                {
+                    return Failure(
+                        request.Id,
+                        "join_already_attempted",
+                        "The deferred client join was already attempted.",
+                        false);
+                }
+
+                if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
+                {
+                    return Failure(
+                        request.Id,
+                        "client_not_at_main_menu",
+                        "The client must be at the main menu with no campaign loaded before joining.",
+                        false);
+                }
+
+                if (Interlocked.Exchange(ref deferredClientJoinAttempted, 1) != 0)
+                {
+                    return Failure(
+                        request.Id,
+                        "join_already_attempted",
+                        "The deferred client join was already attempted.",
+                        false);
+                }
+
+                bool started = startAsClient();
+                Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
+                return Success(request.Id, new
+                {
+                    attempted = true,
+                    started,
+                });
+            }, true);
         }
 
         private LiveTestResponse CreateStatusResponse(string requestId)
@@ -412,7 +503,7 @@ namespace Coop.LiveTesting
                         .OrderBy(player => player.ControllerId, StringComparer.Ordinal)
                         .ToArray();
                     registeredPlayers = players.Length;
-                    if (ModInformation.IsServer)
+                    if (logic is IServerLogic)
                     {
                         registeredPlayerCount = players.Length;
                         registeredControllerIds = players
@@ -484,6 +575,8 @@ namespace Coop.LiveTesting
                 connectedPlayerCount,
                 registeredControllerIds,
                 connectedControllerIds,
+                deferredClientJoinEnabled,
+                deferredClientJoinAttempted = Volatile.Read(ref deferredClientJoinAttempted) != 0,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
@@ -503,10 +596,7 @@ namespace Coop.LiveTesting
                 {
                     try
                     {
-                        using (AllowedThread.Suspend())
-                        {
-                            response = operation();
-                        }
+                        response = operation();
                     }
                     catch (Exception exception)
                     {
@@ -691,9 +781,9 @@ namespace Coop.LiveTesting
                     bool isBmp = headerLength == header.Length &&
                         header[0] == 'B' &&
                         header[1] == 'M';
-                    uint declaredLength = isBmp
-                        ? BitConverter.ToUInt32(header, 2)
-                        : 0;
+                    long? declaredLength = isBmp
+                        ? (long?)BitConverter.ToUInt32(header, 2)
+                        : null;
                     return new ScreenshotFileObservation(
                         true,
                         isBmp,
@@ -704,11 +794,11 @@ namespace Coop.LiveTesting
             }
             catch (IOException)
             {
-                return new ScreenshotFileObservation(true, false, 0, 0, null);
+                return new ScreenshotFileObservation(true, false, 0, null, null);
             }
             catch (UnauthorizedAccessException)
             {
-                return new ScreenshotFileObservation(true, false, 0, 0, null);
+                return new ScreenshotFileObservation(true, false, 0, null, null);
             }
         }
 
@@ -799,19 +889,20 @@ namespace Coop.LiveTesting
         private readonly struct ScreenshotFileObservation
         {
             public static readonly ScreenshotFileObservation Missing =
-                new ScreenshotFileObservation(false, false, 0, 0, null);
+                new ScreenshotFileObservation(false, false, 0, null, null);
 
             public bool Exists { get; }
             public bool IsBmp { get; }
             public long Length { get; }
-            public uint DeclaredLength { get; }
+            public long? DeclaredLength { get; }
+            public bool LengthMatchesHeader => DeclaredLength == Length;
             public DateTime? LastWriteUtc { get; }
 
             public ScreenshotFileObservation(
                 bool exists,
                 bool isBmp,
                 long length,
-                uint declaredLength,
+                long? declaredLength,
                 DateTime? lastWriteUtc)
             {
                 Exists = exists;

@@ -60,7 +60,6 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
-
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;
@@ -94,12 +93,14 @@ public class CoopBattleController : CoopMissionController
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ICoopMissionComponent coopMissionComponent,
+        INetworkWorldItemRegistry worldItemRegistry,
         IBattleHostRegistry hostRegistry,
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
         IHostEpochPolicy hostEpochPolicy,
         IBattleAgentBudget agentBudget,
         IGuardedHitWindow guardedHitWindow,
+        IAgentNativeMountState agentNativeMountState,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec)
         : base(
@@ -114,7 +115,15 @@ public class CoopBattleController : CoopMissionController
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
 
-        lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, missionContext);
+        lifecycle = new BattleInstanceLifecycle(
+            network,
+            relayNetwork,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            worldItemRegistry,
+            session,
+            missionContext);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, spawnBatchCodec);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
@@ -130,7 +139,9 @@ public class CoopBattleController : CoopMissionController
             messageBroker,
             coopMissionComponent,
             session,
-            guardedHitWindow);
+            guardedHitWindow,
+            agentNativeMountState,
+            puppetMountStateRepairer);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch

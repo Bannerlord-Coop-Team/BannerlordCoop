@@ -4,6 +4,8 @@ using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -30,9 +32,13 @@ internal class LocationAgentSpawnedPatch
         if (LocationNpcGate.SuppressCapture) return;
         if (__result == null) return;
 
-        // The player's own agent goes through Mission.SpawnAgent too (MissionHelper.SpawnPlayer) —
-        // players replicate via the join-info path, never as NPC records.
+        // The player's own agent and accompanying companions go through Mission.SpawnAgent too. The owning
+        // client replicates the whole party through mission join info; capturing a companion here would also
+        // register it as an ambient host NPC and make it eligible for host migration after its player leaves.
         if (__result.Controller == AgentControllerType.Player) return;
+        bool isLocalPlayerPartyAgent =
+            __result.Origin is PartyAgentOrigin origin && origin.Party == PartyBase.MainParty;
+        if (!ShouldCaptureAsAmbientNpc(isLocalPlayerPartyAgent)) return;
 
         // Settlement humans always spawn on foot (native passes NoHorses everywhere), so a mount here
         // is unexpected; animals arrive via SpawnMonster and are captured by LocationMonsterSpawnedPatch.
@@ -40,6 +46,9 @@ internal class LocationAgentSpawnedPatch
 
         MessageBroker.Instance.Publish(__result, new AgentSpawnedInLocation(__result));
     }
+
+    internal static bool ShouldCaptureAsAmbientNpc(bool isLocalPlayerPartyAgent)
+        => !isLocalPlayerPartyAgent;
 }
 
 /// <summary>
