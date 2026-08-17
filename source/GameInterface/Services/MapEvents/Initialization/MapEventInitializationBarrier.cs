@@ -462,8 +462,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         bool matchesDeferredSimulation = cleanup != null &&
             ReferenceEquals(encounter, cleanup.Encounter) &&
             ReferenceEquals(encounter?.BattleSimulation, cleanup.BattleSimulation);
-        if (PlayerCaptivity.IsCaptive ||
-            encounter?.EncounterState != PlayerEncounterState.End ||
+        if (encounter?.EncounterState != PlayerEncounterState.End ||
             encounter.BattleSimulation == null ||
             (!matchesDeferredSimulation &&
                 (mapEvent.WinningSide == encounter.PlayerSide || !References(encounter, mapEvent))))
@@ -471,10 +470,32 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
+        if (PlayerCaptivity.IsCaptive)
+        {
+            PlayerEncounter.LeaveEncounter = true;
+            encounter.BattleSimulation = null;
+            Campaign.Current.PlayerEncounter = null;
+            Campaign.Current.LocationEncounter = null;
+            ShowCaptivityMenu();
+            return true;
+        }
+
         // Mirror vanilla's simulated-defeat branch before detaching the destroyed map event.
         encounter.EncounterState = PlayerEncounterState.Begin;
         GameMenu.SwitchToMenu("encounter");
         return true;
+    }
+
+    private static void ShowCaptivityMenu()
+    {
+        var captorParty = PlayerCaptivity.CaptorParty;
+        if (captorParty == null) return;
+
+        var menuId = captorParty.IsSettlement ? "settlement_wait" : "prisoner_wait";
+        if ((Game.Current?.GameStateManager?.ActiveState as MapState)?.AtMenu == true)
+            GameMenu.SwitchToMenu(menuId);
+        else
+            GameMenu.ActivateGameMenu(menuId);
     }
 
     private void ClearEngageOrder(MobileParty party)

@@ -422,13 +422,11 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false, BattleState.DefenderVictory, PlayerEncounterState.Begin)]
+    [InlineData(BattleState.DefenderVictory, PlayerEncounterState.Begin)]
     // The result message has already put the defeated encounter in End; do not let a stale local
     // map-event winner override that authoritative per-player result while the scoreboard closes.
-    [InlineData(false, BattleState.AttackerVictory, PlayerEncounterState.Begin)]
-    [InlineData(true, BattleState.DefenderVictory, PlayerEncounterState.End)]
+    [InlineData(BattleState.AttackerVictory, PlayerEncounterState.Begin)]
     public void SiegeSimulationDefeat_DestroyDefersEncounterCleanupUntilScoreboardCloses(
-        bool playerCaptive,
         BattleState localBattleState,
         PlayerEncounterState expectedEncounterState)
     {
@@ -453,12 +451,9 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Game.Current.GameStateManager._gameStates.Add(mapState);
 
             destroyedMapEvent._battleState = localBattleState;
-            if (playerCaptive)
-                Campaign.Current.PlayerCaptivity._captorParty = destroyedMapEvent.DefenderSide.LeaderParty;
-
             Assert.Same(destroyedMapEvent, MobileParty.MainParty.MapEvent);
             Assert.True(mapState.IsSimulationActive);
-            Assert.Equal(playerCaptive, PlayerCaptivity.IsCaptive);
+            Assert.False(PlayerCaptivity.IsCaptive);
             Assert.Null(encounter.BattleSimulation.MapEvent);
         }, MapEventDisabledMethods);
 
@@ -566,12 +561,13 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     }
 
     [Fact]
-    public void SiegeSimulationDefeat_ResultRetainsCleanupAfterMapEventReferencesDisappear()
+    public void SiegeSimulationDefeat_ResultRetainsCleanupWhileCaptiveAfterMapEventReferencesDisappear()
     {
         var setup = SetupSiegeSimulationResultClient();
         var client = Clients.First();
         MapEvent destroyedMapEvent = null;
         BattleSimulation simulation = null;
+        using var menuRecorder = new GameMenuActivationRecorder();
 
         client.Call(() =>
         {
@@ -586,6 +582,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             simulation.IsSimulationFinished = true;
             encounter.PlayerSide = BattleSideEnum.Attacker;
             AccessTools.Field(typeof(BattleSimulation), "_mapEvent").SetValue(simulation, destroyedMapEvent);
+            Campaign.Current.PlayerCaptivity._captorParty = destroyedMapEvent.DefenderSide.LeaderParty;
+            Campaign.Current.LocationEncounter = ObjectHelper.SkipConstructor<LocationEncounter>();
 
             var mapState = Game.Current.GameStateManager.CreateState<MapState>();
             mapState._battleSimulation = simulation;
@@ -593,6 +591,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
             Assert.Same(destroyedMapEvent, PlayerEncounter.Battle);
             Assert.True(mapState.IsSimulationActive);
+            Assert.True(PlayerCaptivity.IsCaptive);
         }, MapEventDisabledMethods);
 
         client.SimulateMessage(Server.NetPeer, new NetworkCommitMapEventResults(
@@ -634,8 +633,9 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             PlayerEncounter.Update();
 
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
-            Assert.NotNull(PlayerEncounter.Current);
-            Assert.Equal(PlayerEncounterState.Begin, PlayerEncounter.Current.EncounterState);
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(PlayerEncounter.LocationEncounter);
+            Assert.Equal(new[] { "prisoner_wait" }, menuRecorder.MenusFor(client));
         }, MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))));
@@ -1005,6 +1005,47 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         public void Dispose()
         {
             harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
+        }
+    }
+
+    private sealed class GameMenuActivationRecorder : IDisposable
+    {
+        private static readonly MethodInfo ActivateGameMenuMethod =
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) });
+        private static readonly MethodInfo SwitchToMenuMethod =
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) });
+        private static readonly List<(object Container, string MenuId)> MenuCalls = new();
+
+        private readonly Harmony harmony = new($"coop-battle-finalize-menu-recorder-{Guid.NewGuid()}");
+
+        public GameMenuActivationRecorder()
+        {
+            MenuCalls.Clear();
+            var prefix = new HarmonyMethod(typeof(GameMenuActivationRecorder), nameof(RecordMenu))
+            {
+                priority = Priority.First,
+            };
+            harmony.Patch(ActivateGameMenuMethod, prefix: prefix);
+            harmony.Patch(SwitchToMenuMethod, prefix: prefix);
+        }
+
+        public string[] MenusFor(EnvironmentInstance instance) =>
+            MenuCalls
+                .Where(call => ReferenceEquals(call.Container, instance.Container))
+                .Select(call => call.MenuId)
+                .ToArray();
+
+        public void Dispose()
+        {
+            harmony.Unpatch(ActivateGameMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
+            harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
+        }
+
+        private static bool RecordMenu(string menuId)
+        {
+            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
+                MenuCalls.Add((container, menuId));
+            return false;
         }
     }
 
