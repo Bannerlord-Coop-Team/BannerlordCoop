@@ -476,6 +476,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
 
+        KingdomDecisionsVM activeDecisionsVm = null;
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var decision = Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            activeDecisionsVm = new KingdomDecisionsVM(() => { });
+            activeDecisionsVm.RefreshWith(decision);
+
+            Assert.NotNull(activeDecisionsVm.CurrentDecision);
+        });
+
         var player2Final = CreateDeclareWarVote(kingdomId, isFinal: true);
         client2.SimulateMessage(this, new KingdomDecisionVoteRequested(player2Final));
 
@@ -511,6 +522,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                            && message.Faction2Id == targetKingdomId
                            && message.Detail == (int)DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision);
         }
+
+        client1.Call(() => Assert.Null(activeDecisionsVm.CurrentDecision));
     }
 
     [Fact]

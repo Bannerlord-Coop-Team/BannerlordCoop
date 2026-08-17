@@ -511,6 +511,7 @@ namespace GameInterface.Services.Kingdoms
             CampaignEventDispatcher.Instance.OnKingdomDecisionConcluded(decision, outcome, isPlayerDecision);
             PublishDecisionNotification(notificationText);
             ClearDecisionState(kingdomId, decisionIndex);
+            CloseDecision(decision);
         }
 
         public void ClearDecisionState(string kingdomId, int decisionIndex)
@@ -527,6 +528,11 @@ namespace GameInterface.Services.Kingdoms
         {
             if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision)) return;
 
+            CloseDecision(decision);
+        }
+
+        private void CloseDecision(KingdomDecision decision)
+        {
             foreach (DecisionItemBaseVM decisionItem in ActiveDecisionItems
                          .Where(item => item?.KingdomDecisionMaker?._decision == decision)
                          .ToList())
