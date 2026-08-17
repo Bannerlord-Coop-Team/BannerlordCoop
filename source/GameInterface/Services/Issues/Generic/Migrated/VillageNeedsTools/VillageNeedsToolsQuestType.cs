@@ -91,7 +91,8 @@ internal static class VillageNeedsToolsQuestType
     static VillageNeedsToolsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("VillageNeedsTools")
-            .WithCreationCapture(CreationCaptureStrategy)
+            .WithQuestSolutionAccept()
+            .WithAlternativeAccept()
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .Build();

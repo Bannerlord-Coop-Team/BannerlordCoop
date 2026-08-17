@@ -19,15 +19,18 @@ internal class VillageNeedsToolsIssueHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IIssueGenerationRegistry generationRegistry;
 
     public VillageNeedsToolsIssueHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IIssueGenerationRegistry generationRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.generationRegistry = generationRegistry;
 
         messageBroker.Subscribe<VillageIssueCreated>(Handle_VillageIssueCreated);
         messageBroker.Subscribe<NetworkVillageIssueCreated>(Handle_NetworkVillageIssueCreated);
@@ -59,7 +62,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         string exchangeItemId = null;
         if (exchangeItem != null && !objectManager.TryGetIdWithLogging(exchangeItem, out exchangeItemId)) return;
 
-        var generation = IssueGenerationRegistry.Bump(issue.IssueOwner);
+        var generation = generationRegistry.Bump(issue.IssueOwner);
 
         network.SendAll(new NetworkVillageIssueCreated(
             ownerId, requestedItemId, exchangeItemId, numberOfRequestedItem, numberOfExchangeItem, payment, generation));
@@ -74,7 +77,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
-            IssueGenerationRegistry.SetGeneration(owner, data.Generation);
+            generationRegistry.SetGeneration(owner, data.Generation);
 
             if (owner.Issue != null) return;
 
