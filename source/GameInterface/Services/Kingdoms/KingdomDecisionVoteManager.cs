@@ -165,7 +165,6 @@ namespace GameInterface.Services.Kingdoms
             if (!TryCreateVoteData(decisionOption, out KingdomDecisionVoteData voteData)) return false;
 
             TryApplyLocalVote(decisionOption.Decision, voteData);
-            Logger.Error($"WHo called this mf trypublishvote");
             MessageBroker.Instance.Publish(decisionOption, new KingdomDecisionVoteRequested(voteData));
             return true;
         }
@@ -186,7 +185,6 @@ namespace GameInterface.Services.Kingdoms
             }
 
             TryApplyLocalVote(decisionItem.KingdomDecisionMaker._decision, voteData);
-            Logger.Error($"WHo called this mf finalvote");
             MessageBroker.Instance.Publish(decisionItem, new KingdomDecisionVoteRequested(voteData));
             if (decisionItem.KingdomDecisionMaker?._decision != null)
             {
@@ -351,7 +349,6 @@ namespace GameInterface.Services.Kingdoms
                 outcomeKey);
 
             TryApplyLocalVote(decision, voteData);
-            Logger.Error($"WHo called this mf finalelection");
             MessageBroker.Instance.Publish(election, new KingdomDecisionVoteRequested(voteData));
             LocalSubmittedDecisions.Add(decision);
             return true;

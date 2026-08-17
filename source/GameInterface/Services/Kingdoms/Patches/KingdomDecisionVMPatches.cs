@@ -61,7 +61,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         private static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
         {
-            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || decision.IsSingleClanDecision() || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
+            if ((CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision)) && decision.IsSingleClanDecision())
             {
                 __instance._shouldCheckForDecision = false;
                 DecisionItemBaseVM decisionItem = __instance.GetDecisionItemBasedOnType(decision);
@@ -387,7 +387,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (targetKingdom == null)
                 return true;
 
-            if (!playerKingdom._unresolvedDecisions.OfType<MakePeaceKingdomDecision>().Any(d => d.Kingdom == playerKingdom && d.FactionToMakePeaceWith == targetKingdom)
+            if (!playerKingdom._unresolvedDecisions.OfType<StartAllianceDecision>().Any(d => d.Kingdom == playerKingdom && d.KingdomToStartAllianceWith == targetKingdom)
                 && !AllianceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId))
             {
                 return true;
@@ -452,17 +452,52 @@ namespace GameInterface.Services.Kingdoms.Patches
 
     public static class AllianceOfferPendingRegistry
     {
+        private static readonly object Lock = new();
         internal static readonly Dictionary<(string, string), bool> _pending = new();
 
         public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
         {
             var key = (requestingKingdomId, targetKingdomId);
-            if (isPending) _pending[key] = true;
-            else _pending.Remove(key);
+            lock (Lock)
+            {
+                if (isPending) _pending[key] = true;
+                else _pending.Remove(key);
+            }
         }
 
         public static bool IsPending(string requestingKingdomId, string targetKingdomId)
-            => _pending.TryGetValue((requestingKingdomId, targetKingdomId), out var val) && val;
+        {
+            lock (Lock)
+            {
+                return _pending.TryGetValue((requestingKingdomId, targetKingdomId), out var val) && val;
+            }
+        }
+
+        public static (string RequestingKingdomId, string TargetKingdomId)[] Snapshot()
+        {
+            lock (Lock)
+            {
+                var result = new (string, string)[_pending.Count];
+                int i = 0;
+                foreach (var kv in _pending)
+                {
+                    result[i++] = (kv.Key.Item1, kv.Key.Item2);
+                }
+                return result;
+            }
+        }
+
+        public static void RestoreAll((string RequestingKingdomId, string TargetKingdomId)[] entries)
+        {
+            lock (Lock)
+            {
+                _pending.Clear();
+                foreach (var (requestingKingdomId, targetKingdomId) in entries)
+                {
+                    _pending[(requestingKingdomId, targetKingdomId)] = true;
+                }
+            }
+        }
     }
 
     internal interface IClientClanStrengthRefresher

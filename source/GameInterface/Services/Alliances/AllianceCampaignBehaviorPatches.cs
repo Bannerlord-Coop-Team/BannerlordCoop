@@ -1,11 +1,8 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Alliances.Messages;
-using GameInterface.Services.Clans.Handlers;
 using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
-using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,7 +20,6 @@ internal class AllianceCampaignBehaviorPatches
 {
     [ThreadStatic]
     public static Hero PendingPayingHero;
-    private static readonly ILogger Logger = LogManager.GetLogger<VassalServiceHandler>();
     [HarmonyPatch(typeof(AllianceCampaignBehavior), nameof(AllianceCampaignBehavior.StartAlliance))]
     private static bool Prefix(AllianceCampaignBehavior __instance, Kingdom proposerKingdom, Kingdom receiverKingdom)
     {

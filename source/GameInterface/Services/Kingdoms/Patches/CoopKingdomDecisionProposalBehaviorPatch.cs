@@ -171,7 +171,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
                                 if (decision is StartAllianceDecision startalliancedecision)
                                 {
-                                    MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
+                                    MessageBroker.Instance.Publish(null, new AllianceOfferPendingStatusChanged(
                                         (Kingdom)startalliancedecision.KingdomToStartAllianceWith,
                                         startalliancedecision.Kingdom,
                                         isPending: false));
@@ -199,7 +199,7 @@ namespace GameInterface.Services.Kingdoms.Patches
                                 }
                                 if (decision is StartAllianceDecision startalliancedecision)
                                 {
-                                    MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
+                                    MessageBroker.Instance.Publish(null, new AllianceOfferPendingStatusChanged(
                                         (Kingdom)startalliancedecision.KingdomToStartAllianceWith,
                                         startalliancedecision.Kingdom,
                                         isPending: false));
