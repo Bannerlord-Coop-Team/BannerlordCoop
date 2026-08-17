@@ -258,6 +258,8 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
             playerDetectedTracks[savedPlayerDetectedTrack.PlayerId] = new();
             foreach (var detectedTrack in savedPlayerDetectedTrack.DetectedTracks)
             {
+                if (detectedTrack == null || detectedTrack.IsExpired) continue;
+
                 playerDetectedTracks[savedPlayerDetectedTrack.PlayerId].Add(detectedTrack);
             }
         }
