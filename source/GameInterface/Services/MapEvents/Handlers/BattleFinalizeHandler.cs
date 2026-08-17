@@ -218,6 +218,17 @@ internal class BattleFinalizeHandler : IHandler
         string[] playerPartyIds = null;
         GameThread.RunSafe(() =>
         {
+            if (siegeMapEventLeaderReconciler.RestoreBeforeFinalize(
+                    mapEvent,
+                    out var replacedLeader,
+                    out var restoredLeader))
+            {
+                Logger.Warning(
+                    "Restored siege map event leader before finalization. Replaced={ReplacedLeader}, Restored={RestoredLeader}",
+                    replacedLeader?.MobileParty?.StringId ?? replacedLeader?.Settlement?.StringId,
+                    restoredLeader?.MobileParty?.StringId ?? restoredLeader?.Settlement?.StringId);
+            }
+
             playerPartyIds = MapEventPlayerPartyCollector.Combine(
                 knownPlayerPartyIds,
                 MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
@@ -255,17 +266,6 @@ internal class BattleFinalizeHandler : IHandler
             {
                 mapEvent._keepSiegeEvent = true;
                 mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
-            }
-
-            if (siegeMapEventLeaderReconciler.RestoreBeforeFinalize(
-                    mapEvent,
-                    out var replacedLeader,
-                    out var restoredLeader))
-            {
-                Logger.Warning(
-                    "Restored siege map event leader before finalization. Replaced={ReplacedLeader}, Restored={RestoredLeader}",
-                    replacedLeader?.MobileParty?.StringId ?? replacedLeader?.Settlement?.StringId,
-                    restoredLeader?.MobileParty?.StringId ?? restoredLeader?.Settlement?.StringId);
             }
 
             mapEvent.FinalizeEventAux();
