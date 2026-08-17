@@ -103,6 +103,7 @@ internal abstract class TestComponentBase
         RegisterMock<IMapEventLoadCleaner>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
+        RegisterMock<IPlayerCreationRollback>(builder);
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);

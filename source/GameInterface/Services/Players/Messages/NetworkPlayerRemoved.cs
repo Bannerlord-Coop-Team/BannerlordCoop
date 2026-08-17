@@ -12,7 +12,7 @@ namespace GameInterface.Services.Players.Messages;
 /// (<see cref="MobileParties.Patches.DestroyPartyActionPatch"/>) before applying them.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkPlayerRemoved : IEvent
+public readonly struct NetworkPlayerRemoved : IEvent
 {
     [ProtoMember(1)]
     public string ControllerId { get; }
