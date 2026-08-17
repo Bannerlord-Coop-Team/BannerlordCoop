@@ -14,7 +14,9 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -27,6 +29,24 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 {
     private static readonly PropertyInfo PlayerProgressProperty =
         AccessTools.Property(typeof(Campaign), nameof(Campaign.PlayerProgress));
+    private static readonly FieldInfo GameModelsField = AccessTools.Field(typeof(Campaign), "_gameModels");
+    private static readonly PropertyInfo CharacterDevelopmentModelProperty =
+        AccessTools.Property(typeof(GameModels), nameof(GameModels.CharacterDevelopmentModel));
+    private static readonly PropertyInfo PlayerTraitDeveloperProperty =
+        AccessTools.Property(typeof(Campaign), nameof(Campaign.PlayerTraitDeveloper));
+
+    private static void InstallCharacterDevelopmentModel()
+    {
+        var models = (GameModels)GameModelsField.GetValue(Campaign.Current);
+        if (models == null)
+        {
+            models = ObjectHelper.SkipConstructor<GameModels>();
+            GameModelsField.SetValue(Campaign.Current, models);
+        }
+
+        CharacterDevelopmentModelProperty.SetValue(models, new DefaultCharacterDevelopmentModel());
+        PlayerTraitDeveloperProperty.SetValue(Campaign.Current, Campaign.Current.PlayerTraitDeveloper ?? new PropertyOwner<PropertyObject>());
+    }
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -76,6 +96,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
                 {
                     Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
                     Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+                    InstallCharacterDevelopmentModel();
 
                     hero.StayingInSettlement = settlement;
                 }
@@ -848,6 +869,61 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
+    public void RequestVillageIssueRemoved_QuestCancel_FinalizesTheRealQuestAndBroadcastsRemovalToEveryPeer()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", "", partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                using (new QuestSolutionStartAuthorityGuard())
+                {
+                    Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+                }
+                Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+                if (instance == Server)
+                {
+                    Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
+                }
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestCancel, generation));
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestCancel, removed.Reason);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Null(owner.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+            });
+        }
+    }
+
+    [Fact]
     public void RealPlayerLocalSuccessClick_RewardIsGrantedAuthoritativelyOnServerNotJustOnTheClickingClient()
     {
         var fixture = SetupIssueOwner();
@@ -918,10 +994,12 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         }
 
         var goldBefore = 0;
+        int honorXpBefore = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             goldBefore = owner.Gold;
+            honorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor);
         });
 
         Client.Call(() =>
@@ -949,6 +1027,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.Equal(goldBefore + 500, owner.Gold);
+            Assert.Equal(honorXpBefore + 30, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
         });
     }
 

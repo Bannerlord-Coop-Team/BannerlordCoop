@@ -8,9 +8,11 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using ProtoBuf;
+using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -135,6 +137,10 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         var itemRosterElement = new ItemRosterElement(quest._requestedItem, quest._requestedItemAmount, null);
         GiveItemAction.ApplyForParties(PartyBase.MainParty, quest.QuestGiver.CurrentSettlement.Party, itemRosterElement);
         GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest.RewardGold, false);
+        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
+        {
+            new Tuple<TraitObject, int>(DefaultTraits.Honor, 30)
+        });
         quest.QuestGiver.AddPower(10f);
         quest.RelationshipChangeWithQuestGiver = 5;
         quest.QuestGiver.CurrentSettlement.Village.Hearth += 30f;
@@ -149,6 +155,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
+            .WithQuestCancelValidation(issue => true)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
