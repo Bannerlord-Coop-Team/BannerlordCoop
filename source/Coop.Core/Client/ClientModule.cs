@@ -40,6 +40,9 @@ public class ClientModule : CommonModule
         builder.RegisterType<AllianceOfferPendingApplier>()
             .As<IAllianceOfferPendingApplier>()
             .InstancePerDependency();
+        builder.RegisterType<PeaceOfferPendingApplier>()
+            .As<IPeaceOfferPendingApplier>()
+            .InstancePerDependency();
 
         // Policies
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

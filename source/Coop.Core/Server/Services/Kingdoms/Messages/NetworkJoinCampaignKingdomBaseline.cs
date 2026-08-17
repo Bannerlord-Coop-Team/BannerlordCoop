@@ -21,6 +21,23 @@ namespace Coop.Core.Server.Services.Kingdoms.Messages
         }
     }
 
+    ///<summary> pending peace offer between two kingdoms.</summary>
+    [ProtoContract(SkipConstructor = true)]
+    public readonly struct PendingPeaceOfferBaseline
+    {
+        [ProtoMember(1)]
+        public readonly string RequestingKingdomId;
+
+        [ProtoMember(2)]
+        public readonly string TargetKingdomId;
+
+        public PendingPeaceOfferBaseline(string requestingKingdomId, string targetKingdomId)
+        {
+            RequestingKingdomId = requestingKingdomId;
+            TargetKingdomId = targetKingdomId;
+        }
+    }
+
     /// <summary>
     /// Authoritative Kingdom state baseline for a joining client.
     /// </summary>
@@ -30,9 +47,13 @@ namespace Coop.Core.Server.Services.Kingdoms.Messages
         [ProtoMember(1)]
         public readonly PendingAllianceOfferBaseline[] PendingAllianceOffers;
 
-        public NetworkJoinCampaignKingdomBaseline(PendingAllianceOfferBaseline[] pendingAllianceOffers = null)
+        [ProtoMember(2)]
+        public readonly PendingPeaceOfferBaseline[] PendingPeaceOffers;
+
+        public NetworkJoinCampaignKingdomBaseline(PendingAllianceOfferBaseline[] pendingAllianceOffers = null, PendingPeaceOfferBaseline[] pendingPeaceOffers = null)
         {
             PendingAllianceOffers = pendingAllianceOffers ?? Array.Empty<PendingAllianceOfferBaseline>();
+            PendingPeaceOffers = pendingPeaceOffers ?? Array.Empty<PendingPeaceOfferBaseline>();
         }
     }
 }

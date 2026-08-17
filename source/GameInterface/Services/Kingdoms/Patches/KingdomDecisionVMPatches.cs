@@ -437,31 +437,19 @@ namespace GameInterface.Services.Kingdoms.Patches
 
     public static class PeaceOfferPendingRegistry
     {
-        internal static readonly Dictionary<(string, string), bool> _pending = new();
-
-        public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
-        {
-            var key = (requestingKingdomId, targetKingdomId);
-            if (isPending) _pending[key] = true;
-            else _pending.Remove(key);
-        }
-
-        public static bool IsPending(string requestingKingdomId, string targetKingdomId)
-            => _pending.TryGetValue((requestingKingdomId, targetKingdomId), out var val) && val;
-    }
-
-    public static class AllianceOfferPendingRegistry
-    {
         private static readonly object Lock = new();
-        internal static readonly Dictionary<(string, string), bool> _pending = new();
+        internal static readonly HashSet<(string RequestingKingdomId, string TargetKingdomId)> _pending = new();
 
         public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
         {
             var key = (requestingKingdomId, targetKingdomId);
+
             lock (Lock)
             {
-                if (isPending) _pending[key] = true;
-                else _pending.Remove(key);
+                if (isPending)
+                    _pending.Add(key);
+                else
+                    _pending.Remove(key);
             }
         }
 
@@ -469,7 +457,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             lock (Lock)
             {
-                return _pending.TryGetValue((requestingKingdomId, targetKingdomId), out var val) && val;
+                return _pending.Contains((requestingKingdomId, targetKingdomId));
             }
         }
 
@@ -477,25 +465,66 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             lock (Lock)
             {
-                var result = new (string, string)[_pending.Count];
-                int i = 0;
-                foreach (var kv in _pending)
-                {
-                    result[i++] = (kv.Key.Item1, kv.Key.Item2);
-                }
-                return result;
+                return _pending.ToArray();
             }
         }
 
-        public static void RestoreAll((string RequestingKingdomId, string TargetKingdomId)[] entries)
+        public static void RestoreAll(
+            (string RequestingKingdomId, string TargetKingdomId)[] entries)
         {
             lock (Lock)
             {
                 _pending.Clear();
-                foreach (var (requestingKingdomId, targetKingdomId) in entries)
-                {
-                    _pending[(requestingKingdomId, targetKingdomId)] = true;
-                }
+
+                foreach (var entry in entries)
+                    _pending.Add(entry);
+            }
+        }
+    }
+
+    public static class AllianceOfferPendingRegistry
+    {
+        private static readonly object Lock = new();
+        internal static readonly HashSet<(string RequestingKingdomId, string TargetKingdomId)> _pending = new();
+
+        public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
+        {
+            var key = (requestingKingdomId, targetKingdomId);
+
+            lock (Lock)
+            {
+                if (isPending)
+                    _pending.Add(key);
+                else
+                    _pending.Remove(key);
+            }
+        }
+
+        public static bool IsPending(string requestingKingdomId, string targetKingdomId)
+        {
+            lock (Lock)
+            {
+                return _pending.Contains((requestingKingdomId, targetKingdomId));
+            }
+        }
+
+        public static (string RequestingKingdomId, string TargetKingdomId)[] Snapshot()
+        {
+            lock (Lock)
+            {
+                return _pending.ToArray();
+            }
+        }
+
+        public static void RestoreAll(
+            (string RequestingKingdomId, string TargetKingdomId)[] entries)
+        {
+            lock (Lock)
+            {
+                _pending.Clear();
+
+                foreach (var entry in entries)
+                    _pending.Add(entry);
             }
         }
     }

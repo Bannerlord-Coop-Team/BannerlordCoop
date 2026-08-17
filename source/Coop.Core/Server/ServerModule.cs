@@ -54,14 +54,17 @@ public class ServerModule : CommonModule
         builder.RegisterType<JoinCampaignBaselineSender>()
             .As<IJoinCampaignBaselineSender>()
             .InstancePerDependency();
+        builder.RegisterType<JoinCampaignKingdomBaseLineSender>()
+            .As<IJoinCampaignKingdomBaseLineSender>()
+            .InstancePerDependency();
         builder.RegisterType<PlayerPartyTroopXpBaselineProvider>()
             .As<IPlayerPartyTroopXpBaselineProvider>()
             .InstancePerDependency();
         builder.RegisterType<AllianceOfferPendingCapturer>()
             .As<IAllianceOfferPendingCapturer>()
             .InstancePerDependency();
-        builder.RegisterType<JoinCampaignKingdomBaseLineSender>()
-            .As<IJoinCampaignKingdomBaseLineSender>()
+        builder.RegisterType<PeaceOfferPendingCapturer>()
+            .As<IPeaceOfferPendingCapturer>()
             .InstancePerDependency();
 
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the

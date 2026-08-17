@@ -167,7 +167,7 @@ namespace Coop.Tests.Server.Connections.States
                 .Setup(sender => sender.Send(playerPeer))
                 .Callback(() => serverComponent.TestNetwork.SendImmediate(
                     playerPeer,
-                    new NetworkJoinCampaignKingdomBaseline(Array.Empty<PendingAllianceOfferBaseline>())));
+                    new NetworkJoinCampaignKingdomBaseline(Array.Empty<PendingAllianceOfferBaseline>(), Array.Empty<PendingPeaceOfferBaseline>())));
             StartReplay(state);
             var beforeAck = serverComponent.TestNetwork.GetPeerMessages(playerPeer).ToArray();
             Assert.DoesNotContain(beforeAck, message => message is NetworkJoinCampaignKingdomBaseline);

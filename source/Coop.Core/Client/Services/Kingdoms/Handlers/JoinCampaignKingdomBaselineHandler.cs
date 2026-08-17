@@ -8,13 +8,16 @@ internal class JoinCampaignKingdomBaselineHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IAllianceOfferPendingApplier allianceOfferPendingApplier;
+    private readonly IPeaceOfferPendingApplier peaceOfferPendingApplier;
 
     public JoinCampaignKingdomBaselineHandler(
         IMessageBroker messageBroker,
-        IAllianceOfferPendingApplier allianceOfferPendingApplier)
+        IAllianceOfferPendingApplier allianceOfferPendingApplier,
+        IPeaceOfferPendingApplier peaceOfferPendingApplier)
     {
         this.messageBroker = messageBroker;
         this.allianceOfferPendingApplier = allianceOfferPendingApplier;
+        this.peaceOfferPendingApplier = peaceOfferPendingApplier;
 
         messageBroker.Subscribe<NetworkJoinCampaignKingdomBaseline>(Handle);
     }
@@ -30,6 +33,7 @@ internal class JoinCampaignKingdomBaselineHandler : IHandler
         GameThread.RunSafe(() =>
         {
             allianceOfferPendingApplier.Apply(baseline.PendingAllianceOffers);
+            peaceOfferPendingApplier.Apply(baseline.PendingPeaceOffers);
         });
     }
 }

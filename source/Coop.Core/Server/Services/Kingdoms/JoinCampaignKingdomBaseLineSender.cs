@@ -12,18 +12,22 @@ public sealed class JoinCampaignKingdomBaseLineSender : IJoinCampaignKingdomBase
 {
     private readonly INetwork network;
     private readonly IAllianceOfferPendingCapturer allianceOfferPendingCapturer;
+    private readonly IPeaceOfferPendingCapturer peaceOfferPendingCapturer;
 
     public JoinCampaignKingdomBaseLineSender(
         INetwork network,
-        IAllianceOfferPendingCapturer allianceOfferPendingCapturer)
+        IAllianceOfferPendingCapturer allianceOfferPendingCapturer,
+        IPeaceOfferPendingCapturer peaceOfferPendingCapturer)
     {
         this.network = network;
         this.allianceOfferPendingCapturer = allianceOfferPendingCapturer;
+        this.peaceOfferPendingCapturer = peaceOfferPendingCapturer;
     }
 
     public void Send(NetPeer peer)
     {
         network.SendImmediate(
-            peer, new NetworkJoinCampaignKingdomBaseline(allianceOfferPendingCapturer.Capture()));
+            peer, new NetworkJoinCampaignKingdomBaseline(allianceOfferPendingCapturer.Capture(),
+            peaceOfferPendingCapturer.Capture()));
     }
 }
