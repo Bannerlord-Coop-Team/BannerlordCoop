@@ -1,4 +1,4 @@
-using Common.Network;
+﻿using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Server.Services.ItemRosters.Messages;
 using Coop.IntegrationTests.Environment;
@@ -169,6 +169,38 @@ namespace Coop.IntegrationTests.ItemRosters
 
                 Assert.True(clearIndex >= 0 && updateIndex >= 0);
                 Assert.True(clearIndex < updateIndex, "post-clear update must arrive after the clear");
+            }
+        }
+
+        [Fact]
+        public void ServerDropsUnregisteredItemRosterUpdate()
+        {
+            var itemRoster = new ItemRoster();
+            var item = TestEnvironment.Server.CreateRegisteredObject<ItemObject>("item1");
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, new ItemRosterUpdated(itemRoster, item, null, 1));
+            FlushCoalescer(server);
+
+            Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkItemRosterUpdate>());
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Empty(client.InternalMessages.GetMessages<UpdateItemRoster>());
+            }
+        }
+
+        [Fact]
+        public void ServerDropsUnregisteredItemRosterClear()
+        {
+            var itemRoster = new ItemRoster();
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, new ItemRosterCleared(itemRoster));
+
+            Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkItemRosterClear>());
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Empty(client.InternalMessages.GetMessages<ClearItemRoster>());
             }
         }
 

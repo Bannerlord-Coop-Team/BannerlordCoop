@@ -76,8 +76,6 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceProperty<Hero, MobileParty>(nameof(Hero.PartyBelongedTo));
             TestEnvironment.AssertReferenceProperty<Hero, PartyBase>(nameof(Hero.PartyBelongedToAsPrisoner));
             TestEnvironment.AssertReferenceProperty<Hero, Settlement>(nameof(Hero.StayingInSettlement));
-            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.HasMet), true);
-            TestEnvironment.AssertProperty<Hero, CampaignTime>(nameof(Hero.LastMeetingTimeWithPlayer), new CampaignTime(1351));
             TestEnvironment.AssertReferenceProperty<Hero, Settlement>(nameof(Hero.BornSettlement));
             TestEnvironment.AssertProperty<Hero, int>(nameof(Hero.Gold), 5);
             // BannerItem: EquipmentElement.ToString() NullRefs when building assertion error message; skip for now

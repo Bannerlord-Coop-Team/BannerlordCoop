@@ -304,6 +304,16 @@ public static class BattleSpawnGate
         }
     }
 
+    /// <summary>Clear the timeout fallback when a late authoritative reserve arrives for this side.</summary>
+    public static void RestoreReserveSide(BattleSideEnum side)
+    {
+        lock (Gate)
+        {
+            if (side == BattleSideEnum.Defender) _defenderReserveTimedOut = false;
+            else if (side == BattleSideEnum.Attacker) _attackerReserveTimedOut = false;
+        }
+    }
+
     /// <summary>Whether the spawn handler deliberately proceeded without this side's reserve.</summary>
     public static bool IsMissingReserveSideAccepted(BattleSideEnum side)
     {

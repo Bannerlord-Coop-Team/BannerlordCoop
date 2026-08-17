@@ -60,7 +60,6 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
-
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;
@@ -101,6 +100,7 @@ public class CoopBattleController : CoopMissionController
         IHostEpochPolicy hostEpochPolicy,
         IBattleAgentBudget agentBudget,
         IGuardedHitWindow guardedHitWindow,
+        IAgentNativeMountState agentNativeMountState,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec)
         : base(
@@ -139,7 +139,9 @@ public class CoopBattleController : CoopMissionController
             messageBroker,
             coopMissionComponent,
             session,
-            guardedHitWindow);
+            guardedHitWindow,
+            agentNativeMountState,
+            puppetMountStateRepairer);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch

@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties;
 using LiteNetLib;
@@ -87,6 +88,7 @@ public class LoadingState : ConnectionStateBase
             if (!IsCurrent(JoinPhase.CampaignEntryQueued)) return;
 
             messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+            messageBroker.Publish(this, new PlayerConnectionStateChanged());
             connectionMessageQueue.Flush(peer);
             phase = JoinPhase.WaitingForReplayApplied;
             network.SendImmediate(peer, new NetworkJoinSync(JoinSyncSignal.ReplayComplete));
@@ -166,6 +168,7 @@ public class LoadingState : ConnectionStateBase
             if (!IsCurrent(JoinPhase.CatchUpAppliedQueued)) return;
 
             connectionMessageQueue.CompleteCatchUp(peer);
+            messageBroker.Publish(this, new PlayerCampaignSynchronized(peer));
             ConnectionLogic.EnterCampaign();
         }, context: nameof(JoinSyncSignal.CatchUpApplied));
     }

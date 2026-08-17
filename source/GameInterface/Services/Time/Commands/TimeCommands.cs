@@ -1,6 +1,8 @@
 ﻿using Common;
-using GameInterface.Services.Heroes.Interaces;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -30,7 +32,14 @@ internal class TimeCommands
             return "set_time_mode must be run on the server/host.";
         }
 
-        if (strings.Count != 1 ||
+#if DEBUG
+        bool forceForLiveTest = strings.Count == 2 &&
+            strings[1].Equals("force-live-test", StringComparison.OrdinalIgnoreCase);
+#else
+        const bool forceForLiveTest = false;
+#endif
+
+        if ((strings.Count != 1 && !forceForLiveTest) ||
             !Enum.TryParse(strings[0], true, out TimeControlEnum timeMode))
         {
             return "Usage: coop.debug.set_time_mode <Pause|Play_1x|Play_2x>";
@@ -41,9 +50,32 @@ internal class TimeCommands
             return "Failed to get time control interface";
         }
 
+#if DEBUG
+        if (forceForLiveTest)
+        {
+            timeControlInterface.ServerSetTimeControlForLiveTest(timeMode);
+            return $"Time control force-set for live testing to {timeControlInterface.GetTimeControl()}";
+        }
+#endif
+
         timeControlInterface.ServerSetTimeControl(timeMode);
         return $"Time control set to {timeControlInterface.GetTimeControl()}";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("request_time_mode", "coop.debug")]
+    public static string RequestTimeMode(List<string> strings)
+    {
+        if (ModInformation.IsServer)
+            return "request_time_mode must be run on a client.";
+        if (strings.Count != 1 ||
+            !Enum.TryParse(strings[0], true, out TimeControlEnum timeMode))
+            return "Usage: coop.debug.request_time_mode <Pause|Play_1x|Play_2x>";
+
+        MessageBroker.Instance.Publish(typeof(TimeCommands), new TimeSpeedChangedAttempted(timeMode));
+        return $"Requested time control {timeMode}.";
+    }
+#endif
 
     [CommandLineArgumentFunction("advance_time", "coop.debug")]
     public static string AdvanceTime(List<string> strings)

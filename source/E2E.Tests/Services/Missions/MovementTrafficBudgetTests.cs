@@ -61,6 +61,36 @@ public sealed class MovementTrafficBudgetTests
     }
 
     [Fact]
+    public void Sender_CircularRotationWrapsInOrderAndUsesTheNewestState()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var compressor = new SizedPacketCompressor();
+        var budget = new MovementTrafficBudget(bytesPerSecond: 20, burstBytes: 20);
+        var sender = new MovementBatchSender(network.Object, compressor, () => budget);
+        var sent = new List<(Guid Id, int Value)>();
+        Guid[] ids = CreateIds(5);
+
+        for (int cycle = 0; cycle < 3; cycle++)
+        {
+            if (cycle > 0) sender.BeginFrame(1f);
+            sender.Send(
+                "receiver",
+                new[] { CreateBatch(ids, valueOffset: cycle * 100) },
+                legacyBatch: null,
+                maxPayloadBytes: 1000,
+                CreatePacket,
+                (id, value) => sent.Add((id, value)));
+        }
+
+        Assert.Equal(
+            new[] { ids[0], ids[1], ids[2], ids[3], ids[4], ids[0] },
+            sent.ConvertAll(item => item.Id));
+        Assert.Equal(
+            new[] { 0, 1, 102, 103, 204, 200 },
+            sent.ConvertAll(item => item.Value));
+    }
+
+    [Fact]
     public void Sender_OneThousandMovingAgentsAllAdvanceUnderSustainedBudgetPressure()
     {
         var network = new Mock<IBattleNetwork>();

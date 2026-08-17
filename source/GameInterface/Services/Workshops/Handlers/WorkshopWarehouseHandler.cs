@@ -273,7 +273,10 @@ internal class WorkshopWarehouseHandler : IHandler
 
     private void Handle_TownWorkshopRun(MessagePayload<TownWorkshopRun> obj)
     {
-        workshopsCampaignBehaviorInterface.RunTownWorkshop(obj.What.Town, obj.What.Workshop);
+        GameThread.RunSafe(() =>
+        {
+            workshopsCampaignBehaviorInterface.RunTownWorkshop(obj.What.Town, obj.What.Workshop);
+        });
     }
 
     private WorkshopsCampaignBehavior GetWorkshopsBehavior()

@@ -19,6 +19,10 @@ internal class PartyScreenHelperPatches
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenHelperPatches>();
     [ThreadStatic]
     private static bool _releasedAndTakenPrisonerActionsRequested;
+    [ThreadStatic]
+    private static Settlement _donationSettlement;
+    [ThreadStatic]
+    private static FlattenedTroopRoster _donatedPrisonersRoster;
 
     internal static void ResetReleasedAndTakenPrisonerActionsRequest()
         => _releasedAndTakenPrisonerActionsRequested = false;
@@ -28,6 +32,22 @@ internal class PartyScreenHelperPatches
         var requested = _releasedAndTakenPrisonerActionsRequested;
         _releasedAndTakenPrisonerActionsRequested = false;
         return requested;
+    }
+
+    internal static void ResetPrisonerDonationRequest()
+    {
+        _donationSettlement = null;
+        _donatedPrisonersRoster = null;
+    }
+
+    internal static bool ConsumePrisonerDonationRequest(
+        out Settlement settlement,
+        out FlattenedTroopRoster donatedPrisonersRoster)
+    {
+        settlement = _donationSettlement;
+        donatedPrisonersRoster = _donatedPrisonersRoster;
+        ResetPrisonerDonationRequest();
+        return settlement != null && donatedPrisonersRoster != null;
     }
 
     [HarmonyPatch(nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroPartyScreenClosed))]
@@ -88,10 +108,8 @@ internal class PartyScreenHelperPatches
     {
         if (!rightSideTransferredPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
         {
-            Settlement currentSettlement = Hero.MainHero.CurrentSettlement;
-
-            var message = new PrisonersDonated(rightSideTransferredPrisonerRoster, currentSettlement, rightParty);
-            MessageBroker.Instance.Publish(null, message);
+            _donationSettlement = Hero.MainHero.CurrentSettlement;
+            _donatedPrisonersRoster = rightSideTransferredPrisonerRoster;
         }
 
         __result = true;

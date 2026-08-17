@@ -21,8 +21,8 @@ concurrency:
 
 env:
   R2_PRIVATE_BUCKET: bannerlordcoop-build-inputs
-  R2_PUBLIC_BUCKET: bannerlordcoop-nightly-releases
-  R2_PUBLIC_BASE_URL: https://pub-bf6bfe4b880e4d1b83f4b09b10419f78.r2.dev
+  R2_NIGHTLY_BUCKET: bannerlordcoop-patron-nightlies
+  NIGHTLY_GATEWAY_ORIGIN: https://bannerlordcoop-nightly-gateway.garrett-luskey.workers.dev
 
 jobs:
   build:
@@ -36,6 +36,9 @@ jobs:
       file_name: ${{ steps.release.outputs.file_name }}
       head_sha: ${{ steps.release.outputs.head_sha }}
       base_sha: ${{ steps.release.outputs.base_sha }}
+      handoff_key: ${{ steps.handoff.outputs.handoff_key }}
+      unsigned_bytes: ${{ steps.handoff.outputs.unsigned_bytes }}
+      unsigned_sha256: ${{ steps.handoff.outputs.unsigned_sha256 }}
 
     steps:
       - name: Checkout development
@@ -145,6 +148,8 @@ jobs:
             "$release_date" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
 
       - name: Stage module
+        env:
+          RELEASE_DATE: ${{ steps.release.outputs.release_date }}
         run: |
           set -eu
           module=release-stage/Coop
@@ -180,33 +185,146 @@ jobs:
             -e "s/\${version}/v$coop_version/g" \
             -e "s/\${game_version}/$game_version/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
-          test "$(grep -Fc "<Name value=\"$nightly_module_name\"/>" "$module/SubModule.xml")" -eq 2
-          grep -Fqx "    <Id value=\"$nightly_module_id\"/>" "$module/SubModule.xml"
-          grep -Fqx '        <Module Id="Coop"/>' "$module/SubModule.xml"
-          ! grep -Fq '<Module Id="CoopNightly"/>' "$module/SubModule.xml"
+          normalized_submodule=$(mktemp)
+          trap 'rm -f "$normalized_submodule"' EXIT
+          tr -d '\r' < "$module/SubModule.xml" > "$normalized_submodule"
+          test "$(grep -Fc "<Name value=\"$nightly_module_name\"/>" "$normalized_submodule")" -eq 2
+          grep -Fqx "    <Id value=\"$nightly_module_id\"/>" "$normalized_submodule"
+          grep -Fqx '        <Module Id="Coop"/>' "$normalized_submodule"
+          ! grep -Fq '<Module Id="CoopNightly"/>' "$normalized_submodule"
 
-      - name: Upload unsigned module
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: unsigned-nightly-module-${{ steps.release.outputs.head_sha }}
-          path: release-stage/
-          if-no-files-found: error
-          retention-days: 1
+      - name: Package private unsigned handoff
+        id: handoff
+        env:
+          HEAD_SHA: ${{ steps.release.outputs.head_sha }}
+        run: |
+          set -eu
+          mkdir transfer
+          tar -C release-stage -czf transfer/unsigned-module.tar.gz Coop
+          unsigned_bytes=$(stat -c %s transfer/unsigned-module.tar.gz)
+          test "$unsigned_bytes" -gt 0
+          test "$unsigned_bytes" -le 33554432
+          unsigned_sha256=$(sha256sum transfer/unsigned-module.tar.gz | awk '{print $1}')
+          printf '%s' "$unsigned_sha256" | grep -Eq '^[a-f0-9]{64}$'
+          handoff_key="nightly-handoffs/v1/$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT/$HEAD_SHA/unsigned-module.tar.gz"
+          printf 'handoff_key=%s\nunsigned_bytes=%s\nunsigned_sha256=%s\n' \
+            "$handoff_key" "$unsigned_bytes" "$unsigned_sha256" >> "$GITHUB_OUTPUT"
 
-  sign-and-package:
+      - name: Install pinned private-storage client
+        env:
+          PINNED_RCLONE_VERSION: 1.70.3
+          PINNED_RCLONE_ARCHIVE_SHA256: 7d69057e69385f6514a9684c7eaa424d972096b130284bb34dd967c4ed4f9dad
+        run: |
+          set -eu
+          archive="$RUNNER_TEMP/rclone.zip"
+          curl --fail --silent --show-error --location \
+            "https://downloads.rclone.org/v$PINNED_RCLONE_VERSION/rclone-v$PINNED_RCLONE_VERSION-linux-amd64.zip" \
+            --output "$archive"
+          echo "$PINNED_RCLONE_ARCHIVE_SHA256  $archive" | sha256sum -c -
+          unzip -q "$archive" -d "$RUNNER_TEMP"
+          install -m 0755 \
+            "$RUNNER_TEMP/rclone-v$PINNED_RCLONE_VERSION-linux-amd64/rclone" \
+            "$RUNNER_TEMP/rclone"
+          "$RUNNER_TEMP/rclone" version
+
+      - name: Upload private unsigned handoff
+        env:
+          RCLONE_CONFIG_PRIVATE_TYPE: s3
+          RCLONE_CONFIG_PRIVATE_PROVIDER: Cloudflare
+          RCLONE_CONFIG_PRIVATE_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_PRIVATE_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          HANDOFF_KEY: ${{ steps.handoff.outputs.handoff_key }}
+          UNSIGNED_BYTES: ${{ steps.handoff.outputs.unsigned_bytes }}
+          UNSIGNED_SHA256: ${{ steps.handoff.outputs.unsigned_sha256 }}
+        run: |
+          set -eu
+          test -n "$R2_ACCOUNT_ID"
+          export RCLONE_CONFIG_PRIVATE_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          source=transfer/unsigned-module.tar.gz
+          destination="private:$R2_PRIVATE_BUCKET/$HANDOFF_KEY"
+          test "$(stat -c %s "$source")" = "$UNSIGNED_BYTES"
+          test "$(sha256sum "$source" | awk '{print $1}')" = "$UNSIGNED_SHA256"
+          "$RUNNER_TEMP/rclone" copyto "$source" "$destination" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          remote_bytes=$("$RUNNER_TEMP/rclone" lsl "$destination" | awk '{print $1}')
+          test "$remote_bytes" = "$UNSIGNED_BYTES"
+          remote_sha256=$("$RUNNER_TEMP/rclone" cat "$destination" | sha256sum | awk '{print $1}')
+          test "$remote_sha256" = "$UNSIGNED_SHA256"
+
+  sign-and-publish:
     needs: build
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - name: Download unsigned module
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: unsigned-nightly-module-${{ needs.build.outputs.head_sha }}
-          path: release-stage
+      - name: Install pinned private-storage client
+        shell: pwsh
+        env:
+          PINNED_RCLONE_VERSION: 1.70.3
+          PINNED_RCLONE_ARCHIVE_SHA256: 1c75923b4d3f0b3d1faf16447a442b5aaed0cfc32997b3381eb96fd087603a30
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'rclone.zip'
+          Invoke-WebRequest -Uri "https://downloads.rclone.org/v$env:PINNED_RCLONE_VERSION/rclone-v$env:PINNED_RCLONE_VERSION-windows-amd64.zip" -OutFile $archive
+          $actualSha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $env:PINNED_RCLONE_ARCHIVE_SHA256) {
+            throw 'Pinned rclone archive checksum mismatch'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
+          $source = Join-Path $env:RUNNER_TEMP "rclone-v$env:PINNED_RCLONE_VERSION-windows-amd64/rclone.exe"
+          Copy-Item -LiteralPath $source -Destination (Join-Path $PWD 'rclone.exe')
+          & (Join-Path $PWD 'rclone.exe') version
+          if ($LASTEXITCODE -ne 0) { throw 'rclone installation validation failed' }
+
+      - name: Download private unsigned handoff
+        shell: pwsh
+        env:
+          RCLONE_CONFIG_PRIVATE_TYPE: s3
+          RCLONE_CONFIG_PRIVATE_PROVIDER: Cloudflare
+          RCLONE_CONFIG_PRIVATE_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_PRIVATE_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          HANDOFF_KEY: ${{ needs.build.outputs.handoff_key }}
+          UNSIGNED_BYTES: ${{ needs.build.outputs.unsigned_bytes }}
+          UNSIGNED_SHA256: ${{ needs.build.outputs.unsigned_sha256 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:HANDOFF_KEY -notmatch '^nightly-handoffs/v1/[0-9]+/[0-9]+/[a-f0-9]{40}/unsigned-module\.tar\.gz$') {
+            throw 'Private unsigned handoff key is invalid'
+          }
+          if ($env:UNSIGNED_BYTES -notmatch '^[0-9]+$' -or [long]$env:UNSIGNED_BYTES -gt 33554432) {
+            throw 'Private unsigned handoff size is invalid'
+          }
+          if ($env:UNSIGNED_SHA256 -notmatch '^[a-f0-9]{64}$') {
+            throw 'Private unsigned handoff checksum is invalid'
+          }
+          $env:RCLONE_CONFIG_PRIVATE_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          $rclone = Join-Path $PWD 'rclone.exe'
+          $archive = Join-Path $PWD 'unsigned-module.tar.gz'
+          & $rclone copyto "private:$env:R2_PRIVATE_BUCKET/$env:HANDOFF_KEY" $archive --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Private unsigned handoff download failed' }
+          $item = Get-Item -LiteralPath $archive
+          $sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($item.Length -ne [long]$env:UNSIGNED_BYTES -or $sha256 -ne $env:UNSIGNED_SHA256) {
+            throw 'Private unsigned handoff identity mismatch'
+          }
+          New-Item -ItemType Directory -Path release-stage | Out-Null
+          tar -xzf $archive -C release-stage
+          if ($LASTEXITCODE -ne 0) { throw 'Private unsigned handoff extraction failed' }
+          $entries = @(Get-ChildItem -LiteralPath release-stage)
+          if ($entries.Count -ne 1 -or $entries[0].Name -ne 'Coop' -or -not $entries[0].PSIsContainer) {
+            throw 'Private unsigned handoff layout is invalid'
+          }
+          $binary = 'release-stage\Coop\bin\Win64_Shipping_Client'
+          foreach ($required in @('Coop.dll', 'Common.dll', 'Coop.Core.dll', 'Coop.Steam.dll', 'GameInterface.dll', 'Missions.dll', 'Coop.CrashReporter.exe')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $binary $required) -PathType Leaf)) {
+              throw "Private unsigned handoff is missing $required"
+            }
+          }
 
       - name: Azure login
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
@@ -253,91 +371,154 @@ jobs:
           fi
           test "$release_size" -gt 0
 
-      - name: Upload isolated signed client input
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: nightly-client-input-${{ needs.build.outputs.head_sha }}
-          path: transfer/Coop.7z
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 1
-
-  publish-client-input:
-    needs: [build, sign-and-package]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Download isolated signed client input
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: nightly-client-input-${{ needs.build.outputs.head_sha }}
-          path: transfer
-
       - name: Validate and describe signed client input
         id: artifact
+        shell: pwsh
         env:
           RELEASE_DATE: ${{ needs.build.outputs.release_date }}
           FILE_NAME: ${{ needs.build.outputs.file_name }}
           HEAD_SHA: ${{ needs.build.outputs.head_sha }}
           BASE_SHA: ${{ needs.build.outputs.base_sha }}
         run: |
-          set -eu
-          test "$GITHUB_REF" = refs/heads/development
-          printf '%s' "$RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-          printf '%s' "$HEAD_SHA" | grep -Eq '^[a-f0-9]{40}$'
-          if [ -n "$BASE_SHA" ]; then
-            printf '%s' "$BASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
-          fi
-          test "$R2_PRIVATE_BUCKET" = bannerlordcoop-build-inputs
-          test "$R2_PUBLIC_BUCKET" = bannerlordcoop-nightly-releases
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF -ne 'refs/heads/development') { throw 'Nightly publication requires development' }
+          if ($env:RELEASE_DATE -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Release date is invalid' }
+          if ($env:HEAD_SHA -notmatch '^[a-f0-9]{40}$') { throw 'Head SHA is invalid' }
+          if ($env:BASE_SHA -and $env:BASE_SHA -notmatch '^[a-f0-9]{40}$') { throw 'Base SHA is invalid' }
+          if ($env:R2_PRIVATE_BUCKET -ne 'bannerlordcoop-build-inputs') { throw 'Private bucket is invalid' }
+          if ($env:R2_NIGHTLY_BUCKET -ne 'bannerlordcoop-patron-nightlies') { throw 'Patron bucket is invalid' }
 
-          test -d transfer
-          test ! -L transfer
-          entry_count=$(find transfer -mindepth 1 -maxdepth 1 -printf x | wc -c)
-          test "$entry_count" -eq 1
-          test -f transfer/Coop.7z
-          test ! -L transfer/Coop.7z
-
-          archive_bytes=$(stat -c %s transfer/Coop.7z)
-          test "$archive_bytes" -gt 0
-          test "$archive_bytes" -le 8388608
-          archive_sha256=$(sha256sum transfer/Coop.7z | awk '{print $1}')
-          printf '%s' "$archive_sha256" | grep -Eq '^[a-f0-9]{64}$'
-
-          mkdir artifact
-          mv transfer/Coop.7z "artifact/$FILE_NAME"
-          export ARCHIVE_BYTES="$archive_bytes"
-          export ARCHIVE_SHA256="$archive_sha256"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          manifest = {
-              "releaseDate": os.environ["RELEASE_DATE"],
-              "fileName": os.environ["FILE_NAME"],
-              "branch": "development",
-              "headSha": os.environ["HEAD_SHA"],
-              "baseSha": os.environ["BASE_SHA"] or None,
-              "serverInput": {
-                  "bucket": os.environ["R2_PRIVATE_BUCKET"],
-                  "key": "nightly-client/Coop.7z",
-                  "bytes": int(os.environ["ARCHIVE_BYTES"]),
-                  "sha256": os.environ["ARCHIVE_SHA256"],
-              },
+          $entries = @(Get-ChildItem -LiteralPath transfer)
+          if ($entries.Count -ne 1 -or $entries[0].Name -ne 'Coop.7z' -or $entries[0].PSIsContainer) {
+            throw 'Signed client input layout is invalid'
           }
-          path = Path("artifact/manifest.json")
-          path.write_text(json.dumps(manifest, separators=(",", ":")) + "\n", encoding="utf-8")
-          if json.loads(path.read_text(encoding="utf-8")) != manifest:
-              raise SystemExit("trusted manifest identity validation failed")
-          PY
-          test "$(stat -c %s artifact/manifest.json)" -le 4096
+          $archiveBytes = [long]$entries[0].Length
+          if ($archiveBytes -le 0 -or $archiveBytes -gt 8388608) { throw 'Signed client input size is invalid' }
+          $archiveSha256 = (Get-FileHash $entries[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($archiveSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Signed client input checksum is invalid' }
 
-          printf 'archive_bytes=%s\n' "$archive_bytes" >> "$GITHUB_OUTPUT"
-          printf 'archive_sha256=%s\n' "$archive_sha256" >> "$GITHUB_OUTPUT"
+          New-Item -ItemType Directory -Path artifact | Out-Null
+          $archivePath = Join-Path artifact $env:FILE_NAME
+          Move-Item -LiteralPath $entries[0].FullName -Destination $archivePath
+          $baseSha = if ($env:BASE_SHA) { $env:BASE_SHA } else { $null }
+          $serverInput = [ordered]@{
+            bucket = $env:R2_PRIVATE_BUCKET
+            key = 'nightly-client/Coop.7z'
+            bytes = $archiveBytes
+            sha256 = $archiveSha256
+          }
+          $handoffManifest = [ordered]@{
+            releaseDate = $env:RELEASE_DATE
+            fileName = $env:FILE_NAME
+            branch = 'development'
+            headSha = $env:HEAD_SHA
+            baseSha = $baseSha
+            serverInput = $serverInput
+          }
+          $builtAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+          $clientManifest = [ordered]@{
+            version = 1
+            releaseDate = $env:RELEASE_DATE
+            headSha = $env:HEAD_SHA
+            baseSha = $baseSha
+            workflowRunId = [long]$env:GITHUB_RUN_ID
+            builtAt = $builtAt
+            client = [ordered]@{
+              fileName = $env:FILE_NAME
+              key = 'nightly/Coop.7z'
+              bytes = $archiveBytes
+              sha256 = $archiveSha256
+              publicUrl = "$env:NIGHTLY_GATEWAY_ORIGIN/v1/artifacts/nightly/Coop.7z"
+            }
+          }
+          $utf8 = [Text.UTF8Encoding]::new($false)
+          [IO.File]::WriteAllText(
+            (Join-Path $PWD 'artifact/manifest.json'),
+            (($handoffManifest | ConvertTo-Json -Depth 5 -Compress) + "`n"),
+            $utf8
+          )
+          [IO.File]::WriteAllText(
+            (Join-Path $PWD 'artifact/client-release.json'),
+            (($clientManifest | ConvertTo-Json -Depth 5 -Compress) + "`n"),
+            $utf8
+          )
+          foreach ($manifestPath in @('artifact/manifest.json', 'artifact/client-release.json')) {
+            $manifest = Get-Item -LiteralPath $manifestPath
+            if ($manifest.Length -le 0 -or $manifest.Length -gt 4096) { throw "$manifestPath size is invalid" }
+            Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json | Out-Null
+          }
+          "archive_bytes=$archiveBytes" >> $env:GITHUB_OUTPUT
+          "archive_sha256=$archiveSha256" >> $env:GITHUB_OUTPUT
 
-      - name: Install pinned R2 uploader
+      - name: Publish dedicated-server client input
+        shell: bash
+        env:
+          RCLONE_CONFIG_PRIVATE_TYPE: s3
+          RCLONE_CONFIG_PRIVATE_PROVIDER: Cloudflare
+          RCLONE_CONFIG_PRIVATE_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_PRIVATE_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          FILE_NAME: ${{ needs.build.outputs.file_name }}
+          ARCHIVE_BYTES: ${{ steps.artifact.outputs.archive_bytes }}
+          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+        run: |
+          set -eu
+          test -n "$R2_ACCOUNT_ID"
+          printf '%s' "$ARCHIVE_SHA256" | grep -Eq '^[a-f0-9]{64}$'
+          export RCLONE_CONFIG_PRIVATE_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          prefix=nightly-client
+          archive="artifact/$FILE_NAME"
+          test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
+          test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
+
+          # The manifest is uploaded last and acts as the completed handoff marker.
+          ./rclone.exe copyto "$archive" "private:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          remote_bytes=$(./rclone.exe lsl "private:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | awk '{print $1}')
+          test "$remote_bytes" = "$ARCHIVE_BYTES"
+          remote_sha256=$(./rclone.exe cat "private:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | sha256sum | awk '{print $1}')
+          test "$remote_sha256" = "$ARCHIVE_SHA256"
+          ./rclone.exe copyto artifact/manifest.json "private:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+
+      - name: Publish latest client to private Patron R2
+        shell: bash
+        env:
+          RCLONE_CONFIG_PATRON_TYPE: s3
+          RCLONE_CONFIG_PATRON_PROVIDER: Cloudflare
+          RCLONE_CONFIG_PATRON_ACCESS_KEY_ID: ${{ secrets.R2_PATRON_NIGHTLY_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_PATRON_SECRET_ACCESS_KEY: ${{ secrets.R2_PATRON_NIGHTLY_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          FILE_NAME: ${{ needs.build.outputs.file_name }}
+          ARCHIVE_BYTES: ${{ steps.artifact.outputs.archive_bytes }}
+          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+        run: |
+          set -eu
+          test -n "$R2_ACCOUNT_ID"
+          export RCLONE_CONFIG_PATRON_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          archive="artifact/$FILE_NAME"
+          test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
+          test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
+          test "$(stat -c %s artifact/client-release.json)" -le 4096
+
+          ./rclone.exe copyto "$archive" "patron:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          remote_bytes=$(./rclone.exe lsl "patron:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" | awk '{print $1}')
+          test "$remote_bytes" = "$ARCHIVE_BYTES"
+          remote_sha256=$(./rclone.exe cat "patron:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" | sha256sum | awk '{print $1}')
+          test "$remote_sha256" = "$ARCHIVE_SHA256"
+          # Publish the manifest last so installers never observe incomplete client bytes.
+          ./rclone.exe copyto artifact/client-release.json "patron:$R2_NIGHTLY_BUCKET/nightly/client.json" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+
+  cleanup-private-handoff:
+    needs: [build, sign-and-publish]
+    if: ${{ always() && needs.build.outputs.handoff_key != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install pinned private-storage client
         env:
           PINNED_RCLONE_VERSION: 1.70.3
           PINNED_RCLONE_ARCHIVE_SHA256: 7d69057e69385f6514a9684c7eaa424d972096b130284bb34dd967c4ed4f9dad
@@ -354,97 +535,20 @@ jobs:
             "$RUNNER_TEMP/rclone"
           "$RUNNER_TEMP/rclone" version
 
-      - name: Publish dedicated-server client input
+      - name: Remove private unsigned handoff
         env:
-          RCLONE_CONFIG_R2_TYPE: s3
-          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
-          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
-          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_PRIVATE_TYPE: s3
+          RCLONE_CONFIG_PRIVATE_PROVIDER: Cloudflare
+          RCLONE_CONFIG_PRIVATE_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_PRIVATE_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          FILE_NAME: ${{ needs.build.outputs.file_name }}
-          ARCHIVE_BYTES: ${{ steps.artifact.outputs.archive_bytes }}
-          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+          HANDOFF_KEY: ${{ needs.build.outputs.handoff_key }}
         run: |
           set -eu
+          printf '%s' "$HANDOFF_KEY" | grep -Eq '^nightly-handoffs/v1/[0-9]+/[0-9]+/[a-f0-9]{40}/unsigned-module\.tar\.gz$'
           test -n "$R2_ACCOUNT_ID"
-          printf '%s' "$ARCHIVE_SHA256" | grep -Eq '^[a-f0-9]{64}$'
-          export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          prefix=nightly-client
-          archive="artifact/$FILE_NAME"
-          test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
-          test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
-
-          # The manifest is uploaded last and acts as the completed handoff marker.
-          "$RUNNER_TEMP/rclone" copyto "$archive" "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" \
-            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          remote_bytes=$("$RUNNER_TEMP/rclone" lsl "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | awk '{print $1}')
-          test "$remote_bytes" = "$ARCHIVE_BYTES"
-          remote_sha256=$("$RUNNER_TEMP/rclone" cat "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | sha256sum | awk '{print $1}')
-          test "$remote_sha256" = "$ARCHIVE_SHA256"
-          "$RUNNER_TEMP/rclone" copyto artifact/manifest.json "r2:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
-            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-
-      - name: Publish latest client to public R2
-        env:
-          RCLONE_CONFIG_R2_TYPE: s3
-          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
-          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PUBLIC_ACCESS_KEY_ID }}
-          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PUBLIC_SECRET_ACCESS_KEY }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          RELEASE_DATE: ${{ needs.build.outputs.release_date }}
-          FILE_NAME: ${{ needs.build.outputs.file_name }}
-          HEAD_SHA: ${{ needs.build.outputs.head_sha }}
-          ARCHIVE_BYTES: ${{ steps.artifact.outputs.archive_bytes }}
-          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
-        run: |
-          set -eu
-          test -n "$R2_ACCOUNT_ID"
-          export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          archive="artifact/$FILE_NAME"
-          test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
-          test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
-          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          export BUILT_AT="$built_at"
-          export PUBLIC_URL="$R2_PUBLIC_BASE_URL/nightly/Coop.7z"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          manifest = {
-              "version": 1,
-              "releaseDate": os.environ["RELEASE_DATE"],
-              "headSha": os.environ["HEAD_SHA"],
-              "builtAt": os.environ["BUILT_AT"],
-              "client": {
-                  "fileName": os.environ["FILE_NAME"],
-                  "bytes": int(os.environ["ARCHIVE_BYTES"]),
-                  "sha256": os.environ["ARCHIVE_SHA256"],
-                  "publicUrl": os.environ["PUBLIC_URL"],
-              },
-          }
-          path = Path("artifact/client-release.json")
-          path.write_text(json.dumps(manifest, separators=(",", ":")) + "\n", encoding="utf-8")
-          if json.loads(path.read_text(encoding="utf-8")) != manifest:
-              raise SystemExit("public manifest validation failed")
-          PY
-          test "$(stat -c %s artifact/client-release.json)" -le 4096
-
-          "$RUNNER_TEMP/rclone" copyto "$archive" "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" \
-            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          remote_bytes=$("$RUNNER_TEMP/rclone" lsl "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" | awk '{print $1}')
-          test "$remote_bytes" = "$ARCHIVE_BYTES"
-          remote_sha256=$("$RUNNER_TEMP/rclone" cat "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" | sha256sum | awk '{print $1}')
-          test "$remote_sha256" = "$ARCHIVE_SHA256"
-          # Publish the manifest last so installers never observe incomplete client bytes.
-          "$RUNNER_TEMP/rclone" copyto artifact/client-release.json "r2:$R2_PUBLIC_BUCKET/nightly/client.json" \
-            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-
-      - name: Upload nightly artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: nightly-release-${{ needs.build.outputs.release_date }}
-          path: artifact/*
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 3
+          export RCLONE_CONFIG_PRIVATE_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          handoff_directory=${HANDOFF_KEY%/unsigned-module.tar.gz}
+          "$RUNNER_TEMP/rclone" delete "private:$R2_PRIVATE_BUCKET/$handoff_directory" \
+            --include unsigned-module.tar.gz --s3-no-check-bucket \
+            --retries 3 --low-level-retries 10 --quiet

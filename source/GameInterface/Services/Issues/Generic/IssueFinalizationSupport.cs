@@ -19,12 +19,13 @@ public sealed class IssueFinalizeAuthorityGuard : IDisposable
 
 internal static class IssueFinalizationSupport
 {
-    public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason)
+    public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason, bool suppressReplicationPatches = true)
     {
         if (owner?.Issue == null) return;
 
+        IDisposable replicationScope = suppressReplicationPatches ? new AllowedThread() : null;
         using (new IssueFinalizeAuthorityGuard())
-        using (new AllowedThread())
+        using (replicationScope)
         {
             var quest = owner.Issue.IssueQuest;
             if (quest != null && quest.IsOngoing)

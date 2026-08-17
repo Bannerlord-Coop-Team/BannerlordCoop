@@ -10,6 +10,7 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -133,12 +134,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
             return;
         }
 
-        var claimedRoster = TroopRoster.CreateDummyTroopRoster();
-        foreach (var element in troopRosterInterface.UnpackTroopRosterData(payload.What.Troops))
-        {
-            claimedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
-        }
-
+        var claimedRoster = UnpackToRoster(payload.What.Troops);
         var validatedRoster = troopValidator.Validate(claimedRoster, issue.AlternativeSolutionSentTroops, preserveTroopXp: true);
         depositedGenerationByOwnerId[payload.What.OwnerId] = currentGeneration;
         troopsRegistry.Deposit(player.ControllerId, validatedRoster);
@@ -168,13 +164,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
         var localControllerId = controllerIdProvider.ControllerId;
         if (string.IsNullOrEmpty(localControllerId)) return;
 
-        var confirmedRoster = TroopRoster.CreateDummyTroopRoster();
-        foreach (var element in troopRosterInterface.UnpackTroopRosterData(payload.What.Troops))
-        {
-            confirmedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
-        }
-
-        troopsRegistry.Deposit(localControllerId, confirmedRoster);
+        troopsRegistry.Deposit(localControllerId, UnpackToRoster(payload.What.Troops));
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDrainedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDrainedLocally> payload)
@@ -195,12 +185,17 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
             return;
         }
 
-        var drainedRoster = TroopRoster.CreateDummyTroopRoster();
-        foreach (var element in troopRosterInterface.UnpackTroopRosterData(payload.What.Troops))
+        troopsRegistry.Withdraw(player.ControllerId, UnpackToRoster(payload.What.Troops));
+    }
+
+    private TroopRoster UnpackToRoster(TroopRosterData troops)
+    {
+        var roster = TroopRoster.CreateDummyTroopRoster();
+        foreach (var element in troopRosterInterface.UnpackTroopRosterData(troops))
         {
-            drainedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
+            roster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
         }
 
-        troopsRegistry.Withdraw(player.ControllerId, drainedRoster);
+        return roster;
     }
 }

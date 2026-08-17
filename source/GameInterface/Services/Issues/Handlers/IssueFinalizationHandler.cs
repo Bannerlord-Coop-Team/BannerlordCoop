@@ -152,16 +152,13 @@ internal class IssueFinalizationHandler : IHandler
         {
             using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
             {
-                IssueFinalizationSupport.FinalizeMirror(owner, reason);
+                IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: false);
             }
         }
         catch (Exception e)
         {
             Logger.Error(e, "Failed to finalize {Reason} for owner {Owner} - not broadcasting", reason, ownerId);
-            return;
         }
-
-        network.SendAll(new NetworkIssueRemoved(ownerId, reason));
     }
 
     private void Handle_RequestIssueRemoved(MessagePayload<RequestIssueRemoved> payload)
@@ -219,96 +216,109 @@ internal class IssueFinalizationHandler : IHandler
                 return;
             }
 
-            var quest = owner.Issue.IssueQuest is { IsOngoing: true } ongoingQuest ? ongoingQuest : null;
-
-            if (reason == IssueFinalizeReason.QuestSuccess)
-            {
-                if (quest == null)
-                {
-                    Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - no ongoing quest to finalize",
-                        nameof(RequestIssueRemoved), ownerId);
-                    return;
-                }
-
-                var validator = QuestTypeRegistry.Get(owner.Issue)?.ValidateQuestSuccess;
-                if (validator == null)
-                {
-                    Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - quest type has no registered ValidateQuestSuccess, completion cannot be re-derived server-side",
-                        nameof(RequestIssueRemoved), ownerId);
-                    return;
-                }
-
-                MobileParty party = null;
-                if (player.MobilePartyId != null)
-                {
-                    objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party);
-                }
-
-                QuestSuccessProofContext.Set(payload.What.SuccessProof);
-                bool validated;
-                try
-                {
-                    validated = validator(owner.Issue, party);
-                }
-                finally
-                {
-                    QuestSuccessProofContext.Set(0);
-                }
-
-                if (!validated)
-                {
-                    Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - completion condition not met for the requester's real party",
-                        nameof(RequestIssueRemoved), ownerId);
-                    return;
-                }
-            }
-            else if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestFail
-                or IssueFinalizeReason.QuestTimeout or IssueFinalizeReason.QuestBetrayal)
-            {
-                if (quest == null)
-                {
-                    Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - no ongoing quest to finalize",
-                        nameof(RequestIssueRemoved), reason, ownerId);
-                    return;
-                }
-
-                if (reason is IssueFinalizeReason.QuestTimeout or IssueFinalizeReason.QuestFail && !quest.QuestDueTime.IsPast)
-                {
-                    Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - due time has not passed",
-                        nameof(RequestIssueRemoved), reason, ownerId);
-                    return;
-                }
-
-                if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestBetrayal)
-                {
-                    var descriptor = QuestTypeRegistry.Get(owner.Issue);
-                    var validator = reason == IssueFinalizeReason.QuestCancel ? descriptor?.ValidateQuestCancel : descriptor?.ValidateQuestBetrayal;
-                    if (validator == null || !validator(owner.Issue))
-                    {
-                        Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - quest type has no registered validator or condition not met",
-                            nameof(RequestIssueRemoved), reason, ownerId);
-                        return;
-                    }
-                }
-            }
-            else if (reason == IssueFinalizeReason.IssueOnly)
-            {
-                if (!owner.Issue.IsOngoingWithoutQuest)
-                {
-                    Logger.Error("Rejecting {Message} claiming IssueOnly for owner {Owner} - a solution is already in progress and must be finalized through its own completion path",
-                        nameof(RequestIssueRemoved), ownerId);
-                    return;
-                }
-            }
-            else if (quest != null)
-            {
-                Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - an ongoing quest exists and must be finalized with a quest-specific reason",
-                    nameof(RequestIssueRemoved), reason, ownerId);
-                return;
-            }
+            if (!TryValidateFinalizeReason(owner, reason, player, payload.What.SuccessProof, ownerId)) return;
 
             FinalizeAndBroadcast(owner, ownerId, player, reason);
         });
+    }
+
+    private bool TryValidateFinalizeReason(Hero owner, IssueFinalizeReason reason, Player player, byte successProof, string ownerId)
+    {
+        var quest = owner.Issue.IssueQuest is { IsOngoing: true } ongoingQuest ? ongoingQuest : null;
+
+        if (reason == IssueFinalizeReason.QuestSuccess)
+        {
+            if (quest == null)
+            {
+                Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - no ongoing quest to finalize",
+                    nameof(RequestIssueRemoved), ownerId);
+                return false;
+            }
+
+            var validator = QuestTypeRegistry.Get(owner.Issue)?.ValidateQuestSuccess;
+            if (validator == null)
+            {
+                Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - quest type has no registered ValidateQuestSuccess, completion cannot be re-derived server-side",
+                    nameof(RequestIssueRemoved), ownerId);
+                return false;
+            }
+
+            MobileParty party = null;
+            if (player.MobilePartyId != null)
+            {
+                objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party);
+            }
+
+            QuestSuccessProofContext.Set(successProof);
+            bool validated;
+            try
+            {
+                validated = validator(owner.Issue, party);
+            }
+            finally
+            {
+                QuestSuccessProofContext.Set(0);
+            }
+
+            if (!validated)
+            {
+                Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - completion condition not met for the requester's real party",
+                    nameof(RequestIssueRemoved), ownerId);
+                return false;
+            }
+        }
+        else if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestFail
+            or IssueFinalizeReason.QuestTimeout or IssueFinalizeReason.QuestBetrayal)
+        {
+            if (quest == null)
+            {
+                Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - no ongoing quest to finalize",
+                    nameof(RequestIssueRemoved), reason, ownerId);
+                return false;
+            }
+
+            if (reason == IssueFinalizeReason.QuestTimeout && !quest.QuestDueTime.IsPast)
+            {
+                Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - due time has not passed",
+                    nameof(RequestIssueRemoved), reason, ownerId);
+                return false;
+            }
+
+            if (reason is IssueFinalizeReason.QuestCancel or IssueFinalizeReason.QuestBetrayal or IssueFinalizeReason.QuestFail)
+            {
+                var descriptor = QuestTypeRegistry.Get(owner.Issue);
+                var validator = reason switch
+                {
+                    IssueFinalizeReason.QuestCancel => descriptor?.ValidateQuestCancel,
+                    IssueFinalizeReason.QuestBetrayal => descriptor?.ValidateQuestBetrayal,
+                    IssueFinalizeReason.QuestFail => descriptor?.ValidateQuestFail,
+                    _ => null,
+                };
+                if (validator == null || !validator(owner.Issue))
+                {
+                    Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - quest type has no registered validator or condition not met",
+                        nameof(RequestIssueRemoved), reason, ownerId);
+                    return false;
+                }
+            }
+        }
+        else if (reason == IssueFinalizeReason.IssueOnly)
+        {
+            if (!owner.Issue.IsOngoingWithoutQuest)
+            {
+                Logger.Error("Rejecting {Message} claiming IssueOnly for owner {Owner} - a solution is already in progress and must be finalized through its own completion path",
+                    nameof(RequestIssueRemoved), ownerId);
+                return false;
+            }
+        }
+        else if (quest != null)
+        {
+            Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - an ongoing quest exists and must be finalized with a quest-specific reason",
+                nameof(RequestIssueRemoved), reason, ownerId);
+            return false;
+        }
+
+        return true;
     }
 
     private void Handle_NetworkIssueRemoved(MessagePayload<NetworkIssueRemoved> payload)
@@ -332,7 +342,7 @@ internal class IssueFinalizationHandler : IHandler
 
             using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
             {
-                IssueFinalizationSupport.FinalizeMirror(owner, reason);
+                IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true);
             }
         });
     }

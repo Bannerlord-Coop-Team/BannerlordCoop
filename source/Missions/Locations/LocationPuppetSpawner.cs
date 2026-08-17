@@ -55,6 +55,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ILocationSession session;
     private readonly ILocationAgentBindingMap bindingMap;
+    private readonly ILocationPartyAgentMap partyAgentMap;
     private readonly ILocationPuppetRosterBinder rosterBinder;
     private readonly IBattleAgentBudget agentBudget;
     private readonly ILocationAgentSpawnBatchCodec spawnBatchCodec;
@@ -88,6 +89,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         ICoopMissionComponent coopMissionComponent,
         ILocationSession session,
         ILocationAgentBindingMap bindingMap,
+        ILocationPartyAgentMap partyAgentMap,
         ILocationPuppetRosterBinder rosterBinder,
         IBattleAgentBudget agentBudget,
         ILocationAgentSpawnBatchCodec spawnBatchCodec,
@@ -98,6 +100,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
         this.bindingMap = bindingMap;
+        this.partyAgentMap = partyAgentMap;
         this.rosterBinder = rosterBinder;
         this.agentBudget = agentBudget;
         this.spawnBatchCodec = spawnBatchCodec;
@@ -336,6 +339,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         if (IsWithdrawn(data.OwnerControllerId, out ownerIsWithdrawnHost) && !ownerIsWithdrawnHost)
             return true;                                                // stale player record — drop
         if (IsTombstoned(data.AgentId)) return true;                    // already despawned by the host — drop
+        if (partyAgentMap.Contains(data.AgentId)) return true;          // party join info owns this id — never bind it as an NPC
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned (incl. our own natives) — dedupe
 
         int slotsNeeded = 1;

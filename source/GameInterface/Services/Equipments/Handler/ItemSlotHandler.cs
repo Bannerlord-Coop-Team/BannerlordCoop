@@ -56,27 +56,31 @@ namespace GameInterface.Services.Equipments.Handlers
             // The struct array-element store mutates live campaign equipment state read by the
             // game loop / renderer; defer it to the main thread so it is ordered and atomic.
             // Resolve the ids inside the lambda so a deferred create can land before the lookup.
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
-                try
-                {
-                    if (!objectManager.TryGetObject(data.EquipmentId, out Equipment equipment)) return;
-                    if (!objectManager.TryGetObject(data.ItemId, out ItemObject item)) return;
-                    if (!objectManager.TryGetObject(data.ItemModifierId, out ItemModifier itemModifier)) return;
+                if (!objectManager.TryGetObjectWithLogging(
+                        data.EquipmentId,
+                        out Equipment equipment)) return;
+                ItemObject item = null;
+                if (data.ItemId != null &&
+                    !objectManager.TryGetObjectWithLogging(
+                        data.ItemId,
+                        out item)) return;
+                ItemModifier itemModifier = null;
+                if (data.ItemModifierId != null &&
+                    !objectManager.TryGetObjectWithLogging(
+                        data.ItemModifierId,
+                        out itemModifier)) return;
 
-                    equipment._itemSlots[data.Index] = new EquipmentElement(item, itemModifier);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply NetworkUpdateItemSlots");
-                }
-            });
+                equipment._itemSlots[data.Index] =
+                    new EquipmentElement(item, itemModifier);
+            }, context: nameof(NetworkUpdateItemSlots));
         }
 
         private bool TryGetId(object value, out string id)
         {
             id = null;
-            if (value == null) return false;
+            if (value == null) return true;
 
             if (!objectManager.TryGetId(value, out id))
             {
