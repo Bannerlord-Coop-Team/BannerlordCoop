@@ -177,7 +177,6 @@ namespace Coop.Tests.Server.Connections.States
                 message => message is NetworkJoinCampaignKingdomBaseline);
         }
 
-
         [Fact]
         public void KingdomBaseline_SentAlongsidePartyBaselineThroughFullJoinHandshake()
         {
@@ -207,7 +206,6 @@ namespace Coop.Tests.Server.Connections.States
             baselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
             kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
         }
-
 
         [Fact]
         public void ReplayReplyDuringMarkerSend_IsAccepted()

@@ -71,7 +71,6 @@ public class JoinCampaignKingdomBaselineHandlerTests
         Apply(new NetworkJoinCampaignKingdomBaseline(first, third));
         Apply(new NetworkJoinCampaignKingdomBaseline(second, fourth));
         
-
         allianceOfferPendingApplier.Verify(applier => applier.Apply(first), Times.Once);
         peaceOfferPendingApplier.Verify(applier => applier.Apply(third), Times.Once);
         allianceOfferPendingApplier.Verify(applier => applier.Apply(second), Times.Once);
