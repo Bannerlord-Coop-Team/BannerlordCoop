@@ -36,6 +36,21 @@ namespace GameInterface.Services.Kingdoms.Commands;
 public class KingdomDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomDebugCommand>();
+#if DEBUG
+    private static readonly Dictionary<string, PlayerKingdomFixtureState> PlayerKingdomFixtures = new Dictionary<string, PlayerKingdomFixtureState>();
+
+    private sealed class PlayerKingdomFixtureState
+    {
+        public string ClanId { get; }
+        public string KingdomId { get; }
+
+        public PlayerKingdomFixtureState(string clanId, string kingdomId)
+        {
+            ClanId = clanId;
+            KingdomId = kingdomId;
+        }
+    }
+#endif
 
     private enum CollectionTarget
     {
@@ -304,7 +319,7 @@ public class KingdomDebugCommand
             return "This command can only be run on the server.";
         }
 
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.kingdom.force_player_join_kingdom <controllerId> <kingdomId>";
         }
@@ -370,6 +385,132 @@ public class KingdomDebugCommand
         string previousKingdomId = previousKingdom?.StringId ?? "<none>";
         return $"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("player_kingdom", "coop.debug.kingdom")]
+    public static string GetPlayerKingdom(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "This command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.player_kingdom";
+        if (Clan.PlayerClan == null) return "The player clan is unavailable.";
+
+        string kingdomId = Clan.PlayerClan.Kingdom?.StringId ?? "<none>";
+        return $"PLAYER_KINGDOM clanId={Clan.PlayerClan.StringId} kingdomId={kingdomId}";
+    }
+
+    [CommandLineArgumentFunction("fixture_capture_player_kingdom", "coop.debug.kingdom")]
+    public static string CapturePlayerKingdomFixture(List<string> args)
+    {
+        if (!ModInformation.IsServer) return "This command can only be run on the server.";
+        if (args.Count != 2) return "Usage: coop.debug.kingdom.fixture_capture_player_kingdom <fixtureId> <controllerId>";
+        if (!TryGetFixturePlayerClan(args[1], out var clan, out string message)) return message;
+
+        string fixtureKey = GetPlayerKingdomFixtureKey(args[0], args[1]);
+        if (PlayerKingdomFixtures.ContainsKey(fixtureKey)) return $"Player kingdom fixture {args[0]} is already captured for {args[1]}.";
+
+        string kingdomId = clan.Kingdom?.StringId;
+        PlayerKingdomFixtures.Add(fixtureKey, new PlayerKingdomFixtureState(clan.StringId, kingdomId));
+        return $"PLAYER_KINGDOM_FIXTURE_CAPTURED fixtureId={args[0]} controllerId={args[1]} clanId={clan.StringId} kingdomId={kingdomId ?? "<none>"}";
+    }
+
+    [CommandLineArgumentFunction("fixture_move_player_kingdom", "coop.debug.kingdom")]
+    public static string MovePlayerKingdomFixture(List<string> args)
+    {
+        if (!ModInformation.IsServer) return "This command can only be run on the server.";
+        if (args.Count != 2) return "Usage: coop.debug.kingdom.fixture_move_player_kingdom <controllerId> <kingdomId>";
+        if (!TryGetFixturePlayerClan(args[0], out var clan, out string message)) return message;
+        if (!TryGetKingdomMembershipState(out var kingdomMembershipState)) return "Unable to resolve KingdomMembershipState";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObject(args[1], out Kingdom kingdom)) return $"Kingdom not found with id: {args[1]}";
+
+        kingdomMembershipState.MoveClanToKingdom(clan.Kingdom, kingdom, clan, publishCollectionChanges: true);
+        if (clan.Kingdom != kingdom) return $"Player {args[0]}'s clan {clan.StringId} did not join kingdom {kingdom.StringId}.";
+
+        return $"PLAYER_KINGDOM_FIXTURE_MOVED controllerId={args[0]} clanId={clan.StringId} kingdomId={kingdom.StringId}";
+    }
+
+    [CommandLineArgumentFunction("fixture_restore_player_kingdom", "coop.debug.kingdom")]
+    public static string RestorePlayerKingdomFixture(List<string> args)
+    {
+        if (!ModInformation.IsServer) return "This command can only be run on the server.";
+        if (args.Count != 2) return "Usage: coop.debug.kingdom.fixture_restore_player_kingdom <fixtureId> <controllerId>";
+        if (!TryGetFixturePlayerClan(args[1], out var clan, out string message)) return message;
+        if (!TryGetKingdomMembershipState(out var kingdomMembershipState)) return "Unable to resolve KingdomMembershipState";
+
+        string fixtureKey = GetPlayerKingdomFixtureKey(args[0], args[1]);
+        if (!PlayerKingdomFixtures.TryGetValue(fixtureKey, out var fixture)) return $"Player kingdom fixture {args[0]} is not captured for {args[1]}.";
+        if (fixture.ClanId != clan.StringId) return $"Player kingdom fixture {args[0]} captured clan {fixture.ClanId}, but {args[1]} now has clan {clan.StringId}.";
+
+        Kingdom originalKingdom = null;
+        if (fixture.KingdomId != null)
+        {
+            if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+            if (!objectManager.TryGetObject(fixture.KingdomId, out originalKingdom)) return $"Original kingdom not found with id: {fixture.KingdomId}";
+        }
+
+        kingdomMembershipState.MoveClanToKingdom(clan.Kingdom, originalKingdom, clan, publishCollectionChanges: true);
+        if (clan.Kingdom != originalKingdom) return $"Player {args[1]}'s clan {clan.StringId} did not restore its original kingdom.";
+
+        return $"PLAYER_KINGDOM_FIXTURE_RESTORED fixtureId={args[0]} controllerId={args[1]} clanId={clan.StringId} kingdomId={fixture.KingdomId ?? "<none>"}";
+    }
+
+    [CommandLineArgumentFunction("fixture_verify_player_kingdom", "coop.debug.kingdom")]
+    public static string VerifyPlayerKingdomFixture(List<string> args)
+    {
+        if (!ModInformation.IsServer) return "This command can only be run on the server.";
+        if (args.Count != 2) return "Usage: coop.debug.kingdom.fixture_verify_player_kingdom <fixtureId> <controllerId>";
+        if (!TryGetFixturePlayerClan(args[1], out var clan, out string message)) return message;
+
+        string fixtureKey = GetPlayerKingdomFixtureKey(args[0], args[1]);
+        if (!PlayerKingdomFixtures.TryGetValue(fixtureKey, out var fixture)) return $"Player kingdom fixture {args[0]} is not captured for {args[1]}.";
+
+        string currentKingdomId = clan.Kingdom?.StringId;
+        if (fixture.ClanId != clan.StringId || fixture.KingdomId != currentKingdomId)
+        {
+            return $"Player kingdom fixture {args[0]} did not restore {args[1]}. Expected clan {fixture.ClanId} in {fixture.KingdomId ?? "<none>"}, but found clan {clan.StringId} in {currentKingdomId ?? "<none>"}.";
+        }
+
+        PlayerKingdomFixtures.Remove(fixtureKey);
+        return $"PLAYER_KINGDOM_FIXTURE_VERIFIED fixtureId={args[0]} controllerId={args[1]} clanId={clan.StringId} kingdomId={currentKingdomId ?? "<none>"}";
+    }
+
+    private static string GetPlayerKingdomFixtureKey(string fixtureId, string controllerId)
+    {
+        return fixtureId + "\n" + controllerId;
+    }
+
+    private static bool TryGetFixturePlayerClan(string controllerId, out Clan clan, out string message)
+    {
+        clan = null;
+        message = null;
+        if (!TryGetPlayerManager(out var playerManager))
+        {
+            message = "Unable to resolve PlayerManager";
+            return false;
+        }
+        if (!playerManager.TryGetPlayer(controllerId, out var player))
+        {
+            message = $"Player not found with controller id: {controllerId}";
+            return false;
+        }
+        if (string.IsNullOrEmpty(player.ClanId))
+        {
+            message = $"Player {controllerId} does not have a clan id.";
+            return false;
+        }
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            message = "Unable to resolve ObjectManager";
+            return false;
+        }
+        if (!objectManager.TryGetObject(player.ClanId, out clan))
+        {
+            message = $"Clan not found for player {controllerId} with clan id: {player.ClanId}";
+            return false;
+        }
+        return true;
+    }
+#endif
 
     // coop.debug.kingdom.force_player_vassalage Player khuzait true
     [CommandLineArgumentFunction("force_player_vassalage", "coop.debug.kingdom")]
