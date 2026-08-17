@@ -11,8 +11,10 @@ using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using ProtoBuf;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
@@ -243,6 +245,22 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
     }
 
     private static bool ValidateQuestCancel(Issue issue) => true;
+    private static bool ValidateQuestFail(Issue issue) => true;
+    private static bool ValidateQuestBetrayal(Issue issue) => true;
+    private static bool ValidateQuestSuccess(Issue issue, MobileParty party) => QuestSuccessProofContext.Current != 0;
+
+    private const byte ProofQuestSuccess = 1;
+
+    private static readonly ConditionalWeakTable<Quest, object> ObservedSuccessProof = new();
+
+    private static byte CaptureQuestSuccessProof(Issue issue)
+        => issue.IssueQuest is Quest quest && ObservedSuccessProof.TryGetValue(quest, out var proof) ? (byte)proof : (byte)0;
+
+    internal static void ObserveQuestSuccess(Quest quest)
+    {
+        ObservedSuccessProof.Remove(quest);
+        ObservedSuccessProof.Add(quest, ProofQuestSuccess);
+    }
 
     static GangLeaderNeedsToOffloadStolenGoodsQuestType()
     {
@@ -251,8 +269,26 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
             .WithAlternativeAccept(AlternativeAcceptMirror)
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestCancelValidation(ValidateQuestCancel)
+            .WithQuestFailValidation(ValidateQuestFail)
+            .WithQuestBetrayalValidation(ValidateQuestBetrayal)
+            .WithQuestSuccessValidation(ValidateQuestSuccess)
+            .WithQuestSuccessProofCapture(CaptureQuestSuccessProof)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
     }
+}
+
+[HarmonyPatch(typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest))]
+internal class GangLeaderNeedsToOffloadStolenGoodsQuestSuccessObserverPatches
+{
+    [HarmonyPatch("SucceedQuestByPayingAndKeepingTheGoods")]
+    [HarmonyPostfix]
+    private static void SucceedQuestByPayingAndKeepingTheGoodsPostfix(Quest __instance) =>
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestSuccess(__instance);
+
+    [HarmonyPatch("SucceedQuestByPayingAndGivingTheGoodsBack")]
+    [HarmonyPostfix]
+    private static void SucceedQuestByPayingAndGivingTheGoodsBackPostfix(Quest __instance) =>
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestSuccess(__instance);
 }
