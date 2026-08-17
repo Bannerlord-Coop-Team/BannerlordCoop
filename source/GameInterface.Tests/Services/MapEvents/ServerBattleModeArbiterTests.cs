@@ -190,4 +190,42 @@ public class ServerBattleModeArbiterTests
             ServerBattleModeArbiter.Release(simulationEvent);
         }
     }
+
+    // Releasing a simulation claim allows the map event to be used by a mission.
+    [Fact]
+    public void ReleaseSimulation_SimulationClaim_AllowsMissionClaim()
+    {
+        const string mapEventId = "release-simulation-claim";
+
+        try
+        {
+            Assert.True(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
+
+            Assert.True(ServerBattleModeArbiter.ReleaseSimulation(mapEventId));
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId));
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+        }
+    }
+
+    // Releasing a simulation must not remove an active mission claim.
+    [Fact]
+    public void ReleaseSimulation_MissionClaim_DoesNotReleaseClaim()
+    {
+        const string mapEventId = "preserve-mission-claim";
+        
+        try
+        {
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId));
+
+            Assert.False(ServerBattleModeArbiter.ReleaseSimulation(mapEventId));
+            Assert.False(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+        }
+    }
 }

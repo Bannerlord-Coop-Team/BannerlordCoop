@@ -10,6 +10,8 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -298,6 +300,15 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
     {
         var agent = payload.What.Agent;
         if (agent == null || !(agent.Character is CharacterObject)) return;
+
+        // Defense in depth: player-owned companions use the party join-info path even when this client is
+        // also the elected NPC host. Never give them an ambient binding or migration eligibility.
+        if (agent.Origin is PartyAgentOrigin origin && origin.Party == PartyBase.MainParty)
+        {
+            Logger.Warning("[LocationSync] Ignored ambient capture event for local party agent {Character}",
+                agent.Character.StringId);
+            return;
+        }
 
         // The roster identity is extracted at capture time — the entry is resolvable via the agent's
         // origin right now, and any FUTURE host needs it to re-bind (SR-022).
