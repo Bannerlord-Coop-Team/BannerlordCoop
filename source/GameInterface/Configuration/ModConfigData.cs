@@ -94,6 +94,8 @@ public sealed class ModOptionsData
 
     public float? MaximumLootersMultiplier { get; set; }
 
+    public float? LooterPartySizeMultiplier { get; set; }
+
     public LordDefectionRetryMode? LordDefectionRetries { get; set; }
   
     public bool? EnableHeroExecutions { get; set; }
