@@ -1063,5 +1063,4 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
         return false;
     }
-
 }

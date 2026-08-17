@@ -67,5 +67,4 @@ public sealed class SiegeCaptureTransitionRetryHandlerTests : IDisposable
             service => service.PromptLocalAftermathChoice(leaderParty, settlement),
             Times.Once);
     }
-
 }
