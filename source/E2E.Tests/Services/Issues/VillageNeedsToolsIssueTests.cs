@@ -392,6 +392,10 @@ public class VillageNeedsToolsIssueTests : IDisposable
             {
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 Assert.NotNull(owner.Issue);
+                using (new AllowedThread())
+                {
+                    owner.Issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                }
                 Assert.Null(owner.Issue.IssueQuest);
                 Assert.True(owner.Issue.IsSolvingWithQuest);
             });
@@ -595,9 +599,11 @@ public class VillageNeedsToolsIssueTests : IDisposable
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             using (new AllowedThread())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
         });
@@ -678,9 +684,11 @@ public class VillageNeedsToolsIssueTests : IDisposable
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             using (new AllowedThread())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
         });
@@ -690,7 +698,8 @@ public class VillageNeedsToolsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("player-A", ownerControllerId);
-            Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
+            Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalHeroes);
+            Assert.Equal(21, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
         });
     }
 
@@ -729,10 +738,12 @@ public class VillageNeedsToolsIssueTests : IDisposable
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             Assert.NotNull(owner.Issue);
             using (new AllowedThread())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
         });
