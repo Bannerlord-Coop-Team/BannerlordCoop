@@ -313,7 +313,7 @@ internal static class SiegeAutoResolveFixtureCommands
         if (args.Count != 1)
             return Error("Usage: coop.debug.siege.auto_resolve_fixture_restore <captureJson>");
         if (fixture == null)
-            return JsonSerializer.Serialize(new { ok = true, phase = "already-restored", fixtureActive = false });
+            return JsonResult(new { ok = true, phase = "already-restored", fixtureActive = false });
 
         string token;
         try
@@ -348,7 +348,7 @@ internal static class SiegeAutoResolveFixtureCommands
                 activeFixture.BaselineFingerprint,
                 currentFingerprint);
             fixture = null;
-            return JsonSerializer.Serialize(new
+            return JsonResult(new
             {
                 ok = true,
                 phase = "restored",
@@ -816,9 +816,12 @@ internal static class SiegeAutoResolveFixtureCommands
         MobileParty playerParty)
     {
         var mapState = Game.Current?.GameStateManager?.LastOrDefault<MapState>();
-        var mapEvent = playerParty?.MapEvent ?? settlement?.Party?.MapEvent;
+        var playerPartyMapEvent = playerParty?.MapEvent;
+        var settlementMapEvent = settlement?.Party?.MapEvent;
+        var mapEvent = playerPartyMapEvent ?? settlementMapEvent;
         var encounter = ModInformation.IsClient ? PlayerEncounter.Current : null;
-        return JsonSerializer.Serialize(new
+        var captorParty = ModInformation.IsClient ? PlayerCaptivity.CaptorParty : null;
+        return JsonResult(new
         {
             ok = true,
             phase,
@@ -837,12 +840,18 @@ internal static class SiegeAutoResolveFixtureCommands
             factionsAtWar = playerParty?.MapFaction?.IsAtWarWith(settlement?.MapFaction) == true,
             playerBesieger = playerParty?.BesiegerCamp?.SiegeEvent == settlement?.SiegeEvent,
             mapEvent = mapEvent?.StringId,
+            playerPartyMapEvent = playerPartyMapEvent?.StringId,
+            settlementMapEvent = settlementMapEvent?.StringId,
             siegeAssault = mapEvent?.IsSiegeAssault == true,
             battleState = mapEvent?.BattleState.ToString(),
             menu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
             aftermathMenu = IsSiegeAftermathMenu(Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId),
             encounterActive = encounter != null,
+            locationEncounterActive = ModInformation.IsClient && PlayerEncounter.LocationEncounter != null,
             encounterState = encounter?.EncounterState.ToString(),
+            playerCaptive = ModInformation.IsClient && PlayerCaptivity.IsCaptive,
+            captorParty = GetPartyBaseId(captorParty),
+            captorIsSettlement = captorParty?.IsSettlement == true,
             simulationActive = mapState?.IsSimulationActive == true,
             simulationFinished = encounter?.BattleSimulation?.IsSimulationFinished,
         });
@@ -852,8 +861,11 @@ internal static class SiegeAutoResolveFixtureCommands
         menuId != null && (menuId.StartsWith("menu_settlement_taken", StringComparison.Ordinal) ||
                            menuId == "siege_aftermath_contextual_summary");
 
+    private static string JsonResult(object value) =>
+        "LIVE_TEST_JSON=" + JsonSerializer.Serialize(value);
+
     private static string Error(string message) =>
-        JsonSerializer.Serialize(new { ok = false, error = message });
+        JsonResult(new { ok = false, error = message });
 
     private sealed class SiegeAutoResolveFixture
     {
