@@ -566,6 +566,82 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     }
 
     [Fact]
+    public void SiegeSimulationDefeat_ResultRetainsCleanupAfterMapEventReferencesDisappear()
+    {
+        var setup = SetupSiegeSimulationResultClient();
+        var client = Clients.First();
+        MapEvent destroyedMapEvent = null;
+        BattleSimulation simulation = null;
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out destroyedMapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(setup.PartyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(setup.MapEventPartyId, out var mapEventParty));
+            Campaign.Current.MainParty = party;
+
+            var encounter = SetMockPlayerEncounter(client, mapEventId: setup.MapEventId);
+            encounter.BattleSimulation = ObjectHelper.SkipConstructor<BattleSimulation>();
+            simulation = encounter.BattleSimulation;
+            simulation.IsSimulationFinished = true;
+            encounter.PlayerSide = BattleSideEnum.Attacker;
+            AccessTools.Field(typeof(BattleSimulation), "_mapEvent").SetValue(simulation, destroyedMapEvent);
+
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._battleSimulation = simulation;
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+
+            Assert.Same(destroyedMapEvent, PlayerEncounter.Battle);
+            Assert.True(mapState.IsSimulationActive);
+        }, MapEventDisabledMethods);
+
+        client.SimulateMessage(Server.NetPeer, new NetworkCommitMapEventResults(
+            setup.MapEventId,
+            BattleSideEnum.Defender,
+            BattleSideEnum.Attacker,
+            setup.MapEventPartyId,
+            new NetworkPlayerLootData(new(), new(), new())));
+
+        client.Call(() =>
+        {
+            Assert.Equal(PlayerEncounterState.End, PlayerEncounter.Current.EncounterState);
+
+            var side = destroyedMapEvent.AttackerSide.Parties.Any(mapEventParty =>
+                mapEventParty.Party == MobileParty.MainParty.Party)
+                ? destroyedMapEvent.AttackerSide
+                : destroyedMapEvent.DefenderSide;
+            var mapEventParty = side.Parties.Single(candidate =>
+                candidate.Party == MobileParty.MainParty.Party);
+            side._battleParties.Remove(mapEventParty);
+            PlayerEncounter.Current._mapEvent = null;
+            AccessTools.Field(typeof(BattleSimulation), "_mapEvent").SetValue(simulation, null);
+            MobileParty.MainParty.Party._mapEventSide = null;
+
+            Assert.Null(MobileParty.MainParty.MapEvent);
+            Assert.Null(PlayerEncounter.Battle);
+            Assert.Null(PlayerEncounter.Current.BattleSimulation.MapEvent);
+            Assert.DoesNotContain(mapEventParty, side.Parties);
+        }, MapEventDisabledMethods);
+
+        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(setup.MapEventId));
+
+        client.Call(() =>
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out _));
+            var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
+            mapState.EndBattleSimulation();
+
+            PlayerEncounter.Update();
+
+            Assert.Null(MobileParty.MainParty.Party.MapEventSide);
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.Equal(PlayerEncounterState.Begin, PlayerEncounter.Current.EncounterState);
+        }, MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))));
+    }
+
+    [Fact]
     public void DuplicateSiegeSimulationResultCommit_PreservesScoreboardPresentation()
     {
         var setup = SetupSiegeSimulationResultClient();

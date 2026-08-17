@@ -39,6 +39,7 @@ public interface IMapEventInitializationBarrier : IGameAbstraction
     void RunAfterCommit(MapEvent mapEvent, Action action);
     void TrackParty(MapEvent mapEvent, MapEventParty party);
     void DeferVisual(GauntletMapEventVisual visual, CampaignVec2 position);
+    void RetainSimulationDefeat(MapEvent mapEvent, PartyBase party);
     void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null);
     void CompleteDeferredEncounterCleanup();
 }
@@ -379,6 +380,15 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         using (new AllowedThread()) visual.OnMapEventEnd();
     }
 
+    public void RetainSimulationDefeat(MapEvent mapEvent, PartyBase party)
+    {
+        var encounter = PlayerEncounter.Current;
+        if (ModInformation.IsServer || mapEvent == null || party == null || encounter?.BattleSimulation == null)
+            return;
+
+        deferredEncounterCleanup = new DeferredEncounterCleanup(mapEvent, party);
+    }
+
     public void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null)
     {
         if (mapEvent == null) return;
@@ -386,6 +396,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         Capture(state, mapEvent);
         if (preservedParty != null)
             deferredEncounterCleanup = new DeferredEncounterCleanup(mapEvent, preservedParty);
+        else if (ReferenceEquals(deferredEncounterCleanup?.MapEvent, mapEvent))
+            preservedParty = deferredEncounterCleanup.Party;
         Campaign.Current?.MapEventManager?._mapEvents.Remove(mapEvent);
         foreach (var mapEventParty in state.Owned.OfType<MapEventParty>())
         {
