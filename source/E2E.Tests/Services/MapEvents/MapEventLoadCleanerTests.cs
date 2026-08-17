@@ -54,6 +54,34 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
+    public void FinalizePlayerMapEvents_StaleParticipantSideLink_RepairsAndCompletes()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-player-stale-side", heroId, mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+            Assert.Contains(mapEvent.DefenderSide.Parties, party => ReferenceEquals(party.Party, defender.Party));
+
+            // Reproduce a malformed loaded graph: the side still owns its MapEventParty, but the
+            // PartyBase backing link is gone. Vanilla HandleMapEventEnd otherwise loops forever
+            // because assigning null to an already-null link never removes the side-list entry.
+            defender.Party._mapEventSide = null;
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+            Assert.Null(defender.Party.MapEventSide);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void FinalizePlayerMapEvents_UnregisteredPlayerPartyInCampaignObjectManager_FinalizesEvent()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);

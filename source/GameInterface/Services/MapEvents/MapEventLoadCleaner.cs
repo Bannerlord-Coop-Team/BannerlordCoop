@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -52,6 +53,8 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
         foreach (var mapEvent in loadedPlayerMapEvents)
         {
+            RepairPartySideLinks(mapEvent);
+
             var involvedMobileParties = mapEvent.InvolvedParties
                 .Where(party => party.IsMobile && party.MobileParty.IsActive)
                 .Select(party => party.MobileParty)
@@ -96,6 +99,39 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
                 mobileParty.ResetNavigationToHold();
             }
+        }
+    }
+
+    private void RepairPartySideLinks(MapEvent mapEvent)
+    {
+        var repairedLinks = 0;
+
+        foreach (var side in mapEvent._sides ?? Array.Empty<MapEventSide>())
+        {
+            if (side?.Parties == null)
+                continue;
+
+            foreach (var mapEventParty in side.Parties)
+            {
+                var party = mapEventParty?.Party;
+                if (party == null || party.MapEventSide != null)
+                    continue;
+
+                // HandleMapEventEnd loops until side.Parties is empty and relies on the PartyBase
+                // setter to remove the current entry. A null backing link makes that setter a no-op,
+                // leaving the vanilla loop permanently stuck. Do not rewrite a non-null link because
+                // it may authoritatively belong to another event.
+                party._mapEventSide = side;
+                repairedLinks++;
+            }
+        }
+
+        if (repairedLinks > 0)
+        {
+            logger.Warning(
+                "Repaired {RepairedLinkCount} missing party-side links in loaded player map event {MapEventId} before finalization",
+                repairedLinks,
+                mapEvent.StringId);
         }
     }
 
