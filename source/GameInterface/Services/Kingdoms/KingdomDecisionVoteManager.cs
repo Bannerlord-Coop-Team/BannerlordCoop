@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Data;
@@ -31,7 +31,7 @@ namespace GameInterface.Services.Kingdoms
         bool TryCreateVoteData(DecisionItemBaseVM decisionItem, out KingdomDecisionVoteData voteData, bool isFinal = false);
         bool TryPublishVote(DecisionOptionVM decisionOption);
         bool TryPublishFinalVote(DecisionItemBaseVM decisionItem);
-        void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem);
+        void CloseDecisionItem(DecisionItemBaseVM decisionItem);
         bool ShouldSuppressLocalDecision(KingdomDecision decision);
         bool ShouldDisableResolveDecision(KingdomDecision decision);
         bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
@@ -101,7 +101,9 @@ namespace GameInterface.Services.Kingdoms
             if (!TryGetDecisionIndex(decisionOption.Decision, out int decisionIndex)) return false;
             if (!TryGetKingdomId(decisionOption.Decision.Kingdom, out string kingdomId)) return false;
 
-            int outcomeIndex = decisionOption.IsOptionForAbstain ? -1 : GetOutcomeIndex(decisionOption.Option, decisionOption._kingdomDecisionMaker);
+            int outcomeIndex = decisionOption.IsOptionForAbstain
+                ? -1
+                : GetOutcomeIndex(decisionOption.Option, decisionOption._kingdomDecisionMaker);
             if (!decisionOption.IsOptionForAbstain && outcomeIndex < 0) return false;
 
             string outcomeKey = null;
@@ -172,7 +174,7 @@ namespace GameInterface.Services.Kingdoms
             if (decisionItem == null || decisionItem._currentSelectedOption == null) return false;
             if (HasLocalPlayerSubmittedVote(decisionItem.KingdomDecisionMaker?._decision))
             {
-                MarkLocalVoteSubmitted(decisionItem);
+                CloseDecisionItem(decisionItem);
                 return true;
             }
 
@@ -188,11 +190,11 @@ namespace GameInterface.Services.Kingdoms
             {
                 LocalSubmittedDecisions.Add(decisionItem.KingdomDecisionMaker._decision);
             }
-            MarkLocalVoteSubmitted(decisionItem);
+            CloseDecisionItem(decisionItem);
             return true;
         }
 
-        public void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem)
+        public void CloseDecisionItem(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null) return;
 
@@ -680,6 +682,54 @@ namespace GameInterface.Services.Kingdoms
             state.Decision.SupportStatusOfFinalDecision = supportStatus;
             string notificationText = GetDecisionNotificationText(state.Decision, chosenOutcome, supportStatus);
 
+            if (state.Decision is StartAllianceDecision allianceDecision && CoopKingdomElection.TryRedirectPlayerAllianceOffer(state.Decision, chosenOutcome)
+                && chosenOutcome is StartAllianceDecision.StartAllianceDecisionOutcome startAllianceOutcome && startAllianceOutcome.ShouldAllianceBeStarted)
+            {
+                if (allianceDecision.Kingdom is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom()
+                    && allianceDecision.KingdomToStartAllianceWith is Kingdom playerkingdom2 && playerkingdom2.IsPlayerKingdom())
+                {
+                    messageBroker?.Publish(state.Decision, new AllianceOfferPendingStatusChanged(
+                        allianceDecision.Kingdom,
+                        allianceDecision.KingdomToStartAllianceWith,
+                        isPending: true));
+                }
+                if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
+                {
+                    state.Decision.Kingdom.RemoveDecision(state.Decision);
+                }
+                RemoveDecisionState(state.Decision);
+                return;
+            }
+
+            if (state.Decision is ProposeCallToWarAgreementDecision && CoopKingdomElection.TryRedirectPlayerProposeCallToWarAgreementOffer(state.Decision, chosenOutcome)
+                && chosenOutcome is ProposeCallToWarAgreementDecision.ProposeCallToWarAgreementDecisionOutcome proposeCallToWarOutcome && proposeCallToWarOutcome.ShouldCallToWar)
+            {
+                if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
+                {
+                    state.Decision.Kingdom.RemoveDecision(state.Decision);
+                }
+                RemoveDecisionState(state.Decision);
+                return;
+            }
+            if (state.Decision is MakePeaceKingdomDecision peaceDecision && CoopKingdomElection.TryRedirectPlayerPeaceOffer(state.Decision, chosenOutcome)
+                && chosenOutcome is MakePeaceKingdomDecision.MakePeaceDecisionOutcome peaceOutcome && peaceOutcome.ShouldPeaceBeDeclared)
+            {
+                if (peaceDecision.Kingdom is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom()
+                    && peaceDecision.FactionToMakePeaceWith is Kingdom playerkingdom2 && playerkingdom2.IsPlayerKingdom())
+                {
+                    messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
+                        peaceDecision.Kingdom,
+                        (Kingdom)peaceDecision.FactionToMakePeaceWith,
+                        isPending: true));
+                }
+
+                if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
+                {
+                    state.Decision.Kingdom.RemoveDecision(state.Decision);
+                }
+                RemoveDecisionState(state.Decision);
+                return;
+            }
             messageBroker?.Publish(state.Decision, new KingdomDecisionResolved(
                 state.KingdomId,
                 state.DecisionIndex,
@@ -691,6 +741,33 @@ namespace GameInterface.Services.Kingdoms
             if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex))
             {
                 state.Election.ApplyChosenOutcomeCoop();
+            }
+
+            if (state.Decision is MakePeaceKingdomDecision decision)
+            {
+                if (decision.Kingdom is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom() 
+                    && decision.FactionToMakePeaceWith is Kingdom playerkingdom2 && playerkingdom2.IsPlayerKingdom())
+                {
+                    messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
+                        playerkingdom2,
+                        playerKingdom,
+                        isPending: false));
+                }
+            }
+            if (state.Decision is StartAllianceDecision startAllianceDecision)
+            {
+                if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(startAllianceDecision))
+                {
+                    CoopKingdomElection._opponentProposedAllianceDecisions.Remove(startAllianceDecision);
+                }
+                if (startAllianceDecision.Kingdom is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom()
+                    && startAllianceDecision.KingdomToStartAllianceWith is Kingdom playerkingdom2 && playerkingdom2.IsPlayerKingdom())
+                {
+                    messageBroker?.Publish(state.Decision, new AllianceOfferPendingStatusChanged(
+                         playerkingdom2,
+                         playerKingdom,
+                         isPending: false));
+                }
             }
             if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
             {
@@ -1035,6 +1112,7 @@ namespace GameInterface.Services.Kingdoms
                 if (string.IsNullOrEmpty(player.ClanId)) continue;
                 if (!TryGetClan(player.ClanId, decision.Kingdom, out Clan clan)) continue;
                 if (clan.Kingdom != decision.Kingdom) continue;
+                if (clan.IsUnderMercenaryService) continue;
 
                 if (TryGetClanId(clan, out string clanId))
                 {

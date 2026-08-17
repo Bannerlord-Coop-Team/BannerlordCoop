@@ -12,6 +12,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Moq;
 using System;
@@ -136,6 +137,87 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void NetworkTransferNewHero_AnnouncesBeforeAuthoritativeServerSetup()
+        {
+            // Arrange
+            var hero = SetupUnpackedHero();
+            var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
+            var creationWasSentBeforeSetup = false;
+            var joiningPeerWasAnsweredBeforeSetup = false;
+            heroInterfaceMock
+                .Setup(h => h.SetupServerHero(hero))
+                .Callback(() =>
+                {
+                    creationWasSentBeforeSetup = serverComponent.TestNetwork.SentNetworkMessages
+                        .TryGetValue(differentPeer.Id, out var messages) &&
+                        messages.OfType<NetworkNewPlayerHeroCreated>().Any();
+                    joiningPeerWasAnsweredBeforeSetup = serverComponent.TestNetwork.ImmediateSends.Any();
+                });
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            // Act
+            var payload = new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero(Array.Empty<byte>()));
+            currentState.Handle_NetworkTransferNewHero(payload);
+
+            // Assert
+            Assert.True(creationWasSentBeforeSetup);
+            Assert.False(joiningPeerWasAnsweredBeforeSetup);
+            heroInterfaceMock.Verify(h => h.SetupServerHero(hero), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkTransferNewHero_ServerSetupFailureDisconnectsBeforeTransferSave()
+        {
+            // Arrange
+            var hero = SetupUnpackedHero();
+            var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            var rollbackMock = serverComponent.Container.Resolve<Mock<IPlayerCreationRollback>>();
+            var registrationIds = new[] { "Hero_test", "MobileParty_test", "TroopRoster_MemberRoster_test" };
+            rollbackMock
+                .Setup(rollback => rollback.CaptureRegistrationIds(It.IsAny<Player>()))
+                .Returns(registrationIds);
+            Player registeredPlayer = null;
+            playerManagerMock
+                .Setup(p => p.AddPlayer(It.IsAny<Player>()))
+                .Callback<Player>(player => registeredPlayer = player)
+                .Returns(true);
+            playerManagerMock
+                .Setup(p => p.RemovePlayer(It.IsAny<Player>()))
+                .Returns(true);
+            serverComponent.Container.Resolve<Mock<IHeroInterface>>()
+                .Setup(h => h.SetupServerHero(hero))
+                .Throws(new InvalidOperationException("setup failed"));
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            // Act
+            var payload = new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero(Array.Empty<byte>()));
+            currentState.Handle_NetworkTransferNewHero(payload);
+
+            // Assert
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.DoesNotContain(
+                serverComponent.TestNetwork.ImmediateSends,
+                send => send.Payload is NetworkHeroRecieved);
+            playerManagerMock.Verify(p => p.RemovePlayer(registeredPlayer), Times.Once);
+            rollbackMock.Verify(rollback => rollback.CaptureRegistrationIds(registeredPlayer), Times.Once);
+            rollbackMock.Verify(rollback => rollback.Rollback(registeredPlayer, registrationIds), Times.Once);
+
+            var remoteMessages = serverComponent.TestNetwork.GetPeerMessages(differentPeer).ToList();
+            Assert.Collection(
+                remoteMessages,
+                message => Assert.IsType<NetworkNewPlayerHeroCreated>(message),
+                message =>
+                {
+                    var rollback = Assert.IsType<NetworkPlayerCreationRolledBack>(message);
+                    Assert.Equal(registeredPlayer, rollback.Player);
+                    Assert.Equal(registrationIds, rollback.RegistrationIds);
+                });
+            Assert.IsType<CreateCharacterState>(connectionLogic.State);
+        }
+
+        [Fact]
         public void NetworkTransferNewHero_ReplaysExistingPlayersToJoiner_ExceptItselfAndHost()
         {
             // Arrange — a pre-existing client, the host, and the joiner's own player are all in the registry.
@@ -225,7 +307,7 @@ namespace Coop.Tests.Server.Connections.States
         /// <param name="registerCharacterObject">
         /// When false, the hero's CharacterObject is left unregistered so TryCreatePlayer fails to resolve its id.
         /// </param>
-        private void SetupUnpackedHero(bool registerCharacterObject = true)
+        private Hero SetupUnpackedHero(bool registerCharacterObject = true)
         {
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
@@ -253,6 +335,8 @@ namespace Coop.Tests.Server.Connections.States
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
                 .Returns(true);
+
+            return hero;
         }
     }
 }

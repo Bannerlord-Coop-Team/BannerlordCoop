@@ -11,8 +11,10 @@ using Missions.Agents;
 using Missions.Data;
 using Missions.Messages;
 using Missions.Services.Network;
+using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -58,7 +60,6 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
-
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;
@@ -81,6 +82,9 @@ public class CoopBattleController : CoopMissionController
     private readonly ISupplyProgressReporter supplyReporter;
     private readonly BattleTeamDiagnostics diagnostics = new BattleTeamDiagnostics();
 
+    // Answer BattleSpawnGate.HeroAgentAuthorityProbe for paths in GameInterface (e.g. HeroExtensions.IsHealthControlledByThisInstance)
+    private readonly Func<Hero, bool?> heroAgentAuthorityProbe;
+
     public CoopBattleController(
         IBattleNetwork network,
         INetwork relayNetwork,
@@ -89,12 +93,14 @@ public class CoopBattleController : CoopMissionController
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ICoopMissionComponent coopMissionComponent,
+        INetworkWorldItemRegistry worldItemRegistry,
         IBattleHostRegistry hostRegistry,
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
         IHostEpochPolicy hostEpochPolicy,
         IBattleAgentBudget agentBudget,
         IGuardedHitWindow guardedHitWindow,
+        IAgentNativeMountState agentNativeMountState,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec)
         : base(
@@ -109,7 +115,15 @@ public class CoopBattleController : CoopMissionController
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
 
-        lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, missionContext);
+        lifecycle = new BattleInstanceLifecycle(
+            network,
+            relayNetwork,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            worldItemRegistry,
+            session,
+            missionContext);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, spawnBatchCodec);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
@@ -125,7 +139,9 @@ public class CoopBattleController : CoopMissionController
             messageBroker,
             coopMissionComponent,
             session,
-            guardedHitWindow);
+            guardedHitWindow,
+            agentNativeMountState,
+            puppetMountStateRepairer);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
@@ -144,6 +160,9 @@ public class CoopBattleController : CoopMissionController
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+
+        heroAgentAuthorityProbe = ProbeHeroAgentAuthority;
+        BattleSpawnGate.HeroAgentAuthorityProbe = heroAgentAuthorityProbe;
 
         // Decode order clips during battle setup so the first issued order does not hitch.
         coopMissionComponent.AgentVoiceHandler.WarmUp();
@@ -167,6 +186,9 @@ public class CoopBattleController : CoopMissionController
         Deployment.Dispose();
         messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+
+        if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
+            BattleSpawnGate.HeroAgentAuthorityProbe = null;
 
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
@@ -228,7 +250,11 @@ public class CoopBattleController : CoopMissionController
         // agent here. The only exception is a side whose reserve crossed the spawn handler's intentional
         // timeout fallback; that exact side is allowed to start empty so the battle can conclude instead of
         // wedging forever. The release is one-shot, so a later real depletion still concludes normally.
-        if (!endConditionHoldReleased)
+        // Hideout controllers own this switch across their camp/boss phases; enabling it here can resolve the
+        // attacker victory after the camp is cleared, before the boss fight has actually concluded.
+        if (!endConditionHoldReleased && ShouldManageBattleEndLogic(
+                Mission?.GetMissionBehavior<HideoutMissionController>() != null,
+                Mission?.GetMissionBehavior<HideoutAmbushMissionController>() != null))
         {
             var battleEndLogic = Mission?.GetMissionBehavior<BattleEndLogic>();
             if (battleEndLogic != null)
@@ -306,6 +332,20 @@ public class CoopBattleController : CoopMissionController
             && (attackerFielded || defenderFielded)
             && (attackerFielded || attackerMissingReserveAccepted)
             && (defenderFielded || defenderMissingReserveAccepted);
+    }
+
+    internal static bool ShouldManageBattleEndLogic(
+        bool hasHideoutMissionController,
+        bool hasHideoutAmbushMissionController)
+        => !hasHideoutMissionController && !hasHideoutAmbushMissionController;
+        
+    // Compare current authority with controller id
+    private bool? ProbeHeroAgentAuthority(Hero hero)
+    {
+        if (!coopMissionComponent.AgentRegistry.TryGetHeroAgentInfo(hero, out var info))
+            return null;
+
+        return info.CurrentAuthority == Session.OwnControllerId;
     }
 
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)

@@ -14,8 +14,10 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime.Serialization;
@@ -114,6 +116,56 @@ namespace Coop.Tests.Server.Connections.States
 
             var castedMessage = (NetworkModuleVersionsValidated)message;
             Assert.True(castedMessage.Matches);
+            Assert.Equal(Common.ModInformation.BuildVersion, castedMessage.CoopBuildVersion);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("different-build")]
+        public void NetworkModuleVersionsValidate_IncompatibleBuild_Denied(string? clientBuildVersion)
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var modules = new List<ModuleInfo>
+            {
+                new ModuleInfo("1", false, false, new ApplicationVersion()),
+            };
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
+                .Setup(mip => mip.GetModuleInfos())
+                .Returns(modules);
+
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer,
+                new NetworkModuleVersionsValidate(modules, clientBuildVersion));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            var validated = Assert.IsType<NetworkModuleVersionsValidated>(message);
+            Assert.False(validated.Matches);
+            Assert.Contains("Incompatible co-op mod build", validated.Reason);
+            Assert.Contains("Update the co-op mod on both sides", validated.Reason);
+            Assert.Equal(Common.ModInformation.BuildVersion, validated.CoopBuildVersion);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ProtobufRoundTrip_PreservesBuildVersion()
+        {
+            var message = new NetworkModuleVersionsValidate(Array.Empty<ModuleInfo>(), "client-build");
+
+            var deserialized = ProtobufRoundTrip(message);
+
+            Assert.Equal("client-build", deserialized.CoopBuildVersion);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidated_ProtobufRoundTrip_PreservesBuildVersion()
+        {
+            var message = new NetworkModuleVersionsValidated(false, "reason", "server-build");
+
+            var deserialized = ProtobufRoundTrip(message);
+
+            Assert.Equal("server-build", deserialized.CoopBuildVersion);
         }
 
         [Fact]
@@ -521,6 +573,14 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.Container.Resolve<IModuleInfoProvider>(),
                 serverComponent.Container.Resolve<IExistingPlayerSender>(),
                 identityResolver);
+        }
+
+        private static T ProtobufRoundTrip<T>(T message)
+        {
+            using var stream = new MemoryStream();
+            Serializer.Serialize(stream, message);
+            stream.Position = 0;
+            return Serializer.Deserialize<T>(stream);
         }
     }
 }

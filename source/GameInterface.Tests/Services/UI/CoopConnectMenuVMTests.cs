@@ -218,7 +218,7 @@ public class CoopConnectMenuVMTests
 
         Assert.Empty(viewModel.Sessions);
         Assert.Equal("Hosted Steam Servers (0 servers; 0 players)", viewModel.SessionBrowserHeaderText);
-        Assert.Equal("No hosts match 'missing'.", viewModel.SessionStatusText);
+        Assert.Equal("No hosted Steam lobbies match the current filters.", viewModel.SessionStatusText);
 
         viewModel.SessionHostSearchText = "  ";
         viewModel.ActionSearchSessions();
@@ -259,6 +259,10 @@ public class CoopConnectMenuVMTests
         Assert.Equal("Type a host name...", viewModel.HostSearchPlaceholderText);
         Assert.Equal("Host Name", viewModel.HostColumnText);
         Assert.Equal("Connected Players", viewModel.ConnectedPlayersColumnText);
+        Assert.Equal("Password", viewModel.PasswordFilterLabelText);
+        Assert.Equal("Minimum Players", viewModel.MinimumPlayersFilterLabelText);
+        Assert.Equal("Any Password", viewModel.PasswordFilterButtonText);
+        Assert.Equal(0, viewModel.MinimumSessionPlayers);
     }
 
     [Fact]
@@ -276,6 +280,83 @@ public class CoopConnectMenuVMTests
         Assert.Equal(1, activationCount);
     }
 
+    [Fact]
+    public void SessionPasswordFilter_CyclesThroughAllModes()
+    {
+        var browser = new TestSessionBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        SelectSessionBrowserTab(viewModel);
+        browser.Complete(
+            CreateLobby(1, "Open Host", passwordRequired: false),
+            CreateLobby(2, "Protected Host", passwordRequired: true));
+
+        Assert.Equal(new[] { "Open Host", "Protected Host" }, VisibleHosts(viewModel));
+        Assert.Equal("Any Password", viewModel.PasswordFilterButtonText);
+
+        viewModel.ActionCycleSessionPasswordFilter();
+
+        Assert.Equal("No Password", viewModel.PasswordFilterButtonText);
+        Assert.Equal("Open Host", Assert.Single(viewModel.Sessions).HostText);
+
+        viewModel.ActionCycleSessionPasswordFilter();
+
+        Assert.Equal("Password Required", viewModel.PasswordFilterButtonText);
+        Assert.Equal("Protected Host", Assert.Single(viewModel.Sessions).HostText);
+
+        viewModel.ActionCycleSessionPasswordFilter();
+
+        Assert.Equal("Any Password", viewModel.PasswordFilterButtonText);
+        Assert.Equal(2, viewModel.Sessions.Count);
+    }
+
+    [Fact]
+    public void MinimumSessionPlayers_FiltersLobbiesAndClampsNegativeValues()
+    {
+        var browser = new TestSessionBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        SelectSessionBrowserTab(viewModel);
+        browser.Complete(
+            CreateLobby(1, "Solo Host", connectedPlayers: 1),
+            CreateLobby(2, "Busy Host", connectedPlayers: 4),
+            CreateLobby(3, "Full Host", connectedPlayers: 8));
+
+        viewModel.MinimumSessionPlayers = 4;
+
+        Assert.Equal(new[] { "Busy Host", "Full Host" }, VisibleHosts(viewModel));
+        Assert.Equal("Hosted Steam Servers (2 servers; 12 players)", viewModel.SessionBrowserHeaderText);
+
+        viewModel.MinimumSessionPlayers = -1;
+
+        Assert.Equal(0, viewModel.MinimumSessionPlayers);
+        Assert.Equal(3, viewModel.Sessions.Count);
+    }
+
+    [Fact]
+    public void SessionFilters_CombineBeforePagination()
+    {
+        var browser = new TestSessionBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        SelectSessionBrowserTab(viewModel);
+        browser.Complete(
+            CreateLobby(1, "Alpha Open", connectedPlayers: 4),
+            CreateLobby(2, "Alpha Protected", connectedPlayers: 5, passwordRequired: true),
+            CreateLobby(3, "Other Open", connectedPlayers: 6),
+            CreateLobby(4, "Alpha Small", connectedPlayers: 1));
+
+        viewModel.SessionHostSearchText = "Alpha";
+        viewModel.MinimumSessionPlayers = 3;
+        viewModel.ActionCycleSessionPasswordFilter();
+
+        Assert.Equal("Alpha Open", Assert.Single(viewModel.Sessions).HostText);
+        Assert.Equal("Hosted Steam Servers (1 servers; 4 players)", viewModel.SessionBrowserHeaderText);
+    }
+
     private static void SelectSessionBrowserTab(CoopConnectMenuVM viewModel)
     {
         Assert.Equal(CoopConnectMenuVM.SessionBrowserTabId, viewModel.Tabs[1].Id);
@@ -286,6 +367,7 @@ public class CoopConnectMenuVMTests
         ulong lobbyId,
         string ownerName,
         int connectedPlayers = 0,
+        bool passwordRequired = false,
         string provider = "steam")
     {
         return new SessionListing
@@ -293,6 +375,7 @@ public class CoopConnectMenuVMTests
             Id = new SessionListingId(provider, lobbyId.ToString()),
             OwnerName = ownerName,
             ConnectedPlayers = connectedPlayers,
+            PasswordRequired = passwordRequired,
             ProtocolVersion = SessionJoinInfo.CurrentVersion,
             ModVersion = ModInformation.BuildVersion,
         };

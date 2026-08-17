@@ -84,7 +84,18 @@ public class ResolveCharacterState : ConnectionStateBase
             var clientModules = obj.What.Modules;
             var serverModules = moduleInfoProvider.GetModuleInfos();
 
-            result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo), out error);
+            if (!ModInformation.MatchesBuildVersion(obj.What.CoopBuildVersion))
+            {
+                result = false;
+                error = GetIncompatibleBuildReason(obj.What.CoopBuildVersion);
+            }
+            else
+            {
+                result = moduleValidator.Validate(
+                    serverModules,
+                    clientModules.Select(ConvertToModuleInfo),
+                    out error);
+            }
         }
         catch (Exception e)
         {
@@ -97,8 +108,23 @@ public class ResolveCharacterState : ConnectionStateBase
                     "Check that the client and server run the same game and mod versions.";
         }
 
-        var validateMessage = new NetworkModuleVersionsValidated(result, error);
+        var validateMessage = new NetworkModuleVersionsValidated(
+            result,
+            error,
+            ModInformation.BuildVersion);
         network.SendImmediate(ConnectionLogic.Peer, validateMessage);
+    }
+
+    private static string GetIncompatibleBuildReason(string? clientBuildVersion)
+    {
+        if (string.IsNullOrEmpty(clientBuildVersion))
+        {
+            return $"Incompatible co-op mod build. The server uses '{ModInformation.BuildVersion}', " +
+                   "but the client did not report an exact build. Update the co-op mod on both sides.";
+        }
+
+        return $"Incompatible co-op mod build. The server uses '{ModInformation.BuildVersion}', " +
+               $"but the client uses '{clientBuildVersion}'. Update the co-op mod on both sides.";
     }
 
     internal void Handle_ClientValidate(MessagePayload<NetworkClientValidate> obj)

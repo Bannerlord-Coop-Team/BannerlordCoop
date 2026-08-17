@@ -1,4 +1,6 @@
 ﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.Buildings.Messages;
 using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -26,7 +28,7 @@ internal class BuildingsCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(BuildingsCampaignBehavior.DailyTickSettlement))]
     [HarmonyPrefix]
-    public static bool DailyTickSettlementPrefix(ref BuildingsCampaignBehavior __instance, Settlement settlement)
+    public static bool DailyTickSettlementPrefix(BuildingsCampaignBehavior __instance, Settlement settlement)
     {
         // Skip if village
         if (!settlement.IsFortification) return false;
@@ -45,6 +47,7 @@ internal class BuildingsCampaignBehaviorPatches
             if (!town.CurrentBuilding.BuildingType.IsDailyProject)
             {
                 __instance.TickCurrentBuildingForTown(town);
+
                 return false;
             }
             if (town.Governor != null && town.Governor.GetPerkValue(DefaultPerks.Charm.Virile) && MBRandom.RandomFloat <= DefaultPerks.Charm.Virile.SecondaryBonus)
@@ -62,5 +65,17 @@ internal class BuildingsCampaignBehaviorPatches
 
         // Safe to run normally for non-player clans
         return true;
+    }
+
+    [HarmonyPatch(nameof(BuildingsCampaignBehavior.DailyTickSettlement))]
+    [HarmonyPostfix]
+    public static void DailyTickSettlementPostfix(BuildingsCampaignBehavior __instance, Settlement settlement)
+    {
+        if (!settlement.IsFortification || !settlement.OwnerClan.IsPlayerClan()) return;
+
+        // Update client's settlement management screen with latest tick
+        // Vanilla is normally paused on this screen so ticks won't update normally
+        var message = new RefreshPlayerSettlementManagementVM(settlement.Town);
+        MessageBroker.Instance.Publish(__instance, message);
     }
 }

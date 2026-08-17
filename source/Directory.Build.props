@@ -2,6 +2,9 @@
   <PropertyGroup>
     <!-- Bannerlord requires a dotted numeric module version. This also seeds the exact build label
          advertised through Steam; the SDK may append source-revision metadata to that label. -->
-    <CoopVersion>0.1.2</CoopVersion>
+    <CoopVersion>0.1.3</CoopVersion>
   </PropertyGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+  </ItemGroup>
 </Project>

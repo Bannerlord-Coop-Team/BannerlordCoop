@@ -20,7 +20,6 @@ namespace E2E.Tests.Services.Settlements
             TestEnvironment.CreateRegisteredObject<CultureObject>();
             TestEnvironment.CreateRegisteredObject<Hideout>();
             TestEnvironment.CreateRegisteredObject<MilitiaPartyComponent>();
-            TestEnvironment.CreateRegisteredObject<ItemRoster>();
             TestEnvironment.CreateRegisteredObject<MobileParty>();
             TestEnvironment.CreateRegisteredObject<PartyBase>();
             //TestEnvironment.CreateRegisteredObject<SiegeEvent>(); // Object reference not set to an instance of an object.

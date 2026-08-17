@@ -16,6 +16,16 @@ using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI;
 
+/// <summary>
+/// Available password-status filters for hosted storefront sessions.
+/// </summary>
+public enum SessionPasswordFilter
+{
+    Any,
+    NoPassword,
+    PasswordRequired,
+}
+
 /// <summary>View model for direct connection and the active storefront's session browser.</summary>
 public class CoopConnectMenuVM : ViewModel, IDisposable
 {
@@ -31,6 +41,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     private CoopConnectionTabVM selectedTab;
     private string sessionHostSearchText = string.Empty;
+    private SessionPasswordFilter sessionPasswordFilter;
+    private int minimumSessionPlayers;
     private string sessionStatusText = string.Empty;
     private bool isRefreshingSessions;
     private bool disposed;
@@ -60,6 +72,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         : ((filteredSessionCount - 1) / SessionPageSize) + 1;
     public string HostSearchLabelText => "Host Name";
     public string HostSearchPlaceholderText => "Type a host name...";
+    public string PasswordFilterLabelText => "Password";
+    public string MinimumPlayersFilterLabelText => "Minimum Players";
     public string HostColumnText => "Host Name";
     public string ConnectedPlayersColumnText => "Connected Players";
     public string PasswordColumnText => "Access";
@@ -79,6 +93,14 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     [DataSourceProperty]
     public HintViewModel PasswordHint { get; } = new HintViewModel(new TextObject(
         "The session password set by the host. Leave empty if the host has not set one."));
+
+    [DataSourceProperty]
+    public string PasswordFilterButtonText => SessionPasswordFilter switch
+    {
+        SessionPasswordFilter.NoPassword => "No Password",
+        SessionPasswordFilter.PasswordRequired => "Password Required",
+        _ => "Any Password",
+    };
 
     public string connectIP = "localhost";
     public string connectPort = "4200";
@@ -115,6 +137,44 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public MBBindingList<SessionListingListItemVM> Sessions { get; }
 
     [DataSourceProperty]
+    public SessionPasswordFilter SessionPasswordFilter
+    {
+        get => sessionPasswordFilter;
+        private set
+        {
+            if (sessionPasswordFilter == value) return;
+
+            sessionPasswordFilter = value;
+            OnPropertyChanged(nameof(SessionPasswordFilter));
+            OnPropertyChanged(nameof(PasswordFilterButtonText));
+
+            if (!disposed && !IsRefreshingSessions)
+            {
+                ApplySessionFilters(resetPage: true);
+            }
+        }
+    }
+
+    [DataSourceProperty]
+    public int MinimumSessionPlayers
+    {
+        get => minimumSessionPlayers;
+        set
+        {
+            value = Math.Max(0, value);
+            if (minimumSessionPlayers == value) return;
+
+            minimumSessionPlayers = value;
+            OnPropertyChanged(nameof(MinimumSessionPlayers));
+
+            if (!disposed && !IsRefreshingSessions)
+            {
+                ApplySessionFilters(resetPage: true);
+            }
+        }
+    }
+
+    [DataSourceProperty]
     public string SessionHostSearchText
     {
         get => sessionHostSearchText;
@@ -128,7 +188,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
             if (!disposed && !IsRefreshingSessions)
             {
-                ApplySessionHostFilter(resetPage: true);
+                ApplySessionFilters(resetPage: true);
             }
         }
     }
@@ -245,6 +305,18 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
+    public void ActionCycleSessionPasswordFilter()
+    {
+        if (disposed || IsRefreshingSessions) return;
+
+        SessionPasswordFilter = SessionPasswordFilter switch
+        {
+            SessionPasswordFilter.Any => SessionPasswordFilter.NoPassword,
+            SessionPasswordFilter.NoPassword => SessionPasswordFilter.PasswordRequired,
+            _ => SessionPasswordFilter.Any,
+        };
+    }
+
     public void ActionRefreshSessions()
     {
         if (disposed || IsRefreshingSessions) return;
@@ -278,7 +350,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     {
         if (disposed || IsRefreshingSessions) return;
 
-        ApplySessionHostFilter(resetPage: true);
+        ApplySessionFilters(resetPage: true);
     }
 
     public void ActionPreviousSessionPage()
@@ -286,7 +358,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         if (disposed || IsPreviousSessionPageDisabled) return;
 
         sessionPageIndex--;
-        ApplySessionHostFilter(resetPage: false);
+        ApplySessionFilters(resetPage: false);
     }
 
     public void ActionNextSessionPage()
@@ -294,7 +366,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         if (disposed || IsNextSessionPageDisabled) return;
 
         sessionPageIndex++;
-        ApplySessionHostFilter(resetPage: false);
+        ApplySessionFilters(resetPage: false);
     }
 
     public void ActionConnect()
@@ -417,15 +489,17 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                 RequestSessionJoin));
         }
 
-        ApplySessionHostFilter(resetPage: true);
+        ApplySessionFilters(resetPage: true);
     }
 
-    private void ApplySessionHostFilter(bool resetPage)
+    private void ApplySessionFilters(bool resetPage)
     {
         string searchText = SessionHostSearchText.Trim();
         var filteredLobbies = discoveredSessions
             .Where(lobby => searchText.Length == 0 ||
                 lobby.HostText.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+            .Where(MatchesSessionPasswordFilter)
+            .Where(lobby => lobby.ConnectedPlayers >= MinimumSessionPlayers)
             .ToList();
 
         filteredSessionCount = filteredLobbies.Count;
@@ -460,8 +534,18 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
         else
         {
-            SessionStatusText = $"No hosts match '{searchText}'.";
+            SessionStatusText = $"No hosted {sessionBrowser.DisplayName} lobbies match the current filters.";
         }
+    }
+
+    private bool MatchesSessionPasswordFilter(SessionListingListItemVM lobby)
+    {
+        return SessionPasswordFilter switch
+        {
+            SessionPasswordFilter.NoPassword => !lobby.PasswordRequired,
+            SessionPasswordFilter.PasswordRequired => lobby.PasswordRequired,
+            _ => true,
+        };
     }
 
     private void ClearSessionDisplay()

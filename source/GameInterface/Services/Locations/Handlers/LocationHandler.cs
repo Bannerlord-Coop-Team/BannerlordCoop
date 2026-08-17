@@ -308,7 +308,9 @@ public class LocationHandler : IHandler
             data.BehaviorsMethodName,
             data.CharacterRelation,
             data.FixedLocation,
-            data.UseCivilianEquipment);
+            data.UseCivilianEquipment,
+            data.PrefabBones,
+            data.PrefabNames);
 
         return true;
     }

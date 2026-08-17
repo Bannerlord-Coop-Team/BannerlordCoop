@@ -257,7 +257,7 @@ public class MissionReadyElectionTests : MissionTestEnvironment
 
             var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
                 otherDefender.IsPopulated, otherAttacker.IsPopulated,
-                otherDefender.TotalTroops, otherAttacker.TotalTroops);
+                otherDefender.TotalTroops, otherAttacker.TotalTroops, otherDefender.BattleSize);
             Assert.True(sizing.Ready, "both reserves landed, so the spawn handler's sizing gate must open");
         }
         finally
@@ -292,6 +292,8 @@ public class MissionReadyElectionTests : MissionTestEnvironment
             .ToArray();
 
         Assert.Equal(2, refresh.Length);
+        Assert.True(refresh[0].BattleSize > 0);
+        Assert.Single(refresh.Select(message => message.BattleSize).Distinct());
         Assert.NotEmpty(Assert.Single(refresh, message => message.Side == (int)BattleSideEnum.Attacker).Parties);
         Assert.Empty(Assert.Single(refresh, message => message.Side == (int)BattleSideEnum.Defender).Parties);
     }

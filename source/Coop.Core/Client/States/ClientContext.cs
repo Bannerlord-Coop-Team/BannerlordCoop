@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Network.Session;
 using Coop.Core.Common;
+using Coop.Core.Common.Session;
 using GameInterface;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
@@ -11,6 +12,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Players;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.UI.JoinCancel;
 
 namespace Coop.Core.Client.States;
 
@@ -37,7 +39,9 @@ public class ClientContext
         INetworkConfig networkConfig,
         ISessionTransportTargetSource transportTargetSource,
         IPeerIdentityPublisher peerIdentityPublisher,
-        ILocalPeerEndpointSource localPeerEndpointSource)
+        ILocalPeerEndpointSource localPeerEndpointSource,
+        IJoinAttemptOverlay joinAttemptOverlay,
+        JoinAttemptPresentation joinAttempt)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -55,6 +59,8 @@ public class ClientContext
         TransportTargetSource = transportTargetSource;
         PeerIdentityPublisher = peerIdentityPublisher;
         LocalPeerEndpointSource = localPeerEndpointSource;
+        JoinAttemptOverlay = joinAttemptOverlay;
+        JoinAttempt = joinAttempt;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -73,4 +79,6 @@ public class ClientContext
     public ISessionTransportTargetSource TransportTargetSource { get; }
     public IPeerIdentityPublisher PeerIdentityPublisher { get; }
     public ILocalPeerEndpointSource LocalPeerEndpointSource { get; }
+    public IJoinAttemptOverlay JoinAttemptOverlay { get; }
+    public JoinAttemptPresentation JoinAttempt { get; }
 }

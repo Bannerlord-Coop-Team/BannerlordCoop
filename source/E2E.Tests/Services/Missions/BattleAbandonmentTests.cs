@@ -74,7 +74,7 @@ public class BattleAbandonmentTests : MissionTestEnvironment
             var playerManager = Server.Resolve<IPlayerManager>();
             playerManager.SetPeer("connected-ctrl", connected.NetPeer);
             Server.Resolve<ITimeControlInterface>().ServerSetTimeControl(TimeControlEnum.Play_2x);
-            Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignEntered(connected.NetPeer));
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignSynchronized(connected.NetPeer));
         });
 
         Assert.Equal(1, Server.NetworkSentMessages.GetMessages<NetworkMapEventLockChanged>().Last().PlayersInMapEvent);

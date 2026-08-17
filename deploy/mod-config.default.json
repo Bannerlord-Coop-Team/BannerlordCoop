@@ -95,12 +95,21 @@
     // Stamina is stored as an integer and ticks are rounded up to ensure heroes always recover some stamina.
     "smithingStaminaRecoveryMultiplier": 0.1,
 
-    // Set a multiplier for increasing/decreasing the number of looter parties.
+    // Set a multiplier for increasing/decreasing the number of looter/bandit parties.
     // The higher the multiplier, the more looter parties can exist on the map at a time.
     // WARNING: Setting this value too high will cause performance issues.
     // The default is 1, which is equivalent to the vanilla spawn limit.
+    // Negative values will default back to 1.0
     "maximumLootersMultiplier": 1.0,
-    
+
+    // Set a multiplier for increasing/decreasing the size of looter/bandit parties.
+    // The higher the multiplier, the more looters/bandits in these parties.
+    // This only applies to new parties, existing bandit parties in a save game will not increase in size.
+    // The default is 1, which is equivalent to the vanilla party size.
+    // When quests are supported, bandit parties spawned by quests will not be affected.
+    // Negative values will default back to 1.0
+    "looterPartySizeMultiplier": 1.0,
+
     // How long a lord remembers refusing to defect to your kingdom.
     // Vanilla records each failed persuasion and refuses that lord until the
     // record expires after one in-game year. Only the machine that ran the
@@ -118,6 +127,6 @@
     // Toggle players being able to execute each others' clan members.
     // This includes player companions and family members.
     // Default is false and won't have any effect if enableHeroExecutions is false.
-    "enablePlayerClanMemberExecutions": false,
+    "enablePlayerClanMemberExecutions": false
   }
 }

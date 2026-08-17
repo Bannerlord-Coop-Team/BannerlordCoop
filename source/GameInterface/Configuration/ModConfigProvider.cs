@@ -49,10 +49,12 @@ public readonly struct ModOptions
     [ProtoMember(14)]
     public readonly float MaximumLootersMultiplier { get; } = 1f;
     [ProtoMember(15)]
+    public readonly float LooterPartySizeMultiplier { get; } = 1f;
+    [ProtoMember(16)]
     public readonly LordDefectionRetryMode LordDefectionRetries { get; } = LordDefectionRetryMode.Vanilla;
-    [ProtoMember(16)]  
+    [ProtoMember(17)]  
     public readonly bool EnableHeroExecutions { get; } = true;
-    [ProtoMember(17)]
+    [ProtoMember(18)]
     public readonly bool EnablePlayerClanMemberExecutions { get; } = false;
 
     public ModOptions(ModOptionsData modOptionsData)
@@ -71,7 +73,8 @@ public readonly struct ModOptions
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
         MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;
-        LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;      
+        LooterPartySizeMultiplier = modOptionsData.LooterPartySizeMultiplier ?? LooterPartySizeMultiplier;
+        LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;
         EnableHeroExecutions = modOptionsData.EnableHeroExecutions ?? EnableHeroExecutions;
         EnablePlayerClanMemberExecutions = modOptionsData.EnablePlayerClanMemberExecutions ?? EnablePlayerClanMemberExecutions;
     }
