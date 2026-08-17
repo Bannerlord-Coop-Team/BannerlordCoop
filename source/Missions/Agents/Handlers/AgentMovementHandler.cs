@@ -30,6 +30,8 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
 
     MovementRateSnapshot MovementRate { get; }
 
+    int AvailableOutgoingMovementBytes { get; }
+
     void Configure(MovementCadenceProfile profile);
 
     bool TrySetForcedBulkHz(int? hz, out string error);
@@ -97,6 +99,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly IAgentVisualActionAccessor visualActionAccessor;
     private readonly IMovementRateController movementRateController;
+    private readonly IMovementPriorityScheduler movementPriorityScheduler;
     private readonly IMissionContext missionContext;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
@@ -211,6 +214,20 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
+    private readonly struct PrioritizedCapturedMovement
+    {
+        public readonly CapturedMovement Captured;
+        public readonly MovementPriorityKey Priority;
+
+        public PrioritizedCapturedMovement(
+            CapturedMovement captured,
+            MovementPriorityKey priority)
+        {
+            Captured = captured;
+            Priority = priority;
+        }
+    }
+
     private readonly struct ReceivedMovement
     {
         public readonly string IdentityScopeId;
@@ -278,6 +295,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private float populationSampleElapsed;
     private bool firstMovementPoll = true;
     private bool firstPopulationSample = true;
+    private int recipientSendOffset;
 #if DEBUG
     private int initialConfiguredBulkHz;
     private float syntheticReceivePressureRemainingSeconds;
@@ -297,9 +315,11 @@ public class AgentMovementHandler : IAgentMovementHandler
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IAgentVisualActionAccessor visualActionAccessor,
         IMovementRateController movementRateController,
+        IMovementPriorityScheduler movementPriorityScheduler,
         IMissionContext missionContext)
     {
         if (movementRateController == null) throw new ArgumentNullException(nameof(movementRateController));
+        if (movementPriorityScheduler == null) throw new ArgumentNullException(nameof(movementPriorityScheduler));
         if (missionContext == null) throw new ArgumentNullException(nameof(missionContext));
 
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
@@ -314,6 +334,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.puppetMountStateRepairer = puppetMountStateRepairer;
         this.visualActionAccessor = visualActionAccessor;
         this.movementRateController = movementRateController;
+        this.movementPriorityScheduler = movementPriorityScheduler;
         this.missionContext = missionContext;
         _interpolator = new AgentPositionInterpolator(agentRegistry);
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
@@ -378,6 +399,8 @@ public class AgentMovementHandler : IAgentMovementHandler
     public PacketType PacketType => PacketType.Movement;
 
     public MovementRateSnapshot MovementRate => movementRateController.Snapshot;
+
+    public int AvailableOutgoingMovementBytes => movementBatchSender.AvailableOutgoingBytes;
 
     public void Configure(MovementCadenceProfile profile)
     {
@@ -465,6 +488,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     {
         if (_disposed || Mission.Current == null) return;
 
+        UpdateLocalFocusAgent();
         movementBatchSender.BeginFrame(dt);
         totalSimulationTime += dt;
 #if DEBUG
@@ -526,6 +550,20 @@ public class AgentMovementHandler : IAgentMovementHandler
             ElapsedMilliseconds(startedAt),
             traffic,
             authoritativeAgentsDue);
+    }
+
+    private void UpdateLocalFocusAgent()
+    {
+        Agent mainAgent = Agent.Main;
+        Guid? focusAgentId = null;
+        if (mainAgent != null &&
+            agentRegistry.TryGetAgentInfo(mainAgent, out CoopAgentInfo focusInfo) &&
+            focusInfo.CurrentAuthority == controllerIdProvider.ControllerId)
+        {
+            focusAgentId = focusInfo.AgentId;
+        }
+
+        movementRateController.SetLocalFocusAgent(focusAgentId);
     }
 
     private IReadOnlyCollection<CoopAgentInfo> GetPriorityAgents()
@@ -665,12 +703,22 @@ public class AgentMovementHandler : IAgentMovementHandler
         SendEquipment(legacyEquipment);
 
         var traffic = new MovementTrafficFrame();
+        var recipientIds = new List<string>();
         foreach (string recipientId in recipients)
         {
-            if (string.IsNullOrEmpty(recipientId) ||
-                recipientId == controllerIdProvider.ControllerId)
-                continue;
+            if (!string.IsNullOrEmpty(recipientId) &&
+                recipientId != controllerIdProvider.ControllerId)
+            {
+                recipientIds.Add(recipientId);
+            }
+        }
 
+        int startRecipient = recipientIds.Count == 0
+            ? 0
+            : recipientSendOffset % recipientIds.Count;
+        for (int recipientIndex = 0; recipientIndex < recipientIds.Count; recipientIndex++)
+        {
+            string recipientId = recipientIds[(startRecipient + recipientIndex) % recipientIds.Count];
             RecipientMovementState recipient = GetOrCreateRecipientState(recipientId);
             bool recipientBulkDue = includeAuthoritativeAgents &&
                 IsRecipientBulkDue(
@@ -685,6 +733,9 @@ public class AgentMovementHandler : IAgentMovementHandler
                 recipientBulkDue,
                 includePriorityAgent));
         }
+
+        if (recipientIds.Count > 0)
+            recipientSendOffset = (startRecipient + 1) % recipientIds.Count;
 
         return traffic;
     }
@@ -744,6 +795,19 @@ public class AgentMovementHandler : IAgentMovementHandler
         MovementBatch<AgentData> legacyPriorityMovement = null;
         MovementBatch<AgentMountData> legacyMountMovement = null;
 
+        Agent recipientFocus = null;
+        if (movementRateController.TryGetReceiverFocusAgentId(
+                controllerId,
+                out Guid focusAgentId) &&
+            agentRegistry.TryGetAgentInfo(focusAgentId, out CoopAgentInfo focusInfo) &&
+            focusInfo.Agent != null &&
+            focusInfo.Agent.Mission != null &&
+            focusInfo.Agent.IsActive())
+        {
+            recipientFocus = focusInfo.Agent;
+        }
+
+        var prioritized = new List<PrioritizedCapturedMovement>();
         foreach (CapturedMovement captured in capturedMovements)
         {
             if ((captured.IsPriority && !includePriorityAgent) ||
@@ -753,31 +817,53 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
 
             Guid agentId = captured.AgentInfo.AgentId;
+            bool shouldSend = captured.IsMount
+                ? ShouldSendMovement(recipient, agentId, captured.MountData)
+                : ShouldSendMovement(recipient, agentId, captured.AgentData);
+            if (!shouldSend) continue;
+
+            MarkMovementPending(recipient, agentId);
+            recipient.MovementPendingSince.TryGetValue(agentId, out float pendingSince);
+            float? lastSuccessfulSendTime = recipient.LastSentMovement.TryGetValue(
+                agentId,
+                out LastSentMovementState lastState)
+                    ? lastState.LastSentTime
+                    : (float?)null;
+            float? distance = recipientFocus == null
+                ? (float?)null
+                : captured.AgentInfo.Agent.Position.Distance(recipientFocus.Position);
+            MovementPriorityKey priority = movementPriorityScheduler.CreateKey(
+                captured.IsPriority,
+                distance,
+                totalSimulationTime,
+                lastSuccessfulSendTime,
+                pendingSince,
+                agentId);
+            prioritized.Add(new PrioritizedCapturedMovement(captured, priority));
+        }
+
+        prioritized.Sort((left, right) =>
+            movementPriorityScheduler.Compare(left.Priority, right.Priority));
+        foreach (PrioritizedCapturedMovement candidate in prioritized)
+        {
+            CapturedMovement captured = candidate.Captured;
             if (captured.IsMount)
             {
-                if (!ShouldSendMovement(recipient, agentId, captured.MountData))
-                    continue;
-
-                MarkMovementPending(recipient, agentId);
                 AddToBatch(
                     mountGroups,
                     ref legacyMountMovement,
                     captured.AgentInfo,
-                    captured.MountData);
-                continue;
+                    captured.MountData,
+                    candidate.Priority);
             }
-
-            if (!ShouldSendMovement(recipient, agentId, captured.AgentData))
-                continue;
-
-            MarkMovementPending(recipient, agentId);
-            if (captured.IsPriority)
+            else if (captured.IsPriority)
             {
                 AddToBatch(
                     priorityMovementGroups,
                     ref legacyPriorityMovement,
                     captured.AgentInfo,
                     captured.AgentData,
+                    candidate.Priority,
                     isPriority: true);
             }
             else
@@ -786,13 +872,18 @@ public class AgentMovementHandler : IAgentMovementHandler
                     movementGroups,
                     ref legacyMovement,
                     captured.AgentInfo,
-                    captured.AgentData);
+                    captured.AgentData,
+                    candidate.Priority);
             }
         }
 
         int maxPayloadBytes = client.GetMaxUnreliablePayloadBytes(controllerId);
-        // The local player's current input/position gets first access to each refill. Formation AI then uses
-        // the rotating cursor, so responsiveness stays high without letting early registry entries monopolize it.
+        movementBatchSender.ConfigureRecipient(
+            controllerId,
+            movementRateController.GetReceiverIncomingBytesPerSecond(controllerId),
+            maxPayloadBytes);
+        // The local player's current input/position gets first access to each refill. Remaining snapshots
+        // are ordered by their per-recipient distance and last-successful-send priority.
         MovementSendResult priorityResult = movementBatchSender.Send(
             controllerId,
             priorityMovementGroups.Values,
@@ -802,7 +893,13 @@ public class AgentMovementHandler : IAgentMovementHandler
             (agentId, data) => RecordSentMovement(recipient, agentId, data));
         MovementSendResult movementResult;
         MovementSendResult mountResult;
-        if (recipient.SendMountMovementFirst)
+        bool sendMountMovementFirst = ShouldSendMountMovementFirst(
+            recipient,
+            movementGroups.Values,
+            legacyMovement,
+            mountGroups.Values,
+            legacyMountMovement);
+        if (sendMountMovementFirst)
         {
             mountResult = movementBatchSender.Send(
                 controllerId,
@@ -844,6 +941,55 @@ public class AgentMovementHandler : IAgentMovementHandler
                 movementResult.DeferredCount +
                 mountResult.DeferredCount,
             GetMaximumDeferredAge(recipient));
+    }
+
+    private bool ShouldSendMountMovementFirst(
+        RecipientMovementState recipient,
+        IEnumerable<MovementBatch<AgentData>> movementBatches,
+        MovementBatch<AgentData> legacyMovement,
+        IEnumerable<MovementBatch<AgentMountData>> mountBatches,
+        MovementBatch<AgentMountData> legacyMountMovement)
+    {
+        bool hasMovement = TryGetBestPriority(
+            movementBatches,
+            legacyMovement,
+            out MovementPriorityKey movementPriority);
+        bool hasMountMovement = TryGetBestPriority(
+            mountBatches,
+            legacyMountMovement,
+            out MovementPriorityKey mountPriority);
+        if (!hasMountMovement) return false;
+        if (!hasMovement) return true;
+
+        int comparison = movementPriorityScheduler.Compare(mountPriority, movementPriority);
+        return comparison < 0 || (comparison == 0 && recipient.SendMountMovementFirst);
+    }
+
+    private bool TryGetBestPriority<T>(
+        IEnumerable<MovementBatch<T>> batches,
+        MovementBatch<T> legacyBatch,
+        out MovementPriorityKey priority)
+    {
+        bool found = false;
+        priority = default;
+        foreach (MovementBatch<T> batch in batches)
+        {
+            if (!batch.HasPriorities) continue;
+            if (!found || movementPriorityScheduler.Compare(batch.Priorities[0], priority) < 0)
+            {
+                priority = batch.Priorities[0];
+                found = true;
+            }
+        }
+
+        if (legacyBatch?.HasPriorities == true &&
+            (!found || movementPriorityScheduler.Compare(legacyBatch.Priorities[0], priority) < 0))
+        {
+            priority = legacyBatch.Priorities[0];
+            found = true;
+        }
+
+        return found;
     }
 
     private static int CountActiveMissionAgents()
@@ -1333,6 +1479,28 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
 
         batch.Add(agentInfo, data);
+    }
+
+    private static void AddToBatch<T>(
+        Dictionary<string, MovementBatch<T>> compactBatches,
+        ref MovementBatch<T> legacyBatch,
+        CoopAgentInfo agentInfo,
+        T data,
+        MovementPriorityKey priority,
+        bool isPriority = false)
+    {
+        MovementBatch<T> batch;
+        if (agentInfo.MovementId == 0)
+        {
+            batch = legacyBatch ??= new MovementBatch<T>(null, isPriority);
+        }
+        else if (!compactBatches.TryGetValue(agentInfo.MovementScopeId, out batch))
+        {
+            batch = new MovementBatch<T>(agentInfo.MovementScopeId, isPriority);
+            compactBatches[agentInfo.MovementScopeId] = batch;
+        }
+
+        batch.Add(agentInfo, data, priority);
     }
 
     private void SendEquipment(IEnumerable<MovementBatch<AgentEquipmentData>> batches)

@@ -6,10 +6,10 @@ namespace GameInterface.Configuration;
 
 /// <summary>
 /// THE mod-config.json schema: one explicit property per key — the class IS the
-/// schema, adding a property adds the key. Gameplay/mod settings only; how the
-/// server process runs (ports, saves, passwords) is the dedicated server's
-/// server-config.json and never appears here. Nullable properties mean "absent =
-/// leave the loaded world's value alone". Keys the file has that the schema
+/// schema, adding a property adds the key. Gameplay/mod settings and local mission
+/// network capacity only; process settings (ports, saves, passwords) live in the
+/// dedicated server's server-config.json. Nullable means the owning consumer uses
+/// its documented default or leaves the loaded world's value alone. Keys the file has that the schema
 /// doesn't land in <see cref="UnknownKeys"/> for the load warning.
 /// </summary>
 public sealed class ModConfigData
@@ -19,6 +19,9 @@ public sealed class ModConfigData
     public DifficultyConfigData Difficulty { get; set; } = new DifficultyConfigData();
 
     public ModOptionsData ModOptions { get; set; } = new ModOptionsData();
+
+    /// <summary>Local client network capacity. Dedicated servers do not originate mission movement.</summary>
+    public NetworkConfigData Network { get; set; } = new NetworkConfigData();
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
@@ -62,6 +65,19 @@ public enum DifficultyLevel
     VeryEasy,
     Easy,
     Realistic,
+}
+
+/// <summary>Local mission movement bandwidth limits for this game process.</summary>
+public sealed class NetworkConfigData
+{
+    /// <summary>Total movement payload this client may send per second.</summary>
+    public double? MovementOutgoingMiBPerSecond { get; set; }
+
+    /// <summary>Total movement payload this client asks all mission peers to send per second.</summary>
+    public double? MovementIncomingMiBPerSecond { get; set; }
+
+    [JsonExtensionData]
+    public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
 
 public sealed class ModOptionsData

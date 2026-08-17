@@ -58,6 +58,10 @@ public sealed class MovementRateSnapshot
     public int BulkPollsPerSecond { get; }
     public int PriorityOnlyPollsPerSecond { get; }
     public string Reason { get; }
+    public int ConfiguredOutgoingBytesPerSecond { get; }
+    public int ConfiguredIncomingBytesPerSecond { get; }
+    public int AdvertisedIncomingBytesPerSender { get; }
+    public Guid FocusAgentId { get; }
 
     internal MovementRateSnapshot(
         MovementCadenceProfile profile,
@@ -83,7 +87,11 @@ public sealed class MovementRateSnapshot
         float maximumDeferredAgeSeconds,
         int bulkPollsPerSecond,
         int priorityOnlyPollsPerSecond,
-        string reason)
+        string reason,
+        int configuredOutgoingBytesPerSecond,
+        int configuredIncomingBytesPerSecond,
+        int advertisedIncomingBytesPerSender,
+        Guid focusAgentId)
     {
         Profile = profile;
         BulkHz = bulkHz;
@@ -109,6 +117,10 @@ public sealed class MovementRateSnapshot
         BulkPollsPerSecond = bulkPollsPerSecond;
         PriorityOnlyPollsPerSecond = priorityOnlyPollsPerSecond;
         Reason = reason;
+        ConfiguredOutgoingBytesPerSecond = configuredOutgoingBytesPerSecond;
+        ConfiguredIncomingBytesPerSecond = configuredIncomingBytesPerSecond;
+        AdvertisedIncomingBytesPerSender = advertisedIncomingBytesPerSender;
+        FocusAgentId = focusAgentId;
     }
 }
 
@@ -127,6 +139,9 @@ public interface IMovementRateController : IDisposable
         double applyMilliseconds,
         int snapshots);
     int GetReceiverCapHz(string controllerId);
+    int GetReceiverIncomingBytesPerSecond(string controllerId);
+    bool TryGetReceiverFocusAgentId(string controllerId, out Guid agentId);
+    void SetLocalFocusAgent(Guid? agentId);
     bool TrySetForcedBulkHz(int? hz, out string error);
     bool TrySetForcedReceiverCapHz(int? hz, out string error);
 }
@@ -154,6 +169,7 @@ public sealed class MovementRateController : IMovementRateController
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMissionContext missionContext;
+    private readonly IMovementNetworkSettings networkSettings;
     private readonly Func<long> timestampProvider;
     private readonly long timestampFrequency;
     private readonly Func<int> frameLimitProvider;
@@ -187,6 +203,7 @@ public sealed class MovementRateController : IMovementRateController
     private string localReason = "location-fixed";
     private string reason = "location-fixed";
     private long receiverCapSequence;
+    private Guid focusAgentId;
     private MovementReceiveHealth reportedReceiveHealth = MovementReceiveHealth.Healthy;
 
     internal MovementReceiveHealth ReportedReceiveHealth => reportedReceiveHealth;
@@ -218,6 +235,8 @@ public sealed class MovementRateController : IMovementRateController
     private sealed class ReceiverCapEntry
     {
         public int MaximumBulkHz;
+        public int MaximumIncomingBytesPerSecond;
+        public Guid FocusAgentId;
         public long Sequence;
         public long ReceivedTimestamp;
     }
@@ -234,6 +253,25 @@ public sealed class MovementRateController : IMovementRateController
         IBattleNetwork network,
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
+        IMissionContext missionContext,
+        IMovementNetworkSettings networkSettings)
+        : this(
+            network,
+            messageBroker,
+            controllerIdProvider,
+            missionContext,
+            Stopwatch.GetTimestamp,
+            Stopwatch.Frequency,
+            ReadFrameLimitHz,
+            enableHeartbeat: true,
+            networkSettings: networkSettings)
+    {
+    }
+
+    internal MovementRateController(
+        IBattleNetwork network,
+        IMessageBroker messageBroker,
+        IControllerIdProvider controllerIdProvider,
         IMissionContext missionContext)
         : this(
             network,
@@ -243,7 +281,8 @@ public sealed class MovementRateController : IMovementRateController
             Stopwatch.GetTimestamp,
             Stopwatch.Frequency,
             ReadFrameLimitHz,
-            enableHeartbeat: true)
+            enableHeartbeat: true,
+            networkSettings: new MovementNetworkSettings(1d, 1d))
     {
     }
 
@@ -255,7 +294,8 @@ public sealed class MovementRateController : IMovementRateController
         Func<long> timestampProvider,
         long timestampFrequency,
         Func<int> frameLimitProvider,
-        bool enableHeartbeat)
+        bool enableHeartbeat,
+        IMovementNetworkSettings networkSettings = null)
     {
         if (network == null) throw new ArgumentNullException(nameof(network));
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
@@ -268,6 +308,7 @@ public sealed class MovementRateController : IMovementRateController
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.missionContext = missionContext;
+        this.networkSettings = networkSettings ?? new MovementNetworkSettings(1d, 1d);
         this.timestampProvider = timestampProvider;
         this.timestampFrequency = timestampFrequency;
         this.frameLimitProvider = frameLimitProvider;
@@ -438,6 +479,59 @@ public sealed class MovementRateController : IMovementRateController
                 ? receiverCap.MaximumBulkHz
                 : RatesAscending[RatesAscending.Length - 1];
         }
+    }
+
+    public int GetReceiverIncomingBytesPerSecond(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId))
+            return MovementNetworkSettings.BytesPerMiB;
+
+        lock (gate)
+        {
+            if (disposed) return MovementNetworkSettings.BytesPerMiB;
+
+            PruneExpiredReceiverCaps();
+            return receiverCaps.TryGetValue(controllerId, out ReceiverCapEntry receiverCap)
+                ? Math.Max(1, receiverCap.MaximumIncomingBytesPerSecond)
+                : MovementNetworkSettings.BytesPerMiB;
+        }
+    }
+
+    public bool TryGetReceiverFocusAgentId(string controllerId, out Guid agentId)
+    {
+        lock (gate)
+        {
+            if (!disposed)
+            {
+                PruneExpiredReceiverCaps();
+                if (receiverCaps.TryGetValue(controllerId, out ReceiverCapEntry receiverCap) &&
+                    receiverCap.FocusAgentId != Guid.Empty)
+                {
+                    agentId = receiverCap.FocusAgentId;
+                    return true;
+                }
+            }
+        }
+
+        agentId = Guid.Empty;
+        return false;
+    }
+
+    public void SetLocalFocusAgent(Guid? agentId)
+    {
+        NetworkMovementReceiverCap? advertisement;
+        lock (gate)
+        {
+            if (disposed) return;
+            Guid next = agentId.GetValueOrDefault();
+            if (focusAgentId == next) return;
+
+            focusAgentId = next;
+            advertisement = CreateReceiverCapAdvertisement();
+        }
+
+        if (advertisement.HasValue)
+            network.SendAll(advertisement.Value);
     }
 
     public void ReportReceive(
@@ -802,11 +896,21 @@ public sealed class MovementRateController : IMovementRateController
             lastMaximumDeferredAgeSeconds,
             lastBulkPollsPerSecond,
             lastPriorityOnlyPollsPerSecond,
-            reason);
+            reason,
+            networkSettings.OutgoingBytesPerSecond,
+            networkSettings.IncomingBytesPerSecond,
+            CalculateIncomingBytesPerSender(),
+            focusAgentId);
     }
 
     private int GetControllerCount() =>
         1 + (missionContext?.ControllersInMission.Count ?? 0);
+
+    private int CalculateIncomingBytesPerSender()
+    {
+        int senders = Math.Max(1, missionContext?.ControllersInMission.Count ?? 0);
+        return Math.Max(1, networkSettings.IncomingBytesPerSecond / senders);
+    }
 
     private static int CalculateSenderCeiling(
         float framesPerSecond,
@@ -917,18 +1021,15 @@ public sealed class MovementRateController : IMovementRateController
 
     private NetworkMovementReceiverCap? CreateReceiverCapAdvertisement()
     {
-        if (!configured ||
-            (profile != MovementCadenceProfile.Battle &&
-                profile != MovementCadenceProfile.Tournament))
-        {
-            return null;
-        }
+        if (!configured) return null;
 
         receiverCapSequence++;
         return new NetworkMovementReceiverCap(
             controllerIdProvider.ControllerId,
             advertisedReceiverCapHz,
-            receiverCapSequence);
+            receiverCapSequence,
+            CalculateIncomingBytesPerSender(),
+            focusAgentId);
     }
 
     internal void PublishReceiverCapHeartbeat()
@@ -973,6 +1074,10 @@ public sealed class MovementRateController : IMovementRateController
             receiverCaps[message.ControllerId] = new ReceiverCapEntry
             {
                 MaximumBulkHz = NormalizeRate(message.MaximumBulkHz),
+                MaximumIncomingBytesPerSecond = Math.Max(
+                    1,
+                    message.MaximumIncomingMovementBytesPerSecondPerSender),
+                FocusAgentId = message.FocusAgentId,
                 Sequence = message.Sequence,
                 ReceivedTimestamp = timestampProvider(),
             };
@@ -991,7 +1096,10 @@ public sealed class MovementRateController : IMovementRateController
         }
 
         if (advertisement.HasValue)
+        {
             network.Send(payload.What.ControllerId, advertisement.Value);
+            network.SendAllBut(payload.What.ControllerId, advertisement.Value);
+        }
     }
 
     private void Handle_PeerLeft(MessagePayload<MissionPeerLeft> payload) =>
@@ -1003,11 +1111,17 @@ public sealed class MovementRateController : IMovementRateController
     private void RemoveReceiverCap(string controllerId)
     {
         if (string.IsNullOrEmpty(controllerId)) return;
+
+        NetworkMovementReceiverCap? advertisement;
         lock (gate)
         {
             receiverCaps.Remove(controllerId);
             RecomputeEffectiveRate();
+            advertisement = CreateReceiverCapAdvertisement();
         }
+
+        if (advertisement.HasValue)
+            network.SendAll(advertisement.Value);
     }
 
     private void ResetWindow()
@@ -1035,7 +1149,9 @@ public sealed class MovementRateController : IMovementRateController
             "receiverCapHz={ReceiverCapHz} peerCapHz={PeerCapHz} peerCapSource={PeerCapSource} " +
             "agents={ActiveAgents} localAgents={LocalAgents} controllers={Controllers} fps={Fps:0.0} " +
             "senderMsPerSecond={SenderMs:0.00} receiverApplyMsPerSecond={ReceiverMs:0.00} " +
-            "receiverQueueMs={QueueMs:0.00} wireBytesPerSecond={WireBytes} deferred={Deferred} " +
+            "receiverQueueMs={QueueMs:0.00} wireBytesPerSecond={WireBytes} " +
+            "outgoingBudget={OutgoingBudget} incomingBudget={IncomingBudget} incomingPerSender={IncomingPerSender} " +
+            "deferred={Deferred} " +
             "deferredAge={DeferredAge:0.000} bulkPolls={BulkPolls} priorityOnlyPolls={PriorityPolls} reason={Reason}",
             snapshot.Profile,
             snapshot.BulkHz,
@@ -1054,6 +1170,9 @@ public sealed class MovementRateController : IMovementRateController
             snapshot.ReceiverApplyMillisecondsPerSecond,
             snapshot.MaximumReceiverQueueMilliseconds,
             snapshot.WireBytesPerSecond,
+            snapshot.ConfiguredOutgoingBytesPerSecond,
+            snapshot.ConfiguredIncomingBytesPerSecond,
+            snapshot.AdvertisedIncomingBytesPerSender,
             snapshot.MaximumDeferredSnapshots,
             snapshot.MaximumDeferredAgeSeconds,
             snapshot.BulkPollsPerSecond,

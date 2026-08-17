@@ -150,6 +150,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IPuppetMountStateRepairer>(),
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 rateController,
+                peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>());
             handler.Configure(MovementCadenceProfile.Battle);
 
@@ -238,6 +239,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IPuppetMountStateRepairer>(),
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 rateController.Object,
+                peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>());
 
             Agent locallyControlledAgent = SpawnRider(mock);
@@ -318,6 +320,79 @@ public class MovementTrafficTests : MissionTestEnvironment
             Assert.NotNull(mountData);
             Assert.Equal(2f, mountData.MountPosition.X);
             Assert.Empty(network.NetworkSentPackets.GetPackets<MountMovementPacket>());
+        });
+    }
+
+    [Fact]
+    public void PollMovement_RotatesRecipientsWhenSharedBudgetOnlyFitsOneRoute()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "owner");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            broker.Publish(this, new NetworkMissionPeerEntered("first", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("second", "battle"));
+
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            component.AgentMovementHandler.Dispose();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var rateController = new Mock<IMovementRateController>();
+            rateController
+                .Setup(value => value.AdvanceFrame(It.IsAny<float>()))
+                .Returns(new MovementCadence(40, 40));
+            rateController
+                .Setup(value => value.GetReceiverCapHz(It.IsAny<string>()))
+                .Returns(40);
+            rateController
+                .Setup(value => value.GetReceiverIncomingBytesPerSecond(It.IsAny<string>()))
+                .Returns(1024 * 1024);
+            var budgets = new Queue<IMovementTrafficBudget>(new[]
+            {
+                new MovementTrafficBudget(10, 10),
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
+            });
+            var priorityScheduler = new MovementPriorityScheduler();
+            var sender = new MovementBatchSender(
+                network,
+                new FixedSizeMovementPacketCompressor(10),
+                new QueueMovementTrafficBudgetFactory(budgets),
+                priorityScheduler,
+                new MovementNetworkSettings(
+                    10d / MovementNetworkSettings.BytesPerMiB,
+                    1d));
+            using var handler = new AgentMovementHandler(
+                network,
+                peer.Resolve<IPacketManager>(),
+                broker,
+                registry,
+                peer.Resolve<IControllerIdProvider>(),
+                peer.Resolve<IAgentEquipmentApplier>(),
+                sender,
+                peer.Resolve<IPuppetMountStateRepairer>(),
+                peer.Resolve<IAgentVisualActionAccessor>(),
+                rateController.Object,
+                priorityScheduler,
+                peer.Resolve<IMissionContext>());
+            Assert.True(registry.TryRegisterAgent(
+                "owner", Guid.NewGuid(), 1, SpawnRider(mock)));
+
+            handler.PollMovement(0f);
+            SerializedPacketSend firstSend = Assert.Single(network.SerializedPacketSends);
+            network.SerializedPacketSends.Clear();
+            network.DirectPacketSends.Clear();
+
+            handler.PollMovement(1f);
+            SerializedPacketSend secondSend = Assert.Single(network.SerializedPacketSends);
+
+            Assert.NotEqual(firstSend.ControllerId, secondSend.ControllerId);
+            Assert.Contains(firstSend.ControllerId, new[] { "first", "second" });
+            Assert.Contains(secondSend.ControllerId, new[] { "first", "second" });
         });
     }
 
@@ -630,7 +705,9 @@ public class MovementTrafficTests : MissionTestEnvironment
             ushort[] sentMounts = packets
                 .SelectMany(packet => packet.MountIds)
                 .ToArray();
-            Assert.Equal(movementIds, sentMounts);
+            Assert.Equal(movementIds.Count, sentMounts.Length);
+            Assert.Equal(sentMounts.Length, sentMounts.Distinct().Count());
+            Assert.All(movementIds, id => Assert.Contains(id, sentMounts));
         });
     }
 
@@ -665,6 +742,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IPuppetMountStateRepairer>(),
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 peer.Resolve<IMovementRateController>(),
+                peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>());
             network.MaxUnreliablePayloadBytes = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
                 serializer,
@@ -781,7 +859,10 @@ public class MovementTrafficTests : MissionTestEnvironment
             Assert.True(packets.Length < (agentIds.Count + 2) / 3,
                 $"Expected fewer than three-agent batching's {(agentIds.Count + 2) / 3} packets, " +
                 $"got {packets.Length}");
-            Assert.Equal(agentIds, packets.SelectMany(packet => packet.AgentGuids));
+            Guid[] sentAgentIds = packets.SelectMany(packet => packet.AgentGuids).ToArray();
+            Assert.Equal(agentIds.Count, sentAgentIds.Length);
+            Assert.Equal(sentAgentIds.Length, sentAgentIds.Distinct().Count());
+            Assert.All(agentIds, id => Assert.Contains(id, sentAgentIds));
 
             MovementPacket mountedPacket = Assert.Single(
                 packets,
@@ -1294,6 +1375,46 @@ public class MovementTrafficTests : MissionTestEnvironment
         return new string(characters);
     }
 
+    private sealed class QueueMovementTrafficBudgetFactory : IMovementTrafficBudgetFactory
+    {
+        private readonly Queue<IMovementTrafficBudget> budgets;
+
+        public QueueMovementTrafficBudgetFactory(Queue<IMovementTrafficBudget> budgets)
+        {
+            this.budgets = budgets;
+        }
+
+        public IMovementTrafficBudget Create(int bytesPerSecond, int burstBytes) =>
+            budgets.Dequeue();
+    }
+
+    private sealed class FixedSizeMovementPacketCompressor : IMovementPacketCompressor
+    {
+        private readonly int bytesPerSnapshot;
+
+        public FixedSizeMovementPacketCompressor(int bytesPerSnapshot)
+        {
+            this.bytesPerSnapshot = bytesPerSnapshot;
+        }
+
+        public byte[] Serialize(IPacket packet)
+        {
+            int snapshots = packet switch
+            {
+                MovementPacket movement => movement.Agents?.Length ?? 0,
+                MountMovementPacket movement => movement.Mounts?.Length ?? 0,
+                _ => 1,
+            };
+            return new byte[Math.Max(1, snapshots) * bytesPerSnapshot];
+        }
+
+        public bool TryRestore(IPacket packet, out IPacket restored)
+        {
+            restored = packet;
+            return true;
+        }
+    }
+
     private sealed class CountingMovementPacketCompressor : IMovementPacketCompressor
     {
         private readonly IMovementPacketCompressor inner;
@@ -1367,6 +1488,15 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         public int GetReceiverCapHz(string controllerId) =>
             inner.GetReceiverCapHz(controllerId);
+
+        public int GetReceiverIncomingBytesPerSecond(string controllerId) =>
+            inner.GetReceiverIncomingBytesPerSecond(controllerId);
+
+        public bool TryGetReceiverFocusAgentId(string controllerId, out Guid agentId) =>
+            inner.TryGetReceiverFocusAgentId(controllerId, out agentId);
+
+        public void SetLocalFocusAgent(Guid? agentId) =>
+            inner.SetLocalFocusAgent(agentId);
 
         public bool TrySetForcedBulkHz(int? hz, out string error) =>
             inner.TrySetForcedBulkHz(hz, out error);

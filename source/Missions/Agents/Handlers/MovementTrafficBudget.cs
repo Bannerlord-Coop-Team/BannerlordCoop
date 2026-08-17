@@ -7,6 +7,9 @@ namespace Missions.Agents.Handlers;
 public interface IMovementTrafficBudget
 {
     int AvailableBytes { get; }
+    int BytesPerSecond { get; }
+    int BurstBytes { get; }
+    void Configure(int bytesPerSecond, int burstBytes);
     void Advance(float elapsedSeconds);
     bool TrySpend(int bytes);
     MovementTrafficFrame ReportFrame(int deferredSnapshots, float maximumDeferredAgeSeconds);
@@ -46,8 +49,8 @@ public sealed class MovementTrafficBudget : IMovementTrafficBudget
     internal const int DefaultBurstBytes = 128 * 1024;
     private const float ReportIntervalSeconds = 1f;
 
-    private readonly int bytesPerSecond;
-    private readonly int burstBytes;
+    private int bytesPerSecond;
+    private int burstBytes;
     private double availableBytes;
     private float reportElapsed;
     private long sentBytes;
@@ -68,6 +71,19 @@ public sealed class MovementTrafficBudget : IMovementTrafficBudget
     }
 
     public int AvailableBytes => (int)Math.Floor(availableBytes);
+    public int BytesPerSecond => bytesPerSecond;
+    public int BurstBytes => burstBytes;
+
+    public void Configure(int bytesPerSecond, int burstBytes)
+    {
+        if (bytesPerSecond <= 0) throw new ArgumentOutOfRangeException(nameof(bytesPerSecond));
+        if (burstBytes <= 0) throw new ArgumentOutOfRangeException(nameof(burstBytes));
+        if (this.bytesPerSecond == bytesPerSecond && this.burstBytes == burstBytes) return;
+
+        this.bytesPerSecond = bytesPerSecond;
+        this.burstBytes = burstBytes;
+        availableBytes = Math.Min(availableBytes, burstBytes);
+    }
 
     public void Advance(float elapsedSeconds)
     {
