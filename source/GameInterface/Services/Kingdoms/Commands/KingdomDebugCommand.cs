@@ -969,8 +969,17 @@ public class KingdomDebugCommand
         if (!(ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen))
         {
             string topScreen = ScreenManager.TopScreen?.GetType().Name ?? "none";
+            bool mapActionEnabled = false;
+            string disabledReasonText = "unavailable";
+            if (ScreenManager.TopScreen is MapScreen)
+            {
+                mapActionEnabled = CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(
+                    out TextObject disabledReason);
+                disabledReasonText = mapActionEnabled ? "none" : disabledReason.ToString();
+            }
             return $"screenActive=False inquiryActive={InformationManager.IsAnyInquiryActive()} " +
-                   $"topScreen={topScreen} currentDecision=none.";
+                   $"topScreen={topScreen} currentDecision=none " +
+                   $"mapActionEnabled={mapActionEnabled} disabledReason={disabledReasonText}.";
         }
 
         DecisionItemBaseVM decisionItem = kingdomScreen.DataSource?.Decision?.CurrentDecision;

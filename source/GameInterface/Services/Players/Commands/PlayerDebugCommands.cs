@@ -2,9 +2,12 @@
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
+using GameInterface.Utils.Commands;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -76,6 +79,39 @@ internal class PlayerDebugCommands
             $"mapEvent={mapEventId}|" +
             $"visual={hasVisual}";
     }
+
+#if DEBUG || DEBUGAUTOCONNECT
+    [CommandLineArgumentFunction("release_captive_player_fixture", "coop.debug.players")]
+    public static string ReleaseCaptivePlayerFixture(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Command can only be run on the server.";
+        if (args.Count != 1)
+            return "Usage: coop.debug.players.release_captive_player_fixture <controllerId>";
+        if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) == false)
+            return $"Unable to get {nameof(IPlayerManager)}";
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            return $"Unable to get {nameof(IObjectManager)}";
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+            return $"Controller {args[0]} is not registered.";
+        if (!objectManager.TryGetObject(player.HeroId, out Hero hero))
+            return $"Hero {player.HeroId} is not resolved.";
+        if (!hero.IsPrisoner)
+            return $"Player {player.ControllerId} is already free.";
+
+        try
+        {
+            EndCaptivityAction.ApplyByReleasedAfterBattle(hero);
+            return $"Released player {player.ControllerId} through EndCaptivityAction.ApplyByReleasedAfterBattle.";
+        }
+        catch (Exception ex)
+        {
+            return CommandHelpers.FormatException(
+                $"Release captive player '{player.ControllerId}'",
+                ex);
+        }
+    }
+#endif
 
     /// <summary>
     /// Reports one of a player's controlled ids: whether it resolves and whether it is in the
