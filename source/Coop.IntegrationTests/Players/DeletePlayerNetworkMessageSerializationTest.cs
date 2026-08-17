@@ -1,3 +1,5 @@
+﻿using Coop.Core.Client.Services.Heroes.Messages;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using ProtoBuf;
 
@@ -35,6 +37,23 @@ public class DeletePlayerNetworkMessageSerializationTest
 
         Assert.Equal("Controller_1", copy.ControllerId);
         Assert.Equal("Hero_Player", copy.HeroId);
+    }
+
+    [Fact]
+    public void NetworkPlayerCreationRolledBack_RoundTrips()
+    {
+        var player = new Player("Controller_1", "Hero_Player", "Party_Player", "Clan_Player", "Character_Player");
+        var registrationIds = new[] { "Hero_Player", "TroopRoster_MemberRoster_Player" };
+        var original = new NetworkPlayerCreationRolledBack(player, registrationIds);
+
+        var copy = RoundTrip(original);
+
+        Assert.Equal(player.ControllerId, copy.Player.ControllerId);
+        Assert.Equal(player.HeroId, copy.Player.HeroId);
+        Assert.Equal(player.MobilePartyId, copy.Player.MobilePartyId);
+        Assert.Equal(player.ClanId, copy.Player.ClanId);
+        Assert.Equal(player.CharacterObjectId, copy.Player.CharacterObjectId);
+        Assert.Equal(registrationIds, copy.RegistrationIds);
     }
 
     [Fact]

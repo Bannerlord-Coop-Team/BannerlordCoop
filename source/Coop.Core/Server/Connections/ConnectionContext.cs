@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
@@ -26,6 +27,7 @@ public class ConnectionContext
         IModuleInfoProvider moduleInfoProvider,
         IPlayerManager playerManager,
         IPlayerPartyRestorer playerPartyRestorer,
+        IPlayerCreationRollback playerCreationRollback,
         IObjectManager objectManager,
         IHeroInterface heroInterface,
         ICoopSessionProvider coopSessionProvider,
@@ -35,7 +37,8 @@ public class ConnectionContext
         IAttachmentIdMapper attachmentIdMapper,
         IExistingPlayerSender existingPlayerSender,
         IServerOptionsProvider serverOptionsProvider,
-        IJoinCampaignBaselineSender joinCampaignBaselineSender)
+        IJoinCampaignBaselineSender joinCampaignBaselineSender,
+        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -43,6 +46,7 @@ public class ConnectionContext
         ModuleInfoProvider = moduleInfoProvider;
         PlayerManager = playerManager;
         PlayerPartyRestorer = playerPartyRestorer;
+        PlayerCreationRollback = playerCreationRollback;
         ObjectManager = objectManager;
         HeroInterface = heroInterface;
         CoopSessionProvider = coopSessionProvider;
@@ -53,6 +57,7 @@ public class ConnectionContext
         ExistingPlayerSender = existingPlayerSender;
         ServerOptionsProvider = serverOptionsProvider;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
+        JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -61,6 +66,7 @@ public class ConnectionContext
     public IModuleInfoProvider ModuleInfoProvider { get; }
     public IPlayerManager PlayerManager { get; }
     public IPlayerPartyRestorer PlayerPartyRestorer { get; }
+    public IPlayerCreationRollback PlayerCreationRollback { get; }
     public IObjectManager ObjectManager { get; }
     public IHeroInterface HeroInterface { get; }
     public ICoopSessionProvider CoopSessionProvider { get; }
@@ -71,4 +77,5 @@ public class ConnectionContext
     public IExistingPlayerSender ExistingPlayerSender { get; }
     public IServerOptionsProvider ServerOptionsProvider { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
+    public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
 }
