@@ -14,4 +14,11 @@ internal class TownManagementViewPatches
     {
         Current = __instance;
     }
+
+    [HarmonyPatch(nameof(GauntletMenuTownManagementView.OnFinalize))]
+    [HarmonyPostfix]
+    public static void OnFinalizePostfix()
+    {
+        Current = null;
+    }
 }

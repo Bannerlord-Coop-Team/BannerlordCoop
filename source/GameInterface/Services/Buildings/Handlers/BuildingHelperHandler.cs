@@ -2,20 +2,16 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.Buildings.Messages;
 using GameInterface.Services.Buildings.Patches;
 using GameInterface.Services.ObjectManager;
 using Helpers;
-using SandBox.GauntletUI;
-using SandBox.GauntletUI.Menu;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Buildings.Handlers;
 
@@ -117,17 +113,16 @@ internal class BuildingHelperHandler : IHandler
                 {
                     if (!objectManager.TryGetObjectWithLogging<Building>(buildingId, out var currentBuilding)) continue;
 
+                    // Reject adding buildings to queue that are already max level
+                    if (currentBuilding.CurrentLevel == 3) continue;
+
                     buildings.Add(currentBuilding);
                 }
             }
 
             BuildingHelper.ChangeCurrentBuildingQueue(buildings, town);
 
-            // Reject new buildings in queue if they have already been constructed
-            foreach (var building in buildings)
-            {
-                BuildingHelper.CheckIfBuildingIsComplete(building);
-            }
+            messageBroker.Publish(this, new RefreshPlayerSettlementManagementVM(town));
         });
     }
 
@@ -186,10 +181,10 @@ internal class BuildingHelperHandler : IHandler
             // Client is in the settlement management screen but not looking at the updated town
             if (TownManagementViewPatches.Current._dataSource._settlement != town.Settlement) return;
 
+            TownManagementViewPatches.Current._dataSource._projectSelection?.Refresh();
+
             TownManagementViewPatches.Current._dataSource.RefreshCurrentDevelopment();
             TownManagementViewPatches.Current._dataSource.RefreshTownManagementStats();
-
-            TownManagementViewPatches.Current._dataSource._projectSelection?.Refresh();
         });
     }
 }
