@@ -26,11 +26,13 @@ using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Settlements;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -753,10 +755,20 @@ public class KingdomDebugCommand
             {
                 return "The Kingdom decision view model is unavailable.";
             }
+            bool mapActionEnabled = CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(
+                out TextObject disabledReason);
+            bool isPlayerParticipant = decision.IsPlayerParticipant;
+            bool shouldBeCancelled = decision.ShouldBeCancelled();
             openedDecisions.HandleDecision(decision);
-            if (openedDecisions._queryData?.AffirmativeAction == null || !InformationManager.IsAnyInquiryActive())
+            bool queryDataAvailable = openedDecisions._queryData?.AffirmativeAction != null;
+            bool inquiryActive = InformationManager.IsAnyInquiryActive();
+            if (!queryDataAvailable || !inquiryActive)
             {
-                return $"The real Kingdom decision inquiry did not open for {decision.GetType().Name}.";
+                string disabledReasonText = mapActionEnabled ? "none" : disabledReason.ToString();
+                return $"The real Kingdom decision inquiry did not open for {decision.GetType().Name}: " +
+                       $"mapActionEnabled={mapActionEnabled}, disabledReason={disabledReasonText}, " +
+                       $"isPlayerParticipant={isPlayerParticipant}, shouldBeCancelled={shouldBeCancelled}, " +
+                       $"queryData={queryDataAvailable}, inquiryActive={inquiryActive}.";
             }
 
             return $"Entered the real Kingdom decision screen for {decision.GetType().Name} " +
