@@ -1,7 +1,5 @@
 ﻿using Common;
 using HarmonyLib;
-using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Alliances;
@@ -12,17 +10,37 @@ internal class DisableAllianceCampaignBehavior
     [HarmonyPatch(nameof(AllianceCampaignBehavior.RegisterEvents))]
     static bool RegisterEventsPrefix() => true;
 
-    // Disable these methods on the client
-    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+    [HarmonyPatch(nameof(AllianceCampaignBehavior.DailyTickClan))]
+    [HarmonyPrefix]
+    private static bool DailyTickClanPrefix()
     {
-            AccessTools.Method(typeof(AllianceCampaignBehavior), nameof(AllianceCampaignBehavior.DailyTickClan)),
-            AccessTools.Method(typeof(AllianceCampaignBehavior), nameof(AllianceCampaignBehavior.OnWarDeclared)),
-            AccessTools.Method(typeof(AllianceCampaignBehavior), nameof(AllianceCampaignBehavior.OnMakePeace)),
-            AccessTools.Method(typeof(AllianceCampaignBehavior), nameof(AllianceCampaignBehavior.OnKingdomDestroyed)),
-            AccessTools.Method(typeof(AllianceCampaignBehavior), nameof(AllianceCampaignBehavior.OnGameLoadFinished))
-    };
+        return ModInformation.IsServer;
+    }
 
-    static bool Prefix()
+    [HarmonyPatch(nameof(AllianceCampaignBehavior.OnWarDeclared))]
+    [HarmonyPrefix]
+    private static bool OnWarDeclaredPrefix()
+    {
+        return ModInformation.IsServer;
+    }
+
+    [HarmonyPatch(nameof(AllianceCampaignBehavior.OnMakePeace))]
+    [HarmonyPrefix]
+    private static bool OnMakePeacePrefix()
+    {
+        return ModInformation.IsServer;
+    }
+
+    [HarmonyPatch(nameof(AllianceCampaignBehavior.OnKingdomDestroyed))]
+    [HarmonyPrefix]
+    private static bool OnKingdomDestroyedPrefix()
+    {
+        return ModInformation.IsServer;
+    }
+
+    [HarmonyPatch(nameof(AllianceCampaignBehavior.OnGameLoadFinished))]
+    [HarmonyPrefix]
+    private static bool OnGameLoadFinished()
     {
         return ModInformation.IsServer;
     }
