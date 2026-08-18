@@ -166,8 +166,8 @@ public class ClientModule : CommonModule
 
         var bridgeResolver = new NamedPipePeerIdentityResolver(bridgeName);
         var peerIdentityResolver = new FallbackAuthenticatedPeerIdentityResolver(
-            bridgeResolver,
-            runtime.PeerIdentityResolver);
+            runtime.PeerIdentityResolver,
+            bridgeResolver);
         return new PeerIdentityResolvingSessionProviderRuntime(
             runtime,
             peerIdentityResolver,

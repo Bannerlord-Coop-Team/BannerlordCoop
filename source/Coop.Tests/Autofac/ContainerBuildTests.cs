@@ -49,12 +49,13 @@ namespace Coop.Tests.Autofac
         }
 
         [Fact]
-        public void ServerRuntime_IdentityBridgePrecedesProviderResolver()
+        public void ServerRuntime_ProviderResolverPrecedesIdentityBridge()
         {
             string bridgeName = PeerIdentityBridgeName.Create();
             var hostEndpoint = new IPEndPoint(IPAddress.Loopback, 43143);
             var providerEndpoint = new IPEndPoint(IPAddress.Loopback, 43144);
             var hostIdentity = new PlatformIdentity("steam", "42");
+            var staleBridgeIdentity = new PlatformIdentity("steam", "43");
             var providerIdentity = new PlatformIdentity("gog", "84");
             var providerResolver = new Mock<IAuthenticatedPeerIdentityResolver>();
             providerResolver
@@ -68,13 +69,14 @@ namespace Coop.Tests.Autofac
             using (var publisher = new NamedPipePeerIdentityPublisher(bridgeName))
             {
                 Assert.True(publisher.TryRegister(hostEndpoint, hostIdentity));
+                Assert.True(publisher.TryRegister(providerEndpoint, staleBridgeIdentity));
                 Assert.True(runtime.PeerIdentityResolver.TryGetIdentity(hostEndpoint, out var resolvedHost));
                 Assert.Equal(hostIdentity, resolvedHost);
                 providerResolver.Verify(
                     resolver => resolver.TryGetIdentity(
                         hostEndpoint,
                         out It.Ref<PlatformIdentity>.IsAny),
-                    Times.Never);
+                    Times.Once);
 
                 Assert.True(runtime.PeerIdentityResolver.TryGetIdentity(
                     providerEndpoint,
