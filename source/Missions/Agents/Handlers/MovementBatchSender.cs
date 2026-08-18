@@ -90,6 +90,14 @@ public sealed class MovementBatch<T>
         Add(info, data);
         Priorities.Add(priority);
     }
+
+    public void Clear()
+    {
+        CompactIds.Clear();
+        CanonicalIds.Clear();
+        Data.Clear();
+        Priorities.Clear();
+    }
 }
 
 /// <summary>Selects and sends the largest movement batches that fit each recipient's route budget.</summary>
@@ -124,6 +132,18 @@ public sealed class MovementBatchSender : IMovementBatchSender
         public RecipientState(IMovementTrafficBudget trafficBudget)
         {
             TrafficBudget = trafficBudget;
+        }
+    }
+
+    /// <summary>Tracks progress through one reusable priority batch without copying its unsent tail.</summary>
+    private sealed class PrioritizedBatchCursor<T>
+    {
+        public MovementBatch<T> Batch { get; }
+        public int StartIndex { get; set; }
+
+        public PrioritizedBatchCursor(MovementBatch<T> batch)
+        {
+            Batch = batch;
         }
     }
 
@@ -256,12 +276,15 @@ public sealed class MovementBatchSender : IMovementBatchSender
             totalSnapshots += batch.Data.Count;
 
         int sentSnapshots = 0;
-        var pending = new List<MovementBatch<T>>(batches);
+        var pending = new List<PrioritizedBatchCursor<T>>(batches.Count);
+        foreach (MovementBatch<T> batch in batches)
+            pending.Add(new PrioritizedBatchCursor<T>(batch));
         var probedScopes = new HashSet<string>(StringComparer.Ordinal);
         while (pending.Count > 0)
         {
             pending.Sort((left, right) => CompareBatchPriority(left, right));
-            MovementBatch<T> batch = pending[0];
+            PrioritizedBatchCursor<T> cursor = pending[0];
+            MovementBatch<T> batch = cursor.Batch;
             MovementSendResult result = SendBatch(
                 controllerId,
                 recipient,
@@ -270,14 +293,14 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 createPacket,
                 onSent,
                 maximumPackets: 1,
-                allowProbeForGrowth: probedScopes.Add(batch.IdentityScopeId));
+                allowProbeForGrowth: probedScopes.Add(batch.IdentityScopeId),
+                startOffset: cursor.StartIndex);
             if (result.ProcessedCount <= 0) break;
 
             sentSnapshots += result.SentCount;
-            if (result.ProcessedCount >= batch.Data.Count)
+            cursor.StartIndex += result.ProcessedCount;
+            if (cursor.StartIndex >= batch.Data.Count)
                 pending.RemoveAt(0);
-            else
-                pending[0] = Slice(batch, result.ProcessedCount);
         }
 
         return new MovementSendResult(
@@ -338,7 +361,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
         Func<string, ushort[], Guid[], T[], IPacket> createPacket,
         Action<Guid, T> onSent,
         int maximumPackets = int.MaxValue,
-        bool allowProbeForGrowth = true)
+        bool allowProbeForGrowth = true,
+        int startOffset = 0)
     {
         if (batch == null) return new MovementSendResult();
         if (batch.Data.Count == 0) return new MovementSendResult();
@@ -355,8 +379,6 @@ public sealed class MovementBatchSender : IMovementBatchSender
             : recipient.SendOffsets.TryGetValue(fairnessKey, out int previousOffset)
                 ? previousOffset % batch.Data.Count
                 : 0;
-        MovementBatch<T> orderedBatch = Rotate(batch, offset);
-
         var fallbackKey = (typeof(T), batch.IdentityScopeId);
         MovementIdFormat idFormat =
             batch.IdentityScopeId == null || recipient.CanonicalIdFallbacks.Contains(fallbackKey)
@@ -367,7 +389,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
         int processedCount = 0;
         int sentPackets = 0;
 
-        for (int start = 0; start < orderedBatch.Data.Count && sentPackets < maximumPackets;)
+        for (int start = startOffset;
+            start < batch.Data.Count && sentPackets < maximumPackets;)
         {
             int availablePayloadBytes = Math.Min(
                 maxPayloadBytes,
@@ -376,7 +399,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
                     recipient.TrafficBudget.AvailableBytes));
             if (availablePayloadBytes <= 0) break;
 
-            int remaining = orderedBatch.Data.Count - start;
+            int remaining = batch.Data.Count - start;
             var preferenceKey = (typeof(T), batch.IdentityScopeId, idFormat);
             int preferredCount = recipient.PreferredBatchSizes.TryGetValue(
                 preferenceKey, out int previousSafeCount)
@@ -384,7 +407,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 : InitialBatchSize;
 
             SerializedMovementBatch candidate = FindLargestFittingBatch(
-                orderedBatch,
+                batch,
+                offset,
                 start,
                 preferredCount,
                 probeForGrowth,
@@ -402,7 +426,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
             if (!candidate.Fits(availablePayloadBytes) && idFormat == MovementIdFormat.Compact)
             {
                 SerializedMovementBatch canonicalCandidate = FindLargestFittingBatch(
-                    orderedBatch,
+                    batch,
+                    offset,
                     start,
                     preferredCount,
                     probeForGrowth,
@@ -425,7 +450,10 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 else
                 {
                     LogOversizedCompactSnapshot(
-                        orderedBatch.CanonicalIds[start],
+                        GetCircular(
+                            batch.CanonicalIds,
+                            offset,
+                            start),
                         candidate,
                         canonicalCandidate,
                         availablePayloadBytes);
@@ -438,7 +466,10 @@ public sealed class MovementBatchSender : IMovementBatchSender
             if (!candidate.Fits(availablePayloadBytes))
             {
                 LogOversizedCanonicalSnapshot(
-                    orderedBatch.CanonicalIds[start],
+                    GetCircular(
+                        batch.CanonicalIds,
+                        offset,
+                        start),
                     candidate,
                     availablePayloadBytes);
                 start++;
@@ -452,8 +483,14 @@ public sealed class MovementBatchSender : IMovementBatchSender
             client.Send(controllerId, candidate.Packet, candidate.Payload);
             for (int i = 0; i < candidate.Count; i++)
                 onSent?.Invoke(
-                    orderedBatch.CanonicalIds[start + i],
-                    orderedBatch.Data[start + i]);
+                    GetCircular(
+                        batch.CanonicalIds,
+                        offset,
+                        start + i),
+                    GetCircular(
+                        batch.Data,
+                        offset,
+                        start + i));
 
             if (availablePayloadBytes == maxPayloadBytes)
                 RememberPreferredBatchSize(
@@ -474,23 +511,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
         return new MovementSendResult(
             sentCount,
-            Math.Max(0, batch.Data.Count - sentCount),
+            Math.Max(0, batch.Data.Count - startOffset - sentCount),
             processedCount);
-    }
-
-    private static MovementBatch<T> Slice<T>(MovementBatch<T> batch, int start)
-    {
-        var slice = new MovementBatch<T>(batch.IdentityScopeId, batch.IsPriority);
-        for (int i = start; i < batch.Data.Count; i++)
-        {
-            slice.CanonicalIds.Add(batch.CanonicalIds[i]);
-            if (batch.IdentityScopeId != null)
-                slice.CompactIds.Add(batch.CompactIds[i]);
-            slice.Data.Add(batch.Data[i]);
-            if (batch.HasPriorities)
-                slice.Priorities.Add(batch.Priorities[i]);
-        }
-        return slice;
     }
 
     private MovementBatch<T> OrderByPriority<T>(MovementBatch<T> batch)
@@ -525,29 +547,20 @@ public sealed class MovementBatchSender : IMovementBatchSender
         return ordered;
     }
 
-    private static MovementBatch<T> Rotate<T>(MovementBatch<T> batch, int offset)
-    {
-        if (offset == 0) return batch;
-
-        var rotated = new MovementBatch<T>(batch.IdentityScopeId, batch.IsPriority);
-        for (int i = 0; i < batch.Data.Count; i++)
-        {
-            int source = (offset + i) % batch.Data.Count;
-            rotated.CanonicalIds.Add(batch.CanonicalIds[source]);
-            if (batch.IdentityScopeId != null)
-                rotated.CompactIds.Add(batch.CompactIds[source]);
-            rotated.Data.Add(batch.Data[source]);
-            if (batch.HasPriorities)
-                rotated.Priorities.Add(batch.Priorities[source]);
-        }
-        return rotated;
-    }
-
     private int CompareBatchPriority<T>(MovementBatch<T> left, MovementBatch<T> right)
     {
         if (!left.HasPriorities) return right.HasPriorities ? 1 : 0;
         if (!right.HasPriorities) return -1;
         return priorityScheduler.Compare(left.Priorities[0], right.Priorities[0]);
+    }
+
+    private int CompareBatchPriority<T>(
+        PrioritizedBatchCursor<T> left,
+        PrioritizedBatchCursor<T> right)
+    {
+        return priorityScheduler.Compare(
+            left.Batch.Priorities[left.StartIndex],
+            right.Batch.Priorities[right.StartIndex]);
     }
 
     private static int CalculateBurstBytes(int bytesPerSecond, int maxPayloadBytes)
@@ -614,6 +627,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
     private SerializedMovementBatch FindLargestFittingBatch<T>(
         MovementBatch<T> batch,
+        int offset,
         int start,
         int preferredCount,
         bool probeForGrowth,
@@ -624,7 +638,13 @@ public sealed class MovementBatchSender : IMovementBatchSender
         int remaining = batch.Data.Count - start;
 
         SerializedMovementBatch CreateCandidate(int count) =>
-            CreateSerializedCandidate(batch, start, count, idFormat, createPacket);
+            CreateSerializedCandidate(
+                batch,
+                offset,
+                start,
+                count,
+                idFormat,
+                createPacket);
 
         int initialCount = Math.Min(Math.Max(1, preferredCount), remaining);
         SerializedMovementBatch initialCandidate = CreateCandidate(initialCount);
@@ -739,25 +759,26 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
     private SerializedMovementBatch CreateSerializedCandidate<T>(
         MovementBatch<T> batch,
+        int offset,
         int start,
         int count,
         MovementIdFormat idFormat,
         Func<string, ushort[], Guid[], T[], IPacket> createPacket)
     {
         var data = new T[count];
-        batch.Data.CopyTo(start, data, 0, count);
+        CopyCircular(batch.Data, offset, start, data);
 
         IPacket packet;
         if (idFormat == MovementIdFormat.Canonical)
         {
             var ids = new Guid[count];
-            batch.CanonicalIds.CopyTo(start, ids, 0, count);
+            CopyCircular(batch.CanonicalIds, offset, start, ids);
             packet = createPacket(null, null, ids, data);
         }
         else
         {
             var ids = new ushort[count];
-            batch.CompactIds.CopyTo(start, ids, 0, count);
+            CopyCircular(batch.CompactIds, offset, start, ids);
             packet = createPacket(batch.IdentityScopeId, ids, null, data);
         }
 
@@ -765,6 +786,24 @@ public sealed class MovementBatchSender : IMovementBatchSender
             count,
             packet,
             packetCompressor.Serialize(packet));
+    }
+
+    private static T GetCircular<T>(
+        List<T> source,
+        int offset,
+        int logicalIndex)
+    {
+        return source[(offset + logicalIndex) % source.Count];
+    }
+
+    private static void CopyCircular<T>(
+        List<T> source,
+        int offset,
+        int logicalStart,
+        T[] destination)
+    {
+        for (int i = 0; i < destination.Length; i++)
+            destination[i] = GetCircular(source, offset, logicalStart + i);
     }
 
     private enum MovementIdFormat

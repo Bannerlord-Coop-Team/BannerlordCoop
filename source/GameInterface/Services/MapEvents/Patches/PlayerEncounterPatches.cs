@@ -6,6 +6,7 @@ using GameInterface.Policies;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -455,7 +456,12 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool UpdatePrefix()
     {
+        if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var initializationBarrier))
+            initializationBarrier.CompleteDeferredEncounterCleanup();
+
+        if (PlayerEncounter.Current == null) return false;
         if (MapEvent.PlayerMapEvent != null) return true;
+        if (PlayerCaptivity.IsCaptive) return false;
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return true;
 

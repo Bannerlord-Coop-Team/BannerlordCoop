@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents.Data;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEventParties;
@@ -26,6 +27,7 @@ internal class MapEventResultsHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IMapEventResultsInterface mapEventResultsInterface;
+    private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly IMapEventContributionBarrier contributionBarrier;
     private readonly IPlayerManager playerManager;
 
@@ -34,6 +36,7 @@ internal class MapEventResultsHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IMapEventResultsInterface mapEventResultsInterface,
+        IMapEventInitializationBarrier initializationBarrier,
         IMapEventContributionBarrier contributionBarrier,
         IPlayerManager playerManager)
     {
@@ -41,6 +44,7 @@ internal class MapEventResultsHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         this.mapEventResultsInterface = mapEventResultsInterface;
+        this.initializationBarrier = initializationBarrier;
         this.contributionBarrier = contributionBarrier;
         this.playerManager = playerManager;
 
@@ -132,6 +136,7 @@ internal class MapEventResultsHandler : IHandler
             else // Player defeat handled elsewhere, this only cares about player victories for giving loot to players
             {
                 playerEncounter.EncounterState = PlayerEncounterState.End;
+                initializationBarrier.RetainSimulationDefeat(mapEvent, MobileParty.MainParty?.Party);
             }
 
             using (new AllowedThread())

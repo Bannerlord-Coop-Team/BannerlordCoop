@@ -29,6 +29,19 @@ public sealed class MovementNetworkSettingsTests
         Assert.Equal(MovementNetworkSettings.BytesPerMiB * 2, settings.IncomingBytesPerSecond);
     }
 
+    [Fact]
+    public void PositiveSubByteValueClampsToOneBytePerSecond()
+    {
+        MovementNetworkSettings settings = Create(new NetworkConfigData
+        {
+            MovementOutgoingMiBPerSecond = 0.0000001d,
+            MovementIncomingMiBPerSecond = 0.0000001d,
+        });
+
+        Assert.Equal(1, settings.OutgoingBytesPerSecond);
+        Assert.Equal(1, settings.IncomingBytesPerSecond);
+    }
+
     [Theory]
     [InlineData(0d)]
     [InlineData(-1d)]

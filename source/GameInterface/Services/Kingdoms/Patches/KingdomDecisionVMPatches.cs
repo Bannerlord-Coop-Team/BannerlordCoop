@@ -1,23 +1,27 @@
-﻿using GameInterface;
-using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Extentions;
+﻿using Common.Logging;
+using GameInterface.Services.Clans.Handlers;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Policies;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
     [HarmonyPatch(typeof(KingdomDecisionsVM))]
     internal class KingdomDecisionsVMPatches
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<VassalServiceHandler>();
         [HarmonyPatch(nameof(KingdomDecisionsVM.HandleDecision))]
         [HarmonyPrefix]
         private static bool HandleDecisionPrefix(KingdomDecisionsVM __instance, KingdomDecision __0)
@@ -50,6 +54,23 @@ namespace GameInterface.Services.Kingdoms.Patches
         internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
         {
             return ContainerProvider.TryResolve(out voteManager);
+        }
+
+        // Bypass vanilla's single-clan shortcut so the receiving player gets the normal peace decision UI and vote.
+        [HarmonyPatch(typeof(KingdomDecisionsVM), nameof(KingdomDecisionsVM.RefreshWith))]
+        [HarmonyPrefix]
+        private static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
+        {
+            if ((CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision)) && decision.IsSingleClanDecision())
+            {
+                __instance._shouldCheckForDecision = false;
+                DecisionItemBaseVM decisionItem = __instance.GetDecisionItemBasedOnType(decision);
+
+                __instance.CurrentDecision = decisionItem;
+                __instance.CurrentDecision.SetDoneInputKey(__instance.DoneInputKey);
+                return false;
+            }
+            return true;
         }
     }
 
@@ -216,7 +237,7 @@ namespace GameInterface.Services.Kingdoms.Patches
     }
 
     [HarmonyPatch(typeof(KingdomDiplomacyVM))]
-    internal class KingdomDiplomacyVMPatches
+    public class KingdomDiplomacyVMPatches
     {
         [HarmonyPatch(nameof(KingdomDiplomacyVM.RefreshValues))]
         [HarmonyPostfix]
@@ -229,6 +250,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         internal static void OnSetWarItemPostfix(KingdomDiplomacyVM __instance, KingdomWarItemVM item)
         {
+            if (PeaceOfferIsPending(__instance, item)) return;
             DisableDiplomacyResolveActionsIfAlreadyVoted(__instance, item);
         }
 
@@ -236,6 +258,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         internal static void OnSetPeaceItemPostfix(KingdomDiplomacyVM __instance, KingdomTruceItemVM item)
         {
+            if (AllianceOfferPending(__instance, item)) return;
             DisableDiplomacyResolveActionsIfAlreadyVoted(__instance, item);
         }
 
@@ -264,6 +287,30 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
         }
 
+        internal static bool PeaceOfferIsPending(KingdomDiplomacyVM diplomacyVm, KingdomWarItemVM diplomacyItem)
+        {
+            if (diplomacyVm?.Actions == null || diplomacyItem == null) return false;
+            if (Clan.PlayerClan?.Kingdom == null) return false;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = diplomacyItem.Faction2 as Kingdom;
+            if (targetKingdom == null) return false;
+
+            return PeaceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId);
+        }
+
+        internal static bool AllianceOfferPending(KingdomDiplomacyVM diplomacyVm, KingdomTruceItemVM diplomacyItem)
+        {
+            if (diplomacyVm?.Actions == null || diplomacyItem == null) return false;
+            if (Clan.PlayerClan?.Kingdom == null) return false;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = diplomacyItem.Faction2 as Kingdom;
+            if (targetKingdom == null) return false;
+
+            return AllianceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId);
+        }
+
         private static IEnumerable<KingdomDecision> GetResolveDecisions(KingdomDiplomacyItemVM diplomacyItem)
         {
             if (Clan.PlayerClan?.Kingdom?.UnresolvedDecisions == null) yield break;
@@ -288,6 +335,66 @@ namespace GameInterface.Services.Kingdoms.Patches
             yield return Clan.PlayerClan.Kingdom.UnresolvedDecisions
                 .OfType<TradeAgreementDecision>()
                 .FirstOrDefault(decision => decision.TargetKingdom == faction);
+        }
+
+        /// <summary>
+        /// Kingdom.UnresolveDecisions is not uniformly synchronized,
+        /// so we have to send a request to the server,
+        /// to ask if there is a peace offer in the enemy's unresolved decisions.
+        [HarmonyPatch(nameof(KingdomDiplomacyVM.GetIsProposingPeaceEnabledWithReason))]
+        [HarmonyPrefix]
+        private static bool GetIsProposingPeaceEnabledWithReasonPrefix(
+        KingdomDiplomacyVM __instance,
+        KingdomWarItemVM item,
+        float actionInfluenceCost,
+        ref TextObject disabledReason,
+        ref bool __result)
+        {
+            if (item == null || Clan.PlayerClan?.Kingdom == null)
+                return true;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = item.Faction2 as Kingdom;
+
+            if (targetKingdom == null)
+                return true;
+
+            if (!playerKingdom._unresolvedDecisions.OfType<MakePeaceKingdomDecision>().Any(d => d.Kingdom == playerKingdom && d.FactionToMakePeaceWith == targetKingdom)
+                && !PeaceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId))
+            {
+                return true;
+            }
+            __result = false;
+            disabledReason = new TextObject("You have already offered peace to this kingdom.");
+            return false;
+        }
+
+        [HarmonyPatch(nameof(KingdomDiplomacyVM.GetIsProposingAllianceEnabledWithReason))]
+        [HarmonyPrefix]
+        private static bool GetIsProposingAllianceEnabledWithReasonPrefix(
+        KingdomDiplomacyVM __instance,
+        KingdomTruceItemVM item,
+        float actionInfluenceCost,
+        ref TextObject disabledReason,
+        ref bool __result)
+        {
+            if (item == null || Clan.PlayerClan?.Kingdom == null)
+                return true;
+
+            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
+            Kingdom targetKingdom = item.Faction2 as Kingdom;
+
+            if (targetKingdom == null)
+                return true;
+
+            if (!playerKingdom._unresolvedDecisions.OfType<StartAllianceDecision>().Any(d => d.Kingdom == playerKingdom && d.KingdomToStartAllianceWith == targetKingdom)
+                && !AllianceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId))
+            {
+                return true;
+            }
+            __result = false;
+            disabledReason = new TextObject("You have already offered an alliance to this kingdom.");
+            return false;
         }
     }
 
@@ -325,6 +432,163 @@ namespace GameInterface.Services.Kingdoms.Patches
             {
                 action.Hint.HintText = AlreadyVotedHint;
             }
+        }
+    }
+
+    public static class PeaceOfferPendingRegistry
+    {
+        private static readonly object Lock = new();
+        internal static readonly HashSet<(string RequestingKingdomId, string TargetKingdomId)> _pending = new();
+
+        public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
+        {
+            var key = (requestingKingdomId, targetKingdomId);
+
+            lock (Lock)
+            {
+                if (isPending)
+                    _pending.Add(key);
+                else
+                    _pending.Remove(key);
+            }
+        }
+
+        public static bool IsPending(string requestingKingdomId, string targetKingdomId)
+        {
+            lock (Lock)
+            {
+                return _pending.Contains((requestingKingdomId, targetKingdomId));
+            }
+        }
+
+        public static (string RequestingKingdomId, string TargetKingdomId)[] Snapshot()
+        {
+            lock (Lock)
+            {
+                return _pending.ToArray();
+            }
+        }
+
+        public static void RestoreAll(
+            (string RequestingKingdomId, string TargetKingdomId)[] entries)
+        {
+            lock (Lock)
+            {
+                _pending.Clear();
+
+                foreach (var entry in entries)
+                    _pending.Add(entry);
+            }
+        }
+    }
+
+    public static class AllianceOfferPendingRegistry
+    {
+        private static readonly object Lock = new();
+        internal static readonly HashSet<(string RequestingKingdomId, string TargetKingdomId)> _pending = new();
+
+        public static void Set(string requestingKingdomId, string targetKingdomId, bool isPending)
+        {
+            var key = (requestingKingdomId, targetKingdomId);
+
+            lock (Lock)
+            {
+                if (isPending)
+                    _pending.Add(key);
+                else
+                    _pending.Remove(key);
+            }
+        }
+
+        public static bool IsPending(string requestingKingdomId, string targetKingdomId)
+        {
+            lock (Lock)
+            {
+                return _pending.Contains((requestingKingdomId, targetKingdomId));
+            }
+        }
+
+        public static (string RequestingKingdomId, string TargetKingdomId)[] Snapshot()
+        {
+            lock (Lock)
+            {
+                return _pending.ToArray();
+            }
+        }
+
+        public static void RestoreAll(
+            (string RequestingKingdomId, string TargetKingdomId)[] entries)
+        {
+            lock (Lock)
+            {
+                _pending.Clear();
+
+                foreach (var entry in entries)
+                    _pending.Add(entry);
+            }
+        }
+    }
+
+    internal interface IClientClanStrengthRefresher
+    {
+        void Refresh(IFaction faction);
+    }
+
+    internal class ClientClanStrengthRefresher : IClientClanStrengthRefresher
+    {
+        public void Refresh(IFaction faction)
+        {
+            if (faction is Kingdom kingdom)
+            {
+                foreach (var clan in kingdom.Clans)
+                {
+                    clan.UpdateCurrentStrength();
+                }
+            }
+            else if (faction is Clan clan)
+            {
+                clan.UpdateCurrentStrength();
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(KingdomWarItemVM), nameof(KingdomWarItemVM.UpdateDiplomacyProperties))]
+    internal class KingdomWarItemVMPatches
+    {
+        [HarmonyPrefix]
+        private static void Prefix(KingdomWarItemVM __instance)
+        {
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(__instance.Faction1);
+            refresher.Refresh(__instance.Faction2);
+        }
+    }
+
+    [HarmonyPatch(typeof(KingdomTruceItemVM), nameof(KingdomTruceItemVM.UpdateDiplomacyProperties))]
+    internal class KingdomTruceItemVMPatches
+    {
+        [HarmonyPrefix]
+        private static void Prefix(KingdomTruceItemVM __instance)
+        {
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(__instance.Faction1);
+            refresher.Refresh(__instance.Faction2);
+        }
+    }
+
+    [HarmonyPatch(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost))]
+    internal class GetCallToWarCostPatches
+    {
+        [HarmonyPrefix]
+        private static void Prefix(DefaultAllianceModel __instance, Kingdom callingKingdom, Kingdom calledKingdom, Kingdom kingdomToCallToWarAgainst)
+        {
+            if (!ContainerProvider.TryResolve<IClientClanStrengthRefresher>(out var refresher)) return;
+
+            refresher.Refresh(callingKingdom);
+            refresher.Refresh(calledKingdom);
+            refresher.Refresh(kingdomToCallToWarAgainst);
         }
     }
 }

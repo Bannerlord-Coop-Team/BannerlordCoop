@@ -1,9 +1,12 @@
-﻿using GameInterface.Services.Heroes.Extensions;
+﻿using GameInterface.Configuration;
+using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.PartyBases.Patches;
 
@@ -58,5 +61,34 @@ internal class DefaultPartySizeLimitModelPatches
         }
 
         return true;
+    }
+
+    [HarmonyPatch(nameof(DefaultPartySizeLimitModel.FindAppropriateInitialRosterForMobileParty))]
+    [HarmonyPostfix]
+    public static void GetInitialPartySizeRatioForMobilePartyPostfix(TroopRoster __result, MobileParty party, PartyTemplateObject partyTemplate)
+    {
+        // Increase/decrease size of new bandit parties based on config
+        if (party.IsBandit)
+        {
+            // Use default value if negative
+            var multiplier = 1f;
+            if (ModConfigProvider.ModOptions.LooterPartySizeMultiplier >= 0)
+                multiplier = ModConfigProvider.ModOptions.LooterPartySizeMultiplier;
+
+            foreach (var troopRosterElement in __result.GetTroopRoster())
+            {
+                var newCharacterCount = (int)(troopRosterElement.Number * multiplier);
+                var numberToAdd = newCharacterCount - troopRosterElement.Number;
+
+                CharacterObject character = troopRosterElement.Character;
+                __result.AddToCounts(character, numberToAdd, false, 0, 0, true, -1);
+
+                // Avoid turning bandit parties to zero parties, keep a minimum
+                if (__result.TotalManCount <= 0)
+                {
+                    __result.AddToCounts(character, 1, false, 0, 0, true, -1);
+                }
+            }
+        }
     }
 }

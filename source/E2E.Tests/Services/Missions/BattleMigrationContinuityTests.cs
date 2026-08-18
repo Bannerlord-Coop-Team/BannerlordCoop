@@ -77,7 +77,8 @@ public class BattleMigrationContinuityTests : MissionTestEnvironment
         // Supplier continuity: on migration a new owner is handed the reserve at the server's supplied pointer,
         // so it resumes mid-list and never re-supplies troops the departed owner already spawned.
         var supplier = new CoopTroopSupplier("mapEvent1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        supplier.SetReserve(new[] { new PartyReserve("P", 4, Entries(10)) }); // server pointer = 4
+        supplier.SetReserve(new[] { new PartyReserve("P", 4, Entries(10)) },
+            sideTotal: 10, playerOwnedParties: 0, authoritativeBattleSize: 1000); // server pointer = 4
 
         Assert.Equal(4, supplier.GetSuppliedByParty().Single().supplied); // resumes at the server's pointer
         Assert.Equal(6, supplier.NumTroopsNotSupplied);

@@ -85,6 +85,32 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_NonHumanNonMountSendsMovementWithoutEquipment()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent animal = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(animal, out var mirror));
+            mirror.IsHuman = false;
+            mirror.IsMount = false;
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), animal));
+
+            component.AgentMovementHandler.PollMovement(0f);
+
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+            Assert.Empty(network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
+        });
+    }
+
+    [Fact]
     public void PollMovement_TournamentProfileUsesSixtyHertzCadence()
     {
         using var fixture = new MissionEngineFixture();
@@ -324,7 +350,7 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PollMovement_RotatesRecipientsWhenSharedBudgetOnlyFitsOneRoute()
+    public void PollMovement_PriorityPollsDoNotAdvanceBulkRecipientRotation()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -336,6 +362,8 @@ public class MovementTrafficTests : MissionTestEnvironment
             var broker = peer.Resolve<IMessageBroker>();
             broker.Publish(this, new NetworkMissionPeerEntered("first", "battle"));
             broker.Publish(this, new NetworkMissionPeerEntered("second", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("third", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("fourth", "battle"));
 
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
@@ -344,16 +372,18 @@ public class MovementTrafficTests : MissionTestEnvironment
             var rateController = new Mock<IMovementRateController>();
             rateController
                 .Setup(value => value.AdvanceFrame(It.IsAny<float>()))
-                .Returns(new MovementCadence(40, 40));
+                .Returns(new MovementCadence(10, 40));
             rateController
                 .Setup(value => value.GetReceiverCapHz(It.IsAny<string>()))
-                .Returns(40);
+                .Returns(10);
             rateController
                 .Setup(value => value.GetReceiverIncomingBytesPerSecond(It.IsAny<string>()))
                 .Returns(1024 * 1024);
             var budgets = new Queue<IMovementTrafficBudget>(new[]
             {
-                new MovementTrafficBudget(10, 10),
+                new MovementTrafficBudget(100, 10),
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
                 new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
                 new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
             });
@@ -364,7 +394,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 new QueueMovementTrafficBudgetFactory(budgets),
                 priorityScheduler,
                 new MovementNetworkSettings(
-                    10d / MovementNetworkSettings.BytesPerMiB,
+                    100d / MovementNetworkSettings.BytesPerMiB,
                     1d));
             using var handler = new AgentMovementHandler(
                 network,
@@ -387,12 +417,14 @@ public class MovementTrafficTests : MissionTestEnvironment
             network.SerializedPacketSends.Clear();
             network.DirectPacketSends.Clear();
 
-            handler.PollMovement(1f);
+            for (int i = 0; i < 4; i++)
+                handler.PollMovement(0.025f);
             SerializedPacketSend secondSend = Assert.Single(network.SerializedPacketSends);
 
             Assert.NotEqual(firstSend.ControllerId, secondSend.ControllerId);
-            Assert.Contains(firstSend.ControllerId, new[] { "first", "second" });
-            Assert.Contains(secondSend.ControllerId, new[] { "first", "second" });
+            string[] recipients = { "first", "second", "third", "fourth" };
+            Assert.Contains(firstSend.ControllerId, recipients);
+            Assert.Contains(secondSend.ControllerId, recipients);
         });
     }
 

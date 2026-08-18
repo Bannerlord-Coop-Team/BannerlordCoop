@@ -71,5 +71,7 @@ public sealed class MovementNetworkSettings : IMovementNetworkSettings
     }
 
     private static int ToBytes(double mebibytesPerSecond) =>
-        checked((int)Math.Round(mebibytesPerSecond * BytesPerMiB));
+        Math.Max(
+            1,
+            checked((int)Math.Round(mebibytesPerSecond * BytesPerMiB)));
 }
