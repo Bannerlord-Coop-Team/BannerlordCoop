@@ -16,26 +16,6 @@ public static class QuestSuccessProofContext
     public static void Set(byte value) => _current = value;
 }
 
-public static class QuestFailProofContext
-{
-    [ThreadStatic]
-    private static byte _current;
-
-    public static byte Current => _current;
-
-    public static void Set(byte value) => _current = value;
-}
-
-public static class QuestBetrayalProofContext
-{
-    [ThreadStatic]
-    private static byte _current;
-
-    public static byte Current => _current;
-
-    public static void Set(byte value) => _current = value;
-}
-
 public abstract class QuestTypeDescriptor
 {
     public Type IssueType { get; }
@@ -62,15 +42,7 @@ public abstract class QuestTypeDescriptor
 
     public Func<IssueBase, bool> ValidateQuestFail { get; }
 
-    public Func<IssueBase, byte> CaptureQuestFailProof { get; }
-
-    public Func<IssueBase, byte> CaptureQuestBetrayalProof { get; }
-
     public Action<QuestBase> ApplyQuestSuccessConsequence { get; }
-
-    public Action<QuestBase> ApplyQuestFailConsequence { get; }
-
-    public Action<QuestBase> ApplyQuestBetrayalConsequence { get; }
 
     public Func<Hero, Func<Hero, bool>, (bool Accepted, byte[] FieldsBytes)> TryArbitrateQuestSolutionAcceptBytes { get; }
 
@@ -98,11 +70,7 @@ public abstract class QuestTypeDescriptor
         Func<IssueBase, bool> validateQuestCancel,
         Func<IssueBase, bool> validateQuestBetrayal,
         Func<IssueBase, bool> validateQuestFail,
-        Func<IssueBase, byte> captureQuestFailProof,
-        Func<IssueBase, byte> captureQuestBetrayalProof,
         Action<QuestBase> applyQuestSuccessConsequence,
-        Action<QuestBase> applyQuestFailConsequence,
-        Action<QuestBase> applyQuestBetrayalConsequence,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -123,11 +91,7 @@ public abstract class QuestTypeDescriptor
         ValidateQuestCancel = validateQuestCancel;
         ValidateQuestBetrayal = validateQuestBetrayal;
         ValidateQuestFail = validateQuestFail;
-        CaptureQuestFailProof = captureQuestFailProof;
-        CaptureQuestBetrayalProof = captureQuestBetrayalProof;
         ApplyQuestSuccessConsequence = applyQuestSuccessConsequence;
-        ApplyQuestFailConsequence = applyQuestFailConsequence;
-        ApplyQuestBetrayalConsequence = applyQuestBetrayalConsequence;
         TryArbitrateQuestSolutionAcceptBytes = tryArbitrateQuestSolutionAcceptBytes;
         MirrorQuestSolutionAcceptBytes = mirrorQuestSolutionAcceptBytes;
         RejectQuestSolutionAccept = rejectQuestSolutionAccept;
@@ -158,11 +122,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         Func<TIssue, bool> validateQuestCancel,
         Func<TIssue, bool> validateQuestBetrayal,
         Func<TIssue, bool> validateQuestFail,
-        Func<TIssue, byte> captureQuestFailProof,
-        Func<TIssue, byte> captureQuestBetrayalProof,
         Action<TQuest> applyQuestSuccessConsequence,
-        Action<TQuest> applyQuestFailConsequence,
-        Action<TQuest> applyQuestBetrayalConsequence,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -183,11 +143,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             NarrowPredicate(validateQuestCancel),
             NarrowPredicate(validateQuestBetrayal),
             NarrowPredicate(validateQuestFail),
-            NarrowCapture(captureQuestFailProof),
-            NarrowCapture(captureQuestBetrayalProof),
             NarrowQuestAction(applyQuestSuccessConsequence),
-            NarrowQuestAction(applyQuestFailConsequence),
-            NarrowQuestAction(applyQuestBetrayalConsequence),
             tryArbitrateQuestSolutionAcceptBytes,
             mirrorQuestSolutionAcceptBytes,
             rejectQuestSolutionAccept,
@@ -245,11 +201,7 @@ public static class QuestDescriptorBuilder
         private Func<TIssue, bool> _validateQuestCancel;
         private Func<TIssue, bool> _validateQuestBetrayal;
         private Func<TIssue, bool> _validateQuestFail;
-        private Func<TIssue, byte> _captureQuestFailProof;
-        private Func<TIssue, byte> _captureQuestBetrayalProof;
         private Action<TQuest> _applyQuestSuccessConsequence;
-        private Action<TQuest> _applyQuestFailConsequence;
-        private Action<TQuest> _applyQuestBetrayalConsequence;
         private Func<Hero, Func<Hero, bool>, (bool, byte[])> _tryArbitrateQuestSolutionAcceptBytes;
         private Action<Hero, byte[]> _mirrorQuestSolutionAcceptBytes;
         private Action<Hero> _rejectQuestSolutionAccept;
@@ -358,33 +310,9 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
-        public Builder<TIssue, TQuest> WithQuestFailProofCapture(Func<TIssue, byte> captureQuestFailProof)
-        {
-            _captureQuestFailProof = captureQuestFailProof;
-            return this;
-        }
-
-        public Builder<TIssue, TQuest> WithQuestBetrayalProofCapture(Func<TIssue, byte> captureQuestBetrayalProof)
-        {
-            _captureQuestBetrayalProof = captureQuestBetrayalProof;
-            return this;
-        }
-
         public Builder<TIssue, TQuest> WithQuestSuccessConsequence(Action<TQuest> applyQuestSuccessConsequence)
         {
             _applyQuestSuccessConsequence = applyQuestSuccessConsequence;
-            return this;
-        }
-
-        public Builder<TIssue, TQuest> WithQuestFailConsequence(Action<TQuest> applyQuestFailConsequence)
-        {
-            _applyQuestFailConsequence = applyQuestFailConsequence;
-            return this;
-        }
-
-        public Builder<TIssue, TQuest> WithQuestBetrayalConsequence(Action<TQuest> applyQuestBetrayalConsequence)
-        {
-            _applyQuestBetrayalConsequence = applyQuestBetrayalConsequence;
             return this;
         }
 
@@ -394,8 +322,7 @@ public static class QuestDescriptorBuilder
                 _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept, _validateQuestSuccess,
                 _captureQuestSuccessProof,
                 _validateQuestCancel, _validateQuestBetrayal, _validateQuestFail,
-                _captureQuestFailProof, _captureQuestBetrayalProof,
-                _applyQuestSuccessConsequence, _applyQuestFailConsequence, _applyQuestBetrayalConsequence,
+                _applyQuestSuccessConsequence,
                 _tryArbitrateQuestSolutionAcceptBytes, _mirrorQuestSolutionAcceptBytes, _rejectQuestSolutionAccept,
                 _tryArbitrateAlternativeAcceptBytes, _mirrorAlternativeAcceptBytes, _rejectAlternativeAccept);
     }

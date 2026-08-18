@@ -47,29 +47,13 @@ internal static class IssueFinalizationSupport
                         quest.CompleteQuestWithCancel();
                         return;
                     case IssueFinalizeReason.QuestFail:
-                        var applyFailConsequence = QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence;
-                        if (applyFailConsequence != null)
-                        {
-                            applyFailConsequence(quest);
-                        }
-                        else
-                        {
-                            quest.CompleteQuestWithFail();
-                        }
+                        quest.CompleteQuestWithFail();
                         return;
                     case IssueFinalizeReason.QuestTimeout:
                         quest.CompleteQuestWithTimeOut();
                         return;
                     case IssueFinalizeReason.QuestBetrayal:
-                        var applyBetrayalConsequence = QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestBetrayalConsequence;
-                        if (applyBetrayalConsequence != null)
-                        {
-                            applyBetrayalConsequence(quest);
-                        }
-                        else
-                        {
-                            quest.CompleteQuestWithBetrayal();
-                        }
+                        quest.CompleteQuestWithBetrayal();
                         return;
                     default:
                         quest.CompleteQuestWithCancel();

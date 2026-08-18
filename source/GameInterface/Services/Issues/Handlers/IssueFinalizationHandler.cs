@@ -12,7 +12,6 @@ using LiteNetLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Handlers;
@@ -57,42 +56,6 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Unsubscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
     }
 
-    private static byte CaptureProof(IssueBase issue, IssueFinalizeReason reason)
-    {
-        var descriptor = QuestTypeRegistry.Get(issue);
-        return reason switch
-        {
-            IssueFinalizeReason.QuestSuccess => descriptor?.CaptureQuestSuccessProof?.Invoke(issue) ?? 0,
-            IssueFinalizeReason.QuestFail => descriptor?.CaptureQuestFailProof?.Invoke(issue) ?? 0,
-            IssueFinalizeReason.QuestBetrayal => descriptor?.CaptureQuestBetrayalProof?.Invoke(issue) ?? 0,
-            _ => (byte)0,
-        };
-    }
-
-    private static void SetProofContext(IssueFinalizeReason reason, byte proof)
-    {
-        switch (reason)
-        {
-            case IssueFinalizeReason.QuestSuccess:
-                QuestSuccessProofContext.Set(proof);
-                break;
-            case IssueFinalizeReason.QuestFail:
-                QuestFailProofContext.Set(proof);
-                break;
-            case IssueFinalizeReason.QuestBetrayal:
-                QuestBetrayalProofContext.Set(proof);
-                break;
-        }
-    }
-
-    private static byte ReadProofContext(IssueFinalizeReason reason) => reason switch
-    {
-        IssueFinalizeReason.QuestSuccess => QuestSuccessProofContext.Current,
-        IssueFinalizeReason.QuestFail => QuestFailProofContext.Current,
-        IssueFinalizeReason.QuestBetrayal => QuestBetrayalProofContext.Current,
-        _ => (byte)0,
-    };
-
     private void Handle_IssueFinalizedTriggered(MessagePayload<IssueFinalizedTriggered> payload)
     {
         var owner = payload.What.Owner;
@@ -101,14 +64,15 @@ internal class IssueFinalizationHandler : IHandler
 
         if (ModInformation.IsServer)
         {
-            var proof = IssueFinalizeAuthorityGuard.IsActive ? ReadProofContext(reason) : CaptureProof(owner.Issue, reason);
-            network.SendAll(new NetworkIssueRemoved(ownerId, reason, proof));
+            network.SendAll(new NetworkIssueRemoved(ownerId, reason));
         }
         else
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
-            var proof = CaptureProof(owner.Issue, reason);
-            network.SendAll(new RequestIssueRemoved(ownerId, reason, generation, proof));
+            var successProof = reason == IssueFinalizeReason.QuestSuccess
+                ? QuestTypeRegistry.Get(owner.Issue)?.CaptureQuestSuccessProof?.Invoke(owner.Issue) ?? 0
+                : (byte)0;
+            network.SendAll(new RequestIssueRemoved(ownerId, reason, generation, successProof));
         }
     }
 
@@ -141,10 +105,10 @@ internal class IssueFinalizationHandler : IHandler
             }
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
-            var successProof = descriptor?.CaptureQuestSuccessProof?.Invoke(owner.Issue) ?? 0;
             var validator = descriptor?.ValidateQuestSuccess;
             if (validator != null)
             {
+                var successProof = descriptor.CaptureQuestSuccessProof?.Invoke(owner.Issue) ?? 0;
                 QuestSuccessProofContext.Set(successProof);
                 bool validated;
                 try
@@ -164,7 +128,7 @@ internal class IssueFinalizationHandler : IHandler
                 }
             }
 
-            FinalizeAndBroadcast(owner, ownerId, player, IssueFinalizeReason.QuestSuccess, successProof);
+            FinalizeAndBroadcast(owner, ownerId, player, IssueFinalizeReason.QuestSuccess);
         }
         else
         {
@@ -174,7 +138,7 @@ internal class IssueFinalizationHandler : IHandler
         }
     }
 
-    private void FinalizeAndBroadcast(Hero owner, string ownerId, Player player, IssueFinalizeReason reason, byte proof = 0)
+    private void FinalizeAndBroadcast(Hero owner, string ownerId, Player player, IssueFinalizeReason reason)
     {
         MobileParty ownerParty = null;
         if (player.MobilePartyId != null)
@@ -184,7 +148,6 @@ internal class IssueFinalizationHandler : IHandler
 
         objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var truePlayerHero);
 
-        SetProofContext(reason, proof);
         try
         {
             using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
@@ -195,10 +158,6 @@ internal class IssueFinalizationHandler : IHandler
         catch (Exception e)
         {
             Logger.Error(e, "Failed to finalize {Reason} for owner {Owner} - not broadcasting", reason, ownerId);
-        }
-        finally
-        {
-            SetProofContext(reason, 0);
         }
     }
 
@@ -257,13 +216,13 @@ internal class IssueFinalizationHandler : IHandler
                 return;
             }
 
-            if (!TryValidateFinalizeReason(owner, reason, player, payload.What.Proof, ownerId)) return;
+            if (!TryValidateFinalizeReason(owner, reason, player, payload.What.SuccessProof, ownerId)) return;
 
-            FinalizeAndBroadcast(owner, ownerId, player, reason, payload.What.Proof);
+            FinalizeAndBroadcast(owner, ownerId, player, reason);
         });
     }
 
-    private bool TryValidateFinalizeReason(Hero owner, IssueFinalizeReason reason, Player player, byte proof, string ownerId)
+    private bool TryValidateFinalizeReason(Hero owner, IssueFinalizeReason reason, Player player, byte successProof, string ownerId)
     {
         var quest = owner.Issue.IssueQuest is { IsOngoing: true } ongoingQuest ? ongoingQuest : null;
 
@@ -290,7 +249,7 @@ internal class IssueFinalizationHandler : IHandler
                 objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party);
             }
 
-            QuestSuccessProofContext.Set(proof);
+            QuestSuccessProofContext.Set(successProof);
             bool validated;
             try
             {
@@ -335,19 +294,7 @@ internal class IssueFinalizationHandler : IHandler
                     IssueFinalizeReason.QuestFail => descriptor?.ValidateQuestFail,
                     _ => null,
                 };
-
-                SetProofContext(reason, proof);
-                bool validated;
-                try
-                {
-                    validated = validator != null && validator(owner.Issue);
-                }
-                finally
-                {
-                    SetProofContext(reason, 0);
-                }
-
-                if (!validated)
+                if (validator == null || !validator(owner.Issue))
                 {
                     Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - quest type has no registered validator or condition not met",
                         nameof(RequestIssueRemoved), reason, ownerId);
@@ -380,7 +327,6 @@ internal class IssueFinalizationHandler : IHandler
 
         var ownerId = payload.What.OwnerId;
         var reason = payload.What.Reason;
-        var proof = payload.What.Proof;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
@@ -394,17 +340,9 @@ internal class IssueFinalizationHandler : IHandler
                 if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
             }
 
-            SetProofContext(reason, proof);
-            try
+            using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
             {
-                using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
-                {
-                    IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true);
-                }
-            }
-            finally
-            {
-                SetProofContext(reason, 0);
+                IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true);
             }
         });
     }
