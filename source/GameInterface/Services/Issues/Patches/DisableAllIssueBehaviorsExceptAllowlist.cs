@@ -162,3 +162,33 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         return false;
     }
 }
+
+[HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_hero_main_options_have_issue_on_condition")]
+internal class DisableIssueDialogueEntryOption
+{
+    private static bool Prefix(ref bool __result)
+    {
+        __result = false;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_lord_task_given_on_condition")]
+internal class DisableIssueDialogueTaskGivenOption
+{
+    private static bool Prefix(ref bool __result)
+    {
+        __result = false;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_lord_task_given_alternative_on_condition")]
+internal class DisableIssueDialogueTaskGivenAlternativeOption
+{
+    private static bool Prefix(ref bool __result)
+    {
+        __result = false;
+        return false;
+    }
+}
