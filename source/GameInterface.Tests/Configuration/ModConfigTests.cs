@@ -47,7 +47,7 @@ public class ModConfigTests : IDisposable
         Assert.True(File.Exists(ConfigPath), "first load should create mod-config.json");
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PersuasionSuccessChance);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.ClanMemberDeathChance);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
         Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
@@ -137,7 +137,7 @@ public class ModConfigTests : IDisposable
         _ = NewModConfig().Data;
 
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
@@ -157,7 +157,7 @@ public class ModConfigTests : IDisposable
         _ = NewModConfig().Data;
 
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
