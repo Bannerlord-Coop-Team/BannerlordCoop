@@ -250,6 +250,7 @@ public class PlayerManager : IPlayerManager
             foreach (var ownedCaravan in hero.OwnedCaravans)
             {
                 ownedCaravan.Party._partyMemberSizeLastCheckVersion = -1;
+                ownedCaravan.Party.MobileParty._partyPureSpeedLastCheckVersion = -1;
             }
         }, context: nameof(PlayerManager));
     }
