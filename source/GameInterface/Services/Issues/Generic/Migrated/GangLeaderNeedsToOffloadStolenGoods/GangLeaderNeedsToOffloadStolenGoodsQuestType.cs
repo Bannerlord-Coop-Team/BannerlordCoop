@@ -10,12 +10,16 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using ProtoBuf;
+using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 
@@ -66,8 +70,6 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 {
     private static readonly FieldInfo RandomForStolenTradeGoodField =
         AccessTools.Field(typeof(Issue), "_randomForStolenTradeGood");
-    private static readonly FieldInfo IssueHideoutField =
-        AccessTools.Field(typeof(Issue), "_issueHideout");
     private static readonly PropertyInfo CounterOfferHeroProperty =
         AccessTools.Property(typeof(Issue), nameof(IssueBase.CounterOfferHero));
 
@@ -97,7 +99,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
             fields = default;
             if (issue == null) return false;
 
-            var issueHideout = (Settlement)IssueHideoutField.GetValue(issue);
+            var issueHideout = issue._issueHideout;
             var randomForStolenTradeGood = (int)RandomForStolenTradeGoodField.GetValue(issue);
             var counterOfferHero = issue.CounterOfferHero;
 
@@ -148,8 +150,11 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
             {
                 if (issue.IsOngoingWithoutQuest)
                 {
-                    issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
-                    issue.IsTriedToSolveBefore = true;
+                    using (new Dispatch.IssueDispatchReplayGuard())
+                    using (new QuestSolutionStartAuthorityGuard())
+                    {
+                        Campaign.Current.IssueManager.StartIssueQuest(owner);
+                    }
                 }
 
                 if (issue.IssueQuest is not Quest quest) return;
@@ -246,20 +251,148 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     private static bool ValidateQuestCancel(Issue issue) => true;
     private static bool ValidateQuestFail(Issue issue) => true;
-    private static bool ValidateQuestBetrayal(Issue issue) => true;
+    private static bool ValidateQuestBetrayal(Issue issue) => QuestBetrayalProofContext.Current != 0;
     private static bool ValidateQuestSuccess(Issue issue, MobileParty party) => QuestSuccessProofContext.Current != 0;
 
-    private const byte ProofQuestSuccess = 1;
+    internal const byte ProofSucceedByPayingAndKeepingTheGoods = 1;
+    internal const byte ProofSucceedByPayingAndGivingTheGoodsBack = 2;
+    internal const byte ProofBetrayByKeepingTheGoods = 1;
+    internal const byte ProofBetrayByGivingTheGoodsBack = 2;
+    internal const byte ProofFailByLosingHideoutBattle = 1;
 
     private static readonly ConditionalWeakTable<Quest, object> ObservedSuccessProof = new();
+    private static readonly ConditionalWeakTable<Quest, object> ObservedBetrayalProof = new();
+    private static readonly ConditionalWeakTable<Quest, object> ObservedFailProof = new();
 
     private static byte CaptureQuestSuccessProof(Issue issue)
         => issue.IssueQuest is Quest quest && ObservedSuccessProof.TryGetValue(quest, out var proof) ? (byte)proof : (byte)0;
 
-    internal static void ObserveQuestSuccess(Quest quest)
+    private static byte CaptureQuestBetrayalProof(Issue issue)
+        => issue.IssueQuest is Quest quest && ObservedBetrayalProof.TryGetValue(quest, out var proof) ? (byte)proof : (byte)0;
+
+    private static byte CaptureQuestFailProof(Issue issue)
+        => issue.IssueQuest is Quest quest && ObservedFailProof.TryGetValue(quest, out var proof) ? (byte)proof : (byte)0;
+
+    internal static void ObserveQuestSuccess(Quest quest, byte proof)
     {
         ObservedSuccessProof.Remove(quest);
-        ObservedSuccessProof.Add(quest, ProofQuestSuccess);
+        ObservedSuccessProof.Add(quest, proof);
+    }
+
+    internal static void ObserveQuestBetrayal(Quest quest, byte proof)
+    {
+        ObservedBetrayalProof.Remove(quest);
+        ObservedBetrayalProof.Add(quest, proof);
+    }
+
+    internal static void ObserveQuestFail(Quest quest, byte proof)
+    {
+        ObservedFailProof.Remove(quest);
+        ObservedFailProof.Add(quest, proof);
+    }
+
+    private static void ApplySucceedByPayingAndKeepingTheGoods(Quest quest)
+    {
+        quest.AddLog(quest.SuccessQuestLogText);
+        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
+        {
+            new Tuple<TraitObject, int>(DefaultTraits.Calculating, 100)
+        });
+        MobileParty.MainParty.ItemRoster.AddToCounts(quest._stolenTradeGood, quest._stolenTradeGoodAmount);
+        quest.QuestGiver.AddPower(5f);
+        quest._counterOfferHero.AddPower(-5f);
+        ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, 10);
+        foreach (var notable in quest.QuestGiver.CurrentSettlement.Notables.WhereQ(notable => notable.IsMerchant))
+        {
+            ChangeRelationAction.ApplyPlayerRelation(notable, -3);
+        }
+        quest.CompleteQuestWithSuccess();
+    }
+
+    private static void ApplySucceedByPayingAndGivingTheGoodsBack(Quest quest)
+    {
+        quest.AddLog(quest.SuccessByGivingBackTheGoodsQuestLogText);
+        GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest._counterOfferGold);
+        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
+        {
+            new Tuple<TraitObject, int>(DefaultTraits.Calculating, 150)
+        });
+        quest.QuestGiver.AddPower(5f);
+        quest._counterOfferHero.AddPower(5f);
+        ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, 10);
+        foreach (var notable in quest.QuestGiver.CurrentSettlement.Notables.WhereQ(notable => notable != quest.QuestGiver))
+        {
+            ChangeRelationAction.ApplyPlayerRelation(notable, 3);
+        }
+        quest.CompleteQuestWithSuccess();
+    }
+
+    private static void ApplyQuestSuccessConsequence(Quest quest)
+    {
+        switch (QuestSuccessProofContext.Current)
+        {
+            case ProofSucceedByPayingAndGivingTheGoodsBack:
+                ApplySucceedByPayingAndGivingTheGoodsBack(quest);
+                return;
+            default:
+                ApplySucceedByPayingAndKeepingTheGoods(quest);
+                return;
+        }
+    }
+
+    private static void ApplyBetrayByKeepingTheGoods(Quest quest)
+    {
+        quest.QuestGiver.AddPower(-5f);
+        quest._counterOfferHero.AddPower(-5f);
+        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
+        {
+            new Tuple<TraitObject, int>(DefaultTraits.Calculating, 100)
+        });
+        MobileParty.MainParty.ItemRoster.AddToCounts(quest._stolenTradeGood, quest._stolenTradeGoodAmount);
+        ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, -5);
+        foreach (var notable in quest.QuestGiver.CurrentSettlement.Notables.WhereQ(notable => notable.IsMerchant))
+        {
+            ChangeRelationAction.ApplyPlayerRelation(notable, -3);
+        }
+        quest.CompleteQuestWithBetrayal(quest.FailBetrayTakeGoodsQuestLogText);
+    }
+
+    private static void ApplyBetrayByGivingTheGoodsBack(Quest quest)
+    {
+        GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest._counterOfferGold);
+        quest.QuestGiver.AddPower(-5f);
+        quest._counterOfferHero.AddPower(5f);
+        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
+        {
+            new Tuple<TraitObject, int>(DefaultTraits.Honor, 100)
+        });
+        ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, -5);
+        foreach (var notable in quest.QuestGiver.CurrentSettlement.Notables.WhereQ(notable => notable != quest.QuestGiver))
+        {
+            ChangeRelationAction.ApplyPlayerRelation(notable, 3);
+        }
+        quest.CompleteQuestWithBetrayal(quest.FailBetrayQuestLogText);
+    }
+
+    private static void ApplyQuestBetrayalConsequence(Quest quest)
+    {
+        switch (QuestBetrayalProofContext.Current)
+        {
+            case ProofBetrayByGivingTheGoodsBack:
+                ApplyBetrayByGivingTheGoodsBack(quest);
+                return;
+            default:
+                ApplyBetrayByKeepingTheGoods(quest);
+                return;
+        }
+    }
+
+    private static void ApplyQuestFailConsequence(Quest quest)
+    {
+        quest.QuestGiver.AddPower(-5f);
+        quest._counterOfferHero.AddPower(-5f);
+        ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, -5);
+        quest.CompleteQuestWithFail(quest.FailLoseHideoutFightQuestLogText);
     }
 
     static GangLeaderNeedsToOffloadStolenGoodsQuestType()
@@ -270,9 +403,14 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestCancelValidation(ValidateQuestCancel)
             .WithQuestFailValidation(ValidateQuestFail)
+            .WithQuestFailProofCapture(CaptureQuestFailProof)
+            .WithQuestFailConsequence(ApplyQuestFailConsequence)
             .WithQuestBetrayalValidation(ValidateQuestBetrayal)
+            .WithQuestBetrayalProofCapture(CaptureQuestBetrayalProof)
+            .WithQuestBetrayalConsequence(ApplyQuestBetrayalConsequence)
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .WithQuestSuccessProofCapture(CaptureQuestSuccessProof)
+            .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
@@ -280,15 +418,35 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 }
 
 [HarmonyPatch(typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest))]
-internal class GangLeaderNeedsToOffloadStolenGoodsQuestSuccessObserverPatches
+internal class GangLeaderNeedsToOffloadStolenGoodsQuestBranchObserverPatches
 {
     [HarmonyPatch("SucceedQuestByPayingAndKeepingTheGoods")]
-    [HarmonyPostfix]
-    private static void SucceedQuestByPayingAndKeepingTheGoodsPostfix(Quest __instance) =>
-        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestSuccess(__instance);
+    [HarmonyPrefix]
+    private static void SucceedQuestByPayingAndKeepingTheGoodsPrefix(Quest __instance) =>
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestSuccess(
+            __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofSucceedByPayingAndKeepingTheGoods);
 
     [HarmonyPatch("SucceedQuestByPayingAndGivingTheGoodsBack")]
-    [HarmonyPostfix]
-    private static void SucceedQuestByPayingAndGivingTheGoodsBackPostfix(Quest __instance) =>
-        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestSuccess(__instance);
+    [HarmonyPrefix]
+    private static void SucceedQuestByPayingAndGivingTheGoodsBackPrefix(Quest __instance) =>
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestSuccess(
+            __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofSucceedByPayingAndGivingTheGoodsBack);
+
+    [HarmonyPatch("FailQuestByKeepingTheGoods")]
+    [HarmonyPrefix]
+    private static void FailQuestByKeepingTheGoodsPrefix(Quest __instance) =>
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestBetrayal(
+            __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofBetrayByKeepingTheGoods);
+
+    [HarmonyPatch("FailQuestByGivingBackTheGoods")]
+    [HarmonyPrefix]
+    private static void FailQuestByGivingBackTheGoodsPrefix(Quest __instance) =>
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestBetrayal(
+            __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofBetrayByGivingTheGoodsBack);
+
+    [HarmonyPatch("FailQuestByLosingHideoutBattle")]
+    [HarmonyPrefix]
+    private static void FailQuestByLosingHideoutBattlePrefix(Quest __instance) =>
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestFail(
+            __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofFailByLosingHideoutBattle);
 }
