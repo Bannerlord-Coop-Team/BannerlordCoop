@@ -19,7 +19,7 @@ public sealed class IssueFinalizeAuthorityGuard : IDisposable
 
 internal static class IssueFinalizationSupport
 {
-    public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason, bool suppressReplicationPatches = true)
+    public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason, bool suppressReplicationPatches = true, bool skipConsequenceReapplication = false)
     {
         if (owner?.Issue == null) return;
 
@@ -33,7 +33,7 @@ internal static class IssueFinalizationSupport
                 switch (reason)
                 {
                     case IssueFinalizeReason.QuestSuccess:
-                        var applyConsequence = QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestSuccessConsequence;
+                        var applyConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestSuccessConsequence;
                         if (applyConsequence != null)
                         {
                             applyConsequence(quest);
