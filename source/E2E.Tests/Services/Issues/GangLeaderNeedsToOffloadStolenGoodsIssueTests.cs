@@ -583,13 +583,17 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         });
 
         int counterOfferGold = 0;
+        int stolenTradeGoodPrice = 0;
         int goldBefore = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
             counterOfferGold = quest._counterOfferGold;
+            stolenTradeGoodPrice = quest._stolenTradeGoodPrice;
             Assert.True(counterOfferGold > 0);
+            Assert.True(stolenTradeGoodPrice > 0);
+            owner.Gold = stolenTradeGoodPrice + 1000;
             goldBefore = owner.Gold;
         });
 
@@ -612,7 +616,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.Null(owner.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
-            Assert.Equal(goldBefore + counterOfferGold, owner.Gold);
+            Assert.Equal(goldBefore - stolenTradeGoodPrice + counterOfferGold, owner.Gold);
         });
     }
 
@@ -646,11 +650,14 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         });
 
         ItemObject stolenGood = null;
+        int stolenTradeGoodAmount = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
             stolenGood = quest._stolenTradeGood;
+            stolenTradeGoodAmount = quest._stolenTradeGoodAmount;
+            Assert.True(stolenTradeGoodAmount > 0);
         });
 
         Client.Call(() =>
@@ -673,7 +680,13 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.Null(owner.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
-            Assert.True(party.ItemRoster.GetItemNumber(stolenGood) > 0);
+            Assert.Equal(stolenTradeGoodAmount, party.ItemRoster.GetItemNumber(stolenGood));
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var registeredParty));
+            Assert.Equal(0, registeredParty.ItemRoster.GetItemNumber(stolenGood));
         });
     }
 

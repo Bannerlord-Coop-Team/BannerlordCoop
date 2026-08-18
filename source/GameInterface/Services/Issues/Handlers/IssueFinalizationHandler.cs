@@ -394,12 +394,14 @@ internal class IssueFinalizationHandler : IHandler
                 if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
             }
 
+            var isLocalPeerOwner = ownershipRegistry.IsLocalPeerOwner(owner);
+
             SetProofContext(reason, proof);
             try
             {
                 using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
                 {
-                    IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true);
+                    IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true, skipConsequenceReapplication: isLocalPeerOwner);
                 }
             }
             finally

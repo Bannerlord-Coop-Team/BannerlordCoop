@@ -293,6 +293,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     private static void ApplySucceedByPayingAndKeepingTheGoods(Quest quest)
     {
+        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
         quest.AddLog(quest.SuccessQuestLogText);
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
         {
@@ -311,6 +312,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     private static void ApplySucceedByPayingAndGivingTheGoodsBack(Quest quest)
     {
+        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
         quest.AddLog(quest.SuccessByGivingBackTheGoodsQuestLogText);
         GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest._counterOfferGold);
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]

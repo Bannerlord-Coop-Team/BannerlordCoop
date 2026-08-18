@@ -19,7 +19,7 @@ public sealed class IssueFinalizeAuthorityGuard : IDisposable
 
 internal static class IssueFinalizationSupport
 {
-    public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason, bool suppressReplicationPatches = true)
+    public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason, bool suppressReplicationPatches = true, bool skipConsequenceReapplication = false)
     {
         if (owner?.Issue == null) return;
 
@@ -33,7 +33,7 @@ internal static class IssueFinalizationSupport
                 switch (reason)
                 {
                     case IssueFinalizeReason.QuestSuccess:
-                        var applyConsequence = QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestSuccessConsequence;
+                        var applyConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestSuccessConsequence;
                         if (applyConsequence != null)
                         {
                             applyConsequence(quest);
@@ -47,7 +47,7 @@ internal static class IssueFinalizationSupport
                         quest.CompleteQuestWithCancel();
                         return;
                     case IssueFinalizeReason.QuestFail:
-                        var applyFailConsequence = QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence;
+                        var applyFailConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence;
                         if (applyFailConsequence != null)
                         {
                             applyFailConsequence(quest);
@@ -61,7 +61,7 @@ internal static class IssueFinalizationSupport
                         quest.CompleteQuestWithTimeOut();
                         return;
                     case IssueFinalizeReason.QuestBetrayal:
-                        var applyBetrayalConsequence = QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestBetrayalConsequence;
+                        var applyBetrayalConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestBetrayalConsequence;
                         if (applyBetrayalConsequence != null)
                         {
                             applyBetrayalConsequence(quest);
