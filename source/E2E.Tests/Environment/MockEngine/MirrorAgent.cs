@@ -51,8 +51,11 @@ public sealed class MirrorAgent
     public Mission Mission { get; set; }
     // Networked movement and action state captured from the engine.
     public Vec3 LookDirection { get; set; }
+    public int SetLookDirectionCalls { get; set; }
     public Vec2 MovementDirection { get; set; }
+    public int SetMovementDirectionCalls { get; set; }
     public Vec2 InputVector { get; set; }
+    public int SetMovementInputCalls { get; set; }
     public Agent.MovementControlFlag MovementFlags { get; set; }
     public int SetMovementFlagsCalls { get; set; }
     public int NativeStateWriteSequence { get; set; }

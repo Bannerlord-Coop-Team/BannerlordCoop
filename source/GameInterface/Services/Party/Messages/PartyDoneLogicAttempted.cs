@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Party.Messages;
 
@@ -33,6 +34,8 @@ public readonly struct PartyDoneLogicAttempted : IEvent
     public readonly bool DoNotApplyGoldTransactions;
     public readonly PartyScreenHelper.PartyScreenMode PartyScreenMode;
     public readonly bool ApplyReleasedAndTakenPrisonerActions;
+    public readonly Settlement DonationSettlement;
+    public readonly FlattenedTroopRoster DonatedPrisonersRoster;
 
     public PartyDoneLogicAttempted(
         Hero mainHero,
@@ -55,7 +58,9 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         int partyMoraleChangeAmount,
         bool doNotApplyGoldTransactions,
         PartyScreenHelper.PartyScreenMode partyScreenMode,
-        bool applyReleasedAndTakenPrisonerActions = false)
+        bool applyReleasedAndTakenPrisonerActions = false,
+        Settlement donationSettlement = null,
+        FlattenedTroopRoster donatedPrisonersRoster = null)
     {
         MainHero = mainHero;
         ReleasedPrisonersRoster = releasedPrisonersRoster;
@@ -78,5 +83,7 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         DoNotApplyGoldTransactions = doNotApplyGoldTransactions;
         PartyScreenMode = partyScreenMode;
         ApplyReleasedAndTakenPrisonerActions = applyReleasedAndTakenPrisonerActions;
+        DonationSettlement = donationSettlement;
+        DonatedPrisonersRoster = donatedPrisonersRoster;
     }
 }

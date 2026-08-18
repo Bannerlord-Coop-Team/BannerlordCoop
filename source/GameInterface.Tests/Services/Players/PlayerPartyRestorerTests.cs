@@ -58,6 +58,20 @@ public class PlayerPartyRestorerTests
     }
 
     [Fact]
+    public void RestoreClanMembership_MissingHero_RepairsOnlyClanCaches()
+    {
+        var (hero, party, clan, character) = CreatePlayerGraph();
+        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>(), Mock.Of<IAutoRegistryFactory>());
+
+        restorer.RestoreClanMembership(hero);
+
+        Assert.Contains(hero, clan.Heroes);
+        Assert.Contains(hero, clan.AliveLords);
+        Assert.Equal(0, party.MemberRoster.GetTroopCount(character));
+        Assert.Null(party.LeaderHero);
+    }
+
+    [Fact]
     public void Restore_StaleHeroPartyRoot_PointsHeroAtRestoredParty()
     {
         var (hero, party, _, _) = CreatePlayerGraph();

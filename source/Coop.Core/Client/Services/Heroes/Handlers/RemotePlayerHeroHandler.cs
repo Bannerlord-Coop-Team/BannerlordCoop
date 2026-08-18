@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
@@ -28,24 +29,44 @@ internal class RemotePlayerHeroHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerRegistry;
+    private readonly IPlayerCreationRollback playerCreationRollback;
 
     public RemotePlayerHeroHandler(
         IMessageBroker messageBroker,
         IHeroInterface heroInterface,
-        IPlayerManager playerRegistry)
+        IPlayerManager playerRegistry,
+        IPlayerCreationRollback playerCreationRollback)
     {
         this.messageBroker = messageBroker;
         this.heroInterface = heroInterface;
         this.playerRegistry = playerRegistry;
+        this.playerCreationRollback = playerCreationRollback;
 
         messageBroker.Subscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
+        messageBroker.Subscribe<NetworkPlayerCreationRolledBack>(Handle_NetworkPlayerCreationRolledBack);
         messageBroker.Subscribe<NetworkPlayerRegistrationUpdated>(Handle_NetworkPlayerRegistrationUpdated);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
+        messageBroker.Unsubscribe<NetworkPlayerCreationRolledBack>(Handle_NetworkPlayerCreationRolledBack);
         messageBroker.Unsubscribe<NetworkPlayerRegistrationUpdated>(Handle_NetworkPlayerRegistrationUpdated);
+    }
+
+    private void Handle_NetworkPlayerCreationRolledBack(MessagePayload<NetworkPlayerCreationRolledBack> payload)
+    {
+        var player = payload.What.Player;
+
+        // Blocking preserves the reliable-stream order when the same controller retries immediately.
+        GameThread.RunSafe(() =>
+        {
+            if (playerRegistry.TryGetPlayer(player.ControllerId, out var registeredPlayer))
+                playerRegistry.RemovePlayer(registeredPlayer);
+
+            using (new AllowedThread())
+                playerCreationRollback.Rollback(player, payload.What.RegistrationIds);
+        }, blocking: true, context: nameof(Handle_NetworkPlayerCreationRolledBack));
     }
 
     private void Handle_NetworkNewPlayerHeroCreated(MessagePayload<NetworkNewPlayerHeroCreated> payload)

@@ -85,6 +85,32 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_NonHumanNonMountSendsMovementWithoutEquipment()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent animal = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(animal, out var mirror));
+            mirror.IsHuman = false;
+            mirror.IsMount = false;
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), animal));
+
+            component.AgentMovementHandler.PollMovement(0f);
+
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+            Assert.Empty(network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
+        });
+    }
+
+    [Fact]
     public void PollMovement_TournamentProfileUsesSixtyHertzCadence()
     {
         using var fixture = new MissionEngineFixture();

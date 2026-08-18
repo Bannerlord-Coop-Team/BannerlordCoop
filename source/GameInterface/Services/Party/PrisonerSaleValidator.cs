@@ -5,7 +5,7 @@ namespace GameInterface.Services.Party;
 
 internal interface IPrisonerSaleValidator
 {
-    TroopRoster Validate(TroopRoster requestedRoster, TroopRoster availableRoster);
+    TroopRoster Validate(TroopRoster requestedRoster, TroopRoster availableRoster, bool preserveTroopXp = false);
 }
 
 /// <summary>
@@ -13,7 +13,7 @@ internal interface IPrisonerSaleValidator
 /// </summary>
 internal class PrisonerSaleValidator : IPrisonerSaleValidator
 {
-    public TroopRoster Validate(TroopRoster requestedRoster, TroopRoster availableRoster)
+    public TroopRoster Validate(TroopRoster requestedRoster, TroopRoster availableRoster, bool preserveTroopXp = false)
     {
         var validatedRoster = new TroopRoster();
 
@@ -40,7 +40,7 @@ internal class PrisonerSaleValidator : IPrisonerSaleValidator
                 totalToSell,
                 false,
                 woundedToSell,
-                0,
+                preserveTroopXp ? available.Xp : 0,
                 true);
         }
 

@@ -232,7 +232,7 @@ public class PlayerCaptivityReleasePositionTests
     }
 
     [Fact]
-    public void NetworkCompleteDoneLogic_RoundTrip_PreservesReleaserPartyPosition()
+    public void NetworkCompleteDoneLogic_RoundTrip_PreservesReleasePositionAndDonationSettlement()
     {
         var releasePosition = Position(44.75f, 91.125f);
         var original = new NetworkCompleteDoneLogic(
@@ -254,7 +254,9 @@ public class PlayerCaptivityReleasePositionTests
             true,
             releasePosition,
             Helpers.PartyScreenHelper.PartyScreenMode.Normal,
-            new TroopRosterOrderData(new()));
+            new TroopRosterOrderData(new()),
+            applyReleasedAndTakenPrisonerActions: false,
+            donationSettlementId: "town_ES1");
 
         byte[] bytes;
         using (var ms = new MemoryStream())
@@ -270,6 +272,7 @@ public class PlayerCaptivityReleasePositionTests
         }
 
         AssertPosition(releasePosition, result.ReleaserPartyPosition);
+        Assert.Equal("town_ES1", result.DonationSettlementId);
     }
 
     private void SetupObject<T>(string id, T obj)

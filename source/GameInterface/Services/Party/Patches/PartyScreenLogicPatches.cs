@@ -55,9 +55,13 @@ internal class PartyScreenLogicPatches
         }
 
         PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
+        PartyScreenHelperPatches.ResetPrisonerDonationRequest();
         bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
         bool applyReleasedAndTakenPrisonerActions =
             PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
+        PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
+            out var donationSettlement,
+            out var donatedPrisonersRoster);
         if (flag)
         {
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
@@ -93,7 +97,9 @@ internal class PartyScreenLogicPatches
                 __instance.CurrentData.PartyMoraleChangeAmount,
                 __instance.DoNotApplyGoldTransactions,
                 partyScreenMode,
-                applyReleasedAndTakenPrisonerActions
+                applyReleasedAndTakenPrisonerActions,
+                donationSettlement,
+                donatedPrisonersRoster
             );
 
             MessageBroker.Instance.Publish(__instance, message);

@@ -193,6 +193,9 @@ public class MissionModule : Module
         builder.RegisterType<PuppetMountStateRepairer>()
             .As<IPuppetMountStateRepairer>()
             .InstancePerDependency();
+        builder.RegisterType<AgentNativeMountState>()
+            .As<IAgentNativeMountState>()
+            .InstancePerDependency();
 
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();

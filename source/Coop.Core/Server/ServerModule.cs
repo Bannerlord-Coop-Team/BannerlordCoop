@@ -5,12 +5,15 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Common.Network.Session;
 using Common.PacketHandlers;
+using Coop.Core.Client.Services.Kingdoms;
+using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Session;
@@ -51,8 +54,17 @@ public class ServerModule : CommonModule
         builder.RegisterType<JoinCampaignBaselineSender>()
             .As<IJoinCampaignBaselineSender>()
             .InstancePerDependency();
+        builder.RegisterType<JoinCampaignKingdomBaseLineSender>()
+            .As<IJoinCampaignKingdomBaseLineSender>()
+            .InstancePerDependency();
         builder.RegisterType<PlayerPartyTroopXpBaselineProvider>()
             .As<IPlayerPartyTroopXpBaselineProvider>()
+            .InstancePerDependency();
+        builder.RegisterType<AllianceOfferPendingCapturer>()
+            .As<IAllianceOfferPendingCapturer>()
+            .InstancePerDependency();
+        builder.RegisterType<PeaceOfferPendingCapturer>()
+            .As<IPeaceOfferPendingCapturer>()
             .InstancePerDependency();
 
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
