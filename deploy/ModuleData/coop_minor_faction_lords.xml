@@ -108,34 +108,4 @@
         equipmentType="Civilian" />
     </Equipments>
   </NPCCharacter>
-  <NPCCharacter
-    id="coop_team_lord_45794b76"
-    name="{=!}Test"
-    voice="ironic"
-    is_template="true"
-    default_group="Infantry"
-    is_hero="false"
-    is_female="false"
-    culture="Culture.sturgia"
-    skill_template="SkillSet.spc_legion_of_the_betrayed_leader_1"
-    occupation="Lord">
-    <face>
-      <face_key_template value="BodyProperty.fighter_sturgia" />
-    </face>
-    <Traits>
-      <Trait id="Calculating" value="-1" />
-      <Trait id="Generosity" value="-1" />
-      <Trait id="Honor" value="1" />
-      <Trait id="Mercy" value="-1" />
-      <Trait id="Valor" value="1" />
-      <Trait id="Commander" value="12" />
-      <Trait id="KnightFightingSkills" value="7" />
-    </Traits>
-    <Equipments>
-      <EquipmentSet id="spc_legion_of_the_betrayed_leader_1" />
-      <EquipmentSet
-        id="spc_legion_of_the_betrayed_leader_1"
-        equipmentType="Civilian" />
-    </Equipments>
-  </NPCCharacter>
 </NPCCharacters>
