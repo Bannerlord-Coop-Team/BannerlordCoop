@@ -37,7 +37,7 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>
-/// Full battle-stack contracts for every siege-related map interaction exposed by the game DLLs.
+/// Full battle-stack contracts for every supported siege-related map interaction.
 /// </summary>
 public class SiegeInteractionBattleTests : MissionTestEnvironment
 {
@@ -51,37 +51,31 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(MapEvent.BattleTypes.Siege, false, false)]
-    [InlineData(MapEvent.BattleTypes.SallyOut, false, false)]
-    [InlineData(MapEvent.BattleTypes.SiegeOutside, false, false)]
-    [InlineData(MapEvent.BattleTypes.None, true, false)]
-    [InlineData(MapEvent.BattleTypes.BlockadeBattle, false, true)]
-    [InlineData(MapEvent.BattleTypes.BlockadeSallyOutBattle, false, true)]
+    [InlineData(MapEvent.BattleTypes.Siege, false)]
+    [InlineData(MapEvent.BattleTypes.SallyOut, false)]
+    [InlineData(MapEvent.BattleTypes.SiegeOutside, false)]
+    [InlineData(MapEvent.BattleTypes.None, true)]
     public void Interaction_SynchronizesIdentitySidesAndExactTroopCounts(
         MapEvent.BattleTypes eventType,
-        bool isSiegeAmbush,
-        bool isNaval)
+        bool isSiegeAmbush)
     {
-        var battle = SetupInteraction(eventType, isSiegeAmbush, isNaval, includeAiParties: true);
+        var battle = SetupInteraction(eventType, isSiegeAmbush, includeAiParties: true);
 
-        AssertInteraction(Server, battle, eventType, isSiegeAmbush, isNaval);
+        AssertInteraction(Server, battle, eventType, isSiegeAmbush);
         foreach (var client in Clients)
-            AssertInteraction(client, battle, eventType, isSiegeAmbush, isNaval);
+            AssertInteraction(client, battle, eventType, isSiegeAmbush);
     }
 
     [Theory]
-    [InlineData(MapEvent.BattleTypes.Siege, false, false)]
-    [InlineData(MapEvent.BattleTypes.SallyOut, false, false)]
-    [InlineData(MapEvent.BattleTypes.SiegeOutside, false, false)]
-    [InlineData(MapEvent.BattleTypes.None, true, false)]
-    [InlineData(MapEvent.BattleTypes.BlockadeBattle, false, true)]
-    [InlineData(MapEvent.BattleTypes.BlockadeSallyOutBattle, false, true)]
+    [InlineData(MapEvent.BattleTypes.Siege, false)]
+    [InlineData(MapEvent.BattleTypes.SallyOut, false)]
+    [InlineData(MapEvent.BattleTypes.SiegeOutside, false)]
+    [InlineData(MapEvent.BattleTypes.None, true)]
     public void Interaction_ReservesCountEveryEligibleTroopOnceAndPreserveOwnership(
         MapEvent.BattleTypes eventType,
-        bool isSiegeAmbush,
-        bool isNaval)
+        bool isSiegeAmbush)
     {
-        var battle = SetupInteraction(eventType, isSiegeAmbush, isNaval, includeAiParties: true);
+        var battle = SetupInteraction(eventType, isSiegeAmbush, includeAiParties: true);
 
         Server.Call(() =>
         {
@@ -116,16 +110,12 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(MapEvent.BattleTypes.SallyOut, false, false)]
-    [InlineData(MapEvent.BattleTypes.SiegeOutside, false, false)]
-    [InlineData(MapEvent.BattleTypes.BlockadeBattle, false, true)]
-    [InlineData(MapEvent.BattleTypes.BlockadeSallyOutBattle, false, true)]
+    [InlineData(MapEvent.BattleTypes.SallyOut)]
+    [InlineData(MapEvent.BattleTypes.SiegeOutside)]
     public void Interaction_StartRequestBroadcastsOneMissionStartPerParticipantOnly(
-        MapEvent.BattleTypes eventType,
-        bool isSiegeAmbush,
-        bool isNaval)
+        MapEvent.BattleTypes eventType)
     {
-        var battle = SetupInteraction(eventType, isSiegeAmbush, isNaval, includeAiParties: false);
+        var battle = SetupInteraction(eventType, isSiegeAmbush: false, includeAiParties: false);
         var clients = Clients.ToArray();
         var attackerClient = clients[0];
         Server.NetworkSentMessages.Clear();
@@ -155,7 +145,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     public void SiegeAmbush_StartRequestBroadcastsSiegeMissionToParticipants()
     {
         var battle = SetupInteraction(MapEvent.BattleTypes.None, isSiegeAmbush: true,
-            isNaval: false, includeAiParties: false);
+            includeAiParties: false);
         Server.Call(() =>
         {
             var handler = Server.Resolve<BattleMissionStartHandler>();
@@ -210,7 +200,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         MapEvent.BattleTypes eventType,
         bool isSiegeAmbush)
     {
-        var battle = SetupInteraction(eventType, isSiegeAmbush, isNaval: false, includeAiParties: false);
+        var battle = SetupInteraction(eventType, isSiegeAmbush, includeAiParties: false);
         var client = Clients.First();
         var launcher = new Mock<ICoopSiegeBattleLauncher>();
         MissionInitializerRecord? capturedRecord = null;
@@ -308,32 +298,19 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     [InlineData(MapEvent.BattleTypes.SiegeOutside)]
     public void LandOutsideInteraction_UsesFieldBattleLauncher(MapEvent.BattleTypes eventType)
     {
-        AssertAttackMissionLauncher(eventType, isNaval: false, expectedScene: "e2e_land_battle",
-            expectFieldLauncher: true);
+        AssertAttackMissionLauncher(eventType, expectedScene: "e2e_land_battle");
     }
 
     [Theory]
-    [InlineData(MapEvent.BattleTypes.BlockadeBattle)]
-    [InlineData(MapEvent.BattleTypes.BlockadeSallyOutBattle)]
-    public void BlockadeInteraction_UsesNavalBattleLauncher(MapEvent.BattleTypes eventType)
-    {
-        AssertAttackMissionLauncher(eventType, isNaval: true, expectedScene: "e2e_naval_battle",
-            expectFieldLauncher: false);
-    }
-
-    [Theory]
-    [InlineData(MapEvent.BattleTypes.Siege, false, false)]
-    [InlineData(MapEvent.BattleTypes.SallyOut, false, false)]
-    [InlineData(MapEvent.BattleTypes.SiegeOutside, false, false)]
-    [InlineData(MapEvent.BattleTypes.None, true, false)]
-    [InlineData(MapEvent.BattleTypes.BlockadeBattle, false, true)]
-    [InlineData(MapEvent.BattleTypes.BlockadeSallyOutBattle, false, true)]
+    [InlineData(MapEvent.BattleTypes.Siege, false)]
+    [InlineData(MapEvent.BattleTypes.SallyOut, false)]
+    [InlineData(MapEvent.BattleTypes.SiegeOutside, false)]
+    [InlineData(MapEvent.BattleTypes.None, true)]
     public void Interaction_LateAiPartiesExpandHostReservesExactlyOnce(
         MapEvent.BattleTypes eventType,
-        bool isSiegeAmbush,
-        bool isNaval)
+        bool isSiegeAmbush)
     {
-        var battle = SetupInteraction(eventType, isSiegeAmbush, isNaval, includeAiParties: false);
+        var battle = SetupInteraction(eventType, isSiegeAmbush, includeAiParties: false);
         var clients = Clients.ToArray();
         var host = clients[0];
         var nonHost = clients[1];
@@ -368,7 +345,6 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     private InteractionContext SetupInteraction(
         MapEvent.BattleTypes eventType,
         bool isSiegeAmbush,
-        bool isNaval,
         bool includeAiParties)
     {
         string? mapEventId = null;
@@ -416,7 +392,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
                 mapEvent._mapEventType = eventType;
-                mapEvent.Position = new CampaignVec2(default, isOnLand: !isNaval);
+                mapEvent.Position = new CampaignVec2(default, isOnLand: true);
             });
         }
 
@@ -494,15 +470,13 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         EnvironmentInstance instance,
         InteractionContext context,
         MapEvent.BattleTypes eventType,
-        bool isSiegeAmbush,
-        bool isNaval)
+        bool isSiegeAmbush)
     {
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
             Assert.Equal(eventType, mapEvent.EventType);
             Assert.Equal(isSiegeAmbush, mapEvent.IsSiegeAmbush);
-            Assert.Equal(isNaval, mapEvent.IsNavalMapEvent);
             Assert.Equal(AttackerPlayerTroops + AttackerAiTroops, mapEvent.AttackerSide.TroopCount);
             Assert.Equal(DefenderPlayerTroops + DefenderAiTroops, mapEvent.DefenderSide.TroopCount);
 
@@ -525,29 +499,19 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
 
     private void AssertAttackMissionLauncher(
         MapEvent.BattleTypes eventType,
-        bool isNaval,
-        string expectedScene,
-        bool expectFieldLauncher)
+        string expectedScene)
     {
-        var battle = SetupInteraction(eventType, isSiegeAmbush: false, isNaval, includeAiParties: false);
+        var battle = SetupInteraction(eventType, isSiegeAmbush: false, includeAiParties: false);
         var client = Clients.First();
         var resolver = new RecordingMissionInitializerResolver(expectedScene);
         var fieldLauncher = new Mock<ICoopFieldBattleLauncher>();
-        var navalLauncher = new Mock<ICoopNavalBattleLauncher>();
-        MissionInitializerRecord? capturedField = null;
-        MissionInitializerRecord? capturedNaval = null;
+        MissionInitializerRecord? captured = null;
         fieldLauncher.Setup(value => value.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()))
-            .Callback<MissionInitializerRecord>(record => capturedField = record)
-            .Returns((Mission)null!);
-        navalLauncher.Setup(value => value.OpenCoopNavalBattle(It.IsAny<MissionInitializerRecord>()))
-            .Callback<MissionInitializerRecord>(record => capturedNaval = record)
+            .Callback<MissionInitializerRecord>(record => captured = record)
             .Returns((Mission)null!);
 
         using var scope = client.Container.BeginLifetimeScope(builder =>
-        {
-            builder.RegisterInstance(fieldLauncher.Object).As<ICoopFieldBattleLauncher>();
-            builder.RegisterInstance(navalLauncher.Object).As<ICoopNavalBattleLauncher>();
-        });
+            builder.RegisterInstance(fieldLauncher.Object).As<ICoopFieldBattleLauncher>());
 
         client.Call(() =>
         {
@@ -576,9 +540,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
 
-                Assert.Equal(expectFieldLauncher, capturedField != null);
-                Assert.Equal(!expectFieldLauncher, capturedNaval != null);
-                var captured = expectFieldLauncher ? capturedField : capturedNaval;
+                Assert.NotNull(captured);
                 Assert.Equal(expectedScene, captured!.Value.SceneName);
             }
             finally

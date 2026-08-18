@@ -142,11 +142,6 @@ public class MissionModule : Module
             .As<ICoopFieldBattleLauncher>()
             .InstancePerLifetimeScope();
 
-        // Opens the native NavalDLC battle mission with coop suppliers and battle behaviors.
-        builder.RegisterType<CoopNavalBattleLauncher>()
-            .As<ICoopNavalBattleLauncher>()
-            .InstancePerLifetimeScope();
-
         // Builds the coop walls-assault siege mission (mirrors SandBoxMissions.OpenSiegeMissionWithDeployment
         // with the same coop swaps). Resolved by the GameInterface battle flow as ICoopSiegeBattleLauncher.
         builder.RegisterType<CoopSiegeBattleLauncher>()

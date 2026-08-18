@@ -147,6 +147,14 @@ internal class BattleMissionStartHandler : IHandler
                     return;
                 }
 
+                operation = "validate naval battle";
+                if (mapEvent.IsNavalMapEvent)
+                {
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles are disabled", payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 // The lords-hall stage is not supported: CurrentSiegeState never advances past OnTheWalls in
                 // co-op (SiegeMissionEndPatches), so this only trips on a save that carried the state in.
                 // Rejected before the arbiter claim so the event stays open for auto-resolve.
@@ -589,6 +597,12 @@ internal class BattleMissionStartHandler : IHandler
             if (!TryGetValidBattle(nameof(NetworkStartAttackMission), mapEventId, out var battle))
                 return;
 
+            if (battle.IsNavalMapEvent)
+            {
+                Logger.Warning("Received {Message} for naval map event {MapEventId}, but naval battles are disabled", nameof(NetworkStartAttackMission), mapEventId);
+                return;
+            }
+
             objectManager.TryGetId(MobileParty.MainParty, out var localPartyId);
             if (!ShouldOpenBattleMission(Hero.MainHero?.IsWounded == true, localPartyId, initiatingPartyId))
             {
@@ -610,29 +624,22 @@ internal class BattleMissionStartHandler : IHandler
                 Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", mapEventId);
             }
 
-            // There is no native fallback: the coop launcher must install the ownership-aware suppliers and
-            // attach the battle lifecycle before the spawn gate can be handed off to the mission.
-            Mission mission = null;
-            if (battle.IsNavalMapEvent)
+            // Coop opens a custom battle mission (per-client troop suppliers) instead of the native one; the
+            // launcher lives in Missions and is resolved from the container. There is deliberately no native
+            // fallback: the same unavailable container would prevent BattleMissionEntryPatch from attaching the
+            // lifecycle that owns EndBattle, while the already-engaged spawn patches could corrupt native setup.
+            if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
             {
-                if (ContainerProvider.TryResolve(out ICoopNavalBattleLauncher navalLauncher))
-                    mission = navalLauncher.OpenCoopNavalBattle(rec2);
+                var mission = battleLauncher.OpenCoopFieldBattle(rec2);
+                if (mission != null)
+                    spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
                 else
-                    Logger.Error("[BattleSync] ICoopNavalBattleLauncher unavailable; cannot safely open the naval battle mission");
+                    Logger.Error("[BattleSync] Coop field-battle launcher returned no mission");
             }
             else
             {
-                if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
-                    mission = battleLauncher.OpenCoopFieldBattle(rec2);
-                else
-                    Logger.Error("[BattleSync] ICoopFieldBattleLauncher unavailable; cannot safely open the field battle mission");
+                Logger.Error("[BattleSync] ICoopFieldBattleLauncher unavailable; cannot safely open the field battle mission");
             }
-
-            if (mission != null)
-                spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
-            else
-                Logger.Error("[BattleSync] Coop {BattleType} launcher returned no mission",
-                    battle.IsNavalMapEvent ? "naval" : "field-battle");
         }
         catch (Exception e)
         {
