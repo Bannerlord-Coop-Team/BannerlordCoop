@@ -238,6 +238,7 @@ internal static class VillageNeedsToolsQuestType
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
             .WithQuestCancelValidation(ValidateQuestCancel)
+            .WithQuestFailValidation(issue => true)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);

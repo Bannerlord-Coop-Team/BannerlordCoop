@@ -558,6 +558,49 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
+    public void RequestIssueRemoved_QuestFail_ClaimingThePlayerDeclaredWar_IsAccepted()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
+            {
+                Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+            }
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestFail, generation));
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.Null(owner.Issue);
+        });
+    }
+
+    [Fact]
     public void RequestIssueRemoved_ClaimingQuestSuccessWithoutTheRealItems_IsRejected()
     {
         var fixture = SetupVillageOwner();

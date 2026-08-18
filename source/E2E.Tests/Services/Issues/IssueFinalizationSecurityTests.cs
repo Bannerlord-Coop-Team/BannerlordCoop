@@ -310,7 +310,7 @@ public class IssueFinalizationSecurityTests : IDisposable
     }
 
     [Fact]
-    public void RequestIssueRemoved_ClaimingQuestFailBeforeDueTimeHasPassed_Rejected()
+    public void RequestIssueRemoved_ClaimingQuestTimeoutBeforeDueTimeHasPassed_Rejected()
     {
         var fixture = SetupVillageOwner();
         var owned = SetupOwnedIssue(fixture);
@@ -333,7 +333,7 @@ public class IssueFinalizationSecurityTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
 
             var network = Client.Resolve<Common.Network.INetwork>();
-            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestFail, owned.Generation));
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestTimeout, owned.Generation));
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
