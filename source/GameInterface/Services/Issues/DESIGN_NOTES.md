@@ -298,24 +298,6 @@ patch. `VerifyAllowlistIntegrity` asks Harmony directly whether any allowlisted 
 still carries a prefix and logs an error if so. The fix for a failure here is always to delete the offending
 orphaned patch class — never to add a gate/exception to it.
 
-## DisableIssueDialogueEntryOption / TaskGivenOption / TaskGivenAlternativeOption
-
-These three patches force `LordConversationsCampaignBehavior.conversation_hero_main_options_have_issue_on_condition`,
-`conversation_lord_task_given_on_condition`, and `conversation_lord_task_given_alternative_on_condition` to
-`false`, hiding every player-facing entry point into the Issues conversation tree. They are declared in this
-file, next to `Allowlist`, on purpose: they are NOT redundant with it and must not be deleted on the assumption
-that they are. `Allowlist`/`ApplyAllowlist` above only gates whether a vanilla issue-type's own `RegisterEvents`
-runs — it says nothing about `LordConversationsCampaignBehavior`, whose three conditions above only check
-whether the hero being talked to already has an `IssueBase`/`QuestBase` instance, with zero awareness of which
-type it is or whether that type is allowlisted. A hero can end up with a non-null `Issue` (a save made before
-these patches existed, a not-yet-fully-gated creation path, etc.) regardless of `Allowlist`'s contents, and
-without this gate, picking one of these options on that hero dead-ends the conversation — this exact class of
-patch has already been written, then deleted on the "Allowlist makes it safe now" reasoning, three times
-(d60d70320, 511fa7e4f, 4364d5bfb), and the third deletion shipped and produced a live player-facing softlock.
-Remove this gate only alongside a deliberate decision to expose specific, finished quest types — and if that
-means gating per-type rather than blanket, it needs to check `IsAllowlisted` against `Hero.OneToOneConversationHero.Issue`
-(or the relevant quest), not just disappear.
-
 ## Test setup: village.Hearth / hero.Occupation magic values
 
 E2E fixtures across `VillageNeedsToolsIssueTests`/`AwaitingAlternativeSolutionTroopsTests` set two values that

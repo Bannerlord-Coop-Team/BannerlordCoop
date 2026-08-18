@@ -164,31 +164,31 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
 }
 
 [HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_hero_main_options_have_issue_on_condition")]
-internal class DisableIssueDialogueEntryOption
+internal class GateIssueDialogueEntryOptionByAllowlist
 {
-    private static bool Prefix(ref bool __result)
+    private static void Postfix(ref bool __result)
     {
-        __result = false;
-        return false;
+        if (!__result) return;
+        __result = DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(Hero.OneToOneConversationHero?.Issue);
     }
 }
 
 [HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_lord_task_given_on_condition")]
-internal class DisableIssueDialogueTaskGivenOption
+internal class GateIssueDialogueTaskGivenOptionByAllowlist
 {
-    private static bool Prefix(ref bool __result)
+    private static void Postfix(ref bool __result)
     {
-        __result = false;
-        return false;
+        if (!__result) return;
+        __result = DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(Hero.OneToOneConversationHero?.Issue);
     }
 }
 
 [HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_lord_task_given_alternative_on_condition")]
-internal class DisableIssueDialogueTaskGivenAlternativeOption
+internal class GateIssueDialogueTaskGivenAlternativeOptionByAllowlist
 {
-    private static bool Prefix(ref bool __result)
+    private static void Postfix(ref bool __result)
     {
-        __result = false;
-        return false;
+        if (!__result) return;
+        __result = DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(Hero.OneToOneConversationHero?.Issue);
     }
 }
