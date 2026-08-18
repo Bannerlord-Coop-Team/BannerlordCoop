@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
 /// <summary>
-/// Opens the walls-assault siege mission on an authoritative participant. Carries the mission-defining siege
+/// Opens a walls-assault or siege-ambush mission on an authoritative participant. Carries the mission-defining siege
 /// inputs snapshotted once per map event on the server, so every entrant loads a physically identical scene
 /// even if campaign-side bombardment sync is mid-flight on their machine.
 /// </summary>
@@ -23,9 +23,12 @@ internal record NetworkStartSiegeMission : ICommand
     public SiegeEngineState[] DefenderEngines { get; }
     [ProtoMember(6)]
     public string InitiatingPartyId { get; }
+    [ProtoMember(7)]
+    public bool IsSallyOut { get; }
 
     public NetworkStartSiegeMission(string mapEventId, int wallLevel, float[] wallHitPointRatios,
-        SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines, string initiatingPartyId)
+        SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines, string initiatingPartyId,
+        bool isSallyOut = false)
     {
         MapEventId = mapEventId;
         WallLevel = wallLevel;
@@ -33,6 +36,7 @@ internal record NetworkStartSiegeMission : ICommand
         AttackerEngines = attackerEngines;
         DefenderEngines = defenderEngines;
         InitiatingPartyId = initiatingPartyId;
+        IsSallyOut = isSallyOut;
     }
 }
 

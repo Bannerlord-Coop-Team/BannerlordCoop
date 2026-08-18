@@ -209,7 +209,7 @@ internal class BattleMissionStartHandler : IHandler
                 operation = "send battle start reply";
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
 
-                if (mapEvent.IsSiegeAssault)
+                if (mapEvent.IsSiegeAssault || mapEvent.IsSiegeAmbush)
                 {
                     operation = "send siege mission snapshot";
                     var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
@@ -220,7 +220,8 @@ internal class BattleMissionStartHandler : IHandler
                         snapshot.WallHitPointRatios,
                         snapshot.AttackerEngines,
                         snapshot.DefenderEngines,
-                        payload.What.AttackerPartyId);
+                        payload.What.AttackerPartyId,
+                        snapshot.IsSallyOut);
                     SendMissionStart(participants, startMessage);
                 }
                 else
@@ -445,7 +446,7 @@ internal class BattleMissionStartHandler : IHandler
 
         return new NetworkStartSiegeMission(mapEventId, wallLevel,
             settlement.SettlementWallSectionHitPointsRatioList.ToArray(), attackerEngines, defenderEngines,
-            initiatingPartyId: null);
+            initiatingPartyId: null, isSallyOut: mapEvent.IsSiegeAmbush);
     }
 
     private void Handle_NetworkStartSiegeMission(MessagePayload<NetworkStartSiegeMission> payload)
@@ -506,7 +507,8 @@ internal class BattleMissionStartHandler : IHandler
             // counts and never attach the coop behaviors, so a missing launcher is a hard error.
             if (ContainerProvider.TryResolve(out ICoopSiegeBattleLauncher siegeLauncher))
             {
-                var mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios, attackerWeapons, defenderWeapons);
+                var mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios,
+                    attackerWeapons, defenderWeapons, payload.IsSallyOut);
                 if (mission != null)
                     spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
                 else
@@ -608,22 +610,29 @@ internal class BattleMissionStartHandler : IHandler
                 Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", mapEventId);
             }
 
-            // Coop opens a custom battle mission (per-client troop suppliers) instead of the native one; the
-            // launcher lives in Missions and is resolved from the container. There is deliberately no native
-            // fallback: the same unavailable container would prevent BattleMissionEntryPatch from attaching the
-            // lifecycle that owns EndBattle, while the already-engaged spawn patches could corrupt native setup.
-            if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
+            // There is no native fallback: the coop launcher must install the ownership-aware suppliers and
+            // attach the battle lifecycle before the spawn gate can be handed off to the mission.
+            Mission mission = null;
+            if (battle.IsNavalMapEvent)
             {
-                var mission = battleLauncher.OpenCoopFieldBattle(rec2);
-                if (mission != null)
-                    spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+                if (ContainerProvider.TryResolve(out ICoopNavalBattleLauncher navalLauncher))
+                    mission = navalLauncher.OpenCoopNavalBattle(rec2);
                 else
-                    Logger.Error("[BattleSync] Coop field-battle launcher returned no mission");
+                    Logger.Error("[BattleSync] ICoopNavalBattleLauncher unavailable; cannot safely open the naval battle mission");
             }
             else
             {
-                Logger.Error("[BattleSync] ICoopFieldBattleLauncher unavailable; cannot safely open the field battle mission");
+                if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
+                    mission = battleLauncher.OpenCoopFieldBattle(rec2);
+                else
+                    Logger.Error("[BattleSync] ICoopFieldBattleLauncher unavailable; cannot safely open the field battle mission");
             }
+
+            if (mission != null)
+                spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+            else
+                Logger.Error("[BattleSync] Coop {BattleType} launcher returned no mission",
+                    battle.IsNavalMapEvent ? "naval" : "field-battle");
         }
         catch (Exception e)
         {

@@ -25,8 +25,8 @@ using TaleWorlds.MountAndBlade.Source.Missions.Handlers.Logic;
 namespace Missions.Battles;
 
 /// <summary>
-/// Coop replacement for <c>SandBoxMissions.OpenSiegeMissionWithDeployment</c> (walls assault only),
-/// with the same coop swaps as <see cref="CoopFieldBattleLauncher"/>. The mission opens under the
+/// Coop replacement for <c>SandBoxMissions.OpenSiegeMissionWithDeployment</c> for walls assaults and
+/// siege-engine ambushes, with the same coop swaps as <see cref="CoopFieldBattleLauncher"/>. It opens under the
 /// exact name "SiegeMissionWithDeployment" so the native siege view stack attaches. BattleEndLogic
 /// deliberately does not arm the defender pull-back: the lords-hall stage is not supported, so the
 /// walls mission only ends in the resolved victory states the result-commit flow already handles.
@@ -53,7 +53,8 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     }
 
     public Mission OpenCoopSiegeBattle(MissionInitializerRecord rec, float[] wallHitPointRatios,
-        List<MissionSiegeWeapon> attackerWeapons, List<MissionSiegeWeapon> defenderWeapons)
+        List<MissionSiegeWeapon> attackerWeapons, List<MissionSiegeWeapon> defenderWeapons,
+        bool isSallyOut)
     {
         var mapEvent = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId))
@@ -63,7 +64,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
         }
 
         var mission = CreateCoopSiegeBattle(rec, mapEventId,
-            wallHitPointRatios, attackerWeapons, defenderWeapons);
+            wallHitPointRatios, attackerWeapons, defenderWeapons, isSallyOut);
         if (mission == null) return null;
 
         // Same post-open coop entry as the field launcher: the controller requests the P2P instance and
@@ -75,7 +76,8 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
 
     private Mission CreateCoopSiegeBattle(MissionInitializerRecord rec, string mapEventId,
         float[] wallHitPointRatios,
-        List<MissionSiegeWeapon> attackerWeapons, List<MissionSiegeWeapon> defenderWeapons)
+        List<MissionSiegeWeapon> attackerWeapons, List<MissionSiegeWeapon> defenderWeapons,
+        bool isSallyOut)
     {
         bool hasAnySiegeTower = attackerWeapons.Exists(weapon => weapon.Type == DefaultSiegeEngineTypes.SiegeTower);
         bool isPlayerSergeant = MobileParty.MainParty.MapEvent.IsPlayerSergeant();
@@ -97,16 +99,18 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 
-            // BattleSizeType.Siege selects the siege battle-size config in the spawn logic.
+            var battleSizeType = isSallyOut
+                ? Mission.BattleSizeType.SallyOut
+                : Mission.BattleSizeType.Siege;
             var spawnLogic = new DefaultBattleMissionAgentSpawnLogic(
                 new IMissionTroopSupplier[] { defenderSupplier, attackerSupplier },
                 PartyBase.MainParty.Side,
-                Mission.BattleSizeType.Siege);
+                battleSizeType);
 
             var mapEvent = MobileParty.MainParty.MapEvent;
             var behaviors = new List<MissionBehavior>
             {
-                new BattleSpawnLogic("battle_set"),
+                new BattleSpawnLogic(isSallyOut ? "sally_out_set" : "battle_set"),
                 new MissionOptionsComponent(),
                 new CampaignMissionComponent(),
                 new BattleEndLogic(),
@@ -116,9 +120,9 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
                     PartyBase.MainParty,
                     mapEvent.GetLeaderParty(BattleSideEnum.Defender),
                     mapEvent.GetLeaderParty(BattleSideEnum.Attacker),
-                    Mission.MissionTeamAITypeEnum.Siege,
+                    isSallyOut ? Mission.MissionTeamAITypeEnum.SallyOut : Mission.MissionTeamAITypeEnum.Siege,
                     isPlayerSergeant),
-                new SiegeMissionPreparationHandler(false, false, wallHitPointRatios, hasAnySiegeTower),
+                new SiegeMissionPreparationHandler(isSallyOut, false, wallHitPointRatios, hasAnySiegeTower),
                 new CampaignSiegeStateHandler(),
             };
 
@@ -131,6 +135,9 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
                 behaviors.Add(new WorkshopMissionHandler(currentTown));
             }
 
+            if (isSallyOut)
+                behaviors.Add(new SandBoxSallyOutMissionController(isSallyOutAmbush: true));
+
             behaviors.Add(new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
                 PartyBase.MainParty.Side));
             behaviors.Add(spawnLogic);
@@ -141,7 +148,8 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             behaviors.Add(new MountAgentLogic());
             behaviors.Add(new BannerBearerLogic());
             behaviors.Add(new AgentHumanAILogic());
-            behaviors.Add(new AmmoSupplyLogic(new List<BattleSideEnum> { BattleSideEnum.Defender }));
+            if (!isSallyOut)
+                behaviors.Add(new AmmoSupplyLogic(new List<BattleSideEnum> { BattleSideEnum.Defender }));
             behaviors.Add(new AgentVictoryLogic());
             behaviors.Add(new AssignPlayerRoleInTeamMissionController(!isPlayerSergeant, isPlayerSergeant, isPlayerInArmy, heroesOnPlayerSideByPriority));
             behaviors.Add(new SandboxGeneralsAndCaptainsAssignmentLogic(attackerGeneralName, defenderGeneralName, null, null, createBodyguard: false));
@@ -152,7 +160,9 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             behaviors.Add(new HighlightsController());
             behaviors.Add(new BattleHighlightsController());
             behaviors.Add(new EquipmentControllerLeaveLogic());
-            behaviors.Add(new MissionSiegeEnginesLogic(defenderWeapons, attackerWeapons));
+            behaviors.Add(isSallyOut
+                ? new MissionSiegeEnginesLogic(new List<MissionSiegeWeapon>(), attackerWeapons)
+                : new MissionSiegeEnginesLogic(defenderWeapons, attackerWeapons));
             behaviors.Add(new SiegeDeploymentHandler(isPlayerAttacker));
             behaviors.Add(new CoopSiegeDeploymentMissionController(isPlayerAttacker));
 
@@ -167,8 +177,8 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
         behaviorAttacher.Attach(mission);
 
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();
-        Logger.Information("[BattleSync] Opened coop siege battle for {MapEventId} (player side {Side})",
-            mapEventId, PartyBase.MainParty.Side);
+        Logger.Information("[BattleSync] Opened coop siege battle for {MapEventId} (player side {Side}, sallyOut={SallyOut})",
+            mapEventId, PartyBase.MainParty.Side, isSallyOut);
         return mission;
     }
 }
