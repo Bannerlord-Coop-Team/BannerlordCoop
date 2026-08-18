@@ -179,16 +179,24 @@ internal static class VillageNeedsToolsQuestType
         if (settlement == null) return false;
         if (settlement.IsRaided || settlement.IsUnderRaid) return true;
 
-        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return false;
-        if (!ownershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var controllerId)) return false;
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return false;
-        if (!playerManager.TryGetPlayer(controllerId, out var player) || player.HeroId == null) return false;
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var trueOwnerHero)) return false;
+        if (!TryResolveTrueOwnerHero(issue.IssueOwner, out var trueOwnerHero)) return false;
 
         var settlementFaction = settlement.MapFaction;
         var heroFaction = trueOwnerHero.MapFaction;
         return settlementFaction != null && heroFaction != null && settlementFaction.IsAtWarWith(heroFaction);
+    }
+
+    private static bool TryResolveTrueOwnerHero(Hero issueOwnerHero, out Hero trueOwnerHero)
+    {
+        trueOwnerHero = null;
+
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return false;
+        if (!ownershipRegistry.TryGetOwnerControllerId(issueOwnerHero, out var controllerId)) return false;
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return false;
+        if (!playerManager.TryGetPlayer(controllerId, out var player) || player.HeroId == null) return false;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
+
+        return objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out trueOwnerHero);
     }
 
     private static void ApplyQuestSuccessConsequence(Quest quest)
