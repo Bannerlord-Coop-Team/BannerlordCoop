@@ -34,9 +34,9 @@ public sealed class JoinAttemptPresentation
         JoinIntent.PlayerDirect => new JoinAttemptPresentation(intent, JoiningTitle,
             $"Contacting {address}:{port}...", PlayerCancelLabel, PlayerCancelledNotice),
 
-        // A tunnelled Steam join dials a local pump, so the host is named by route not by address.
-        JoinIntent.PlayerSteam => new JoinAttemptPresentation(intent, JoiningTitle,
-            "Contacting the host through Steam...", PlayerCancelLabel, PlayerCancelledNotice),
+        // A provider join can dial a local pump, so the host is named by route not by address.
+        JoinIntent.PlayerProvider => new JoinAttemptPresentation(intent, JoiningTitle,
+            "Contacting the host through the platform network...", PlayerCancelLabel, PlayerCancelledNotice),
 
         // Cancelling abandons the wait, not the server, which this instance never owns.
         JoinIntent.HostLoopback => new JoinAttemptPresentation(intent, HostingTitle,

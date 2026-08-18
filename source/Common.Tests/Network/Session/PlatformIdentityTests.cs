@@ -63,4 +63,25 @@ public class PlatformIdentityTests
         Assert.False(PlatformIdentity.TryParseControllerId(controllerId, out var identity));
         Assert.False(identity.IsValid);
     }
+
+    [Fact]
+    public void TryMigrateLegacySteamControllerId_NumericId_AddsSteamNamespace()
+    {
+        Assert.True(PlatformIdentity.TryMigrateLegacySteamControllerId(
+            "76561198000000042",
+            out var migratedControllerId));
+        Assert.Equal("steam:76561198000000042", migratedControllerId);
+    }
+
+    [Theory]
+    [InlineData("steam:76561198000000042")]
+    [InlineData("gog:76561198000000042")]
+    [InlineData("PlayerOne")]
+    public void TryMigrateLegacySteamControllerId_NonLegacyId_LeavesValueUnchanged(string controllerId)
+    {
+        Assert.False(PlatformIdentity.TryMigrateLegacySteamControllerId(
+            controllerId,
+            out var migratedControllerId));
+        Assert.Equal(controllerId, migratedControllerId);
+    }
 }

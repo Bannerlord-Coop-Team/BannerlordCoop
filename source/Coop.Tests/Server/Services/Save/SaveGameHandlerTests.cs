@@ -175,6 +175,94 @@ public class SaveGameHandlerTests
     }
 
     [Fact]
+    public void AllGameObjectsRegistered_LegacySteamControllerId_MigratesBeforeRegistration()
+    {
+        const string legacyControllerId = "76561198000000001";
+        const string migratedControllerId = "steam:76561198000000001";
+        var legacy = new Player(
+            legacyControllerId,
+            LiveHeroId,
+            LivePartyId,
+            "Clan_One",
+            "Character_Live");
+        var playerPartyRestorer = new Mock<IPlayerPartyRestorer>();
+        var playerRegistry = new Mock<IPlayerManager>();
+        var restoredPlayer = new Player(
+            migratedControllerId,
+            LiveHeroId,
+            LivePartyId,
+            "Clan_One",
+            "Character_Live");
+
+        playerPartyRestorer
+            .Setup(restorer => restorer.TryRestore(
+                It.Is<Player>(player => player.ControllerId == migratedControllerId),
+                out restoredPlayer))
+            .Returns(true);
+        playerRegistry.Setup(registry => registry.AddPlayer(restoredPlayer)).Returns(true);
+
+        using var handler = CreateHandler(
+            playerRegistry,
+            new[] { legacy },
+            playerPartyRestorer);
+
+        playerRegistry.Verify(registry => registry.AddPlayer(restoredPlayer), Times.Once);
+        playerRegistry.Verify(
+            registry => registry.AddPlayer(It.Is<Player>(player => player.ControllerId == legacyControllerId)),
+            Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AllGameObjectsRegistered_LegacyAndCanonicalCollision_PrefersViableLegacyRegistration(
+        bool legacyFirst)
+    {
+        const string legacyControllerId = "76561198000000001";
+        const string migratedControllerId = "steam:76561198000000001";
+        var legacy = new Player(
+            legacyControllerId,
+            LiveHeroId,
+            LivePartyId,
+            "Clan_Legacy",
+            "Character_Legacy");
+        var canonical = new Player(
+            migratedControllerId,
+            StaleHeroId,
+            LivePartyId,
+            "Clan_Canonical",
+            "Character_Canonical");
+        var saved = legacyFirst ? new[] { legacy, canonical } : new[] { canonical, legacy };
+        var restoredLegacy = new Player(
+            migratedControllerId,
+            LiveHeroId,
+            LivePartyId,
+            "Clan_Legacy",
+            "Character_Legacy");
+        var playerPartyRestorer = new Mock<IPlayerPartyRestorer>();
+        var playerRegistry = new Mock<IPlayerManager>();
+        var restoredPlayer = restoredLegacy;
+
+        playerPartyRestorer
+            .Setup(restorer => restorer.TryRestore(
+                It.Is<Player>(player =>
+                    player.ControllerId == migratedControllerId &&
+                    player.HeroId == LiveHeroId),
+                out restoredPlayer))
+            .Returns(true);
+        playerRegistry.Setup(registry => registry.AddPlayer(restoredLegacy)).Returns(true);
+
+        using var handler = CreateHandler(playerRegistry, saved, playerPartyRestorer);
+
+        playerRegistry.Verify(registry => registry.AddPlayer(restoredLegacy), Times.Once);
+        playerPartyRestorer.Verify(
+            restorer => restorer.TryRestore(
+                It.Is<Player>(player => player.HeroId == StaleHeroId),
+                out It.Ref<Player>.IsAny),
+            Times.Never);
+    }
+
+    [Fact]
     public void AllGameObjectsRegistered_DuplicateStaleParties_PrefersResolvableHeroForRepair()
     {
         var missing = new Player(ControllerId, MissingHeroId, "Party_Missing", "Clan_One", "Character_Missing");

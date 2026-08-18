@@ -1,4 +1,5 @@
-using Common.Logging;
+﻿using Common.Logging;
+using Common.Network.Session;
 using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
 using Serilog;
@@ -35,7 +36,7 @@ internal class IssueOwnershipPersistencePatches
         }
     }
 
-    private static void SyncDataInternal(IDataStore dataStore, IIssueOwnershipRegistry ownershipRegistry, IIssueGenerationRegistry generationRegistry)
+    internal static void SyncDataInternal(IDataStore dataStore, IIssueOwnershipRegistry ownershipRegistry, IIssueGenerationRegistry generationRegistry)
     {
         List<IssueOwnershipSaveData> saveData = null;
         if (dataStore.IsSaving)
@@ -56,7 +57,9 @@ internal class IssueOwnershipPersistencePatches
             {
                 ownershipRegistry.RestoreAll(saveData
                     .Where(entry => entry?.IssueGiverHero != null && !string.IsNullOrEmpty(entry.OwnerControllerId))
-                    .Select(entry => new KeyValuePair<Hero, string>(entry.IssueGiverHero, entry.OwnerControllerId)));
+                    .Select(entry => new KeyValuePair<Hero, string>(
+                        entry.IssueGiverHero,
+                        MigrateLegacySteamControllerId(entry.OwnerControllerId))));
             }
         }
 
@@ -74,5 +77,17 @@ internal class IssueOwnershipPersistencePatches
         generationRegistry.RestoreAll((generationSaveData ?? new List<IssueGenerationSaveData>())
             .Where(entry => entry?.IssueGiverHero != null)
             .Select(entry => new KeyValuePair<Hero, int>(entry.IssueGiverHero, entry.Generation)));
+    }
+
+    private static string MigrateLegacySteamControllerId(string controllerId)
+    {
+        if (!PlatformIdentity.TryMigrateLegacySteamControllerId(controllerId, out var migratedControllerId))
+            return controllerId;
+
+        Logger.Information(
+            "Migrating legacy issue owner Steam controller id {LegacyControllerId} to {ControllerId}",
+            controllerId,
+            migratedControllerId);
+        return migratedControllerId;
     }
 }

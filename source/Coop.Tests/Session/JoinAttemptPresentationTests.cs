@@ -16,12 +16,14 @@ public class JoinAttemptPresentationTests
     }
 
     [Fact]
-    public void For_SteamJoin_KeepsTheTunnelEndpointOutOfTheDescription()
+    public void For_ProviderJoin_KeepsTheTunnelEndpointOutOfTheDescription()
     {
-        var presentation = JoinAttemptPresentation.For(JoinIntent.PlayerSteam, "127.0.0.1", 27015);
+        var presentation = JoinAttemptPresentation.For(JoinIntent.PlayerProvider, "127.0.0.1", 27015);
 
         Assert.DoesNotContain("127.0.0.1", presentation.Description);
         Assert.DoesNotContain("27015", presentation.Description);
+        Assert.DoesNotContain("Steam", presentation.Description);
+        Assert.DoesNotContain("GOG", presentation.Description);
     }
 
     [Fact]
@@ -41,7 +43,7 @@ public class JoinAttemptPresentationTests
         Assert.Equal("Connecting to Coop Server",
             JoinAttemptPresentation.For(JoinIntent.PlayerDirect, "localhost", 4200).Title);
         Assert.Equal("Connecting to Coop Server",
-            JoinAttemptPresentation.For(JoinIntent.PlayerSteam, "localhost", 4200).Title);
+            JoinAttemptPresentation.For(JoinIntent.PlayerProvider, "localhost", 4200).Title);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
@@ -168,29 +169,66 @@ internal class SaveGameHandler : IHandler
     {
         // AllGameObjectsRegistered means the campaign's objects are resolvable, so these lookups
         // are authoritative about which registration still has a complete player graph.
-        foreach (var group in players.Where(player => player != null).GroupBy(player => player.ControllerId))
+        foreach (var group in players
+            .Where(player => player != null)
+            .Select(player =>
+            {
+                var migratedPlayer = MigrateLegacySteamControllerId(player, out var wasLegacySteamId);
+                return (Player: migratedPlayer, WasLegacySteamId: wasLegacySteamId);
+            })
+            .GroupBy(candidate => candidate.Player.ControllerId))
         {
             var registrations = group.ToArray();
             if (registrations.Length == 1)
             {
-                yield return registrations[0];
+                yield return registrations[0].Player;
                 continue;
             }
 
-            var live = registrations.FirstOrDefault(PlayerGraphExists) ??
-                registrations.FirstOrDefault(PlayerHeroExists) ??
-                registrations[0];
+            // A canonical registration can be the duplicate character created by the namespace
+            // regression, so a viable raw Steam registration wins regardless of save order.
+            var live = registrations
+                .FirstOrDefault(candidate =>
+                    candidate.WasLegacySteamId && PlayerGraphExists(candidate.Player)).Player ??
+                registrations.FirstOrDefault(candidate => PlayerGraphExists(candidate.Player)).Player ??
+                registrations
+                    .FirstOrDefault(candidate =>
+                        candidate.WasLegacySteamId && PlayerHeroExists(candidate.Player)).Player ??
+                registrations.FirstOrDefault(candidate => PlayerHeroExists(candidate.Player)).Player ??
+                registrations[0].Player;
 
             Logger.Warning(
                 "Save carries {Count} registrations for controller {ControllerId} (heroes {HeroIds}); " +
                 "restoring {KeptHeroId} and dropping the rest",
                 registrations.Length,
                 group.Key,
-                string.Join(", ", registrations.Select(registration => registration.HeroId)),
+                string.Join(", ", registrations.Select(registration => registration.Player.HeroId)),
                 live.HeroId);
 
             yield return live;
         }
+    }
+
+    private static Player MigrateLegacySteamControllerId(Player player, out bool wasLegacySteamId)
+    {
+        wasLegacySteamId = PlatformIdentity.TryMigrateLegacySteamControllerId(
+            player.ControllerId,
+            out var controllerId);
+        if (!wasLegacySteamId)
+        {
+            return player;
+        }
+
+        Logger.Information(
+            "Migrating legacy Steam controller id {LegacyControllerId} to {ControllerId}",
+            player.ControllerId,
+            controllerId);
+        return new Player(
+            controllerId,
+            player.HeroId,
+            player.MobilePartyId,
+            player.ClanId,
+            player.CharacterObjectId);
     }
 
     private bool PlayerGraphExists(Player player) =>

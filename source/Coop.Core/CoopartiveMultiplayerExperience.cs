@@ -359,7 +359,7 @@ namespace Coop.Core
             try
             {
                 // A refusal leaves the process-wide tunnel and lobby to the start still in flight.
-                if (!StartAsClient(configuration, intent: JoinIntent.PlayerSteam))
+                if (!StartAsClient(configuration, intent: JoinIntent.PlayerProvider))
                 {
                     InformationManager.DisplayMessage(new InformationMessage(StartRefusedNotice));
                     return;

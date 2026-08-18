@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 
 namespace Common.Network.Session;
 
@@ -53,6 +54,21 @@ public readonly struct PlatformIdentity : IEquatable<PlatformIdentity>
             controllerId.Substring(0, separator),
             controllerId.Substring(separator + 1));
         return identity.IsValid;
+    }
+
+    public static bool TryMigrateLegacySteamControllerId(
+        string controllerId,
+        out string migratedControllerId)
+    {
+        migratedControllerId = controllerId;
+        if (TryParseControllerId(controllerId, out _) ||
+            !ulong.TryParse(controllerId, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+        {
+            return false;
+        }
+
+        migratedControllerId = new PlatformIdentity("steam", controllerId).ControllerId;
+        return true;
     }
 
     private static string NormalizeProvider(string provider) =>

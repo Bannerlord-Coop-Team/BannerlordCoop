@@ -1,5 +1,6 @@
-using Common;
+﻿using Common;
 using Common.Logging;
+using Common.Network.Session;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Interfaces;
 using HarmonyLib;
@@ -78,7 +79,7 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
         }
     }
 
-    private static void SyncDataInternal(IDataStore dataStore, IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
+    internal static void SyncDataInternal(IDataStore dataStore, IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
     {
         List<AwaitingAlternativeSolutionTroopsSaveData> saveData = null;
         if (dataStore.IsSaving)
@@ -97,7 +98,9 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
             foreach (var entry in saveData)
             {
                 if (entry?.OwnerControllerId == null || entry.Troops == null) continue;
-                troopsRegistry.Restore(entry.OwnerControllerId, entry.Troops);
+                troopsRegistry.Restore(
+                    MigrateLegacySteamControllerId(entry.OwnerControllerId),
+                    entry.Troops);
             }
         }
 
@@ -130,5 +133,18 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
         }
 
         LegacyAwaitingTroopsField.SetValue(Campaign.Current.IssueManager, TroopRoster.CreateDummyTroopRoster());
+    }
+
+    private static string MigrateLegacySteamControllerId(string controllerId)
+    {
+        if (!PlatformIdentity.TryMigrateLegacySteamControllerId(controllerId, out var migratedControllerId))
+            return controllerId;
+
+        Logger.Information(
+            "Migrating legacy alternative-solution troop owner Steam controller id {LegacyControllerId} " +
+            "to {ControllerId}",
+            controllerId,
+            migratedControllerId);
+        return migratedControllerId;
     }
 }
