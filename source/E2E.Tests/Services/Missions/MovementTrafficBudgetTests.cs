@@ -252,7 +252,7 @@ public sealed class MovementTrafficBudgetTests
             secondLegacyBatch: null,
             (scope, compactIds, canonicalIds, data) => new SizedPacket(data.Length),
             (id, value) => sent.Add($"second-{value}"),
-            maxPayloadBytes: 10);
+            maxPayloadBytes: 20);
 
         Assert.Equal(3, result.First.SentCount);
         Assert.Equal(3, result.Second.SentCount);
@@ -310,6 +310,7 @@ public sealed class MovementTrafficBudgetTests
         Assert.Empty(sent);
         Assert.True(blocked.BlockedBySharedBudget);
         Assert.True(blocked.PriorityBlockedBySharedBudget);
+        Assert.Equal(150, blocked.RequiredSharedBudgetBytes);
         Assert.Equal(100, sharedBudget.AvailableBytes);
 
         sender.BeginFrame(0.5f);
@@ -328,6 +329,43 @@ public sealed class MovementTrafficBudgetTests
         Assert.Equal(priorityId, Assert.Single(sent));
         Assert.Equal(1, sentAfterRefill.PrioritySentCount);
         Assert.Equal(0, sentAfterRefill.BulkSentCount);
+    }
+
+    [Fact]
+    public void Sender_DoesNotReserveSharedBudgetWhenRecipientIsAlsoShort()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var sharedBudget = new MovementTrafficBudget(bytesPerSecond: 100, burstBytes: 150);
+        Assert.True(sharedBudget.TrySpend(50));
+        var budgets = new Queue<IMovementTrafficBudget>(new[]
+        {
+            sharedBudget,
+            new MovementTrafficBudget(bytesPerSecond: 100, burstBytes: 100),
+        });
+        var sender = new MovementBatchSender(
+            network.Object,
+            new SizedPacketCompressor(),
+            new QueueBudgetFactory(budgets),
+            new MovementPriorityScheduler(),
+            new MovementNetworkSettings(
+                100d / MovementNetworkSettings.BytesPerMiB,
+                1d));
+        Guid agentId = Guid.NewGuid();
+        var batch = new MovementBatch<int>(null);
+        batch.CanonicalIds.Add(agentId);
+        batch.Data.Add(15);
+        batch.Priorities.Add(new MovementPriorityKey(1, 1d, 0f, 0f, agentId));
+
+        MovementSendResult result = sender.Send(
+            "receiver",
+            new[] { batch },
+            legacyBatch: null,
+            maxPayloadBytes: 200,
+            (scope, compactIds, canonicalIds, data) => new SizedPacket(data[0]),
+            onSent: null);
+
+        Assert.False(result.BlockedBySharedBudget);
+        Assert.Equal(0, result.RequiredSharedBudgetBytes);
     }
 
     [Fact]

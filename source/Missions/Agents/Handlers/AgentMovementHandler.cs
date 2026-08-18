@@ -401,6 +401,9 @@ public class AgentMovementHandler : IAgentMovementHandler
     private bool firstPopulationSample = true;
     private int bulkRecipientSendOffset;
     private int priorityRecipientSendOffset;
+    private string sharedBudgetReservedControllerId;
+    private int sharedBudgetReservedBytes;
+    private bool sharedBudgetReservationIsPriority;
 #if DEBUG
     private int initialConfiguredBulkHz;
     private float syntheticReceivePressureRemainingSeconds;
@@ -823,12 +826,31 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
         }
 
+        int reservedRecipient = string.IsNullOrEmpty(sharedBudgetReservedControllerId)
+            ? -1
+            : recipientIds.IndexOf(sharedBudgetReservedControllerId);
+        if (!string.IsNullOrEmpty(sharedBudgetReservedControllerId) &&
+            reservedRecipient < 0)
+        {
+            ClearSharedBudgetReservation();
+        }
+        if (reservedRecipient >= 0 &&
+            (movementBatchSender.AvailableOutgoingBytes < sharedBudgetReservedBytes ||
+                (sharedBudgetReservationIsPriority
+                    ? !includePriorityAgent
+                    : !includeAuthoritativeAgents)))
+        {
+            return traffic;
+        }
+
         int recipientOffset = includeAuthoritativeAgents
             ? bulkRecipientSendOffset
             : priorityRecipientSendOffset;
-        int startRecipient = recipientIds.Count == 0
-            ? 0
-            : recipientOffset % recipientIds.Count;
+        int startRecipient = reservedRecipient >= 0
+            ? reservedRecipient
+            : recipientIds.Count == 0
+                ? 0
+                : recipientOffset % recipientIds.Count;
         int? lastBulkSendingRecipient = null;
         int? lastPrioritySendingRecipient = null;
         int? bulkBlockedRecipient = null;
@@ -842,6 +864,16 @@ public class AgentMovementHandler : IAgentMovementHandler
                 IsRecipientBulkDue(
                     recipient,
                     movementRateController.GetReceiverCapHz(recipientId));
+            bool reservedRoute = string.Equals(
+                recipientId,
+                sharedBudgetReservedControllerId,
+                StringComparison.Ordinal);
+            if (reservedRoute &&
+                !sharedBudgetReservationIsPriority &&
+                !recipientBulkDue)
+            {
+                return traffic;
+            }
             if (!recipientBulkDue && !includePriorityAgent) continue;
 
             MovementTrafficFrame recipientTraffic = SendMovementToRecipient(
@@ -856,8 +888,14 @@ public class AgentMovementHandler : IAgentMovementHandler
                 lastBulkSendingRecipient = routedRecipientIndex;
             if (sendResult.PrioritySentCount > 0)
                 lastPrioritySendingRecipient = routedRecipientIndex;
-            if (!sendResult.BlockedBySharedBudget) continue;
+            if (!sendResult.BlockedBySharedBudget)
+            {
+                if (reservedRoute)
+                    ClearSharedBudgetReservation();
+                continue;
+            }
 
+            ReserveSharedBudget(recipientId, sendResult);
             if (sendResult.PriorityBlockedBySharedBudget)
                 priorityBlockedRecipient = routedRecipientIndex;
             else
@@ -877,6 +915,22 @@ public class AgentMovementHandler : IAgentMovementHandler
                 (lastPrioritySendingRecipient.Value + 1) % recipientIds.Count;
 
         return traffic;
+    }
+
+    private void ReserveSharedBudget(
+        string controllerId,
+        MovementSendPairResult sendResult)
+    {
+        sharedBudgetReservedControllerId = controllerId;
+        sharedBudgetReservedBytes = Math.Max(1, sendResult.RequiredSharedBudgetBytes);
+        sharedBudgetReservationIsPriority = sendResult.PriorityBlockedBySharedBudget;
+    }
+
+    private void ClearSharedBudgetReservation()
+    {
+        sharedBudgetReservedControllerId = null;
+        sharedBudgetReservedBytes = 0;
+        sharedBudgetReservationIsPriority = false;
     }
 
     private RecipientMovementState GetOrCreateRecipientState(string controllerId)
