@@ -757,9 +757,15 @@ public class MovementTrafficTests : MissionTestEnvironment
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            network.MaxUnreliablePayloadBytes = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
+                serializer,
+                "MapEvent_Created_0000",
+                "76561198000000042",
+                LiteNetP2PClient.SafeSinglePacketBytes);
             component.AgentMovementHandler.Dispose();
             var compressor = new CountingMovementPacketCompressor(
-                new MovementPacketCompressor(serializer));
+                new FixedSizeMovementPacketCompressor(
+                    (network.MaxUnreliablePayloadBytes / 4) + 1));
             using var handler = new AgentMovementHandler(
                 network,
                 peer.Resolve<IPacketManager>(),
@@ -776,11 +782,6 @@ public class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IMovementRateController>(),
                 peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>());
-            network.MaxUnreliablePayloadBytes = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
-                serializer,
-                "MapEvent_Created_0000",
-                "76561198000000042",
-                LiteNetP2PClient.SafeSinglePacketBytes);
             var riderMirrors = new List<MirrorAgent>();
 
             for (int i = 0; i < 18; i++)
