@@ -44,7 +44,15 @@ internal static class IssueFinalizationSupport
                         }
                         return;
                     case IssueFinalizeReason.QuestCancel:
-                        quest.CompleteQuestWithCancel();
+                        var applyCancelConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestCancelConsequence;
+                        if (applyCancelConsequence != null)
+                        {
+                            applyCancelConsequence(quest);
+                        }
+                        else
+                        {
+                            quest.CompleteQuestWithCancel();
+                        }
                         return;
                     case IssueFinalizeReason.QuestFail:
                         quest.CompleteQuestWithFail();

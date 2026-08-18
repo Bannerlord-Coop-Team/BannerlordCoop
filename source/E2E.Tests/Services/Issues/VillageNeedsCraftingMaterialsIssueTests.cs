@@ -924,6 +924,61 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
+    public void RequestVillageIssueRemoved_QuestFail_ClaimingWarWasDeclared_FinalizesTheRealQuestAndBroadcastsRemovalToEveryPeer()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", "", partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                using (new QuestSolutionStartAuthorityGuard())
+                {
+                    Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+                }
+                Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+                if (instance == Server)
+                {
+                    Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
+                }
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestFail, generation));
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Null(owner.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+            });
+        }
+    }
+
+    [Fact]
     public void RealPlayerLocalSuccessClick_RewardIsGrantedAuthoritativelyOnServerNotJustOnTheClickingClient()
     {
         var fixture = SetupIssueOwner();

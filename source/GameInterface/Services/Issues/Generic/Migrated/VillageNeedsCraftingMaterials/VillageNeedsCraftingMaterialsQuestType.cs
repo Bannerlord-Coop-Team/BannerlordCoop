@@ -156,6 +156,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
             .WithQuestCancelValidation(issue => true)
+            .WithQuestFailValidation(issue => true)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
