@@ -7,9 +7,9 @@ namespace Missions.Agents.Handlers;
 public interface IMovementTrafficBudget
 {
     int AvailableBytes { get; }
-    int BytesPerSecond { get; }
+    double BytesPerSecond { get; }
     int BurstBytes { get; }
-    void Configure(int bytesPerSecond, int burstBytes);
+    void Configure(double bytesPerSecond, int burstBytes);
     void Advance(float elapsedSeconds);
     bool TrySpend(int bytes);
     MovementTrafficFrame ReportFrame(int deferredSnapshots, float maximumDeferredAgeSeconds);
@@ -49,7 +49,7 @@ public sealed class MovementTrafficBudget : IMovementTrafficBudget
     internal const int DefaultBurstBytes = 128 * 1024;
     private const float ReportIntervalSeconds = 1f;
 
-    private int bytesPerSecond;
+    private double bytesPerSecond;
     private int burstBytes;
     private double availableBytes;
     private float reportElapsed;
@@ -59,10 +59,13 @@ public sealed class MovementTrafficBudget : IMovementTrafficBudget
     private float maximumDeferredAgeSeconds;
 
     public MovementTrafficBudget(
-        int bytesPerSecond = DefaultBytesPerSecond,
+        double bytesPerSecond = DefaultBytesPerSecond,
         int burstBytes = DefaultBurstBytes)
     {
-        if (bytesPerSecond <= 0) throw new ArgumentOutOfRangeException(nameof(bytesPerSecond));
+        if (double.IsNaN(bytesPerSecond) ||
+            double.IsInfinity(bytesPerSecond) ||
+            bytesPerSecond <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(bytesPerSecond));
         if (burstBytes <= 0) throw new ArgumentOutOfRangeException(nameof(burstBytes));
 
         this.bytesPerSecond = bytesPerSecond;
@@ -71,12 +74,15 @@ public sealed class MovementTrafficBudget : IMovementTrafficBudget
     }
 
     public int AvailableBytes => (int)Math.Floor(availableBytes);
-    public int BytesPerSecond => bytesPerSecond;
+    public double BytesPerSecond => bytesPerSecond;
     public int BurstBytes => burstBytes;
 
-    public void Configure(int bytesPerSecond, int burstBytes)
+    public void Configure(double bytesPerSecond, int burstBytes)
     {
-        if (bytesPerSecond <= 0) throw new ArgumentOutOfRangeException(nameof(bytesPerSecond));
+        if (double.IsNaN(bytesPerSecond) ||
+            double.IsInfinity(bytesPerSecond) ||
+            bytesPerSecond <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(bytesPerSecond));
         if (burstBytes <= 0) throw new ArgumentOutOfRangeException(nameof(burstBytes));
         if (this.bytesPerSecond == bytesPerSecond && this.burstBytes == burstBytes) return;
 

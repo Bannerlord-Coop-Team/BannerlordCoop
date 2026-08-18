@@ -60,7 +60,7 @@ public sealed class MovementRateSnapshot
     public string Reason { get; }
     public int ConfiguredOutgoingBytesPerSecond { get; }
     public int ConfiguredIncomingBytesPerSecond { get; }
-    public int AdvertisedIncomingBytesPerSender { get; }
+    public double AdvertisedIncomingBytesPerSender { get; }
     public Guid FocusAgentId { get; }
 
     internal MovementRateSnapshot(
@@ -90,7 +90,7 @@ public sealed class MovementRateSnapshot
         string reason,
         int configuredOutgoingBytesPerSecond,
         int configuredIncomingBytesPerSecond,
-        int advertisedIncomingBytesPerSender,
+        double advertisedIncomingBytesPerSender,
         Guid focusAgentId)
     {
         Profile = profile;
@@ -139,7 +139,7 @@ public interface IMovementRateController : IDisposable
         double applyMilliseconds,
         int snapshots);
     int GetReceiverCapHz(string controllerId);
-    int GetReceiverIncomingBytesPerSecond(string controllerId);
+    double GetReceiverIncomingBytesPerSecond(string controllerId);
     bool TryGetReceiverFocusAgentId(string controllerId, out Guid agentId);
     void SetLocalFocusAgent(Guid? agentId);
     bool TrySetForcedBulkHz(int? hz, out string error);
@@ -235,7 +235,7 @@ public sealed class MovementRateController : IMovementRateController
     private sealed class ReceiverCapEntry
     {
         public int MaximumBulkHz;
-        public int MaximumIncomingBytesPerSecond;
+        public double MaximumIncomingBytesPerSecond;
         public Guid FocusAgentId;
         public long Sequence;
         public long ReceivedTimestamp;
@@ -481,7 +481,7 @@ public sealed class MovementRateController : IMovementRateController
         }
     }
 
-    public int GetReceiverIncomingBytesPerSecond(string controllerId)
+    public double GetReceiverIncomingBytesPerSecond(string controllerId)
     {
         if (string.IsNullOrEmpty(controllerId))
             return MovementNetworkSettings.BytesPerMiB;
@@ -492,7 +492,7 @@ public sealed class MovementRateController : IMovementRateController
 
             PruneExpiredReceiverCaps();
             return receiverCaps.TryGetValue(controllerId, out ReceiverCapEntry receiverCap)
-                ? Math.Max(1, receiverCap.MaximumIncomingBytesPerSecond)
+                ? NormalizeIncomingByteRate(receiverCap.MaximumIncomingBytesPerSecond)
                 : MovementNetworkSettings.BytesPerMiB;
         }
     }
@@ -906,11 +906,18 @@ public sealed class MovementRateController : IMovementRateController
     private int GetControllerCount() =>
         1 + (missionContext?.ControllersInMission.Count ?? 0);
 
-    private int CalculateIncomingBytesPerSender()
+    private double CalculateIncomingBytesPerSender()
     {
         int senders = Math.Max(1, missionContext?.ControllersInMission.Count ?? 0);
-        return Math.Max(1, networkSettings.IncomingBytesPerSecond / senders);
+        return (double)networkSettings.IncomingBytesPerSecond / senders;
     }
+
+    private static double NormalizeIncomingByteRate(double bytesPerSecond) =>
+        double.IsNaN(bytesPerSecond) ||
+        double.IsInfinity(bytesPerSecond) ||
+        bytesPerSecond <= 0d
+            ? double.Epsilon
+            : bytesPerSecond;
 
     private static int CalculateSenderCeiling(
         float framesPerSecond,
@@ -1074,8 +1081,7 @@ public sealed class MovementRateController : IMovementRateController
             receiverCaps[message.ControllerId] = new ReceiverCapEntry
             {
                 MaximumBulkHz = NormalizeRate(message.MaximumBulkHz),
-                MaximumIncomingBytesPerSecond = Math.Max(
-                    1,
+                MaximumIncomingBytesPerSecond = NormalizeIncomingByteRate(
                     message.MaximumIncomingMovementBytesPerSecondPerSender),
                 FocusAgentId = message.FocusAgentId,
                 Sequence = message.Sequence,

@@ -672,22 +672,39 @@ public sealed class MovementRateControllerTests
         fixture.Controller.Configure(MovementCadenceProfile.Battle);
 
         Assert.Equal(
-            settings.IncomingBytesPerSecond / 2,
+            settings.IncomingBytesPerSecond / 2d,
             Assert.Single(fixture.Advertisements).MaximumIncomingMovementBytesPerSecondPerSender);
 
         fixture.Controllers.Add("third");
         fixture.Broker.Publish(this, new NetworkMissionPeerEntered("third", "battle"));
         Assert.Equal(
-            settings.IncomingBytesPerSecond / 3,
+            settings.IncomingBytesPerSecond / 3d,
             Assert.Single(fixture.DirectedAdvertisements).Advertisement
                 .MaximumIncomingMovementBytesPerSecondPerSender);
 
         fixture.Controllers.Remove("third");
         fixture.Broker.Publish(this, new MissionPeerLeft("third", "battle"));
         Assert.Equal(
-            settings.IncomingBytesPerSecond / 2,
+            settings.IncomingBytesPerSecond / 2d,
             fixture.Advertisements[fixture.Advertisements.Count - 1]
                 .MaximumIncomingMovementBytesPerSecondPerSender);
+    }
+
+    [Fact]
+    public void IncomingBudgetBelowSenderCountUsesFractionalPerSenderRates()
+    {
+        var settings = new MovementNetworkSettings(
+            1d,
+            1d / MovementNetworkSettings.BytesPerMiB);
+        using var fixture = new RateControllerFixture(networkSettings: settings);
+        fixture.Controllers.AddRange(new[] { "first", "second", "third", "fourth" });
+
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        double perSender = Assert.Single(fixture.Advertisements)
+            .MaximumIncomingMovementBytesPerSecondPerSender;
+        Assert.Equal(0.25d, perSender);
+        Assert.Equal(settings.IncomingBytesPerSecond, perSender * fixture.Controllers.Count);
     }
 
     [Fact]
@@ -704,7 +721,7 @@ public sealed class MovementRateControllerTests
         fixture.Broker.Publish(
             this,
             new NetworkMovementReceiverCap("remote", 40, 10, 12345, focusAgentId));
-        Assert.Equal(12345, fixture.Controller.GetReceiverIncomingBytesPerSecond("remote"));
+        Assert.Equal(12345d, fixture.Controller.GetReceiverIncomingBytesPerSecond("remote"));
         Assert.True(fixture.Controller.TryGetReceiverFocusAgentId("remote", out Guid received));
         Assert.Equal(focusAgentId, received);
     }

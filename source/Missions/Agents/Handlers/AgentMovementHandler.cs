@@ -178,7 +178,6 @@ public class AgentMovementHandler : IAgentMovementHandler
             new Dictionary<Guid, float>();
         public bool HasBulkPoll;
         public float LastBulkPollTime;
-        public bool SendMountMovementFirst;
         public readonly ReusableMovementBatches<AgentData> Movement =
             new ReusableMovementBatches<AgentData>();
         public readonly ReusableMovementBatches<AgentData> PriorityMovement =
@@ -830,9 +829,11 @@ public class AgentMovementHandler : IAgentMovementHandler
         int startRecipient = recipientIds.Count == 0
             ? 0
             : recipientOffset % recipientIds.Count;
+        int? lastSendingRecipient = null;
         for (int recipientIndex = 0; recipientIndex < recipientIds.Count; recipientIndex++)
         {
-            string recipientId = recipientIds[(startRecipient + recipientIndex) % recipientIds.Count];
+            int routedRecipientIndex = (startRecipient + recipientIndex) % recipientIds.Count;
+            string recipientId = recipientIds[routedRecipientIndex];
             RecipientMovementState recipient = GetOrCreateRecipientState(recipientId);
             bool recipientBulkDue = includeAuthoritativeAgents &&
                 IsRecipientBulkDue(
@@ -840,20 +841,24 @@ public class AgentMovementHandler : IAgentMovementHandler
                     movementRateController.GetReceiverCapHz(recipientId));
             if (!recipientBulkDue && !includePriorityAgent) continue;
 
-            traffic = traffic.Add(SendMovementToRecipient(
+            MovementTrafficFrame recipientTraffic = SendMovementToRecipient(
                 recipientId,
                 recipient,
                 capturedMovements,
                 recipientBulkDue,
-                includePriorityAgent));
+                includePriorityAgent);
+            traffic = traffic.Add(recipientTraffic);
+            if (recipientTraffic.SentBytes > 0)
+                lastSendingRecipient = routedRecipientIndex;
         }
 
-        if (recipientIds.Count > 0)
+        if (lastSendingRecipient.HasValue)
         {
+            int nextRecipient = (lastSendingRecipient.Value + 1) % recipientIds.Count;
             if (includeAuthoritativeAgents)
-                bulkRecipientSendOffset = (startRecipient + 1) % recipientIds.Count;
+                bulkRecipientSendOffset = nextRecipient;
             else
-                priorityRecipientSendOffset = (startRecipient + 1) % recipientIds.Count;
+                priorityRecipientSendOffset = nextRecipient;
         }
 
         return traffic;
@@ -1011,105 +1016,24 @@ public class AgentMovementHandler : IAgentMovementHandler
             maxPayloadBytes,
             CreateMovementPacket,
             (agentId, data) => RecordSentMovement(recipient, agentId, data));
-        MovementSendResult movementResult;
-        MovementSendResult mountResult;
-        bool sendMountMovementFirst = ShouldSendMountMovementFirst(
-            recipient,
+        MovementSendPairResult movementResult = movementBatchSender.SendInterleaved(
+            controllerId,
             movement.Compact.Values,
             movement.Legacy,
+            CreateMovementPacket,
+            (agentId, data) => RecordSentMovement(recipient, agentId, data),
             mountMovement.Compact.Values,
-            mountMovement.Legacy);
-        if (sendMountMovementFirst)
-        {
-            mountResult = movementBatchSender.Send(
-                controllerId,
-                mountMovement.Compact.Values,
-                mountMovement.Legacy,
-                maxPayloadBytes,
-                CreateMountMovementPacket,
-                (agentId, data) => RecordSentMovement(recipient, agentId, data));
-            movementResult = movementBatchSender.Send(
-                controllerId,
-                movement.Compact.Values,
-                movement.Legacy,
-                maxPayloadBytes,
-                CreateMovementPacket,
-                (agentId, data) => RecordSentMovement(recipient, agentId, data));
-        }
-        else
-        {
-            movementResult = movementBatchSender.Send(
-                controllerId,
-                movement.Compact.Values,
-                movement.Legacy,
-                maxPayloadBytes,
-                CreateMovementPacket,
-                (agentId, data) => RecordSentMovement(recipient, agentId, data));
-            mountResult = movementBatchSender.Send(
-                controllerId,
-                mountMovement.Compact.Values,
-                mountMovement.Legacy,
-                maxPayloadBytes,
-                CreateMountMovementPacket,
-                (agentId, data) => RecordSentMovement(recipient, agentId, data));
-        }
-        recipient.SendMountMovementFirst = !recipient.SendMountMovementFirst;
+            mountMovement.Legacy,
+            CreateMountMovementPacket,
+            (agentId, data) => RecordSentMovement(recipient, agentId, data),
+            maxPayloadBytes);
 
         return movementBatchSender.EndFrame(
             controllerId,
             priorityResult.DeferredCount +
-                movementResult.DeferredCount +
-                mountResult.DeferredCount,
+                movementResult.First.DeferredCount +
+                movementResult.Second.DeferredCount,
             GetMaximumDeferredAge(recipient));
-    }
-
-    private bool ShouldSendMountMovementFirst(
-        RecipientMovementState recipient,
-        IEnumerable<MovementBatch<AgentData>> movementBatches,
-        MovementBatch<AgentData> legacyMovement,
-        IEnumerable<MovementBatch<AgentMountData>> mountBatches,
-        MovementBatch<AgentMountData> legacyMountMovement)
-    {
-        bool hasMovement = TryGetBestPriority(
-            movementBatches,
-            legacyMovement,
-            out MovementPriorityKey movementPriority);
-        bool hasMountMovement = TryGetBestPriority(
-            mountBatches,
-            legacyMountMovement,
-            out MovementPriorityKey mountPriority);
-        if (!hasMountMovement) return false;
-        if (!hasMovement) return true;
-
-        int comparison = movementPriorityScheduler.Compare(mountPriority, movementPriority);
-        return comparison < 0 || (comparison == 0 && recipient.SendMountMovementFirst);
-    }
-
-    private bool TryGetBestPriority<T>(
-        IEnumerable<MovementBatch<T>> batches,
-        MovementBatch<T> legacyBatch,
-        out MovementPriorityKey priority)
-    {
-        bool found = false;
-        priority = default;
-        foreach (MovementBatch<T> batch in batches)
-        {
-            if (!batch.HasPriorities) continue;
-            if (!found || movementPriorityScheduler.Compare(batch.Priorities[0], priority) < 0)
-            {
-                priority = batch.Priorities[0];
-                found = true;
-            }
-        }
-
-        if (legacyBatch?.HasPriorities == true &&
-            (!found || movementPriorityScheduler.Compare(legacyBatch.Priorities[0], priority) < 0))
-        {
-            priority = legacyBatch.Priorities[0];
-            found = true;
-        }
-
-        return found;
     }
 
     private static int CountActiveMissionAgents()

@@ -17,7 +17,7 @@ public readonly struct NetworkMovementReceiverCap : IEvent
     public readonly long Sequence;
 
     [ProtoMember(4)]
-    public readonly int MaximumIncomingMovementBytesPerSecondPerSender;
+    public readonly double MaximumIncomingMovementBytesPerSecondPerSender;
 
     [ProtoMember(5)]
     public readonly System.Guid FocusAgentId;
@@ -39,7 +39,7 @@ public readonly struct NetworkMovementReceiverCap : IEvent
         string controllerId,
         int maximumBulkHz,
         long sequence,
-        int maximumIncomingMovementBytesPerSecondPerSender,
+        double maximumIncomingMovementBytesPerSecondPerSender,
         System.Guid focusAgentId)
     {
         ControllerId = controllerId;

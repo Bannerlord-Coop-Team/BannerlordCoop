@@ -4,13 +4,13 @@ namespace Missions.Agents.Handlers;
 
 public interface IMovementTrafficBudgetFactory
 {
-    IMovementTrafficBudget Create(int bytesPerSecond, int burstBytes);
+    IMovementTrafficBudget Create(double bytesPerSecond, int burstBytes);
 }
 
 /// <summary>Creates independent token buckets for global and per-recipient movement limits.</summary>
 public sealed class MovementTrafficBudgetFactory : IMovementTrafficBudgetFactory
 {
-    public IMovementTrafficBudget Create(int bytesPerSecond, int burstBytes) =>
+    public IMovementTrafficBudget Create(double bytesPerSecond, int burstBytes) =>
         new MovementTrafficBudget(bytesPerSecond, burstBytes);
 }
 
@@ -26,7 +26,7 @@ internal sealed class DelegateMovementTrafficBudgetFactory : IMovementTrafficBud
         this.factory = factory;
     }
 
-    public IMovementTrafficBudget Create(int bytesPerSecond, int burstBytes)
+    public IMovementTrafficBudget Create(double bytesPerSecond, int burstBytes)
     {
         // Compatibility seam for focused sender tests that supply only per-recipient budgets.
         if (createUnboundedGlobal)

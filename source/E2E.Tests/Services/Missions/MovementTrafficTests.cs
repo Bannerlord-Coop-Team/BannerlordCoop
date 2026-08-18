@@ -429,6 +429,85 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_RecipientRotationAdvancesFromRouteThatActuallySends()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "owner");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            broker.Publish(this, new NetworkMissionPeerEntered("first", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("second", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("third", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("fourth", "battle"));
+
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            component.AgentMovementHandler.Dispose();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var rateController = new Mock<IMovementRateController>();
+            rateController
+                .Setup(value => value.AdvanceFrame(It.IsAny<float>()))
+                .Returns(new MovementCadence(40, 40));
+            rateController
+                .Setup(value => value.GetReceiverCapHz(It.IsAny<string>()))
+                .Returns(40);
+            rateController
+                .Setup(value => value.GetReceiverIncomingBytesPerSecond(It.IsAny<string>()))
+                .Returns(1024 * 1024d);
+            var budgets = new Queue<IMovementTrafficBudget>(new[]
+            {
+                new MovementTrafficBudget(100, 10),
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
+            });
+            var priorityScheduler = new MovementPriorityScheduler();
+            var sender = new MovementBatchSender(
+                network,
+                new FixedSizeMovementPacketCompressor(10),
+                new QueueMovementTrafficBudgetFactory(budgets),
+                priorityScheduler,
+                new MovementNetworkSettings(
+                    100d / MovementNetworkSettings.BytesPerMiB,
+                    1d));
+            using var handler = new AgentMovementHandler(
+                network,
+                peer.Resolve<IPacketManager>(),
+                broker,
+                registry,
+                peer.Resolve<IControllerIdProvider>(),
+                peer.Resolve<IAgentEquipmentApplier>(),
+                sender,
+                peer.Resolve<IPuppetMountStateRepairer>(),
+                peer.Resolve<IAgentVisualActionAccessor>(),
+                rateController.Object,
+                priorityScheduler,
+                peer.Resolve<IMissionContext>());
+            Agent agent = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(agent, out MirrorAgent mirror));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
+
+            handler.PollMovement(0f);
+            SerializedPacketSend firstSend = Assert.Single(network.SerializedPacketSends);
+            network.SerializedPacketSends.Clear();
+
+            for (int i = 1; i <= 4; i++)
+            {
+                mirror.Position = new Vec3(i, 0f, 0f);
+                handler.PollMovement(0.025f);
+            }
+            SerializedPacketSend secondSend = Assert.Single(network.SerializedPacketSends);
+
+            Assert.NotEqual(firstSend.ControllerId, secondSend.ControllerId);
+        });
+    }
+
+    [Fact]
     public void PollMovement_SlowReceiverDoesNotThrottleFastReceiverOrLoseLatestState()
     {
         using var fixture = new MissionEngineFixture();
@@ -1417,7 +1496,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             this.budgets = budgets;
         }
 
-        public IMovementTrafficBudget Create(int bytesPerSecond, int burstBytes) =>
+        public IMovementTrafficBudget Create(double bytesPerSecond, int burstBytes) =>
             budgets.Dequeue();
     }
 
@@ -1522,7 +1601,7 @@ public class MovementTrafficTests : MissionTestEnvironment
         public int GetReceiverCapHz(string controllerId) =>
             inner.GetReceiverCapHz(controllerId);
 
-        public int GetReceiverIncomingBytesPerSecond(string controllerId) =>
+        public double GetReceiverIncomingBytesPerSecond(string controllerId) =>
             inner.GetReceiverIncomingBytesPerSecond(controllerId);
 
         public bool TryGetReceiverFocusAgentId(string controllerId, out Guid agentId) =>

@@ -27,6 +27,19 @@ public sealed class MovementTrafficBudgetTests
     }
 
     [Fact]
+    public void TokenBucket_AccumulatesFractionalByteRates()
+    {
+        var budget = new MovementTrafficBudget(bytesPerSecond: 0.25d, burstBytes: 1);
+        Assert.True(budget.TrySpend(1));
+
+        budget.Advance(3f);
+        Assert.Equal(0, budget.AvailableBytes);
+        budget.Advance(1f);
+
+        Assert.Equal(1, budget.AvailableBytes);
+    }
+
+    [Fact]
     public void TokenBucket_ReconfigurationDoesNotRefillTokens()
     {
         var budget = new MovementTrafficBudget(bytesPerSecond: 100, burstBytes: 100);
@@ -204,6 +217,51 @@ public sealed class MovementTrafficBudgetTests
     }
 
     [Fact]
+    public void Sender_InterleavesMovementTypesAfterEveryPacket()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var compressor = new SizedPacketCompressor();
+        var budget = new MovementTrafficBudget(bytesPerSecond: 60, burstBytes: 60);
+        var sender = new MovementBatchSender(network.Object, compressor, () => budget);
+        var first = new MovementBatch<int>(null);
+        var second = new MovementBatch<string>(null);
+        var sent = new List<string>();
+
+        for (int i = 0; i < 3; i++)
+        {
+            Guid firstId = Guid.NewGuid();
+            first.CanonicalIds.Add(firstId);
+            first.Data.Add(i);
+            first.Priorities.Add(new MovementPriorityKey(
+                1, (i * 2) + 1, 0f, 0f, firstId));
+
+            Guid secondId = Guid.NewGuid();
+            second.CanonicalIds.Add(secondId);
+            second.Data.Add(i.ToString());
+            second.Priorities.Add(new MovementPriorityKey(
+                1, (i * 2) + 2, 0f, 0f, secondId));
+        }
+
+        MovementSendPairResult result = sender.SendInterleaved(
+            "receiver",
+            new[] { first },
+            firstLegacyBatch: null,
+            (scope, compactIds, canonicalIds, data) => new SizedPacket(data.Length),
+            (id, value) => sent.Add($"first-{value}"),
+            new[] { second },
+            secondLegacyBatch: null,
+            (scope, compactIds, canonicalIds, data) => new SizedPacket(data.Length),
+            (id, value) => sent.Add($"second-{value}"),
+            maxPayloadBytes: 10);
+
+        Assert.Equal(3, result.First.SentCount);
+        Assert.Equal(3, result.Second.SentCount);
+        Assert.Equal(
+            new[] { "first-0", "second-0", "first-1", "second-1", "first-2", "second-2" },
+            sent);
+    }
+
+    [Fact]
     public void Sender_SharedOutgoingBudgetCapsAllRecipientsTogether()
     {
         var network = new Mock<IBattleNetwork>();
@@ -343,7 +401,7 @@ public sealed class MovementTrafficBudgetTests
             this.budgets = budgets;
         }
 
-        public IMovementTrafficBudget Create(int bytesPerSecond, int burstBytes) =>
+        public IMovementTrafficBudget Create(double bytesPerSecond, int burstBytes) =>
             budgets.Dequeue();
     }
 
