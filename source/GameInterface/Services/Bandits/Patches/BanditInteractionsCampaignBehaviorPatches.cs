@@ -119,6 +119,9 @@ internal class BanditInteractionsCampaignBehaviorPatches
                 PlayerEncounter.StartBattle();
             }
 
+            // Failed to start battle, exit early to avoid NRE
+            if (PlayerEncounter.Battle == null) return false;
+
             PlayerEncounter.Battle.SetOverrideWinner(PlayerEncounter.Battle.PlayerSide);
             PlayerEncounter.EnemySurrender = true;
 
