@@ -89,5 +89,4 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
             VillageNeedsCraftingMaterialsQuestType.CreationCapture.ConstructAndRegisterReplicated(owner, requestedItem);
         });
     }
-
 }
