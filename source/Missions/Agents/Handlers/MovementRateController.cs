@@ -1102,7 +1102,7 @@ public sealed class MovementRateController : IMovementRateController
         }
 
         if (advertisement.HasValue)
-            network.Send(payload.What.ControllerId, advertisement.Value);
+            network.SendAll(advertisement.Value);
     }
 
     private void Handle_PeerLeft(MessagePayload<MissionPeerLeft> payload) =>

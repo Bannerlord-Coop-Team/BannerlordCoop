@@ -829,7 +829,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         int startRecipient = recipientIds.Count == 0
             ? 0
             : recipientOffset % recipientIds.Count;
-        int? lastSendingRecipient = null;
+        int? lastBulkSendingRecipient = null;
+        int? lastPrioritySendingRecipient = null;
+        int? bulkBlockedRecipient = null;
+        int? priorityBlockedRecipient = null;
         for (int recipientIndex = 0; recipientIndex < recipientIds.Count; recipientIndex++)
         {
             int routedRecipientIndex = (startRecipient + recipientIndex) % recipientIds.Count;
@@ -846,20 +849,32 @@ public class AgentMovementHandler : IAgentMovementHandler
                 recipient,
                 capturedMovements,
                 recipientBulkDue,
-                includePriorityAgent);
+                includePriorityAgent,
+                out MovementSendPairResult sendResult);
             traffic = traffic.Add(recipientTraffic);
-            if (recipientTraffic.SentBytes > 0)
-                lastSendingRecipient = routedRecipientIndex;
+            if (sendResult.BulkSentCount > 0)
+                lastBulkSendingRecipient = routedRecipientIndex;
+            if (sendResult.PrioritySentCount > 0)
+                lastPrioritySendingRecipient = routedRecipientIndex;
+            if (!sendResult.BlockedBySharedBudget) continue;
+
+            if (sendResult.PriorityBlockedBySharedBudget)
+                priorityBlockedRecipient = routedRecipientIndex;
+            else
+                bulkBlockedRecipient = routedRecipientIndex;
+            break;
         }
 
-        if (lastSendingRecipient.HasValue)
-        {
-            int nextRecipient = (lastSendingRecipient.Value + 1) % recipientIds.Count;
-            if (includeAuthoritativeAgents)
-                bulkRecipientSendOffset = nextRecipient;
-            else
-                priorityRecipientSendOffset = nextRecipient;
-        }
+        if (bulkBlockedRecipient.HasValue)
+            bulkRecipientSendOffset = bulkBlockedRecipient.Value;
+        else if (lastBulkSendingRecipient.HasValue)
+            bulkRecipientSendOffset = (lastBulkSendingRecipient.Value + 1) % recipientIds.Count;
+
+        if (priorityBlockedRecipient.HasValue)
+            priorityRecipientSendOffset = priorityBlockedRecipient.Value;
+        else if (lastPrioritySendingRecipient.HasValue)
+            priorityRecipientSendOffset =
+                (lastPrioritySendingRecipient.Value + 1) % recipientIds.Count;
 
         return traffic;
     }
@@ -910,7 +925,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         RecipientMovementState recipient,
         IReadOnlyCollection<CapturedMovement> capturedMovements,
         bool includeAuthoritativeAgents,
-        bool includePriorityAgent)
+        bool includePriorityAgent,
+        out MovementSendPairResult sendResult)
     {
         ReusableMovementBatches<AgentData> movement = recipient.Movement;
         ReusableMovementBatches<AgentData> priorityMovement =
@@ -1007,19 +1023,12 @@ public class AgentMovementHandler : IAgentMovementHandler
             controllerId,
             movementRateController.GetReceiverIncomingBytesPerSecond(controllerId),
             maxPayloadBytes);
-        // The local player's current input/position gets first access to each refill. Remaining snapshots
-        // are ordered by their per-recipient distance and last-successful-send priority.
-        MovementSendResult priorityResult = movementBatchSender.Send(
+        // Schedule the main player, ordinary agents and mounts together so lower tiers cannot spend
+        // tokens while a higher-priority packet is waiting for the shared bucket to refill.
+        sendResult = movementBatchSender.SendInterleaved(
             controllerId,
-            priorityMovement.Compact.Values,
-            priorityMovement.Legacy,
-            maxPayloadBytes,
-            CreateMovementPacket,
-            (agentId, data) => RecordSentMovement(recipient, agentId, data));
-        MovementSendPairResult movementResult = movementBatchSender.SendInterleaved(
-            controllerId,
-            movement.Compact.Values,
-            movement.Legacy,
+            EnumerateAgentMovementBatches(priorityMovement, movement),
+            firstLegacyBatch: null,
             CreateMovementPacket,
             (agentId, data) => RecordSentMovement(recipient, agentId, data),
             mountMovement.Compact.Values,
@@ -1030,10 +1039,22 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         return movementBatchSender.EndFrame(
             controllerId,
-            priorityResult.DeferredCount +
-                movementResult.First.DeferredCount +
-                movementResult.Second.DeferredCount,
+            sendResult.First.DeferredCount + sendResult.Second.DeferredCount,
             GetMaximumDeferredAge(recipient));
+    }
+
+    private static IEnumerable<MovementBatch<AgentData>> EnumerateAgentMovementBatches(
+        ReusableMovementBatches<AgentData> priorityMovement,
+        ReusableMovementBatches<AgentData> movement)
+    {
+        foreach (MovementBatch<AgentData> batch in priorityMovement.Compact.Values)
+            yield return batch;
+        if (priorityMovement.Legacy != null)
+            yield return priorityMovement.Legacy;
+        foreach (MovementBatch<AgentData> batch in movement.Compact.Values)
+            yield return batch;
+        if (movement.Legacy != null)
+            yield return movement.Legacy;
     }
 
     private static int CountActiveMissionAgents()

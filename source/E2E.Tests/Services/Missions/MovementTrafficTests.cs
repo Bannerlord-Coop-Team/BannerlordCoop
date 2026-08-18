@@ -508,6 +508,84 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_BulkRotationIgnoresPriorityOnlyRouteSends()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "owner");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            broker.Publish(this, new NetworkMissionPeerEntered("first", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("second", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("third", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("fourth", "battle"));
+
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            component.AgentMovementHandler.Dispose();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var rateController = new Mock<IMovementRateController>();
+            rateController
+                .Setup(value => value.AdvanceFrame(It.IsAny<float>()))
+                .Returns(new MovementCadence(10, 10));
+            rateController
+                .Setup(value => value.GetReceiverCapHz(It.IsAny<string>()))
+                .Returns(10);
+            rateController
+                .Setup(value => value.GetReceiverIncomingBytesPerSecond(It.IsAny<string>()))
+                .Returns(1024 * 1024d);
+            var budgets = new Queue<IMovementTrafficBudget>(new[]
+            {
+                new MovementTrafficBudget(1024 * 1024, 1024 * 1024),
+                new MovementTrafficBudget(1024 * 1024, 20),
+                new MovementTrafficBudget(1024 * 1024, 10),
+                new MovementTrafficBudget(1024 * 1024, 10),
+                new MovementTrafficBudget(1024 * 1024, 10),
+            });
+            var priorityScheduler = new MovementPriorityScheduler();
+            var sender = new MovementBatchSender(
+                network,
+                new FixedSizeMovementPacketCompressor(10),
+                new QueueMovementTrafficBudgetFactory(budgets),
+                priorityScheduler,
+                new MovementNetworkSettings(1d, 1d));
+            using var handler = new AgentMovementHandler(
+                network,
+                peer.Resolve<IPacketManager>(),
+                broker,
+                registry,
+                peer.Resolve<IControllerIdProvider>(),
+                peer.Resolve<IAgentEquipmentApplier>(),
+                sender,
+                peer.Resolve<IPuppetMountStateRepairer>(),
+                peer.Resolve<IAgentVisualActionAccessor>(),
+                rateController.Object,
+                priorityScheduler,
+                peer.Resolve<IMissionContext>());
+            Agent mainAgent = SpawnRider(mock);
+            Agent formationAgent = SpawnRider(mock);
+            mock.MainAgent = mainAgent;
+            Assert.True(AgentMirror.TryGet(mainAgent, out MirrorAgent mainMirror));
+            Assert.True(AgentMirror.TryGet(formationAgent, out MirrorAgent formationMirror));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 1, mainAgent));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 2, formationAgent));
+
+            handler.PollMovement(0f);
+            Assert.Equal("first", network.DirectPacketSends[0].ControllerId);
+            network.DirectPacketSends.Clear();
+            mainMirror.Position = new Vec3(1f, 0f, 0f);
+            formationMirror.Position = new Vec3(2f, 0f, 0f);
+
+            handler.PollMovement(0.1f);
+
+            Assert.Equal("second", network.DirectPacketSends[0].ControllerId);
+        });
+    }
+
+    [Fact]
     public void PollMovement_SlowReceiverDoesNotThrottleFastReceiverOrLoseLatestState()
     {
         using var fixture = new MissionEngineFixture();

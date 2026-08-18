@@ -256,9 +256,78 @@ public sealed class MovementTrafficBudgetTests
 
         Assert.Equal(3, result.First.SentCount);
         Assert.Equal(3, result.Second.SentCount);
+        Assert.Equal(0, result.PrioritySentCount);
+        Assert.Equal(6, result.BulkSentCount);
         Assert.Equal(
             new[] { "first-0", "second-0", "first-1", "second-1", "first-2", "second-2" },
             sent);
+    }
+
+    [Fact]
+    public void Sender_ReservesSharedBalanceForBlockedPriorityPacket()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var compressor = new SizedPacketCompressor();
+        var sharedBudget = new MovementTrafficBudget(bytesPerSecond: 100, burstBytes: 150);
+        Assert.True(sharedBudget.TrySpend(50));
+        var budgets = new Queue<IMovementTrafficBudget>(new[]
+        {
+            sharedBudget,
+            new MovementTrafficBudget(bytesPerSecond: 1000, burstBytes: 1000),
+        });
+        var sender = new MovementBatchSender(
+            network.Object,
+            compressor,
+            new QueueBudgetFactory(budgets),
+            new MovementPriorityScheduler(),
+            new MovementNetworkSettings(
+                100d / MovementNetworkSettings.BytesPerMiB,
+                1d));
+        Guid priorityId = Guid.NewGuid();
+        var priority = new MovementBatch<int>(null, isPriority: true);
+        priority.CanonicalIds.Add(priorityId);
+        priority.Data.Add(15);
+        priority.Priorities.Add(new MovementPriorityKey(0, 0d, 0f, 0f, priorityId));
+        Guid bulkId = Guid.NewGuid();
+        var bulk = new MovementBatch<int>(null);
+        bulk.CanonicalIds.Add(bulkId);
+        bulk.Data.Add(10);
+        bulk.Priorities.Add(new MovementPriorityKey(1, 1d, 0f, 0f, bulkId));
+        var sent = new List<Guid>();
+
+        MovementSendPairResult blocked = sender.SendInterleaved(
+            "receiver",
+            new[] { priority, bulk },
+            firstLegacyBatch: null,
+            (scope, compactIds, canonicalIds, data) => new SizedPacket(data[0]),
+            (id, value) => sent.Add(id),
+            Array.Empty<MovementBatch<string>>(),
+            secondLegacyBatch: null,
+            (scope, compactIds, canonicalIds, data) => new SizedPacket(data.Length),
+            onSecondSent: null,
+            maxPayloadBytes: 200);
+
+        Assert.Empty(sent);
+        Assert.True(blocked.BlockedBySharedBudget);
+        Assert.True(blocked.PriorityBlockedBySharedBudget);
+        Assert.Equal(100, sharedBudget.AvailableBytes);
+
+        sender.BeginFrame(0.5f);
+        MovementSendPairResult sentAfterRefill = sender.SendInterleaved(
+            "receiver",
+            new[] { priority, bulk },
+            firstLegacyBatch: null,
+            (scope, compactIds, canonicalIds, data) => new SizedPacket(data[0]),
+            (id, value) => sent.Add(id),
+            Array.Empty<MovementBatch<string>>(),
+            secondLegacyBatch: null,
+            (scope, compactIds, canonicalIds, data) => new SizedPacket(data.Length),
+            onSecondSent: null,
+            maxPayloadBytes: 200);
+
+        Assert.Equal(priorityId, Assert.Single(sent));
+        Assert.Equal(1, sentAfterRefill.PrioritySentCount);
+        Assert.Equal(0, sentAfterRefill.BulkSentCount);
     }
 
     [Fact]

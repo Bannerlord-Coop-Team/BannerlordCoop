@@ -122,14 +122,12 @@ public sealed class MovementRateControllerTests
             this,
             new NetworkMissionPeerEntered("joining-peer", "battle"));
 
-        Assert.Equal(2, fixture.Advertisements.Count);
+        Assert.Equal(3, fixture.Advertisements.Count);
         Assert.Equal(15, fixture.Advertisements[1].MaximumBulkHz);
         Assert.Equal(2, fixture.Advertisements[1].Sequence);
-
-        var directed = Assert.Single(fixture.DirectedAdvertisements);
-        Assert.Equal("joining-peer", directed.RecipientControllerId);
-        Assert.Equal(15, directed.Advertisement.MaximumBulkHz);
-        Assert.Equal(3, directed.Advertisement.Sequence);
+        Assert.Equal(15, fixture.Advertisements[2].MaximumBulkHz);
+        Assert.Equal(3, fixture.Advertisements[2].Sequence);
+        Assert.Empty(fixture.DirectedAdvertisements);
     }
 
     [Fact]
@@ -679,7 +677,7 @@ public sealed class MovementRateControllerTests
         fixture.Broker.Publish(this, new NetworkMissionPeerEntered("third", "battle"));
         Assert.Equal(
             settings.IncomingBytesPerSecond / 3d,
-            Assert.Single(fixture.DirectedAdvertisements).Advertisement
+            fixture.Advertisements[fixture.Advertisements.Count - 1]
                 .MaximumIncomingMovementBytesPerSecondPerSender);
 
         fixture.Controllers.Remove("third");
