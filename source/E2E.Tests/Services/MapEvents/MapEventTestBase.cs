@@ -104,6 +104,16 @@ public abstract class MapEventTestBase : IDisposable
         Assert.NotNull(attackerPartyId);
         Assert.NotNull(defenderPartyId);
 
+        // CreateServerMapEvent models a land field battle; the constructor-skipped position otherwise reads as naval.
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                mapEvent.Position = new CampaignVec2(default, isOnLand: true);
+            });
+        }
+
         return new MapEventContext(
             mapEventId,
             attackerPartyId,
