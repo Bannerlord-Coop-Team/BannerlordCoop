@@ -201,6 +201,8 @@ internal class BanditInteractionsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanId, out var playerClan)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
+            if (data.PartiesIds == null) return;
+
             foreach (var partyId in data.PartiesIds)
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var mobileParty)) return;
@@ -258,6 +260,8 @@ internal class BanditInteractionsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+
+            if (data.PartiesIds == null) return;
 
             foreach (var partyId in data.PartiesIds)
             {

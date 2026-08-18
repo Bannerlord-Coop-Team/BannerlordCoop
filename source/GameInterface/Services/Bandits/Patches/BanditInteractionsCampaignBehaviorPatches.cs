@@ -20,23 +20,12 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Bandits.Patches;
 
 [HarmonyPatch(typeof(BanditInteractionsCampaignBehavior))]
-internal class DisableBanditInteractionsCampaignBehavior
-{
-    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
-    {
-        AccessTools.Method(typeof(BanditInteractionsCampaignBehavior), nameof(BanditInteractionsCampaignBehavior.OnPartyDestroyed)),
-        //AccessTools.Method(typeof(BanditInteractionsCampaignBehavior), nameof(BanditInteractionsCampaignBehavior.OnSessionLaunched)), // Needed on client to load dialogue
-    };
-
-    static bool Prefix()
-    {
-        return ModInformation.IsServer;
-    }
-}
-
-[HarmonyPatch(typeof(BanditInteractionsCampaignBehavior))]
 internal class BanditInteractionsCampaignBehaviorPatches
 {
+    [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.OnPartyDestroyed))]
+    [HarmonyPrefix]
+    public static bool OnPartyDestroyedPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.bandit_barter_successful_on_consequence))]
     [HarmonyPostfix]
     public static void BanditBarterSuccessfulOnConsequencePostfix(BanditInteractionsCampaignBehavior __instance)
