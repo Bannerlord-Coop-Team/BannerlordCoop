@@ -18,6 +18,7 @@
       <template id="NPCCharacter.coop_team_lord_hasted" />
       <template id="NPCCharacter.coop_team_lord_curzek" />
       <template id="NPCCharacter.coop_team_lord_shotup" />
+      <template id="NPCCharacter.coop_team_lord_45794b76" />
     </minor_faction_character_templates>
   </Faction>
 </Factions>
