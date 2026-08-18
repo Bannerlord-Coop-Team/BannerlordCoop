@@ -194,11 +194,14 @@ internal class TradeAgreementsHandler : IHandler
             {
                 Logger.Debug("Skipping forming new trade agreement between {kingdom1} and {kingdom2} because an agreement is already present.",
                     newTradeAgreement.Kingdom1.Name,
-                    newTradeAgreement.Kingdom1.Name);
+                    newTradeAgreement.Kingdom2.Name);
                 return;
             }
 
             tradeAgreementsBehavior._tradeAgreements.Add(newTradeAgreement);
+
+            // Call OnTradeAgreementSigned to show notification on clients
+            CampaignEventDispatcher.Instance.OnTradeAgreementSigned(newTradeAgreement.Kingdom1, newTradeAgreement.Kingdom2);
         });
     }
 
