@@ -221,7 +221,7 @@ internal class BanditInteractionsHandler : IHandler
                         characterAtIndex.HeroObject.ChangeState(Hero.CharacterStates.Active);
                         AddHeroToPartyAction.Apply(characterAtIndex.HeroObject, mainParty, true);
                     }
-                    else if (playerClan.IsAtWarWith(characterAtIndex.HeroObject.Clan))
+                    else if (characterAtIndex.IsHero && playerClan.IsAtWarWith(characterAtIndex.HeroObject.Clan))
                     {
                         TransferPrisonerAction.Apply(characterAtIndex, mobileParty.Party, mainParty.Party);
                     }
