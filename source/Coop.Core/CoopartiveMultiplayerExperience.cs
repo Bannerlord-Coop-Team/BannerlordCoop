@@ -171,9 +171,8 @@ namespace Coop.Core
             clientConnectedOnce = false;
             bool playerOwnsProviderTunnel =
                 SessionDiscovery.ClientProvider?.SupportsDedicatedServer == false;
-            string peerIdentityBridgeName = playerOwnsProviderTunnel
-                ? PeerIdentityBridgeName.Create()
-                : string.Empty;
+            // The launching player reconnects over loopback, so every spawned provider server needs this handoff.
+            string peerIdentityBridgeName = PeerIdentityBridgeName.Create();
             string serverSessionProvider = playerOwnsProviderTunnel
                 ? "direct"
                 : SessionDiscovery.ClientProvider.Provider;

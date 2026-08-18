@@ -81,21 +81,13 @@ public class ClientModule : CommonModule
                     PeerIdentityBridgeName = networkConfig.PeerIdentityBridgeName,
                 };
 
+                ISessionProviderRuntime runtime;
                 if (provider == null)
                 {
                     var advertiser = new NoopSessionAdvertiser();
                     var tunnelHost = new NoopSessionTunnelHost();
-                    var peerIdentityResolver = (IAuthenticatedPeerIdentityResolver)tunnelHost;
-                    var providerResources = Array.Empty<IDisposable>();
-                    if (isServer && PeerIdentityBridgeName.IsValid(options.PeerIdentityBridgeName))
-                    {
-                        var bridgeResolver = new NamedPipePeerIdentityResolver(options.PeerIdentityBridgeName);
-                        peerIdentityResolver = bridgeResolver;
-                        providerResources = new IDisposable[] { bridgeResolver };
-                    }
-
                     var unavailable = UnavailableSessionServices.Instance;
-                    return new SessionProviderRuntime(
+                    runtime = new SessionProviderRuntime(
                         advertiser,
                         tunnelHost,
                         unavailable,
@@ -103,22 +95,27 @@ public class ClientModule : CommonModule
                         unavailable,
                         unavailable,
                         new NoopMissionPeerTransport(),
-                        peerIdentityResolver,
+                        tunnelHost,
                         NoopPeerIdentityPublisher.Instance,
-                        providerResources);
+                        Array.Empty<IDisposable>());
                 }
-
-                if (isServer)
+                else if (isServer)
                 {
                     options.Visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
 #if DEBUG
                     options.Visibility = ServerVisibility.None;
 #endif
-                    return provider.CreateServerRuntime(options);
+                    runtime = provider.CreateServerRuntime(options);
+                }
+                else
+                {
+                    options.Visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
+                    runtime = provider.CreateClientRuntime(options);
                 }
 
-                options.Visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
-                return provider.CreateClientRuntime(options);
+                return isServer
+                    ? AddPeerIdentityBridge(runtime, options.PeerIdentityBridgeName)
+                    : runtime;
             })
             .As<ISessionProviderRuntime>()
             .InstancePerLifetimeScope();
@@ -159,5 +156,21 @@ public class ClientModule : CommonModule
             .As<IPeerIdentityPublisher>()
             .InstancePerLifetimeScope()
             .ExternallyOwned();
+    }
+
+    internal static ISessionProviderRuntime AddPeerIdentityBridge(
+        ISessionProviderRuntime runtime,
+        string bridgeName)
+    {
+        if (!PeerIdentityBridgeName.IsValid(bridgeName)) return runtime;
+
+        var bridgeResolver = new NamedPipePeerIdentityResolver(bridgeName);
+        var peerIdentityResolver = new FallbackAuthenticatedPeerIdentityResolver(
+            bridgeResolver,
+            runtime.PeerIdentityResolver);
+        return new PeerIdentityResolvingSessionProviderRuntime(
+            runtime,
+            peerIdentityResolver,
+            bridgeResolver);
     }
 }

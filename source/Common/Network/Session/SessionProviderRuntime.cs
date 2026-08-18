@@ -55,6 +55,53 @@ public sealed class SessionProviderRuntime : ISessionProviderRuntime
     }
 }
 
+/// <summary>Overrides identity resolution while preserving one provider runtime's other facets.</summary>
+public sealed class PeerIdentityResolvingSessionProviderRuntime : ISessionProviderRuntime
+{
+    private readonly ISessionProviderRuntime runtime;
+    private readonly IDisposable peerIdentityResolverResource;
+    private bool disposed;
+
+    public PeerIdentityResolvingSessionProviderRuntime(
+        ISessionProviderRuntime runtime,
+        IAuthenticatedPeerIdentityResolver peerIdentityResolver,
+        IDisposable peerIdentityResolverResource)
+    {
+        if (runtime == null) throw new ArgumentNullException(nameof(runtime));
+        if (peerIdentityResolver == null) throw new ArgumentNullException(nameof(peerIdentityResolver));
+        if (peerIdentityResolverResource == null) throw new ArgumentNullException(nameof(peerIdentityResolverResource));
+
+        this.runtime = runtime;
+        PeerIdentityResolver = peerIdentityResolver;
+        this.peerIdentityResolverResource = peerIdentityResolverResource;
+    }
+
+    public ISessionAdvertiser Advertiser => runtime.Advertiser;
+    public ISessionTunnelHost TunnelHost => runtime.TunnelHost;
+    public ISessionMembership Membership => runtime.Membership;
+    public ISessionAdvertisementOwner AdvertisementOwner => runtime.AdvertisementOwner;
+    public ISessionServerReadiness ServerReadiness => runtime.ServerReadiness;
+    public ISessionTransportTargetSource TransportTargetSource => runtime.TransportTargetSource;
+    public IMissionPeerTransport MissionTransport => runtime.MissionTransport;
+    public IAuthenticatedPeerIdentityResolver PeerIdentityResolver { get; }
+    public IPeerIdentityPublisher PeerIdentityPublisher => runtime.PeerIdentityPublisher;
+
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+
+        try
+        {
+            runtime.Dispose();
+        }
+        finally
+        {
+            peerIdentityResolverResource.Dispose();
+        }
+    }
+}
+
 /// <summary>Shared empty session facets for direct and unavailable provider capabilities.</summary>
 public sealed class UnavailableSessionServices :
     ISessionMembership,
