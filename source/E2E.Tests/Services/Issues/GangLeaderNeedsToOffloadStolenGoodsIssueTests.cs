@@ -4,6 +4,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
@@ -738,6 +739,55 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.Null(owner.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+        });
+    }
+
+    [Fact]
+    public void OnSettlementOwnerChanged_TriggeredByANonOwningPeer_DoesNotCancelTheOwnersQuest()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("owner-controller", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "owner-controller");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("owner-controller");
+        OpenConversation(Client, fixture.HeroId, "owner-controller");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+        });
+
+        OtherClient.Resolve<IControllerIdProvider>().SetControllerId("bystander-controller");
+        OtherClient.Call(() =>
+        {
+            Assert.True(OtherClient.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+            Assert.True(OtherClient.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            Assert.True(OtherClient.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var bystander));
+
+            using (new MainHeroSubstitutionScope(bystander, null))
+            {
+                quest.OnSettlementOwnerChanged(settlement, false, bystander, null, bystander,
+                    TaleWorlds.CampaignSystem.Actions.ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege);
+            }
+
+            Assert.NotNull(owner.Issue);
+            Assert.Same(quest, owner.Issue.IssueQuest);
+            Assert.True(quest.IsOngoing);
         });
     }
 

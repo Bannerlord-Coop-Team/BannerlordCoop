@@ -48,6 +48,12 @@ internal class GangLeaderNeedsToOffloadStolenGoodsOwnershipGatePatches
     private static bool OnSettlementLeftPrefix(
         GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
         IsLocalPeerOwner(__instance.QuestGiver);
+
+    [HarmonyPatch("OnSettlementOwnerChanged")]
+    [HarmonyPrefix]
+    private static bool OnSettlementOwnerChangedPrefix(
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
+        IsLocalPeerOwner(__instance.QuestGiver);
 }
 
 [HarmonyPatch]

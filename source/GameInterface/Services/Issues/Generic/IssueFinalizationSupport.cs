@@ -53,7 +53,8 @@ internal static class IssueFinalizationSupport
                 RunConsequenceOrFallback(applyConsequence, quest, quest.CompleteQuestWithSuccess);
                 return;
             case IssueFinalizeReason.QuestCancel:
-                quest.CompleteQuestWithCancel();
+                var applyCancelConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestCancelConsequence;
+                RunConsequenceOrFallback(applyCancelConsequence, quest, () => quest.CompleteQuestWithCancel());
                 return;
             case IssueFinalizeReason.QuestFail:
                 var applyFailConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence;

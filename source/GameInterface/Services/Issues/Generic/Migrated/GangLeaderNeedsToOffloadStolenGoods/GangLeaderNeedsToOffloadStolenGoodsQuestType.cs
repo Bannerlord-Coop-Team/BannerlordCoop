@@ -397,6 +397,11 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         quest.CompleteQuestWithFail(quest.FailLoseHideoutFightQuestLogText);
     }
 
+    private static void ApplyQuestCancelConsequence(Quest quest)
+    {
+        quest.CompleteQuestWithCancel(quest.CancelSettlementOwnerChangedQuestLogText);
+    }
+
     static GangLeaderNeedsToOffloadStolenGoodsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("GangLeaderNeedsToOffloadStolenGoods")
@@ -404,6 +409,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
             .WithAlternativeAccept(AlternativeAcceptMirror)
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestCancelValidation(ValidateQuestCancel)
+            .WithQuestCancelConsequence(ApplyQuestCancelConsequence)
             .WithQuestFailValidation(ValidateQuestFail)
             .WithQuestFailProofCapture(CaptureQuestFailProof)
             .WithQuestFailConsequence(ApplyQuestFailConsequence)
