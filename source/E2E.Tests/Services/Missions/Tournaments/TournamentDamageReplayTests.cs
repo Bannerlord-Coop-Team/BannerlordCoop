@@ -1,8 +1,10 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Tournaments.Data;
+using GameInterface.Services.Tournaments.Messages;
 using HarmonyLib;
 using Missions;
 using Missions.Agents.Patches;
@@ -219,6 +221,78 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                     NetworkApplyTournamentDamage>());
             Assert.True(AgentMirror.TryGet(victim, out var after));
             Assert.Equal(64f, after.Health);
+        });
+    }
+
+    [Fact]
+    public void AcceptedPlayerHit_SubmitsTournamentProgressionWithoutActiveDamageContext()
+    {
+        using var fixture = new MissionEngineFixture();
+        var host = Clients.First();
+        SetControllerId(host, "host");
+
+        host.Call(() =>
+        {
+            var mock = fixture.CreateMission(host);
+            var controller = host.Resolve<CoopTournamentController>();
+            var registry = host.Resolve<INetworkAgentRegistry>();
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            AccessTools.Property(typeof(Agent), nameof(Agent.HealthLimit))
+                .SetValue(victim, 100f);
+            Guid victimId = Guid.NewGuid();
+            Guid attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("victim-owner", victimId, victim));
+            Assert.True(registry.TryRegisterAgent("host", attackerId, attacker));
+
+            var contestants = new[]
+            {
+                new TournamentContestantData(
+                    "attacker-slot", "attacker", 1, "host", "Host", true, false, true, null),
+                new TournamentContestantData(
+                    "victim-slot", "victim", 2, null, "Victim", false, false, false, null)
+            };
+            var snapshot = CreateLiveSnapshot(contestants);
+            SetField(controller, "snapshot", snapshot);
+            Assert.True(controller.Session.TryApplyState(
+                snapshot.SessionId,
+                snapshot.MissionInstanceId,
+                snapshot.Revision,
+                snapshot.BracketRevision,
+                snapshot.CurrentMatchId,
+                snapshot.HostControllerId,
+                Array.Empty<string>()));
+            SetField(
+                controller,
+                "latestManifest",
+                new TournamentSpawnManifestData(
+                    "session",
+                    "match",
+                    1,
+                    1,
+                    1,
+                    new[]
+                    {
+                        CreateSpawnData(attackerId, "attacker-slot", "attacker", "host"),
+                        CreateSpawnData(victimId, "victim-slot", "victim", null)
+                    }));
+
+            InvokeCaptureHitProgression(
+                controller,
+                victim,
+                attacker,
+                new Blow(attacker.Index) { InflictedDamage = 25 },
+                default);
+
+            var network = Assert.IsType<MockClient>(host.Resolve<INetwork>());
+            NetworkSubmitTournamentHitProgression request = Assert.Single(
+                network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
+            Assert.Equal("host", request.Data.DamageOriginControllerId);
+            Assert.Equal(attackerId, request.Data.AttackerAgentId);
+            Assert.Equal(victimId, request.Data.VictimAgentId);
+            Assert.Equal(1, request.Data.DamageSequence);
         });
     }
 
@@ -475,6 +549,46 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             true);
     }
 
+    private static void InvokeCaptureHitProgression(
+        CoopTournamentController controller,
+        Agent victim,
+        Agent attacker,
+        Blow blow,
+        AttackCollisionData collisionData)
+    {
+        MethodInfo capture = typeof(CoopTournamentController).GetMethod(
+            "CaptureHitProgression",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(capture);
+        capture.Invoke(
+            controller,
+            new object[] { victim, attacker, null, blow, collisionData, 0f });
+    }
+
+    private static TournamentAgentSpawnData CreateSpawnData(
+        Guid agentId,
+        string slotId,
+        string characterId,
+        string controllerId) =>
+        new(
+            agentId,
+            slotId,
+            characterId,
+            1,
+            "team",
+            0,
+            null,
+            controllerId,
+            Array.Empty<EquipmentElement>(),
+            Vec3.Zero,
+            Vec2.Forward,
+            100f,
+            Guid.Empty,
+            null,
+            0,
+            Array.Empty<EquipmentElement>(),
+            0f);
+
     private static void SetField(
         object target,
         string name,
@@ -518,7 +632,8 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         onLeaving.Invoke(controller, null);
     }
 
-    private static TournamentSessionSnapshot CreateLiveSnapshot() =>
+    private static TournamentSessionSnapshot CreateLiveSnapshot(
+        TournamentContestantData[] contestants = null) =>
         new(
             "session",
             "mission",
@@ -531,7 +646,7 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             "match",
             "host",
             Array.Empty<string>(),
-            Array.Empty<TournamentContestantData>(),
+            contestants ?? Array.Empty<TournamentContestantData>(),
             Array.Empty<string>(),
             Array.Empty<TournamentPlayerChoiceData>(),
             Array.Empty<TournamentRoundData>(),

@@ -72,6 +72,7 @@ public class CoopTournamentController : CoopMissionController
     private readonly Queue<PendingLocalTournamentDamage>
         pendingLocalDamage = new();
     private long damageSequence;
+    private long hitProgressionSequence;
     private long knockoutSequence;
     private long runtimeSequence;
     private NetworkTournamentRuntimeState latestRuntimeState;
@@ -271,6 +272,7 @@ public class CoopTournamentController : CoopMissionController
         guardedHitWindow.Reset();
         RemovePendingTournamentPacketsForOtherMatches();
         damageSequence = 0;
+        hitProgressionSequence = 0;
         knockoutSequence = 0;
         runtimeSequence = 0;
         latestRuntimeState = null;
@@ -534,18 +536,19 @@ public class CoopTournamentController : CoopMissionController
         in AttackCollisionData collisionData,
         float shotDifficulty)
     {
-        NetworkApplyTournamentDamage damage = activeDamageMessage;
-        if (!session.IsLocalHost || damage == null ||
+        if (!session.IsLocalHost ||
             snapshot?.Phase != TournamentSessionPhase.LiveMatch ||
-            affectedAgent == null || affectorAgent == null ||
-            damage.MatchId != snapshot.CurrentMatchId) return;
-        TournamentAgentSpawnData attackerSpawn = FindManifestAgent(damage.AttackerAgentId);
-        TournamentAgentSpawnData victimSpawn = FindManifestAgent(damage.VictimAgentId);
+            affectedAgent == null || affectorAgent == null) return;
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(affectorAgent, out var attackerInfo) ||
+            !registry.TryGetAgentInfo(affectedAgent, out var victimInfo)) return;
+        TournamentAgentSpawnData attackerSpawn = FindManifestAgent(attackerInfo.AgentId);
+        TournamentAgentSpawnData victimSpawn = FindManifestAgent(victimInfo.AgentId);
         if (attackerSpawn == null || victimSpawn == null) return;
         TournamentContestantData attacker = snapshot.Contestants.FirstOrDefault(data =>
             data.SlotId == attackerSpawn.SlotId);
         if (attacker == null || !attacker.IsHuman || attacker.IsReplaced ||
-            attacker.ControllerId != damage.OriginControllerId) return;
+            string.IsNullOrEmpty(attacker.ControllerId)) return;
 
         float damageAmount = Math.Min(blow.InflictedDamage, affectedAgent.HealthLimit);
         if (damageAmount <= 0 || affectedAgent.HealthLimit <= 0) return;
@@ -560,10 +563,10 @@ public class CoopTournamentController : CoopMissionController
             snapshot.CurrentMatchId,
             snapshot.Revision,
             snapshot.BracketRevision,
-            damage.OriginControllerId,
-            damage.Sequence,
-            damage.AttackerAgentId,
-            damage.VictimAgentId,
+            attacker.ControllerId,
+            ++hitProgressionSequence,
+            attackerInfo.AgentId,
+            victimInfo.AgentId,
             weaponItemId,
             weaponUsageIndex,
             blow.MovementSpeedDamageModifier,
