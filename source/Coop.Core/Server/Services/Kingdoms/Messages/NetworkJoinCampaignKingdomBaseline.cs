@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using GameInterface.Services.Kingdoms.Data;
 using System;
 
 namespace Coop.Core.Server.Services.Kingdoms.Messages
@@ -50,10 +51,17 @@ namespace Coop.Core.Server.Services.Kingdoms.Messages
         [ProtoMember(2)]
         public readonly PendingPeaceOfferBaseline[] PendingPeaceOffers;
 
-        public NetworkJoinCampaignKingdomBaseline(PendingAllianceOfferBaseline[] pendingAllianceOffers = null, PendingPeaceOfferBaseline[] pendingPeaceOffers = null)
+        [ProtoMember(3)]
+        public readonly KingdomDecisionRoundStatusData[] ActiveDecisionRounds;
+
+        public NetworkJoinCampaignKingdomBaseline(
+            PendingAllianceOfferBaseline[] pendingAllianceOffers = null,
+            PendingPeaceOfferBaseline[] pendingPeaceOffers = null,
+            KingdomDecisionRoundStatusData[] activeDecisionRounds = null)
         {
             PendingAllianceOffers = pendingAllianceOffers ?? Array.Empty<PendingAllianceOfferBaseline>();
             PendingPeaceOffers = pendingPeaceOffers ?? Array.Empty<PendingPeaceOfferBaseline>();
+            ActiveDecisionRounds = activeDecisionRounds ?? Array.Empty<KingdomDecisionRoundStatusData>();
         }
     }
 }

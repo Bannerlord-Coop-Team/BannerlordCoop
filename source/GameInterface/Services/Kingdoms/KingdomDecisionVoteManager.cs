@@ -35,7 +35,8 @@ namespace GameInterface.Services.Kingdoms
         bool TryPublishFinalVote(DecisionItemBaseVM decisionItem);
         void CloseDecisionItem(DecisionItemBaseVM decisionItem);
         void ApplyRoundStatus(KingdomDecisionRoundStatusData status);
-        void RefreshDecisionWaitingStatus(DecisionItemBaseVM decisionItem);
+        IReadOnlyList<KingdomDecisionRoundStatusData> CaptureActiveRoundStatuses();
+        string RefreshDecisionWaitingStatus(DecisionItemBaseVM decisionItem);
         bool ShouldSuppressLocalDecision(KingdomDecision decision);
         bool ShouldDisableResolveDecision(KingdomDecision decision);
         bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
@@ -44,7 +45,7 @@ namespace GameInterface.Services.Kingdoms
         void UnregisterDecisionItem(DecisionItemBaseVM decisionItem);
         bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData);
         void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData);
-        bool TryResolveDecision(KingdomDecision decision, bool force);
+        bool TryResolveDecision(KingdomDecision decision);
         bool HasEligiblePlayerClan(KingdomDecision decision);
         bool TryPublishFinalVoteForElection(KingdomElection election);
         IReadOnlyList<KingdomDecisionVoteManager.KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom);
@@ -57,6 +58,7 @@ namespace GameInterface.Services.Kingdoms
             string notificationText = null);
         void CloseDecision(string kingdomId, int decisionIndex);
         void ClearDecisionState(string kingdomId, int decisionIndex);
+        void ClearDecisionState(KingdomDecision decision);
     }
 
     public class KingdomDecisionVoteManager : IKingdomDecisionVoteManager, IDisposable
@@ -245,6 +247,20 @@ namespace GameInterface.Services.Kingdoms
             }
         }
 
+        public IReadOnlyList<KingdomDecisionRoundStatusData> CaptureActiveRoundStatuses()
+        {
+            if (!ModInformation.IsServer) return Array.Empty<KingdomDecisionRoundStatusData>();
+
+            RegisterLoadedDecisions();
+            return DecisionStates.Values
+                .Where(state => IsDecisionUnresolved(state.Decision) &&
+                                !state.IsResolved &&
+                                state.RoundDeadlineUtc.HasValue)
+                .Select(CreateRoundStatus)
+                .Where(status => status != null)
+                .ToArray();
+        }
+
         private void ApplyPendingRoundStatus(KingdomDecisionVoteState state)
         {
             KingdomDecisionRoundStatusData pending = PendingRoundStatuses.LastOrDefault(candidate =>
@@ -258,11 +274,11 @@ namespace GameInterface.Services.Kingdoms
             state.ApplyRoundStatus(pending);
         }
 
-        public void RefreshDecisionWaitingStatus(DecisionItemBaseVM decisionItem)
+        public string RefreshDecisionWaitingStatus(DecisionItemBaseVM decisionItem)
         {
             KingdomDecision decision = decisionItem?.KingdomDecisionMaker?._decision;
-            if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return;
-            if (state.RoundClans.Count == 0 || !state.RoundDeadlineUtc.HasValue) return;
+            if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return null;
+            if (state.RoundClans.Count == 0 || !state.RoundDeadlineUtc.HasValue) return null;
 
             List<KingdomDecisionRoundClanStatusData> waitingClans = state.RoundClans.Values
                 .Where(clan => !clan.HasFinalVote)
@@ -273,15 +289,14 @@ namespace GameInterface.Services.Kingdoms
             string prefix = HasLocalPlayerSubmittedVote(decision) ? "Vote submitted. " : string.Empty;
             if (waitingClans.Count == 0)
             {
-                SetDecisionFeedback(decisionItem, prefix + "All votes received. Resolving...");
-                return;
+                return prefix + "All votes received. Resolving...";
             }
 
             int remainingSeconds = Math.Max(
                 0,
                 (int)Math.Ceiling((state.RoundDeadlineUtc.Value - DateTime.UtcNow).TotalSeconds));
             string waitingText = string.Join("; ", waitingClans.Select(FormatWaitingClan));
-            SetDecisionFeedback(decisionItem, $"{prefix}Voting ends in {remainingSeconds}s. Waiting for: {waitingText}.");
+            return $"{prefix}Voting ends in {remainingSeconds}s. Waiting for: {waitingText}.";
         }
 
         public void CloseDecisionItem(DecisionItemBaseVM decisionItem)
@@ -409,14 +424,14 @@ namespace GameInterface.Services.Kingdoms
             ApplyVote(state, clanId, clan, voteData);
         }
 
-        public bool TryResolveDecision(KingdomDecision decision, bool force)
+        public bool TryResolveDecision(KingdomDecision decision)
         {
-            if (decision == null) return false;
+            if (!IsDecisionUnresolved(decision)) return false;
 
             KingdomDecisionVoteState state = GetOrCreateState(decision);
             RefreshEligibleClanIds(state, decision);
             if (state.EligibleClanIds.Count == 0) return false;
-            if (!force && !state.HasAllVotes) return false;
+            if (!state.HasAllVotes) return TryResolveExpiredRound(state, DateTime.UtcNow);
 
             ResolveDecision(state);
             return true;
@@ -424,6 +439,13 @@ namespace GameInterface.Services.Kingdoms
 
         public bool HasEligiblePlayerClan(KingdomDecision decision)
         {
+            if (decision != null &&
+                DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) &&
+                state.HasRoundSnapshot)
+            {
+                return true;
+            }
+
             return GetEligibleClanIds(decision).Count > 0;
         }
 
@@ -521,6 +543,11 @@ namespace GameInterface.Services.Kingdoms
             PendingRoundStatuses.RemoveAll(candidate => candidate.KingdomId == kingdomId);
             if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision)) return;
 
+            RemoveDecisionState(decision);
+        }
+
+        public void ClearDecisionState(KingdomDecision decision)
+        {
             RemoveDecisionState(decision);
         }
 
@@ -1477,6 +1504,11 @@ namespace GameInterface.Services.Kingdoms
             RegisterLoadedDecisions();
             foreach (KingdomDecisionVoteState state in DecisionStates.Values.ToList())
             {
+                if (!IsDecisionUnresolved(state.Decision))
+                {
+                    RemoveDecisionState(state.Decision);
+                    continue;
+                }
                 if (state.IsResolved || !state.RoundDeadlineUtc.HasValue) continue;
 
                 TryGetKingdomId(state.Decision.Kingdom, out string kingdomId);
@@ -1542,6 +1574,11 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
+        private static bool IsDecisionUnresolved(KingdomDecision decision)
+        {
+            return decision?.Kingdom?._unresolvedDecisions?.Contains(decision) == true;
+        }
+
         private void ApplyMissingAbstentions(KingdomDecisionVoteState state)
         {
             foreach (string clanId in state.EligibleClanIds.Where(clanId => !state.FinalVotes.ContainsKey(clanId)))
@@ -1559,7 +1596,15 @@ namespace GameInterface.Services.Kingdoms
 
         private void PublishRoundStatus(KingdomDecisionVoteState state)
         {
-            if (!ModInformation.IsServer || state == null || state.IsResolved || !state.RoundDeadlineUtc.HasValue) return;
+            KingdomDecisionRoundStatusData status = CreateRoundStatus(state);
+            if (status == null) return;
+
+            messageBroker?.Publish(state.Decision, new KingdomDecisionRoundStatusChanged(status));
+        }
+
+        private KingdomDecisionRoundStatusData CreateRoundStatus(KingdomDecisionVoteState state)
+        {
+            if (!ModInformation.IsServer || state == null || state.IsResolved || !state.RoundDeadlineUtc.HasValue) return null;
 
             foreach (string clanId in state.EligibleClanIds)
             {
@@ -1569,12 +1614,11 @@ namespace GameInterface.Services.Kingdoms
                     state.FinalVotes.ContainsKey(clanId));
             }
 
-            var status = new KingdomDecisionRoundStatusData(
+            return new KingdomDecisionRoundStatusData(
                 state.KingdomId,
                 state.DecisionIndex,
                 state.RoundDeadlineUtc.Value.Ticks,
                 state.RoundClans.Values.OrderBy(clan => clan.ClanId).ToArray());
-            messageBroker?.Publish(state.Decision, new KingdomDecisionRoundStatusChanged(status));
         }
 
         private void ShowSubmittedState(DecisionItemBaseVM decisionItem)
@@ -1591,14 +1635,6 @@ namespace GameInterface.Services.Kingdoms
                 option.IsSupportOption3Enabled = false;
             }
             RefreshDecisionWaitingStatus(decisionItem);
-        }
-
-        private static void SetDecisionFeedback(DecisionItemBaseVM decisionItem, string feedback)
-        {
-            if (decisionItem == null) return;
-
-            decisionItem.TitleText = feedback;
-            decisionItem.DescriptionText = feedback;
         }
 
         private static string FormatWaitingClan(KingdomDecisionRoundClanStatusData clan)

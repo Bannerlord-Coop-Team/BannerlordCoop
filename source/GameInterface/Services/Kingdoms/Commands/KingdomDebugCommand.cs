@@ -902,7 +902,7 @@ public class KingdomDebugCommand
 
     // coop.debug.kingdom.resolve_decision
     /// <summary>
-    /// Forces a queued player kingdom decision to resolve through the coop vote manager.
+    /// Resolves a queued player kingdom decision after every vote or the shared deadline.
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index</param>
     /// <returns>result message</returns>
@@ -919,7 +919,7 @@ public class KingdomDebugCommand
             return "Unable to resolve KingdomDecisionVoteManager";
         }
 
-        return voteManager.TryResolveDecision(decision, force: true)
+        return voteManager.TryResolveDecision(decision)
             ? $"Resolved {decision.GetType().Name} through player vote manager."
             : $"Could not resolve {decision.GetType().Name} through player vote manager.";
     }

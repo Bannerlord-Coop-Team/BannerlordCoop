@@ -1,5 +1,5 @@
-using GameInterface.Services.Kingdoms.Extentions;
-﻿using Common.Logging;
+﻿using GameInterface.Services.Kingdoms.Extentions;
+using Common.Logging;
 using GameInterface.Services.Clans.Handlers;
 using HarmonyLib;
 using Serilog;
@@ -57,7 +57,8 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (!TryGetVoteManager(out var voteManager)) return;
 
-            voteManager.RefreshDecisionWaitingStatus(__instance.CurrentDecision);
+            string feedback = voteManager.RefreshDecisionWaitingStatus(__instance.CurrentDecision);
+            KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, feedback);
         }
 
         internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
@@ -586,7 +587,6 @@ namespace GameInterface.Services.Kingdoms.Patches
             refresher.Refresh(__instance.Faction2);
         }
     }
-
     [HarmonyPatch(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost))]
     internal class GetCallToWarCostPatches
     {
