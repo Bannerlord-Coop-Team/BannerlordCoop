@@ -57,6 +57,7 @@ public class KingdomHandler : IHandler
         messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
         messageBroker.Subscribe<ChangeKingdomDecisionVote>(HandleChangeKingdomDecisionVote);
         messageBroker.Subscribe<ApplyKingdomDecisionVote>(HandleApplyKingdomDecisionVote);
+        messageBroker.Subscribe<ApplyKingdomDecisionRoundStatus>(HandleApplyKingdomDecisionRoundStatus);
         messageBroker.Subscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Subscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
@@ -425,6 +426,11 @@ public class KingdomHandler : IHandler
         });
     }
 
+    private void HandleApplyKingdomDecisionRoundStatus(MessagePayload<ApplyKingdomDecisionRoundStatus> obj)
+    {
+        RunKingdomMutation(() => decisionVoteManager.ApplyRoundStatus(obj.What.Status));
+    }
+
     private void HandleChangeKingdomDecisionVote(MessagePayload<ChangeKingdomDecisionVote> obj)
     {
         var payload = obj.What;
@@ -460,34 +466,33 @@ public class KingdomHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
-        {
-            Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
-            return;
-        }
-
-        // Kingdoms created on clients skip the constructor, so the list can be null.
-        var decisions = kingdom._unresolvedDecisions;
-        if (decisions == null)
-        {
-            Logger.Debug("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
-            return;
-        }
-
         RunKingdomMutation(() =>
         {
             decisionVoteManager.ClearDecisionState(payload.KingdomId, payload.Index);
-        });
+            if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+            {
+                Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
+                return;
+            }
 
-        if (payload.Index >= 0 && decisions.Count > payload.Index)
-        {
-            kingdomInterface.RemoveDecision(kingdom, decisions[payload.Index]);
-        }
-        else
-        {
-            Logger.Warning("Index is out of bounds of the list.");
-            return;
-        }
+            // Kingdoms created on clients skip the constructor, so the list can be null.
+            var decisions = kingdom._unresolvedDecisions;
+            if (decisions == null)
+            {
+                Logger.Debug("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
+                return;
+            }
+
+            if (payload.Index < 0 || decisions.Count <= payload.Index)
+            {
+                Logger.Warning("Index is out of bounds of the list.");
+                return;
+            }
+
+            KingdomDecision decision = decisions[payload.Index];
+            decisionVoteManager.CloseDecision(payload.KingdomId, payload.Index);
+            kingdomInterface.RemoveDecision(kingdom, decision);
+        });
     }
 
     private void HandleAddDecision(MessagePayload<AddDecision> obj)
@@ -569,6 +574,7 @@ public class KingdomHandler : IHandler
         messageBroker.Unsubscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
         messageBroker.Unsubscribe<ChangeKingdomDecisionVote>(HandleChangeKingdomDecisionVote);
         messageBroker.Unsubscribe<ApplyKingdomDecisionVote>(HandleApplyKingdomDecisionVote);
+        messageBroker.Unsubscribe<ApplyKingdomDecisionRoundStatus>(HandleApplyKingdomDecisionRoundStatus);
         messageBroker.Unsubscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Unsubscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
