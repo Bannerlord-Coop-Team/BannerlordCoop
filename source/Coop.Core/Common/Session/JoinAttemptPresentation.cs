@@ -29,10 +29,10 @@ public sealed class JoinAttemptPresentation
     public string CancelLabel { get; }
     public string CancelledNotice { get; }
 
-    public static JoinAttemptPresentation For(JoinIntent intent, string address, int port) => intent switch
+    public static JoinAttemptPresentation For(JoinIntent intent) => intent switch
     {
         JoinIntent.PlayerDirect => new JoinAttemptPresentation(intent, JoiningTitle,
-            $"Contacting {address}:{port}...", PlayerCancelLabel, PlayerCancelledNotice),
+            "Contacting the server...", PlayerCancelLabel, PlayerCancelledNotice),
 
         // A tunnelled Steam join dials a local pump, so the host is named by route not by address.
         JoinIntent.PlayerSteam => new JoinAttemptPresentation(intent, JoiningTitle,
