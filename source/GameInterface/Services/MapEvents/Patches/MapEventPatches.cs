@@ -78,6 +78,13 @@ internal class MapEventPatches
             __instance,
             __instance._sides.SelectMany(side => side.Parties).ToList());
         MessageBroker.Instance.Publish(__instance, message);
+
+        if (isPlayerJoin && !InteractionPatches.IsInitializingPlayerBattle(__instance))
+        {
+            InteractionPatches.OpenAiJoinWindowAndPublish(
+                __instance,
+                () => MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle()));
+        }
     }
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
@@ -520,10 +527,17 @@ internal class InteractionPatches
             return;
 
         initializingPlayerBattles.Remove(__instance);
-        playerBattleWindows.GetValue(
+        OpenAiJoinWindowAndPublish(
             __instance,
+            () => MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle()));
+    }
+
+    internal static void OpenAiJoinWindowAndPublish(MapEvent mapEvent, Action publish)
+    {
+        playerBattleWindows.GetValue(
+            mapEvent,
             _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
-        MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
+        publish();
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
