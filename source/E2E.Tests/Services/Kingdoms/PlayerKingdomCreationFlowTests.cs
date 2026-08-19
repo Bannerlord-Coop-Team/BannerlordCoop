@@ -377,42 +377,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
-#if DEBUG
-    [Fact]
-    public void PlayerKingdomFixture_RestoresCapturedKingdom()
-    {
-        var player = CreateSyncedPlayerContext();
-        var originalKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        var fixtureKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        ConfigureClanInKingdom(player.ClanId, originalKingdomId);
-
-        Server.Call(() =>
-        {
-            var captured = KingdomDebugCommand.CapturePlayerKingdomFixture(
-                new List<string> { "test-fixture", ControllerId });
-            var moved = KingdomDebugCommand.MovePlayerKingdomFixture(
-                new List<string> { ControllerId, fixtureKingdomId });
-            var restored = KingdomDebugCommand.RestorePlayerKingdomFixture(
-                new List<string> { "test-fixture", ControllerId });
-            var verified = KingdomDebugCommand.VerifyPlayerKingdomFixture(
-                new List<string> { "test-fixture", ControllerId });
-
-            Assert.Contains("PLAYER_KINGDOM_FIXTURE_CAPTURED", captured);
-            Assert.Contains("PLAYER_KINGDOM_FIXTURE_MOVED", moved);
-            Assert.Contains("PLAYER_KINGDOM_FIXTURE_RESTORED", restored);
-            Assert.Contains("PLAYER_KINGDOM_FIXTURE_VERIFIED", verified);
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(originalKingdomId, out var originalKingdom));
-            Assert.Same(originalKingdom, clan.Kingdom);
-        });
-
-        foreach (var client in Clients)
-        {
-            client.Call(() => AssertVassalMembership(client, player.ClanId, originalKingdomId));
-        }
-    }
-#endif
-
     [Fact]
     public void KingdomDecisionVotes_WaitForEveryPlayerClanBeforeResolvingDeclareWar()
     {

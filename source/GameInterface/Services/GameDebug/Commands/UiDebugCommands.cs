@@ -17,7 +17,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade.View.Tableaus;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
@@ -168,19 +167,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("thumbnail_state", "coop.debug.ui")]
-    public static string ThumbnailState(List<string> args)
-    {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.ui.thumbnail_state";
-
-        bool managerAvailable = ThumbnailCacheManager.Current != null;
-        int pendingRequests = ThumbnailCacheManager.GetNumberOfPendingRequests();
-        return $"THUMBNAIL_STATE manager={managerAvailable} pending={pendingRequests}";
-    }
-
     [CommandLineArgumentFunction("map_click_offset", "coop.debug.ui")]
     public static string MapClickOffset(List<string> args)
     {
