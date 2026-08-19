@@ -32,11 +32,14 @@ internal sealed class NearbyPartyReinforcementHandler : IHandler
 
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
     {
-        if (!ModInformation.IsServer || payload.Who is not MapEvent mapEvent)
+        if (!ModInformation.IsServer)
             return;
 
         GameThread.RunSafe(() =>
         {
+            if (payload.Who is not MapEvent mapEvent)
+                return;
+
             using (AllowedThread.Suspend())
                 nearbyPartyReinforcer.Reinforce(mapEvent);
         });

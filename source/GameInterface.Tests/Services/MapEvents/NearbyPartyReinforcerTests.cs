@@ -1,5 +1,10 @@
-﻿using GameInterface.Services.Entity;
+﻿using Common;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -14,6 +19,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using Xunit;
 using FormatterServices = System.Runtime.Serialization.FormatterServices;
@@ -38,11 +44,24 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
             .Field(typeof(PlayerManager), "PlayerObjects")
             .GetValue(null)!;
     private readonly List<object> controlledObjects = new();
+    private readonly bool previousIsServer;
+    private readonly int previousGameThreadId;
+
+    public NearbyPartyReinforcerTests()
+    {
+        previousIsServer = ModInformation.IsServer;
+        previousGameThreadId = GameThread.Instance.GameThreadId;
+        ModInformation.IsServer = true;
+        GameThread.Instance.MarkGameThread();
+    }
 
     public void Dispose()
     {
         foreach (var controlledObject in controlledObjects)
             playerObjects.Remove(controlledObject);
+
+        ModInformation.IsServer = previousIsServer;
+        GameThread.Instance.RestoreGameThread(previousGameThreadId);
     }
 
     [Fact]
@@ -77,6 +96,32 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     }
 
     [Fact]
+    public void SallyOutSelection_UsesMapEventSettlementWithoutPlayerSiege()
+    {
+        var playerParty = CreateMobileParty();
+        var enemyParty = CreateMobileParty();
+        var mapEvent = CreatePlayerBattle(playerParty, enemyParty);
+        var encounterSettlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
+        mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
+        mapEvent.MapEventSettlement = encounterSettlement;
+        MarkAsPlayerParty(playerParty);
+        InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
+        var selectorCalled = false;
+        var reinforcer = new NearbyPartyReinforcer();
+
+        reinforcer.Reinforce(
+            mapEvent,
+            (playerSide, enemySide) =>
+            {
+                selectorCalled = true;
+                Assert.Same(encounterSettlement, PlayerEncounter.EncounterSettlement);
+            },
+            (side, party) => { });
+
+        Assert.True(selectorCalled);
+    }
+
+    [Fact]
     public void CampaignTick_AddsAllyThatArrivesLaterDuringWindow()
     {
         var playerParty = CreateMobileParty();
@@ -92,11 +137,29 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
             mapEvent,
             (attackers, defenders) => { },
             (side, party) => joins.Add(party));
-        reinforcer.Reinforce(
-            mapEvent,
-            (attackers, defenders) => attackers.Add(lateAlly),
+
+        long firstScanTicks = CampaignTime.Now.NumTicks;
+        var selectorCalls = 0;
+        Action<List<MobileParty>, List<MobileParty>> selectLateAlly = (attackers, defenders) =>
+        {
+            selectorCalls++;
+            attackers.Add(lateAlly);
+        };
+
+        reinforcer.ReinforceOpenPlayerBattles(
+            firstScanTicks,
+            selectLateAlly,
             (side, party) => joins.Add(party));
 
+        Assert.Equal(0, selectorCalls);
+        Assert.Empty(joins);
+
+        reinforcer.ReinforceOpenPlayerBattles(
+            firstScanTicks + NearbyPartyReinforcer.FollowUpScanIntervalTicks,
+            selectLateAlly,
+            (side, party) => joins.Add(party));
+
+        Assert.Equal(1, selectorCalls);
         Assert.Collection(joins, party => Assert.Same(lateAlly, party));
     }
 
@@ -153,18 +216,45 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     }
 
     [Fact]
-    public void PlayerBattleAnnouncement_ObservesOpenAiJoinWindow()
+    public void EventConcludedDuringSelection_DoesNotAddJoiner()
+    {
+        var playerParty = CreateMobileParty();
+        var enemyParty = CreateMobileParty();
+        var nearbyAlly = CreateMobileParty();
+        var mapEvent = CreatePlayerBattle(playerParty, enemyParty);
+        MarkAsPlayerParty(playerParty);
+        InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
+        var joins = new List<MobileParty>();
+        var reinforcer = new NearbyPartyReinforcer();
+
+        reinforcer.Reinforce(
+            mapEvent,
+            (playerSide, enemySide) =>
+            {
+                playerSide.Add(nearbyAlly);
+                mapEvent._battleState = TaleWorlds.Core.BattleState.AttackerVictory;
+            },
+            (side, party) => joins.Add(party));
+
+        Assert.Empty(joins);
+    }
+
+    [Fact]
+    public void PlayerBattleAnnouncement_OpensWindowBeforeImmediateGameThreadScan()
     {
         var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
-        var published = false;
+        var reinforcer = new RecordingReinforcer(mapEvent);
+        using var messageBroker = new MessageBroker();
+        using var handler = new NearbyPartyReinforcementHandler(messageBroker, reinforcer);
 
-        InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () =>
+        using (new AllowedThread())
         {
-            published = true;
-            Assert.True(InteractionPatches.IsWithinAiJoinWindow(mapEvent));
-        });
+            InteractionPatches.OpenAiJoinWindowAndPublish(
+                mapEvent,
+                () => messageBroker.Publish(mapEvent, new PlayerJoinedBattle()));
+        }
 
-        Assert.True(published);
+        Assert.Equal(1, reinforcer.ImmediateScanCount);
     }
 
     private MapEvent CreatePlayerBattle(MobileParty playerParty, MobileParty enemyParty)
@@ -205,5 +295,30 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
             mobileParty,
             new ControlledObjectInfo("PlayerOne", new ControllerIdProvider()));
         controlledObjects.Add(mobileParty);
+    }
+
+    private sealed class RecordingReinforcer : INearbyPartyReinforcer
+    {
+        private readonly MapEvent expectedMapEvent;
+
+        public RecordingReinforcer(MapEvent expectedMapEvent)
+        {
+            this.expectedMapEvent = expectedMapEvent;
+        }
+
+        public int ImmediateScanCount { get; private set; }
+
+        public void Reinforce(MapEvent mapEvent)
+        {
+            Assert.Same(expectedMapEvent, mapEvent);
+            Assert.True(GameThread.Instance.IsGameThread);
+            Assert.False(AllowedThread.IsThisThreadAllowed());
+            Assert.True(InteractionPatches.IsWithinAiJoinWindow(mapEvent));
+            ImmediateScanCount++;
+        }
+
+        public void ReinforceOpenPlayerBattles()
+        {
+        }
     }
 }

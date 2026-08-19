@@ -2,7 +2,6 @@
 using GameInterface.Services.MobileParties.Extensions;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -21,6 +20,18 @@ internal interface INearbyPartyReinforcer
 /// <summary>Applies nearby AI reinforcements to open player battles on the server.</summary>
 internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
 {
+    // Campaign-time scheduling stops follow-up scans while the map is paused.
+    private const float FollowUpScanIntervalHours = 0.25f;
+
+    private sealed class FollowUpScanState
+    {
+        public long NextScanAtTicks { get; set; }
+    }
+
+    private readonly Dictionary<MapEvent, FollowUpScanState> followUpScans = new();
+    private readonly List<MapEvent> completedFollowUpScans = new();
+    private long nextFollowUpScanAtTicks = long.MaxValue;
+
     public void Reinforce(MapEvent mapEvent)
     {
         var encounterModel = Campaign.Current?.Models?.EncounterModel;
@@ -35,20 +46,86 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
 
     public void ReinforceOpenPlayerBattles()
     {
-        var mapEvents = Campaign.Current?.MapEventManager?.MapEvents;
-        if (mapEvents == null)
+        long currentTicks = CampaignTime.Now.NumTicks;
+        if (currentTicks < nextFollowUpScanAtTicks)
             return;
 
-        foreach (var mapEvent in mapEvents.ToArray())
-            Reinforce(mapEvent);
+        var encounterModel = Campaign.Current?.Models?.EncounterModel;
+        if (encounterModel == null)
+        {
+            nextFollowUpScanAtTicks = currentTicks + FollowUpScanIntervalTicks;
+            return;
+        }
+
+        ReinforceOpenPlayerBattles(
+            currentTicks,
+            encounterModel.FindNonAttachedNpcPartiesWhoWillJoinPlayerEncounter,
+            (side, party) => side.AddNearbyPartyToPlayerMapEvent(party));
     }
+
+    internal void ReinforceOpenPlayerBattles(
+        long currentTicks,
+        Action<List<MobileParty>, List<MobileParty>> selectJoiners,
+        Action<MapEventSide, MobileParty> addJoiner)
+    {
+        if (currentTicks < nextFollowUpScanAtTicks)
+            return;
+
+        completedFollowUpScans.Clear();
+        nextFollowUpScanAtTicks = long.MaxValue;
+
+        foreach (var pair in followUpScans)
+        {
+            var mapEvent = pair.Key;
+            var state = pair.Value;
+            if (!CanReinforce(mapEvent))
+            {
+                completedFollowUpScans.Add(mapEvent);
+                continue;
+            }
+
+            bool scanIsDue = IsFollowUpScanDue(mapEvent, currentTicks);
+            if (scanIsDue)
+                state.NextScanAtTicks = currentTicks + FollowUpScanIntervalTicks;
+
+            nextFollowUpScanAtTicks = Math.Min(nextFollowUpScanAtTicks, state.NextScanAtTicks);
+
+            if (scanIsDue)
+                ReinforceCore(mapEvent, selectJoiners, addJoiner);
+        }
+
+        foreach (var mapEvent in completedFollowUpScans)
+            followUpScans.Remove(mapEvent);
+    }
+
+    internal static long FollowUpScanIntervalTicks => CampaignTime.Hours(FollowUpScanIntervalHours).NumTicks;
 
     internal void Reinforce(
         MapEvent mapEvent,
         Action<List<MobileParty>, List<MobileParty>> selectJoiners,
         Action<MapEventSide, MobileParty> addJoiner)
     {
-        if (!CanReinforce(mapEvent) || !TryGetPlayerParty(mapEvent, out var playerParty, out var playerSide))
+        if (!CanReinforce(mapEvent))
+            return;
+
+        ScheduleFollowUpScan(mapEvent, CampaignTime.Now.NumTicks);
+        ReinforceCore(mapEvent, selectJoiners, addJoiner);
+    }
+
+    internal bool IsFollowUpScanDue(MapEvent mapEvent, long currentTicks)
+    {
+        if (!followUpScans.TryGetValue(mapEvent, out var state) || !CanReinforce(mapEvent))
+            return false;
+
+        return currentTicks >= state.NextScanAtTicks;
+    }
+
+    private void ReinforceCore(
+        MapEvent mapEvent,
+        Action<List<MobileParty>, List<MobileParty>> selectJoiners,
+        Action<MapEventSide, MobileParty> addJoiner)
+    {
+        if (!TryGetPlayerParty(mapEvent, out var playerParty, out var playerSide))
             return;
 
         var enemySide = playerSide.GetOppositeSide();
@@ -59,8 +136,23 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
 
         SelectJoiners(mapEvent, playerParty, playerSide, playerParties, enemyParties, selectJoiners);
 
+        if (!CanReinforce(mapEvent))
+            return;
+
         AddJoiners(mapEvent.GetMapEventSide(playerSide), playerParties, playerPartyCount, addJoiner);
         AddJoiners(mapEvent.GetMapEventSide(enemySide), enemyParties, enemyPartyCount, addJoiner);
+    }
+
+    private void ScheduleFollowUpScan(MapEvent mapEvent, long currentTicks)
+    {
+        if (!followUpScans.TryGetValue(mapEvent, out var state))
+        {
+            state = new FollowUpScanState();
+            followUpScans.Add(mapEvent, state);
+        }
+
+        state.NextScanAtTicks = currentTicks + FollowUpScanIntervalTicks;
+        nextFollowUpScanAtTicks = Math.Min(nextFollowUpScanAtTicks, state.NextScanAtTicks);
     }
 
     internal static bool CanReinforce(MapEvent mapEvent)
@@ -90,6 +182,7 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
         var encounter = new PlayerEncounter
         {
             _mapEvent = mapEvent,
+            EncounterSettlementAux = mapEvent.MapEventSettlement,
             PlayerSide = playerSide,
             OpponentSide = playerSide.GetOppositeSide()
         };
