@@ -1,6 +1,7 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Connections.States;
 using LiteNetLib;
 using System;
 using System.Collections;
@@ -18,6 +19,7 @@ namespace Coop.Core.Server.Connections;
 public interface IConnectionCollection : IEnumerable<IConnectionLogic>, IDisposable
 {
     IEnumerable<IConnectionLogic> LoadingPeers { get; }
+    bool HasCompletedCampaignSynchronization(NetPeer peer);
 }
 
 /// <inheritdoc cref="IConnectionCollection"/>
@@ -28,6 +30,10 @@ public class ConnectionCollection : IConnectionCollection
     public IEnumerable<IConnectionLogic> LoadingPeers => ConnectionStates
         .Select(conn => conn.Value)
         .Where(conn => conn.IsLoading);
+
+    public bool HasCompletedCampaignSynchronization(NetPeer peer) =>
+        ConnectionStates.TryGetValue(peer, out var connection) &&
+        (connection.State is CampaignState || connection.State is MissionState);
 
     private readonly IMessageBroker messageBroker;
     private readonly ConnectionContext connectionContext;
