@@ -10,7 +10,14 @@ namespace Missions.Agents.Handlers;
 
 public interface IMovementBatchSender
 {
+    int AvailableOutgoingBytes { get; }
+
     void BeginFrame(float elapsedSeconds);
+
+    void ConfigureRecipient(
+        string controllerId,
+        double bytesPerSecond,
+        int maxPayloadBytes);
 
     MovementSendResult Send<T>(
         string controllerId,
@@ -19,6 +26,18 @@ public interface IMovementBatchSender
         int maxPayloadBytes,
         Func<string, ushort[], Guid[], T[], IPacket> createPacket,
         Action<Guid, T> onSent);
+
+    MovementSendPairResult SendInterleaved<TFirst, TSecond>(
+        string controllerId,
+        IEnumerable<MovementBatch<TFirst>> firstScopedBatches,
+        MovementBatch<TFirst> firstLegacyBatch,
+        Func<string, ushort[], Guid[], TFirst[], IPacket> createFirstPacket,
+        Action<Guid, TFirst> onFirstSent,
+        IEnumerable<MovementBatch<TSecond>> secondScopedBatches,
+        MovementBatch<TSecond> secondLegacyBatch,
+        Func<string, ushort[], Guid[], TSecond[], IPacket> createSecondPacket,
+        Action<Guid, TSecond> onSecondSent,
+        int maxPayloadBytes);
 
     MovementTrafficFrame EndFrame(
         string controllerId,
@@ -33,18 +52,66 @@ public interface IMovementBatchSender
 public readonly struct MovementSendResult
 {
     public int SentCount { get; }
+    public int PrioritySentCount { get; }
     public int DeferredCount { get; }
+    public bool BlockedBySharedBudget { get; }
+    public bool PriorityBlockedBySharedBudget { get; }
+    public int RequiredSharedBudgetBytes { get; }
+    internal int ProcessedCount { get; }
 
-    public MovementSendResult(int sentCount, int deferredCount)
+    public MovementSendResult(
+        int sentCount,
+        int deferredCount,
+        int processedCount = -1,
+        int prioritySentCount = 0,
+        bool blockedBySharedBudget = false,
+        bool priorityBlockedBySharedBudget = false,
+        int requiredSharedBudgetBytes = 0)
     {
         SentCount = sentCount;
+        PrioritySentCount = prioritySentCount;
         DeferredCount = deferredCount;
+        BlockedBySharedBudget = blockedBySharedBudget;
+        PriorityBlockedBySharedBudget = priorityBlockedBySharedBudget;
+        RequiredSharedBudgetBytes = requiredSharedBudgetBytes;
+        ProcessedCount = processedCount < 0 ? sentCount : processedCount;
     }
 
     public MovementSendResult Add(MovementSendResult other) =>
         new MovementSendResult(
             SentCount + other.SentCount,
-            DeferredCount + other.DeferredCount);
+            DeferredCount + other.DeferredCount,
+            ProcessedCount + other.ProcessedCount,
+            PrioritySentCount + other.PrioritySentCount,
+            BlockedBySharedBudget || other.BlockedBySharedBudget,
+            PriorityBlockedBySharedBudget || other.PriorityBlockedBySharedBudget,
+            Math.Max(RequiredSharedBudgetBytes, other.RequiredSharedBudgetBytes));
+}
+
+/// <summary>Results for two movement streams scheduled against one shared budget.</summary>
+public readonly struct MovementSendPairResult
+{
+    public MovementSendResult First { get; }
+    public MovementSendResult Second { get; }
+
+    public int PrioritySentCount =>
+        First.PrioritySentCount + Second.PrioritySentCount;
+    public int BulkSentCount =>
+        First.SentCount + Second.SentCount - PrioritySentCount;
+    public bool BlockedBySharedBudget =>
+        First.BlockedBySharedBudget || Second.BlockedBySharedBudget;
+    public bool PriorityBlockedBySharedBudget =>
+        First.PriorityBlockedBySharedBudget || Second.PriorityBlockedBySharedBudget;
+    public int RequiredSharedBudgetBytes =>
+        Math.Max(First.RequiredSharedBudgetBytes, Second.RequiredSharedBudgetBytes);
+
+    public MovementSendPairResult(
+        MovementSendResult first,
+        MovementSendResult second)
+    {
+        First = first;
+        Second = second;
+    }
 }
 
 public sealed class MovementBatch<T>
@@ -54,6 +121,9 @@ public sealed class MovementBatch<T>
     public List<ushort> CompactIds { get; } = new List<ushort>();
     public List<Guid> CanonicalIds { get; } = new List<Guid>();
     public List<T> Data { get; } = new List<T>();
+    public List<MovementPriorityKey> Priorities { get; } = new List<MovementPriorityKey>();
+
+    public bool HasPriorities => Priorities.Count == Data.Count && Data.Count > 0;
 
     public MovementBatch(string identityScopeId, bool isPriority = false)
     {
@@ -69,11 +139,18 @@ public sealed class MovementBatch<T>
         Data.Add(data);
     }
 
+    public void Add(CoopAgentInfo info, T data, MovementPriorityKey priority)
+    {
+        Add(info, data);
+        Priorities.Add(priority);
+    }
+
     public void Clear()
     {
         CompactIds.Clear();
         CanonicalIds.Clear();
         Data.Clear();
+        Priorities.Clear();
     }
 }
 
@@ -85,7 +162,10 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
     private readonly IBattleNetwork client;
     private readonly IMovementPacketCompressor packetCompressor;
-    private readonly Func<IMovementTrafficBudget> trafficBudgetFactory;
+    private readonly IMovementTrafficBudgetFactory trafficBudgetFactory;
+    private readonly IMovementPriorityScheduler priorityScheduler;
+    private readonly IMovementNetworkSettings networkSettings;
+    private readonly IMovementTrafficBudget outgoingTrafficBudget;
     private readonly Dictionary<string, RecipientState> recipients =
         new Dictionary<string, RecipientState>(StringComparer.Ordinal);
 
@@ -109,24 +189,104 @@ public sealed class MovementBatchSender : IMovementBatchSender
         }
     }
 
+    /// <summary>Tracks progress through one reusable priority batch without copying its unsent tail.</summary>
+    private sealed class PrioritizedBatchCursor<T>
+    {
+        public MovementBatch<T> Batch { get; }
+        public int StartIndex { get; set; }
+
+        public PrioritizedBatchCursor(MovementBatch<T> batch)
+        {
+            Batch = batch;
+        }
+    }
+
+    private struct MovementSendAccumulator
+    {
+        public int SentCount;
+        public int PrioritySentCount;
+        public bool BlockedBySharedBudget;
+        public bool PriorityBlockedBySharedBudget;
+        public int RequiredSharedBudgetBytes;
+
+        public void Add(MovementSendResult result)
+        {
+            SentCount += result.SentCount;
+            PrioritySentCount += result.PrioritySentCount;
+            BlockedBySharedBudget |= result.BlockedBySharedBudget;
+            PriorityBlockedBySharedBudget |= result.PriorityBlockedBySharedBudget;
+            RequiredSharedBudgetBytes = Math.Max(
+                RequiredSharedBudgetBytes,
+                result.RequiredSharedBudgetBytes);
+        }
+
+        public MovementSendResult ToResult(int totalSnapshots) =>
+            new MovementSendResult(
+                SentCount,
+                Math.Max(0, totalSnapshots - SentCount),
+                prioritySentCount: PrioritySentCount,
+                blockedBySharedBudget: BlockedBySharedBudget,
+                priorityBlockedBySharedBudget: PriorityBlockedBySharedBudget,
+                requiredSharedBudgetBytes: RequiredSharedBudgetBytes);
+    }
+
     public MovementBatchSender(
         IBattleNetwork client,
         IMovementPacketCompressor packetCompressor,
-        Func<IMovementTrafficBudget> trafficBudgetFactory)
+        IMovementTrafficBudgetFactory trafficBudgetFactory,
+        IMovementPriorityScheduler priorityScheduler,
+        IMovementNetworkSettings networkSettings)
     {
         if (client == null) throw new ArgumentNullException(nameof(client));
         if (packetCompressor == null) throw new ArgumentNullException(nameof(packetCompressor));
         if (trafficBudgetFactory == null) throw new ArgumentNullException(nameof(trafficBudgetFactory));
+        if (priorityScheduler == null) throw new ArgumentNullException(nameof(priorityScheduler));
+        if (networkSettings == null) throw new ArgumentNullException(nameof(networkSettings));
 
         this.client = client;
         this.packetCompressor = packetCompressor;
         this.trafficBudgetFactory = trafficBudgetFactory;
+        this.priorityScheduler = priorityScheduler;
+        this.networkSettings = networkSettings;
+        outgoingTrafficBudget = trafficBudgetFactory.Create(
+            networkSettings.OutgoingBytesPerSecond,
+            CalculateBurstBytes(networkSettings.OutgoingBytesPerSecond, 1000));
+        if (outgoingTrafficBudget == null)
+            throw new InvalidOperationException("The movement traffic-budget factory returned null.");
     }
+
+    internal MovementBatchSender(
+        IBattleNetwork client,
+        IMovementPacketCompressor packetCompressor,
+        Func<IMovementTrafficBudget> trafficBudgetFactory)
+        : this(
+            client,
+            packetCompressor,
+            new DelegateMovementTrafficBudgetFactory(trafficBudgetFactory),
+            new MovementPriorityScheduler(),
+            new MovementNetworkSettings(1d, 1d))
+    {
+    }
+
+    public int AvailableOutgoingBytes => outgoingTrafficBudget.AvailableBytes;
 
     public void BeginFrame(float elapsedSeconds)
     {
+        outgoingTrafficBudget.Advance(elapsedSeconds);
         foreach (RecipientState recipient in recipients.Values)
             recipient.TrafficBudget.Advance(elapsedSeconds);
+    }
+
+    public void ConfigureRecipient(
+        string controllerId,
+        double bytesPerSecond,
+        int maxPayloadBytes)
+    {
+        double normalizedBytesPerSecond = NormalizeByteRate(bytesPerSecond);
+        RecipientState recipient = GetOrCreateRecipient(controllerId);
+        recipient.TrafficBudget.Configure(
+            normalizedBytesPerSecond,
+            CalculateBurstBytes(normalizedBytesPerSecond, maxPayloadBytes));
     }
 
     public MovementSendResult Send<T>(
@@ -138,16 +298,27 @@ public sealed class MovementBatchSender : IMovementBatchSender
         Action<Guid, T> onSent)
     {
         RecipientState recipient = GetOrCreateRecipient(controllerId);
-        var batches = new List<MovementBatch<T>>();
-        foreach (MovementBatch<T> batch in scopedBatches)
-        {
-            if (batch != null && batch.Data.Count > 0)
-                batches.Add(batch);
-        }
-        if (legacyBatch != null && legacyBatch.Data.Count > 0)
-            batches.Add(legacyBatch);
-
+        List<MovementBatch<T>> batches = CollectBatches(
+            scopedBatches,
+            legacyBatch);
         if (batches.Count == 0) return new MovementSendResult();
+
+        bool prioritize = batches.Exists(batch => batch.HasPriorities);
+        if (prioritize)
+        {
+            batches.Sort((left, right) => CompareBatchPriority(left, right));
+        }
+
+        if (prioritize)
+        {
+            return SendPrioritizedBatches(
+                controllerId,
+                recipient,
+                batches,
+                maxPayloadBytes,
+                createPacket,
+                onSent);
+        }
 
         var fairnessKey = (typeof(T), batches[0].IsPriority);
         int offset = recipient.BatchOffsets.TryGetValue(fairnessKey, out int previousOffset)
@@ -170,6 +341,220 @@ public sealed class MovementBatchSender : IMovementBatchSender
         return result;
     }
 
+    public MovementSendPairResult SendInterleaved<TFirst, TSecond>(
+        string controllerId,
+        IEnumerable<MovementBatch<TFirst>> firstScopedBatches,
+        MovementBatch<TFirst> firstLegacyBatch,
+        Func<string, ushort[], Guid[], TFirst[], IPacket> createFirstPacket,
+        Action<Guid, TFirst> onFirstSent,
+        IEnumerable<MovementBatch<TSecond>> secondScopedBatches,
+        MovementBatch<TSecond> secondLegacyBatch,
+        Func<string, ushort[], Guid[], TSecond[], IPacket> createSecondPacket,
+        Action<Guid, TSecond> onSecondSent,
+        int maxPayloadBytes)
+    {
+        RecipientState recipient = GetOrCreateRecipient(controllerId);
+        List<PrioritizedBatchCursor<TFirst>> firstPending = CreatePriorityCursors(
+            CollectBatches(firstScopedBatches, firstLegacyBatch),
+            out int firstTotal);
+        List<PrioritizedBatchCursor<TSecond>> secondPending = CreatePriorityCursors(
+            CollectBatches(secondScopedBatches, secondLegacyBatch),
+            out int secondTotal);
+        var firstProbedScopes = new HashSet<string>(StringComparer.Ordinal);
+        var secondProbedScopes = new HashSet<string>(StringComparer.Ordinal);
+        var firstResult = new MovementSendAccumulator();
+        var secondResult = new MovementSendAccumulator();
+
+        while (firstPending.Count > 0 || secondPending.Count > 0)
+        {
+            firstPending.Sort((left, right) => CompareBatchPriority(left, right));
+            secondPending.Sort((left, right) => CompareBatchPriority(left, right));
+            bool sendFirst = ShouldSendFirst(firstPending, secondPending);
+            bool progressed;
+            if (sendFirst)
+            {
+                progressed = SendNextPrioritizedPacket(
+                    controllerId,
+                    recipient,
+                    firstPending,
+                    firstProbedScopes,
+                    GetCompetingPriority(firstPending, secondPending),
+                    maxPayloadBytes,
+                    createFirstPacket,
+                    onFirstSent,
+                    ref firstResult);
+            }
+            else
+            {
+                progressed = SendNextPrioritizedPacket(
+                    controllerId,
+                    recipient,
+                    secondPending,
+                    secondProbedScopes,
+                    GetCompetingPriority(secondPending, firstPending),
+                    maxPayloadBytes,
+                    createSecondPacket,
+                    onSecondSent,
+                    ref secondResult);
+            }
+            if (!progressed) break;
+        }
+
+        return new MovementSendPairResult(
+            firstResult.ToResult(firstTotal),
+            secondResult.ToResult(secondTotal));
+    }
+
+    private MovementSendResult SendPrioritizedBatches<T>(
+        string controllerId,
+        RecipientState recipient,
+        List<MovementBatch<T>> batches,
+        int maxPayloadBytes,
+        Func<string, ushort[], Guid[], T[], IPacket> createPacket,
+        Action<Guid, T> onSent)
+    {
+        List<PrioritizedBatchCursor<T>> pending = CreatePriorityCursors(
+            batches,
+            out int totalSnapshots);
+        var probedScopes = new HashSet<string>(StringComparer.Ordinal);
+        var result = new MovementSendAccumulator();
+        while (pending.Count > 0)
+        {
+            pending.Sort((left, right) => CompareBatchPriority(left, right));
+            MovementPriorityKey? competingPriority = pending.Count > 1
+                ? GetCursorPriority(pending[1])
+                : (MovementPriorityKey?)null;
+            if (!SendNextPrioritizedPacket(
+                    controllerId,
+                    recipient,
+                    pending,
+                    probedScopes,
+                    competingPriority,
+                    maxPayloadBytes,
+                    createPacket,
+                    onSent,
+                    ref result))
+            {
+                break;
+            }
+        }
+
+        return result.ToResult(totalSnapshots);
+    }
+
+    private bool ShouldSendFirst<TFirst, TSecond>(
+        List<PrioritizedBatchCursor<TFirst>> first,
+        List<PrioritizedBatchCursor<TSecond>> second)
+    {
+        if (second.Count == 0) return true;
+        if (first.Count == 0) return false;
+
+        PrioritizedBatchCursor<TFirst> firstCursor = first[0];
+        PrioritizedBatchCursor<TSecond> secondCursor = second[0];
+        return priorityScheduler.Compare(
+            firstCursor.Batch.Priorities[firstCursor.StartIndex],
+            secondCursor.Batch.Priorities[secondCursor.StartIndex]) <= 0;
+    }
+
+    private MovementPriorityKey? GetCompetingPriority<TCurrent, TOther>(
+        List<PrioritizedBatchCursor<TCurrent>> current,
+        List<PrioritizedBatchCursor<TOther>> other)
+    {
+        MovementPriorityKey? competing = current.Count > 1
+            ? GetCursorPriority(current[1])
+            : (MovementPriorityKey?)null;
+        if (other.Count == 0) return competing;
+
+        MovementPriorityKey otherPriority = GetCursorPriority(other[0]);
+        return !competing.HasValue ||
+            priorityScheduler.Compare(otherPriority, competing.Value) < 0
+                ? otherPriority
+                : competing;
+    }
+
+    private static MovementPriorityKey GetCursorPriority<T>(
+        PrioritizedBatchCursor<T> cursor) =>
+        cursor.Batch.Priorities[cursor.StartIndex];
+
+    private bool SendNextPrioritizedPacket<T>(
+        string controllerId,
+        RecipientState recipient,
+        List<PrioritizedBatchCursor<T>> pending,
+        HashSet<string> probedScopes,
+        MovementPriorityKey? competingPriority,
+        int maxPayloadBytes,
+        Func<string, ushort[], Guid[], T[], IPacket> createPacket,
+        Action<Guid, T> onSent,
+        ref MovementSendAccumulator accumulator)
+    {
+        PrioritizedBatchCursor<T> cursor = pending[0];
+        MovementBatch<T> batch = cursor.Batch;
+        MovementSendResult result = SendBatch(
+            controllerId,
+            recipient,
+            batch,
+            maxPayloadBytes,
+            createPacket,
+            onSent,
+            maximumPackets: 1,
+            maximumSnapshots: GetMaximumSnapshots(cursor, competingPriority),
+            allowProbeForGrowth: probedScopes.Add(batch.IdentityScopeId),
+            startOffset: cursor.StartIndex);
+        accumulator.Add(result);
+        if (result.ProcessedCount <= 0) return false;
+
+        cursor.StartIndex += result.ProcessedCount;
+        if (cursor.StartIndex >= batch.Data.Count)
+            pending.RemoveAt(0);
+        return true;
+    }
+
+    private int GetMaximumSnapshots<T>(
+        PrioritizedBatchCursor<T> cursor,
+        MovementPriorityKey? competingPriority)
+    {
+        if (!competingPriority.HasValue) return int.MaxValue;
+
+        int count = 1;
+        while (cursor.StartIndex + count < cursor.Batch.Priorities.Count &&
+            priorityScheduler.Compare(
+                cursor.Batch.Priorities[cursor.StartIndex + count],
+                competingPriority.Value) <= 0)
+        {
+            count++;
+        }
+        return count;
+    }
+
+    private List<PrioritizedBatchCursor<T>> CreatePriorityCursors<T>(
+        List<MovementBatch<T>> batches,
+        out int totalSnapshots)
+    {
+        totalSnapshots = 0;
+        var pending = new List<PrioritizedBatchCursor<T>>(batches.Count);
+        foreach (MovementBatch<T> batch in batches)
+        {
+            totalSnapshots += batch.Data.Count;
+            pending.Add(new PrioritizedBatchCursor<T>(batch));
+        }
+        return pending;
+    }
+
+    private List<MovementBatch<T>> CollectBatches<T>(
+        IEnumerable<MovementBatch<T>> scopedBatches,
+        MovementBatch<T> legacyBatch)
+    {
+        var batches = new List<MovementBatch<T>>();
+        foreach (MovementBatch<T> batch in scopedBatches)
+        {
+            if (batch != null && batch.Data.Count > 0)
+                batches.Add(OrderByPriority(batch));
+        }
+        if (legacyBatch != null && legacyBatch.Data.Count > 0)
+            batches.Add(OrderByPriority(legacyBatch));
+        return batches;
+    }
+
     public MovementTrafficFrame EndFrame(
         string controllerId,
         int deferredSnapshots,
@@ -190,6 +575,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
     public void Clear()
     {
+        outgoingTrafficBudget.Clear();
         foreach (RecipientState recipient in recipients.Values)
             recipient.TrafficBudget.Clear();
         recipients.Clear();
@@ -203,7 +589,9 @@ public sealed class MovementBatchSender : IMovementBatchSender
         if (recipients.TryGetValue(controllerId, out RecipientState recipient))
             return recipient;
 
-        IMovementTrafficBudget trafficBudget = trafficBudgetFactory();
+        IMovementTrafficBudget trafficBudget = trafficBudgetFactory.Create(
+            networkSettings.OutgoingBytesPerSecond,
+            CalculateBurstBytes(networkSettings.OutgoingBytesPerSecond, 1000));
         if (trafficBudget == null)
             throw new InvalidOperationException("The movement traffic-budget factory returned null.");
 
@@ -218,7 +606,11 @@ public sealed class MovementBatchSender : IMovementBatchSender
         MovementBatch<T> batch,
         int maxPayloadBytes,
         Func<string, ushort[], Guid[], T[], IPacket> createPacket,
-        Action<Guid, T> onSent)
+        Action<Guid, T> onSent,
+        int maximumPackets = int.MaxValue,
+        int maximumSnapshots = int.MaxValue,
+        bool allowProbeForGrowth = true,
+        int startOffset = 0)
     {
         if (batch == null) return new MovementSendResult();
         if (batch.Data.Count == 0) return new MovementSendResult();
@@ -229,25 +621,37 @@ public sealed class MovementBatchSender : IMovementBatchSender
         }
 
         var fairnessKey = (typeof(T), batch.IdentityScopeId, batch.IsPriority);
-        int offset = recipient.SendOffsets.TryGetValue(fairnessKey, out int previousOffset)
-            ? previousOffset % batch.Data.Count
-            : 0;
+        bool prioritize = batch.HasPriorities;
+        int offset = prioritize
+            ? 0
+            : recipient.SendOffsets.TryGetValue(fairnessKey, out int previousOffset)
+                ? previousOffset % batch.Data.Count
+                : 0;
         var fallbackKey = (typeof(T), batch.IdentityScopeId);
         MovementIdFormat idFormat =
             batch.IdentityScopeId == null || recipient.CanonicalIdFallbacks.Contains(fallbackKey)
                 ? MovementIdFormat.Canonical
                 : MovementIdFormat.Compact;
-        bool probeForGrowth = true;
+        bool probeForGrowth = allowProbeForGrowth;
         int sentCount = 0;
+        int processedCount = 0;
+        int sentPackets = 0;
+        bool blockedBySharedBudget = false;
+        int requiredSharedBudgetBytes = 0;
 
-        for (int start = 0; start < batch.Data.Count;)
+        for (int start = startOffset;
+            start < batch.Data.Count && sentPackets < maximumPackets;)
         {
+            int sharedAvailableBytes = outgoingTrafficBudget.AvailableBytes;
+            int recipientAvailableBytes = recipient.TrafficBudget.AvailableBytes;
             int availablePayloadBytes = Math.Min(
                 maxPayloadBytes,
-                recipient.TrafficBudget.AvailableBytes);
+                Math.Min(sharedAvailableBytes, recipientAvailableBytes));
             if (availablePayloadBytes <= 0) break;
 
-            int remaining = batch.Data.Count - start;
+            int remaining = Math.Min(
+                batch.Data.Count - start,
+                maximumSnapshots);
             var preferenceKey = (typeof(T), batch.IdentityScopeId, idFormat);
             int preferredCount = recipient.PreferredBatchSizes.TryGetValue(
                 preferenceKey, out int previousSafeCount)
@@ -258,6 +662,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 batch,
                 offset,
                 start,
+                remaining,
                 preferredCount,
                 probeForGrowth,
                 availablePayloadBytes,
@@ -268,6 +673,10 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 !candidate.Fits(availablePayloadBytes) &&
                 candidate.Fits(maxPayloadBytes))
             {
+                blockedBySharedBudget = candidate.Payload.Length > sharedAvailableBytes &&
+                    candidate.Payload.Length <= recipientAvailableBytes;
+                if (blockedBySharedBudget)
+                    requiredSharedBudgetBytes = candidate.Payload.Length;
                 break;
             }
 
@@ -277,14 +686,28 @@ public sealed class MovementBatchSender : IMovementBatchSender
                     batch,
                     offset,
                     start,
+                    remaining,
                     preferredCount,
                     probeForGrowth,
                     availablePayloadBytes,
                     MovementIdFormat.Canonical,
                     createPacket);
                 if (!canonicalCandidate.Fits(availablePayloadBytes) &&
-                    canonicalCandidate.Fits(maxPayloadBytes))
+                    (candidate.Fits(maxPayloadBytes) ||
+                        canonicalCandidate.Fits(maxPayloadBytes)))
                 {
+                    int requiredBytes = candidate.Fits(maxPayloadBytes) &&
+                        canonicalCandidate.Fits(maxPayloadBytes)
+                            ? Math.Min(
+                                candidate.Payload.Length,
+                                canonicalCandidate.Payload.Length)
+                            : candidate.Fits(maxPayloadBytes)
+                                ? candidate.Payload.Length
+                                : canonicalCandidate.Payload.Length;
+                    blockedBySharedBudget = requiredBytes > sharedAvailableBytes &&
+                        requiredBytes <= recipientAvailableBytes;
+                    if (blockedBySharedBudget)
+                        requiredSharedBudgetBytes = requiredBytes;
                     break;
                 }
 
@@ -306,6 +729,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
                         canonicalCandidate,
                         availablePayloadBytes);
                     start++;
+                    processedCount++;
                     continue;
                 }
             }
@@ -320,10 +744,13 @@ public sealed class MovementBatchSender : IMovementBatchSender
                     candidate,
                     availablePayloadBytes);
                 start++;
+                processedCount++;
                 continue;
             }
 
             if (!recipient.TrafficBudget.TrySpend(candidate.Payload.Length)) break;
+            if (!outgoingTrafficBudget.TrySpend(candidate.Payload.Length))
+                throw new InvalidOperationException("The shared movement budget changed during a game-thread send.");
             client.Send(controllerId, candidate.Packet, candidate.Payload);
             for (int i = 0; i < candidate.Count; i++)
                 onSent?.Invoke(
@@ -343,17 +770,87 @@ public sealed class MovementBatchSender : IMovementBatchSender
                     candidate.Count,
                     remaining);
             sentCount += candidate.Count;
+            processedCount += candidate.Count;
+            sentPackets++;
             start += candidate.Count;
             probeForGrowth = false;
         }
 
-        if (batch.Data.Count > 0)
+        if (!prioritize && batch.Data.Count > 0)
             recipient.SendOffsets[fairnessKey] =
                 (offset + sentCount) % batch.Data.Count;
 
         return new MovementSendResult(
             sentCount,
-            Math.Max(0, batch.Data.Count - sentCount));
+            Math.Max(0, batch.Data.Count - startOffset - sentCount),
+            processedCount,
+            batch.IsPriority ? sentCount : 0,
+            blockedBySharedBudget,
+            blockedBySharedBudget && batch.IsPriority,
+            requiredSharedBudgetBytes);
+    }
+
+    private MovementBatch<T> OrderByPriority<T>(MovementBatch<T> batch)
+    {
+        if (!batch.HasPriorities || batch.Data.Count < 2) return batch;
+
+        bool alreadyOrdered = true;
+        for (int i = 1; i < batch.Priorities.Count; i++)
+        {
+            if (priorityScheduler.Compare(batch.Priorities[i - 1], batch.Priorities[i]) <= 0)
+                continue;
+
+            alreadyOrdered = false;
+            break;
+        }
+        if (alreadyOrdered) return batch;
+
+        var indices = new List<int>(batch.Data.Count);
+        for (int i = 0; i < batch.Data.Count; i++) indices.Add(i);
+        indices.Sort((left, right) =>
+            priorityScheduler.Compare(batch.Priorities[left], batch.Priorities[right]));
+
+        var ordered = new MovementBatch<T>(batch.IdentityScopeId, batch.IsPriority);
+        foreach (int source in indices)
+        {
+            ordered.CanonicalIds.Add(batch.CanonicalIds[source]);
+            if (batch.IdentityScopeId != null)
+                ordered.CompactIds.Add(batch.CompactIds[source]);
+            ordered.Data.Add(batch.Data[source]);
+            ordered.Priorities.Add(batch.Priorities[source]);
+        }
+        return ordered;
+    }
+
+    private int CompareBatchPriority<T>(MovementBatch<T> left, MovementBatch<T> right)
+    {
+        if (!left.HasPriorities) return right.HasPriorities ? 1 : 0;
+        if (!right.HasPriorities) return -1;
+        return priorityScheduler.Compare(left.Priorities[0], right.Priorities[0]);
+    }
+
+    private int CompareBatchPriority<T>(
+        PrioritizedBatchCursor<T> left,
+        PrioritizedBatchCursor<T> right)
+    {
+        return priorityScheduler.Compare(
+            left.Batch.Priorities[left.StartIndex],
+            right.Batch.Priorities[right.StartIndex]);
+    }
+
+    private static double NormalizeByteRate(double bytesPerSecond) =>
+        double.IsNaN(bytesPerSecond) ||
+        double.IsInfinity(bytesPerSecond) ||
+        bytesPerSecond <= 0d
+            ? double.Epsilon
+            : bytesPerSecond;
+
+    private static int CalculateBurstBytes(double bytesPerSecond, int maxPayloadBytes)
+    {
+        int sustainedBurst = (int)Math.Min(
+            int.MaxValue,
+            Math.Max(1d, bytesPerSecond) / 8d);
+        return Math.Max(Math.Max(1, maxPayloadBytes), sustainedBurst);
     }
 
     private static void LogMissingPayloadBudget<T>(MovementBatch<T> batch)
@@ -416,13 +913,16 @@ public sealed class MovementBatchSender : IMovementBatchSender
         MovementBatch<T> batch,
         int offset,
         int start,
+        int maximumSnapshots,
         int preferredCount,
         bool probeForGrowth,
         int maxPayloadBytes,
         MovementIdFormat idFormat,
         Func<string, ushort[], Guid[], T[], IPacket> createPacket)
     {
-        int remaining = batch.Data.Count - start;
+        int remaining = Math.Min(
+            batch.Data.Count - start,
+            maximumSnapshots);
 
         SerializedMovementBatch CreateCandidate(int count) =>
             CreateSerializedCandidate(
