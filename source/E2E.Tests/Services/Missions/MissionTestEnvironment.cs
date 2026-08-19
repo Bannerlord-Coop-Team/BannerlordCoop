@@ -70,6 +70,13 @@ public class MissionTestEnvironment : E2ETestEnvironment
     /// </summary>
     protected (string mapEventId, string[] partyIds) SetupCoopBattle(params string[] controllerIds)
     {
+        var setup = SetupCoopBattleWithHeroes(controllerIds);
+        return (setup.mapEventId, setup.partyIds);
+    }
+
+    /// <summary>Creates the same battle as <see cref="SetupCoopBattle"/> and also returns each registered player hero id.</summary>
+    protected (string mapEventId, string[] partyIds, string[] heroIds) SetupCoopBattleWithHeroes(params string[] controllerIds)
+    {
         Assert.True(controllerIds.Length >= 2, "Need at least two players for a battle");
 
         var clients = Clients.ToArray();
@@ -103,13 +110,14 @@ public class MissionTestEnvironment : E2ETestEnvironment
 
         Assert.NotNull(mapEventId);
 
+        var heroIds = new string[controllerIds.Length];
         for (int i = 0; i < controllerIds.Length; i++)
         {
-            var heroId = CreateRegisteredObject<Hero>();
-            RegisterAsPlayerParty(controllerIds[i], heroId, partyIds[i]);
+            heroIds[i] = CreateRegisteredObject<Hero>();
+            RegisterAsPlayerParty(controllerIds[i], heroIds[i], partyIds[i]);
         }
 
-        return (mapEventId!, partyIds);
+        return (mapEventId!, partyIds, heroIds);
     }
 
     /// <summary>Registers a hero/party pair as a player on every instance (controller id → party).</summary>
