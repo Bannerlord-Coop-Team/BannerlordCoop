@@ -37,6 +37,11 @@ internal class JoinCampaignKingdomBaselineHandler : IHandler
         {
             allianceOfferPendingApplier.Apply(baseline.PendingAllianceOffers);
             peaceOfferPendingApplier.Apply(baseline.PendingPeaceOffers);
+            foreach (var roundVote in GetActiveDecisionVotes(baseline))
+            {
+                if (roundVote?.VoteData == null || string.IsNullOrWhiteSpace(roundVote.ClanId)) continue;
+                messageBroker.Publish(this, new ApplyKingdomDecisionVote(roundVote.ClanId, roundVote.VoteData));
+            }
             foreach (var roundStatus in GetActiveDecisionRounds(baseline))
             {
                 messageBroker.Publish(this, new ApplyKingdomDecisionRoundStatus(roundStatus));
@@ -48,5 +53,11 @@ internal class JoinCampaignKingdomBaselineHandler : IHandler
         NetworkJoinCampaignKingdomBaseline baseline)
     {
         return baseline.ActiveDecisionRounds ?? Array.Empty<KingdomDecisionRoundStatusData>();
+    }
+
+    internal static KingdomDecisionRoundVoteData[] GetActiveDecisionVotes(
+        NetworkJoinCampaignKingdomBaseline baseline)
+    {
+        return baseline.ActiveDecisionVotes ?? Array.Empty<KingdomDecisionRoundVoteData>();
     }
 }

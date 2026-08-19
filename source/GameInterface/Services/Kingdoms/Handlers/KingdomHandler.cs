@@ -466,35 +466,33 @@ public class KingdomHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
-        {
-            Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
-            return;
-        }
-
-        // Kingdoms created on clients skip the constructor, so the list can be null.
-        var decisions = kingdom._unresolvedDecisions;
-        if (decisions == null)
-        {
-            Logger.Debug("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
-            return;
-        }
-
         RunKingdomMutation(() =>
         {
-            decisionVoteManager.CloseDecision(payload.KingdomId, payload.Index);
             decisionVoteManager.ClearDecisionState(payload.KingdomId, payload.Index);
-        });
+            if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+            {
+                Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
+                return;
+            }
 
-        if (payload.Index >= 0 && decisions.Count > payload.Index)
-        {
-            kingdomInterface.RemoveDecision(kingdom, decisions[payload.Index]);
-        }
-        else
-        {
-            Logger.Warning("Index is out of bounds of the list.");
-            return;
-        }
+            // Kingdoms created on clients skip the constructor, so the list can be null.
+            var decisions = kingdom._unresolvedDecisions;
+            if (decisions == null)
+            {
+                Logger.Debug("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
+                return;
+            }
+
+            if (payload.Index < 0 || decisions.Count <= payload.Index)
+            {
+                Logger.Warning("Index is out of bounds of the list.");
+                return;
+            }
+
+            KingdomDecision decision = decisions[payload.Index];
+            decisionVoteManager.CloseDecision(payload.KingdomId, payload.Index);
+            kingdomInterface.RemoveDecision(kingdom, decision);
+        });
     }
 
     private void HandleAddDecision(MessagePayload<AddDecision> obj)

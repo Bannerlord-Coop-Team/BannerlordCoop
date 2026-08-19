@@ -34,6 +34,7 @@ public sealed class JoinCampaignKingdomBaseLineSender : IJoinCampaignKingdomBase
         network.SendImmediate(
             peer, new NetworkJoinCampaignKingdomBaseline(allianceOfferPendingCapturer.Capture(),
             peaceOfferPendingCapturer.Capture(),
-            kingdomDecisionVoteManager.CaptureActiveRoundStatuses().ToArray()));
+            kingdomDecisionVoteManager.CaptureActiveRoundStatuses().ToArray(),
+            kingdomDecisionVoteManager.CaptureActiveRoundVotes().ToArray()));
     }
 }

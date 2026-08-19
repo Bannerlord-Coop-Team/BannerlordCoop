@@ -15,19 +15,30 @@ namespace GameInterface.Services.Kingdoms.Data
         public KingdomDecisionRoundClanStatusData[] Clans { get; }
         [ProtoMember(5)]
         public string[] OrderedOutcomeKeys { get; }
+        [ProtoMember(6)]
+        public long ServerUtcTicks { get; }
 
         public KingdomDecisionRoundStatusData(
             string kingdomId,
             int decisionIndex,
             long deadlineUtcTicks,
             KingdomDecisionRoundClanStatusData[] clans,
-            string[] orderedOutcomeKeys = null)
+            string[] orderedOutcomeKeys = null,
+            long serverUtcTicks = 0)
         {
             KingdomId = kingdomId;
             DecisionIndex = decisionIndex;
             DeadlineUtcTicks = deadlineUtcTicks;
             Clans = clans;
             OrderedOutcomeKeys = orderedOutcomeKeys ?? System.Array.Empty<string>();
+            ServerUtcTicks = serverUtcTicks;
+        }
+
+        public System.DateTime GetLocalDeadlineUtc(System.DateTime localUtcNow)
+        {
+            long referenceTicks = ServerUtcTicks > 0 ? ServerUtcTicks : localUtcNow.Ticks;
+            long remainingTicks = System.Math.Max(0, DeadlineUtcTicks - referenceTicks);
+            return localUtcNow + System.TimeSpan.FromTicks(remainingTicks);
         }
 
         public bool HasSameContent(KingdomDecisionRoundStatusData other)
@@ -57,6 +68,21 @@ namespace GameInterface.Services.Kingdoms.Data
             }
 
             return true;
+        }
+    }
+
+    [ProtoContract(SkipConstructor = true)]
+    public class KingdomDecisionRoundVoteData
+    {
+        [ProtoMember(1)]
+        public string ClanId { get; }
+        [ProtoMember(2)]
+        public KingdomDecisionVoteData VoteData { get; }
+
+        public KingdomDecisionRoundVoteData(string clanId, KingdomDecisionVoteData voteData)
+        {
+            ClanId = clanId;
+            VoteData = voteData;
         }
     }
 

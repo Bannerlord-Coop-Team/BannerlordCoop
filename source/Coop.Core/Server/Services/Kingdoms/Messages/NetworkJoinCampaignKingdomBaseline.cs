@@ -54,14 +54,19 @@ namespace Coop.Core.Server.Services.Kingdoms.Messages
         [ProtoMember(3)]
         public readonly KingdomDecisionRoundStatusData[] ActiveDecisionRounds;
 
+        [ProtoMember(4)]
+        public readonly KingdomDecisionRoundVoteData[] ActiveDecisionVotes;
+
         public NetworkJoinCampaignKingdomBaseline(
             PendingAllianceOfferBaseline[] pendingAllianceOffers = null,
             PendingPeaceOfferBaseline[] pendingPeaceOffers = null,
-            KingdomDecisionRoundStatusData[] activeDecisionRounds = null)
+            KingdomDecisionRoundStatusData[] activeDecisionRounds = null,
+            KingdomDecisionRoundVoteData[] activeDecisionVotes = null)
         {
             PendingAllianceOffers = pendingAllianceOffers ?? Array.Empty<PendingAllianceOfferBaseline>();
             PendingPeaceOffers = pendingPeaceOffers ?? Array.Empty<PendingPeaceOfferBaseline>();
             ActiveDecisionRounds = activeDecisionRounds ?? Array.Empty<KingdomDecisionRoundStatusData>();
+            ActiveDecisionVotes = activeDecisionVotes ?? Array.Empty<KingdomDecisionRoundVoteData>();
         }
     }
 }

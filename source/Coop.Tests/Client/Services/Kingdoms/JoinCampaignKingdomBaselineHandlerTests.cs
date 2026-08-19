@@ -99,6 +99,36 @@ public class JoinCampaignKingdomBaselineHandlerTests
     }
 
     [Fact]
+    public void ReceivedBaseline_PublishesActiveVotesBeforeRoundStatus()
+    {
+        var appliedMessages = new List<object>();
+        messageBroker.Subscribe<ApplyKingdomDecisionVote>(payload => appliedMessages.Add(payload.What));
+        messageBroker.Subscribe<ApplyKingdomDecisionRoundStatus>(payload => appliedMessages.Add(payload.What));
+        var voteData = new KingdomDecisionVoteData("kingdom_a", 0, 1, 3, false, true, "outcome-b");
+        var status = new KingdomDecisionRoundStatusData(
+            "kingdom_a",
+            0,
+            100,
+            Array.Empty<KingdomDecisionRoundClanStatusData>());
+
+        var baseline = new NetworkJoinCampaignKingdomBaseline(
+            activeDecisionRounds: new[] { status },
+            activeDecisionVotes: new[] { new KingdomDecisionRoundVoteData("clan_a", voteData) });
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, baseline);
+        stream.Position = 0;
+
+        Apply(Serializer.Deserialize<NetworkJoinCampaignKingdomBaseline>(stream));
+
+        var appliedVote = Assert.IsType<ApplyKingdomDecisionVote>(appliedMessages[0]);
+        Assert.Equal("clan_a", appliedVote.ClanId);
+        Assert.Equal(voteData.KingdomId, appliedVote.VoteData.KingdomId);
+        Assert.Equal(voteData.DecisionIndex, appliedVote.VoteData.DecisionIndex);
+        Assert.Equal(voteData.OutcomeKey, appliedVote.VoteData.OutcomeKey);
+        Assert.IsType<ApplyKingdomDecisionRoundStatus>(appliedMessages[1]);
+    }
+
+    [Fact]
     public void EmptySerializedBaseline_DoesNotPublishDecisionRoundStatus()
     {
         var appliedStatuses = new List<KingdomDecisionRoundStatusData>();
@@ -110,7 +140,9 @@ public class JoinCampaignKingdomBaselineHandlerTests
             Serializer.Deserialize<NetworkJoinCampaignKingdomBaseline>(stream);
 
         Assert.Null(baseline.ActiveDecisionRounds);
+        Assert.Null(baseline.ActiveDecisionVotes);
         Assert.Empty(JoinCampaignKingdomBaselineHandler.GetActiveDecisionRounds(baseline));
+        Assert.Empty(JoinCampaignKingdomBaselineHandler.GetActiveDecisionVotes(baseline));
         Apply(baseline);
 
         Assert.Empty(appliedStatuses);
