@@ -15,6 +15,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -45,14 +46,11 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
             .GetValue(null)!;
     private readonly List<object> controlledObjects = new();
     private readonly bool previousIsServer;
-    private readonly int previousGameThreadId;
 
     public NearbyPartyReinforcerTests()
     {
         previousIsServer = ModInformation.IsServer;
-        previousGameThreadId = GameThread.Instance.GameThreadId;
         ModInformation.IsServer = true;
-        GameThread.Instance.MarkGameThread();
     }
 
     public void Dispose()
@@ -61,7 +59,6 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
             playerObjects.Remove(controlledObject);
 
         ModInformation.IsServer = previousIsServer;
-        GameThread.Instance.RestoreGameThread(previousGameThreadId);
     }
 
     [Fact]
@@ -243,17 +240,30 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     public void PlayerBattleAnnouncement_OpensWindowBeforeImmediateGameThreadScan()
     {
         var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
-        var reinforcer = new RecordingReinforcer(mapEvent);
+        using var reinforcer = new RecordingReinforcer(mapEvent);
         using var messageBroker = new MessageBroker();
         using var handler = new NearbyPartyReinforcementHandler(messageBroker, reinforcer);
 
-        using (new AllowedThread())
+        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
+        if (ownsGameThreadMark)
+            GameThread.Instance.MarkGameThread();
+
+        try
         {
-            InteractionPatches.OpenAiJoinWindowAndPublish(
-                mapEvent,
-                () => messageBroker.Publish(mapEvent, new PlayerJoinedBattle()));
+            using (new AllowedThread())
+            {
+                InteractionPatches.OpenAiJoinWindowAndPublish(
+                    mapEvent,
+                    () => messageBroker.Publish(mapEvent, new PlayerJoinedBattle()));
+            }
+        }
+        finally
+        {
+            if (ownsGameThreadMark)
+                GameThread.Instance.RestoreGameThread(0);
         }
 
+        Assert.True(reinforcer.WaitForImmediateScan());
         Assert.Equal(1, reinforcer.ImmediateScanCount);
     }
 
@@ -297,9 +307,10 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         controlledObjects.Add(mobileParty);
     }
 
-    private sealed class RecordingReinforcer : INearbyPartyReinforcer
+    private sealed class RecordingReinforcer : INearbyPartyReinforcer, IDisposable
     {
         private readonly MapEvent expectedMapEvent;
+        private readonly ManualResetEventSlim immediateScanCompleted = new(false);
 
         public RecordingReinforcer(MapEvent expectedMapEvent)
         {
@@ -315,10 +326,18 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
             Assert.False(AllowedThread.IsThisThreadAllowed());
             Assert.True(InteractionPatches.IsWithinAiJoinWindow(mapEvent));
             ImmediateScanCount++;
+            immediateScanCompleted.Set();
         }
 
         public void ReinforceOpenPlayerBattles()
         {
+        }
+
+        public bool WaitForImmediateScan() => immediateScanCompleted.Wait(TimeSpan.FromSeconds(5));
+
+        public void Dispose()
+        {
+            immediateScanCompleted.Dispose();
         }
     }
 }
