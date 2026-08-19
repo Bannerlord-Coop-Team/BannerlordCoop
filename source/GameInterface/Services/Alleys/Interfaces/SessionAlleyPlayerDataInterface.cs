@@ -18,6 +18,7 @@ public interface ISessionAlleyPlayerDataInterface : IGameAbstraction
 {
     bool TryGetManagementData(string alleyId, out AlleyManagementData data);
     void SetManagementData(string alleyId, string overseerId, TroopRosterElementData[] garrison);
+    void SetLastRecruitTimeTicks(string alleyId, long lastRecruitTimeTicks);
     void RemoveManagementData(string alleyId);
 
     /// <summary>Records that a rival alley is attacking this player alley, with the answer deadline.</summary>
@@ -68,9 +69,16 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
         {
             entry.UnderAttackByAlleyId = existing.UnderAttackByAlleyId;
             entry.AttackResponseDueDate = existing.AttackResponseDueDate;
+            entry.LastRecruitTimeTicks = existing.LastRecruitTimeTicks;
         }
 
         map[alleyId] = entry;
+    }
+
+    public void SetLastRecruitTimeTicks(string alleyId, long lastRecruitTimeTicks)
+    {
+        if (!TryGetManagementData(alleyId, out var data)) return;
+        data.LastRecruitTimeTicks = lastRecruitTimeTicks;
     }
 
     public void RemoveManagementData(string alleyId)

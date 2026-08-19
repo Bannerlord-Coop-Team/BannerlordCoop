@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
@@ -10,8 +11,10 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -109,6 +112,56 @@ namespace Coop.Tests.Server.Connections.States
 
             var castedMessage = (NetworkModuleVersionsValidated)message;
             Assert.True(castedMessage.Matches);
+            Assert.Equal(Common.ModInformation.BuildVersion, castedMessage.CoopBuildVersion);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("different-build")]
+        public void NetworkModuleVersionsValidate_IncompatibleBuild_Denied(string? clientBuildVersion)
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var modules = new List<ModuleInfo>
+            {
+                new ModuleInfo("1", false, false, new ApplicationVersion()),
+            };
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
+                .Setup(mip => mip.GetModuleInfos())
+                .Returns(modules);
+
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer,
+                new NetworkModuleVersionsValidate(modules, clientBuildVersion));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            var validated = Assert.IsType<NetworkModuleVersionsValidated>(message);
+            Assert.False(validated.Matches);
+            Assert.Contains("Incompatible co-op mod build", validated.Reason);
+            Assert.Contains("Update the co-op mod on both sides", validated.Reason);
+            Assert.Equal(Common.ModInformation.BuildVersion, validated.CoopBuildVersion);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ProtobufRoundTrip_PreservesBuildVersion()
+        {
+            var message = new NetworkModuleVersionsValidate(Array.Empty<ModuleInfo>(), "client-build");
+
+            var deserialized = ProtobufRoundTrip(message);
+
+            Assert.Equal("client-build", deserialized.CoopBuildVersion);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidated_ProtobufRoundTrip_PreservesBuildVersion()
+        {
+            var message = new NetworkModuleVersionsValidated(false, "reason", "server-build");
+
+            var deserialized = ProtobufRoundTrip(message);
+
+            Assert.Equal("server-build", deserialized.CoopBuildVersion);
         }
 
         [Fact]
@@ -211,6 +264,12 @@ namespace Coop.Tests.Server.Connections.States
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             Assert.True(objectManager.AddExisting(player.HeroId, hero));
+            var restoredPlayer = player;
+
+            serverComponent.Container
+                .Resolve<Mock<IPlayerPartyRestorer>>()
+                .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                .Returns(true);
 
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
@@ -226,6 +285,48 @@ namespace Coop.Tests.Server.Connections.States
 
             Assert.True(message.HeroExists);
             Assert.Equal(player, message.Player);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_RegisteredHeroWithStaleParty_RepairsWithoutCreatingCharacter()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MissingParty", "MyClan", "MyCharacter");
+            var repaired = new Player("MyPlayer", "MyHero", "RecoveredParty", "MyClan", "MyCharacter");
+            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            var registeredPlayer = player;
+            playerManager
+                .Setup(manager => manager.TryGetPlayer(player.ControllerId, out registeredPlayer))
+                .Returns(true);
+            playerManager.Setup(manager => manager.ReplacePlayer(player, repaired)).Returns(true);
+
+            var objectManager = serverComponent.Container.Resolve<IObjectManager>();
+            var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Assert.True(objectManager.AddExisting(player.HeroId, hero));
+            var restoredPlayer = repaired;
+
+            serverComponent.Container
+                .Resolve<Mock<IPlayerPartyRestorer>>()
+                .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                .Returns(true);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            playerManager.Verify(manager => manager.ReplacePlayer(player, repaired), Times.Once);
+            playerManager.Verify(manager => manager.RemovePlayer(It.IsAny<Player>()), Times.Never);
+
+            var validation = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessages(playerPeer).OfType<NetworkClientValidated>());
+            Assert.True(validation.HeroExists);
+            Assert.Same(repaired, validation.Player);
+
+            var update = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessages(differentPeer)
+                    .OfType<NetworkPlayerRegistrationUpdated>());
+            Assert.Same(repaired, update.Player);
+            Assert.IsNotType<CreateCharacterState>(connectionLogic.State);
         }
 
         [Fact]
@@ -320,6 +421,14 @@ namespace Coop.Tests.Server.Connections.States
                 .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
 
             Assert.Empty(messages.OfType<NetworkClientValidated>());
+        }
+
+        private static T ProtobufRoundTrip<T>(T message)
+        {
+            using var stream = new MemoryStream();
+            Serializer.Serialize(stream, message);
+            stream.Position = 0;
+            return Serializer.Deserialize<T>(stream);
         }
     }
 }

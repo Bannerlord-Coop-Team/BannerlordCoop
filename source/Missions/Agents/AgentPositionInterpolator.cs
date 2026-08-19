@@ -1,4 +1,7 @@
-﻿using Missions.Agents.Packets;
+﻿using Common.Logging;
+using Missions.Agents.Packets;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -31,7 +34,6 @@ public interface IAgentPositionInterpolator
         out Vec3 position,
         out Vec3 lookDirection,
         out long updateSequence);
-
     /// <summary>[Game thread] Apply each tracked agent's latest native target frame.</summary>
     void Tick(float dt);
 
@@ -55,6 +57,8 @@ public interface IAgentPositionInterpolator
 /// </summary>
 public class AgentPositionInterpolator : IAgentPositionInterpolator
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AgentPositionInterpolator>();
+
     // Snap only when the replicated owner is far enough away that local locomotion has clearly diverged.
     private const float RiderSnapDistance = 6f;
     private const float MountSnapDistance = 12f;
@@ -64,14 +68,21 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float MountedFollowRate = 12f;
     private const float MountedPositionEpsilon = 0.0001f;
     private const float MountedGuardPositionTolerance = 0.15f;
-
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
         new Dictionary<Agent, long>();
+    private readonly INetworkAgentRegistry agentRegistry;
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
     private long updateSequence;
+
+    public AgentPositionInterpolator() : this(null) { }
+
+    internal AgentPositionInterpolator(INetworkAgentRegistry agentRegistry)
+    {
+        this.agentRegistry = agentRegistry;
+    }
 
     public void SetRiderTarget(Agent agent, AgentData data)
     {
@@ -81,7 +92,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             new ContinuousState(
                 data.MovementDirection,
                 data.LookDirection,
-                agent.MovementInputVector,
+                data.GetMovementInput(agent),
                 data.MovementFlag),
             hasMountSnapPosition: false,
             Vec3.Zero,
@@ -93,21 +104,19 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     public void SetMountedRiderTarget(Agent agent, AgentData data)
     {
         if (agent == null || data.MountData == null) return;
-        Agent mount = agent.MountAgent;
         _targets[agent] = new TargetFrame(
             data.Position,
             new ContinuousState(
                 data.MountData.MountMovementDirection,
                 data.MountData.MountLookDirection,
-                mount?.MovementInputVector ??
-                    data.MountData.MountInputVector,
-                data.MountData.MountMovementFlag),
+                data.MountData.GetMovementInput(),
+                data.MountData.GetMovementFlags()),
             hasMountSnapPosition: true,
             data.MountData.MountPosition,
             new ContinuousState(
                 data.MovementDirection,
                 data.LookDirection,
-                agent.MovementInputVector,
+                data.GetMovementInput(agent),
                 data.MovementFlag),
             elapsed,
             GetNextUpdateSequence());
@@ -121,8 +130,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             new ContinuousState(
                 data.MountMovementDirection,
                 data.MountLookDirection,
-                mountAgent.MovementInputVector,
-                data.MountMovementFlag),
+                data.GetMovementInput(),
+                data.GetMovementFlags()),
             hasMountSnapPosition: false,
             Vec3.Zero,
             default,
@@ -201,7 +210,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         targetUpdateSequence = target.UpdateSequence;
         return true;
     }
-
     public void Clear()
     {
         _targets.Clear();
@@ -226,6 +234,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
+            // A point-owned puppet's facing belongs to the point it is using — a look write per
+            // native cycle is exactly the churn that spun seated NPCs.
+            if (LocationPoseLock.IsPointOwned(agent))
+                continue;
+
             TargetFrame target = pair.Value;
             if (agent.MountAgent != null && target.HasMountSnapPosition)
             {
@@ -243,7 +256,16 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         if (dt <= 0f) return;
         elapsed += dt;
-        if (_targets.Count == 0) return;
+        if (_targets.Count == 0)
+        {
+            return;
+        }
+
+        int trackedBefore = _targets.Count;
+        int staleTargets = 0;
+        float oldestStaleAge = 0f;
+        Agent oldestStaleAgent = null;
+        TargetFrame oldestStaleTarget = default;
 
         foreach (var pair in _targets)
         {
@@ -257,9 +279,17 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             }
 
             // A stale target (owner stopped reporting) expires instead of pinning the puppet to an old position.
-            if (elapsed - pair.Value.UpdatedAt > StaleTargetSeconds)
+            float targetAge = elapsed - pair.Value.UpdatedAt;
+            if (targetAge > StaleTargetSeconds)
             {
                 _evict.Add(agent);
+                staleTargets++;
+                if (oldestStaleAgent == null || targetAge > oldestStaleAge)
+                {
+                    oldestStaleAge = targetAge;
+                    oldestStaleAgent = agent;
+                    oldestStaleTarget = pair.Value;
+                }
                 continue;
             }
 
@@ -270,6 +300,14 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
+            // A settlement puppet USING a scene point (seated, at an animation point) is owned by
+            // that point: the point's own machinery aligns it, animates it and holds it — on this
+            // client exactly as on the host, because the puppet uses the SAME local point
+            // (replicated semantically via NetworkNpcPointUse). Driving movement here would only
+            // fight it. When the use ends, the point plays its leave action and this seek resumes.
+            if (LocationPoseLock.IsPointOwned(agent))
+                continue;
+
             // A mount tolerates more slack before we snap; an on-foot rider is held tighter.
             float snapDistance = agent.IsMount ? MountSnapDistance : RiderSnapDistance;
             if (agent.Position.Distance(pair.Value.Position) <= snapDistance)
@@ -278,6 +316,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 Teleport(agent, pair.Value);
             pair.Value.AgentState.Apply(agent);
         }
+
+        if (staleTargets > 0)
+            LogStaleTargets(staleTargets, trackedBefore, oldestStaleAge, oldestStaleAgent, oldestStaleTarget);
 
         if (_evict.Count > 0)
         {
@@ -290,6 +331,50 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         }
     }
 
+    private void LogStaleTargets(
+        int staleTargets,
+        int trackedBefore,
+        float oldestAge,
+        Agent sampleAgent,
+        TargetFrame sampleTarget)
+    {
+        Guid agentId = Guid.Empty;
+        string authority = null;
+        string movementScope = null;
+        ushort movementId = 0;
+        if (agentRegistry != null && agentRegistry.TryGetAgentInfo(sampleAgent, out var info))
+        {
+            agentId = info.AgentId;
+            authority = info.CurrentAuthority;
+            movementScope = info.MovementScopeId;
+            movementId = info.MovementId;
+        }
+
+        Logger.Warning(
+            "[BattleDesync] Expired {StaleTargets} active movement target(s): trackedBefore={TrackedBefore} " +
+            "oldestAge={OldestAge:0.000}s sampleAgentId={AgentId} sampleAuthority={Authority} " +
+            "sampleMovementIdentity={MovementScope}/{MovementId} sampleIndex={AgentIndex} sampleName={AgentName} " +
+            "sampleHealth={Health:0.0} sampleController={Controller} sampleAiControlled={AiControlled} " +
+            "sampleSpeed={Speed:0.00} sampleDistance={Distance:0.00} samplePosition={Position} " +
+            "sampleTarget={Target} sampleSequence={Sequence}",
+            staleTargets,
+            trackedBefore,
+            oldestAge,
+            agentId,
+            authority,
+            movementScope,
+            movementId,
+            sampleAgent.Index,
+            sampleAgent.Name,
+            sampleAgent.Health,
+            sampleAgent.Controller,
+            sampleAgent.IsAIControlled,
+            sampleAgent.GetRealGlobalVelocity().AsVec2.Length,
+            sampleAgent.Position.Distance(sampleTarget.Position),
+            sampleAgent.Position,
+            sampleTarget.Position,
+            sampleTarget.UpdateSequence);
+    }
     private static void MoveTowardTarget(Agent agent, TargetFrame target)
     {
         Vec2 targetPosition = target.Position.AsVec2;
@@ -307,9 +392,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         Agent mount = rider.MountAgent;
         if (mount == null || !mount.IsActive()) return;
 
-        target.MountedRiderState.Apply(rider);
-        target.AgentState.Apply(mount);
-
         Vec3 mountTarget = target.HasMountSnapPosition ? target.MountSnapPosition : target.Position;
         Vec3 cur = mount.Position;
         float distance = cur.Distance(mountTarget);
@@ -321,16 +403,24 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                     out long processedSequence) &&
                 processedSequence == target.UpdateSequence)
             {
+                target.AgentState.Apply(mount);
+                target.MountedRiderState.Apply(rider);
                 return;
             }
 
             _mountedGuardProcessedSequences[rider] =
                 target.UpdateSequence;
             if (distance <= MountedGuardPositionTolerance)
+            {
+                target.AgentState.Apply(mount);
+                target.MountedRiderState.Apply(rider);
                 return;
+            }
         }
         if (distance <= MountedPositionEpsilon)
         {
+            target.AgentState.Apply(mount);
+            target.MountedRiderState.Apply(rider);
             return;
         }
 
@@ -342,8 +432,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             : cur + ((mountTarget - cur) * alpha);
 
         mount.TeleportToPosition(next);
-        // Teleporting a horse rewrites its rider's movement basis. Put both owner snapshots back in the same
-        // frame so the puppet does not flip between movement packets.
+        // Teleporting a horse rewrites its rider's movement basis. Install both owner snapshots once afterward.
         target.AgentState.Apply(mount);
         target.MountedRiderState.Apply(rider);
     }
@@ -485,9 +574,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 return;
             }
 
-            agent.SetMovementDirection(MovementDirection);
-            agent.LookDirection = LookDirection;
-            agent.MovementInputVector = MovementInput;
+            AgentData.ApplyMovementDirection(agent, MovementDirection);
+            AgentData.ApplyLookDirection(agent, LookDirection);
+            AgentData.ApplyMovementInput(agent, MovementInput);
             // Native continuous-state setters can consume or rewrite the move mask. Install it last so the
             // upcoming Agent tick sees the owner's translation and turn inputs.
             AgentData.ApplyLocomotionMovementFlags(
@@ -504,7 +593,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 return;
             }
 
-            agent.LookDirection = LookDirection;
+            AgentData.ApplyLookDirection(agent, LookDirection);
         }
     }
 }

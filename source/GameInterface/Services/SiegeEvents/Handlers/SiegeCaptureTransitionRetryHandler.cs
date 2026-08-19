@@ -2,20 +2,18 @@
 using Common.Messaging;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using System.Linq;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.SiegeEvents.Handlers;
 
 /// <summary>
-/// Client-side deferred settlement-taken transition for a real-time siege capture. When the capturing player wins
-/// the assault in a live mission, the server captures the town and destroys the map event, but the client's mission
-/// pops back to the STALE pre-mission siege "encounter" menu instead of the aftermath menu (native
-/// <c>PlayerEncounter.DoEnd</c> can't run: MainParty is no longer attached to the destroyed map event). The prompt
-/// reaches <see cref="ISiegeEventInterface.PromptLocalAftermathChoice"/> while the mission is still tearing down,
-/// which is too early to touch PlayerEncounter, so it parks the transition here. This retries it on the next
-/// CampaignTick once the mission has fully popped, mirroring PvPInteractionClientHandler's deferred-close pattern.
+/// Client-side deferred settlement-taken transition for siege captures. The prompt arrives before the old map event
+/// is destroyed, so a mission or simulation scoreboard must release its presentation before the aftermath menu opens.
 /// </summary>
 internal class SiegeCaptureTransitionRetryHandler : IHandler
 {
@@ -35,24 +33,39 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
-    /// <summary>Parks a settlement-taken transition to run once the battle mission has finished tearing down.</summary>
+    /// <summary>Parks a settlement-taken transition until the battle presentation has finished tearing down.</summary>
     internal static void Arm(MobileParty leaderParty, Settlement settlement)
     {
         pendingLeaderParty = leaderParty;
         pendingSettlement = settlement;
     }
 
+    internal static bool IsBattlePresentationActive()
+    {
+        if (MissionState.Current != null) return true;
+
+        return Game.Current?.GameStateManager?.GameStates
+            .OfType<MapState>()
+            .Any(state => state.IsSimulationActive) == true;
+    }
+
+    internal static bool TryTakeReady(out MobileParty leaderParty, out Settlement settlement)
+    {
+        leaderParty = null;
+        settlement = null;
+        if (pendingSettlement == null || IsBattlePresentationActive()) return false;
+
+        leaderParty = pendingLeaderParty;
+        settlement = pendingSettlement;
+        pendingLeaderParty = null;
+        pendingSettlement = null;
+        return true;
+    }
+
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsServer) return;
-        if (pendingSettlement == null) return;
-        // The mission screen is still up (or popping): re-establishing PlayerEncounter now is unsafe. Wait.
-        if (MissionState.Current != null) return;
-
-        var leaderParty = pendingLeaderParty;
-        var settlement = pendingSettlement;
-        pendingLeaderParty = null;
-        pendingSettlement = null;
+        if (!TryTakeReady(out var leaderParty, out var settlement)) return;
 
         siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement);
     }

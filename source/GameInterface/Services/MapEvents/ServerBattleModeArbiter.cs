@@ -128,4 +128,32 @@ internal static class ServerBattleModeArbiter
             modes.Remove(mapEventId);
         }
     }
+
+    /// <summary>
+    /// Drops every claim. For session/test-environment boundaries: object-manager ids restart
+    /// there, so a claim held under a stale id would gate an unrelated future battle that reuses it.
+    /// </summary>
+    public static void Reset()
+    {
+        lock (lockObj)
+        {
+            modes.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Prevents cancellation cleanup from accidentally releasing a different battle mode.
+    /// </summary>
+    public static bool ReleaseSimulation(string mapEventId)
+    {
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            if (!modes.TryGetValue(mapEventId, out var current) || current != Mode.Simulation) return false;
+            
+            modes.Remove(mapEventId);
+            return true;
+        }
+    }
 }

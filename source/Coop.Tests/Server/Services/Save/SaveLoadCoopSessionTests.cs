@@ -4,6 +4,8 @@ using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Inventory;
+using GameInterface.Services.Heroes;
+using System.Collections.Generic;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players.Data;
@@ -44,6 +46,10 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
+            var interactionsPlayerData = new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new());
+            interactionsPlayerData.PlayerAlreadySneakedSettlements[players[0].HeroId] = new() { "settlement1Id", "settlement2Id" };
+            interactionsPlayerData.PlayerAlreadySneakedSettlements[players[1].HeroId] = new() { "settlement2Id", "settlement3Id" };
+
             ICoopSession sessionData = new CoopSession(
                 "SaveManagerTest",
                 players,
@@ -51,9 +57,10 @@ namespace Coop.Tests.Server.Services.Save
                 new WorkshopPlayerData(new()),
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
-                new InteractionsPlayerData(new(), new(), new(), new()),
-                new TradePlayerData(new()),
-                new InventoryPlayerData(new(), new()));
+                interactionsPlayerData,
+                new TradePlayerData(new(), new(), new()),
+                new InventoryPlayerData(new(), new()),
+                new HeroMeetingData(new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -86,6 +93,18 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
+            var interactionsPlayerData = new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new());
+            interactionsPlayerData.PlayerAlreadySneakedSettlements[players[0].HeroId] = new() { "settlement1Id", "settlement2Id" };
+            interactionsPlayerData.PlayerAlreadySneakedSettlements[players[1].HeroId] = new() { "settlement2Id", "settlement3Id" };
+
+            var meetingTimes = new Dictionary<string, Dictionary<string, long>>
+            {
+                ["MyHero1"] = new Dictionary<string, long>
+                {
+                    ["lord_6_1"] = 1351,
+                },
+            };
+
             ICoopSession sessionData = new CoopSession(
                 "SaveManagerTest",
                 players,
@@ -93,9 +112,10 @@ namespace Coop.Tests.Server.Services.Save
                 new WorkshopPlayerData(new()),
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
-                new InteractionsPlayerData(new(), new(), new(), new()),
-                new TradePlayerData(new()),
-                new InventoryPlayerData(new(), new()));
+                interactionsPlayerData,
+                new TradePlayerData(new(), new(), new()),
+                new InventoryPlayerData(new(), new()),
+                new HeroMeetingData(meetingTimes));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
@@ -116,7 +136,12 @@ namespace Coop.Tests.Server.Services.Save
                 Assert.Equal(sessionData.Players[i].HeroId, savedSession.Players[i].HeroId);
                 Assert.Equal(sessionData.Players[i].MobilePartyId, savedSession.Players[i].MobilePartyId);
                 Assert.Equal(sessionData.Players[i].ClanId, savedSession.Players[i].ClanId);
+
+                var playerHeroId = sessionData.Players[i].HeroId;
+
+                Assert.Equal(sessionData.InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId], savedSession.InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId]);
             }
+            Assert.Equal(1351, savedSession.HeroMeetingData.PlayerLastMeetingTimes["MyHero1"]["lord_6_1"]);
         }
 
         [Fact]

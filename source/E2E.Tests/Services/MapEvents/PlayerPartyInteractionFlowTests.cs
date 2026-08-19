@@ -1,7 +1,12 @@
-﻿using Coop.Core.Server.Services.Stances.Messages;
+﻿using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Client.Services.SiegeEvents.Handlers;
+using Coop.Core.Client.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.Stances.Messages;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Barters.Messages;
@@ -12,20 +17,27 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.Locations.Messages.Conversation;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobilePartyAIs.Patches;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
+using Helpers;
+using LiteNetLib;
 using Missions.Messages;
 using System.Collections.Generic;
 using System.Reflection;
@@ -51,6 +63,8 @@ namespace E2E.Tests.Services.MapEvents;
 
 public class PlayerPartyInteractionFlowTests : MapEventTestBase
 {
+    private static Action? beforePvpNotificationDrain;
+
     public PlayerPartyInteractionFlowTests(ITestOutputHelper output) : base(output)
     {
         ClearPlayerPartyInteractionState();
@@ -154,6 +168,96 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionDenied>());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task PvpInteractionNotifications_ConcurrentEnd_PreservesStartThenEndOrder()
+    {
+        var (client, _, attackerPartyId, defenderPartyId) = CreateTwoPlayerParties();
+        var handler = Server.Resolve<ConversationRequestHandler>();
+        PartyBase? attacker = null;
+        Server.Call(() =>
+            Assert.True(Server.ObjectManager.TryGetObject(attackerPartyId, out attacker)));
+        Assert.NotNull(attacker);
+
+        var notifyStarted = AccessTools.Method(
+            typeof(ConversationRequestHandler),
+            "NotifyPvpInteractionStarted");
+        var endInteraction = AccessTools.Method(
+            typeof(ConversationRequestHandler),
+            "EndPvpInteraction");
+        var drainNotifications = AccessTools.Method(
+            typeof(ConversationRequestHandler),
+            "DrainPvpInteractionNotifications");
+        var networkRouting = GetNetworkRoutingMethod();
+        Assert.NotNull(notifyStarted);
+        Assert.NotNull(endInteraction);
+        Assert.NotNull(drainNotifications);
+
+        using var drainEntered = new System.Threading.ManualResetEventSlim();
+        using var releaseDrain = new System.Threading.ManualResetEventSlim();
+        beforePvpNotificationDrain = () =>
+        {
+            drainEntered.Set();
+            Assert.True(releaseDrain.Wait(TimeSpan.FromSeconds(5)));
+        };
+
+        var harmony = new Harmony($"{nameof(PlayerPartyInteractionFlowTests)}.pvp-notification-order");
+        harmony.Patch(
+            drainNotifications,
+            prefix: new HarmonyMethod(
+                typeof(PlayerPartyInteractionFlowTests),
+                nameof(BlockPvpNotificationDrain)));
+        harmony.Patch(
+            networkRouting,
+            prefix: new HarmonyMethod(
+                typeof(PlayerPartyInteractionFlowTests),
+                nameof(SuppressNetworkRouting)));
+
+        Server.NetworkSentMessages.Clear();
+        var request = new NetworkRequestConversation(
+            defenderPartyId,
+            attackerPartyId,
+            forcePlayerOutFromSettlement: false,
+            source: ConversationRestartSource.PlayerEncounter,
+            armyTalkEncounter: false,
+            requestId: "ordered-pvp-notification");
+
+        try
+        {
+            var startTask = System.Threading.Tasks.Task.Run(() => Server.Call(() =>
+                notifyStarted.Invoke(handler, new object[] { client.NetPeer, request, attacker! })));
+            Assert.True(drainEntered.Wait(TimeSpan.FromSeconds(5)));
+
+            await System.Threading.Tasks.Task.Run(() =>
+                endInteraction.Invoke(
+                    handler,
+                    new object?[] { client.NetPeer, request.RequestId, true }));
+
+            releaseDrain.Set();
+            await startTask;
+        }
+        finally
+        {
+            releaseDrain.Set();
+            beforePvpNotificationDrain = null;
+            harmony.Unpatch(drainNotifications, HarmonyPatchType.Prefix, harmony.Id);
+            harmony.Unpatch(networkRouting, HarmonyPatchType.Prefix, harmony.Id);
+        }
+
+        var notifications = Server.NetworkSentMessages.Messages
+            .Where(message =>
+                message is NetworkPlayerInteractionStarted ||
+                message is NetworkPlayerInteractionEnded)
+            .ToArray();
+        Assert.Collection(
+            notifications,
+            message => Assert.Equal(
+                defenderPartyId,
+                Assert.IsType<NetworkPlayerInteractionStarted>(message).DefenderPartyId),
+            message => Assert.Equal(
+                defenderPartyId,
+                Assert.IsType<NetworkPlayerInteractionEnded>(message).DefenderPartyId));
     }
 
     [Fact]
@@ -1383,10 +1487,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
         Assert.Equal(initiatorPartyId, allowed.AttackerId);
         Assert.Equal(aiPartyId, allowed.DefenderId);
+        Assert.Equal("e2e-conversation-request", allowed.RequestId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
         AssertInteractionStateCleared(client1);
 
-        client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        client1.Call(() => client1.Resolve<INetwork>().SendAll(
+            new NetworkConversationEnded("e2e-conversation-request")));
     }
 
     [Fact]
@@ -1396,12 +1502,30 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var firstAiPartyId = CreateMobilePartyBase();
         var secondAiPartyId = CreateMobilePartyBase();
 
-        RequestInteraction(client1, initiatorPartyId, firstAiPartyId);
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
-
         SetMainParty(client1, initiatorPartyId);
         EnableHeadlessEncounterFinish(client1);
         SetMockPlayerEncounter(client1);
+        client1.NetworkSentMessages.Clear();
+
+        var disabledRouter = new[]
+        {
+            AccessTools.Method(
+                typeof(TestNetworkRouter),
+                nameof(TestNetworkRouter.SendAll),
+                new[] { typeof(NetPeer), typeof(IMessage) }),
+        };
+        PublishConversationRequest(client1, initiatorPartyId, firstAiPartyId, disabledRouter);
+        var request = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryBeginEngagement(
+                client1.NetPeer,
+                initiatorPartyId,
+                firstAiPartyId,
+                wasAiDisabled: false,
+                requestId: request.RequestId));
+        });
         client1.NetworkSentMessages.Clear();
 
         client1.Call(() =>
@@ -1412,14 +1536,857 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             }
         }, MapEventDisabledMethods);
 
-        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        var ended = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        Assert.Equal(request.RequestId, ended.RequestId);
         AssertHasPlayerEncounter(client1, expected: false);
+        Server.Call(() =>
+            Assert.False(Server.Resolve<ConversationPartyTracker>().TryGetEngagement(client1.NetPeer, out _)));
 
         Server.NetworkSentMessages.Clear();
         RequestInteraction(client1, initiatorPartyId, secondAiPartyId);
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+    }
+
+    [Fact]
+    public void PendingReplacementRejected_WhenActiveEncounterFinishes_ReleasesActiveEngagement()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var activeAiPartyId = CreateMobilePartyBase();
+        var replacementAiPartyId = CreateMobilePartyBase();
+
+        SetMainParty(client, playerPartyId);
+        EnableHeadlessEncounterFinish(client);
+        SetMockPlayerEncounter(client);
+        var activeRequestId = CaptureConversationRestart(client);
+
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryBeginEngagement(
+                client.NetPeer,
+                playerPartyId,
+                activeAiPartyId,
+                wasAiDisabled: false,
+                requestId: activeRequestId));
+        });
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            activeAiPartyId,
+            activeRequestId,
+            ConversationRestartSource.PlayerEncounter,
+            forcePlayerOutFromSettlement: false);
+
+        client.NetworkSentMessages.Clear();
+        Server.NetworkSentMessages.Clear();
+        // Let the server reject the replacement while its reply remains in flight.
+        PublishConversationRequest(
+            client,
+            playerPartyId,
+            replacementAiPartyId,
+            new[] { GetDirectNetworkRoutingMethod() });
+
+        var replacementRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        var denial = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        Assert.Equal(replacementRequest.RequestId, denial.RequestId);
+        Assert.Equal(ConversationDeniedReason.PartyEngaged, denial.Reason);
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryGetEngagement(client.NetPeer, out var engagement));
+            Assert.Equal(activeRequestId, engagement.RequestId);
+        });
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                PlayerEncounter.Finish(false);
+            }
+        }, MapEventDisabledMethods);
+
+        var endedRequestIds = client.NetworkSentMessages
+            .GetMessages<NetworkConversationEnded>()
+            .Select(message => message.RequestId)
+            .ToArray();
+        Assert.Equal(2, endedRequestIds.Length);
+        Assert.Contains(replacementRequest.RequestId, endedRequestIds);
+        Assert.Contains(activeRequestId, endedRequestIds);
+        AssertHasPlayerEncounter(client, expected: false);
+        Server.Call(() =>
+            Assert.False(Server.Resolve<ConversationPartyTracker>().TryGetEngagement(client.NetPeer, out _)));
+
+        Server.NetworkSentMessages.Clear();
+        RequestInteraction(client, playerPartyId, replacementAiPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ConversationDenial_QueuedBeforeRetry_DoesNotClearNewPendingRequest()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var firstAiPartyId = CreateMobilePartyBase();
+        var secondAiPartyId = CreateMobilePartyBase();
+        var disabledRouter = new[] { GetNetworkRoutingMethod() };
+
+        SetMockPlayerEncounter(client);
+        PublishConversationRequest(client, playerPartyId, firstAiPartyId, disabledRouter);
+        var firstRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        ResetConversationRequestCooldown(client);
+
+        await System.Threading.Tasks.Task.Run(() =>
+            client.SimulateMessage(
+                Server.NetPeer,
+                new NetworkConversationDenied(
+                    ConversationDeniedReason.PartyEngaged,
+                    firstRequest.RequestId),
+                markGameThread: false));
+        Common.GameThread.Instance.MarkGameThread();
+
+        Assert.Equal(firstRequest.RequestId, GetPendingConversationRequestId(client));
+
+        client.NetworkSentMessages.Clear();
+        PublishConversationRequest(client, playerPartyId, secondAiPartyId, disabledRouter);
+        var secondRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+
+        client.Call(() => Common.GameThread.Instance.Update(TimeSpan.Zero));
+
+        Assert.Equal(secondRequest.RequestId, GetPendingConversationRequestId(client));
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+            client.Resolve<IMessageBroker>().Publish(this, new ConversationEnded()));
+
+        var ended = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        Assert.Equal(secondRequest.RequestId, ended.RequestId);
+    }
+
+    [Fact]
+    public void ConversationApproval_ReplacesCapturedEncounter()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+
+        SetMainParty(client, playerPartyId);
+        EnableHeadlessEncounterFinish(client);
+        var capturedEncounter = SetMockPlayerEncounter(client);
+        var requestId = CaptureConversationRestart(client);
+
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            requestId,
+            ConversationRestartSource.PlayerEncounter,
+            forcePlayerOutFromSettlement: true);
+
+        client.Call(() =>
+        {
+            Assert.NotSame(capturedEncounter, PlayerEncounter.Current);
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.Same(aiParty, PlayerEncounter.EncounteredParty);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ConversationApproval_PumpedNewerApproval_KeepsNewerRequestActive()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (_, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var aiMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var aiPartyId = GetPartyBaseId(Server, aiMobilePartyId);
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        SetMainParty(client, playerPartyId);
+        EnableHeadlessEncounterFinish(client);
+        SetMockPlayerEncounter(client);
+
+        var firstRequestId = CaptureConversationRestart(client);
+        var secondRequestId = CaptureConversationRestart(client);
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryBeginEngagement(
+                client.NetPeer,
+                playerPartyId,
+                aiPartyId,
+                wasAiDisabled: false,
+                requestId: firstRequestId));
+            Assert.True(tracker.TryBeginEngagement(
+                client.NetPeer,
+                playerPartyId,
+                aiPartyId,
+                wasAiDisabled: false,
+                requestId: secondRequestId));
+        });
+
+        await System.Threading.Tasks.Task.Run(() =>
+            client.SimulateMessage(
+                Server.NetPeer,
+                new NetworkAllowConversation(
+                    aiPartyId,
+                    playerPartyId,
+                    forcePlayerOutFromSettlement: false,
+                    ConversationRestartSource.EncounterManager,
+                    secondRequestId),
+                markGameThread: false));
+        Common.GameThread.Instance.MarkGameThread();
+        Assert.True(Common.GameThread.Instance.QueueLength > 0);
+
+        var getEncounterMenu = AccessTools.Method(
+            typeof(DefaultEncounterGameMenuModel),
+            nameof(DefaultEncounterGameMenuModel.GetEncounterMenu));
+        Assert.NotNull(getEncounterMenu);
+        var harmony = new Harmony($"{nameof(PlayerPartyInteractionFlowTests)}.approval-pump");
+        var startBattleInternal = AccessTools.Method(typeof(PlayerEncounter), "StartBattleInternal");
+        Assert.NotNull(startBattleInternal);
+        harmony.Patch(
+            getEncounterMenu,
+            prefix: new HarmonyMethod(
+                typeof(PlayerPartyInteractionFlowTests),
+                nameof(ForceImmediateBattleEncounterMenu)));
+        harmony.Patch(
+            startBattleInternal,
+            postfix: new HarmonyMethod(
+                typeof(PlayerPartyInteractionFlowTests),
+                nameof(PublishConversationEnded)));
+
+        client.NetworkSentMessages.Clear();
+
+        try
+        {
+            DeliverConversationApproval(
+                client,
+                playerPartyId,
+                aiPartyId,
+                firstRequestId,
+                ConversationRestartSource.EncounterManager,
+                forcePlayerOutFromSettlement: false,
+                AccessTools.Method(
+                    typeof(GameMenu),
+                    nameof(GameMenu.ActivateGameMenu),
+                    new[] { typeof(string) }));
+        }
+        finally
+        {
+            harmony.Unpatch(getEncounterMenu, HarmonyPatchType.Prefix, harmony.Id);
+            harmony.Unpatch(startBattleInternal, HarmonyPatchType.Postfix, harmony.Id);
+        }
+
+        var endedDuringRestart = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        Assert.Equal(firstRequestId, endedDuringRestart.RequestId);
+        Assert.Equal(secondRequestId, GetActiveConversationRequestId(client));
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryGetEngagement(client.NetPeer, out var engagement));
+            Assert.Equal(secondRequestId, engagement.RequestId);
+        });
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+            client.Resolve<IMessageBroker>().Publish(this, new ConversationEnded()));
+
+        var ended = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        Assert.Equal(secondRequestId, ended.RequestId);
+        Server.Call(() =>
+            Assert.False(Server.Resolve<ConversationPartyTracker>().TryGetEngagement(client.NetPeer, out _)));
+    }
+
+    [Fact]
+    public void ApprovedRestart_StartBattleInternal_UsesRegisteredServerMapEventForAttack()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (_, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var opponentMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var opponentPartyId = GetPartyBaseId(Server, opponentMobilePartyId);
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        SetMainParty(client, playerPartyId);
+
+        string? mapEventId = null;
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+                Assert.True(client.ObjectManager.TryGetObject<PartyBase>(opponentPartyId, out var opponentParty));
+
+                var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+                encounter._attackerParty = playerParty;
+                encounter._defenderParty = opponentParty;
+                Campaign.Current.PlayerEncounter = encounter;
+
+                MapEvent? mapEvent;
+                using (new AllowedThread())
+                {
+                    mapEvent = InvokePatchedStartBattleInternal(encounter);
+                }
+
+                Assert.NotNull(mapEvent);
+                Assert.Same(mapEvent, encounter._mapEvent);
+                Assert.Same(mapEvent, playerParty.MapEvent);
+                Assert.Same(mapEvent, opponentParty.MapEvent);
+                Assert.Contains(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+                Assert.True(client.ObjectManager.TryGetId(mapEvent, out mapEventId));
+            }, MapEventDisabledMethods);
+
+            Assert.NotNull(mapEventId);
+            Server.Call(() => Assert.True(ServerBattleModeArbiter.TryClaimSimulation(mapEventId!)));
+            client.NetworkSentMessages.Clear();
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() =>
+            {
+                var battleStartCoordinator = client.Resolve<BattleStartCoordinator>();
+                // E2E clients share process statics, so select this simulated client's coordinator for the patch.
+                AccessTools.Field(typeof(BattleStartCoordinator), "<Instance>k__BackingField")
+                    .SetValue(null, battleStartCoordinator);
+                Assert.Same(battleStartCoordinator, BattleStartCoordinator.Instance);
+                InvokePatchedEncounterAttack();
+                Assert.Same(battleStartCoordinator, BattleStartCoordinator.Instance);
+            }, MapEventDisabledMethods);
+
+            var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkBattleStartRequest>());
+            Assert.Equal((int)BattleStartMode.Mission, request.Mode);
+            Assert.Equal(mapEventId, request.MapEventId);
+            Assert.Equal(playerMobilePartyId, request.AttackerPartyId);
+            Assert.False(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+        }
+        finally
+        {
+            if (mapEventId != null)
+                Server.Call(() => ServerBattleModeArbiter.Release(mapEventId));
+        }
+    }
+
+    [Fact]
+    public void DuplicateConversationApproval_DoesNotReplaceOpenEncounter()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+
+        SetMainParty(client, playerPartyId);
+        EnableHeadlessEncounterFinish(client);
+        SetMockPlayerEncounter(client);
+        var requestId = CaptureConversationRestart(client);
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            requestId,
+            ConversationRestartSource.PlayerEncounter,
+            forcePlayerOutFromSettlement: false);
+
+        PlayerEncounter? openedEncounter = null;
+        client.Call(() => openedEncounter = PlayerEncounter.Current);
+        client.NetworkSentMessages.Clear();
+
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            requestId,
+            ConversationRestartSource.PlayerEncounter,
+            forcePlayerOutFromSettlement: false);
+
+        client.Call(() => Assert.Same(openedEncounter, PlayerEncounter.Current));
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+    }
+
+    [Fact]
+    public void StaleConversationApproval_DoesNotReleaseNewerServerEngagement()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        var unrelatedPartyId = CreateMobilePartyBase();
+        var capturedEncounter = SetMockPlayerEncounter(client);
+        var staleRequestId = CaptureConversationRestart(client);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(unrelatedPartyId, out var unrelatedParty));
+            capturedEncounter._encounteredParty = unrelatedParty;
+        });
+        var currentRequestId = CaptureConversationRestart(client);
+
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryBeginEngagement(
+                client.NetPeer,
+                playerPartyId,
+                aiPartyId,
+                wasAiDisabled: false,
+                requestId: currentRequestId));
+        });
+
+        client.NetworkSentMessages.Clear();
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            staleRequestId,
+            ConversationRestartSource.PlayerEncounter,
+            forcePlayerOutFromSettlement: false);
+
+        client.Call(() => Assert.Same(capturedEncounter, PlayerEncounter.Current));
+        var ended = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        Assert.Equal(staleRequestId, ended.RequestId);
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryGetEngagement(client.NetPeer, out var engagement));
+            Assert.Equal(currentRequestId, engagement.RequestId);
+        });
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(
+            new NetworkConversationEnded(currentRequestId)));
+    }
+
+    [Fact]
+    public void SallyOutConsequence_ApprovedWhileSiegeLeaderPending_OpensSiegeEncounter()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var siege = CreateSyncedSiege();
+        var pendingMapEventId = TestEnvironment.CreateRegisteredObject<MapEvent>(MapEventDisabledMethods);
+
+        var capturedEncounter = PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId);
+        client.NetworkSentMessages.Clear();
+
+        var captureDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeSallyOutConsequence, captureDisabledMethods);
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        Assert.Equal(playerPartyId, request.AttackerId);
+        Assert.Equal(siege.LeaderPartyId, request.DefenderId);
+        Assert.Equal(ConversationRestartSource.EncounterManager, request.Source);
+        client.Call(() => Assert.Same(capturedEncounter, PlayerEncounter.Current));
+
+        MarkPartyPending(client, pendingMapEventId, siege.LeaderPartyId);
+
+        DeliverConversationApproval(
+            client,
+            request.AttackerId,
+            request.DefenderId,
+            request.RequestId,
+            request.Source,
+            request.ForcePlayerOutFromSettlement,
+            AccessTools.Method(
+                typeof(DefaultEncounterGameMenuModel),
+                nameof(DefaultEncounterGameMenuModel.GetEncounterMenu)));
+
+        AssertApprovedSiegeEncounter(
+            client,
+            capturedEncounter,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+    }
+
+    [Fact]
+    public void BreakInContinuation_ServerEntryPrecedesApprovalAndOpensPendingSiegeEncounter()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        var pendingMapEventId = TestEnvironment.CreateRegisteredObject<MapEvent>(MapEventDisabledMethods);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+
+        var capturedEncounter = PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        client.NetworkSentMessages.Clear();
+        Server.NetworkSentMessages.Clear();
+        client.Call(() =>
+            client.Resolve<ClientSiegeEntryHandler>().BreakInContinuationTimeout = TimeSpan.Zero);
+
+        var captureRequestDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var breakInRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        Assert.Equal(playerMobilePartyId, breakInRequest.PartyId);
+        Assert.Equal(siege.SettlementId, breakInRequest.SettlementId);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+        foreach (var syncedClient in Clients)
+            AssertPartyOutsideSettlement(syncedClient, playerMobilePartyId);
+        LocationEncounter? stagedLocationEncounter = null;
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(
+                siege.SettlementId,
+                out var settlement));
+            stagedLocationEncounter = PlayerEncounter.LocationEncounter;
+            Assert.NotNull(stagedLocationEncounter);
+            Assert.Same(settlement, stagedLocationEncounter!.Settlement);
+        });
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkBreakInContinuationApproved(
+                "stale-break-in-request",
+                siege.SettlementId,
+                approved: true));
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        AssertPartyOutsideSettlement(client, playerMobilePartyId);
+        client.Call(() => Assert.Same(stagedLocationEncounter, PlayerEncounter.LocationEncounter));
+
+        client.NetworkSentMessages.Clear();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var firstRequestId = breakInRequest.RequestId;
+        breakInRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        Assert.NotEqual(firstRequestId, breakInRequest.RequestId);
+        client.Call(() =>
+        {
+            stagedLocationEncounter = PlayerEncounter.LocationEncounter;
+            Assert.NotNull(stagedLocationEncounter);
+        });
+
+        Server.Call(
+            () =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    playerMobilePartyId,
+                    out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                    siege.SettlementId,
+                    out var settlement));
+                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(
+                    siege.LeaderPartyId,
+                    out var siegeLeaderParty));
+
+                VillageHostileFactionStanceHelper.ApplyWarStance(
+                    siegeLeaderParty.MapFaction,
+                    playerParty.MapFaction);
+                Assert.True(playerParty.IsActive);
+                Assert.Null(playerParty.CurrentSettlement);
+                Assert.Null(playerParty.BesiegerCamp);
+                Assert.Null(playerParty.Party.MapEventSide);
+                Assert.NotNull(settlement.SiegeEvent);
+                Assert.True(settlement.SiegeEvent.CanPartyJoinSide(
+                    playerParty.Party,
+                    BattleSideEnum.Defender));
+
+                Server.SimulateMessage(client.NetPeer, breakInRequest);
+            },
+            MapEventDisabledMethods.Append(GetDirectNetworkRoutingMethod()));
+
+        var settlementEntry = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
+        Assert.Equal(
+            ObjectManager.Compact(playerMobilePartyId, typeof(MobileParty)),
+            settlementEntry.PartyId);
+        Assert.Equal(
+            ObjectManager.Compact(siege.SettlementId, typeof(Settlement)),
+            settlementEntry.SettlementId);
+        var breakInApproval = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkBreakInContinuationApproved>());
+        Assert.Equal(breakInRequest.RequestId, breakInApproval.RequestId);
+        Assert.True(breakInApproval.Approved);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        AssertPartyEnteredSettlement(Server, playerMobilePartyId, siege.SettlementId);
+        foreach (var syncedClient in Clients)
+            AssertPartyEnteredSettlement(syncedClient, playerMobilePartyId, siege.SettlementId);
+        client.Call(() =>
+        {
+            Assert.Same(capturedEncounter, PlayerEncounter.Current);
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(
+                siege.SettlementId,
+                out var settlement));
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.NotNull(Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>());
+        });
+
+        client.NetworkSentMessages.Clear();
+
+        var captureContinuationDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .Append(AccessTools.Method(typeof(PlayerSiege), nameof(PlayerSiege.StartSiegePreparation)))
+            .ToList();
+        client.Call(
+            () => client.SimulateMessage(Server.NetPeer, breakInApproval),
+            captureContinuationDisabledMethods);
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        Assert.Equal(siege.LeaderPartyId, request.AttackerId);
+        Assert.Equal(playerPartyId, request.DefenderId);
+        Assert.Equal(ConversationRestartSource.PlayerEncounter, request.Source);
+        client.Call(() => Assert.Same(capturedEncounter, PlayerEncounter.Current));
+
+        MarkPartyPending(client, pendingMapEventId, siege.LeaderPartyId);
+
+        DeliverConversationApproval(
+            client,
+            request.AttackerId,
+            request.DefenderId,
+            request.RequestId,
+            request.Source,
+            request.ForcePlayerOutFromSettlement);
+
+        AssertApprovedSiegeEncounter(
+            client,
+            capturedEncounter,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+    }
+
+    [Fact]
+    public void BreakInContinuation_PendingRequestSuppressesDuplicateAttempt()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        client.Call(() =>
+            client.Resolve<ClientSiegeEntryHandler>().BreakInContinuationTimeout = TimeSpan.FromMinutes(1));
+        client.NetworkSentMessages.Clear();
+
+        var captureRequestDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var request = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        LocationEncounter? stagedLocationEncounter = null;
+        client.Call(() => stagedLocationEncounter = PlayerEncounter.LocationEncounter);
+        Assert.NotNull(stagedLocationEncounter);
+
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var retainedRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        Assert.Equal(request.RequestId, retainedRequest.RequestId);
+        client.Call(() => Assert.Same(stagedLocationEncounter, PlayerEncounter.LocationEncounter));
+    }
+
+    [Fact]
+    public void BreakInContinuation_TimedOutRequestRetriesAndIgnoresStaleApproval()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(siege.LeaderPartyId, out var siegeLeaderParty));
+                Assert.NotNull(playerParty.MobileParty);
+                Assert.NotNull(siegeLeaderParty.MobileParty);
+
+                using (new AllowedThread())
+                {
+                    playerParty.MobileParty.SetMoveEngageParty(
+                        siegeLeaderParty.MobileParty,
+                        MobileParty.NavigationType.Default);
+                }
+
+                Assert.Equal(AiBehavior.EngageParty, playerParty.MobileParty.DefaultBehavior);
+            }, MapEventDisabledMethods);
+        }
+        client.Call(() =>
+            client.Resolve<ClientSiegeEntryHandler>().BreakInContinuationTimeout = TimeSpan.Zero);
+        client.NetworkSentMessages.Clear();
+        LocationEncounter? previousLocationEncounter = null;
+        client.Call(() => previousLocationEncounter = PlayerEncounter.LocationEncounter);
+        Assert.Null(previousLocationEncounter);
+
+        var captureRequestDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var firstRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        LocationEncounter? firstStagedLocationEncounter = null;
+        client.Call(() => firstStagedLocationEncounter = PlayerEncounter.LocationEncounter);
+        Assert.NotNull(firstStagedLocationEncounter);
+
+        client.NetworkSentMessages.Clear();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var replacementRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        Assert.NotEqual(firstRequest.RequestId, replacementRequest.RequestId);
+        LocationEncounter? replacementLocationEncounter = null;
+        client.Call(() => replacementLocationEncounter = PlayerEncounter.LocationEncounter);
+        Assert.NotNull(replacementLocationEncounter);
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkBreakInContinuationApproved(
+                firstRequest.RequestId,
+                firstRequest.SettlementId,
+                approved: false));
+        client.Call(() => Assert.Same(replacementLocationEncounter, PlayerEncounter.LocationEncounter));
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkBreakInContinuationApproved(
+                replacementRequest.RequestId,
+                replacementRequest.SettlementId,
+                approved: false));
+        client.Call(() =>
+        {
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(PlayerEncounter.LocationEncounter);
+        });
+        TestEnvironment.FlushCoalescer();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+                Assert.NotNull(playerParty.MobileParty);
+                Assert.Equal(AiBehavior.Hold, playerParty.MobileParty.DefaultBehavior);
+                Assert.Null(playerParty.MobileParty.TargetParty);
+            });
+        }
+    }
+
+    [Fact]
+    public void BreakInContinuation_HandlerDisposedBeforeApproval_RestoresLocationEncounter()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        client.NetworkSentMessages.Clear();
+        LocationEncounter? previousLocationEncounter = null;
+        client.Call(() => previousLocationEncounter = PlayerEncounter.LocationEncounter);
+
+        var captureRequestDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        client.Call(() =>
+        {
+            Assert.NotSame(previousLocationEncounter, PlayerEncounter.LocationEncounter);
+            client.Resolve<ClientSiegeEntryHandler>().Dispose();
+            Assert.Same(previousLocationEncounter, PlayerEncounter.LocationEncounter);
+        });
+    }
+
+    [Fact]
+    public void BreakInContinuation_ApprovedAfterEncounterChanges_PreservesEnteredLocation()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        client.NetworkSentMessages.Clear();
+
+        var captureRequestDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var request = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        LocationEncounter? stagedLocationEncounter = null;
+        client.Call(() =>
+        {
+            stagedLocationEncounter = PlayerEncounter.LocationEncounter;
+            Assert.NotNull(stagedLocationEncounter);
+        });
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkPartyEnterSettlement(
+                ObjectManager.Compact(siege.SettlementId, typeof(Settlement)),
+                ObjectManager.Compact(playerMobilePartyId, typeof(MobileParty))));
+        AssertPartyEnteredSettlement(client, playerMobilePartyId, siege.SettlementId);
+
+        PlayerEncounter? changedEncounter = null;
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(
+                siege.SettlementId,
+                out var settlement));
+            changedEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            changedEncounter.EncounterSettlementAux = settlement;
+            Campaign.Current.PlayerEncounter = changedEncounter;
+        });
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkBreakInContinuationApproved(
+                request.RequestId,
+                request.SettlementId,
+                approved: true));
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        AssertPartyEnteredSettlement(client, playerMobilePartyId, siege.SettlementId);
+        client.Call(() =>
+        {
+            Assert.Same(changedEncounter, PlayerEncounter.Current);
+            Assert.Same(stagedLocationEncounter, PlayerEncounter.LocationEncounter);
+        });
     }
 
     [Fact]
@@ -1448,6 +2415,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
         Assert.Equal(aiPartyId, allowed.AttackerId);
         Assert.Equal(playerPartyId, allowed.DefenderId);
+        Assert.Null(allowed.RequestId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
     }
 
@@ -1548,6 +2516,124 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertPeaceMade(Server, playerClanId, targetClanId);
         foreach (var environmentClient in Clients)
             AssertPeaceMade(environmentClient, playerClanId, targetClanId);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void NpcPeaceBarter_StationarySettlementConversation_ReturnsAcceptedAfterMutation(
+        bool failDuringPeaceDispatch,
+        bool failAfterMutation)
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int initialTargetGold = 40;
+        const int offeredGold = 500_000;
+        const string requestId = "settlement-peace-success";
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var (targetHeroId, targetMobilePartyId, targetPartyId) = CreateAiPartyWithRegisteredLeader();
+        var (playerClanId, targetClanId) = MakePartiesHostile(playerPartyId, targetPartyId);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var harmony = new Harmony($"e2e.settlement-peace.{Guid.NewGuid():N}");
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(targetMobilePartyId, out var targetParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            playerHero.Gold = initialPlayerGold;
+            targetHero.Gold = initialTargetGold;
+            playerParty.CurrentSettlement = settlement;
+            targetHero.PartyBelongedTo = null;
+            targetHero.StayingInSettlement = settlement;
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
+            Assert.Equal(settlement, playerHero.CurrentSettlement);
+            Assert.Equal(settlement, targetHero.CurrentSettlement);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
+        });
+        TestEnvironment.FlushCoalescer();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
+        });
+
+        if (failDuringPeaceDispatch)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(CampaignEventDispatcher),
+                    nameof(CampaignEventDispatcher.OnMakePeace)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowDuringMakePeaceDispatch)));
+        }
+        else if (failAfterMutation)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(CampaignEventDispatcher),
+                    nameof(CampaignEventDispatcher.OnBarterAccepted)),
+                postfix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowAfterBarterAccepted)));
+        }
+
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestPeaceBarter(
+                targetHeroId,
+                PeaceConversationContext.Settlement,
+                settlementId,
+                new[]
+                {
+                    new PeaceBarterTerm(
+                        PeaceBarterTermType.Gold,
+                        playerHeroId,
+                        objectId: null,
+                        itemModifierId: null,
+                        itemModifierNull: true,
+                        amount: offeredGold),
+                },
+                requestId)));
+            TestEnvironment.FlushCoalescer();
+
+            var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>());
+            Assert.True(result.Accepted, result.Reason);
+            Assert.Equal(requestId, result.RequestId);
+            var expectedPlayerGold = failDuringPeaceDispatch
+                ? initialPlayerGold
+                : initialPlayerGold - offeredGold;
+            var expectedTargetGold = failDuringPeaceDispatch
+                ? initialTargetGold
+                : initialTargetGold + offeredGold;
+            Assert.Equal(expectedPlayerGold, result.PlayerGold);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+                Assert.Equal(expectedPlayerGold, playerHero.Gold);
+                Assert.Equal(expectedTargetGold, targetHero.Gold);
+            });
+            AssertPeaceMade(Server, playerClanId, targetClanId);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
     }
 
     [Fact]
@@ -1943,6 +3029,140 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void BanditSafePassage_Failure_CommitsAfterSafePassageIsInstalled(
+        bool failBeforeSafePassageIsInstalled,
+        bool failDuringGoldDispatch)
+    {
+        const int initialPlayerGold = 1000;
+        const int initialBanditGold = 40;
+        const int offeredGold = 250;
+        const string requestId = "bandit-post-apply-failure";
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var banditMobilePartyId = CreateBanditParty("E2EBanditPostApplyFailure");
+        var banditPartyId = GetPartyBaseId(Server, banditMobilePartyId);
+        var harmony = new Harmony($"e2e.bandit-post-apply.{Guid.NewGuid():N}");
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+
+            Server.Resolve<ISessionInteractionsPlayerDataInterface>().AddPlayerKeys(playerHeroId);
+            playerHero.Gold = initialPlayerGold;
+            banditParty.PartyTradeGold = initialBanditGold;
+            VillageHostileFactionStanceHelper.ApplyWarStance(banditParty.MapFaction, playerParty.MapFaction);
+            Assert.True(ConversationPartyHold.TryEngage(
+                Server.Resolve<ConversationPartyTracker>(),
+                client.NetPeer,
+                playerPartyId,
+                banditParty,
+                banditPartyId,
+                engagerIsDefender: true));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        if (failBeforeSafePassageIsInstalled)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(DefaultMobilePartyAIModelPatches),
+                    nameof(DefaultMobilePartyAIModelPatches.PreventAttacksUntil)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowBeforeBanditSafePassageMutation)));
+        }
+        else if (failDuringGoldDispatch)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(CampaignEventDispatcher),
+                    nameof(CampaignEventDispatcher.OnHeroOrPartyTradedGold)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowDuringBanditGoldDispatch)));
+        }
+        else
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(ConversationPartyHold),
+                    nameof(ConversationPartyHold.EndEngagement),
+                    new[] { typeof(ConversationPartyTracker), typeof(object) }),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowAfterBanditBarterMutation)));
+        }
+
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestBanditBarter(
+                banditMobilePartyId,
+                offeredGold,
+                Array.Empty<ItemRosterElementData>(),
+                Array.Empty<TroopRosterElementData>(),
+                requestId)));
+            if (!failDuringGoldDispatch)
+                TestEnvironment.FlushCoalescer();
+
+            var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBanditBarterResult>());
+            Assert.Equal(!failBeforeSafePassageIsInstalled, result.Accepted);
+            Assert.Equal(requestId, result.RequestId);
+            var expectedPlayerGold = failBeforeSafePassageIsInstalled
+                ? initialPlayerGold
+                : initialPlayerGold - offeredGold;
+            var expectedBanditGold = failBeforeSafePassageIsInstalled
+                ? initialBanditGold
+                : initialBanditGold + offeredGold;
+            Assert.Equal(expectedPlayerGold, result.PlayerGold);
+            AssertBanditBarterGold(
+                Server,
+                playerHeroId,
+                banditMobilePartyId,
+                expectedPlayerGold,
+                expectedBanditGold);
+
+            if (failDuringGoldDispatch)
+            {
+                foreach (var environmentClient in Clients)
+                {
+                    environmentClient.Call(() =>
+                    {
+                        Assert.True(environmentClient.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                        Assert.Equal(expectedPlayerGold, playerHero.Gold);
+                    });
+                }
+
+                Server.Call(() =>
+                {
+                    Assert.False(Server.Resolve<ConversationPartyTracker>().TryGetEngagement(client.NetPeer, out _));
+                    Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+                    Assert.False(banditParty.Ai.IsDisabled);
+                });
+            }
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            Server.Call(() =>
+            {
+                ConversationPartyHold.EndEngagement(Server.Resolve<ConversationPartyTracker>(), client.NetPeer);
+                if (Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty))
+                    DefaultMobilePartyAIModelPatches.RemoveAttackProtectionsForParty(banditParty);
+            });
+        }
+    }
+
     [Fact]
     public void BanditSafePassage_Underpayment_IsRejectedWithoutEffects()
     {
@@ -2152,6 +3372,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         var (initiatorHeroId, initiatorMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var (responderHeroId, responderMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            playerManager.SetPeer("PlayerOne", client1.NetPeer);
+            playerManager.SetPeer("PlayerTwo", client2.NetPeer);
+        });
 
         return (
             client1,
@@ -2169,6 +3395,343 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(partyId, out var party));
             Assert.NotNull(party.MobileParty);
             Campaign.Current.MainParty = party.MobileParty;
+        }, MapEventDisabledMethods);
+    }
+
+    private (string SiegeEventId, string SettlementId, string LeaderPartyId) CreateSyncedSiege()
+    {
+        var siegeCreationDisabledMethods = new[]
+        {
+            AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+            AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+        };
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var leaderMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var leaderPartyId = GetPartyBaseId(Server, leaderMobilePartyId);
+
+        string? siegeEventId = null;
+        string? campId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leaderMobilePartyId, out var leader));
+
+            var siegeEvent = new SiegeEvent(settlement, leader);
+            Assert.NotNull(siegeEvent.BesiegerCamp);
+
+            Assert.True(Server.ObjectManager.TryGetId(siegeEvent, out siegeEventId));
+            Assert.True(Server.ObjectManager.TryGetId(siegeEvent.BesiegerCamp, out campId));
+        }, siegeCreationDisabledMethods);
+
+        Assert.NotNull(siegeEventId);
+        Assert.NotNull(campId);
+
+        // The headless fixture suppresses OnPartyJoinedSiegeInternal, so wire the already-synced graph's
+        // membership on each replica without replacing any registered siege object.
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId!, out var siegeEvent));
+                Assert.True(instance.ObjectManager.TryGetObject<BesiegerCamp>(campId!, out var camp));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(leaderPartyId, out var leaderParty));
+                Assert.NotNull(leaderParty.MobileParty);
+
+                using (new AllowedThread())
+                {
+                    leaderParty.MobileParty._besiegerCamp = camp;
+                    camp._leaderParty = leaderParty.MobileParty;
+                    if (!camp._besiegerParties.Contains(leaderParty.MobileParty))
+                        camp._besiegerParties.Add(leaderParty.MobileParty);
+                }
+
+                Assert.Same(camp, siegeEvent.BesiegerCamp);
+                Assert.Same(settlement, siegeEvent.BesiegedSettlement);
+                Assert.Same(siegeEvent, camp.SiegeEvent);
+                Assert.Same(leaderParty.MobileParty, camp.LeaderParty);
+            }, MapEventDisabledMethods);
+        }
+
+        return (siegeEventId!, settlementId, leaderPartyId);
+    }
+
+    private PlayerEncounter PrepareClientSiegeEncounter(
+        EnvironmentInstance client,
+        string playerPartyId,
+        string settlementId,
+        bool enterSettlement = true)
+    {
+        SetMainParty(client, playerPartyId);
+        EnableHeadlessEncounterFinish(client);
+
+        PlayerEncounter? encounter = null;
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.NotNull(playerParty.MobileParty);
+
+            using (new AllowedThread())
+            {
+                if (enterSettlement)
+                    playerParty.MobileParty._currentSettlement = settlement;
+                else
+                    playerParty.MobileParty._currentSettlement = null;
+                Hero.MainHero._partyBelongedTo = playerParty.MobileParty;
+            }
+
+            if (Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>() == null)
+            {
+                Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
+                    new CampaignBehaviorBase[] { new EncounterGameMenuBehavior() }));
+            }
+
+            encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter.EncounterSettlementAux = settlement;
+            Campaign.Current.PlayerEncounter = encounter;
+
+            if (enterSettlement)
+            {
+                Assert.Same(settlement, Settlement.CurrentSettlement);
+                Assert.Same(settlement, Hero.MainHero.CurrentSettlement);
+                Assert.Same(settlement.SiegeEvent, PlayerSiege.PlayerSiegeEvent);
+            }
+            else
+            {
+                Assert.Null(playerParty.MobileParty.CurrentSettlement);
+                Assert.Null(Hero.MainHero.CurrentSettlement);
+                Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            }
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(encounter);
+        return encounter!;
+    }
+
+    private void PrepareBreakInDefenderEligibility(
+        string playerPartyId,
+        string settlementId,
+        string siegeLeaderPartyId)
+    {
+        var defenderClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var attackerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(siegeLeaderPartyId, out var siegeLeaderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(defenderClanId, out var defenderClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(attackerClanId, out var attackerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Town>(townId, out var town));
+            Assert.NotNull(playerParty.MobileParty);
+            Assert.NotNull(siegeLeaderParty.MobileParty);
+
+            playerParty.LeaderHero.Clan = defenderClan;
+            playerParty.MobileParty.ActualClan = defenderClan;
+            siegeLeaderParty.LeaderHero.Clan = attackerClan;
+            siegeLeaderParty.MobileParty.ActualClan = attackerClan;
+            SetupFief(settlement, town, playerParty);
+            VillageHostileFactionStanceHelper.ApplyWarStance(
+                siegeLeaderParty.MapFaction,
+                playerParty.MapFaction);
+
+            Assert.True(settlement.SiegeEvent.CanPartyJoinSide(
+                playerParty,
+                BattleSideEnum.Defender));
+        }, MapEventDisabledMethods);
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(
+                    playerPartyId,
+                    out var playerParty));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(
+                    settlementId,
+                    out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Town>(
+                    townId,
+                    out var town));
+                Assert.NotNull(playerParty.MobileParty);
+                using (new AllowedThread())
+                {
+                    settlement.Town = town;
+                    settlement.SetSettlementComponent(town);
+                    playerParty.MobileParty._currentSettlement = null;
+                }
+            });
+        }
+    }
+
+    private static void AssertPartyOutsideSettlement(
+        EnvironmentInstance instance,
+        string playerMobilePartyId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(
+                playerMobilePartyId,
+                out var playerParty));
+            Assert.Null(playerParty.CurrentSettlement);
+        });
+    }
+
+    private static void AssertPartyEnteredSettlement(
+        EnvironmentInstance instance,
+        string playerMobilePartyId,
+        string settlementId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(
+                playerMobilePartyId,
+                out var playerParty));
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(
+                settlementId,
+                out var settlement));
+            Assert.Same(settlement, playerParty.CurrentSettlement);
+        });
+    }
+
+    private void MarkPartyPending(
+        EnvironmentInstance client,
+        string mapEventId,
+        string partyId)
+    {
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkMapEventPartyPending(mapEventId, partyId));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyId, out var party));
+            Assert.True(client.Resolve<IMapEventInitializationBarrier>().IsPartyPending(party));
+            Assert.False(PendingMapEventPartyMovementPatch.CanAdvancePosition(party));
+        });
+    }
+
+    private static MethodBase GetNetworkRoutingMethod()
+    {
+        var method = AccessTools.Method(
+            typeof(TestNetworkRouter),
+            nameof(TestNetworkRouter.SendAll),
+            new[] { typeof(NetPeer), typeof(IMessage) });
+        Assert.NotNull(method);
+        return method;
+    }
+
+    private static MethodBase GetDirectNetworkRoutingMethod()
+    {
+        var method = AccessTools.Method(
+            typeof(TestNetworkRouter),
+            nameof(TestNetworkRouter.Send),
+            new[] { typeof(NetPeer), typeof(NetPeer), typeof(IMessage) });
+        Assert.NotNull(method);
+        return method;
+    }
+
+    private static void ResetConversationRequestCooldown(EnvironmentInstance client)
+    {
+        client.Call(() =>
+        {
+            var handler = client.Resolve<ConversationRequestHandler>();
+            var field = AccessTools.Field(
+                typeof(ConversationRequestHandler),
+                "lastRequestSentUtc");
+            Assert.NotNull(field);
+            field.SetValue(handler, DateTime.MinValue);
+        });
+    }
+
+    private static string? GetPendingConversationRequestId(EnvironmentInstance client)
+    {
+        string? requestId = null;
+        client.Call(() =>
+        {
+            var handler = client.Resolve<ConversationRequestHandler>();
+            var field = AccessTools.Field(
+                typeof(ConversationRequestHandler),
+                "pendingConversationRequestId");
+            Assert.NotNull(field);
+            requestId = (string?)field.GetValue(handler);
+        });
+        return requestId;
+    }
+
+    private static string? GetActiveConversationRequestId(EnvironmentInstance client)
+    {
+        string? requestId = null;
+        client.Call(() =>
+        {
+            var handler = client.Resolve<ConversationRequestHandler>();
+            var field = AccessTools.Field(
+                typeof(ConversationRequestHandler),
+                "activeConversationRequestId");
+            Assert.NotNull(field);
+            requestId = (string?)field.GetValue(handler);
+        });
+        return requestId;
+    }
+
+    private static bool ForceImmediateBattleEncounterMenu(
+        ref string __result,
+        ref bool startBattle,
+        ref bool joinBattle)
+    {
+        __result = "encounter";
+        startBattle = true;
+        joinBattle = false;
+        return false;
+    }
+
+    private static void PublishConversationEnded()
+        => MessageBroker.Instance.Publish(null, new ConversationEnded());
+
+    private static void BlockPvpNotificationDrain()
+        => beforePvpNotificationDrain?.Invoke();
+
+    private static bool SuppressNetworkRouting() => false;
+
+    private static void InvokeSallyOutConsequence()
+    {
+        var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), "sally_out_consequence");
+        Assert.NotNull(method);
+
+        var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+        method.Invoke(behavior, Array.Empty<object>());
+    }
+
+    private static void InvokeBreakInContinuation()
+    {
+        var method = AccessTools.Method(
+            typeof(EncounterGameMenuBehavior),
+            "break_in_debrief_continue_on_consequence");
+        Assert.NotNull(method);
+
+        var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+        method.Invoke(behavior, new object?[] { null });
+    }
+
+    private void AssertApprovedSiegeEncounter(
+        EnvironmentInstance client,
+        PlayerEncounter capturedEncounter,
+        string settlementId,
+        string leaderPartyId)
+    {
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(leaderPartyId, out var leaderParty));
+
+            Assert.NotSame(capturedEncounter, PlayerEncounter.Current);
+            Assert.Same(leaderParty, PlayerEncounter.EncounteredParty);
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.False(PendingMapEventPartyMovementPatch.CanAdvancePosition(leaderParty));
         }, MapEventDisabledMethods);
     }
 
@@ -2356,7 +3919,55 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 initiatorPartyId,
                 forcePlayerOutFromSettlement: false,
                 ConversationRestartSource.PlayerEncounter,
-                false)),
+                false,
+                requestId: "e2e-conversation-request")),
+            disabledMethods);
+    }
+
+    private static string CaptureConversationRestart(EnvironmentInstance client)
+    {
+        string? requestId = null;
+        client.Call(() =>
+            requestId = client.Resolve<IConversationRestartContextTracker>().Capture(PlayerEncounter.Current));
+
+        Assert.NotNull(requestId);
+        return requestId!;
+    }
+
+    private static MapEvent? InvokePatchedStartBattleInternal(PlayerEncounter encounter)
+    {
+        var method = AccessTools.Method(typeof(PlayerEncounter), "StartBattleInternal");
+        Assert.NotNull(method);
+        return (MapEvent?)method.Invoke(encounter, new object[method.GetParameters().Length]);
+    }
+
+    private static void InvokePatchedEncounterAttack()
+    {
+        var method = AccessTools.Method(typeof(MenuHelper), nameof(MenuHelper.EncounterAttackConsequence));
+        Assert.NotNull(method);
+        method.Invoke(null, new object[method.GetParameters().Length]);
+    }
+
+    private void DeliverConversationApproval(
+        EnvironmentInstance client,
+        string playerPartyId,
+        string targetPartyId,
+        string requestId,
+        ConversationRestartSource source,
+        bool forcePlayerOutFromSettlement,
+        params MethodBase[] additionalDisabledMethods)
+    {
+        var disabledMethods = MapEventDisabledMethods
+            .Concat(additionalDisabledMethods)
+            .ToList();
+
+        client.Call(() =>
+            client.SimulateMessage(Server.NetPeer, new NetworkAllowConversation(
+                targetPartyId,
+                playerPartyId,
+                forcePlayerOutFromSettlement,
+                source,
+                requestId)),
             disabledMethods);
     }
 
@@ -2372,7 +3983,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     private void PublishConversationRequest(
         EnvironmentInstance client,
         string initiatorPartyId,
-        string responderPartyId)
+        string responderPartyId,
+        IReadOnlyList<MethodBase>? disabledMethods = null)
     {
         client.Call(() =>
         {
@@ -2385,7 +3997,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 forcePlayerOutFromSettlement: false,
                 ConversationRestartSource.PlayerEncounter, 
                 armyTalkEncounter: true));
-        });
+        }, disabledMethods);
     }
 
     private void SubmitOption(
@@ -2475,6 +4087,21 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         return 0;
     }
+
+    private static void ThrowAfterBarterAccepted()
+        => throw new InvalidOperationException("Post-acceptance barter work failed.");
+
+    private static void ThrowDuringMakePeaceDispatch()
+        => throw new InvalidOperationException("Peace event dispatch failed after the factions became neutral.");
+
+    private static void ThrowBeforeBanditSafePassageMutation()
+        => throw new InvalidOperationException("Bandit safe-passage installation failed.");
+
+    private static void ThrowDuringBanditGoldDispatch()
+        => throw new InvalidOperationException("Bandit gold dispatch failed after payment.");
+
+    private static void ThrowAfterBanditBarterMutation()
+        => throw new InvalidOperationException("Post-apply bandit barter work failed.");
 
     private static void AssertPartyItemSnapshotContains(ItemRosterElementData[] items, string itemId, int amount)
     {

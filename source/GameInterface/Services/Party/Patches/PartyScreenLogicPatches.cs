@@ -1,12 +1,14 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -53,9 +55,13 @@ internal class PartyScreenLogicPatches
         }
 
         PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
+        PartyScreenHelperPatches.ResetPrisonerDonationRequest();
         bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
         bool applyReleasedAndTakenPrisonerActions =
             PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
+        PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
+            out var donationSettlement,
+            out var donatedPrisonersRoster);
         if (flag)
         {
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
@@ -91,7 +97,9 @@ internal class PartyScreenLogicPatches
                 __instance.CurrentData.PartyMoraleChangeAmount,
                 __instance.DoNotApplyGoldTransactions,
                 partyScreenMode,
-                applyReleasedAndTakenPrisonerActions
+                applyReleasedAndTakenPrisonerActions,
+                donationSettlement,
+                donatedPrisonersRoster
             );
 
             MessageBroker.Instance.Publish(__instance, message);
@@ -144,39 +152,45 @@ internal class PartyScreenLogicPatches
         partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
     }
 
-    /// <summary>
-    /// Executing prisoner heroes is disabled in coop: the kill rides KillCharacterAction and its follow-on
-    /// death/inheritance handling, which crashes the game when it targets a lord or player
-    /// (<see href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/2310">issue #2310</see>).
-    /// Skipping the original also skips its local prisoner-roster mutation, so nothing diverges from the server.
-    /// </summary>
     [HarmonyPatch(nameof(PartyScreenLogic.ExecuteTroop))]
-    [HarmonyPrefix]
-    public static bool ExecuteTroopPrefix() => false;
-
-    /// <summary>
-    /// Reports every prisoner as non-executable so the party screen disables the execute button and
-    /// <see cref="PartyScreenLogic.ValidateCommand"/> rejects any ExecuteTroop command (issue #2310).
-    /// </summary>
-    [HarmonyPatch(nameof(PartyScreenLogic.IsExecutable))]
-    [HarmonyPrefix]
-    public static bool IsExecutablePrefix(ref bool __result)
+    [HarmonyPostfix]
+    public static void ExecuteTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command)
     {
-        __result = false;
-        return false;
+        if (!__instance.ValidateCommand(command)) return;
+
+        // Send message to server to run KillCharacterAction.ApplyByExecution
+        var message = new HeroExecuted(command.Character.HeroObject, Hero.MainHero, KillCharacterAction.KillCharacterActionDetail.Executed, false);
+        MessageBroker.Instance.Publish(__instance, message);
     }
 
-    internal const string ExecutionDisabledReason = "Executing prisoners is disabled in Co-op.";
+    [HarmonyPatch(nameof(PartyScreenLogic.IsExecutable))]
+    [HarmonyPrefix]
+    public static bool IsExecutablePrefix(ref bool __result, CharacterObject character)
+    {
+        if (!HeroExecutionRules.IsExecutable(character.HeroObject, out var _))
+        {
+            __result = false;
+            return false;
+        }
+
+        return true;
+    }
 
     /// <summary>
-    /// The disabled execute button's tooltip; the native "Cannot execute hero right now" would suggest
-    /// execution can become available.
+    /// Replace execute button's tooltip for player heroes and companions.
+    /// Vanilla doesn't have messages for these because you are not able to capture a player or companion normally.
     /// </summary>
     [HarmonyPatch(nameof(PartyScreenLogic.GetExecutableReasonString))]
     [HarmonyPrefix]
-    public static bool GetExecutableReasonStringPrefix(ref string __result)
+    public static bool GetExecutableReasonStringPrefix(ref string __result, CharacterObject character)
     {
-        __result = ExecutionDisabledReason;
-        return false;
+        if (!HeroExecutionRules.IsExecutable(character.HeroObject, out var reason))
+        {
+            __result = reason;
+            return false;
+        }
+
+        // Use default message otherwise
+        return true;
     }
 }

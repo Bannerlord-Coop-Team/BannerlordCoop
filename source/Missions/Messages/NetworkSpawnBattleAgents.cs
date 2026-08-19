@@ -10,20 +10,73 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Messages;
 
 /// <summary>
-/// Host → peers (over the mission mesh): a batch of agents the host spawned into the battle, for peers to
-/// recreate as puppets. v1 puppets are inert — movement, combat, death and control/authority sync are
-/// layered on in Phase 3.
+/// Owner to peers over the mission mesh: one bounded, optionally compressed batch of agents for peers to
+/// recreate as puppets. The codec owns the wire representation and validates it before any game state is read.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NetworkSpawnBattleAgents : IEvent
 {
     [ProtoMember(1)]
-    public readonly BattleAgentSpawnData[] Agents = Array.Empty<BattleAgentSpawnData>();
+    public readonly byte[] Payload = Array.Empty<byte>();
+    [ProtoMember(2)]
+    public readonly int UncompressedLength;
+    [ProtoMember(3)]
+    public readonly int RecordCount;
+    [ProtoMember(4)]
+    public readonly bool IsCompressed;
+    [ProtoMember(5)]
+    public readonly Guid TransferId;
+    [ProtoMember(6)]
+    public readonly int BatchIndex;
+    [ProtoMember(7)]
+    public readonly int BatchCount;
+    [ProtoMember(8)]
+    public readonly SpawnBatchPurpose Purpose;
+    [ProtoMember(9)]
+    public readonly byte[] PayloadSha256 = Array.Empty<byte>();
+
+    // Kept only on an in-process message so tests and the sending side can inspect exact records. Protobuf
+    // carries Payload instead, so no uncompressed duplicate crosses the network.
+    [ProtoIgnore]
+    public readonly BattleAgentSpawnData[] Agents;
 
     public NetworkSpawnBattleAgents(BattleAgentSpawnData[] agents)
     {
+        Agents = agents ?? Array.Empty<BattleAgentSpawnData>();
+        RecordCount = Agents.Length;
+        BatchCount = 1;
+    }
+
+    internal NetworkSpawnBattleAgents(
+        byte[] payload,
+        int uncompressedLength,
+        int recordCount,
+        bool isCompressed,
+        Guid transferId,
+        int batchIndex,
+        int batchCount,
+        SpawnBatchPurpose purpose,
+        byte[] payloadSha256,
+        BattleAgentSpawnData[] agents)
+    {
+        Payload = payload;
+        UncompressedLength = uncompressedLength;
+        RecordCount = recordCount;
+        IsCompressed = isCompressed;
+        TransferId = transferId;
+        BatchIndex = batchIndex;
+        BatchCount = batchCount;
+        Purpose = purpose;
+        PayloadSha256 = payloadSha256;
         Agents = agents;
     }
+}
+
+public enum SpawnBatchPurpose
+{
+    Initial = 0,
+    Deployment = 1,
+    CatchUp = 2,
 }
 
 /// <summary>One host-spawned battle agent: its network id, who it is, where it spawned, which side, and the

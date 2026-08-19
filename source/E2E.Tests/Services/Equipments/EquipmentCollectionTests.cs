@@ -25,29 +25,53 @@ public class EquipmentCollectionTests : IDisposable
     [Fact]
     public void ServerUpdateEquipmentCollection_SyncAllClients()
     {
-        // Arrange
         var server = TestEnvironment.Server;
-        EquipmentElement element = new EquipmentElement();
-        // Act
 
         server.Call(() =>
         {
             EquipmentId = TestEnvironment.CreateRegisteredObject<Equipment>();
             ItemObjectId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-            Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var Equipment));
+            Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var equipment));
             Assert.True(server.ObjectManager.TryGetObject<ItemObject>(ItemObjectId, out var serverItemObject));
-            EquipmentElement element = new EquipmentElement(serverItemObject);
-            EquipmentCollectionPatches.ArrayAssignIntercept<EquipmentElement, ItemSlotsArrayUpdated>(Equipment._itemSlots, 0, element, Equipment);
-            Assert.Equal(element.Item, Equipment._itemSlots[0].Item);
-        });
+            var element = new EquipmentElement(serverItemObject);
 
-        // Assert
-        Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var Equip));
+            EquipmentCollectionPatches.ArrayAssignIntercept<EquipmentElement, ItemSlotsArrayUpdated>(
+                equipment._itemSlots,
+                0,
+                element,
+                equipment);
+
+            Assert.Same(serverItemObject, equipment._itemSlots[0].Item);
+            Assert.Null(equipment._itemSlots[0].ItemModifier);
+        });
 
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var clientEquipment));
-            Assert.Equal(element.Item, clientEquipment._itemSlots[0].Item);
+            Assert.True(client.ObjectManager.TryGetObject<ItemObject>(ItemObjectId, out var clientItemObject));
+            Assert.Same(clientItemObject, clientEquipment._itemSlots[0].Item);
+            Assert.Null(clientEquipment._itemSlots[0].ItemModifier);
+        }
+
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var equipment));
+
+            EquipmentCollectionPatches.ArrayAssignIntercept<EquipmentElement, ItemSlotsArrayUpdated>(
+                equipment._itemSlots,
+                0,
+                new EquipmentElement(),
+                equipment);
+
+            Assert.Null(equipment._itemSlots[0].Item);
+            Assert.Null(equipment._itemSlots[0].ItemModifier);
+        });
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var clientEquipment));
+            Assert.Null(clientEquipment._itemSlots[0].Item);
+            Assert.Null(clientEquipment._itemSlots[0].ItemModifier);
         }
     }
 

@@ -10,12 +10,13 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using SandBox.View.Map.Managers;
-using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
+using System.Runtime.ExceptionServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -31,6 +32,7 @@ public interface IHeroInterface : IGameAbstraction
     byte[] PackageMainHero();
     void SwitchToPlayer(Player player);
     Hero ServerUnpackHero(byte[] bytes);
+    void SetupServerHero(Hero hero);
     Hero ClientUnpackHero(byte[] bytes, Player player);
 }
 
@@ -41,17 +43,20 @@ internal class HeroInterface : IHeroInterface
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IPartyVisibilitySweep partyVisibilitySweep;
+    private readonly IPlayerPartyRestorer playerPartyRestorer;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
         IObjectManager objectManager,
-        IPartyVisibilitySweep partyVisibilitySweep)
+        IPartyVisibilitySweep partyVisibilitySweep,
+        IPlayerPartyRestorer playerPartyRestorer)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
         this.partyVisibilitySweep = partyVisibilitySweep;
+        this.playerPartyRestorer = playerPartyRestorer;
     }
 
     public byte[] PackageMainHero()
@@ -68,19 +73,36 @@ internal class HeroInterface : IHeroInterface
 
     public Hero ServerUnpackHero(byte[] bytes)
     {
-        // Host: unpack and fully set up the hero on the main thread, assigning fresh "Player" network ids.
-        return UnpackHero(bytes, AssignServerHeroNetworkIds);
+        // Prepare the identity before the creation broadcast. Authoritative setup runs afterwards with patches live.
+        return UnpackHero(bytes, AssignServerHeroNetworkIds, setupHero: false);
+    }
+
+    public void SetupServerHero(Hero hero)
+    {
+        ExceptionDispatchInfo exception = null;
+
+        GameThread.Run(() =>
+        {
+            try
+            {
+                SetupNewHero(hero, restoreParty: true);
+            }
+            catch (Exception e)
+            {
+                exception = ExceptionDispatchInfo.Capture(e);
+            }
+        }, blocking: true);
+
+        exception?.Throw();
     }
 
     public Hero ClientUnpackHero(byte[] bytes, Player player)
     {
-        // Client: unpack and set up on the main thread, reusing the ids the host already assigned (carried by
-        // the Player). Unpacking and setup MUST happen in one main-thread pass — splitting them across threads
-        // corrupts the campaign's object/StringId bookkeeping and the next save.
-        return UnpackHero(bytes, hero => AssignClientHeroNetworkIds(hero, player));
+        // The client applies the received creation as one suppressed main-thread operation.
+        return UnpackHero(bytes, hero => AssignClientHeroNetworkIds(hero, player), setupHero: true);
     }
 
-    private Hero UnpackHero(byte[] bytes, Action<Hero> assignNetworkIds)
+    private Hero UnpackHero(byte[] bytes, Action<Hero> assignNetworkIds, bool setupHero)
     {
         Hero hero = null;
 
@@ -93,7 +115,10 @@ internal class HeroInterface : IHeroInterface
                         .DeserializeCompressed<HeroBinaryPackage>(bytes)
                         .Unpack<Hero>(binaryPackageFactory);
 
-                    SetupNewHero(hero, assignNetworkIds);
+                    assignNetworkIds(hero);
+
+                    if (setupHero)
+                        SetupNewHero(hero, restoreParty: false);
                 }
             }
             catch (Exception ex)
@@ -113,6 +138,8 @@ internal class HeroInterface : IHeroInterface
         if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty playerParty))
             return;
 
+        LogPlayerSwitchState("before", player, playerHero, playerParty);
+
         Campaign.Current.MainParty = playerParty;
         Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
 
@@ -121,8 +148,6 @@ internal class HeroInterface : IHeroInterface
         // This is needed because if the player is captured the PartyBelongedTo is null
         // Causing ChangePlayerCharacterAction to fail
         playerHero.PartyBelongedTo = playerParty;
-
-        Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
 
         // Vanilla's character change ejects a main hero from its settlement, which would pop the
         // reloaded party outside on this client only (the server's save keeps it inside); keep it
@@ -136,6 +161,8 @@ internal class HeroInterface : IHeroInterface
         {
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
         }
+
+        LogPlayerSwitchState("after", player, playerHero, playerParty);
 
         if (playerParty.CurrentSettlement != null || playerParty.BesiegerCamp != null)
         {
@@ -167,12 +194,74 @@ internal class HeroInterface : IHeroInterface
         GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
     }
 
-    private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
+    private void LogPlayerSwitchState(
+        string phase,
+        Player player,
+        Hero playerHero,
+        MobileParty playerParty)
     {
+        bool heroRegistered = objectManager.TryGetId(playerHero, out string registeredHeroId);
+        bool partyRegistered = objectManager.TryGetId(playerParty, out string registeredPartyId);
+        bool partyInCampaign = Campaign.Current?.MobileParties?.Contains(playerParty) == true;
+
+        Logger.Information(
+            "Player switch {Phase}: hero={HeroName} requestedHero={RequestedHeroId} " +
+            "registeredHero={RegisteredHeroId} heroRegistered={HeroRegistered} " +
+            "heroParty={HeroPartyId} requestedParty={RequestedPartyId} " +
+            "registeredParty={RegisteredPartyId} partyRegistered={PartyRegistered} " +
+            "mainHero={MainHeroId} mainParty={MainPartyId} inCampaign={PartyInCampaign} " +
+            "active={PartyActive} roster={RosterCount} mapEvent={MapEventId} " +
+            "settlement={SettlementId} moveMode={MoveMode} targetParty={TargetPartyId} " +
+            "targetSettlement={TargetSettlementId} moveTargetParty={MoveTargetPartyId} " +
+            "interactable={InteractableType}",
+            phase,
+            playerHero.Name?.ToString(),
+            player.HeroId,
+            heroRegistered ? registeredHeroId : "missing",
+            heroRegistered,
+            playerHero.PartyBelongedTo?.StringId,
+            player.MobilePartyId,
+            partyRegistered ? registeredPartyId : "missing",
+            partyRegistered,
+            Hero.MainHero?.StringId,
+            MobileParty.MainParty?.StringId,
+            partyInCampaign,
+            playerParty.IsActive,
+            playerParty.MemberRoster?.TotalManCount ?? -1,
+            playerParty.MapEvent?.StringId,
+            playerParty.CurrentSettlement?.StringId,
+            playerParty.PartyMoveMode,
+            playerParty.TargetParty?.StringId,
+            playerParty.TargetSettlement?.StringId,
+            playerParty.MoveTargetParty?.StringId,
+            playerParty.Ai?.AiBehaviorInteractable?.GetType().Name);
+    }
+
+    private void SetupNewHero(Hero hero, bool restoreParty)
+    {
+        var party = hero.PartyBelongedTo;
+
+        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+        if (campaignObjectManager == null)
+        {
+            throw new InvalidOperationException(
+                $"{typeof(CampaignObjectManager)} was null when trying to register a {typeof(Hero)}");
+        }
+
+        // These registrations assign the final MBGUIDs used by MBObjectBase.GetHashCode. Finish them before
+        // any setup operation can add a faction stance keyed by the imported clan.
+        var characterObject = hero.CharacterObject;
+        MBObjectManager.Instance?.RegisterObject(characterObject);
+        if (characterObject.StringId != hero.StringId)
+            Logger.Error("CharacterObject was renamed to {newId} during registration; expected {expectedId}",
+                characterObject.StringId, hero.StringId);
+
+        campaignObjectManager.AddClan(hero.Clan);
+        campaignObjectManager.AddHero(hero);
+        campaignObjectManager.AddMobileParty(party);
+
         // Player birth dates come from a separate character-creation campaign, so rebase them to this campaign.
         hero.SetBirthDay(CampaignTime.YearsFromNow(-hero._defaultAge));
-
-        var party = hero.PartyBelongedTo;
 
         party.Anchor = new AnchorPoint(party);
 
@@ -201,58 +290,11 @@ internal class HeroInterface : IHeroInterface
 
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
 
-        // Add to game managed lists
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
-        if (campaignObjectManager == null)
-        {
-            Logger.Error("{type} was null when trying to register a {managedType}", typeof(CampaignObjectManager), typeof(Hero));
-            return;
-        }
-
-        // Restore the roster before assignNetworkIds registers it. Otherwise the AllowedThread AddToCounts
-        // patch sends a roster update before clients receive the hero creation message.
-        RestorePlayerMemberships(hero, party);
-
-        // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
-        // the next "PlayerN" from CampaignObjectType.MaxCreatedPostfixIndex, which is cached in OnItemAdded when an
-        // object is *added* (using the StringId at that instant). If we add first (with the deserialized
-        // "main_hero" id) and rename afterwards, that cache never learns about the assigned "PlayerN", so the next
-        // hero computes — and collides with — the same id.
-        assignNetworkIds(hero);
-
-        // The party's visual was created above inside this AllowedThread, which suppressed the patch that
-        // registers it. Register it under the party's derived id, now that the StringId is final, so the host
-        // and already-connected clients (which run this same unpack for a late joiner) resolve it by one id.
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual != null)
-            objectManager.AddExisting($"{nameof(MobilePartyVisual)}_{party.StringId}", partyVisual);
-
-        // The unpacked CharacterObject still carries the sender's MBGUID and IsRegistered flag. The Add* calls
-        // below re-mint hero/party/clan ids, but a CharacterObject is owned by MBObjectManager, which only mints
-        // ids on registration — so register it (after its StringId is final). Left unregistered, the transfer
-        // save's load either skips it silently (hero falls back to the default character) or, with
-        // a unique StringId, crashes adding the foreign MBGUID to the registry's GUID table.
-        var characterObject = hero.CharacterObject;
-        MBObjectManager.Instance?.RegisterObject(characterObject);
-        if (characterObject.StringId != hero.StringId)
-            Logger.Error("CharacterObject was renamed to {newId} during registration; expected {expectedId}",
-                characterObject.StringId, hero.StringId);
-
-        campaignObjectManager.AddHero(hero);
-        campaignObjectManager.AddMobileParty(party);
-        campaignObjectManager.AddClan(hero.Clan);
-    }
-
-    internal static void RestorePlayerMemberships(Hero hero, MobileParty party)
-    {
-        // PackageMainHero unregisters the player hero before packaging, so ClanBinaryPackage cannot store its
-        // network ID in the clan's hero and alive-lord caches.
-        if (!hero.Clan.Heroes.Contains(hero))
-            hero.Clan.OnLordAdded(hero);
-
-        // TroopRosterBinaryPackage excludes roster elements, so the imported party has an empty member roster.
-        if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
-            party.MemberRoster.AddToCounts(hero.CharacterObject, 1, insertAtFront: true);
+        // Clan membership is not replicated, but roster and leadership repairs are server-authoritative.
+        if (restoreParty)
+            playerPartyRestorer.Restore(hero, party);
+        else
+            playerPartyRestorer.RestoreClanMembership(hero);
     }
 
     /// <summary>

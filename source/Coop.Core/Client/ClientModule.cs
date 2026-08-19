@@ -5,6 +5,8 @@ using Common.Network;
 using Common.Network.Session;
 using Common.PacketHandlers;
 using Coop.Core.Client.Policies;
+using Coop.Core.Client.Services.Kingdoms;
+using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Client.Services.Session;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
@@ -32,6 +34,15 @@ public class ClientModule : CommonModule
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyTroopXpBaselineApplier>()
+            .As<IPlayerPartyTroopXpBaselineApplier>()
+            .InstancePerDependency();
+        builder.RegisterType<AllianceOfferPendingApplier>()
+            .As<IAllianceOfferPendingApplier>()
+            .InstancePerDependency();
+        builder.RegisterType<PeaceOfferPendingApplier>()
+            .As<IPeaceOfferPendingApplier>()
+            .InstancePerDependency();
 
         // Policies
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
@@ -49,6 +60,11 @@ public class ClientModule : CommonModule
 
         builder.RegisterType<ConfiguredSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
         builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
+
+        // Keeps the module resolvable on its own; a session container registers the real intent.
+        builder.Register(_ => JoinAttemptPresentation.For(JoinIntent.PlayerDirect))
+            .AsSelf()
+            .InstancePerLifetimeScope();
 
         RegisterAllTypesWithInterface<ClientModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);

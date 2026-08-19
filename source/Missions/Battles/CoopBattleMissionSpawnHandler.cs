@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using System;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents;
@@ -35,6 +36,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
     // Latched once the sides are sized jointly; both are held at zero until then.
     private bool _sized;
+    private long _appliedAllocationRevision;
 
     // Time spent holding both sides while a reserve is in flight (only accrues on the held path).
     private float _heldSeconds;
@@ -65,7 +67,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
             if (sizing.SizeNow && HasLocalPlayerOrigin())
             {
                 // On-time (common): both reserves present, so size before the first tick.
-                RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
+                RunJointInit(sizing);
                 _sized = true;
                 Logger.Information("[BattleSync] Coop spawn sized on start: Defender={Def}, Attacker={Atk}", sizing.DefenderOwned, sizing.AttackerOwned);
                 return;
@@ -90,6 +92,9 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     // distinguish newly-owned parties with no adopted live agents without disturbing the initial phase sizing.
     public override void OnMissionTick(float dt)
     {
+        if (_sized)
+            ReconcileRefreshedAllocation();
+
         base.OnMissionTick(dt);
         if (_sized || _invalidBattleAbortRequested) return;
 
@@ -97,7 +102,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         var sizing = ReadSizing();
         if (ShouldContinueHolding(sizing)) return;
 
-        if (!HasLocalPlayerOrigin())
+        if (!sizing.HasValidBattleSize || !HasLocalPlayerOrigin())
         {
             AbortInvalidBattle(sizing);
             return;
@@ -107,7 +112,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         // Ready, or the deadline expired with a partial/missing reserve. At least one combatant exists here,
         // so the joint Init cannot hit its invalid 0/0 split.
-        RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
+        RunJointInit(sizing);
         LogSizingCompleted(sizing);
         _sized = true;
     }
@@ -175,27 +180,241 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     {
         bool defenderPopulated = _defenderSupplier.IsPopulated;
         bool attackerPopulated = _attackerSupplier.IsPopulated;
-        int defenderOwned = _defenderSupplier.TotalTroops;
-        int attackerOwned = _attackerSupplier.TotalTroops;
-        return new SideSizing(defenderPopulated, attackerPopulated, defenderOwned, attackerOwned);
+        // The SIDE's totals, not this client's share of them. The engine splits a fixed battle size in
+        // proportion to the two numbers it is given, so a client sizing from what it happens to own measures
+        // a side that is divided between players at a fraction of its strength: its opponent gets capped
+        // against that fraction, and the divided side ends up fielding more men than the larger one.
+        int defenderOwned = _defenderSupplier.SideTotalTroops;
+        int attackerOwned = _attackerSupplier.SideTotalTroops;
+        int battleSize = ResolveBattleSize(defenderPopulated, _defenderSupplier.BattleSize,
+            attackerPopulated, _attackerSupplier.BattleSize);
+        return new SideSizing(defenderPopulated, attackerPopulated, defenderOwned, attackerOwned, battleSize);
+    }
+
+    internal static int ResolveBattleSize(bool defenderPopulated, int defenderBattleSize,
+        bool attackerPopulated, int attackerBattleSize)
+    {
+        if (defenderPopulated && attackerPopulated)
+            return defenderBattleSize > 0 && defenderBattleSize == attackerBattleSize ? defenderBattleSize : 0;
+        if (defenderPopulated)
+            return Math.Max(0, defenderBattleSize);
+        if (attackerPopulated)
+            return Math.Max(0, attackerBattleSize);
+        return 0;
     }
 
     // Re-run the engine's Init with the real totals (initial == total; Init applies the joint cap, wave split and
     // agent counts). Clear the placeholder phases first — InitWithSinglePhase appends, so a leftover held phase
     // would leave two active phases. Nothing spawned while held, so no double-spawn.
-    private void RunJointInit(int defenderOwned, int attackerOwned)
+    private void RunJointInit(SideSizing sizing)
     {
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Defender].Clear();
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Attacker].Clear();
 
         var settings = CreateSandBoxBattleWaveSpawnSettings();
-        _missionAgentSpawnLogic.InitWithSinglePhase(defenderOwned, attackerOwned, defenderOwned, attackerOwned, spawnDefenders: true, spawnAttackers: true, in settings);
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            sizing.DefenderOwned,
+            sizing.AttackerOwned,
+            sizing.BattleSize,
+            settings.MaximumBattleSideRatio,
+            settings.DefenderAdvantageFactor);
+        var authoritativeSettings = new MissionSpawnSettings(
+            MissionSpawnSettings.InitialSpawnMethod.FreeAllocation,
+            settings.ReinforcementTroopsTimingMethod,
+            settings.ReinforcementTroopsSpawnMethod,
+            settings.GlobalReinforcementInterval,
+            settings.ReinforcementBatchPercentage,
+            settings.DesiredReinforcementPercentage,
+            settings.ReinforcementWavePercentage,
+            settings.MaximumReinforcementWaveCount,
+            settings.DefenderReinforcementBatchPercentage,
+            settings.AttackerReinforcementBatchPercentage,
+            settings.DefenderAdvantageFactor,
+            settings.MaximumBattleSideRatio);
+        _missionAgentSpawnLogic.InitWithSinglePhase(sizing.DefenderOwned, sizing.AttackerOwned,
+            targets.Defenders, targets.Attackers, spawnDefenders: true, spawnAttackers: true,
+            in authoritativeSettings);
+
+        GuaranteePlayerInitialSlots();
+        ClampPhasesToOwnedShare(BattleSideEnum.Defender, _defenderSupplier);
+        ClampPhasesToOwnedShare(BattleSideEnum.Attacker, _attackerSupplier);
 
         // Init leaves both sides spawn-active; the native path clears them after Init but nothing does here, so
         // restore it — else SetupTeams's first side spawns both at once and the per-side freeze misses one.
         _missionAgentSpawnLogic.SetSpawnTroops(BattleSideEnum.Defender, spawnTroops: false);
         _missionAgentSpawnLogic.SetSpawnTroops(BattleSideEnum.Attacker, spawnTroops: false);
+        var defenderSnapshot = _defenderSupplier.CaptureAllocationSnapshot();
+        var attackerSnapshot = _attackerSupplier.CaptureAllocationSnapshot();
+        _appliedAllocationRevision = MatchingAllocationRevision(defenderSnapshot.Revision, attackerSnapshot.Revision);
     }
+
+    // Reserve refreshes are sent as a reliable-ordered pair. Wait until both suppliers advanced, then resize
+    // only the unspent lifetime quota; InitialSpawnNumber/InitialSpawnedNumber keep deployment one-shot.
+    private void ReconcileRefreshedAllocation()
+    {
+        var defenderSnapshot = _defenderSupplier.CaptureAllocationSnapshot();
+        var attackerSnapshot = _attackerSupplier.CaptureAllocationSnapshot();
+        long allocationRevision = MatchingAllocationRevision(defenderSnapshot.Revision, attackerSnapshot.Revision);
+        if (allocationRevision <= _appliedAllocationRevision
+            || defenderSnapshot.BattleSize <= 0
+            || defenderSnapshot.BattleSize != attackerSnapshot.BattleSize)
+            return;
+
+        BattleSpawnGate.RestoreReserveSide(BattleSideEnum.Defender);
+        BattleSpawnGate.RestoreReserveSide(BattleSideEnum.Attacker);
+
+        var settings = _missionAgentSpawnLogic.SpawnSettings;
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            defenderSnapshot.SideTotalTroops,
+            attackerSnapshot.SideTotalTroops,
+            defenderSnapshot.BattleSize,
+            settings.MaximumBattleSideRatio,
+            settings.DefenderAdvantageFactor);
+
+        ReconcileSideLifetimeQuota(BattleSideEnum.Defender, defenderSnapshot, targets.Defenders, settings);
+        ReconcileSideLifetimeQuota(BattleSideEnum.Attacker, attackerSnapshot, targets.Attackers, settings);
+
+        _appliedAllocationRevision = allocationRevision;
+        Logger.Information("[BattleSync] Reconciled refreshed native quotas: Defender={Def}, Attacker={Atk}",
+            _missionAgentSpawnLogic.DefenderActivePhase.TotalSpawnNumber,
+            _missionAgentSpawnLogic.AttackerActivePhase.TotalSpawnNumber);
+    }
+
+    internal static long MatchingAllocationRevision(long defenderRevision, long attackerRevision)
+        => defenderRevision > 0 && defenderRevision == attackerRevision ? defenderRevision : 0;
+
+    private void ReconcileSideLifetimeQuota(BattleSideEnum side,
+        CoopTroopSupplier.AllocationSnapshot allocationSnapshot, int initialTarget, MissionSpawnSettings settings)
+    {
+        int sideLifetimeTarget = CalculateLifetimeTarget(
+            allocationSnapshot.SideTotalTroops,
+            initialTarget,
+            settings.ReinforcementWavePercentage,
+            settings.MaximumReinforcementWaveCount);
+        int ownedLifetimeTarget = allocationSnapshot.OwnedShareOf(sideLifetimeTarget);
+        int reserved = _missionAgentSpawnLogic._battleSideSpawnContexts[(int)side].ReservedTroopsCount;
+        ReconcilePhaseLifetimeQuota(
+            _missionAgentSpawnLogic._phases[(int)side][0],
+            ownedLifetimeTarget,
+            allocationSnapshot.SuppliedTroops,
+            reserved);
+        _missionAgentSpawnLogic._numberOfTroopsInTotal[(int)side] = ownedLifetimeTarget;
+    }
+
+    internal static int CalculateLifetimeTarget(int sideTotal, int initialTarget, float wavePercentage,
+        int maximumWaveCount)
+    {
+        initialTarget = Math.Min(Math.Max(0, initialTarget), Math.Max(0, sideTotal));
+        int remaining = Math.Max(0, sideTotal - initialTarget);
+        if (maximumWaveCount > 0)
+        {
+            int waveSize = Math.Max(1, (int)(initialTarget * wavePercentage));
+            remaining = Math.Min(remaining, waveSize * maximumWaveCount);
+        }
+        return initialTarget + remaining;
+    }
+
+    internal static void ReconcilePhaseLifetimeQuota(MissionSpawnPhase phase, int refreshedOwnedTarget,
+        int supplied, int reserved)
+    {
+        if (phase == null) return;
+
+        int nativeSpawned = Math.Max(0, phase.TotalSpawnNumber - phase.RemainingSpawnNumber);
+        int consumedSupply = Math.Max(0, supplied - reserved);
+        int committed = Math.Max(nativeSpawned, consumedSupply);
+        int remaining = Math.Max(0, refreshedOwnedTarget - committed);
+        phase.RemainingSpawnNumber = remaining;
+        phase.TotalSpawnNumber = committed + remaining;
+    }
+
+    private void GuaranteePlayerInitialSlots()
+    {
+        var defender = _missionAgentSpawnLogic.DefenderActivePhase;
+        var attacker = _missionAgentSpawnLogic.AttackerActivePhase;
+        AdjustInitialAllocations(
+            defender.InitialSpawnNumber,
+            attacker.InitialSpawnNumber,
+            defender.TotalSpawnNumber,
+            attacker.TotalSpawnNumber,
+            _defenderSupplier.PlayerOwnedPartyCount,
+            _attackerSupplier.PlayerOwnedPartyCount,
+            out var defenderInitial,
+            out var attackerInitial);
+        defender.InitialSpawnNumber = defenderInitial;
+        defender.RemainingSpawnNumber = defender.TotalSpawnNumber - defenderInitial;
+        attacker.InitialSpawnNumber = attackerInitial;
+        attacker.RemainingSpawnNumber = attacker.TotalSpawnNumber - attackerInitial;
+    }
+
+    internal static void AdjustInitialAllocations(
+        int defenderInitial,
+        int attackerInitial,
+        int defenderTotal,
+        int attackerTotal,
+        int defenderPlayers,
+        int attackerPlayers,
+        out int adjustedDefenders,
+        out int adjustedAttackers)
+    {
+        adjustedDefenders = defenderInitial;
+        adjustedAttackers = attackerInitial;
+        int defenderMinimum = Math.Min(defenderPlayers, defenderTotal);
+        int attackerMinimum = Math.Min(attackerPlayers, attackerTotal);
+
+        int transfer = Math.Min(Math.Max(0, defenderMinimum - adjustedDefenders),
+            Math.Max(0, adjustedAttackers - attackerMinimum));
+        adjustedDefenders += transfer;
+        adjustedAttackers -= transfer;
+
+        transfer = Math.Min(Math.Max(0, attackerMinimum - adjustedAttackers),
+            Math.Max(0, adjustedDefenders - defenderMinimum));
+        adjustedAttackers += transfer;
+        adjustedDefenders -= transfer;
+    }
+
+    // Init uses whole-side totals for vanilla sizing, but this client's deployment target must be its exact
+    // owner share. Derive remaining from total and initial so the native phase invariant stays intact.
+    private void ClampPhasesToOwnedShare(BattleSideEnum side, CoopTroopSupplier supplier)
+    {
+        foreach (var phase in _missionAgentSpawnLogic._phases[(int)side])
+        {
+            AdjustPhaseToOwnedShare(
+                phase.TotalSpawnNumber,
+                phase.InitialSpawnNumber,
+                supplier.OwnedShareOf(phase.TotalSpawnNumber),
+                supplier.OwnedShareOf(phase.InitialSpawnNumber),
+                out var total,
+                out var initial,
+                out var remaining);
+            phase.TotalSpawnNumber = total;
+            phase.InitialSpawnNumber = initial;
+            phase.RemainingSpawnNumber = remaining;
+        }
+    }
+
+    internal static void AdjustPhaseToOwnedShare(
+        int sideTotal,
+        int sideInitial,
+        int ownedTotal,
+        int ownedInitial,
+        out int total,
+        out int initial,
+        out int remaining)
+    {
+        total = ReachableSpawnNumber(sideTotal, ownedTotal);
+        initial = Math.Min(total, ReachableSpawnNumber(sideInitial, ownedInitial));
+        remaining = total - initial;
+    }
+
+    private static int ReachableSpawnNumber(int sideNumber, CoopTroopSupplier supplier)
+        => ReachableSpawnNumber(sideNumber, supplier.OwnedShareOf(sideNumber));
+
+    /// <summary>
+    /// The largest spawn target this client can actually reach: never more than the side needs, and never more
+    /// than the supplier will hand over when asked for that many.
+    /// </summary>
+    internal static int ReachableSpawnNumber(int sideNumber, int ownedShareOfSideNumber)
+        => Math.Min(sideNumber, ownedShareOfSideNumber);
 
     // Zero phases so the first tick has active phases to read (else DefenderActivePhase NREs), without feeding Init
     // a 0/0 total: its float battle-size split yields NaN, which Mono casts to int.MinValue (desktop .NET gives 0).
@@ -216,20 +435,25 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         public readonly bool AttackerPopulated;
         public readonly int DefenderOwned;
         public readonly int AttackerOwned;
+        public readonly int BattleSize;
 
-        public SideSizing(bool defenderPopulated, bool attackerPopulated, int defenderOwned, int attackerOwned)
+        public SideSizing(bool defenderPopulated, bool attackerPopulated, int defenderOwned, int attackerOwned,
+            int battleSize)
         {
             DefenderPopulated = defenderPopulated;
             AttackerPopulated = attackerPopulated;
             DefenderOwned = defenderOwned;
             AttackerOwned = attackerOwned;
+            BattleSize = battleSize;
         }
 
         // Both reserves landed: commit the joint sizing now (else keep holding both sides at zero).
         public bool Ready => DefenderPopulated && AttackerPopulated;
 
         // Ready and at least one side owns troops: run the real Init (a positive sum avoids Init's 0/0 NaN).
-        public bool SizeNow => Ready && DefenderOwned + AttackerOwned > 0;
+        public bool SizeNow => Ready && DefenderOwned + AttackerOwned > 0 && BattleSize > 0;
+
+        public bool HasValidBattleSize => BattleSize > 0;
 
         /// <summary>Whether a timeout can safely degrade to a one-sided sizing instead of empty/empty.</summary>
         public bool HasAnyOwnedTroops => DefenderOwned + AttackerOwned > 0;

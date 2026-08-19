@@ -34,30 +34,22 @@ internal class SettlementPopulationTracker : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly FixedTownNpcService fixedTownNpcService;
 
     // Keyed by Settlement.StringId; holds the settlement so cleanup never rescans the campaign.
     private readonly Dictionary<string, Settlement> populatedSettlements = new Dictionary<string, Settlement>();
     private readonly Dictionary<string, string> playerPartySettlements = new Dictionary<string, string>();
-    private readonly Dictionary<string, List<LocationCharacterEntry>> partyCompanionEntries =
-        new Dictionary<string, List<LocationCharacterEntry>>();
 
-    private readonly struct LocationCharacterEntry
-    {
-        public readonly Location Location;
-        public readonly LocationCharacter Entry;
-
-        public LocationCharacterEntry(Location location, LocationCharacter entry)
-        {
-            Location = location;
-            Entry = entry;
-        }
-    }
-
-    public SettlementPopulationTracker(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public SettlementPopulationTracker(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        FixedTownNpcService fixedTownNpcService)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.fixedTownNpcService = fixedTownNpcService;
 
         messageBroker.Subscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
@@ -91,7 +83,9 @@ internal class SettlementPopulationTracker : IHandler
                     PopulateSettlement(settlement);
                 }
 
-                AddCompanionEntries(partyId, party, settlement);
+                // The visiting client's vanilla LocationEncounter spawns its own accompanying companions.
+                // They are deliberately absent from this server roster; their owner announces them over the
+                // mission mesh and every other client creates controller-less puppets.
                 BroadcastRosterSnapshot(settlement, settlementId);
             }
             else if (HasPlayerVisitors(settlementId) && party.LeaderHero != null)
@@ -122,7 +116,6 @@ internal class SettlementPopulationTracker : IHandler
             }
 
             playerPartySettlements.Remove(partyId);
-            RemoveCompanionEntries(partyId);
 
             if (objectManager.TryGetObjectWithLogging(settlementId, out Settlement settlement) == false) return;
 
@@ -204,20 +197,23 @@ internal class SettlementPopulationTracker : IHandler
         if (behavior == null)
         {
             Logger.Warning("HeroAgentSpawnCampaignBehavior not found; cannot populate {Settlement}", settlement.StringId);
-            return;
+        }
+        else
+        {
+            foreach (var hero in CollectHeroesToPlace(settlement))
+            {
+                try
+                {
+                    behavior.RefreshLocationOfHeroForSettlement(hero, settlement);
+                }
+                catch (Exception e)
+                {
+                    Logger.Warning(e, "Failed to place {Hero} in {Settlement}", hero.StringId, settlement.StringId);
+                }
+            }
         }
 
-        foreach (var hero in CollectHeroesToPlace(settlement))
-        {
-            try
-            {
-                behavior.RefreshLocationOfHeroForSettlement(hero, settlement);
-            }
-            catch (Exception e)
-            {
-                Logger.Warning(e, "Failed to place {Hero} in {Settlement}", hero.StringId, settlement.StringId);
-            }
-        }
+        fixedTownNpcService.Populate(settlement);
     }
 
     private static IEnumerable<Hero> CollectHeroesToPlace(Settlement settlement)
@@ -269,51 +265,6 @@ internal class SettlementPopulationTracker : IHandler
         catch (Exception e)
         {
             Logger.Warning(e, "Failed to place {Hero} in {Settlement}", hero.StringId, settlement.StringId);
-        }
-    }
-
-    private void AddCompanionEntries(string partyId, MobileParty party, Settlement settlement)
-    {
-        var locationComplex = settlement.LocationComplex;
-        var targetLocation = locationComplex.GetLocationWithId("tavern") ?? locationComplex.GetLocationWithId("center");
-        if (targetLocation == null) return;
-
-        if (party.MemberRoster == null) return;
-
-        var entries = new List<LocationCharacterEntry>();
-
-        foreach (var rosterElement in party.MemberRoster.GetTroopRoster())
-        {
-            var character = rosterElement.Character;
-            if (character == null || character.IsHero == false) continue;
-
-            var hero = character.HeroObject;
-            if (hero == null || hero == party.LeaderHero || hero.IsAlive == false) continue;
-            if (PlayerManager.TryGetControlledObjectInfo(hero, out _)) continue;
-
-            var entry = LocationCharacterFactory.CreateCompanion(hero, party, useCivilianEquipment: settlement.IsVillage == false);
-
-            // The patched mutator publishes the broadcast for this add.
-            targetLocation.AddCharacter(entry);
-            entries.Add(new LocationCharacterEntry(targetLocation, entry));
-        }
-
-        if (entries.Count > 0)
-        {
-            partyCompanionEntries[partyId] = entries;
-        }
-    }
-
-    private void RemoveCompanionEntries(string partyId)
-    {
-        if (partyCompanionEntries.TryGetValue(partyId, out var entries) == false) return;
-
-        partyCompanionEntries.Remove(partyId);
-
-        foreach (var entry in entries)
-        {
-            // List.Remove on an absent entry is a no-op, so no containment check is needed.
-            entry.Location.RemoveLocationCharacter(entry.Entry);
         }
     }
 

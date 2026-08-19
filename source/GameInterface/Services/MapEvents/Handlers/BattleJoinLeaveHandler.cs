@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
@@ -10,9 +11,11 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -40,6 +43,9 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IMapEventInitializationBarrier initializationBarrier;
+    private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
+    private readonly ConcurrentDictionary<string, string> pendingJoinRequests = new ConcurrentDictionary<string, string>();
 
     public BattleJoinLeaveHandler(
         IMessageBroker messageBroker,
@@ -47,7 +53,9 @@ internal class BattleJoinLeaveHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IMapEventLogger mapEventLogger,
-        IMapEventInitializationBarrier initializationBarrier)
+        IMapEventInitializationBarrier initializationBarrier,
+        ISiegeEventInterface siegeEventInterface,
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -55,10 +63,13 @@ internal class BattleJoinLeaveHandler : IHandler
         this.playerManager = playerManager;
         this.mapEventLogger = mapEventLogger;
         this.initializationBarrier = initializationBarrier;
+        this.siegeEventInterface = siegeEventInterface;
+        this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
         messageBroker.Subscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+        messageBroker.Subscribe<NetworkJoinBattleReply>(Handle_NetworkJoinBattleReply);
         messageBroker.Subscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
         messageBroker.Subscribe<NetworkRequestLeaveBattle>(Handle_NetworkRequestLeaveBattle);
         messageBroker.Subscribe<NetworkPartyLeftBattle>(Handle_NetworkPartyLeftBattle);
@@ -69,9 +80,11 @@ internal class BattleJoinLeaveHandler : IHandler
         messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Unsubscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
         messageBroker.Unsubscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+        messageBroker.Unsubscribe<NetworkJoinBattleReply>(Handle_NetworkJoinBattleReply);
         messageBroker.Unsubscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
         messageBroker.Unsubscribe<NetworkRequestLeaveBattle>(Handle_NetworkRequestLeaveBattle);
         messageBroker.Unsubscribe<NetworkPartyLeftBattle>(Handle_NetworkPartyLeftBattle);
+        pendingJoinRequests.Clear();
     }
 
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
@@ -122,15 +135,64 @@ internal class BattleJoinLeaveHandler : IHandler
     /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
     private void Handle_PlayerJoinBattleAttempted(MessagePayload<PlayerJoinBattleAttempted> payload)
     {
+        if (ModInformation.IsServer) return;
+
         var data = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
         if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
 
+        var requestId = Guid.NewGuid().ToString();
+        if (!pendingJoinRequests.TryAdd(partyId, requestId))
+        {
+            mapEventLogger.DebugMapEvent(data.MapEvent, "Battle join is already pending for PartyId={PartyId}", partyId);
+            return;
+        }
+
         mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
 
         // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkRequestJoinBattle(mapEventId, partyId, data.Side));
+        network.SendAll(new NetworkRequestJoinBattle(requestId, mapEventId, partyId, data.Side));
+    }
+
+    private void Handle_NetworkJoinBattleReply(MessagePayload<NetworkJoinBattleReply> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var reply = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!pendingJoinRequests.TryGetValue(reply.PartyId, out var pendingRequestId) ||
+                !string.Equals(pendingRequestId, reply.RequestId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            pendingJoinRequests.TryRemove(reply.PartyId, out _);
+            if (reply.Accepted) return;
+
+            Logger.Warning("Server rejected battle join for party {PartyId} and map event {MapEventId}",
+                reply.PartyId, reply.MapEventId);
+
+            if (Campaign.Current == null) return;
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(reply.MapEventId, out var mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(reply.PartyId, out var party)) return;
+
+            var encounter = PlayerEncounter.Current;
+            if (!ReferenceEquals(party, PartyBase.MainParty) ||
+                party.MapEventSide != null ||
+                mapEvent.FindMapEventParty(party) != null ||
+                encounter == null ||
+                !encounter.IsJoinedBattle ||
+                !ReferenceEquals(encounter._mapEvent, mapEvent))
+            {
+                return;
+            }
+
+            PlayerEncounter.LeaveBattle();
+            if (Campaign.Current.CurrentMenuContext != null)
+                GameMenu.SwitchToMenu("join_encounter");
+        }, context: nameof(Handle_NetworkJoinBattleReply));
     }
 
     /// <summary>[Server] Perform the authoritative join; the native add replicates to all clients.</summary>
@@ -151,6 +213,11 @@ internal class BattleJoinLeaveHandler : IHandler
                 {
                     if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
                     if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+                    if (!TryGetRequestingPlayer(requestingPeer, party, out _))
+                    {
+                        Logger.Warning("Ignoring join request: peer does not control party {PartyId}", data.PartyId);
+                        return;
+                    }
 
                     if (mapEvent.BattleState != BattleState.None || mapEvent.IsFinalized)
                     {
@@ -177,7 +244,17 @@ internal class BattleJoinLeaveHandler : IHandler
                     // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
                     // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
                     party.MapEventSide = side;
-                    joined = TryGetRequestingPlayer(requestingPeer, party, out _);
+                    joined = mapEvent.FindMapEventParty(party) != null;
+                    if (!joined)
+                    {
+                        Logger.Error("Battle join did not create a MapEventParty for party {PartyId} in map event {MapEventId}",
+                            data.PartyId, data.MapEventId);
+                        return;
+                    }
+
+                    // Removal temporarily promotes a remaining party; put the persistent besieger back when it rejoins.
+                    siegeMapEventLeaderReconciler.RestoreAfterJoin(mapEvent, party);
+
                     if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
                         MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
 
@@ -197,6 +274,15 @@ internal class BattleJoinLeaveHandler : IHandler
                 {
                     if (!joined && reservedControllerId != null)
                         PublishJoinCancelled(requestingPeer, data.MapEventId, reservedControllerId, reservationId);
+
+                    if (requestingPeer != null)
+                    {
+                        network.Send(requestingPeer, new NetworkJoinBattleReply(
+                            data.RequestId,
+                            data.MapEventId,
+                            data.PartyId,
+                            joined));
+                    }
                 }
             },
             blocking: true,
@@ -209,9 +295,9 @@ internal class BattleJoinLeaveHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.LeavingParty, out var partyId)) return;
 
         if (ModInformation.IsServer)
-            RemovePartyFromBattleAndBroadcast(partyId);
+            RemovePartyFromBattleAndBroadcast(partyId, payload.What.FinishLocalMenus);
         else
-            network.SendAll(new NetworkRequestLeaveBattle(partyId));
+            network.SendAll(new NetworkRequestLeaveBattle(partyId, payload.What.FinishLocalMenus));
     }
 
     /// <summary>[Server] A client asked to leave a battle without ending it.</summary>
@@ -219,12 +305,18 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        RemovePartyFromBattleAndBroadcast(payload.What.PartyId, payload.Who as NetPeer);
+        RemovePartyFromBattleAndBroadcast(
+            payload.What.PartyId,
+            payload.What.FinishLocalMenus,
+            payload.Who as NetPeer);
     }
 
     // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
     // collection sync), so remove authoritatively and broadcast the removal explicitly.
-    private void RemovePartyFromBattleAndBroadcast(string partyId, NetPeer requestingPeer = null)
+    private void RemovePartyFromBattleAndBroadcast(
+        string partyId,
+        bool finishLocalMenus = true,
+        NetPeer requestingPeer = null)
     {
         GameThread.RunSafe(
             () =>
@@ -235,7 +327,10 @@ internal class BattleJoinLeaveHandler : IHandler
                 bool leaveSiege = IsAttackingSiegeAssault(party);
                 ApplyAuthoritativeLeave(party);
                 // Preserve the client's PlayerSiege reference until its explicit cleanup runs.
-                network.SendAll(new NetworkPartyLeftBattle(partyId, leaveSiege));
+                network.SendAll(new NetworkPartyLeftBattle(
+                    partyId,
+                    leaveSiege,
+                    finishLocalMenus));
 
                 if (leaveSiege && party.MobileParty?.BesiegerCamp != null)
                     party.MobileParty.BesiegerCamp = null;
@@ -264,7 +359,10 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (Campaign.Current == null) return;
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.PartyId, out var party)) return;
 
-                ApplyNetworkLeave(party, message.LeaveSiege);
+                ApplyNetworkLeave(
+                    party,
+                    message.LeaveSiege,
+                    message.FinishLocalMenus);
             },
             context: nameof(Handle_NetworkPartyLeftBattle));
     }
@@ -320,16 +418,16 @@ internal class BattleJoinLeaveHandler : IHandler
         return party.MapEvent?.IsSiegeAssault == true && party.Side == BattleSideEnum.Attacker;
     }
 
-    // Apply the received removal under AllowedThread and unwind this client's local siege/encounter state.
-    private static void ApplyNetworkLeave(PartyBase party, bool leaveSiege)
+    // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
+    private void ApplyNetworkLeave(PartyBase party, bool leaveSiege, bool finishLocalMenus)
     {
         using (new AllowedThread())
         {
+            var mapEvent = party.MapEvent;
+            bool isSiegeAssault = mapEvent?.IsSiegeAssault == true;
+            var siegeSettlement = mapEvent?.MapEventSettlement;
             bool isMainParty = party == PartyBase.MainParty;
             var mobileParty = party.MobileParty;
-
-            if (leaveSiege && isMainParty && PlayerSiege.PlayerSiegeEvent != null)
-                PlayerSiege.FinalizePlayerSiege();
 
             if (party.MapEventSide != null)
                 party.MapEventSide = null;
@@ -337,12 +435,18 @@ internal class BattleJoinLeaveHandler : IHandler
             if (leaveSiege && mobileParty?.BesiegerCamp != null)
                 mobileParty.BesiegerCamp = null;
 
-            if (isMainParty)
+            if (isMainParty && finishLocalMenus)
             {
-                if (PlayerEncounter.Current != null)
+                if (leaveSiege || isSiegeAssault)
+                {
+                    siegeEventInterface.FinishLocalPlayerSiegeLeave(
+                        siegeSettlement,
+                        forcePlayerOutFromSettlement: false);
+                }
+                else if (PlayerEncounter.Current != null)
+                {
                     PlayerEncounter.Finish(false);
-                else if (leaveSiege)
-                    GameMenu.ExitToLast();
+                }
             }
 
             if (leaveSiege && isMainParty)

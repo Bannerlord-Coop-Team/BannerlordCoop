@@ -5,15 +5,19 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Common.Network.Session;
 using Common.PacketHandlers;
+using Coop.Core.Client.Services.Kingdoms;
+using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Session;
+using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
 using Coop.Steam;
@@ -50,6 +54,18 @@ public class ServerModule : CommonModule
         builder.RegisterType<JoinCampaignBaselineSender>()
             .As<IJoinCampaignBaselineSender>()
             .InstancePerDependency();
+        builder.RegisterType<JoinCampaignKingdomBaseLineSender>()
+            .As<IJoinCampaignKingdomBaseLineSender>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerPartyTroopXpBaselineProvider>()
+            .As<IPlayerPartyTroopXpBaselineProvider>()
+            .InstancePerDependency();
+        builder.RegisterType<AllianceOfferPendingCapturer>()
+            .As<IAllianceOfferPendingCapturer>()
+            .InstancePerDependency();
+        builder.RegisterType<PeaceOfferPendingCapturer>()
+            .As<IPeaceOfferPendingCapturer>()
+            .InstancePerDependency();
 
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
@@ -60,6 +76,9 @@ public class ServerModule : CommonModule
             .As<IMissionMembershipRegistry>()
             .InstancePerLifetimeScope();
         builder.RegisterType<BattleCompletionTracker>().As<IBattleCompletionTracker>().InstancePerDependency();
+        builder.RegisterType<SettlementEncounterDistanceValidator>()
+            .As<ISettlementEncounterDistanceValidator>()
+            .InstancePerDependency();
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
@@ -98,9 +117,24 @@ public class ServerModule : CommonModule
             .As<ISteamLobbyApi>()
             .As<ISteamPublicLobbyApi>()
             .InstancePerLifetimeScope();
-        builder.Register(context => new SteamPublicLobbyAdvertiser(
-                context.Resolve<ISteamPublicLobbyApi>(),
-                context.Resolve<SessionAdvertisementConfig>().Visibility))
+        builder.RegisterType<SteamLobbyLeaseRenewer>()
+            .As<ISteamLobbyLeaseRenewer>()
+            .InstancePerDependency();
+        // Debug servers remain joinable through steam but are excluded from the public discovery
+        // Release builds continue to use the configured visibility.
+        builder.Register(context =>
+            {
+                var visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
+
+#if DEBUG
+                visibility = ServerVisibility.None;
+#endif
+
+                return new SteamPublicLobbyAdvertiser(
+                    context.Resolve<ISteamPublicLobbyApi>(),
+                    visibility,
+                    context.Resolve<ISteamLobbyLeaseRenewer>());
+            })
             .As<ISessionAdvertiser>()
             .As<ISteamLobbyOwner>()
             .InstancePerLifetimeScope();

@@ -1,11 +1,11 @@
 ﻿using Common;
 using Common.Logging;
-using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
@@ -26,18 +26,15 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
 
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
 
     public PlayerPartyHostileEncounterService(
         IObjectManager objectManager,
         INetwork network,
-        IMessageBroker messageBroker,
         IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.network = network;
-        this.messageBroker = messageBroker;
         this.playerManager = playerManager;
     }
 
@@ -139,7 +136,7 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
                 TakePrisonerAction.Apply(initiatorParty, responderHero);
             }
 
-            PvpEncounterCloseSender.Send(network, messageBroker, this, new[] { initiatorPartyId, responderPartyId }, responderPartyId);
+            PvpEncounterCloseSender.Send(network, new[] { initiatorPartyId, responderPartyId }, responderPartyId);
             return true;
         }
         catch (Exception e)
@@ -251,8 +248,22 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
             "Applying player-party hostile demand war between {InitiatorFaction} and {ResponderFaction}",
             initiatorFaction.Name,
             responderFaction.Name);
-        DeclareWarAction.ApplyByPlayerHostility(initiatorFaction, responderFaction);
+        DeclareWarByPlayerHostility(initiatorParty, initiatorFaction, responderFaction);
         VillageHostileFactionStanceHelper.ApplyWarStance(initiatorFaction, responderFaction);
+    }
+
+    private static void DeclareWarByPlayerHostility(PartyBase initiatorParty, IFaction initiatorFaction, IFaction responderFaction)
+    {
+        var previousResolvedMainHero = ResolvedMainHeroContext.ResolvedMainHero;
+        try
+        {
+            ResolvedMainHeroContext.ResolvedMainHero = initiatorParty.LeaderHero;
+            DeclareWarAction.ApplyByPlayerHostility(initiatorFaction, responderFaction);
+        }
+        finally
+        {
+            ResolvedMainHeroContext.ResolvedMainHero = previousResolvedMainHero;
+        }
     }
 
     private static IFaction GetMapFaction(PartyBase party)

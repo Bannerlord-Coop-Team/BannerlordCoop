@@ -1,6 +1,8 @@
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -27,6 +29,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
     private readonly IPlayerManager playerManager;
+    private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly IExistingPlayerSender existingPlayerSender;
@@ -36,6 +39,7 @@ public class ResolveCharacterState : ConnectionStateBase
         INetwork network,
         IModuleValidator moduleValidator,
         IPlayerManager playerManager,
+        IPlayerPartyRestorer playerPartyRestorer,
         IObjectManager objectManager,
         IModuleInfoProvider moduleInfoProvider,
         IExistingPlayerSender existingPlayerSender)
@@ -45,6 +49,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.network = network;
         this.moduleValidator = moduleValidator;
         this.playerManager = playerManager;
+        this.playerPartyRestorer = playerPartyRestorer;
         this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
         this.existingPlayerSender = existingPlayerSender;
@@ -74,7 +79,18 @@ public class ResolveCharacterState : ConnectionStateBase
             var clientModules = obj.What.Modules;
             var serverModules = moduleInfoProvider.GetModuleInfos();
 
-            result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo), out error);
+            if (!ModInformation.MatchesBuildVersion(obj.What.CoopBuildVersion))
+            {
+                result = false;
+                error = GetIncompatibleBuildReason(obj.What.CoopBuildVersion);
+            }
+            else
+            {
+                result = moduleValidator.Validate(
+                    serverModules,
+                    clientModules.Select(ConvertToModuleInfo),
+                    out error);
+            }
         }
         catch (Exception e)
         {
@@ -87,8 +103,23 @@ public class ResolveCharacterState : ConnectionStateBase
                     "Check that the client and server run the same game and mod versions.";
         }
 
-        var validateMessage = new NetworkModuleVersionsValidated(result, error);
+        var validateMessage = new NetworkModuleVersionsValidated(
+            result,
+            error,
+            ModInformation.BuildVersion);
         network.SendImmediate(ConnectionLogic.Peer, validateMessage);
+    }
+
+    private static string GetIncompatibleBuildReason(string? clientBuildVersion)
+    {
+        if (string.IsNullOrEmpty(clientBuildVersion))
+        {
+            return $"Incompatible co-op mod build. The server uses '{ModInformation.BuildVersion}', " +
+                   "but the client did not report an exact build. Update the co-op mod on both sides.";
+        }
+
+        return $"Incompatible co-op mod build. The server uses '{ModInformation.BuildVersion}', " +
+               $"but the client uses '{clientBuildVersion}'. Update the co-op mod on both sides.";
     }
 
     internal void Handle_ClientValidate(MessagePayload<NetworkClientValidate> obj)
@@ -125,12 +156,44 @@ public class ResolveCharacterState : ConnectionStateBase
     {
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
-            if (objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _)) // If new save, player hero will not exist
+            var heroExists = false;
+            var partyRestored = false;
+            var registrationReplaced = false;
+            var restoredPlayer = player;
+
+            // Resolve campaign objects and repair the registration on the game thread. A loaded
+            // party can be registered by an earlier queued apply even though this poll-thread
+            // validation has already arrived.
+            GameThread.Run(() =>
             {
+                heroExists = objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _);
+                if (!heroExists) return;
+
+                partyRestored = playerPartyRestorer.TryRestore(player, out restoredPlayer);
+                if (!partyRestored || ReferenceEquals(restoredPlayer, player)) return;
+
+                registrationReplaced = playerManager.ReplacePlayer(player, restoredPlayer);
+            }, blocking: true);
+
+            if (heroExists)
+            {
+                if (!partyRestored || (!ReferenceEquals(restoredPlayer, player) && !registrationReplaced))
+                {
+                    Logger.Error(
+                        "Controller {ControllerId} hero {HeroId} has no recoverable player party; disconnecting the joiner",
+                        controllerId,
+                        player.HeroId);
+                    peer.Disconnect();
+                    return;
+                }
+
+                if (registrationReplaced)
+                    network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
+
                 // This peer is a new NetPeer for an already registered player, so the
                 // peer-Player link must be established here
                 playerManager.SetPeer(controllerId, peer);
-                network.SendImmediate(peer, new NetworkClientValidated(true, player));
+                network.SendImmediate(peer, new NetworkClientValidated(true, restoredPlayer));
                 ConnectionLogic.TransferSave();
 
                 existingPlayerSender.SendExistingPlayers(peer, controllerId);

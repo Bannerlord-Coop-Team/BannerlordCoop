@@ -1,4 +1,4 @@
-using Common.Network.Session;
+﻿using Common.Network.Session;
 using Coop.Steam;
 using System.Collections.Generic;
 using Xunit;
@@ -24,6 +24,12 @@ public class SteamLobbyBrowserTests
             api.SetLobbyData(lobbyId, pair.Key, pair.Value);
         }
         api.SetLobbyData(lobbyId, LobbyDataCodec.OwnerNameKey, api.PersonaName);
+    }
+
+    private void SetAdvertisementExpiry(ulong lobbyId, uint expiresAt)
+    {
+        api.SetLobbyData(lobbyId, LobbyDataCodec.AdvertisementExpiresAtKey,
+            LobbyDataCodec.EncodeAdvertisementExpiry(expiresAt));
     }
 
     [Fact]
@@ -70,6 +76,117 @@ public class SteamLobbyBrowserTests
             lobby => Assert.Equal(41UL, lobby.LobbyId),
             lobby => Assert.Equal(42UL, lobby.LobbyId));
         Assert.Equal(new[] { 42UL }, api.RequestedLobbyDataIds);
+    }
+
+    [Fact]
+    public void RequestLobbies_ExcludesExpiredAdvertisementAndKeepsRestartedServer()
+    {
+        api.SteamServerTime = 1_000;
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000041 });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 });
+        SetAdvertisementExpiry(41, 1_000);
+        SetAdvertisementExpiry(42, 1_060);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Equal(42UL, Assert.Single(results).LobbyId);
+    }
+
+    [Fact]
+    public void RequestLobbies_KeepsMissingAndMalformedAdvertisementLeases()
+    {
+        api.SteamServerTime = 1_000;
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000041 });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 });
+        api.SetLobbyData(42, LobbyDataCodec.AdvertisementExpiresAtKey, "not-a-time");
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Collection(results,
+            lobby => Assert.Equal(41UL, lobby.LobbyId),
+            lobby => Assert.Equal(42UL, lobby.LobbyId));
+    }
+
+    [Fact]
+    public void RequestLobbies_UnavailableSteamTimeFailsOpen()
+    {
+        api.SteamServerTime = 0;
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 });
+        SetAdvertisementExpiry(42, 1);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Equal(42UL, Assert.Single(results).LobbyId);
+    }
+
+    [Fact]
+    public void RequestLobbies_SameServerSteamIdKeepsLatestAdvertisement()
+    {
+        const ulong serverSteamId = 76561198000000042;
+        api.SteamServerTime = 1_000;
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = serverSteamId });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = serverSteamId });
+        SetAdvertisementExpiry(41, 1_030);
+        SetAdvertisementExpiry(42, 1_060);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Equal(42UL, Assert.Single(results).LobbyId);
+    }
+
+    [Fact]
+    public void RequestLobbies_TiedAdvertisementLeasesFailOpen()
+    {
+        const ulong serverSteamId = 76561198000000042;
+        api.SteamServerTime = 1_000;
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = serverSteamId });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = serverSteamId });
+        SetAdvertisementExpiry(41, 1_060);
+        SetAdvertisementExpiry(42, 1_060);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Equal(2, results.Count);
+    }
+
+    [Fact]
+    public void RequestLobbies_DistinctLiveServerSteamIdsRemainDistinct()
+    {
+        api.SteamServerTime = 1_000;
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000041 });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 });
+        SetAdvertisementExpiry(41, 1_030);
+        SetAdvertisementExpiry(42, 1_060);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Collection(results,
+            lobby => Assert.Equal(41UL, lobby.LobbyId),
+            lobby => Assert.Equal(42UL, lobby.LobbyId));
+    }
+
+    [Fact]
+    public void RequestLobbies_PublicAndFriendDuplicatesUseLatestAdvertisement()
+    {
+        const ulong serverSteamId = 76561198000000042;
+        api.SteamServerTime = 1_000;
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = serverSteamId });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = serverSteamId },
+            publiclyListed: false);
+        SetAdvertisementExpiry(41, 1_030);
+        SetAdvertisementExpiry(42, 1_060);
+        api.FriendLobbyIds.Add(42);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Equal(42UL, Assert.Single(results).LobbyId);
     }
 
     [Fact]

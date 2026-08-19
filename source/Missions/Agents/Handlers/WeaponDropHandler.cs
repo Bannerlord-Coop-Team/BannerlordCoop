@@ -5,6 +5,7 @@ using Missions.Agents.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -74,23 +75,29 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     private void WeaponDropReceive(MessagePayload<NetworkWeaponDropped> obj)
     {
-        if (!networkAgentRegistry.TryGetAgentInfo(obj.What.AgentId, out var agentInfo))
-        {
-            Logger.Warning("No agent found for {guid} in {class}", obj.What.AgentId, typeof(WeaponDropHandler));
-            return;
-        }
-
-        var agent = agentInfo.Agent;
         GameThread.RunSafe(() =>
         {
-            if (agent.GetWeaponEntityFromEquipmentSlot(obj.What.EquipmentIndex) == null)
+            if (!networkAgentRegistry.TryGetAgentInfo(obj.What.AgentId, out var agentInfo))
             {
-                Logger.Error($"Tried to drop a weapon from an empty slot ({obj.What.EquipmentIndex})");
+                Logger.Warning("No agent found for {guid} in {class}", obj.What.AgentId, typeof(WeaponDropHandler));
+                return;
+            }
+
+            var agent = agentInfo.Agent;
+            EquipmentIndex equipmentIndex = obj.What.EquipmentIndex;
+            if (equipmentIndex < EquipmentIndex.WeaponItemBeginSlot ||
+                equipmentIndex >= EquipmentIndex.NumAllWeaponSlots ||
+                agent.Equipment[equipmentIndex].IsEmpty)
+            {
+                Logger.Warning(
+                    "Ignored weapon drop for empty or invalid slot {EquipmentIndex} on agent {AgentId}",
+                    equipmentIndex,
+                    obj.What.AgentId);
                 return;
             }
 
             HashSet<SpawnedItemEntity> existingItems = WeaponDropItemTracker.Capture();
-            agent.DropItem(obj.What.EquipmentIndex);
+            agent.DropItem(equipmentIndex);
             SpawnedItemEntity droppedItem = WeaponDropItemTracker.FindDroppedItem(existingItems);
             worldItemRegistry.Register(obj.What.WorldItemId, droppedItem);
         });

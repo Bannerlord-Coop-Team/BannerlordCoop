@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
@@ -15,6 +16,7 @@ using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -90,11 +92,14 @@ public class SiegeLeaveMenuTests : IDisposable
         // Assert: the click was routed, not applied locally — exactly one break request named the leaver's party.
         var request = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
         Assert.Equal(partyId, request.PartyId);
+        Assert.True(request.FinishLocalMenus);
         Assert.Empty(Clients.Last().NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
 
         // The server approved the request and cleared the camp authoritatively...
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
+        Assert.True(approval.FinishLocalMenus);
+        Assert.False(approval.BattleLeaveApplied);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
         // ...and the cleared camp replicated to every client.
@@ -120,15 +125,92 @@ public class SiegeLeaveMenuTests : IDisposable
         // Assert
         var request = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
         Assert.Equal(partyId, request.PartyId);
+        Assert.True(request.FinishLocalMenus);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
+        Assert.True(approval.FinishLocalMenus);
+        Assert.False(approval.BattleLeaveApplied);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
         foreach (var client in Clients)
         {
             AssertBesiegerCamp(client, partyId, expectCamp: false);
         }
+    }
+
+    [Theory]
+    [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
+    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
+    public void AssaultCondition_TornSiegeGraph_ReturnsFalseWithoutThrowing(
+        string methodName,
+        GameMenuOption.LeaveType expectedLeaveType)
+    {
+        var client = Clients.First();
+        var (partyId, siegeEventId) = SetupBesiegingPlayerParty(client);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+            Assert.NotNull(party.BesiegerCamp);
+            Assert.NotNull(siegeEvent.BesiegedSettlement);
+
+            siegeEvent.BesiegedSettlement.SiegeEvent = null;
+            var (shown, args) = InvokeAssaultCondition(methodName);
+
+            Assert.False(shown);
+            Assert.Equal(expectedLeaveType, args.optionLeaveType);
+        });
+    }
+
+    [Theory]
+    [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
+    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
+    public void AssaultCondition_MissingSideEngines_ReturnsFalseWithoutThrowing(
+        string methodName,
+        GameMenuOption.LeaveType expectedLeaveType)
+    {
+        var client = Clients.First();
+        var (partyId, _) = SetupBesiegingPlayerParty(client);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.NotNull(party.BesiegerCamp);
+            party.BesiegerCamp.SiegeEngines = null;
+
+            var (shown, args) = InvokeAssaultCondition(methodName);
+
+            Assert.False(shown);
+            Assert.Equal(expectedLeaveType, args.optionLeaveType);
+        });
+    }
+
+    [Theory]
+    [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
+    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
+    public void AssaultCondition_DefenderWithCompleteSiegeGraph_AllowsVanillaCondition(
+        string methodName,
+        GameMenuOption.LeaveType expectedLeaveType)
+    {
+        var client = Clients.First();
+        var (partyId, siegeEventId) = SetupBesiegingPlayerParty(client);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+            Assert.NotNull(siegeEvent.BesiegedSettlement);
+
+            party._besiegerCamp = null;
+            party.CurrentSettlement = siegeEvent.BesiegedSettlement;
+            var (runOriginal, result, args) = InvokeAssaultConditionPrefix(methodName);
+
+            Assert.True(runOriginal);
+            Assert.False(result);
+            Assert.Equal(expectedLeaveType, args.optionLeaveType);
+        });
     }
 
     [Fact]
@@ -154,7 +236,9 @@ public class SiegeLeaveMenuTests : IDisposable
 
         Server.Call(() =>
         {
-            Server.Resolve<INetwork>().SendAll(new NetworkPartyLeftBattle(partyBaseId, true));
+            Server.Resolve<INetwork>().SendAll(new NetworkPartyLeftBattle(
+                partyBaseId,
+                leaveSiege: true));
         }, LeaveRoundTripDisabledMethods);
 
         foreach (var client in Clients)
@@ -163,6 +247,97 @@ public class SiegeLeaveMenuTests : IDisposable
         }
 
         leavingClient.Call(() => Assert.Null(PlayerSiege.PlayerSiegeEvent));
+    }
+
+    [Fact]
+    public void ClientEncounterLeave_WhenServerAlreadyRemovedParty_ReconcilesStaleClientCamp()
+    {
+        var leavingClient = Clients.First();
+        var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            party._besiegerCamp = null;
+        });
+
+        AssertBesiegerCamp(leavingClient, partyId, expectCamp: true);
+
+        var disabledMethods = LeaveRoundTripDisabledMethods
+            .Where(method => method.DeclaringType != typeof(GameMenu) ||
+                method.Name != nameof(GameMenu.ExitToLast))
+            .ToList();
+        using var menuExit = new GameMenuExitToLastCounter();
+        leavingClient.Call(InvokePatchedEncounterLeave, disabledMethods);
+
+        var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
+        Assert.Equal(SiegeBreakOutcome.AlreadyLeft, approval.Outcome);
+        Assert.True(approval.FinishLocalMenus);
+        Assert.False(approval.BattleLeaveApplied);
+        AssertBesiegerCamp(Server, partyId, expectCamp: false);
+        AssertBesiegerCamp(leavingClient, partyId, expectCamp: false);
+        Assert.Equal(1, menuExit.CountFor(leavingClient));
+    }
+
+    [Fact]
+    public void ClientPassiveArmySiegeLeave_OwnsItsMenuContinuation()
+    {
+        var leavingClient = Clients.First();
+        var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
+
+        var disabledMethods = LeaveRoundTripDisabledMethods
+            .Where(method => method.DeclaringType != typeof(GameMenu) ||
+                method.Name != nameof(GameMenu.ExitToLast))
+            .ToList();
+        using var menuExit = new GameMenuExitToLastCounter();
+        leavingClient.Call(InvokePatchedPassiveArmySiegeLeave, disabledMethods);
+
+        var request = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
+        Assert.Equal(partyId, request.PartyId);
+        Assert.False(request.FinishLocalMenus);
+        var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
+        Assert.False(approval.FinishLocalMenus);
+        Assert.False(approval.BattleLeaveApplied);
+        AssertBesiegerCamp(Server, partyId, expectCamp: false);
+        AssertBesiegerCamp(leavingClient, partyId, expectCamp: false);
+        Assert.Equal(1, menuExit.CountFor(leavingClient));
+    }
+
+    [Fact]
+    public void ClientArmyEncounterAbandon_OwnsItsEncounterContinuation()
+    {
+        var leavingClient = Clients.First();
+        var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
+        var disabledMethods = LeaveRoundTripDisabledMethods
+            .Append(AccessTools.Method(typeof(MapEvent), nameof(MapEvent.BeginWait)))
+            .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.SetMoveModeHold)))
+            .Append(AccessTools.Method(
+                typeof(ArmyPatches),
+                nameof(ArmyPatches.RemoveMobilePartyInArmy)))
+            .ToList();
+
+        using var encounterFinish = new PlayerEncounterFinishCounter();
+        leavingClient.Call(() =>
+        {
+            Assert.True(leavingClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            party._army = ObjectHelper.SkipConstructor<Army>();
+            Campaign.Current.PlayerEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            PlayerEncounter.Current._mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+
+            InvokePatchedArmyEncounterAbandon();
+        }, disabledMethods);
+
+        var request = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
+        Assert.Equal(partyId, request.PartyId);
+        Assert.False(request.FinishLocalMenus);
+        var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
+        Assert.False(approval.FinishLocalMenus);
+        Assert.False(approval.BattleLeaveApplied);
+        AssertBesiegerCamp(Server, partyId, expectCamp: false);
+        AssertBesiegerCamp(leavingClient, partyId, expectCamp: false);
+        Assert.Equal(1, encounterFinish.CountFor(leavingClient));
     }
 
     [Fact]
@@ -206,7 +381,7 @@ public class SiegeLeaveMenuTests : IDisposable
         Assert.True(request.FinishLocalMenus);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.True(approval.FinishLocalMenus);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
@@ -238,7 +413,7 @@ public class SiegeLeaveMenuTests : IDisposable
         Assert.True(request.FinishLocalMenus);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
         foreach (var client in Clients)
@@ -296,7 +471,7 @@ public class SiegeLeaveMenuTests : IDisposable
         Assert.False(breakRequest.FinishLocalMenus);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.False(approval.FinishLocalMenus);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
@@ -329,7 +504,7 @@ public class SiegeLeaveMenuTests : IDisposable
         Assert.False(request.FinishLocalMenus);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.False(approval.FinishLocalMenus);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
@@ -362,7 +537,7 @@ public class SiegeLeaveMenuTests : IDisposable
         Assert.False(request.FinishLocalMenus);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.False(approval.FinishLocalMenus);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
@@ -395,7 +570,7 @@ public class SiegeLeaveMenuTests : IDisposable
         Assert.False(request.FinishLocalMenus);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.False(approval.FinishLocalMenus);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
@@ -495,6 +670,54 @@ public class SiegeLeaveMenuTests : IDisposable
         method.Invoke(behavior, new object[] { null });
     }
 
+    private static void InvokePatchedPassiveArmySiegeLeave()
+    {
+        var method = AccessTools.Method(
+            typeof(SiegeEventCampaignBehavior),
+            nameof(SiegeEventCampaignBehavior.menu_siege_strategies_passive_wait_leave_on_consequence));
+        Assert.NotNull(method);
+
+        var behavior = ObjectHelper.SkipConstructor<SiegeEventCampaignBehavior>();
+        method.Invoke(behavior, new object[] { null });
+    }
+
+    private static (bool shown, MenuCallbackArgs args) InvokeAssaultCondition(string methodName)
+    {
+        var method = AccessTools.Method(typeof(SiegeEventCampaignBehavior), methodName);
+        Assert.NotNull(method);
+
+        var args = new MenuCallbackArgs((MenuContext)null, null);
+        var behavior = ObjectHelper.SkipConstructor<SiegeEventCampaignBehavior>();
+        var shown = (bool)method.Invoke(behavior, new object[] { args });
+        return (shown, args);
+    }
+
+    private static (bool runOriginal, bool result, MenuCallbackArgs args) InvokeAssaultConditionPrefix(string methodName)
+    {
+        string prefixName = methodName.Contains("lead_assault")
+            ? "LeadAssaultConditionPrefix"
+            : "OrderAssaultConditionPrefix";
+        var prefix = AccessTools.Method(typeof(SiegeAssaultCommandGatePatch), prefixName);
+        Assert.NotNull(prefix);
+
+        var args = new MenuCallbackArgs((MenuContext)null, null);
+        object[] parameters = { args, false };
+        var runOriginal = (bool)prefix.Invoke(null, parameters);
+        return (runOriginal, (bool)parameters[1], args);
+    }
+
+    private static void InvokePatchedArmyEncounterAbandon()
+    {
+        var method = AccessTools.Method(
+            typeof(EncounterGameMenuBehavior),
+            nameof(EncounterGameMenuBehavior.game_menu_encounter_abandon_on_consequence));
+
+        Assert.NotNull(method);
+
+        var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+        method.Invoke(behavior, new object[] { null });
+    }
+
     /// <summary>Invokes the real (Harmony-patched) join_encounter leave lambda, resolved through the
     /// same IL scan the patch's TargetMethod uses, on the compiler's closure singleton (or an
     /// uninitialized closure — the lambda captures nothing).</summary>
@@ -568,7 +791,6 @@ public class SiegeLeaveMenuTests : IDisposable
             Campaign.Current.PlayerEncounter = null;
         }
     }
-
     // ------------------------------------------------------------------
     // Setup / assertions
     // ------------------------------------------------------------------
@@ -655,5 +877,69 @@ public class SiegeLeaveMenuTests : IDisposable
                 Assert.Null(party.BesiegerCamp);
             }
         });
+    }
+
+    private sealed class GameMenuExitToLastCounter : IDisposable
+    {
+        private static readonly MethodInfo ExitToLastMethod =
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast));
+        private static readonly List<object> ExitContainers = new();
+
+        private readonly Harmony harmony = new($"siege-leave-menu-counter-{Guid.NewGuid()}");
+
+        public GameMenuExitToLastCounter()
+        {
+            ExitContainers.Clear();
+            harmony.Patch(
+                ExitToLastMethod,
+                prefix: new HarmonyMethod(typeof(GameMenuExitToLastCounter), nameof(CountExitToLast)));
+        }
+
+        public int CountFor(EnvironmentInstance instance) =>
+            ExitContainers.Count(container => ReferenceEquals(container, instance.Container));
+
+        public void Dispose()
+        {
+            harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
+        }
+
+        private static bool CountExitToLast()
+        {
+            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
+                ExitContainers.Add(container);
+            return false;
+        }
+    }
+
+    private sealed class PlayerEncounterFinishCounter : IDisposable
+    {
+        private static readonly MethodInfo FinishMethod =
+            AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish));
+        private static readonly List<object> FinishContainers = new();
+
+        private readonly Harmony harmony = new($"siege-leave-encounter-counter-{Guid.NewGuid()}");
+
+        public PlayerEncounterFinishCounter()
+        {
+            FinishContainers.Clear();
+            harmony.Patch(
+                FinishMethod,
+                prefix: new HarmonyMethod(typeof(PlayerEncounterFinishCounter), nameof(CountFinish)));
+        }
+
+        public int CountFor(EnvironmentInstance instance) =>
+            FinishContainers.Count(container => ReferenceEquals(container, instance.Container));
+
+        public void Dispose()
+        {
+            harmony.Unpatch(FinishMethod, HarmonyPatchType.Prefix, harmony.Id);
+        }
+
+        private static bool CountFinish()
+        {
+            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
+                FinishContainers.Add(container);
+            return false;
+        }
     }
 }

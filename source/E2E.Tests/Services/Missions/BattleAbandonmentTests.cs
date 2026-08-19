@@ -74,7 +74,7 @@ public class BattleAbandonmentTests : MissionTestEnvironment
             var playerManager = Server.Resolve<IPlayerManager>();
             playerManager.SetPeer("connected-ctrl", connected.NetPeer);
             Server.Resolve<ITimeControlInterface>().ServerSetTimeControl(TimeControlEnum.Play_2x);
-            Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignEntered(connected.NetPeer));
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignSynchronized(connected.NetPeer));
         });
 
         Assert.Equal(1, Server.NetworkSentMessages.GetMessages<NetworkMapEventLockChanged>().Last().PlayersInMapEvent);
@@ -314,6 +314,12 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         var clients = Clients.ToArray();
         EnterBattle(clients[0], mapEventId);
         EnterBattle(clients[1], mapEventId);
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            playerManager.SetPeer("ctrl-A", clients[0].NetPeer);
+            playerManager.SetPeer("ctrl-B", clients[1].NetPeer);
+        });
         Server.Call(() => Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId)));
 
         // Both members announce entry into the battle's mission instance over the relay.
@@ -345,10 +351,10 @@ public class BattleAbandonmentTests : MissionTestEnvironment
             var missionManager = Server.Resolve<IMissionManager>();
             Assert.True(missionManager.TryGetControllers(mapEventId, out _));
 
-            Assert.True(missionManager.TryHandleDisconnect(clients[0].NetPeer, out var controllerId, out var instanceId, out var remaining));
-            Assert.Equal("ctrl-A", controllerId);
-            Assert.Equal(mapEventId, instanceId);
-            Assert.Empty(remaining);
+            var departure = Assert.Single(missionManager.HandleDisconnect(clients[0].NetPeer));
+            Assert.Equal("ctrl-A", departure.ControllerId);
+            Assert.Equal(mapEventId, departure.InstanceId);
+            Assert.Empty(departure.RemainingMembers);
 
             Assert.False(missionManager.TryGetControllers(mapEventId, out _),
                 "the empty mission-instance record should be pruned when its last member disconnects");

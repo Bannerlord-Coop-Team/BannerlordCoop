@@ -20,12 +20,22 @@ public class CoopAgentSpawnData
     public readonly float Health;
     [ProtoMember(5)]
     public readonly bool IsPlayer;
+    [ProtoMember(6)]
+    public readonly bool HasMount;
 
-    public CoopAgentSpawnData(Guid agentId, string characterObjectId, Vec3 position, float health, bool isPlayer)
+    public CoopAgentSpawnData(
+        Guid agentId,
+        string characterObjectId,
+        Vec3 position,
+        float health,
+        bool isPlayer,
+        bool hasMount = false)
     {
         AgentId = agentId;
         CharacterObjectId = characterObjectId;
         Position = position;
         Health = health;
+        IsPlayer = isPlayer;
+        HasMount = hasMount;
     }
 }

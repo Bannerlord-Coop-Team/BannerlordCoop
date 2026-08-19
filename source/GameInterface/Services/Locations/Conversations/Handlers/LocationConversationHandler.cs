@@ -114,6 +114,10 @@ internal class LocationConversationHandler : IHandler
         {
             network.Send(peer, new NetworkAllowLocationConversation(request.Generation));
             StartPlayerWaitingInteraction(peer, request.CharacterId);
+
+            // SR-040: tell the NPC host to hold the reserved NPC still, so the initiating client's
+            // conversation anchors to a stationary puppet.
+            network.SendAll(new NetworkLocationNpcHold(request.LocationId, request.CharacterId));
         }
         else
         {
@@ -165,8 +169,12 @@ internal class LocationConversationHandler : IHandler
             return;
         }
 
-        tracker.TryEndEngagement(peer, out _);
-        EndPlayerWaitingInteraction(peer);
+        GameThread.RunSafe(() =>
+        {
+            if (tracker.TryEndEngagement(peer, out var npcKey))
+                BroadcastNpcRelease(npcKey);
+            EndPlayerWaitingInteraction(peer);
+        }, context: nameof(NetworkLocationConversationEnded));
     }
 
     /// <summary>[Server] A player disconnected: release the NPC held for them, if any.</summary>
@@ -174,8 +182,23 @@ internal class LocationConversationHandler : IHandler
     {
         if (!ModInformation.IsServer) return;
 
-        tracker.TryEndEngagement(payload.What.PlayerId, out _);
+        if (tracker.TryEndEngagement(payload.What.PlayerId, out var npcKey))
+            BroadcastNpcRelease(npcKey);
         EndPlayerWaitingInteraction(payload.What.PlayerId);
+    }
+
+    // SR-040: undo the hold the grant broadcast. The engagement key is ComposeKey's
+    // "{locationId}|{characterId}"; location ids contain no pipe, so the first pipe splits it.
+    private void BroadcastNpcRelease(string npcKey)
+    {
+        if (string.IsNullOrEmpty(npcKey)) return;
+
+        var separatorIndex = npcKey.IndexOf('|');
+        if (separatorIndex <= 0 || separatorIndex >= npcKey.Length - 1) return;
+
+        network.SendAll(new NetworkLocationNpcReleased(
+            npcKey.Substring(0, separatorIndex),
+            npcKey.Substring(separatorIndex + 1)));
     }
 
     private void StartPlayerWaitingInteraction(NetPeer initiatorPeer, string characterId)

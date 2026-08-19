@@ -14,6 +14,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -22,6 +23,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -475,6 +477,137 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NpcPeaceOffer_TargetingPlayerKingdom_RequiresPlayerVote(bool acceptPeace)
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        ConfigureClanInKingdom(enemyClanId, enemyKingdomId);
+        EnsureKingdomRegisteredEverywhere(playerKingdomId);
+        EnsureKingdomRegisteredEverywhere(enemyKingdomId);
+        ConfigureWarEverywhere(playerKingdomId, enemyKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(enemyClanId, out var enemyClan));
+
+            var npcDecision = new MakePeaceKingdomDecision(
+                enemyClan,
+                playerKingdom,
+                dailyTributeToBePaid: 100,
+                dailyTributeDurationInDays: 30);
+            var peaceOutcome = npcDecision.DetermineInitialCandidates()
+                .OfType<MakePeaceKingdomDecision.MakePeaceDecisionOutcome>()
+                .Single(outcome => outcome.ShouldPeaceBeDeclared);
+
+            Assert.True(CoopKingdomElection.TryRedirectPlayerPeaceOffer(npcDecision, peaceOutcome));
+
+            var playerDecision = Assert.IsType<MakePeaceKingdomDecision>(
+                Assert.Single(playerKingdom.UnresolvedDecisions));
+            Assert.Same(enemyKingdom, playerDecision.FactionToMakePeaceWith);
+            Assert.Equal(-100, playerDecision.DailyTributeToBePaid);
+            Assert.Equal(30, playerDecision.DailyTributeDurationInDays);
+            Assert.True(playerDecision._isProposedByOpponent);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+        Assert.Contains(
+            Server.NetworkSentMessages.GetMessages<NetworkAddDecision>(),
+            message => message.KingdomId == playerKingdomId
+                       && message.Data is MakePeaceKingdomDecisionData peaceData
+                       && peaceData.FactionToMakePeaceWithId == enemyKingdomId
+                       && peaceData.DailyTributeToBePaid == -100
+                       && peaceData.IsProposedByOpponent);
+
+        foreach (var testClient in Clients)
+        {
+            testClient.Call(() =>
+            {
+                Assert.True(testClient.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+                var playerDecision = Assert.IsType<MakePeaceKingdomDecision>(
+                    Assert.Single(playerKingdom.UnresolvedDecisions));
+                Assert.Equal(-100, playerDecision.DailyTributeToBePaid);
+                Assert.True(playerDecision._isProposedByOpponent);
+            });
+        }
+
+        client.SimulateMessage(
+            this,
+            new KingdomDecisionVoteRequested(CreateMakePeaceVote(playerKingdomId, acceptPeace)));
+
+        if (acceptPeace)
+        {
+            Assert.Single(
+                Server.NetworkSentMessages.GetMessages<NetworkMakePeace>(),
+                message => message.Faction1Id == playerKingdomId
+                           && message.Faction2Id == enemyKingdomId
+                           && message.DailyTribute == -100
+                           && message.DailyTributeDuration == 30);
+        }
+        else
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
+            Assert.Empty(playerKingdom.UnresolvedDecisions);
+            Assert.Equal(!acceptPeace, FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
+        });
+    }
+
+    [Fact]
+    public void NpcPeaceOffer_TargetingPlayerKingdom_ExpiresAsDeclined()
+    {
+        var player = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        ConfigureClanInKingdom(enemyClanId, enemyKingdomId);
+        EnsureKingdomRegisteredEverywhere(playerKingdomId);
+        EnsureKingdomRegisteredEverywhere(enemyKingdomId);
+        ConfigureWarEverywhere(playerKingdomId, enemyKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(enemyClanId, out var enemyClan));
+
+            var npcDecision = new MakePeaceKingdomDecision(enemyClan, playerKingdom);
+            var peaceOutcome = npcDecision.DetermineInitialCandidates()
+                .OfType<MakePeaceKingdomDecision.MakePeaceDecisionOutcome>()
+                .Single(outcome => outcome.ShouldPeaceBeDeclared);
+            Assert.True(CoopKingdomElection.TryRedirectPlayerPeaceOffer(npcDecision, peaceOutcome));
+
+            var playerDecision = Assert.IsType<MakePeaceKingdomDecision>(
+                Assert.Single(playerKingdom.UnresolvedDecisions));
+            playerDecision.TriggerTime = CampaignTime.Zero;
+
+            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+
+            Assert.Empty(playerKingdom.UnresolvedDecisions);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+    }
+
     [Fact]
     public void AddDecision_UsesRegisteredPlayerClanWhenPartyClanPointsElsewhere()
     {
@@ -518,8 +651,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var player = CreateSyncedPlayerContext();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetPlayer = CreateSyncedPlayerContext("TargetKingdomTimeout", _ => false);
 
         ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(targetPlayer.ClanId, targetKingdomId);
         EnsureKingdomRegisteredEverywhere(kingdomId);
         EnsureKingdomRegisteredEverywhere(targetKingdomId);
 
@@ -531,8 +666,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
 
             decision = new DeclareWarDecision(playerClan, targetKingdom);
+            decision.TriggerTime = CampaignTime.Never;
             kingdom.AddDecision(decision);
 
+            Assert.False(decision.ShouldBeCancelled());
+            Assert.False(decision.TriggerTime.IsPast);
             CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
 
             Assert.Same(decision, Assert.Single(kingdom.UnresolvedDecisions));
@@ -545,7 +683,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
 
-            decision.TriggerTime = CampaignTime.HoursFromNow(-1);
+            decision.TriggerTime = CampaignTime.Zero;
+            Assert.True(decision.TriggerTime.IsPast);
             CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
 
             Assert.Empty(kingdom.UnresolvedDecisions);
@@ -1074,6 +1213,65 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void KingdomDecisionRefreshWinPercentages_NoSponsors_NormalizesOptions()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+
+            kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var decision = Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var election = new KingdomElection(decision);
+            var decisionItem = ObjectHelper.SkipConstructor<DecisionItemBaseVM>();
+            decisionItem.DecisionOptionsList = new MBBindingList<DecisionOptionVM>();
+            decisionItem.KingdomDecisionMaker = election;
+
+            foreach (DecisionOutcome outcome in election._possibleOutcomes)
+            {
+                outcome.SupporterList.Clear();
+
+                var option = ObjectHelper.SkipConstructor<DecisionOptionVM>();
+                option.Option = outcome;
+                decisionItem.DecisionOptionsList.Add(option);
+            }
+
+            decisionItem.RefreshWinPercentages();
+
+            Assert.Collection(
+                decisionItem.DecisionOptionsList,
+                option =>
+                {
+                    Assert.Null(option.Sponsor);
+                    Assert.Equal(50, option.WinPercentage);
+                },
+                option =>
+                {
+                    Assert.Null(option.Sponsor);
+                    Assert.Equal(50, option.WinPercentage);
+                });
+            Assert.Equal(100, decisionItem.DecisionOptionsList.Sum(option => option.WinPercentage));
+        });
+    }
+
+    [Fact]
     public void KingdomDecisionDebugCommand_ListsClientVoteState()
     {
         var client1 = Clients.First();
@@ -1380,6 +1578,100 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void KingdomDecisionFinalVote_MissingKingdomId_KeepsDecisionUiOpenAndRetries()
+    {
+        var client1 = Clients.First();
+        var client2 = Clients.Skip(1).First();
+        client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        client2.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+        var player1 = CreateSyncedPlayerContext(ControllerId, client1);
+        var player2 = CreateSyncedPlayerContext(SecondControllerId, client2);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player1.ClanId, kingdomId);
+        ConfigureClanInKingdom(player2.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        string policyId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+            PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
+            policyId = policy.StringId;
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
+            }
+        });
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+                PolicyObject policy = PolicyObject.All.Single(candidate => candidate.StringId == policyId);
+                using (new AllowedThread())
+                {
+                    kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
+                }
+            });
+        }
+
+        client2.Call(() =>
+        {
+            Assert.True(client2.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+
+            var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
+                candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
+                outcome.ShouldDecisionBeEnforced);
+            option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
+            decisionItem._currentSelectedOption = option;
+            decisionItem.ExecuteFinalSelection();
+
+            Assert.Null(decisionsVm.CurrentDecision);
+        });
+
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+
+            var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
+                candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
+                outcome.ShouldDecisionBeEnforced);
+            option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
+            decisionItem._currentSelectedOption = option;
+            RemoveReverseObjectManagerId(client1, kingdom);
+
+            decisionItem.ExecuteFinalSelection();
+
+            Assert.Same(decisionItem, decisionsVm.CurrentDecision);
+            Assert.True(decisionItem.IsActive);
+            Assert.False(decisionItem._finalSelectionDone);
+            Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
+
+            RestoreReverseObjectManagerId(client1, kingdom, kingdomId);
+            decisionItem.ExecuteFinalSelection();
+
+            Assert.Null(decisionsVm.CurrentDecision);
+        });
+
+        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId);
+    }
+
+    [Fact]
     public void PlayerKingdomCreatedNotification_RelinksClientClanWhenFieldSyncHasNotArrived()
     {
         var player = CreateSyncedPlayerContext();
@@ -1607,6 +1899,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var client = Clients.First();
         var settlementId = CreateSyncedSettlement();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        TestEnvironment.ConnectRegisteredPlayer(client, ControllerId);
 
         client.Call(() =>
         {
@@ -1763,16 +2056,19 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     {
         var player = CreateSyncedPlayerContext();
         var settlementId = CreateSyncedSettlement();
+        var client = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(client, ControllerId);
 
         Server.SimulateMessage(
-            this,
+            client.NetPeer,
             new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
-        Server.SimulateMessage(this, new NetworkRequestEndSettlementEncounter(player.PartyId));
+        Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(player.PartyId));
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
 
-        Assert.DoesNotContain(
+        var leaveResult = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
-            message => true);
+            message => message.PartyId == player.PartyId);
+        Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, leaveResult.Outcome);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
             message => message.PartyId == player.PartyId);
@@ -1920,9 +2216,45 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.True(table.Remove(obj));
     }
 
+    private static void RestoreReverseObjectManagerId(
+        EnvironmentInstance instance,
+        object obj,
+        string id)
+    {
+        var table = (ConditionalWeakTable<object, string>)AccessTools
+            .Field(typeof(ObjectManager), "objsIds")
+            .GetValue(instance.ObjectManager);
+
+        table.Add(obj, id);
+    }
+
     private PlayerContext CreateSyncedPlayerContext()
     {
         return CreateSyncedPlayerContext(ControllerId, _ => true);
+    }
+
+    private string CreateSyncedNpcClan()
+    {
+        const string npcControllerId = "NpcPeaceOfferEnemy";
+        var npc = CreateSyncedPlayerContext(npcControllerId, _ => false);
+
+        RemovePlayerRegistration(Server, npcControllerId);
+        foreach (var client in Clients)
+        {
+            RemovePlayerRegistration(client, npcControllerId);
+        }
+
+        return npc.ClanId;
+    }
+
+    private static void RemovePlayerRegistration(EnvironmentInstance instance, string controllerId)
+    {
+        instance.Call(() =>
+        {
+            var playerManager = instance.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(controllerId, out var player));
+            Assert.True(playerManager.RemovePlayer(player));
+        });
     }
 
     private PlayerContext CreateSyncedPlayerContext(string controllerId, EnvironmentInstance localPlayerClient)
@@ -1954,10 +2286,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private string CreateSyncedClanFief(string clanId)
     {
         var fiefId = TestEnvironment.CreateRegisteredObject<Town>();
-        ConfigureClanFief(Server, clanId, fiefId);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        ConfigureClanFief(Server, clanId, fiefId, settlementId);
         foreach (var client in Clients)
         {
-            ConfigureClanFief(client, clanId, fiefId);
+            ConfigureClanFief(client, clanId, fiefId, settlementId);
         }
 
         return fiefId;
@@ -1983,6 +2316,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             supportWeight: (int)Supporter.SupportWeights.FullyPush,
             isAbstain: false,
             isFinal: isFinal);
+    }
+
+    private static KingdomDecisionVoteData CreateMakePeaceVote(string kingdomId, bool shouldMakePeace)
+    {
+        return new KingdomDecisionVoteData(
+            kingdomId,
+            decisionIndex: 0,
+            outcomeIndex: shouldMakePeace ? 0 : 1,
+            supportWeight: (int)Supporter.SupportWeights.FullyPush,
+            isAbstain: false,
+            isFinal: true);
     }
 
     private static KingdomDecisionVoteData CreateDeclareWarVoteFromUi(EnvironmentInstance instance, bool shouldWarBeDeclared)
@@ -2050,15 +2394,21 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         return policiesVm;
     }
 
-    private static void ConfigureClanFief(EnvironmentInstance instance, string clanId, string fiefId)
+    private static void ConfigureClanFief(EnvironmentInstance instance, string clanId, string fiefId, string settlementId)
     {
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
             Assert.True(instance.ObjectManager.TryGetObject<Town>(fiefId, out var fief));
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
             using (new AllowedThread())
             {
+                if (settlement.Town == null)
+                {
+                    fief.Owner = settlement.Party;
+                    settlement.Town = fief;
+                }
                 fief._ownerClan = clan;
                 clan._fiefsCache ??= new MBList<Town>();
                 if (!clan._fiefsCache.Contains(fief))
@@ -2078,6 +2428,26 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             ConfigureClanInKingdom(client, clanId, kingdomId);
         }
+    }
+
+    private void ConfigureWarEverywhere(string faction1Id, string faction2Id)
+    {
+        ConfigureWar(Server, faction1Id, faction2Id);
+        foreach (var client in Clients)
+        {
+            ConfigureWar(client, faction1Id, faction2Id);
+        }
+    }
+
+    private static void ConfigureWar(EnvironmentInstance instance, string faction1Id, string faction2Id)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(faction1Id, out var faction1));
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(faction2Id, out var faction2));
+            VillageHostileFactionStanceHelper.ApplyWarStance(faction1, faction2);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(faction1, faction2));
+        });
     }
 
     /// <summary>

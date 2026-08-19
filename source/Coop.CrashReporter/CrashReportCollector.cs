@@ -58,6 +58,15 @@ namespace Coop.CrashReporter
         {
             process.WaitForExit();
             int exitCode = process.ExitCode;
+
+            // Walked before anything waits on a dump: the zero exit-code path spends up to
+            // 30 seconds looking for one, and a launcher update inside that window would rewrite
+            // the very files being listed. A clean exit pays for a walk whose result is then
+            // thrown away, but the game's own binaries are still in the file cache it just used
+            // them from, so that is a fraction of a second in a process about to exit anyway.
+            GameBinariesManifest binaries = GameBinariesManifest.Capture(
+                options.GameBinariesDirectory);
+
             string dumpPath = exitCode == 0
                 ? WaitForMatchingDump(CrashDumpDiscoveryTimeout)
                 : null;
@@ -68,6 +77,10 @@ namespace Coop.CrashReporter
             string logsDirectory = Path.Combine(reportDirectory, "logs");
             Directory.CreateDirectory(logsDirectory);
             List<string> copiedLogs = CopyLogs(logsDirectory);
+
+            string manifestPath = Path.Combine(reportDirectory, GameBinariesManifest.FileName);
+            bool manifestWritten;
+            string binariesSummary = binaries.Write(manifestPath, out manifestWritten);
 
             if (dumpPath == null)
                 dumpPath = WaitForMatchingDump(CrashDumpDiscoveryTimeout);
@@ -85,13 +98,15 @@ namespace Coop.CrashReporter
                 exitCode,
                 dumpCopied,
                 dumpCaptureDetails,
+                binariesSummary,
                 copiedLogs);
-            WriteReadme(readmePath, dumpCopied);
+            WriteReadme(readmePath, dumpCopied, manifestWritten);
             CreateShareableZip(
                 Path.Combine(reportDirectory, "shareable.zip"),
                 readmePath,
                 reportPath,
                 dumpCopied ? copiedDumpPath : null,
+                manifestWritten ? manifestPath : null,
                 copiedLogs);
             return 0;
         }
@@ -331,6 +346,7 @@ namespace Coop.CrashReporter
             int exitCode,
             bool dumpCopied,
             string dumpCaptureDetails,
+            string binariesSummary,
             IEnumerable<string> copiedLogs)
         {
             var lines = new[]
@@ -343,12 +359,17 @@ namespace Coop.CrashReporter
                 "Exit code: " + exitCode.ToString(CultureInfo.InvariantCulture),
                 "Dump captured: " + (dumpCopied ? "yes" : "no"),
                 "Dump capture details: " + dumpCaptureDetails,
+                "Game binaries directory: " + (options.GameBinariesDirectory ?? "unknown"),
+                "Game binaries: " + binariesSummary,
                 "Logs captured: " + copiedLogs.Count().ToString(CultureInfo.InvariantCulture),
             };
             File.WriteAllLines(reportPath, lines, new UTF8Encoding(false));
         }
 
-        private static void WriteReadme(string readmePath, bool dumpCopied)
+        private static void WriteReadme(
+            string readmePath,
+            bool dumpCopied,
+            bool manifestWritten)
         {
             var lines = new List<string>
             {
@@ -366,6 +387,14 @@ namespace Coop.CrashReporter
                 lines.Add("The ZIP contains dump.dmp for advanced debugging.");
             }
 
+            if (manifestWritten)
+            {
+                lines.Add("");
+                lines.Add(
+                    GameBinariesManifest.FileName +
+                    " lists the file names, sizes and versions found in the game's binaries folder.");
+            }
+
             File.WriteAllLines(readmePath, lines, new UTF8Encoding(false));
         }
 
@@ -374,6 +403,7 @@ namespace Coop.CrashReporter
             string readmePath,
             string reportPath,
             string dumpPath,
+            string manifestPath,
             IEnumerable<string> copiedLogs)
         {
             using (var stream = new FileStream(
@@ -387,6 +417,8 @@ namespace Coop.CrashReporter
                 AddFile(archive, reportPath, "report.txt", false);
                 if (dumpPath != null)
                     AddFile(archive, dumpPath, "dump.dmp", false);
+                if (manifestPath != null)
+                    AddFile(archive, manifestPath, GameBinariesManifest.FileName, false);
 
                 foreach (string logPath in copiedLogs)
                 {

@@ -14,11 +14,14 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -36,7 +39,9 @@ public interface IMapEventInitializationBarrier : IGameAbstraction
     void RunAfterCommit(MapEvent mapEvent, Action action);
     void TrackParty(MapEvent mapEvent, MapEventParty party);
     void DeferVisual(GauntletMapEventVisual visual, CampaignVec2 position);
+    void RetainSimulationDefeat(MapEvent mapEvent, PartyBase party);
     void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null);
+    void CompleteDeferredEncounterCleanup();
 }
 
 internal sealed class MapEventInitializationBarrier : IMapEventInitializationBarrier, IDisposable
@@ -49,6 +54,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
+    private HashSet<PartyBase> pendingParties = new HashSet<PartyBase>();
+    private DeferredEncounterCleanup deferredEncounterCleanup;
     private bool disposed;
 
     public MapEventInitializationBarrier(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
@@ -69,37 +76,49 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         messageBroker.Unsubscribe<NetworkMapEventInitialized>(HandleCommit);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         states.Clear();
+        deferredEncounterCleanup = null;
+        PublishPendingParties();
     }
 
     public bool IsPending(MapEvent mapEvent) =>
         mapEvent != null && states.TryGetValue(mapEvent, out var state) && !state.Committed;
 
     public bool IsPartyPending(PartyBase party) =>
-        party != null && states.Values.Any(state => state.Parties.Contains(party) || state.Announced.Contains(party));
+        party != null && Volatile.Read(ref pendingParties).Contains(party);
 
     public void Register(MapEvent mapEvent, bool committed = false)
     {
         if (disposed || mapEvent == null) return;
         if (!states.TryGetValue(mapEvent, out var state)) states.Add(mapEvent, state = new State(mapEvent));
-        if (!committed) return;
-        Capture(state, mapEvent);
-        state.Committed = true;
-        state.Parties.Clear();
+        if (committed)
+        {
+            Capture(state, mapEvent);
+            state.Committed = true;
+            state.Parties.Clear();
+        }
+        PublishPendingParties();
     }
 
     public void SetServerPartyPending(MapEvent mapEvent, PartyBase party, bool pending)
     {
         if (mapEvent == null || party == null || !states.TryGetValue(mapEvent, out var state)) return;
-        if (!state.Committed && !(pending ? state.Announced.Add(party) : state.Announced.Remove(party))) return;
+        bool stateChanged = false;
+        if (!state.Committed)
+        {
+            stateChanged = pending ? state.Announced.Add(party) : state.Announced.Remove(party);
+            if (!stateChanged) return;
+        }
         if (objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId) &&
             objectManager.TryGetIdWithLogging(party, out var partyId))
         {
+            if (stateChanged) PublishPendingParties();
             network.SendAll(new NetworkMapEventPartyPending(mapEventId, partyId, !pending));
             return;
         }
-        if (!state.Committed)
+        if (stateChanged)
         {
             if (pending) state.Announced.Remove(party); else state.Announced.Add(party);
+            PublishPendingParties();
         }
     }
 
@@ -115,9 +134,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                     tracker.AddParty(party);
         }
         Capture(state, mapEvent);
-        if (!TryGetId(mapEvent, out var mapEventId) ||
-            !TryGetId(tracker, out var trackerId) || !TryGetId(mapEvent.Component, out var componentId) ||
-            !TryGetId(mapEvent.MapEventVisual as GauntletMapEventVisual, out var visualId))
+        if (!TryResolveCommitIds(mapEvent, tracker,
+                out var mapEventId, out var trackerId, out var componentId, out var visualId))
         {
             AbortServer(mapEvent);
             return;
@@ -126,12 +144,37 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         network.SendAll(new NetworkMapEventInitialized(mapEventId, false, trackerId, componentId, visualId));
         state.Committed = true;
         state.Announced.Clear();
+        PublishPendingParties();
+    }
+
+    private bool TryResolveCommitIds(MapEvent mapEvent, TroopUpgradeTracker tracker,
+        out string mapEventId, out string trackerId, out string componentId, out string visualId)
+    {
+        bool hasEventId = TryGetId(mapEvent, out mapEventId);
+        bool hasTrackerId = TryGetId(tracker, out trackerId);
+        bool hasComponentId = TryGetId(mapEvent.Component, out componentId);
+        bool hasVisualId = TryGetId(mapEvent.MapEventVisual as GauntletMapEventVisual, out visualId);
+        if (hasEventId && hasTrackerId && hasComponentId && hasVisualId) return true;
+
+        // The resulting abort destroys the whole battle graph on the server AND every client;
+        // without a named reason its only trace is a generic ObjectManager id-miss line, which has
+        // made this exit the least diagnosable step of battle replication.
+        Logger.Error(
+            "Aborting MapEvent commit: unresolvable id (event={HasEventId}, tracker={HasTrackerId}, " +
+            "component={HasComponentId} [{ComponentType}], visual={HasVisualId} [{VisualType}])",
+            hasEventId, hasTrackerId,
+            hasComponentId, mapEvent.Component?.GetType().Name ?? "null",
+            hasVisualId, mapEvent.MapEventVisual?.GetType().Name ?? "null");
+        return false;
     }
 
     public void AbortServer(MapEvent mapEvent)
     {
         if (mapEvent == null || !states.TryGetValue(mapEvent, out var state) || state.Committed) return;
-        if (TryGetId(mapEvent, out var id)) network.SendAll(new NetworkMapEventInitialized(id, true));
+        bool notified = TryGetId(mapEvent, out var id);
+        Logger.Error("Aborting MapEvent {MapEventId}: destroying its graph on the server and every notified client",
+            notified ? id : "<unregistered>");
+        if (notified) network.SendAll(new NetworkMapEventInitialized(id, true));
         DestroyGraph(mapEvent);
     }
 
@@ -151,6 +194,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             Register(mapEvent);
             if (message.IsCancellation) states[mapEvent].Parties.Remove(party);
             else states[mapEvent].Parties.Add(party);
+            PublishPendingParties();
         }, context: nameof(NetworkMapEventPartyPending));
     }
 
@@ -160,11 +204,28 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent)) return;
-            if (message.IsTerminal || string.IsNullOrEmpty(message.TroopUpgradeTrackerId) ||
-                !objectManager.TryGetObjectWithLogging<TroopUpgradeTracker>(message.TroopUpgradeTrackerId, out var tracker) ||
-                !Matches(message.ComponentId, mapEvent.Component) ||
-                !Matches(message.VisualId, mapEvent.MapEventVisual as GauntletMapEventVisual))
+            if (message.IsTerminal)
             {
+                FinishClient(mapEvent, abort: true);
+                return;
+            }
+
+            TroopUpgradeTracker tracker = null;
+            bool hasTracker = !string.IsNullOrEmpty(message.TroopUpgradeTrackerId) &&
+                objectManager.TryGetObjectWithLogging<TroopUpgradeTracker>(message.TroopUpgradeTrackerId, out tracker);
+            bool componentMatches = TryBindComponent(message.ComponentId, mapEvent);
+            bool visualMatches = Matches(message.VisualId, mapEvent.MapEventVisual as GauntletMapEventVisual);
+            if (!hasTracker || !componentMatches || !visualMatches)
+            {
+                // Destroying the replica graph over a mismatch must say WHICH member mismatched —
+                // the local-vs-message visual identity in particular separates "the server's null
+                // overwrite never replicated here" from "the commit raced the reference sync".
+                Logger.Error(
+                    "Client destroying MapEvent {MapEventId} graph at commit: tracker={HasTracker}, " +
+                    "componentMatch={ComponentMatches}, visualMatch={VisualMatches} " +
+                    "(message visual id {VisualId}, local visual {LocalVisualType})",
+                    message.MapEventId, hasTracker, componentMatches, visualMatches,
+                    message.VisualId ?? "null", mapEvent.MapEventVisual?.GetType().Name ?? "null");
                 FinishClient(mapEvent, abort: true);
                 return;
             }
@@ -177,6 +238,31 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private bool Matches<T>(string id, T actual) where T : class =>
         id == null ? actual == null :
         objectManager.TryGetObjectWithLogging<T>(id, out var expected) && ReferenceEquals(expected, actual);
+
+    private bool TryBindComponent(string id, MapEvent mapEvent)
+    {
+        MapEventComponent component = null;
+        if (id != null && !objectManager.TryGetObjectWithLogging(id, out component))
+            return false;
+
+        if (component?.MapEvent != null && !ReferenceEquals(component.MapEvent, mapEvent))
+            return false;
+
+        if (ReferenceEquals(mapEvent.Component, component) &&
+            (component == null || ReferenceEquals(component.MapEvent, mapEvent)))
+        {
+            return true;
+        }
+
+        using (new AllowedThread())
+        {
+            if (component != null)
+                component.MapEvent = mapEvent;
+            mapEvent.Component = component;
+        }
+
+        return true;
+    }
 
     private void FinishClient(MapEvent mapEvent, bool abort)
     {
@@ -215,6 +301,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             if (state.Visual != null) PublishVisual(state.Visual, state.Position);
             state.Committed = true;
             state.Parties.Clear();
+            PublishPendingParties();
         }
         catch (Exception ex)
         {
@@ -241,12 +328,13 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
         if (state == null || state.Committed)
         {
-            state?.Parties.Remove(party.Party);
+            if (state?.Parties.Remove(party.Party) == true) PublishPendingParties();
             afterCommit?.Invoke();
             return;
         }
 
         state.Parties.Add(party.Party);
+        PublishPendingParties();
         state.Callback += afterCommit;
     }
 
@@ -292,11 +380,24 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         using (new AllowedThread()) visual.OnMapEventEnd();
     }
 
+    public void RetainSimulationDefeat(MapEvent mapEvent, PartyBase party)
+    {
+        var encounter = PlayerEncounter.Current;
+        if (ModInformation.IsServer || mapEvent == null || party == null || encounter?.BattleSimulation == null)
+            return;
+
+        deferredEncounterCleanup = new DeferredEncounterCleanup(mapEvent, party);
+    }
+
     public void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null)
     {
         if (mapEvent == null) return;
         if (!states.TryGetValue(mapEvent, out var state)) state = new State(mapEvent);
         Capture(state, mapEvent);
+        if (preservedParty != null)
+            deferredEncounterCleanup = new DeferredEncounterCleanup(mapEvent, preservedParty);
+        else if (ReferenceEquals(deferredEncounterCleanup?.MapEvent, mapEvent))
+            preservedParty = deferredEncounterCleanup.Party;
         Campaign.Current?.MapEventManager?._mapEvents.Remove(mapEvent);
         foreach (var mapEventParty in state.Owned.OfType<MapEventParty>())
         {
@@ -309,21 +410,92 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
         foreach (var visual in state.Owned.OfType<GauntletMapEventVisual>().ToArray()) EndVisual(visual);
         states.Remove(mapEvent);
+        PublishPendingParties();
         foreach (var instance in state.Owned) objectManager.Remove(instance);
     }
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
+        CompleteDeferredEncounterCleanup();
+    }
+
+    public void CompleteDeferredEncounterCleanup()
+    {
         if (ModInformation.IsServer || MissionState.Current != null || Mission.Current != null) return;
 
-        var party = MobileParty.MainParty?.Party;
-        var mapEvent = party?.MapEvent;
+        var cleanup = deferredEncounterCleanup;
+        var party = cleanup?.Party ?? MobileParty.MainParty?.Party;
+        var encounter = PlayerEncounter.Current;
+        var mapEvent = cleanup?.MapEvent ?? party?.MapEvent;
+        if (mapEvent == null && !PlayerCaptivity.IsCaptive &&
+            encounter?.EncounterState == PlayerEncounterState.End)
+        {
+            mapEvent = encounter.BattleSimulation?.MapEvent;
+        }
         if (mapEvent == null || IsPending(mapEvent)) return;
         if (Campaign.Current?.MapEventManager?.MapEvents.Contains(mapEvent) == true) return;
+        if (IsBattleSimulationActive()) return;
 
+        if (cleanup != null)
+            deferredEncounterCleanup = null;
         party._mapEventSide = null;
-        if (!CloseStaleDestroyedEncounter(mapEvent))
-            ClearEngageOrder(party.MobileParty);
+        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent, cleanup);
+        if (!continuedEncounter && CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
+
+        ClearEngageOrder(party.MobileParty);
+    }
+
+    private static bool IsBattleSimulationActive()
+    {
+        var battleSimulation = PlayerEncounter.CurrentBattleSimulation;
+        return battleSimulation != null &&
+               Game.Current?.GameStateManager?.GameStates
+                   .OfType<MapState>()
+                   .Any(state => state._battleSimulation == battleSimulation) == true;
+    }
+
+    private static bool ContinueDestroyedSimulationDefeat(
+        MapEvent mapEvent,
+        DeferredEncounterCleanup cleanup)
+    {
+        var encounter = PlayerEncounter.Current;
+        bool matchesDeferredSimulation = cleanup != null &&
+            ReferenceEquals(encounter, cleanup.Encounter) &&
+            ReferenceEquals(encounter?.BattleSimulation, cleanup.BattleSimulation);
+        if (encounter?.EncounterState != PlayerEncounterState.End ||
+            encounter.BattleSimulation == null ||
+            (!matchesDeferredSimulation &&
+                (mapEvent.WinningSide == encounter.PlayerSide || !References(encounter, mapEvent))))
+        {
+            return false;
+        }
+
+        if (PlayerCaptivity.IsCaptive)
+        {
+            PlayerEncounter.LeaveEncounter = true;
+            encounter.BattleSimulation = null;
+            Campaign.Current.PlayerEncounter = null;
+            Campaign.Current.LocationEncounter = null;
+            ShowCaptivityMenu();
+            return true;
+        }
+
+        // Mirror vanilla's simulated-defeat branch before detaching the destroyed map event.
+        encounter.EncounterState = PlayerEncounterState.Begin;
+        GameMenu.SwitchToMenu("encounter");
+        return true;
+    }
+
+    private static void ShowCaptivityMenu()
+    {
+        var captorParty = PlayerCaptivity.CaptorParty;
+        if (captorParty == null) return;
+
+        var menuId = captorParty.IsSettlement ? "settlement_wait" : "prisoner_wait";
+        if ((Game.Current?.GameStateManager?.ActiveState as MapState)?.AtMenu == true)
+            GameMenu.SwitchToMenu(menuId);
+        else
+            GameMenu.ActivateGameMenu(menuId);
     }
 
     private void ClearEngageOrder(MobileParty party)
@@ -335,7 +507,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         messageBroker.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
-    private bool CloseStaleDestroyedEncounter(MapEvent mapEvent)
+    private bool CloseStaleDestroyedEncounter(MapEvent mapEvent, DeferredEncounterCleanup cleanup)
     {
         if (PlayerCaptivity.IsCaptive)
             return false;
@@ -347,7 +519,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
-        if (!References(encounter, mapEvent))
+        if (!References(encounter, mapEvent) && !ReferenceEquals(encounter, cleanup?.Encounter))
             return false;
 
         if (IsBattleResultEncounter(encounter))
@@ -373,6 +545,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
     private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
         encounter?._mapEvent == mapEvent ||
+        encounter?.BattleSimulation?.MapEvent == mapEvent ||
         GetPlayerEncounterBattle() == mapEvent ||
         GetPlayerEncounterEncounteredBattle() == mapEvent;
 
@@ -454,6 +627,17 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
     internal static TroopUpgradeTracker GetTracker(MapEvent mapEvent) => mapEvent == null ? null : TrackerField(mapEvent);
 
+    private void PublishPendingParties()
+    {
+        var snapshot = new HashSet<PartyBase>();
+        foreach (var state in states.Values)
+        {
+            snapshot.UnionWith(state.Parties);
+            snapshot.UnionWith(state.Announced);
+        }
+        Volatile.Write(ref pendingParties, snapshot);
+    }
+
     private static void Capture(State state, MapEvent mapEvent)
     {
         if (mapEvent == null) return;
@@ -492,6 +676,22 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         public void Add(object instance)
         {
             if (instance != null) Owned.Add(instance);
+        }
+    }
+
+    private sealed class DeferredEncounterCleanup
+    {
+        public readonly MapEvent MapEvent;
+        public readonly PartyBase Party;
+        public readonly PlayerEncounter Encounter;
+        public readonly BattleSimulation BattleSimulation;
+
+        public DeferredEncounterCleanup(MapEvent mapEvent, PartyBase party)
+        {
+            MapEvent = mapEvent;
+            Party = party;
+            Encounter = PlayerEncounter.Current;
+            BattleSimulation = Encounter?.BattleSimulation;
         }
     }
 }

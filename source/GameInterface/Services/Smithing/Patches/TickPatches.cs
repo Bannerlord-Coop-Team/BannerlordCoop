@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Policies;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
@@ -33,13 +34,17 @@ internal class TickPatches
         // Only let server handle ticks
         if (ModInformation.IsClient) return false;
 
-        // Replace TaleWorlds implementation to allow stamina recovery outside of settlements
+        // Replace TaleWorlds implementation to allow stamina recovery outside of settlements based on config
         foreach (KeyValuePair<Hero, CraftingCampaignBehavior.HeroCraftingRecord> keyValuePair in __instance._heroCraftingRecords)
         {
-            int maxHeroCraftingStamina = __instance.GetMaxHeroCraftingStamina(keyValuePair.Key);
-            if (keyValuePair.Value.CraftingStamina < maxHeroCraftingStamina)
+            if (keyValuePair.Key.CurrentSettlement != null 
+                || ModConfigProvider.ModOptions.SmithingStaminaRecoveryOutsideSettlements)
             {
-                keyValuePair.Value.CraftingStamina = MathF.Min(maxHeroCraftingStamina, keyValuePair.Value.CraftingStamina + CraftingCampaignBehavior.GetStaminaHourlyRecoveryRate(keyValuePair.Key));
+                int maxHeroCraftingStamina = __instance.GetMaxHeroCraftingStamina(keyValuePair.Key);
+                if (keyValuePair.Value.CraftingStamina < maxHeroCraftingStamina)
+                {
+                    keyValuePair.Value.CraftingStamina = MathF.Min(maxHeroCraftingStamina, keyValuePair.Value.CraftingStamina + CraftingCampaignBehavior.GetStaminaHourlyRecoveryRate(keyValuePair.Key));
+                }
             }
         }
 
@@ -60,10 +65,9 @@ internal class TickPatches
             num += MathF.Round((float)num * DefaultPerks.Athletics.Stamina.PrimaryBonus);
         }
 
-        // Multiply the vanilla result to be 10 times slower as stamina now regenerates outside of settlements
-        // Later expand this to be part of a config for players if its too slow or fast
+        // Multiply the vanilla result by the config factor
         // Round up the result so that crafting stamina always regenerates partially
-        __result = MathF.Ceiling(num * 0.1f);
+        __result = MathF.Ceiling((float)(num * ModConfigProvider.ModOptions.SmithingStaminaRecoveryMultiplier));
         return false;
     }
 

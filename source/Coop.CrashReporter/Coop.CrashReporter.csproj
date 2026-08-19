@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="CrashReportCollector.cs" />
     <Compile Include="CrashReporterOptions.cs" />
+    <Compile Include="GameBinariesManifest.cs" />
     <Compile Include="MinidumpProcessIdReader.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

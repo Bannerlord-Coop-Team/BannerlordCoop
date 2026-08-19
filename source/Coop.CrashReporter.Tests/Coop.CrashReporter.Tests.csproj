@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="..\Coop.CrashReporter\CrashReportCollector.cs" Link="CrashReporter\CrashReportCollector.cs" />
     <Compile Include="..\Coop.CrashReporter\CrashReporterOptions.cs" Link="CrashReporter\CrashReporterOptions.cs" />
+    <Compile Include="..\Coop.CrashReporter\GameBinariesManifest.cs" Link="CrashReporter\GameBinariesManifest.cs" />
     <Compile Include="..\Coop.CrashReporter\MinidumpProcessIdReader.cs" Link="CrashReporter\MinidumpProcessIdReader.cs" />
   </ItemGroup>
 </Project>
