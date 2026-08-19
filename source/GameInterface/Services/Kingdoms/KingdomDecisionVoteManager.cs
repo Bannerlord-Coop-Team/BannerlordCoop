@@ -21,6 +21,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.Core.ViewModelCollection.ImageIdentifiers;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Kingdoms
@@ -37,6 +38,8 @@ namespace GameInterface.Services.Kingdoms
         void ApplyRoundStatus(KingdomDecisionRoundStatusData status);
         IReadOnlyList<KingdomDecisionRoundStatusData> CaptureActiveRoundStatuses();
         string RefreshDecisionWaitingStatus(DecisionItemBaseVM decisionItem);
+        IReadOnlyList<string> GetDecisionWaitingColumns(DecisionItemBaseVM decisionItem);
+        string RefreshDecisionTitle(DecisionItemBaseVM decisionItem);
         bool ShouldSuppressLocalDecision(KingdomDecision decision);
         bool ShouldDisableResolveDecision(KingdomDecision decision);
         bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
@@ -76,6 +79,8 @@ namespace GameInterface.Services.Kingdoms
         private readonly IObjectManager objectManager;
         private readonly IMessageBroker messageBroker;
         private readonly IKingdomDecisionOutcomeResolver outcomeResolver;
+        private readonly IKingdomDecisionOutcomeOrder outcomeOrder;
+        private readonly IKingdomDecisionRoundPresentation roundPresentation;
         private readonly Timer votingRoundTimer;
         private int isDisposed;
 
@@ -83,12 +88,16 @@ namespace GameInterface.Services.Kingdoms
             IPlayerManager playerManager,
             IObjectManager objectManager,
             IMessageBroker messageBroker,
-            IKingdomDecisionOutcomeResolver outcomeResolver)
+            IKingdomDecisionOutcomeResolver outcomeResolver,
+            IKingdomDecisionOutcomeOrder outcomeOrder,
+            IKingdomDecisionRoundPresentation roundPresentation)
         {
             this.playerManager = playerManager;
             this.objectManager = objectManager;
             this.messageBroker = messageBroker;
             this.outcomeResolver = outcomeResolver;
+            this.outcomeOrder = outcomeOrder;
+            this.roundPresentation = roundPresentation;
 
             if (ModInformation.IsServer)
             {
@@ -230,18 +239,27 @@ namespace GameInterface.Services.Kingdoms
             }
 
             KingdomDecisionVoteState state = GetOrCreateState(decision);
+            if (state.LastPublishedRoundStatus != null &&
+                state.LastPublishedRoundStatus.HasSameContent(status))
+            {
+                return;
+            }
+
+            state.LastPublishedRoundStatus = status;
             state.ApplyRoundStatus(status);
+            ApplyAuthoritativeOutcomes(state);
             foreach (DecisionItemBaseVM decisionItem in ActiveDecisionItems.ToList())
             {
                 if (decisionItem?.KingdomDecisionMaker?._decision == decision)
                 {
+                    ApplyAuthoritativeOutcomes(state, decisionItem);
                     if (HasLocalPlayerSubmittedVote(decision))
                     {
                         ShowSubmittedState(decisionItem);
                     }
                     else
                     {
-                        RefreshDecisionWaitingStatus(decisionItem);
+                        RefreshDecisionPresentation(decisionItem);
                     }
                 }
             }
@@ -272,31 +290,28 @@ namespace GameInterface.Services.Kingdoms
                 candidate.KingdomId == state.KingdomId &&
                 candidate.DecisionIndex == state.DecisionIndex);
             state.ApplyRoundStatus(pending);
+            ApplyAuthoritativeOutcomes(state);
         }
 
         public string RefreshDecisionWaitingStatus(DecisionItemBaseVM decisionItem)
         {
-            KingdomDecision decision = decisionItem?.KingdomDecisionMaker?._decision;
-            if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return null;
-            if (state.RoundClans.Count == 0 || !state.RoundDeadlineUtc.HasValue) return null;
+            return GetWaitingFeedback(decisionItem)?.Header;
+        }
 
-            List<KingdomDecisionRoundClanStatusData> waitingClans = state.RoundClans.Values
-                .Where(clan => !clan.HasFinalVote)
-                .OrderBy(clan => clan.PlayerNames)
-                .ThenBy(clan => clan.ClanName)
-                .ToList();
+        public IReadOnlyList<string> GetDecisionWaitingColumns(DecisionItemBaseVM decisionItem)
+        {
+            return GetWaitingFeedback(decisionItem)?.Columns ?? Array.Empty<string>();
+        }
 
-            string prefix = HasLocalPlayerSubmittedVote(decision) ? "Vote submitted. " : string.Empty;
-            if (waitingClans.Count == 0)
-            {
-                return prefix + "All votes received. Resolving...";
-            }
+        public string RefreshDecisionTitle(DecisionItemBaseVM decisionItem)
+        {
+            if (decisionItem == null) return null;
 
-            int remainingSeconds = Math.Max(
-                0,
-                (int)Math.Ceiling((state.RoundDeadlineUtc.Value - DateTime.UtcNow).TotalSeconds));
-            string waitingText = string.Join("; ", waitingClans.Select(FormatWaitingClan));
-            return $"{prefix}Voting ends in {remainingSeconds}s. Waiting for: {waitingText}.";
+            string baseTitle = GetBaseDecisionTitle(decisionItem);
+            int? remainingSeconds = TryGetRemainingSeconds(decisionItem);
+            string title = roundPresentation.FormatTitle(baseTitle, remainingSeconds);
+            decisionItem.TitleText = title;
+            return title;
         }
 
         public void CloseDecisionItem(DecisionItemBaseVM decisionItem)
@@ -367,6 +382,10 @@ namespace GameInterface.Services.Kingdoms
             }
 
             ActiveDecisionItems.Add(decisionItem);
+            if (decision != null && DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState registeredState))
+            {
+                ApplyAuthoritativeOutcomes(registeredState, decisionItem);
+            }
             ReplayVotes(decisionItem);
             if (HasLocalPlayerSubmittedVote(decision))
             {
@@ -374,7 +393,7 @@ namespace GameInterface.Services.Kingdoms
             }
             else
             {
-                RefreshDecisionWaitingStatus(decisionItem);
+                RefreshDecisionPresentation(decisionItem);
             }
         }
 
@@ -1598,7 +1617,13 @@ namespace GameInterface.Services.Kingdoms
         {
             KingdomDecisionRoundStatusData status = CreateRoundStatus(state);
             if (status == null) return;
+            if (state.LastPublishedRoundStatus != null &&
+                state.LastPublishedRoundStatus.HasSameContent(status))
+            {
+                return;
+            }
 
+            state.LastPublishedRoundStatus = status;
             messageBroker?.Publish(state.Decision, new KingdomDecisionRoundStatusChanged(status));
         }
 
@@ -1618,7 +1643,8 @@ namespace GameInterface.Services.Kingdoms
                 state.KingdomId,
                 state.DecisionIndex,
                 state.RoundDeadlineUtc.Value.Ticks,
-                state.RoundClans.Values.OrderBy(clan => clan.ClanId).ToArray());
+                state.RoundClans.Values.OrderBy(clan => clan.ClanId).ToArray(),
+                outcomeOrder.CaptureKeys(state.Election._possibleOutcomes, objectManager));
         }
 
         private void ShowSubmittedState(DecisionItemBaseVM decisionItem)
@@ -1634,20 +1660,245 @@ namespace GameInterface.Services.Kingdoms
                 option.IsSupportOption2Enabled = false;
                 option.IsSupportOption3Enabled = false;
             }
+            RefreshDecisionPresentation(decisionItem);
+        }
+
+        private void RefreshDecisionPresentation(DecisionItemBaseVM decisionItem)
+        {
+            RefreshDecisionTitle(decisionItem);
             RefreshDecisionWaitingStatus(decisionItem);
         }
 
-        private static string FormatWaitingClan(KingdomDecisionRoundClanStatusData clan)
+        private KingdomDecisionWaitingFeedback GetWaitingFeedback(DecisionItemBaseVM decisionItem)
         {
-            string label = clan.PlayerNames;
-            if (!string.Equals(clan.PlayerNames, clan.ClanName, StringComparison.OrdinalIgnoreCase))
+            KingdomDecision decision = decisionItem?.KingdomDecisionMaker?._decision;
+            if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return null;
+            if (state.RoundClans.Count == 0 || !state.RoundDeadlineUtc.HasValue) return null;
+
+            List<KingdomDecisionRoundClanStatusData> waitingClans = state.RoundClans.Values
+                .Where(clan => !clan.HasFinalVote)
+                .OrderBy(clan => clan.PlayerNames)
+                .ThenBy(clan => clan.ClanName)
+                .ToList();
+
+            return roundPresentation.FormatWaitingFeedback(HasLocalPlayerSubmittedVote(decision), waitingClans);
+        }
+
+        private int? TryGetRemainingSeconds(DecisionItemBaseVM decisionItem)
+        {
+            KingdomDecision decision = decisionItem?.KingdomDecisionMaker?._decision;
+            if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return null;
+            if (!state.RoundDeadlineUtc.HasValue) return null;
+
+            return Math.Max(
+                0,
+                (int)Math.Ceiling((state.RoundDeadlineUtc.Value - DateTime.UtcNow).TotalSeconds));
+        }
+
+        private static string GetBaseDecisionTitle(DecisionItemBaseVM decisionItem)
+        {
+            KingdomElection election = decisionItem?.KingdomDecisionMaker;
+            KingdomDecision decision = election?._decision;
+            if (decision == null) return decisionItem.TitleText;
+
+            string baseTitle = election._chooser == Clan.PlayerClan
+                ? decision.GetChooseTitle()?.ToString()
+                : decision.GetSupportTitle()?.ToString();
+            return baseTitle ?? string.Empty;
+        }
+
+        private void ApplyAuthoritativeOutcomes(KingdomDecisionVoteState state, DecisionItemBaseVM decisionItem = null)
+        {
+            if (state?.OrderedOutcomeKeys == null || state.OrderedOutcomeKeys.Length == 0) return;
+
+            if (state.Election != null && !HasAuthoritativeOutcomeOrder(state.Election, state.OrderedOutcomeKeys))
             {
-                label += $" ({clan.ClanName}";
-                if (!clan.IsConnected) label += ", disconnected";
-                return label + ")";
+                IReadOnlyList<DecisionOutcome> orderedOutcomes = outcomeOrder.ResolveOrderedOutcomes(
+                    state.OrderedOutcomeKeys,
+                    state.Election._possibleOutcomes,
+                    GetFullDecisionCandidates(state.Decision),
+                    objectManager);
+                if (orderedOutcomes.Count == 0) return;
+
+                InitializeAuthoritativeOutcomes(state.Election, orderedOutcomes);
+                ReplayVotes(state.Election, state);
             }
 
-            return clan.IsConnected ? label : label + " (disconnected)";
+            if (decisionItem == null) return;
+
+            KingdomElection election = decisionItem.KingdomDecisionMaker;
+            if (election != null && !HasAuthoritativeOutcomeOrder(election, state.OrderedOutcomeKeys))
+            {
+                IReadOnlyList<DecisionOutcome> itemOutcomes = outcomeOrder.ResolveOrderedOutcomes(
+                    state.OrderedOutcomeKeys,
+                    election._possibleOutcomes,
+                    GetFullDecisionCandidates(election._decision),
+                    objectManager);
+                if (itemOutcomes.Count > 0)
+                {
+                    InitializeAuthoritativeOutcomes(election, itemOutcomes);
+                    RemapDecisionOptions(decisionItem, itemOutcomes);
+                }
+            }
+
+            ReplayVotes(decisionItem, state);
+        }
+
+        private bool HasAuthoritativeOutcomeOrder(
+            KingdomElection election,
+            IReadOnlyList<string> orderedOutcomeKeys)
+        {
+            if (election?._possibleOutcomes == null || orderedOutcomeKeys == null) return false;
+
+            string[] localKeys = outcomeOrder.CaptureKeys(election._possibleOutcomes, objectManager);
+            return localKeys.Length == orderedOutcomeKeys.Count &&
+                   localKeys.SequenceEqual(orderedOutcomeKeys);
+        }
+
+        private static void InitializeAuthoritativeOutcomes(
+            KingdomElection election,
+            IReadOnlyList<DecisionOutcome> outcomes)
+        {
+            MBList<DecisionOutcome> outcomeList = ToMBList(outcomes);
+            election._possibleOutcomes = outcomeList;
+            election._decision.DetermineSponsors(outcomeList);
+
+            foreach (DecisionOutcome outcome in outcomeList)
+            {
+                outcome.InitialSupport = election.DetermineInitialSupport(outcome);
+            }
+
+            float totalInitialSupport = outcomeList.Sum(outcome => outcome.InitialSupport);
+            foreach (DecisionOutcome outcome in outcomeList)
+            {
+                outcome.Likelihood = totalInitialSupport == 0f
+                    ? 0f
+                    : outcome.InitialSupport / totalInitialSupport;
+            }
+
+            election.DetermineSupport(outcomeList, false);
+            election._decision.DetermineSponsors(outcomeList);
+            election.UpdateSupport(outcomeList);
+            election.DetermineOfficialSupport();
+        }
+
+        private void ReplayVotes(KingdomElection election, KingdomDecisionVoteState state)
+        {
+            foreach (AppliedKingdomDecisionVote vote in state.Votes.Values)
+            {
+                if (!TryGetClan(vote.ClanId, state.Decision.Kingdom, out Clan clan)) continue;
+
+                ApplyVoteToElection(election, clan, vote.VoteData, false);
+            }
+        }
+
+        private static MBList<DecisionOutcome> ToMBList(IReadOnlyList<DecisionOutcome> outcomes)
+        {
+            var list = new MBList<DecisionOutcome>();
+            if (outcomes == null) return list;
+
+            foreach (DecisionOutcome outcome in outcomes)
+            {
+                list.Add(outcome);
+            }
+
+            return list;
+        }
+
+        private static IEnumerable<DecisionOutcome> GetFullDecisionCandidates(KingdomDecision decision)
+        {
+            if (decision == null) return Array.Empty<DecisionOutcome>();
+
+            MBList<DecisionOutcome> candidates =
+                (decision.DetermineInitialCandidates() ?? Array.Empty<DecisionOutcome>()).ToMBList();
+            return decision.NarrowDownCandidates(candidates, candidates.Count);
+        }
+
+        private void RemapDecisionOptions(DecisionItemBaseVM decisionItem, IReadOnlyList<DecisionOutcome> orderedOutcomes)
+        {
+            if (decisionItem?.DecisionOptionsList == null || orderedOutcomes == null) return;
+
+            DecisionOptionVM selectedOption = decisionItem._currentSelectedOption;
+            bool selectedOptionWasVisible = selectedOption != null &&
+                                            decisionItem.DecisionOptionsList.Contains(selectedOption);
+            string selectedKey = null;
+            if (selectedOptionWasVisible && selectedOption.Option != null)
+            {
+                outcomeResolver.TryGetOutcomeKey(selectedOption.Option, objectManager, out selectedKey);
+            }
+
+            var existingByKey = new Dictionary<string, DecisionOptionVM>();
+            DecisionOptionVM abstainOption = null;
+            Action<DecisionOptionVM> onSelect = null;
+            Action<DecisionOptionVM> onSupportChange = null;
+            foreach (DecisionOptionVM option in decisionItem.DecisionOptionsList)
+            {
+                if (option == null) continue;
+                if (onSelect == null) onSelect = option._onSelect;
+                if (onSupportChange == null) onSupportChange = option._onSupportStrengthChange;
+                if (option.IsOptionForAbstain)
+                {
+                    abstainOption = option;
+                    continue;
+                }
+
+                if (option.Option == null) continue;
+                if (!outcomeResolver.TryGetOutcomeKey(option.Option, objectManager, out string optionKey)) continue;
+                if (string.IsNullOrWhiteSpace(optionKey) || existingByKey.ContainsKey(optionKey)) continue;
+
+                existingByKey.Add(optionKey, option);
+            }
+
+            if (selectedOption != null && !selectedOption.IsOptionForAbstain)
+            {
+                selectedOption.IsSelected = false;
+                decisionItem._currentSelectedOption = null;
+            }
+
+            decisionItem.DecisionOptionsList.Clear();
+            foreach (DecisionOutcome outcome in orderedOutcomes)
+            {
+                if (outcome == null) continue;
+                DecisionOptionVM option;
+                if (outcomeResolver.TryGetOutcomeKey(outcome, objectManager, out string outcomeKey) &&
+                    existingByKey.TryGetValue(outcomeKey, out option))
+                {
+                    option.Option = outcome;
+                }
+                else
+                {
+                    option = new DecisionOptionVM(
+                        outcome,
+                        decisionItem.KingdomDecisionMaker?._decision,
+                        decisionItem.KingdomDecisionMaker,
+                        onSelect ?? decisionItem.OnChangeVote,
+                        onSupportChange ?? decisionItem.OnSupportStrengthChange);
+                }
+
+                option.WinPercentage = TaleWorlds.Library.MathF.Round(outcome.WinChance * 100f);
+                option.InitialPercentage = TaleWorlds.Library.MathF.Round(outcome.WinChance * 100f);
+
+                decisionItem.DecisionOptionsList.Add(option);
+            }
+
+            if (abstainOption != null)
+            {
+                decisionItem.DecisionOptionsList.Add(abstainOption);
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedKey))
+            {
+                foreach (DecisionOptionVM option in decisionItem.DecisionOptionsList)
+                {
+                    if (option?.Option == null) continue;
+                    if (!outcomeResolver.TryGetOutcomeKey(option.Option, objectManager, out string optionKey)) continue;
+                    if (!string.Equals(optionKey, selectedKey, StringComparison.Ordinal)) continue;
+
+                    decisionItem._currentSelectedOption = option;
+                    option.IsSelected = true;
+                    break;
+                }
+            }
         }
 
         public void Dispose()
@@ -1666,6 +1917,8 @@ namespace GameInterface.Services.Kingdoms
             public Dictionary<string, AppliedKingdomDecisionVote> Votes { get; }
             public Dictionary<string, AppliedKingdomDecisionVote> FinalVotes { get; }
             public Dictionary<string, KingdomDecisionRoundClanStatusData> RoundClans { get; }
+            public string[] OrderedOutcomeKeys { get; private set; }
+            public KingdomDecisionRoundStatusData LastPublishedRoundStatus { get; set; }
             public DateTime? RoundDeadlineUtc { get; private set; }
             public bool IsResolved { get; set; }
             public bool HasRoundSnapshot => RoundClans.Count > 0;
@@ -1690,6 +1943,7 @@ namespace GameInterface.Services.Kingdoms
                 FinalVotes = new Dictionary<string, AppliedKingdomDecisionVote>();
                 RoundDeadlineUtc = roundDeadlineUtc;
                 RoundClans = roundClans ?? new Dictionary<string, KingdomDecisionRoundClanStatusData>();
+                OrderedOutcomeKeys = Array.Empty<string>();
             }
 
             public void RefreshDecisionIdentity(string kingdomId, int decisionIndex)
@@ -1716,6 +1970,7 @@ namespace GameInterface.Services.Kingdoms
                     if (clan == null || string.IsNullOrWhiteSpace(clan.ClanId)) continue;
                     RoundClans[clan.ClanId] = clan;
                 }
+                OrderedOutcomeKeys = status.OrderedOutcomeKeys ?? Array.Empty<string>();
                 RefreshEligibleClanIds(new HashSet<string>(RoundClans.Keys));
             }
         }

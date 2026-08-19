@@ -40,6 +40,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!TryGetVoteManager(out var voteManager)) return;
 
             voteManager.RegisterDecisionItem(__instance.CurrentDecision);
+            KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
         }
 
         [HarmonyPatch(nameof(KingdomDecisionsVM.RefreshWith))]
@@ -49,6 +50,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!TryGetVoteManager(out var voteManager)) return;
 
             voteManager.RegisterDecisionItem(__instance.CurrentDecision);
+            KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
         }
 
         [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
@@ -57,8 +59,11 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (!TryGetVoteManager(out var voteManager)) return;
 
+            voteManager.RefreshDecisionTitle(__instance.CurrentDecision);
             string feedback = voteManager.RefreshDecisionWaitingStatus(__instance.CurrentDecision);
-            KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, feedback);
+            IReadOnlyList<string> columns = voteManager.GetDecisionWaitingColumns(__instance.CurrentDecision);
+            KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
+            KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, feedback, columns);
         }
 
         internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
