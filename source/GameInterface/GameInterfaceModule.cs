@@ -85,6 +85,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<ArmyDisbander>().As<IArmyDisbander>().InstancePerDependency();
+        builder.RegisterType<PlayerSiegeTargetScoring>().As<IPlayerSiegeTargetScoring>().InstancePerDependency();
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();
