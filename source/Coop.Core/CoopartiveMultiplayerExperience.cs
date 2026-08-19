@@ -619,9 +619,7 @@ namespace Coop.Core
                 builder.RegisterInstance(advertisementConfig).AsSelf().SingleInstance();
             }
 
-            // Null config is the debug auto-connect entry point.
-            var joinConfig = configuration ?? this.configuration;
-            var presentation = JoinAttemptPresentation.For(intent, joinConfig.Address, joinConfig.Port);
+            var presentation = JoinAttemptPresentation.For(intent);
             builder.RegisterInstance(presentation).AsSelf().SingleInstance();
 
             container = builder.Build();
