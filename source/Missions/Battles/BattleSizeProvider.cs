@@ -15,9 +15,14 @@ public class BattleSizeProvider : IBattleSizeProvider
     {
         if (mapEvent == null) throw new ArgumentNullException(nameof(mapEvent));
 
-        int configuredBattleSize = mapEvent.IsSiegeAssault
-            ? BannerlordConfig.GetRealBattleSizeForSiege()
-            : BannerlordConfig.GetRealBattleSize();
+        int configuredBattleSize;
+        if (mapEvent.IsSiegeAmbush)
+            configuredBattleSize = BannerlordConfig.GetRealBattleSizeForSallyOut();
+        else if (mapEvent.IsSiegeAssault)
+            configuredBattleSize = BannerlordConfig.GetRealBattleSizeForSiege();
+        else
+            configuredBattleSize = BannerlordConfig.GetRealBattleSize();
+
         return Math.Min(configuredBattleSize, DefaultBattleMissionAgentSpawnLogic.MaxNumberOfTroopsForMission);
     }
 }

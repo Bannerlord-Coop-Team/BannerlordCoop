@@ -139,7 +139,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
                 behaviors.Add(new SandBoxSallyOutMissionController(isSallyOutAmbush: true));
 
             behaviors.Add(new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
-                PartyBase.MainParty.Side));
+                PartyBase.MainParty.Side, isSallyOut: isSallyOut));
             behaviors.Add(spawnLogic);
             behaviors.Add(new BattlePowerCalculationLogic());
             behaviors.Add(new BattleObserverMissionLogic());

@@ -16,12 +16,14 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using Moq;
 using SandBox;
 using SandBox.GauntletUI.Map;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -191,6 +193,58 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             start => start.MapEventId == battle.MapEventId);
         Assert.DoesNotContain(clients[2].InternalMessages.GetMessages<NetworkStartSiegeMission>(),
             start => start.MapEventId == battle.MapEventId);
+    }
+
+    [Theory]
+    [InlineData(BattleSideEnum.Defender, true, false)]
+    [InlineData(BattleSideEnum.Attacker, false, true)]
+    public void SiegeAmbush_ReturnToCastleResultIsDefenderVictory(
+        BattleSideEnum playerSide, bool playerVictory, bool playerDefeated)
+    {
+        var result = SiegeMissionEndPatches.CreateSiegeAmbushResult(playerSide);
+
+        Assert.Equal(BattleState.DefenderVictory, result.BattleState);
+        Assert.Equal(playerVictory, result.PlayerVictory);
+        Assert.Equal(playerDefeated, result.PlayerDefeated);
+        Assert.True(result.BattleResolved);
+    }
+
+    [Fact]
+    public void SiegeAmbush_MissionEndWaitsForAuthoritativeCompletion()
+    {
+        var battle = SetupInteraction(MapEvent.BattleTypes.None, isSiegeAmbush: true,
+            includeAiParties: false);
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPlayerPartyId, out var mainParty));
+            var previousMainParty = Campaign.Current.MainParty;
+            var previousEncounter = Campaign.Current.PlayerEncounter;
+            bool previousConclusionGate = BattleConclusionGate.IsInCoopBattleMission;
+
+            try
+            {
+                Campaign.Current.MainParty = mainParty;
+                PlayerEncounter.Start();
+                PlayerEncounter.Current._mapEvent = mapEvent;
+                PlayerEncounter.Current.SetIsSallyOutAmbush(true);
+                BattleConclusionGate.IsInCoopBattleMission = true;
+
+                new SiegeAmbushCampaignBehavior().OnMissionEnded(Mock.Of<IMission>());
+
+                Assert.Same(mapEvent, PlayerEncounter.Battle);
+                Assert.False(mapEvent.IsFinalized);
+                Assert.False(PlayerEncounter.Current._isSallyOutAmbush);
+            }
+            finally
+            {
+                BattleConclusionGate.IsInCoopBattleMission = previousConclusionGate;
+                Campaign.Current.MainParty = previousMainParty;
+                Campaign.Current.PlayerEncounter = previousEncounter;
+            }
+        });
     }
 
     [Theory]

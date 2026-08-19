@@ -135,6 +135,20 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     }
 
     [Fact]
+    public void SallyOutSpawnSettings_PreserveNativeReinforcementConfiguration()
+    {
+        var settings = CoopBattleMissionSpawnHandler.CreateSallyOutSpawnSettings();
+        Assert.Equal(MissionSpawnSettings.InitialSpawnMethod.FreeAllocation,
+            settings.InitialTroopsSpawnMethod);
+        Assert.Equal(MissionSpawnSettings.ReinforcementTimingMethod.CustomTimer,
+            settings.ReinforcementTroopsTimingMethod);
+        Assert.Equal(MissionSpawnSettings.ReinforcementSpawnMethod.Fixed,
+            settings.ReinforcementTroopsSpawnMethod);
+        Assert.Equal(0.01f, settings.DefenderReinforcementBatchPercentage);
+        Assert.Equal(0.1f, settings.AttackerReinforcementBatchPercentage);
+    }
+
+    [Fact]
     public void ConsecutiveRefreshes_DoNotReconcileAMixedSidePair()
     {
         Assert.Equal(0, CoopBattleMissionSpawnHandler.MatchingAllocationRevision(2, 1));

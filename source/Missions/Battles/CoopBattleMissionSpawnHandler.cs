@@ -33,6 +33,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     private readonly CoopTroopSupplier _attackerSupplier;
     private readonly IMessageBroker _messageBroker;
     private readonly BattleSideEnum _playerSide;
+    private readonly bool _isSallyOut;
 
     // Latched once the sides are sized jointly; both are held at zero until then.
     private bool _sized;
@@ -47,24 +48,26 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     public bool IsSized => _sized;
 
     public CoopBattleMissionSpawnHandler(CoopTroopSupplier defenderSupplier, CoopTroopSupplier attackerSupplier,
-        IMessageBroker messageBroker, BattleSideEnum playerSide)
+        IMessageBroker messageBroker, BattleSideEnum playerSide, bool isSallyOut = false)
     {
         _defenderSupplier = defenderSupplier;
         _attackerSupplier = attackerSupplier;
         _messageBroker = messageBroker;
         _playerSide = playerSide;
+        _isSallyOut = isSallyOut;
     }
 
     public override void AfterStart()
     {
         _missionAgentSpawnLogic.SetSpawnHorses(BattleSideEnum.Defender, !_mapEvent.IsSiegeAssault);
-        _missionAgentSpawnLogic.SetSpawnHorses(BattleSideEnum.Attacker, !_mapEvent.IsSiegeAssault);
+        _missionAgentSpawnLogic.SetSpawnHorses(BattleSideEnum.Attacker,
+            !_mapEvent.IsSiegeAssault && !_isSallyOut);
 
         var sizing = ReadSizing();
 
         if (sizing.Ready)
         {
-            if (sizing.SizeNow && HasLocalPlayerOrigin())
+            if (sizing.SizeNow && HasValidMissionSizing(sizing) && HasLocalPlayerOrigin())
             {
                 // On-time (common): both reserves present, so size before the first tick.
                 RunJointInit(sizing);
@@ -76,7 +79,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
             // Keep deployment held when the authoritative response cannot produce the local player agent.
             // OnMissionTick ends the invalid mission without allowing native SetupTeams to run.
             AddHeldPhases();
-            Logger.Error("[BattleSync] Battle reserves cannot produce the local player origin; holding deployment before aborting the invalid mission");
+            Logger.Error("[BattleSync] Battle reserves cannot produce valid mission sizing and a local player origin; holding deployment before aborting the invalid mission");
             return;
         }
 
@@ -102,7 +105,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         var sizing = ReadSizing();
         if (ShouldContinueHolding(sizing)) return;
 
-        if (!sizing.HasValidBattleSize || !HasLocalPlayerOrigin())
+        if (!HasValidMissionSizing(sizing) || !HasLocalPlayerOrigin())
         {
             AbortInvalidBattle(sizing);
             return;
@@ -121,6 +124,16 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     {
         return _heldSeconds < ReserveHoldDeadlineSeconds
             && (!sizing.Ready || !sizing.HasAnyOwnedTroops);
+    }
+
+    private bool HasValidMissionSizing(SideSizing sizing)
+    {
+        if (!sizing.HasValidBattleSize) return false;
+        if (!_isSallyOut) return true;
+
+        var targets = CalculateSallyOutSizing(
+            sizing.DefenderOwned, sizing.AttackerOwned, sizing.BattleSize);
+        return targets.DefenderTotal + targets.AttackerTotal > 0;
     }
 
     // The native deployment controller dereferences InitialPlayerAgent after spawning. Without the local
@@ -203,37 +216,64 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         return 0;
     }
 
-    // Re-run the engine's Init with the real totals (initial == total; Init applies the joint cap, wave split and
-    // agent counts). Clear the placeholder phases first — InitWithSinglePhase appends, so a leftover held phase
-    // would leave two active phases. Nothing spawned while held, so no double-spawn.
+    // Re-run the engine's Init with the authoritative totals. Clear the placeholder phases first because
+    // InitWithSinglePhase appends, and the sally-out controller may also have initialized phases before reserves land.
     private void RunJointInit(SideSizing sizing)
     {
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Defender].Clear();
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Attacker].Clear();
+        _missionAgentSpawnLogic._numberOfTroopsInTotal[(int)BattleSideEnum.Defender] = 0;
+        _missionAgentSpawnLogic._numberOfTroopsInTotal[(int)BattleSideEnum.Attacker] = 0;
 
-        var settings = CreateSandBoxBattleWaveSpawnSettings();
-        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
-            sizing.DefenderOwned,
-            sizing.AttackerOwned,
-            sizing.BattleSize,
-            settings.MaximumBattleSideRatio,
-            settings.DefenderAdvantageFactor);
-        var authoritativeSettings = new MissionSpawnSettings(
-            MissionSpawnSettings.InitialSpawnMethod.FreeAllocation,
-            settings.ReinforcementTroopsTimingMethod,
-            settings.ReinforcementTroopsSpawnMethod,
-            settings.GlobalReinforcementInterval,
-            settings.ReinforcementBatchPercentage,
-            settings.DesiredReinforcementPercentage,
-            settings.ReinforcementWavePercentage,
-            settings.MaximumReinforcementWaveCount,
-            settings.DefenderReinforcementBatchPercentage,
-            settings.AttackerReinforcementBatchPercentage,
-            settings.DefenderAdvantageFactor,
-            settings.MaximumBattleSideRatio);
-        _missionAgentSpawnLogic.InitWithSinglePhase(sizing.DefenderOwned, sizing.AttackerOwned,
-            targets.Defenders, targets.Attackers, spawnDefenders: true, spawnAttackers: true,
+        MissionSpawnSettings authoritativeSettings;
+        int defenderTotal;
+        int attackerTotal;
+        int defenderInitial;
+        int attackerInitial;
+        if (_isSallyOut)
+        {
+            var targets = CalculateSallyOutSizing(
+                sizing.DefenderOwned, sizing.AttackerOwned, sizing.BattleSize);
+            defenderTotal = targets.DefenderTotal;
+            attackerTotal = targets.AttackerTotal;
+            defenderInitial = targets.DefenderInitial;
+            attackerInitial = targets.AttackerInitial;
+            authoritativeSettings = CreateSallyOutSpawnSettings();
+        }
+        else
+        {
+            var settings = CreateSandBoxBattleWaveSpawnSettings();
+            var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+                sizing.DefenderOwned,
+                sizing.AttackerOwned,
+                sizing.BattleSize,
+                settings.MaximumBattleSideRatio,
+                settings.DefenderAdvantageFactor);
+            defenderTotal = sizing.DefenderOwned;
+            attackerTotal = sizing.AttackerOwned;
+            defenderInitial = targets.Defenders;
+            attackerInitial = targets.Attackers;
+            authoritativeSettings = new MissionSpawnSettings(
+                MissionSpawnSettings.InitialSpawnMethod.FreeAllocation,
+                settings.ReinforcementTroopsTimingMethod,
+                settings.ReinforcementTroopsSpawnMethod,
+                settings.GlobalReinforcementInterval,
+                settings.ReinforcementBatchPercentage,
+                settings.DesiredReinforcementPercentage,
+                settings.ReinforcementWavePercentage,
+                settings.MaximumReinforcementWaveCount,
+                settings.DefenderReinforcementBatchPercentage,
+                settings.AttackerReinforcementBatchPercentage,
+                settings.DefenderAdvantageFactor,
+                settings.MaximumBattleSideRatio);
+        }
+
+        _missionAgentSpawnLogic.InitWithSinglePhase(defenderTotal, attackerTotal,
+            defenderInitial, attackerInitial, spawnDefenders: true, spawnAttackers: true,
             in authoritativeSettings);
+        if (_isSallyOut)
+            _missionAgentSpawnLogic.SetCustomReinforcementSpawnTimer(
+                new SallyOutReinforcementSpawnTimer(1f, 90f, 15f, 5));
 
         GuaranteePlayerInitialSlots();
         ClampPhasesToOwnedShare(BattleSideEnum.Defender, _defenderSupplier);
@@ -264,15 +304,39 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         BattleSpawnGate.RestoreReserveSide(BattleSideEnum.Attacker);
 
         var settings = _missionAgentSpawnLogic.SpawnSettings;
-        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
-            defenderSnapshot.SideTotalTroops,
-            attackerSnapshot.SideTotalTroops,
-            defenderSnapshot.BattleSize,
-            settings.MaximumBattleSideRatio,
-            settings.DefenderAdvantageFactor);
+        int defenderLifetimeTarget;
+        int attackerLifetimeTarget;
+        if (_isSallyOut)
+        {
+            var targets = CalculateSallyOutSizing(
+                defenderSnapshot.SideTotalTroops,
+                attackerSnapshot.SideTotalTroops,
+                defenderSnapshot.BattleSize);
+            defenderLifetimeTarget = targets.DefenderTotal;
+            attackerLifetimeTarget = targets.AttackerTotal;
+        }
+        else
+        {
+            var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+                defenderSnapshot.SideTotalTroops,
+                attackerSnapshot.SideTotalTroops,
+                defenderSnapshot.BattleSize,
+                settings.MaximumBattleSideRatio,
+                settings.DefenderAdvantageFactor);
+            defenderLifetimeTarget = CalculateLifetimeTarget(
+                defenderSnapshot.SideTotalTroops,
+                targets.Defenders,
+                settings.ReinforcementWavePercentage,
+                settings.MaximumReinforcementWaveCount);
+            attackerLifetimeTarget = CalculateLifetimeTarget(
+                attackerSnapshot.SideTotalTroops,
+                targets.Attackers,
+                settings.ReinforcementWavePercentage,
+                settings.MaximumReinforcementWaveCount);
+        }
 
-        ReconcileSideLifetimeQuota(BattleSideEnum.Defender, defenderSnapshot, targets.Defenders, settings);
-        ReconcileSideLifetimeQuota(BattleSideEnum.Attacker, attackerSnapshot, targets.Attackers, settings);
+        ReconcileSideLifetimeQuota(BattleSideEnum.Defender, defenderSnapshot, defenderLifetimeTarget);
+        ReconcileSideLifetimeQuota(BattleSideEnum.Attacker, attackerSnapshot, attackerLifetimeTarget);
 
         _appliedAllocationRevision = allocationRevision;
         Logger.Information("[BattleSync] Reconciled refreshed native quotas: Defender={Def}, Attacker={Atk}",
@@ -284,13 +348,8 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         => defenderRevision > 0 && defenderRevision == attackerRevision ? defenderRevision : 0;
 
     private void ReconcileSideLifetimeQuota(BattleSideEnum side,
-        CoopTroopSupplier.AllocationSnapshot allocationSnapshot, int initialTarget, MissionSpawnSettings settings)
+        CoopTroopSupplier.AllocationSnapshot allocationSnapshot, int sideLifetimeTarget)
     {
-        int sideLifetimeTarget = CalculateLifetimeTarget(
-            allocationSnapshot.SideTotalTroops,
-            initialTarget,
-            settings.ReinforcementWavePercentage,
-            settings.MaximumReinforcementWaveCount);
         int ownedLifetimeTarget = allocationSnapshot.OwnedShareOf(sideLifetimeTarget);
         int reserved = _missionAgentSpawnLogic._battleSideSpawnContexts[(int)side].ReservedTroopsCount;
         ReconcilePhaseLifetimeQuota(
@@ -416,12 +475,49 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     internal static int ReachableSpawnNumber(int sideNumber, int ownedShareOfSideNumber)
         => Math.Min(sideNumber, ownedShareOfSideNumber);
 
+    internal static MissionSpawnSettings CreateSallyOutSpawnSettings()
+        => SallyOutMissionController.CreateSallyOutSpawnSettings(0.01f, 0.1f);
+
+    private SallyOutSizing CalculateSallyOutSizing(
+        int defenderTotal, int attackerTotal, int battleSize)
+    {
+        var controller = Mission.GetMissionBehavior<SallyOutMissionController>();
+        if (controller == null || controller.MissionAgentSpawnLogic.BattleSize != battleSize)
+            return default;
+
+        controller.AdjustTotalTroopCounts(ref defenderTotal, ref attackerTotal);
+        int initialPerSide = (int)Math.Ceiling((defenderTotal + attackerTotal) * 0.1f);
+        return new SallyOutSizing(
+            defenderTotal,
+            attackerTotal,
+            Math.Min(defenderTotal, initialPerSide),
+            Math.Min(attackerTotal, initialPerSide));
+    }
+
     // Zero phases so the first tick has active phases to read (else DefenderActivePhase NREs), without feeding Init
-    // a 0/0 total: its float battle-size split yields NaN, which Mono casts to int.MinValue (desktop .NET gives 0).
+    // a 0/0 total. Clear first because the sally-out controller initializes its native phases before this handler.
     private void AddHeldPhases()
     {
+        _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Defender].Clear();
+        _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Attacker].Clear();
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Defender].Add(new MissionSpawnPhase());
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Attacker].Add(new MissionSpawnPhase());
+    }
+
+    internal readonly struct SallyOutSizing
+    {
+        public readonly int DefenderTotal;
+        public readonly int AttackerTotal;
+        public readonly int DefenderInitial;
+        public readonly int AttackerInitial;
+
+        public SallyOutSizing(int defenderTotal, int attackerTotal, int defenderInitial, int attackerInitial)
+        {
+            DefenderTotal = defenderTotal;
+            AttackerTotal = attackerTotal;
+            DefenderInitial = defenderInitial;
+            AttackerInitial = attackerInitial;
+        }
     }
 
     /// <summary>
