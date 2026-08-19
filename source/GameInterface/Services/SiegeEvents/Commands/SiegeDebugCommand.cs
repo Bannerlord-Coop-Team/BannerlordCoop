@@ -10,6 +10,7 @@ using GameInterface.Services.Party.Commands;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEngines;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using SandBox.View.Map;
@@ -863,6 +864,105 @@ public class SiegeDebugCommand
 
         var mapEventId = objectManager.TryGetId(mapEvent, out string id) ? id : mapEvent.StringId;
         return $"Started AI siege assault by {attacker.Name} against {settlement.Name} (MapEvent {mapEventId})";
+    }
+
+    /// <summary>
+    /// Reports the exact vanilla readiness inputs and the starvation terminal decision. Read-only.
+    /// </summary>
+    [CommandLineArgumentFunction("terminal_status", "coop.debug.siege")]
+    public static string TerminalStatus(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.terminal_status town_ES1";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            || !ContainerProvider.TryResolve<IAiSiegeAssaultReadiness>(out var readiness)
+            || !ContainerProvider.TryResolve<IAiSiegeTerminalPolicy>(out var terminalPolicy))
+        {
+            return "Unable to resolve AI siege terminal services";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var siegeEvent = settlement.SiegeEvent;
+        var camp = siegeEvent?.BesiegerCamp;
+        var leader = camp?.LeaderParty;
+        if (siegeEvent == null || camp == null || leader == null)
+        {
+            return $"{settlement.Name} has no active siege leader";
+        }
+
+        var result = readiness.Evaluate(camp);
+        int starvingParties = 0;
+        int commandGroupParties = 0;
+        if (leader.Army?.LeaderParty == leader)
+        {
+            commandGroupParties = leader.Army.LeaderPartyAndAttachedPartiesCount;
+            starvingParties = leader.Party.IsStarving ? 1 : 0;
+            starvingParties += leader.AttachedParties.Count(party => party.Party.IsStarving);
+        }
+
+        bool foodProblem = commandGroupParties > 0
+            && (float)starvingParties / (float)commandGroupParties > 0.5f;
+        bool activeTransition = leader.MapEvent != null || settlement.Party.MapEvent != null;
+        var decision = terminalPolicy.GetDecision(new AiSiegeTerminalContext(
+            foodProblem,
+            camp.IsPreparationComplete,
+            leader.IsPlayerParty(),
+            isCurrentSiege: true,
+            activeTransition,
+            result.IsViable));
+
+        return $"settlement={settlement.StringId} leader={leader.StringId} playerLed={leader.IsPlayerParty()} " +
+            $"prepared={camp.IsPreparationComplete} elapsedHours={siegeEvent.SiegeStartTime.ElapsedHoursUntilNow:0.0} " +
+            $"starving={starvingParties}/{commandGroupParties} foodProblem={foodProblem} activeTransition={activeTransition} " +
+            $"attacker={result.AttackerStrength:0.00} defender={result.DefenderStrength:0.00} " +
+            $"powerRatio={result.PowerRatioBeforeEquipment:0.000} adjustedRatio={result.PowerRatioAfterEquipment:0.000} " +
+            $"assaultChance={result.AssaultChance:0.000} viable={result.IsViable} decision={decision}";
+    }
+
+    /// <summary>
+    /// Simulates the vanilla food-problem terminal event for an AI siege. Server only.
+    /// </summary>
+    [CommandLineArgumentFunction("resolve_starvation", "coop.debug.siege")]
+    public static string ResolveStarvation(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.resolve_starvation town_ES1";
+        }
+
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be used by the server";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            || !ContainerProvider.TryResolve<IAiSiegeTerminalPolicy>(out var terminalPolicy))
+        {
+            return "Unable to resolve AI siege terminal services";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var siegeEvent = settlement.SiegeEvent;
+        var leader = siegeEvent?.BesiegerCamp?.LeaderParty;
+        if (siegeEvent == null || leader == null)
+        {
+            return $"{settlement.Name} has no active siege leader";
+        }
+
+        var decision = terminalPolicy.ResolveFoodProblem(
+            new AiSiegeTerminalTransitionState(leader, siegeEvent));
+        return $"Simulated starvation terminal policy at {settlement.Name} ({settlement.StringId}): {decision}";
     }
 
     // coop.debug.siege.list
