@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Data;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Patches;
@@ -40,11 +41,14 @@ public class MapEventResultsInterface : IMapEventResultsInterface
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventResultsInterface>();
     private readonly IObjectManager objectManager;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
 
-    public MapEventResultsInterface(IObjectManager objectManager, ITroopRosterInterface troopRosterInterface)
+    public MapEventResultsInterface(IObjectManager objectManager, ITroopRosterInterface troopRosterInterface,
+        IRetreatedMapEventPartyTracker retreatedPartyTracker)
     {
         this.objectManager = objectManager;
         this.troopRosterInterface = troopRosterInterface;
+        this.retreatedPartyTracker = retreatedPartyTracker;
     }
 
     public NetworkPlayerLootData PackPlayerLootData(PlayerLootData playerLootData)
@@ -175,8 +179,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         {
             if (mapEvent.BattleState == BattleState.AttackerVictory || mapEvent.BattleState == BattleState.DefenderVictory)
             {
-                MBList<MapEventParty> defeatedParties = mapEvent.GetMapEventSide(mapEvent.DefeatedSide).Parties.ToMBList<MapEventParty>();
-                MBList<MapEventParty> winnerParties = mapEvent.GetMapEventSide(mapEvent.WinningSide).Parties.ToMBList<MapEventParty>();
+                MBList<MapEventParty> defeatedParties = mapEvent.GetMapEventSide(mapEvent.DefeatedSide).Parties
+                    .Where(party => !retreatedPartyTracker.IsRetreated(mapEvent, party.Party)).ToMBList<MapEventParty>();
+                MBList<MapEventParty> winnerParties = mapEvent.GetMapEventSide(mapEvent.WinningSide).Parties
+                    .Where(party => !retreatedPartyTracker.IsRetreated(mapEvent, party.Party)).ToMBList<MapEventParty>();
 
                 List<MapEventParty> winnerPlayerParties = winnerParties.FindAll(x => x.Party.MobileParty.IsPlayerParty());
                 bool winningSideIncludesPlayers = winnerPlayerParties.Count > 0;
