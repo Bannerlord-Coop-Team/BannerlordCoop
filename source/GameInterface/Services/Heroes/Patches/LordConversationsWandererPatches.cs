@@ -36,8 +36,8 @@ internal class LordConversationsWandererPatches
             && CharacterObject.OneToOneConversationCharacter.IsHero
             && CharacterObject.OneToOneConversationCharacter.Occupation == Occupation.Wanderer
             && CharacterObject.OneToOneConversationCharacter.HeroObject.HeroState != Hero.CharacterStates.Prisoner
-            && Hero.OneToOneConversationHero.CompanionOf != null
-            && Hero.OneToOneConversationHero.Clan == Clan.PlayerClan;
+            && (Hero.OneToOneConversationHero.CompanionOf == null
+            || Hero.OneToOneConversationHero.CompanionOf == Clan.PlayerClan);
 
         return false;
     }
