@@ -48,6 +48,9 @@ internal sealed class FakeGalaxySdk : IGalaxySdk
     public bool CompleteLobbyDataWritesImmediately { get; set; } = true;
     public bool InviteDialogResult { get; set; } = true;
     public bool RichPresenceResult { get; set; } = true;
+    public bool AuthenticationSucceeds { get; set; } = true;
+    public bool CompleteAuthenticationImmediately { get; set; } = true;
+    public ulong AuthenticatedUserId { get; set; } = 100;
     public bool ThrowOnCreate { get; set; }
     public string FailedLobbyDataKey { get; set; } = string.Empty;
     public string ThrowOnLobbyDataWriteKey { get; set; } = string.Empty;
@@ -61,6 +64,7 @@ internal sealed class FakeGalaxySdk : IGalaxySdk
         new List<(GalaxyLobbyVisibility, int)>();
     public List<ulong> LobbyDataRequests { get; } = new List<ulong>();
     public List<ulong> JoinRequests { get; } = new List<ulong>();
+    public int AuthenticationRequests { get; private set; }
     public bool RichPresenceCleared { get; private set; }
     public bool Disposed { get; private set; }
 
@@ -73,9 +77,38 @@ internal sealed class FakeGalaxySdk : IGalaxySdk
             new Queue<(ulong, string, string, Action<bool>)>();
     private Action<ulong, bool> pendingJoin;
     private ulong pendingJoinLobbyId;
+    private Action<bool> pendingAuthentication;
 
     public event Action<string> GameJoinRequested;
     public event Action<ulong, byte, byte[]> PacketReceived;
+
+    public void EnsureAuthenticated(Action<bool> onCompleted)
+    {
+        if (LocalUserId != 0)
+        {
+            onCompleted(true);
+            return;
+        }
+
+        AuthenticationRequests++;
+        if (CompleteAuthenticationImmediately)
+        {
+            if (AuthenticationSucceeds) LocalUserId = AuthenticatedUserId;
+            onCompleted(AuthenticationSucceeds);
+        }
+        else
+        {
+            pendingAuthentication += onCompleted;
+        }
+    }
+
+    public void CompleteAuthentication(bool success)
+    {
+        if (success) LocalUserId = AuthenticatedUserId;
+        var callback = pendingAuthentication;
+        pendingAuthentication = null;
+        callback?.Invoke(success);
+    }
 
     public void CreateLobby(
         GalaxyLobbyVisibility visibility,

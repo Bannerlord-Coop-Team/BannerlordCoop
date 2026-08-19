@@ -43,20 +43,7 @@ public sealed class GalaxySessionProvider : ISessionProvider
         try
         {
             sdk = new GalaxySdk(gameServer: false);
-            if (sdk.LocalUserId == 0)
-            {
-                sdk.Dispose();
-                Logger.Warning("Galaxy session integration unavailable: local Galaxy identity is invalid");
-                return null;
-            }
-
-            var joinListener = new GalaxyJoinListener(messageBroker, sdk, joinRequestGate);
-            return new GalaxySessionProvider(
-                sdk,
-                joinListener,
-                new GalaxyLobbyBrowser(sdk),
-                new GalaxyTunnelJoinEndpointPreparer(sdk),
-                gameServer: false);
+            return CreateClient(sdk, messageBroker, joinRequestGate);
         }
         catch (Exception ex)
         {
@@ -89,6 +76,7 @@ public sealed class GalaxySessionProvider : ISessionProvider
 
     public string Provider => ProviderId;
     public string DisplayName => "GOG";
+    public bool IsAvailable => gameServer || sdk.LocalUserId != 0;
     public bool SupportsDedicatedServer => GalaxyGameServerBoot.HasConfiguredCredentials;
     public ISessionBrowser Browser => browser;
     public ITunnelJoinEndpointPreparer JoinEndpointPreparer => joinEndpointPreparer;
@@ -167,6 +155,36 @@ public sealed class GalaxySessionProvider : ISessionProvider
         PeerIdentityBridgeName.IsValid(bridgeName)
             ? new NamedPipePeerIdentityPublisher(bridgeName)
             : NoopPeerIdentityPublisher.Instance;
+
+    internal static GalaxySessionProvider CreateClient(
+        IGalaxySdk sdk,
+        IMessageBroker messageBroker,
+        ISessionJoinRequestGate joinRequestGate)
+    {
+        if (sdk == null) throw new ArgumentNullException(nameof(sdk));
+
+        var joinListener = new GalaxyJoinListener(messageBroker, sdk, joinRequestGate);
+        var provider = new GalaxySessionProvider(
+            sdk,
+            joinListener,
+            new GalaxyLobbyBrowser(sdk),
+            new GalaxyTunnelJoinEndpointPreparer(sdk),
+            gameServer: false);
+
+        if (!provider.IsAvailable)
+        {
+            Logger.Warning("Galaxy identity is not authenticated yet; retrying Galaxy sign-in");
+            sdk.EnsureAuthenticated(success =>
+            {
+                if (success)
+                    Logger.Information("Galaxy identity authenticated; GOG session services are ready");
+                else
+                    Logger.Warning("Galaxy sign-in failed; launch Bannerlord through GOG Galaxy and retry the lobby search");
+            });
+        }
+
+        return provider;
+    }
 
     private sealed class GalaxyTransportTargetSource : ISessionTransportTargetSource
     {

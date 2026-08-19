@@ -32,13 +32,41 @@ public sealed class GalaxyLobbyBrowser : ISessionBrowser
         requestInFlight = true;
         try
         {
-            sdk.RequestLobbyList((lobbyIds, success) =>
-                HandleLobbyList(lobbyIds, success, onCompleted));
+            sdk.EnsureAuthenticated(authenticated =>
+            {
+                if (!authenticated)
+                {
+                    Finish(
+                        Array.Empty<SessionListing>(),
+                        "GOG Galaxy is not signed in; launch Bannerlord through GOG Galaxy and try again",
+                        onCompleted);
+                    return;
+                }
+
+                RequestAuthenticatedSessions(onCompleted);
+            });
         }
         catch (Exception ex)
         {
             requestInFlight = false;
             onCompleted(Array.Empty<SessionListing>(), $"Could not search GOG lobbies: {ex.Message}");
+        }
+    }
+
+    private void RequestAuthenticatedSessions(
+        Action<IReadOnlyList<SessionListing>, string> onCompleted)
+    {
+        try
+        {
+            sdk.RequestLobbyList((lobbyIds, success) =>
+                HandleLobbyList(lobbyIds, success, onCompleted));
+        }
+        catch (Exception ex)
+        {
+            Finish(
+                Array.Empty<SessionListing>(),
+                $"Could not search GOG lobbies: {ex.Message}",
+                onCompleted);
         }
     }
 

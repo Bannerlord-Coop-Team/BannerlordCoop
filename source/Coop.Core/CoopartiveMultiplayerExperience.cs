@@ -152,9 +152,17 @@ namespace Coop.Core
 
             // Without a storefront provider, keep the in-process dedicated-server behavior: this instance becomes
             // the server, and the player launches a second instance to join it.
-            if (!SessionDiscovery.ProviderAvailable)
+            if (!SessionDiscovery.ProviderConfigured)
             {
                 StartAsServer(obj.What.SaveName, password, visibility);
+                return;
+            }
+
+            if (!SessionDiscovery.ProviderAvailable)
+            {
+                string providerName = SessionDiscovery.ClientProvider.DisplayName;
+                InformationManager.DisplayMessage(new InformationMessage(
+                    $"{providerName} authentication is not ready; launch Bannerlord through {providerName} and try hosting again"));
                 return;
             }
 

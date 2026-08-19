@@ -48,6 +48,7 @@ public sealed class SteamSessionProvider : ISessionProvider
 
     public string Provider => ProviderId;
     public string DisplayName => "Steam";
+    public bool IsAvailable => true;
     public bool SupportsDedicatedServer => true;
     public ISessionBrowser Browser => browser;
     public ITunnelJoinEndpointPreparer JoinEndpointPreparer => joinEndpointPreparer;

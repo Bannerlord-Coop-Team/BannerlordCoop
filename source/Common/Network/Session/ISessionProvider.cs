@@ -66,6 +66,7 @@ public interface ISessionProvider : IDisposable
 {
     string Provider { get; }
     string DisplayName { get; }
+    bool IsAvailable { get; }
     bool SupportsDedicatedServer { get; }
     ISessionBrowser Browser { get; }
     ITunnelJoinEndpointPreparer JoinEndpointPreparer { get; }

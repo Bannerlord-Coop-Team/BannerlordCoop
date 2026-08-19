@@ -22,6 +22,7 @@ public sealed class GalaxyJoinListener : ISessionMembership, IDisposable
     private ulong joiningLobbyId;
     private ulong activeLobbyId;
     private ulong activeLobbyAdvertiserId;
+    private bool disposed;
 
     internal GalaxyJoinListener(
         IMessageBroker messageBroker,
@@ -90,24 +91,73 @@ public sealed class GalaxyJoinListener : ISessionMembership, IDisposable
             return;
         }
 
-        LeaveActiveLobby();
         joinInFlight = true;
         joiningLobbyId = lobbyId;
         resolveJoinInfoAfterEnter = resolveJoinInfo;
         leaveWhenJoinCompletes = false;
         try
         {
+            sdk.EnsureAuthenticated(authenticated =>
+                HandleAuthenticationCompleted(lobbyId, authenticated));
+        }
+        catch (Exception ex)
+        {
+            CompleteJoinFailure(
+                lobbyId,
+                "Could not authenticate with GOG Galaxy",
+                ex);
+        }
+    }
+
+    private void HandleAuthenticationCompleted(ulong lobbyId, bool authenticated)
+    {
+        if (disposed || !joinInFlight || joiningLobbyId != lobbyId) return;
+        if (leaveWhenJoinCompletes)
+        {
+            ResetJoinState();
+            return;
+        }
+
+        if (!authenticated)
+        {
+            CompleteJoinFailure(
+                lobbyId,
+                "GOG Galaxy is not signed in; launch Bannerlord through GOG Galaxy and try again");
+            return;
+        }
+
+        if (resolveJoinInfoAfterEnter && !joinRequestGate.CanStartJoin())
+        {
+            ResetJoinState();
+            return;
+        }
+
+        try
+        {
+            LeaveActiveLobby();
             sdk.JoinLobby(lobbyId, HandleLobbyEntered);
         }
         catch (Exception ex)
         {
-            joinInFlight = false;
-            joiningLobbyId = 0;
-            resolveJoinInfoAfterEnter = false;
-            Logger.Error(ex, "Failed to join GOG lobby {LobbyId}", lobbyId.ToString());
-            if (resolveJoinInfo)
-                messageBroker.Publish(this, new SessionJoinFailed("Could not join the GOG lobby"));
+            CompleteJoinFailure(lobbyId, "Could not join the GOG lobby", ex);
         }
+    }
+
+    private void CompleteJoinFailure(ulong lobbyId, string reason, Exception exception = null)
+    {
+        bool resolveJoinInfo = resolveJoinInfoAfterEnter;
+        ResetJoinState();
+        if (exception != null)
+            Logger.Error(exception, "Failed to join GOG lobby {LobbyId}", lobbyId.ToString());
+        if (resolveJoinInfo) messageBroker.Publish(this, new SessionJoinFailed(reason));
+    }
+
+    private void ResetJoinState()
+    {
+        joinInFlight = false;
+        joiningLobbyId = 0;
+        resolveJoinInfoAfterEnter = false;
+        leaveWhenJoinCompletes = false;
     }
 
     private void HandleLobbyEntered(ulong lobbyId, bool success)
@@ -119,6 +169,7 @@ public sealed class GalaxyJoinListener : ISessionMembership, IDisposable
 
         if (!success)
         {
+            leaveWhenJoinCompletes = false;
             if (resolveJoinInfo)
                 messageBroker.Publish(this, new SessionJoinFailed("Could not join the GOG lobby"));
             return;
@@ -237,6 +288,7 @@ public sealed class GalaxyJoinListener : ISessionMembership, IDisposable
 
     public void Dispose()
     {
+        disposed = true;
         LeaveSession();
         sdk.GameJoinRequested -= HandleGameJoinRequested;
         messageBroker.Unsubscribe<JoinSessionListing>(HandleJoinListing);

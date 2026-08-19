@@ -26,6 +26,7 @@ internal interface IGalaxySdk : IDisposable
     event Action<string> GameJoinRequested;
     event Action<ulong, byte, byte[]> PacketReceived;
 
+    void EnsureAuthenticated(Action<bool> onCompleted);
     void CreateLobby(
         GalaxyLobbyVisibility visibility,
         int maxMembers,

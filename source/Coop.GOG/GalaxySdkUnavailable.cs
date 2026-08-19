@@ -24,6 +24,8 @@ internal sealed class GalaxySdk : IGalaxySdk
         remove => throw Unavailable();
     }
 
+    public void EnsureAuthenticated(Action<bool> onCompleted) => throw Unavailable();
+
     public void CreateLobby(
         GalaxyLobbyVisibility visibility,
         int maxMembers,

@@ -9,6 +9,54 @@ namespace Coop.Tests.GOG;
 public class GalaxyLobbyBrowserTests
 {
     [Fact]
+    public void RequestSessions_WhenGalaxyAuthenticationFails_ReportsHowToRetry()
+    {
+        var sdk = new FakeGalaxySdk
+        {
+            LocalUserId = 0,
+            AuthenticationSucceeds = false,
+        };
+        var browser = new GalaxyLobbyBrowser(sdk);
+        IReadOnlyList<SessionListing> result = null;
+        string error = null;
+
+        browser.RequestSessions((listings, failure) =>
+        {
+            result = listings;
+            error = failure;
+        });
+
+        Assert.Empty(result);
+        Assert.Contains("launch Bannerlord through GOG Galaxy", error);
+        Assert.Equal(1, sdk.AuthenticationRequests);
+    }
+
+    [Fact]
+    public void RequestSessions_WhenPendingAuthenticationCompletes_ContinuesLobbySearch()
+    {
+        var sdk = new FakeGalaxySdk
+        {
+            LocalUserId = 0,
+            CompleteAuthenticationImmediately = false,
+        };
+        var browser = new GalaxyLobbyBrowser(sdk);
+        IReadOnlyList<SessionListing> result = null;
+        string error = "not completed";
+
+        browser.RequestSessions((listings, failure) =>
+        {
+            result = listings;
+            error = failure;
+        });
+
+        Assert.Null(result);
+        sdk.CompleteAuthentication(success: true);
+
+        Assert.Empty(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
     public void RequestSessions_ReturnsDisplaySafeGogListing()
     {
         var sdk = new FakeGalaxySdk { LobbyList = new ulong[] { 42 } };

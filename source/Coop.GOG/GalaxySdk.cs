@@ -17,8 +17,10 @@ internal sealed class GalaxySdk : IGalaxySdk
     private readonly IFriends friends;
     private readonly IDisposable networkingListener;
     private readonly IDisposable gameJoinListener;
+    private readonly List<Action<bool>> authenticationWaiters = new List<Action<bool>>();
     private readonly HashSet<LobbyDataUpdateListener> lobbyDataUpdateListeners =
         new HashSet<LobbyDataUpdateListener>();
+    private AuthenticationListener authenticationListener;
     private bool disposed;
 
     public GalaxySdk(bool gameServer)
@@ -36,12 +38,57 @@ internal sealed class GalaxySdk : IGalaxySdk
             gameJoinListener = new GameJoinListener(connectionString => GameJoinRequested?.Invoke(connectionString));
     }
 
-    public ulong LocalUserId => user.GetGalaxyID().ToUint64();
+    public ulong LocalUserId
+    {
+        get
+        {
+            if (!user.SignedIn()) return 0;
+
+            using (GalaxyID galaxyId = user.GetGalaxyID())
+            {
+                return galaxyId != null &&
+                    galaxyId.IsValid() &&
+                    galaxyId.GetIDType() == GalaxyID.IDType.ID_TYPE_USER
+                        ? galaxyId.ToUint64()
+                        : 0;
+            }
+        }
+    }
+
     public string LocalPersonaName => gameServer ? "Dedicated Server" : friends.GetPersonaName();
     public uint UtcNowSeconds => unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
     public event Action<string> GameJoinRequested;
     public event Action<ulong, byte, byte[]> PacketReceived;
+
+    public void EnsureAuthenticated(Action<bool> onCompleted)
+    {
+        if (onCompleted == null) throw new ArgumentNullException(nameof(onCompleted));
+        if (disposed || gameServer)
+        {
+            onCompleted(false);
+            return;
+        }
+
+        if (LocalUserId != 0)
+        {
+            onCompleted(true);
+            return;
+        }
+
+        authenticationWaiters.Add(onCompleted);
+        if (authenticationListener != null) return;
+
+        authenticationListener = new AuthenticationListener(CompleteAuthentication);
+        try
+        {
+            user.SignInGalaxy(requireOnline: true, authenticationListener);
+        }
+        catch
+        {
+            CompleteAuthentication(false);
+        }
+    }
 
     public void CreateLobby(
         GalaxyLobbyVisibility visibility,
@@ -204,8 +251,39 @@ internal sealed class GalaxySdk : IGalaxySdk
         lobbyDataUpdateListeners.Clear();
         foreach (var listener in dataUpdateListeners) listener.Dispose();
 
+        authenticationListener?.Dispose();
+        authenticationListener = null;
+        CompleteAuthenticationWaiters(false);
+
         networkingListener?.Dispose();
         gameJoinListener?.Dispose();
+    }
+
+    private void CompleteAuthentication(bool success)
+    {
+        authenticationListener?.Dispose();
+        authenticationListener = null;
+
+        bool authenticated = false;
+        if (success)
+        {
+            try
+            {
+                authenticated = LocalUserId != 0;
+            }
+            catch
+            {
+            }
+        }
+
+        CompleteAuthenticationWaiters(authenticated);
+    }
+
+    private void CompleteAuthenticationWaiters(bool success)
+    {
+        Action<bool>[] waiters = authenticationWaiters.ToArray();
+        authenticationWaiters.Clear();
+        foreach (Action<bool> waiter in waiters) waiter(success);
     }
 
     private static LobbyType ToLobbyType(GalaxyLobbyVisibility visibility) => visibility switch
@@ -215,6 +293,20 @@ internal sealed class GalaxySdk : IGalaxySdk
         GalaxyLobbyVisibility.Public => LobbyType.LOBBY_TYPE_PUBLIC,
         _ => throw new ArgumentOutOfRangeException(nameof(visibility)),
     };
+
+    private sealed class AuthenticationListener : IAuthListener
+    {
+        private readonly Action<bool> completed;
+
+        public AuthenticationListener(Action<bool> completed)
+        {
+            this.completed = completed;
+        }
+
+        public override void OnAuthSuccess() => completed(true);
+        public override void OnAuthFailure(FailureReason failureReason) => completed(false);
+        public override void OnAuthLost() => completed(false);
+    }
 
     private sealed class LobbyCreatedListener : ILobbyCreatedListener
     {

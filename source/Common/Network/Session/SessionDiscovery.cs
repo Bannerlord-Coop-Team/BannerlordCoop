@@ -9,7 +9,8 @@ public static class SessionDiscovery
     public static ISessionProvider ClientProvider { get; set; }
     public static ISessionProvider ServerProvider { get; set; }
 
-    public static bool ProviderAvailable => ClientProvider != null;
+    public static bool ProviderConfigured => ClientProvider != null;
+    public static bool ProviderAvailable => ClientProvider?.IsAvailable == true;
 
     public static ISessionBrowser Browser => ClientProvider?.Browser ?? UnavailableSessionBrowser.Instance;
 

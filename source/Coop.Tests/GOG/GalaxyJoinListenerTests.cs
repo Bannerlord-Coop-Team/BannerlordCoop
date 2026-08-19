@@ -64,6 +64,87 @@ public class GalaxyJoinListenerTests : IDisposable
     }
 
     [Fact]
+    public void GameJoinRequest_WaitsForAuthenticationBeforeJoining()
+    {
+        sdk.LocalUserId = 0;
+        sdk.CompleteAuthenticationImmediately = false;
+        GalaxyLobbyBrowserTests.ConfigureListing(sdk, 42, ownerId: 500, ownerName: "host");
+
+        sdk.RaiseGameJoinRequested("+connect_gog_lobby 42");
+
+        Assert.Equal(1, sdk.AuthenticationRequests);
+        Assert.Empty(sdk.JoinRequests);
+        Assert.Empty(resolved);
+
+        sdk.CompleteAuthentication(success: true);
+
+        Assert.Equal(42UL, Assert.Single(sdk.JoinRequests));
+        Assert.Single(resolved);
+        Assert.Empty(failed);
+    }
+
+    [Fact]
+    public void GameJoinRequest_WhenAuthenticationFails_PublishesLaunchGuidance()
+    {
+        sdk.LocalUserId = 0;
+        sdk.AuthenticationSucceeds = false;
+
+        sdk.RaiseGameJoinRequested("+connect_gog_lobby 42");
+
+        Assert.Empty(sdk.JoinRequests);
+        Assert.Empty(resolved);
+        Assert.Contains("launch Bannerlord through GOG Galaxy", Assert.Single(failed).Reason);
+    }
+
+    [Fact]
+    public void AbandonedAuthentication_DoesNotJoinAfterAuthenticationCompletes()
+    {
+        sdk.LocalUserId = 0;
+        sdk.CompleteAuthenticationImmediately = false;
+
+        messageBroker.Publish(this, new JoinSessionListing(new SessionListingId("gog", "42")));
+        messageBroker.Publish(this, new SessionJoinAbandoned());
+        sdk.CompleteAuthentication(success: true);
+
+        Assert.Empty(sdk.JoinRequests);
+        Assert.Empty(resolved);
+        Assert.Empty(failed);
+    }
+
+    [Fact]
+    public void AbandonedAuthentication_DoesNotFailWhenAuthenticationFails()
+    {
+        sdk.LocalUserId = 0;
+        sdk.CompleteAuthenticationImmediately = false;
+
+        messageBroker.Publish(this, new JoinSessionListing(new SessionListingId("gog", "42")));
+        messageBroker.Publish(this, new SessionJoinAbandoned());
+        sdk.CompleteAuthentication(success: false);
+
+        Assert.Empty(sdk.JoinRequests);
+        Assert.Empty(resolved);
+        Assert.Empty(failed);
+    }
+
+    [Fact]
+    public void AuthenticationCompletion_RechecksJoinGateBeforeLeavingCurrentLobby()
+    {
+        listener.JoinSession(new SessionListingId("gog", "41"));
+        sdk.LocalUserId = 0;
+        sdk.CompleteAuthenticationImmediately = false;
+
+        sdk.RaiseGameJoinRequested("+connect_gog_lobby 42");
+        joinRequestGate.CanStart = false;
+        sdk.CompleteAuthentication(success: true);
+
+        Assert.Equal(new SessionListingId("gog", "41"), listener.ListingId);
+        Assert.Equal(41UL, Assert.Single(sdk.JoinRequests));
+        Assert.Empty(sdk.LeftLobbies);
+        Assert.Empty(resolved);
+        Assert.Empty(failed);
+    }
+
+    [Fact]
     public void GameJoinRequest_WhenSessionRejectsJoin_KeepsCurrentLobbyMembership()
     {
         listener.JoinSession(new SessionListingId("gog", "41"));
