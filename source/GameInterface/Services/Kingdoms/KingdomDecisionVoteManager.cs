@@ -62,7 +62,7 @@ namespace GameInterface.Services.Kingdoms
             string notificationText = null);
         void CloseDecision(string kingdomId, int decisionIndex);
         void ClearDecisionState(string kingdomId, int decisionIndex);
-        void ClearDecisionState(KingdomDecision decision);
+        void ClearDecisionState(Kingdom kingdom, int decisionIndex);
     }
 
     public class KingdomDecisionVoteManager : IKingdomDecisionVoteManager, IDisposable
@@ -607,15 +607,17 @@ namespace GameInterface.Services.Kingdoms
             RemoveDecisionState(decision);
         }
 
-        public void ClearDecisionState(KingdomDecision decision)
+        public void ClearDecisionState(Kingdom kingdom, int decisionIndex)
         {
-            if (decision != null &&
-                TryGetKingdomId(decision.Kingdom, out string kingdomId) &&
-                TryGetDecisionIndex(decision, out int decisionIndex))
+            if (kingdom == null || decisionIndex < 0) return;
+
+            if (TryGetKingdomId(kingdom, out string kingdomId))
             {
                 RemoveAndRemapPendingDecisionState(kingdomId, decisionIndex);
             }
-            RemoveDecisionState(decision);
+            if (kingdom._unresolvedDecisions == null || decisionIndex >= kingdom._unresolvedDecisions.Count) return;
+
+            RemoveDecisionState(kingdom._unresolvedDecisions[decisionIndex]);
         }
 
         private void RefreshDecisionIdentities()
