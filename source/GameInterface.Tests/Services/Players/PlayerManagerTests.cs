@@ -11,7 +11,9 @@ using Serilog;
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Players;
@@ -19,12 +21,14 @@ namespace GameInterface.Tests.Services.Players;
 public class PlayerManagerTests
 {
     private const string ControllerId = "PlayerOne";
+    private const string HeroId = "HeroOne";
     private const string PartyId = "PartyOne";
 
     static PlayerManagerTests()
     {
         RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
     }
+
     private static PlayerManager CreatePlayerManager(out Mock<IObjectManager> objectManager)
     {
         objectManager = new Mock<IObjectManager>();
@@ -32,6 +36,7 @@ public class PlayerManagerTests
 
         return new PlayerManager(new Mock<ILogger>().Object, objectManager.Object, controllerIdProvider);
     }
+
     [Fact]
     public void AddPlayer_MobileParty_InvalidatesBaseSpeedCache()
     {
@@ -64,6 +69,63 @@ public class PlayerManagerTests
             playerObjects.Remove(party);
         }
     }
+
+    [Fact]
+    public void AddPlayer_MobileParty_InvalidatesCaravansCaches()
+    {
+        Assert.True(GameThread.Instance.IsInitialized, "game-loop pump was not initialized");
+
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        hero.OwnedCaravans = new();
+
+        // Populate hero.OwnedCaravans to invalidate caches of
+        for (int i = 0; i < 5; i++)
+        {
+            MobileParty caravan = ObjectHelper.SkipConstructor<MobileParty>();
+            caravan.Party = ObjectHelper.SkipConstructor<PartyBase>();
+            caravan.Party.MobileParty = caravan;
+
+            caravan._partyComponent = new CaravanPartyComponent(null, hero, null, false, null);
+            caravan._partyComponent?.Initialize(caravan);
+
+            caravan.Party._partyMemberSizeLastCheckVersion = 42;
+            caravan.Party.MobileParty._partyPureSpeedLastCheckVersion = 84;
+
+            hero.OwnedCaravans.Add(caravan.CaravanPartyComponent);
+        }
+
+        var playerManager = CreatePlayerManager(out var objectManager);
+        Hero resolvedHero = hero;
+        objectManager.Setup(o => o.TryGetObjectWithLogging<Hero>(HeroId, out hero))
+            .Returns(true);
+
+        var playerObjects = GetPlayerObjects();
+        try
+        {
+            Assert.True(playerManager.AddPlayer(new Player(
+                ControllerId,
+                HeroId,
+                string.Empty,
+                string.Empty,
+                string.Empty)));
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(hero, out _));
+            Assert.NotNull(hero.OwnedCaravans);
+            foreach (var ownedCaravan in hero.OwnedCaravans)
+            {
+                Assert.True(
+                SpinWait.SpinUntil(() => ownedCaravan.Party._partyMemberSizeLastCheckVersion == -1, TimeSpan.FromSeconds(5)),
+                "player-caravan member size limit cache was not invalidated");
+                Assert.True(
+                SpinWait.SpinUntil(() => ownedCaravan.Party.MobileParty._partyPureSpeedLastCheckVersion == -1, TimeSpan.FromSeconds(5)),
+                "player-caravan speed cache was not invalidated");
+            }
+        }
+        finally
+        {
+            playerObjects.Remove(hero);
+        }
+    }
+
     [Fact]
     public void SetPeer_KnownController_AssociatesPeerWithPlayer()
     {

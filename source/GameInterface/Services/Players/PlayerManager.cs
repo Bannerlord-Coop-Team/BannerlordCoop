@@ -229,7 +229,7 @@ public class PlayerManager : IPlayerManager
 
         if (obj is Hero hero)
         {
-            InvalidatePlayerCaravanMemberLimitCaches(hero);
+            InvalidatePlayerCaravanCaches(hero);
         }
     }
 
@@ -241,7 +241,7 @@ public class PlayerManager : IPlayerManager
         }, context: nameof(PlayerManager));
     }
 
-    private void InvalidatePlayerCaravanMemberLimitCaches(Hero hero)
+    private void InvalidatePlayerCaravanCaches(Hero hero)
     {
         GameThread.RunSafe(() =>
         {
