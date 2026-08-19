@@ -26,15 +26,6 @@ internal class BanditInteractionsCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnPartyDestroyedPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.bandit_barter_successful_on_consequence))]
-    [HarmonyPostfix]
-    public static void BanditBarterSuccessfulOnConsequencePostfix(BanditInteractionsCampaignBehavior __instance)
-    {
-        // Locally update PlayerInteraction and send updated in postfix to save in CoopSession
-        var message = new SetPlayerBanditInteraction(Hero.MainHero, MobileParty.ConversationParty, BanditInteractionsCampaignBehavior.PlayerInteraction.PaidOffParty);
-        MessageBroker.Instance.Publish(__instance, message);
-    }
-
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.bandit_neutral_greet_on_consequence))]
     [HarmonyPostfix]
     public static void BanditNeutralGreetOnConsequence(BanditInteractionsCampaignBehavior __instance)
@@ -119,15 +110,13 @@ internal class BanditInteractionsCampaignBehaviorPatches
                 PlayerEncounter.StartBattle();
             }
 
-            // Failed to start battle, exit early to avoid NRE
-            if (PlayerEncounter.Battle == null) return false;
+            PlayerEncounter.Battle?.SetOverrideWinner(PlayerEncounter.Battle.PlayerSide);
 
-            PlayerEncounter.Battle.SetOverrideWinner(PlayerEncounter.Battle.PlayerSide);
             PlayerEncounter.EnemySurrender = true;
 
             // Nullify player's map event to use patched PlayerEncounter update.
             // Without this, client gets a duplicate loot screen cycle.
-            PlayerEncounter.Current._mapEvent = null;
+            if (PlayerEncounter.Battle != null) PlayerEncounter.Current._mapEvent = null;
 
             return false;
         }
