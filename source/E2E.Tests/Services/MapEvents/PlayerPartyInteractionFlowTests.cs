@@ -1108,6 +1108,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(client2.ObjectManager.TryGetObject<Hero>(initiatorHeroId, out var initiatorHero));
             Assert.True(client2.ObjectManager.TryGetObject<CharacterObject>(initiatorTroopId, out var initiatorTroop));
 
+            PlayerPartyTradeContext.Begin(sessionId, responderParty);
+
             var troopRosterElement = new TroopRosterElement(initiatorTroop)
             {
                 _number = 5
