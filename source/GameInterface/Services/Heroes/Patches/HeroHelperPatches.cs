@@ -21,7 +21,7 @@ internal class HeroHelperPatches
         __result = hero != null && 
             ((hero.MapFaction != null && hero.MapFaction.Leader == Hero.MainHero) 
             || (hero.IsNotable && hero.HomeSettlement.OwnerClan == Clan.PlayerClan) 
-            || hero.CompanionOf != null && hero.CompanionOf == Clan.PlayerClan);
+            || (hero.CompanionOf != null && hero.CompanionOf == Clan.PlayerClan));
 
         return false;
     }
