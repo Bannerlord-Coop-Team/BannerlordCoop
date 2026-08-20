@@ -1,5 +1,10 @@
-﻿using GameInterface.Services.MobileParties.Extensions;
+﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MobileParties.Extensions;
 using Serilog;
+using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
@@ -9,6 +14,7 @@ namespace GameInterface.Services.SiegeEvents;
 public enum AiSiegeTerminalDecision
 {
     None,
+    Defer,
     Assault,
     Withdraw,
 }
@@ -60,15 +66,27 @@ public interface IAiSiegeTerminalPolicy
 }
 
 /// <summary>Resolves an AI siege after vanilla disperses its starving army.</summary>
-internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy
+internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy, IDisposable
 {
     private readonly IAiSiegeAssaultReadiness readiness;
     private readonly ILogger logger;
+    private readonly IMessageBroker messageBroker;
+    private readonly List<AiSiegeTerminalTransitionState> deferredTransitions = new();
 
-    public AiSiegeTerminalPolicy(IAiSiegeAssaultReadiness readiness, ILogger logger)
+    public AiSiegeTerminalPolicy(
+        IAiSiegeAssaultReadiness readiness,
+        ILogger logger,
+        IMessageBroker messageBroker)
     {
         this.readiness = readiness;
         this.logger = logger;
+        this.messageBroker = messageBroker;
+        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
     public AiSiegeTerminalDecision GetDecision(AiSiegeTerminalContext context)
@@ -76,11 +94,12 @@ internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy
         // World state is the idempotency marker, so a save cannot retain a stale pending transition.
         if (!context.IsFoodProblem
             || context.IsPlayerLed
-            || !context.IsCurrentSiege
-            || context.HasActiveTransition)
+            || !context.IsCurrentSiege)
         {
             return AiSiegeTerminalDecision.None;
         }
+
+        if (context.HasActiveTransition) return AiSiegeTerminalDecision.Defer;
 
         return context.IsPrepared && context.IsAssaultViable
             ? AiSiegeTerminalDecision.Assault
@@ -111,7 +130,11 @@ internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy
             readinessResult.IsViable);
         var decision = GetDecision(context);
 
-        if (decision == AiSiegeTerminalDecision.Assault)
+        if (decision == AiSiegeTerminalDecision.Defer)
+        {
+            Defer(state);
+        }
+        else if (decision == AiSiegeTerminalDecision.Assault)
         {
             logger.Information(
                 "Starving AI siege at {SettlementId} is starting its viable assault: attacker={AttackerStrength:0.00} defender={DefenderStrength:0.00} ratio={PowerRatio:0.000} chance={AssaultChance:0.000}",
@@ -139,5 +162,35 @@ internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy
         }
 
         return decision;
+    }
+
+    internal void Defer(AiSiegeTerminalTransitionState state)
+    {
+        foreach (var pending in deferredTransitions)
+        {
+            if (pending.LeaderParty == state.LeaderParty && pending.SiegeEvent == state.SiegeEvent)
+                return;
+        }
+
+        deferredTransitions.Add(state);
+    }
+
+    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> _)
+    {
+        if (ModInformation.IsClient) return;
+
+        RetryDeferredTransitions(state => { ResolveFoodProblem(state); });
+    }
+
+    internal void RetryDeferredTransitions(Action<AiSiegeTerminalTransitionState> resolve)
+    {
+        if (deferredTransitions.Count == 0) return;
+
+        var pending = deferredTransitions.ToArray();
+        deferredTransitions.Clear();
+        foreach (var state in pending)
+        {
+            resolve(state);
+        }
     }
 }

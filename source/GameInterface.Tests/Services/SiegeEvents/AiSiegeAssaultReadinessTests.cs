@@ -67,6 +67,23 @@ public class AiSiegeAssaultReadinessTests
         Assert.True(result.IsViable);
     }
 
+    [Fact]
+    public void EmptyAttackAndDefense_IsNotViable()
+    {
+        var result = readiness.Evaluate(new AiSiegeAssaultReadinessInput(
+            attackerStrength: 0f,
+            defenderStrength: 0f,
+            settlementAdvantage: 1f,
+            siegeElapsedHours: 96f,
+            hasRam: true,
+            hasSiegeTower: true,
+            equipmentBuilt: 3,
+            maximumEquipmentProgress: 0f));
+
+        Assert.True(float.IsNaN(result.PowerRatioBeforeEquipment));
+        Assert.False(result.IsViable);
+    }
+
     private static AiSiegeAssaultReadinessInput CreateTimedInput(float siegeElapsedHours)
     {
         return new AiSiegeAssaultReadinessInput(

@@ -46,8 +46,8 @@ public readonly struct AiSiegeAssaultReadinessResult
     public float PowerRatioAfterEquipment { get; }
     public float AssaultChance { get; }
 
-    public bool IsViable => DefenderStrength == 0f ||
-        (PowerRatioBeforeEquipment > 1f && AssaultChance > 0f);
+    public bool IsViable => PowerRatioBeforeEquipment > 1f &&
+        (DefenderStrength == 0f || AssaultChance > 0f);
 
     public AiSiegeAssaultReadinessResult(
         float attackerStrength,
@@ -161,7 +161,7 @@ internal class AiSiegeAssaultReadiness : IAiSiegeAssaultReadiness
     public bool ShouldStartAssault(BesiegerCamp camp)
     {
         var result = Evaluate(camp);
-        if (result.PowerRatioBeforeEquipment <= 1f) return false;
+        if (!(result.PowerRatioBeforeEquipment > 1f)) return false;
 
         return result.DefenderStrength == 0f || MBRandom.RandomFloat < result.AssaultChance;
     }

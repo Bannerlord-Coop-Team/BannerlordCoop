@@ -1,6 +1,11 @@
-﻿using GameInterface.Services.SiegeEvents;
+﻿using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.SiegeEvents;
 using Moq;
 using Serilog;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
@@ -11,7 +16,8 @@ public class AiSiegeTerminalPolicyTests
     {
         return new AiSiegeTerminalPolicy(
             new Mock<IAiSiegeAssaultReadiness>().Object,
-            new Mock<ILogger>().Object);
+            new Mock<ILogger>().Object,
+            new Mock<IMessageBroker>().Object);
     }
 
     [Fact]
@@ -31,13 +37,32 @@ public class AiSiegeTerminalPolicyTests
     }
 
     [Fact]
-    public void ActiveTransition_DoesNotStartDuplicateTerminalAction()
+    public void ActiveTransition_DefersTerminalAction()
     {
         var decision = CreatePolicy().GetDecision(CreateContext(
             isAssaultViable: true,
             hasActiveTransition: true));
 
-        Assert.Equal(AiSiegeTerminalDecision.None, decision);
+        Assert.Equal(AiSiegeTerminalDecision.Defer, decision);
+    }
+
+    [Fact]
+    public void DeferredTransition_IsRetriedOnce()
+    {
+        using var policy = CreatePolicy();
+        var state = new AiSiegeTerminalTransitionState(
+            ObjectHelper.SkipConstructor<MobileParty>(),
+            ObjectHelper.SkipConstructor<SiegeEvent>());
+        var retried = new List<AiSiegeTerminalTransitionState>();
+        policy.Defer(state);
+        policy.Defer(state);
+
+        policy.RetryDeferredTransitions(retried.Add);
+        policy.RetryDeferredTransitions(retried.Add);
+
+        var retry = Assert.Single(retried);
+        Assert.Same(state.LeaderParty, retry.LeaderParty);
+        Assert.Same(state.SiegeEvent, retry.SiegeEvent);
     }
 
     [Fact]
