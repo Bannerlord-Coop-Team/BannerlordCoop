@@ -24,13 +24,8 @@ public readonly struct ModOptions
     public readonly bool FastForwardEnabled { get; } = true;
     [ProtoMember(2)]
     public readonly bool AutoPauseEnabled { get; } = true;
-#if DEBUG
-    [ProtoMember(3)]
-    public readonly bool ClientsCanUseCheats { get; } = true;
-#else
     [ProtoMember(3)]
     public readonly bool ClientsCanUseCheats { get; } = false;
-#endif
     [ProtoMember(4)]
     public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = true;
     [ProtoMember(5)]

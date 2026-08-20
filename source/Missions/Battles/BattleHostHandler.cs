@@ -324,8 +324,9 @@ internal class BattleHostHandler : IHandler
             return;
 
         var result = payload.What;
-        if (result.BattleState != BattleState.AttackerVictory &&
-            result.BattleState != BattleState.DefenderVictory)
+        if (result.BattleState != BattleState.AttackerVictory
+            && result.BattleState != BattleState.DefenderVictory
+            && result.BattleState != BattleState.DefenderPullBack)
         {
             return;
         }
@@ -1027,8 +1028,9 @@ internal class BattleHostHandler : IHandler
         hostRegistry.Set(mapEventId, assignment);
         network.SendAll(ToMessage(mapEventId, assignment));
         if (battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) &&
-            (runtimeState.ResolvedState == BattleState.AttackerVictory ||
-             runtimeState.ResolvedState == BattleState.DefenderVictory))
+            (runtimeState.ResolvedState == BattleState.AttackerVictory
+             || runtimeState.ResolvedState == BattleState.DefenderVictory
+             || runtimeState.ResolvedState == BattleState.DefenderPullBack))
         {
             BroadcastResolvedState(mapEventId, assignment, runtimeState.ResolvedState);
         }

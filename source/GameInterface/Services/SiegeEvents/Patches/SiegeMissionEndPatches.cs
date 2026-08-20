@@ -39,10 +39,11 @@ internal class SiegeMissionEndPatches
         missionResult = CreateSiegeAmbushResult(__instance.Mission.PlayerTeam.Side);
     }
 
+    // DefenderPullBack is the completion-barrier signal; it is never applied to the campaign MapEvent.
     internal static MissionResult CreateSiegeAmbushResult(BattleSideEnum playerSide)
     {
         bool playerVictory = playerSide == BattleSideEnum.Defender;
-        return new MissionResult(BattleState.DefenderVictory, playerVictory, !playerVictory, enemyRetreated: false);
+        return new MissionResult(BattleState.DefenderPullBack, playerVictory, !playerVictory, enemyRetreated: false);
     }
 
     // Defer the ambush map-event teardown to the coop result-ready barrier. Keep vanilla's local ambush-flag

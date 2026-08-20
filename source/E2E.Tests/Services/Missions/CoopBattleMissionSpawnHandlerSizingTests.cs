@@ -172,6 +172,20 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     }
 
     [Fact]
+    public void SallyOutSizing_UsesAuthoritativeBattleSizeCaps()
+    {
+        var sizing = CoopBattleMissionSpawnHandler.CalculateSallyOutSizingFromBattleSize(
+            defenderTotal: 500,
+            attackerTotal: 500,
+            battleSize: 200);
+
+        Assert.Equal(50, sizing.DefenderTotal);
+        Assert.Equal(150, sizing.AttackerTotal);
+        Assert.Equal(20, sizing.DefenderInitial);
+        Assert.Equal(20, sizing.AttackerInitial);
+    }
+
+    [Fact]
     public void MissingAuthoritativeBattleSize_DoesNotSizeTheBattle()
     {
         var sizing = new CoopBattleMissionSpawnHandler.SideSizing(

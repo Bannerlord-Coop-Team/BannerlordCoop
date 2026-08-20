@@ -2,6 +2,7 @@
 using Common;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -11,6 +12,7 @@ using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
@@ -19,6 +21,8 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using Moq;
+using Missions.Battles;
+using Missions.Messages;
 using SandBox;
 using SandBox.GauntletUI.Map;
 using System.Collections.Concurrent;
@@ -198,15 +202,63 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     [Theory]
     [InlineData(BattleSideEnum.Defender, true, false)]
     [InlineData(BattleSideEnum.Attacker, false, true)]
-    public void SiegeAmbush_ReturnToCastleResultIsDefenderVictory(
+    public void SiegeAmbush_ReturnToCastleResultUsesNoVictoryCompletionSignal(
         BattleSideEnum playerSide, bool playerVictory, bool playerDefeated)
     {
         var result = SiegeMissionEndPatches.CreateSiegeAmbushResult(playerSide);
 
-        Assert.Equal(BattleState.DefenderVictory, result.BattleState);
+        Assert.Equal(BattleState.DefenderPullBack, result.BattleState);
         Assert.Equal(playerVictory, result.PlayerVictory);
         Assert.Equal(playerDefeated, result.PlayerDefeated);
         Assert.True(result.BattleResolved);
+    }
+
+    [Fact]
+    public void SiegeAmbush_ReportsSurvivingEngineStates()
+    {
+        var battle = SetupInteraction(MapEvent.BattleTypes.None, isSiegeAmbush: true,
+            includeAiParties: false);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            Assert.True(SiegeEngineStateReporter.ShouldReport(mapEvent));
+        });
+    }
+
+    [Fact]
+    public void SiegeAmbush_AllMembersComplete_FinalizesWithoutVictoryState()
+    {
+        var battle = SetupInteraction(MapEvent.BattleTypes.None, isSiegeAmbush: true,
+            includeAiParties: false);
+        var participants = Clients.Take(2).ToArray();
+        EnterBattle(participants[0], battle.MapEventId);
+        EnterBattle(participants[1], battle.MapEventId);
+        Server.SimulateMessage(participants[0].NetPeer,
+            new NetworkMissionEntered("attacker", battle.MapEventId));
+        Server.SimulateMessage(participants[1].NetPeer,
+            new NetworkMissionEntered("defender", battle.MapEventId));
+        BattleState? finalizedState = null;
+        Server.Call(() => Server.Resolve<IMessageBroker>().Subscribe<MapEventFinalized>(
+            payload => finalizedState = payload.What.MapEvent.BattleState));
+
+        foreach (var participant in participants)
+        {
+            participant.Call(() =>
+            {
+                Assert.True(participant.Resolve<IBattleHostRegistry>().TryGet(
+                    battle.MapEventId,
+                    out var assignment));
+                participant.Resolve<INetwork>().SendAll(new NetworkBattleResultReady(
+                    battle.MapEventId,
+                    BattleState.DefenderPullBack,
+                    assignment.Epoch));
+            }, MapEventDisabledMethods);
+        }
+
+        Assert.Equal(BattleState.None, finalizedState);
+        Server.Call(() => Assert.False(
+            Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out _)));
     }
 
     [Fact]

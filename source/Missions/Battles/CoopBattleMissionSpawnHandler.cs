@@ -481,11 +481,30 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     private SallyOutSizing CalculateSallyOutSizing(
         int defenderTotal, int attackerTotal, int battleSize)
     {
-        var controller = Mission.GetMissionBehavior<SallyOutMissionController>();
-        if (controller == null || controller.MissionAgentSpawnLogic.BattleSize != battleSize)
+        if (Mission.GetMissionBehavior<SallyOutMissionController>() == null)
             return default;
 
-        controller.AdjustTotalTroopCounts(ref defenderTotal, ref attackerTotal);
+        return CalculateSallyOutSizingFromBattleSize(defenderTotal, attackerTotal, battleSize);
+    }
+
+    internal static SallyOutSizing CalculateSallyOutSizingFromBattleSize(
+        int defenderTotal, int attackerTotal, int battleSize)
+    {
+        const float defenderRatio = 0.25f;
+        const float attackerRatio = 1f - defenderRatio;
+        defenderTotal = Math.Min(defenderTotal, (int)(battleSize * defenderRatio));
+        attackerTotal = Math.Min(attackerTotal, (int)(battleSize * attackerRatio));
+
+        float attackerToDefenderRatio = attackerRatio / defenderRatio;
+        if ((float)attackerTotal / defenderTotal <= attackerToDefenderRatio)
+        {
+            defenderTotal = Math.Min((int)(attackerTotal / attackerToDefenderRatio), defenderTotal);
+        }
+        else
+        {
+            attackerTotal = Math.Min((int)(defenderTotal * attackerToDefenderRatio), attackerTotal);
+        }
+
         int initialPerSide = (int)Math.Ceiling((defenderTotal + attackerTotal) * 0.1f);
         return new SallyOutSizing(
             defenderTotal,

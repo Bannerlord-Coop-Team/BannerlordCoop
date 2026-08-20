@@ -109,13 +109,20 @@ public class ServerBattleCompletionHandler : IHandler
             if (!hostRegistry.TryGet(instanceId, out var assignment))
                 return;
 
+            bool isVictory = result.BattleState == BattleState.AttackerVictory
+                || result.BattleState == BattleState.DefenderVictory;
+            bool isAmbushCompletion = result.BattleState == BattleState.DefenderPullBack
+                && objectManager.TryGetObject<MapEvent>(instanceId, out var resultMapEvent)
+                && resultMapEvent.IsSiegeAmbush
+                && resultMapEvent.BattleState == BattleState.None;
+            if (!isVictory && !isAmbushCompletion)
+                return;
+
             bool canConclude = !HasPendingJoiners(instanceId);
             bool isCurrentHostResult =
                 currentMembers.Contains(controllerId) &&
                 controllerId == assignment.HostControllerId &&
-                result.HostEpoch == assignment.Epoch &&
-                (result.BattleState == BattleState.AttackerVictory ||
-                 result.BattleState == BattleState.DefenderVictory);
+                result.HostEpoch == assignment.Epoch;
 
             bool concluded = completionTracker.TryRecordResult(
                     instanceId,
@@ -439,6 +446,12 @@ public class ServerBattleCompletionHandler : IHandler
     {
         Logger.Information("All {Count} mission member(s) reconciled {State} for battle {Instance}; concluding at host epoch {Epoch}",
             memberCount, concludedState, instanceId, hostEpoch);
+        if (concludedState == BattleState.DefenderPullBack)
+        {
+            messageBroker.Publish(this, new AuthoritativeSiegeAmbushCompletionRequested(instanceId));
+            return;
+        }
+
         messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(instanceId, concludedState, hostEpoch));
     }
 

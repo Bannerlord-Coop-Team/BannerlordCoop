@@ -91,6 +91,7 @@ internal class BattleFinalizeHandler : IHandler
         messageBroker.Subscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
         messageBroker.Subscribe<NetworkRaidBattleResetToVillage>(Handle_NetworkRaidBattleResetToVillage);
         messageBroker.Subscribe<MapEventConcluded>(Handle_MapEventConcluded);
+        messageBroker.Subscribe<AuthoritativeSiegeAmbushCompletionRequested>(Handle_AuthoritativeSiegeAmbushCompletionRequested);
     }
 
     public void Dispose()
@@ -100,6 +101,7 @@ internal class BattleFinalizeHandler : IHandler
         messageBroker.Unsubscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
         messageBroker.Unsubscribe<NetworkRaidBattleResetToVillage>(Handle_NetworkRaidBattleResetToVillage);
         messageBroker.Unsubscribe<MapEventConcluded>(Handle_MapEventConcluded);
+        messageBroker.Unsubscribe<AuthoritativeSiegeAmbushCompletionRequested>(Handle_AuthoritativeSiegeAmbushCompletionRequested);
     }
 
     private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
@@ -202,6 +204,45 @@ internal class BattleFinalizeHandler : IHandler
         catch (Exception e)
         {
             Logger.Error(e, "Failed to auto-finalize concluded map event");
+        }
+    }
+
+    private void Handle_AuthoritativeSiegeAmbushCompletionRequested(
+        MessagePayload<AuthoritativeSiegeAmbushCompletionRequested> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var completion = payload.What;
+        bool applied = false;
+        try
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(completion.MapEventId, out var mapEvent))
+                return;
+
+            if (mapEvent.IsFinalized)
+            {
+                applied = true;
+                return;
+            }
+
+            if (!mapEvent.IsSiegeAmbush || mapEvent.BattleState != BattleState.None)
+                return;
+
+            var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
+            applied = mapEvent.IsFinalized;
+            if (applied && playerPartyIds.Length > 0)
+                PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: completion.MapEventId);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to finalize completed siege ambush {MapEventId}", completion.MapEventId);
+        }
+        finally
+        {
+            messageBroker.Publish(this, new BattleStateChangeProcessed(
+                completion.MapEventId,
+                BattleState.DefenderPullBack,
+                applied));
         }
     }
 
