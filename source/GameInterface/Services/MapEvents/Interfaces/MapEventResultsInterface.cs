@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Participation;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Patches;
@@ -209,8 +210,8 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
                 }
 
-                // Need to patch the gold change to display plunder message
-                mapEvent.CommitCalculatedMapEventResults();
+                // Commit XP, renown, influence, morale, and gold only for parties that remained in the battle.
+                MapEventPatches.CommitCalculatedMapEventResults(mapEvent, party => !retreatedPartyTracker.IsRetreated(mapEvent, party.Party));
             }
             mapEvent._mapEventResultsApplied = true;
         });
