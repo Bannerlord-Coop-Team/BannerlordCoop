@@ -1,23 +1,24 @@
-﻿using Common.Messaging;
+﻿using Common;
 using Common.Util;
 using GameInterface.Services.SiegeEvents;
 using Moq;
 using Serilog;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class AiSiegeTerminalPolicyTests
 {
     private static AiSiegeTerminalPolicy CreatePolicy()
     {
         return new AiSiegeTerminalPolicy(
             new Mock<IAiSiegeAssaultReadiness>().Object,
-            new Mock<ILogger>().Object,
-            new Mock<IMessageBroker>().Object);
+            new Mock<ILogger>().Object);
     }
 
     [Fact]
@@ -49,7 +50,7 @@ public class AiSiegeTerminalPolicyTests
     [Fact]
     public void DeferredTransition_IsRetriedOnce()
     {
-        using var policy = CreatePolicy();
+        var policy = CreatePolicy();
         var state = new AiSiegeTerminalTransitionState(
             ObjectHelper.SkipConstructor<MobileParty>(),
             ObjectHelper.SkipConstructor<SiegeEvent>());
@@ -63,6 +64,37 @@ public class AiSiegeTerminalPolicyTests
         var retry = Assert.Single(retried);
         Assert.Same(state.LeaderParty, retry.LeaderParty);
         Assert.Same(state.SiegeEvent, retry.SiegeEvent);
+    }
+
+    [Fact]
+    public void DeferredTransition_SurvivesSaveAndReload()
+    {
+        var records = new Dictionary<string, object>();
+        var state = new AiSiegeTerminalTransitionState(
+            ObjectHelper.SkipConstructor<MobileParty>(),
+            ObjectHelper.SkipConstructor<SiegeEvent>());
+        bool previousRole = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+
+        try
+        {
+            var original = CreatePolicy();
+            original.Defer(state);
+            original.SyncData(new TestDataStore(isSaving: true, records));
+
+            var restored = CreatePolicy();
+            restored.SyncData(new TestDataStore(isSaving: false, records));
+            var retried = new List<AiSiegeTerminalTransitionState>();
+            restored.RetryDeferredTransitions(retried.Add);
+
+            var retry = Assert.Single(retried);
+            Assert.Same(state.LeaderParty, retry.LeaderParty);
+            Assert.Same(state.SiegeEvent, retry.SiegeEvent);
+        }
+        finally
+        {
+            ModInformation.IsServer = previousRole;
+        }
     }
 
     [Fact]
@@ -92,6 +124,33 @@ public class AiSiegeTerminalPolicyTests
             isPrepared: false));
 
         Assert.Equal(AiSiegeTerminalDecision.Withdraw, decision);
+    }
+
+    private sealed class TestDataStore : IDataStore
+    {
+        private readonly Dictionary<string, object> records;
+
+        public bool IsSaving { get; }
+        public bool IsLoading => !IsSaving;
+
+        public TestDataStore(bool isSaving, Dictionary<string, object> records)
+        {
+            IsSaving = isSaving;
+            this.records = records;
+        }
+
+        public bool SyncData<T>(string key, ref T data)
+        {
+            if (IsSaving)
+            {
+                records[key] = data;
+                return true;
+            }
+
+            if (!records.TryGetValue(key, out var value)) return false;
+            data = (T)value;
+            return true;
+        }
     }
 
     private static AiSiegeTerminalContext CreateContext(

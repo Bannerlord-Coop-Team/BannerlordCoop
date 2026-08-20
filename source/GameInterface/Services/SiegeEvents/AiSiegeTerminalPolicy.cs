@@ -1,10 +1,9 @@
 ﻿using Common;
-using Common.Messaging;
-using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
@@ -63,30 +62,26 @@ public interface IAiSiegeTerminalPolicy
 {
     AiSiegeTerminalDecision GetDecision(AiSiegeTerminalContext context);
     AiSiegeTerminalDecision ResolveFoodProblem(AiSiegeTerminalTransitionState state);
+    void RetryDeferredTransitions();
+    void SyncData(IDataStore dataStore);
 }
 
 /// <summary>Resolves an AI siege after vanilla disperses its starving army.</summary>
-internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy, IDisposable
+internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy
 {
+    private const string DeferredLeaderSaveKey = "_coop_ai_siege_terminal_leaders";
+    private const string DeferredSiegeEventSaveKey = "_coop_ai_siege_terminal_events";
+
     private readonly IAiSiegeAssaultReadiness readiness;
     private readonly ILogger logger;
-    private readonly IMessageBroker messageBroker;
     private readonly List<AiSiegeTerminalTransitionState> deferredTransitions = new();
 
     public AiSiegeTerminalPolicy(
         IAiSiegeAssaultReadiness readiness,
-        ILogger logger,
-        IMessageBroker messageBroker)
+        ILogger logger)
     {
         this.readiness = readiness;
         this.logger = logger;
-        this.messageBroker = messageBroker;
-        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
-    }
-
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
     public AiSiegeTerminalDecision GetDecision(AiSiegeTerminalContext context)
@@ -175,10 +170,42 @@ internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy, IDisposable
         deferredTransitions.Add(state);
     }
 
-    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> _)
+    public void SyncData(IDataStore dataStore)
     {
-        if (ModInformation.IsClient) return;
+        List<MobileParty> leaders = null;
+        List<SiegeEvent> siegeEvents = null;
+        if (dataStore.IsSaving)
+        {
+            leaders = new List<MobileParty>();
+            siegeEvents = new List<SiegeEvent>();
+            if (ModInformation.IsServer)
+            {
+                foreach (var transition in deferredTransitions)
+                {
+                    leaders.Add(transition.LeaderParty);
+                    siegeEvents.Add(transition.SiegeEvent);
+                }
+            }
+        }
 
+        dataStore.SyncData(DeferredLeaderSaveKey, ref leaders);
+        dataStore.SyncData(DeferredSiegeEventSaveKey, ref siegeEvents);
+        if (!dataStore.IsLoading) return;
+
+        deferredTransitions.Clear();
+        if (ModInformation.IsClient || leaders == null || siegeEvents == null) return;
+
+        int count = Math.Min(leaders.Count, siegeEvents.Count);
+        for (int i = 0; i < count; i++)
+        {
+            var transition = new AiSiegeTerminalTransitionState(leaders[i], siegeEvents[i]);
+            if (transition.IsValid)
+                Defer(transition);
+        }
+    }
+
+    public void RetryDeferredTransitions()
+    {
         RetryDeferredTransitions(state => { ResolveFoodProblem(state); });
     }
 
