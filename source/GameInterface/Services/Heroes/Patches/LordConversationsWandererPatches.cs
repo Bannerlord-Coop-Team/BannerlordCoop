@@ -54,7 +54,6 @@ internal class LordConversationsWandererPatches
             && !CharacterObject.OneToOneConversationCharacter.HeroObject.IsPrisoner
             && Campaign.Current.CurrentConversationContext == ConversationContext.PartyEncounter
             && Settlement.CurrentSettlement == null
-            && CharacterObject.OneToOneConversationCharacter.HeroObject.CompanionOf != null
             && CharacterObject.OneToOneConversationCharacter.HeroObject.CompanionOf != Clan.PlayerClan
             && FactionManager.IsNeutralWithFaction(Hero.OneToOneConversationHero.MapFaction, Hero.MainHero.MapFaction)
             && !MobileParty.MainParty.IsInRaftState;
