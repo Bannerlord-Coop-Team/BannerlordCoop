@@ -185,12 +185,15 @@ internal class BattleDebugRouteHandler : IHandler
             : mission.MissionObjects
                 .OfType<UsableMachine>()
                 .FirstOrDefault(candidate => candidate.Id.Id == action.MachineId);
-        readinessError = string.Empty;
         if (machine == null)
         {
-            SendFixtureReport(action, machine, agent, false, "machine or local main agent unavailable");
-            return true;
+            readinessError = action.Action == SiegeInteractableFixtureAction.Capture
+                ? "no locally eligible siege machine is registered"
+                : "fixture machine is not registered";
+            return false;
         }
+
+        readinessError = string.Empty;
 
         try
         {

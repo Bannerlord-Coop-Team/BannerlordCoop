@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text.Json;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -155,6 +156,110 @@ internal static class SiegeSetupDebugCommands
             playerSiegeActive = party != null && PlayerSiege.PlayerSiegeEvent != null,
             currentMenu,
             currentSiegeState = settlement.CurrentSiegeState.ToString(),
+        });
+    }
+
+    [CommandLineArgumentFunction("setup_defender_topology", "coop.debug.siege")]
+    public static string DefenderTopology(List<string> args)
+    {
+        if (!TryGetClientSettlement(args, out Settlement settlement, out string error))
+            return Failure("defender-topology", error);
+
+        var party = MobileParty.MainParty;
+        var mapEvent = settlement.Party?.MapEvent;
+        var defenderSide = mapEvent?.DefenderSide;
+        var attackerSide = mapEvent?.AttackerSide;
+        var defenderLeader = defenderSide?.LeaderParty;
+        var attackerLeader = attackerSide?.LeaderParty;
+        bool mapEventActive = mapEvent != null &&
+            !mapEvent.IsFinalized && mapEvent.BattleState == BattleState.None;
+        bool topologyReady = party?.Party != null && mapEvent?.IsSiegeAssault == true && mapEventActive &&
+            defenderSide != null && attackerSide != null && defenderLeader != null && attackerLeader != null;
+        return Result(new
+        {
+            success = topologyReady,
+            action = "defender-topology",
+            settlement = settlement.StringId,
+            siegeAssault = mapEvent?.IsSiegeAssault == true,
+            mapEventActive,
+            defenderSideReady = defenderSide != null,
+            attackerSideReady = attackerSide != null,
+            defenderLeaderReady = defenderLeader != null,
+            attackerLeaderReady = attackerLeader != null,
+            localPartyReady = party?.Party != null,
+        });
+    }
+
+    [CommandLineArgumentFunction("setup_join_defender", "coop.debug.siege")]
+    public static string JoinDefender(List<string> args)
+    {
+        if (!TryGetClientSettlement(args, out Settlement settlement, out string error))
+            return Failure("join-defender", error);
+
+        var party = MobileParty.MainParty;
+        var mapEvent = settlement.Party?.MapEvent;
+        var defenderSide = mapEvent?.DefenderSide;
+        var attackerSide = mapEvent?.AttackerSide;
+        var defenderLeader = defenderSide?.LeaderParty;
+        var attackerLeader = attackerSide?.LeaderParty;
+        bool mapEventActive = mapEvent != null &&
+            !mapEvent.IsFinalized && mapEvent.BattleState == BattleState.None;
+        bool topologyReady = party?.Party != null && mapEvent?.IsSiegeAssault == true && mapEventActive &&
+            defenderSide != null && attackerSide != null && defenderLeader != null && attackerLeader != null;
+        if (!topologyReady)
+        {
+            return Result(new
+            {
+                success = false,
+                action = "join-defender",
+                settlement = settlement.StringId,
+                reason = "defender topology is not ready",
+                siegeAssault = mapEvent?.IsSiegeAssault == true,
+                mapEventActive,
+                defenderSideReady = defenderSide != null,
+                attackerSideReady = attackerSide != null,
+                defenderLeaderReady = defenderLeader != null,
+                attackerLeaderReady = attackerLeader != null,
+                localPartyReady = party?.Party != null,
+            });
+        }
+        if (party.MapEvent != null || party.BesiegerCamp != null || PlayerEncounter.Current != null)
+        {
+            return Result(new
+            {
+                success = false,
+                action = "join-defender",
+                settlement = settlement.StringId,
+                reason = "the local player is already in a siege setup state",
+            });
+        }
+
+        try
+        {
+            PlayerEncounter.Start();
+            PlayerEncounter.Current.SetupFields(attackerLeader, party.Party);
+            PlayerEncounter.JoinBattle(BattleSideEnum.Defender);
+        }
+        catch (Exception exception)
+        {
+            return Result(new
+            {
+                success = false,
+                action = "join-defender",
+                settlement = settlement.StringId,
+                exceptionType = exception.GetType().FullName,
+                exceptionMessage = exception.Message,
+            });
+        }
+
+        return Result(new
+        {
+            success = PlayerEncounter.Current != null && PlayerEncounter.Battle?.IsSiegeAssault == true,
+            action = "join-defender",
+            settlement = settlement.StringId,
+            topologyReady = true,
+            encounterActive = PlayerEncounter.Current != null,
+            encounterSiegeAssault = PlayerEncounter.Battle?.IsSiegeAssault == true,
         });
     }
 
