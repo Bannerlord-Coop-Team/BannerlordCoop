@@ -114,6 +114,7 @@
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRequestKingdomDecisionVote.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkChangeKingdomDecisionVote.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkKingdomDecisionResolved.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkKingdomDecisionRoundStatus.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRequestCreateKingdom.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkPlayerKingdomCreated.cs" />
   </ItemGroup>

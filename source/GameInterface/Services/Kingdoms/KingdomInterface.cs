@@ -50,6 +50,7 @@ internal class KingdomInterface : IKingdomInterface
         var index = kingdom._unresolvedDecisions?.FindIndex(decision => decision == kingdomDecision) ?? -1;
         if (index >= 0)
         {
+            decisionVoteManager.ClearDecisionState(kingdom, index);
             MessageBroker.Instance.Publish(kingdom,
                 new DecisionRemoved(kingdom, index));
         }
