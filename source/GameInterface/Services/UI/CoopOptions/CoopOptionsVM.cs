@@ -1,9 +1,10 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.UI.CoopOptions.Providers;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
+using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.Donate;
 using System;
 using TaleWorlds.Library;
@@ -17,7 +18,8 @@ public class CoopOptionsVM : ViewModel
     {
         new KillFeedOptionsTabProvider(),
         new MapTimeOptionsTabProvider(),
-        new ChatOptionsTabProvider()
+        new ChatOptionsTabProvider(),
+        new PlayerNameplatesOptionsTabProvider()
     };
 
     private readonly ICoopOptionsStore optionsStore;
@@ -126,11 +128,16 @@ public class CoopOptionsVM : ViewModel
     [DataSourceProperty]
     public CoopOptionsTabVM ChatTab {get; set;}
 
+    [DataSourceProperty]
+    public CoopOptionsTabVM PlayerNameplatesTab { get; set; }
+
     // Binding each panel to the specific tab object from the root VM
     private void InitializeTabs(CoopOptionsData options)
     {
         foreach (var provider in TabDefinitions)
         {
+            if (!provider.IsAvailable) continue;
+
             var tab = provider.CreateTab(options, messageBroker, SelectTab);
             Tabs.Add(tab);
 
@@ -145,6 +152,10 @@ public class CoopOptionsVM : ViewModel
             else if (tab.Id == ChatOptionsTabProvider.TabId)
             {
                 ChatTab = tab;
+            }
+            else if (tab.Id == PlayerNameplatesOptionsTabProvider.TabId)
+            {
+                PlayerNameplatesTab = tab;
             }
         }
 

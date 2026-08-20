@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -452,9 +453,18 @@ public class SiegeDebugCommand
         besieger.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
 
+        var liveTestResult = JsonSerializer.Serialize(new
+        {
+            settlementId = settlement.StringId,
+            besiegerPartyId = besieger.StringId,
+            originalX = originalPosition.X,
+            originalY = originalPosition.Y,
+            originalIsOnLand = originalPosition.IsOnLand
+        });
         return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}\n" +
             $"Restore with: coop.debug.siege.stop {settlement.StringId} " +
-            $"{originalPosition.X:R} {originalPosition.Y:R} {originalPosition.IsOnLand}";
+            $"{originalPosition.X:R} {originalPosition.Y:R} {originalPosition.IsOnLand}\n" +
+            $"LIVE_TEST_JSON={liveTestResult}";
     }
 
     /// <summary>

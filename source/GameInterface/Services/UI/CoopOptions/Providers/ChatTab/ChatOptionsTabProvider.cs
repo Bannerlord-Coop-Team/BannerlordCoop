@@ -10,6 +10,7 @@ public class ChatOptionsTabProvider : ICoopOptionsTabProvider
     public const string TabName = "Chat";
 
     public string Id => TabId;
+    public bool IsAvailable => true;
 
     public CoopOptionsTabVM CreateTab(
         CoopOptionsData options,

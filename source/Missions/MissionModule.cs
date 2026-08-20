@@ -5,6 +5,7 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
@@ -76,6 +77,13 @@ public class MissionModule : Module
         builder.RegisterType<MissionMapTimeView>()
             .AsSelf()
             .As<ILocationMissionBehavior>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateMissionView>()
+            .AsSelf()
+            .As<ILocationMissionBehavior>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateEligibility>()
+            .As<IPlayerNameplateEligibility>()
             .InstancePerDependency();
 
         // MissionContext mirrors the server's instance membership and must live for the whole client

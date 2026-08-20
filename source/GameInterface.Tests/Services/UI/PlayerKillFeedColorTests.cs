@@ -40,6 +40,15 @@ public class PlayerKillFeedColorTests
     }
 
     [Fact]
+    public void ColorService_ColorStringMatchesRenderedKillFeedColor()
+    {
+        var service = new PlayerKillFeedColorService();
+        service.SetColor("PlayerOne", new PlayerKillFeedColor(10, 20, 30));
+
+        Assert.Equal("#0A141EFF", service.GetColorString("PlayerOne"));
+    }
+
+    [Fact]
     public void CoopOptionsStore_SaveAndReload_RoundTripsColor()
     {
         var filePath = CreateTempFilePath();

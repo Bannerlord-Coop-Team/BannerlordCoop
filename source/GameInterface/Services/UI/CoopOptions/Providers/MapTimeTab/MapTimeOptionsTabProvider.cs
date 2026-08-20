@@ -13,6 +13,7 @@ public class MapTimeOptionsTabProvider : ICoopOptionsTabProvider
     public const string TabName = "Map Time";
     
     public string Id => TabId;
+    public bool IsAvailable => true;
 
     public CoopOptionsTabVM CreateTab(CoopOptionsData options, IMessageBroker messageBroker,
         Action<CoopOptionsTabVM> onSelect)

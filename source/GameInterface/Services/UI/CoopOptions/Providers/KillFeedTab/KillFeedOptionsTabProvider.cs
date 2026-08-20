@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.UI;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers;
@@ -18,6 +18,7 @@ public class KillFeedOptionsTabProvider : ICoopOptionsTabProvider
     public const string KillFeedColorBlueText = "Blue";
 
     public string Id => TabId;
+    public bool IsAvailable => true;
 
     public CoopOptionsTabVM CreateTab(CoopOptionsData options, IMessageBroker messageBroker, Action<CoopOptionsTabVM> onSelect)
     {

@@ -118,6 +118,8 @@ public sealed class ModOptionsData
 
     public bool? EnablePlayerClanMemberExecutions { get; set; }
 
+    public bool? ShowPlayerNameplates { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
