@@ -7,6 +7,8 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.MountAndBlade;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace Missions.Battles;
@@ -15,6 +17,111 @@ internal static class SiegeInteractableDebugCommands
 {
     private static readonly TimeSpan ReportTimeout = TimeSpan.FromSeconds(75);
     private static FixtureState fixture;
+
+    [CommandLineArgumentFunction("siege_interactable_readiness", "coop.debug.battle")]
+    public static string Readiness(List<string> args)
+    {
+        var errors = new List<string>();
+        string expectedControllerId = args.Count == 1 ? args[0] : string.Empty;
+        if (args.Count != 1 || string.IsNullOrEmpty(expectedControllerId))
+        {
+            errors.Add("expected-controller-id-required");
+        }
+
+        bool isClient = ModInformation.IsClient;
+        if (!isClient)
+        {
+            errors.Add("not-a-client");
+        }
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        var session = controller?.Session;
+        var mainAgent = mission?.MainAgent;
+        bool siegeMission = mission?.IsSiegeBattle == true;
+        bool hasBattleController = controller != null;
+        bool sessionStarted = session?.HasInstance == true;
+        bool joinedSiegeAssault = MobileParty.MainParty?.MapEvent?.IsSiegeAssault == true;
+        bool mainAgentActive = mainAgent?.IsActive() == true;
+        bool mainAgentInMission = mainAgent != null && mainAgent.Mission == mission;
+        string ownControllerId = session?.OwnControllerId ?? string.Empty;
+        bool expectedControllerMatches = ownControllerId == expectedControllerId;
+        bool agentRegistered = false;
+        bool locallyControlled = false;
+        bool agentAuthorityMatchesSession = false;
+        string agentControllerId = string.Empty;
+
+        if (!siegeMission)
+        {
+            errors.Add("siege-mission-unavailable");
+        }
+        if (!hasBattleController)
+        {
+            errors.Add("battle-controller-unavailable");
+        }
+        if (!sessionStarted)
+        {
+            errors.Add("battle-session-unavailable");
+        }
+        if (!joinedSiegeAssault)
+        {
+            errors.Add("siege-assault-not-joined");
+        }
+        if (!mainAgentActive || !mainAgentInMission)
+        {
+            errors.Add("local-main-agent-unavailable");
+        }
+        if (!expectedControllerMatches)
+        {
+            errors.Add("controller-id-mismatch");
+        }
+
+        if (!ContainerProvider.TryResolve<Missions.INetworkAgentRegistry>(out var registry))
+        {
+            errors.Add("agent-registry-unavailable");
+        }
+        else if (mainAgent == null || !registry.TryGetAgentInfo(mainAgent, out var info))
+        {
+            errors.Add("local-main-agent-unregistered");
+        }
+        else
+        {
+            agentRegistered = true;
+            locallyControlled = registry.IsLocallyControlled(info.AgentId);
+            agentControllerId = info.CurrentAuthority ?? string.Empty;
+            agentAuthorityMatchesSession = agentControllerId == ownControllerId;
+            if (!locallyControlled)
+            {
+                errors.Add("local-main-agent-not-locally-controlled");
+            }
+            if (!agentAuthorityMatchesSession)
+            {
+                errors.Add("local-main-agent-controller-mismatch");
+            }
+        }
+
+        bool ready = errors.Count == 0;
+        return Structured(new
+        {
+            ready,
+            expectedControllerId,
+            ownControllerId,
+            agentControllerId,
+            missionInstanceId = session?.InstanceId ?? string.Empty,
+            isClient,
+            siegeMission,
+            hasBattleController,
+            sessionStarted,
+            joinedSiegeAssault,
+            mainAgentActive,
+            mainAgentInMission,
+            expectedControllerMatches,
+            agentRegistered,
+            locallyControlled,
+            agentAuthorityMatchesSession,
+            errors = errors.ToArray(),
+        });
+    }
 
     [CommandLineArgumentFunction("siege_interactable_capture", "coop.debug.battle")]
     public static string Capture(List<string> args)
