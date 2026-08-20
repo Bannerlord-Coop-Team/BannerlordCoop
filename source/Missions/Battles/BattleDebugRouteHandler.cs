@@ -151,8 +151,7 @@ internal class BattleDebugRouteHandler : IHandler
     {
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
-        if (mission == null || !mission.IsSiegeBattle || controller == null
-            || controller.Session.OwnControllerId != action.ControllerId)
+        if (mission == null || !mission.IsSiegeBattle || controller == null)
         {
             return false;
         }
