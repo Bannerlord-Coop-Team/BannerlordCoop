@@ -13,7 +13,7 @@ namespace Missions.Battles;
 
 internal static class SiegeInteractableDebugCommands
 {
-    private static readonly TimeSpan ReportTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ReportTimeout = TimeSpan.FromSeconds(35);
     private static FixtureState fixture;
 
     [CommandLineArgumentFunction("siege_interactable_capture", "coop.debug.battle")]
