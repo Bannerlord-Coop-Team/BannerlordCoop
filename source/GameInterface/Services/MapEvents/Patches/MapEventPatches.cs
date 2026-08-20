@@ -273,24 +273,23 @@ internal class MapEventPatches
         return false;
     }
 
-    internal static int CommitCalculatedMapEventResults(
-        MapEvent mapEvent,
-        IReadOnlyList<Action<MapEventParty>> commitPhases)
+    internal static int CommitCalculatedMapEventResults(MapEvent mapEvent, IReadOnlyList<Action<MapEventParty>> commitPhases, Func<MapEventParty, bool> canCommitParty = null)
     {
         int removedPartyCount = RemovePartiesWithoutParty(mapEvent);
 
         foreach (MapEventSide side in mapEvent._sides)
         {
-            if (side == null)
-                continue;
+            if (side == null) continue;
 
             foreach (Action<MapEventParty> commitPhase in commitPhases)
             {
                 MapEventParty[] parties = side.Parties.ToArray();
                 foreach (MapEventParty party in parties)
                 {
-                    if (!side._battleParties.Contains(party) || party?.Party == null)
+                    if (!side._battleParties.Contains(party) || party?.Party == null || canCommitParty?.Invoke(party) == false)
+                    {
                         continue;
+                    }
 
                     commitPhase(party);
                     removedPartyCount += RemovePartiesWithoutParty(mapEvent);
@@ -299,6 +298,11 @@ internal class MapEventPatches
         }
 
         return removedPartyCount;
+    }
+
+    internal static int CommitCalculatedMapEventResults(MapEvent mapEvent, Func<MapEventParty, bool> canCommitParty)
+    {
+        return CommitCalculatedMapEventResults(mapEvent, CommitResultPhases, canCommitParty);
     }
 
     [HarmonyPatch(nameof(MapEvent.Update))]
