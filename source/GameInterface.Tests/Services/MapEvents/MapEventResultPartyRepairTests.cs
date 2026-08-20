@@ -106,6 +106,30 @@ namespace GameInterface.Tests.Services.MapEvents
         }
 
         [Fact]
+        public void IneligibleParty_IsSkippedAcrossEveryCommitPhase()
+        {
+            MapEventParty includedDefender = CreateResolvedParty();
+            MapEventParty excludedDefender = CreateResolvedParty();
+            MapEventParty attacker = CreateResolvedParty();
+            MapEvent mapEvent = CreateMapEvent(CreateSide(includedDefender, excludedDefender), CreateSide(attacker));
+
+            var committedParties = new List<MapEventParty>();
+            Action<MapEventParty>[] commitPhases =
+            {
+                party => committedParties.Add(party),
+                party => committedParties.Add(party)
+            };
+
+            int removedPartyCount = MapEventPatches.CommitCalculatedMapEventResults(mapEvent, commitPhases, party => party != excludedDefender);
+
+            Assert.Equal(0, removedPartyCount);
+            Assert.Equal(new[] { includedDefender, includedDefender, attacker, attacker }, committedParties);
+
+            Assert.Collection(mapEvent.DefenderSide.Parties, party => Assert.Same(includedDefender, party), party => Assert.Same(excludedDefender, party));
+            Assert.Collection(mapEvent.AttackerSide.Parties, party => Assert.Same(attacker, party));
+        }
+
+        [Fact]
         public void CanCommitRenownChanges_LeaderWithoutClan_ReturnsFalse()
         {
             Hero leaderHero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
