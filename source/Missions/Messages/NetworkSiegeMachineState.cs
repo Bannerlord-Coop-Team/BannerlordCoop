@@ -4,9 +4,9 @@ using ProtoBuf;
 namespace Missions.Messages;
 
 /// <summary>
-/// Mission host → peers (over the mesh): one siege machine's gameplay state. Sent whenever a field
-/// changes and replayed to joiners; appliers are idempotent. Machines are scene-placed, so their
-/// MissionObjectId matches across clients loading the same scene and levels.
+/// Siege machine simulator → peers (over the mesh): one machine's gameplay state. Sent whenever a
+/// field changes and replayed to joiners; appliers are idempotent. Machines are scene-placed, so
+/// their MissionObjectId matches across clients loading the same scene and levels.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NetworkSiegeMachineState : IEvent
@@ -47,6 +47,12 @@ public class NetworkSiegeMachineState : IEvent
     /// </summary>
     [ProtoMember(11)]
     public readonly int HostEpoch;
+    /// <summary>StonePile.AmmoCount; -1 for non-stone-pile machines.</summary>
+    [ProtoMember(12)]
+    public readonly int StoneAmmo;
+    /// <summary>Whether <see cref="StoneAmmo"/> was captured by the sender.</summary>
+    [ProtoMember(13)]
+    public readonly bool HasStoneAmmo;
     public NetworkSiegeMachineState(
         int machineId,
         float hitPoints,
@@ -58,7 +64,8 @@ public class NetworkSiegeMachineState : IEvent
         int weaponState,
         float aimDirection,
         float aimReleaseAngle,
-        int hostEpoch = 0)
+        int hostEpoch = 0,
+        int stoneAmmo = -1)
     {
         MachineId = machineId;
         HitPoints = hitPoints;
@@ -71,5 +78,7 @@ public class NetworkSiegeMachineState : IEvent
         AimDirection = aimDirection;
         AimReleaseAngle = aimReleaseAngle;
         HostEpoch = hostEpoch;
+        StoneAmmo = stoneAmmo;
+        HasStoneAmmo = stoneAmmo >= 0;
     }
 }

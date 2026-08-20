@@ -1,4 +1,8 @@
 ﻿using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -22,6 +26,56 @@ internal class SiegeMachineAuthorityPatches
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
 
         return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id);
+    }
+
+    [HarmonyPatch(typeof(StonePile), "OnTick")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> StonePileOnTickTranspiler(
+        IEnumerable<CodeInstruction> instructions,
+        MethodBase __originalMethod)
+    {
+        var nativeClientGetter = AccessTools.PropertyGetter(typeof(GameNetwork), nameof(GameNetwork.IsClientOrReplay));
+        var coopClientGetter = AccessTools.Method(typeof(SiegeMachineAuthorityPatches), nameof(IsClientForStonePile));
+        int replacements = 0;
+        int existingReplacements = 0;
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(coopClientGetter))
+            {
+                existingReplacements++;
+                yield return instruction;
+                continue;
+            }
+
+            if (!instruction.Calls(nativeClientGetter))
+            {
+                yield return instruction;
+                continue;
+            }
+
+            instruction.opcode = OpCodes.Ldarg_0;
+            instruction.operand = null;
+            yield return instruction;
+            yield return new CodeInstruction(OpCodes.Call, coopClientGetter);
+            replacements++;
+        }
+
+        if (replacements != 1 && !(replacements == 0 && existingReplacements == 1))
+        {
+            throw new InvalidOperationException(
+                $"Failed to patch stone pile authority check in {__originalMethod.Name}: " +
+                $"found {replacements} native and {existingReplacements} co-op checks.");
+        }
+    }
+
+    private static bool IsClientForStonePile(StonePile stonePile)
+    {
+        if (GameNetwork.IsClientOrReplay) return true;
+        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return false;
+        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return true;
+
+        return !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(stonePile.Id.Id);
     }
 
     // A machine simulated elsewhere aims from the replicated targets: re-asserting them each weapon
@@ -53,19 +107,19 @@ internal class SiegeMachineAuthorityPatches
 
     [HarmonyPatch(typeof(CastleGate), nameof(CastleGate.OpenDoor))]
     [HarmonyPrefix]
-    private static bool OpenDoorPrefix() => AllowGateToggle();
+    private static bool OpenDoorPrefix(CastleGate __instance) => AllowGateToggle(__instance);
 
     [HarmonyPatch(typeof(CastleGate), nameof(CastleGate.CloseDoor))]
     [HarmonyPrefix]
-    private static bool CloseDoorPrefix() => AllowGateToggle();
+    private static bool CloseDoorPrefix(CastleGate __instance) => AllowGateToggle(__instance);
 
     // The gate's auto-open logic reacts to nearby agents, including interpolated puppets, so a
     // non-authority client's local toggles must not run; the replicated state applies under suppress.
-    private static bool AllowGateToggle()
+    private static bool AllowGateToggle(CastleGate gate)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
         if (SiegeMissionAuthorityGate.SuppressCapture) return true;
 
-        return SiegeMissionAuthorityGate.IsLocalAuthority;
+        return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(gate.Id.Id);
     }
 }

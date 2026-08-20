@@ -16,7 +16,7 @@ namespace Coop.Tests.Missions.Battles;
 public class SiegeMachineStateReplicatorTests
 {
     [Fact]
-    public void NetworkSiegeMachineState_RoundTripsDiscreteLadderState()
+    public void NetworkSiegeMachineState_RoundTripsSimulatorOwnedState()
     {
         var original = new NetworkSiegeMachineState(
             machineId: 12,
@@ -29,7 +29,8 @@ public class SiegeMachineStateReplicatorTests
             weaponState: -1,
             aimDirection: -1000f,
             aimReleaseAngle: -1000f,
-            hostEpoch: 4);
+            hostEpoch: 4,
+            stoneAmmo: 7);
 
         NetworkSiegeMachineState result;
         using (var stream = new MemoryStream())
@@ -43,6 +44,8 @@ public class SiegeMachineStateReplicatorTests
         }
 
         Assert.Equal(original.LadderState, result.LadderState);
+        Assert.True(result.HasStoneAmmo);
+        Assert.Equal(original.StoneAmmo, result.StoneAmmo);
         Assert.Equal(original.HostEpoch, result.HostEpoch);
     }
 

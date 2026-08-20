@@ -10,6 +10,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Missions;
+using TaleWorlds.MountAndBlade.Objects.Usables;
 
 namespace Missions.Battles;
 
@@ -81,11 +82,11 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly Dictionary<int, string> claimedMachines = new Dictionary<int, string>();
     private readonly Dictionary<int, float> pendingClaimSeconds = new Dictionary<int, float>();
     private readonly Dictionary<int, float> unusedOwnedSeconds = new Dictionary<int, float>();
-    // Ranged machines whose local troop AI is currently gated off because another client simulates them.
+    // Non-primary machines whose local troop AI is currently gated off because another client simulates them.
     private readonly HashSet<int> aiDisabledMachines = new HashSet<int>();
-    // Movement machines (rams/towers) this client simulated last poll, so losing the sim vacates the
-    // local crew; their AI flag is never touched (a disabled primary weapon crashes the attacker tactic).
-    private readonly HashSet<int> locallySimulatedMovementMachines = new HashSet<int>();
+    // Primary machines this client simulated last poll, so losing the sim vacates the local crew;
+    // their AI flag is never touched (a disabled primary weapon crashes the attacker tactic).
+    private readonly HashSet<int> locallySimulatedPrimaryMachines = new HashSet<int>();
     // [Host] Machines granted by crew proximity rather than a player mount; a mount claim outranks
     // these, and an unused hand-back starts a cooldown so a troopless winner can't flap the grant.
     private readonly HashSet<int> proximityGrants = new HashSet<int>();
@@ -175,7 +176,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             pendingClaimSeconds.Clear();
             unusedOwnedSeconds.Clear();
             aiDisabledMachines.Clear();
-            locallySimulatedMovementMachines.Clear();
+            locallySimulatedPrimaryMachines.Clear();
             proximityGrants.Clear();
             grantWinner.Clear();
             grantStreak.Clear();
@@ -253,6 +254,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             && previous.LadderState == state.LadderState
             && previous.HasArrived == state.HasArrived
             && previous.WeaponState == state.WeaponState
+            && previous.HasStoneAmmo == state.HasStoneAmmo
+            && (!state.HasStoneAmmo || previous.StoneAmmo == state.StoneAmmo)
             && Math.Abs(previous.MoveDistance - state.MoveDistance) < MoveDistanceThreshold
             && Math.Abs(previous.AimDirection - state.AimDirection) < AimEpsilon
             && Math.Abs(previous.AimReleaseAngle - state.AimReleaseAngle) < AimEpsilon;
@@ -285,7 +288,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     {
         return new NetworkSiegeMachineState(state.MachineId, state.HitPoints, state.DestructionState,
             state.GateState, state.LadderState, state.MoveDistance, state.HasArrived, state.WeaponState,
-            state.AimDirection, state.AimReleaseAngle, session.HostEpoch);
+            state.AimDirection, state.AimReleaseAngle, session.HostEpoch,
+            state.HasStoneAmmo ? state.StoneAmmo : -1);
     }
 
     private NetworkSiegeLadderAnimationState Stamp(NetworkSiegeLadderAnimationState state)
@@ -319,34 +323,41 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private static NetworkSiegeMachineState CaptureState(UsableMachine machine, bool isHost, bool simulatedLocally)
     {
         ReadState(machine, out var hitPoints, out var destructionState, out var gateState, out var ladderState,
-            out var moveDistance, out var hasArrived, out var weaponState, out var aimDirection, out var aimReleaseAngle);
+            out var moveDistance, out var hasArrived, out var weaponState, out var aimDirection,
+            out var aimReleaseAngle, out var stoneAmmo);
 
         if (isHost && !simulatedLocally)
         {
-            // The claiming peer reports this machine's weapon sim, aim, movement and (for a tower) ramp;
-            // the host stays authoritative for damage. Sentinels let receivers merge both snapshots.
+            // The claiming peer reports this machine's simulator-owned fields; the host stays
+            // authoritative for damage. Sentinels let receivers merge both snapshots.
             weaponState = -1;
             aimDirection = AimSentinel;
             aimReleaseAngle = AimSentinel;
             moveDistance = -1f;
             hasArrived = false;
-            if (machine is SiegeTower) gateState = -1;
+            if (machine is CastleGate || machine is SiegeTower) gateState = -1;
+            if (machine is SiegeLadder) ladderState = -1;
+            if (machine is StonePile) stoneAmmo = -1;
         }
         else if (!isHost)
         {
             hitPoints = -1f;
             destructionState = -1;
-            ladderState = -1;
-            if (!IsMovementMachine(machine))
+            if (!simulatedLocally)
             {
                 gateState = -1;
+                ladderState = -1;
                 moveDistance = -1f;
                 hasArrived = false;
+                weaponState = -1;
+                aimDirection = AimSentinel;
+                aimReleaseAngle = AimSentinel;
+                stoneAmmo = -1;
             }
         }
 
         return new NetworkSiegeMachineState(machine.Id.Id, hitPoints, destructionState, gateState, ladderState,
-            moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle);
+            moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle, stoneAmmo: stoneAmmo);
     }
 
     private static NetworkSiegeLadderAnimationState CaptureLadderAnimationState(SiegeLadder ladder)
@@ -374,11 +385,14 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     {
         foreach (var machine in machines)
         {
-            // Keep the primary siege weapons (rams/towers/ladders) live on a peer: it still runs its own attacker
-            // AI, and BehaviorAssaultWalls strips deactivated primary weapons then MaxBy-crashes on the empty set.
-            // Ranged machines also stay live so the local player can man (and thereby claim) them; their troop AI
-            // is gated per simulation owner in RefreshMachineGates instead.
-            if (machine is IPrimarySiegeWeapon || machine is RangedSiegeWeapon) continue;
+            // Keep primary weapons live for local tactics, and keep player interactables live so
+            // vanilla can focus and highlight their standing points on every peer.
+            if (machine is IPrimarySiegeWeapon || machine is RangedSiegeWeapon
+                || machine is CastleGate || machine is StonePile
+                || machine is AmmoBarrelBase || machine is SiegeMachineStonePile)
+            {
+                continue;
+            }
 
             if (!deactivated.Add(machine.Id.Id)) continue;
 
@@ -393,13 +407,18 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private static bool IsGrantableMachine(UsableMachine machine)
     {
+        return machine is RangedSiegeWeapon || IsMovementMachine(machine)
+            || machine is SiegeLadder || machine is CastleGate || machine is StonePile;
+    }
+
+    private static bool IsCrewGrantableMachine(UsableMachine machine)
+    {
         return machine is RangedSiegeWeapon || IsMovementMachine(machine);
     }
 
     // Keep every grantable machine's local crew in line with its simulation owner: the owner's
-    // TickAux scan crews it, everyone else's AI stays off it (ranged only — a disabled primary
-    // weapon crashes the attacker tactic), and losing the sim vacates the local crew so it stops
-    // fighting the replicated state.
+    // simulation crews it, everyone else's AI stays off non-primary machines, and losing a primary
+    // sim vacates the local crew. Disabling a primary weapon crashes the attacker tactic.
     private void RefreshMachineGates()
     {
         foreach (var machine in machines)
@@ -409,7 +428,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             int machineId = machine.Id.Id;
             bool simulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
 
-            if (machine is RangedSiegeWeapon)
+            if (!(machine is IPrimarySiegeWeapon))
             {
                 bool disableAi = !simulatedLocally;
                 if (disableAi == aiDisabledMachines.Contains(machineId)) continue;
@@ -427,9 +446,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
             else if (simulatedLocally)
             {
-                locallySimulatedMovementMachines.Add(machineId);
+                locallySimulatedPrimaryMachines.Add(machineId);
             }
-            else if (locallySimulatedMovementMachines.Remove(machineId))
+            else if (locallySimulatedPrimaryMachines.Remove(machineId))
             {
                 VacateLocalUsers(machine);
             }
@@ -444,7 +463,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         crewSnapshotValid = false;
         foreach (var machine in machines)
         {
-            if (!(machine is SiegeWeapon siegeWeapon) || !IsGrantableMachine(machine)) continue;
+            if (!(machine is SiegeWeapon siegeWeapon) || !IsCrewGrantableMachine(machine)) continue;
 
             int machineId = machine.Id.Id;
 
@@ -868,6 +887,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // [Host, game thread] Record and announce a machine's simulation owner (null = back to the host).
     private void SetMachineAuthority(int machineId, string controllerId)
     {
+        bool wasSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
         if (string.IsNullOrEmpty(controllerId))
         {
             claimedMachines.Remove(machineId);
@@ -878,6 +898,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
 
         PushClaimsToGate();
+        ResetSendCacheWhenSimulationMovesHere(machineId, wasSimulatedLocally);
         RefreshMachineGates();
         // BR-102: the arbitration decision is THE host-authority act here — stamp our hosting generation.
         network.SendAll(new NetworkSiegeMachineAuthority(machineId, controllerId ?? string.Empty, session.HostEpoch));
@@ -897,6 +918,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // Refresh BEFORE mutating, like every sibling handler: on a freshly-opened mission the
             // refresh takes the mission-change clear branch, which would wipe the claim just written.
             RefreshMachineCache();
+            bool wasSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId);
 
             if (string.IsNullOrEmpty(obj.ControllerId))
             {
@@ -916,8 +938,17 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
             pendingClaimSeconds.Remove(obj.MachineId);
             PushClaimsToGate();
+            ResetSendCacheWhenSimulationMovesHere(obj.MachineId, wasSimulatedLocally);
             RefreshMachineGates();
         });
+    }
+
+    private void ResetSendCacheWhenSimulationMovesHere(int machineId, bool wasSimulatedLocally)
+    {
+        if (wasSimulatedLocally || !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId)) return;
+
+        lastSent.Remove(machineId);
+        lastSentLadderAnimations.Remove(machineId);
     }
 
     private void PushClaimsToGate()
@@ -1058,7 +1089,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private static void ReadState(UsableMachine machine, out float hitPoints, out int destructionState,
         out int gateState, out int ladderState, out float moveDistance, out bool hasArrived, out int weaponState,
-        out float aimDirection, out float aimReleaseAngle)
+        out float aimDirection, out float aimReleaseAngle, out int stoneAmmo)
     {
         hitPoints = -1f;
         destructionState = -1;
@@ -1073,6 +1104,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         gateState = machine is CastleGate gate ? (int)gate.State
             : machine is SiegeTower gateTower ? (int)gateTower.State : -1;
         ladderState = machine is SiegeLadder ladder ? (int)ladder.State : -1;
+        stoneAmmo = machine is StonePile stonePile ? stonePile.AmmoCount : -1;
         weaponState = -1;
         aimDirection = AimSentinel;
         aimReleaseAngle = AimSentinel;
@@ -1269,6 +1301,11 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 }
                 ladder.State = targetState;
             }
+        }
+
+        if (state.HasStoneAmmo && machine is StonePile stonePile && stonePile.AmmoCount != state.StoneAmmo)
+        {
+            stonePile.SetAmmo(state.StoneAmmo);
         }
 
         if (state.HitPoints >= 0f && machine.DestructionComponent != null)

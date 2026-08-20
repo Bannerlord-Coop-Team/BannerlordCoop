@@ -111,6 +111,22 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         AssertSingleClaim(machineId: 10, controllerId: "peer");
     }
 
+    [Fact]
+    public void AuthorityMovingHere_InvalidatesThePreviousSimulatorSendCache()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(11, "peer", hostEpoch: LocalEpoch));
+        DrainGameThread();
+
+        LastSentStates()[11] = MachineState(machineId: 11, hostEpoch: 0);
+        LastSentLadderAnimations()[11] = LadderAnimationState(ladderId: 11, hostEpoch: 0);
+
+        broker.Publish(this, new NetworkSiegeMachineAuthority(11, "us", hostEpoch: LocalEpoch));
+        DrainGameThread();
+
+        Assert.DoesNotContain(11, LastSentStates());
+        Assert.DoesNotContain(11, LastSentLadderAnimations());
+    }
+
     // ------------------------------------------------------------------
     // NetworkSiegeMachineState — receiver gate
     // ------------------------------------------------------------------
@@ -276,7 +292,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         var captured = new NetworkSiegeMachineState(
             machineId: 30, hitPoints: 42.5f, destructionState: 2, gateState: 1, ladderState: 3,
             moveDistance: 18f, hasArrived: true, weaponState: 4, aimDirection: 0.75f,
-            aimReleaseAngle: 0.25f);
+            aimReleaseAngle: 0.25f, stoneAmmo: 7);
 
         var stamped = Assert.IsType<NetworkSiegeMachineState>(
             method!.Invoke(sut, new object[] { captured }));
@@ -292,6 +308,8 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(4, stamped.WeaponState);
         Assert.Equal(0.75f, stamped.AimDirection);
         Assert.Equal(0.25f, stamped.AimReleaseAngle);
+        Assert.True(stamped.HasStoneAmmo);
+        Assert.Equal(7, stamped.StoneAmmo);
     }
 
     [Fact]
@@ -357,6 +375,12 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
     private Dictionary<int, NetworkSiegeLadderAnimationState> PendingLadderAnimations()
         => GetField<Dictionary<int, NetworkSiegeLadderAnimationState>>("pendingLadderAnimationsById");
+
+    private Dictionary<int, NetworkSiegeMachineState> LastSentStates()
+        => GetField<Dictionary<int, NetworkSiegeMachineState>>("lastSent");
+
+    private Dictionary<int, NetworkSiegeLadderAnimationState> LastSentLadderAnimations()
+        => GetField<Dictionary<int, NetworkSiegeLadderAnimationState>>("lastSentLadderAnimations");
 
     private void InvokePrivate(string methodName)
     {
