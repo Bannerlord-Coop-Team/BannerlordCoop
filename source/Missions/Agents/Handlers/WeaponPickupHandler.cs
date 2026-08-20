@@ -24,13 +24,28 @@ namespace Missions.Agents.Handlers
     /// <inheritdoc/>
     public class WeaponPickupHandler : IWeaponPickupHandler
     {
+        /// <summary>Retains the authoritative picker id while a runtime item waits for its canonical id.</summary>
+        private readonly struct PendingIdentityPickup
+        {
+            public Guid AgentId { get; }
+            public WeaponPickedup Pickup { get; }
+
+            public PendingIdentityPickup(Guid agentId, WeaponPickedup pickup)
+            {
+                AgentId = agentId;
+                Pickup = pickup;
+            }
+        }
+
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly INetworkWorldItemRegistry worldItemRegistry;
         readonly IBattleNetwork network;
         readonly IMessageBroker messageBroker;
         readonly IObjectManager objectManager;
-        readonly Dictionary<SpawnedItemEntity, Queue<WeaponPickedup>> pendingIdentityPickups =
-            new Dictionary<SpawnedItemEntity, Queue<WeaponPickedup>>();
+        readonly Dictionary<SpawnedItemEntity, Queue<PendingIdentityPickup>> pendingIdentityPickups =
+            new Dictionary<SpawnedItemEntity, Queue<PendingIdentityPickup>>();
+        readonly Dictionary<SpawnedItemEntity, Queue<PendingIdentityPickup>> abandonedIdentityPickups =
+            new Dictionary<SpawnedItemEntity, Queue<PendingIdentityPickup>>();
         readonly HashSet<SpawnedItemEntity> pendingWorldItemIdentities =
             new HashSet<SpawnedItemEntity>();
         readonly static ILogger Logger = LogManager.GetLogger<WeaponPickupHandler>();
@@ -99,6 +114,7 @@ namespace Missions.Agents.Handlers
             messageBroker.Unsubscribe<WorldItemIdentityPending>(HandleWorldItemIdentityPending);
             messageBroker.Unsubscribe<WorldItemIdentityAbandoned>(HandleWorldItemIdentityAbandoned);
             pendingIdentityPickups.Clear();
+            abandonedIdentityPickups.Clear();
             pendingWorldItemIdentities.Clear();
 #if DEBUG
             messageBroker.Unsubscribe<PreparePartialConsumablePickupFixture>(PreparePartialConsumableFixtureSend);
@@ -138,29 +154,32 @@ namespace Missions.Agents.Handlers
             {
                 if (!pendingWorldItemIdentities.Contains(payload.WorldItem))
                 {
-                    SendWeaponPickup(payload, agentInfo, Guid.Empty);
+                    SendWeaponPickup(payload, agentInfo.AgentId, Guid.Empty);
                     return;
                 }
 
-                if (!pendingIdentityPickups.TryGetValue(payload.WorldItem, out Queue<WeaponPickedup> pending))
+                if (!pendingIdentityPickups.TryGetValue(
+                        payload.WorldItem,
+                        out Queue<PendingIdentityPickup> pending))
                 {
-                    pending = new Queue<WeaponPickedup>();
+                    pending = new Queue<PendingIdentityPickup>();
                     pendingIdentityPickups.Add(payload.WorldItem, pending);
                 }
-                pending.Enqueue(payload);
+                pending.Enqueue(new PendingIdentityPickup(agentInfo.AgentId, payload));
                 Logger.Debug("Deferred weapon pickup until the runtime world item receives its canonical identity");
                 return;
             }
             if (!payload.WorldItem.Id.CreatedAtRuntime)
                 worldItemId = worldItemRegistry.GetOrCreateId(payload.WorldItem);
 
-            SendWeaponPickup(payload, agentInfo, worldItemId);
+            SendWeaponPickup(payload, agentInfo.AgentId, worldItemId);
         }
 
         private void SendWeaponPickup(
             WeaponPickedup payload,
-            CoopAgentInfo agentInfo,
-            Guid worldItemId)
+            Guid agentId,
+            Guid worldItemId,
+            bool isIdentityCorrection = false)
         {
             if (!objectManager.TryGetIdWithLogging(payload.WeaponObject, out string itemObjectId))
                 return;
@@ -182,7 +201,7 @@ namespace Missions.Agents.Handlers
             }
 
             NetworkWeaponPickedup message = new NetworkWeaponPickedup(
-                agentInfo.AgentId,
+                agentId,
                 payload.EquipmentIndex,
                 worldItemId,
                 itemObjectId,
@@ -197,7 +216,8 @@ namespace Missions.Agents.Handlers
                 resultingSlotItemObjectId,
                 resultingSlotItemModifierId,
                 payload.ResultingSlotWeapon.Banner,
-                payload.ResultingSlotWeapon.RawDataForNetwork);
+                payload.ResultingSlotWeapon.RawDataForNetwork,
+                isIdentityCorrection);
 
             network.SendAll(message);
         }
@@ -205,22 +225,32 @@ namespace Missions.Agents.Handlers
         private void HandleWorldItemIdentityResolved(MessagePayload<WorldItemIdentityResolved> payload)
         {
             WorldItemIdentityResolved resolved = payload.What;
-            pendingWorldItemIdentities.Remove(resolved.WorldItem);
-            if (resolved.WorldItem == null || resolved.WorldItemId == Guid.Empty ||
-                !pendingIdentityPickups.TryGetValue(
-                    resolved.WorldItem,
-                    out Queue<WeaponPickedup> pending))
+            if (resolved.WorldItem == null || resolved.WorldItemId == Guid.Empty)
             {
                 return;
+            }
+
+            pendingWorldItemIdentities.Remove(resolved.WorldItem);
+            bool isIdentityCorrection = false;
+            if (!pendingIdentityPickups.TryGetValue(
+                    resolved.WorldItem,
+                    out Queue<PendingIdentityPickup> pending))
+            {
+                if (!abandonedIdentityPickups.TryGetValue(resolved.WorldItem, out pending))
+                    return;
+                isIdentityCorrection = true;
+                abandonedIdentityPickups.Remove(resolved.WorldItem);
             }
 
             pendingIdentityPickups.Remove(resolved.WorldItem);
             while (pending.Count > 0)
             {
-                WeaponPickedup pickup = pending.Dequeue();
-                if (!networkAgentRegistry.TryGetAgentInfo(pickup.Agent, out CoopAgentInfo agentInfo))
-                    continue;
-                SendWeaponPickup(pickup, agentInfo, resolved.WorldItemId);
+                PendingIdentityPickup pendingPickup = pending.Dequeue();
+                SendWeaponPickup(
+                    pendingPickup.Pickup,
+                    pendingPickup.AgentId,
+                    resolved.WorldItemId,
+                    isIdentityCorrection);
             }
         }
 
@@ -232,21 +262,46 @@ namespace Missions.Agents.Handlers
 
         private void HandleWorldItemIdentityAbandoned(MessagePayload<WorldItemIdentityAbandoned> payload)
         {
-            if (payload.What.WorldItem != null)
-                pendingWorldItemIdentities.Remove(payload.What.WorldItem);
+            SpawnedItemEntity worldItem = payload.What.WorldItem;
+            if (worldItem == null) return;
+
+            pendingWorldItemIdentities.Remove(worldItem);
+            if (!payload.What.AwaitLateResolution)
+                abandonedIdentityPickups.Remove(worldItem);
+            if (!pendingIdentityPickups.TryGetValue(
+                    worldItem,
+                    out Queue<PendingIdentityPickup> pending))
+            {
+                return;
+            }
+
+            pendingIdentityPickups.Remove(worldItem);
+            if (payload.What.AwaitLateResolution)
+                abandonedIdentityPickups[worldItem] = pending;
+            foreach (PendingIdentityPickup pendingPickup in pending)
+            {
+                SendWeaponPickup(
+                    pendingPickup.Pickup,
+                    pendingPickup.AgentId,
+                    Guid.Empty);
+            }
         }
         private void WeaponPickupReceive(MessagePayload<NetworkWeaponPickedup> obj)
         {
             GameThread.RunSafe(() =>
             {
-                if (networkAgentRegistry.TryGetAgentInfo(obj.What.AgentId, out var agentInfo) == false)
+                if (obj.What.IsIdentityCorrection)
                 {
-                    Logger.Warning("No agent found at {guid} in {class}", obj.What.AgentId, typeof(WeaponPickupHandler));
+                    messageBroker.Publish(
+                        this,
+                        new WeaponPickupApplied(
+                            obj.What.AgentId,
+                            obj.What.EquipmentIndex,
+                            obj.What.WorldItemId,
+                            obj.What.ResultingWorldItemAmount,
+                            obj.What.WorldItemConsumed));
                     return;
                 }
-
-                Agent agent = agentInfo.Agent;
-                if (agent == null || agent.Mission != Mission.Current || !agent.IsActive()) return;
 
                 if (!objectManager.TryGetObjectWithLogging<ItemObject>(obj.What.ItemObjectId, out var itemObject))
                     return;
@@ -268,6 +323,27 @@ namespace Missions.Agents.Handlers
                             obj.What.ItemObjectId);
                         return;
                     }
+                }
+
+                bool hasActiveAgent =
+                    networkAgentRegistry.TryGetAgentInfo(obj.What.AgentId, out CoopAgentInfo agentInfo) &&
+                    agentInfo.Agent != null &&
+                    agentInfo.Agent.Mission == Mission.Current &&
+                    agentInfo.Agent.IsActive();
+                if (!hasActiveAgent)
+                {
+                    Logger.Warning(
+                        "Retiring weapon pickup without active agent={AgentId}",
+                        obj.What.AgentId);
+                    messageBroker.Publish(
+                        this,
+                        new WeaponPickupApplied(
+                            obj.What.AgentId,
+                            obj.What.EquipmentIndex,
+                            obj.What.WorldItemId,
+                            obj.What.ResultingWorldItemAmount,
+                            obj.What.WorldItemConsumed));
+                    return;
                 }
 
                 MissionWeapon missionWeapon = new MissionWeapon(

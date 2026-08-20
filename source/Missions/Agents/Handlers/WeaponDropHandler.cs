@@ -8,6 +8,8 @@ using Missions.Agents.Packets;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -24,6 +26,7 @@ public interface IWeaponDropHandler : IHandler
 public class WeaponDropHandler : IWeaponDropHandler
 {
     private const int MaxPendingDropsPerSlot = 8;
+    private const int MaxPendingPickupTombstonesPerSlot = 8;
     private const int MaxObjectIdLength = 256;
     private const int MaxBannerCodeLength = 4096;
     private const int KnownSpawnFlagsMask = 0x7F;
@@ -41,6 +44,8 @@ public class WeaponDropHandler : IWeaponDropHandler
         public DateTime ExpiresAtUtc { get; }
         public bool HasLaterAuthoritativeSlotTransition { get; set; }
         public bool HasPendingPickup { get; private set; }
+        public bool IdentityAbandoned { get; private set; }
+        public bool AwaitingLateResolution { get; private set; }
         public bool PendingPickupConsumed { get; private set; }
         public short PendingRemainingAmount { get; private set; }
 
@@ -64,6 +69,12 @@ public class WeaponDropHandler : IWeaponDropHandler
             PendingRemainingAmount = pickup.ResultingWorldItemAmount;
             HasLaterAuthoritativeSlotTransition = true;
         }
+
+        public void MarkIdentityAbandoned(bool awaitLateResolution)
+        {
+            IdentityAbandoned = true;
+            AwaitingLateResolution = awaitLateResolution;
+        }
     }
 
     private readonly INetworkAgentRegistry networkAgentRegistry;
@@ -74,11 +85,14 @@ public class WeaponDropHandler : IWeaponDropHandler
     private readonly IWeaponDropWorldItemSpawner worldItemSpawner;
     private readonly Dictionary<(Guid AgentId, EquipmentIndex Slot), Queue<ObservedDrop>> pendingDrops =
         new Dictionary<(Guid AgentId, EquipmentIndex Slot), Queue<ObservedDrop>>();
+    private readonly Dictionary<(Guid AgentId, EquipmentIndex Slot), Queue<ObservedDrop>> pendingPickupTombstones =
+        new Dictionary<(Guid AgentId, EquipmentIndex Slot), Queue<ObservedDrop>>();
     private readonly Dictionary<Guid, NetworkWeaponDropped> activeDrops =
         new Dictionary<Guid, NetworkWeaponDropped>();
     private readonly HashSet<Guid> appliedDropIds = new HashSet<Guid>();
     private readonly HashSet<Guid> retiredWorldItemIds = new HashSet<Guid>();
     private readonly Dictionary<Guid, short> remainingWorldItemAmounts = new Dictionary<Guid, short>();
+    private readonly CancellationTokenSource expiryCancellation = new CancellationTokenSource();
     private bool disposed;
 
     public WeaponDropHandler(
@@ -109,16 +123,20 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     public void Dispose()
     {
+        if (disposed) return;
         disposed = true;
+        expiryCancellation.Cancel();
         messageBroker.Unsubscribe<WeaponDropped>(HandleWeaponDropped);
         messageBroker.Unsubscribe<NetworkWeaponDropped>(HandleNetworkWeaponDropped);
         messageBroker.Unsubscribe<WeaponPickedup>(HandleWeaponPickedup);
         messageBroker.Unsubscribe<WeaponPickupApplied>(HandleWeaponPickupApplied);
         pendingDrops.Clear();
+        pendingPickupTombstones.Clear();
         activeDrops.Clear();
         appliedDropIds.Clear();
         retiredWorldItemIds.Clear();
         remainingWorldItemAmounts.Clear();
+        expiryCancellation.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -207,7 +225,16 @@ public class WeaponDropHandler : IWeaponDropHandler
             if (applied.WorldItemConsumed)
                 RetireWorldItem(applied.WorldItemId);
             else
+            {
                 remainingWorldItemAmounts[applied.WorldItemId] = applied.ResultingWorldItemAmount;
+                if (worldItemRegistry.TryGet(
+                        applied.WorldItemId,
+                        out SpawnedItemEntity item) &&
+                    worldItemSpawner.IsPresent(item))
+                {
+                    item._weapon.Amount = applied.ResultingWorldItemAmount;
+                }
+            }
         }
 
         var key = (applied.AgentId, applied.EquipmentIndex);
@@ -345,21 +372,14 @@ public class WeaponDropHandler : IWeaponDropHandler
 
         while (queue.Count >= MaxPendingDropsPerSlot)
         {
-            ObservedDrop discarded = null;
-            var retained = new Queue<ObservedDrop>();
-            while (queue.Count > 0)
+            ObservedDrop discarded = queue.Dequeue();
+            if (discarded.HasPendingPickup)
+                RetainPendingPickupTombstone(key, discarded, "pending-limit");
+            else
             {
-                ObservedDrop candidate = queue.Dequeue();
-                if (discarded == null && !candidate.HasPendingPickup)
-                    discarded = candidate;
-                else
-                    retained.Enqueue(candidate);
+                AbandonObservedWorldItemIdentity(discarded);
+                DiscardObservedDrop(discarded, agentId, dropped.EquipmentIndex, "pending-limit");
             }
-            queue = retained;
-            pendingDrops[key] = queue;
-            if (discarded == null) break;
-            AbandonObservedWorldItemIdentity(discarded);
-            DiscardObservedDrop(discarded, agentId, dropped.EquipmentIndex, "pending-limit");
         }
 
         var observed = new ObservedDrop(
@@ -400,19 +420,36 @@ public class WeaponDropHandler : IWeaponDropHandler
             return;
         }
 
+        bool hasAgent = networkAgentRegistry.TryGetAgentInfo(
+            message.AgentId,
+            out CoopAgentInfo agentInfo);
+        if (!hasAgent)
+            Logger.Warning("[WeaponDrop] Reconciling drop={DropId} without agent={AgentId}", message.DropId, message.AgentId);
+
         if (message.WorldItemId != Guid.Empty && retiredWorldItemIds.Contains(message.WorldItemId))
         {
+            bool hadRetiredObservation = TryTakeObservedDrop(
+                message.AgentId,
+                message.EquipmentIndex,
+                canonical,
+                expectsWorldItem: true,
+                out ObservedDrop retiredObservation);
+            if (hadRetiredObservation)
+            {
+                DiscardObservedDrop(
+                    retiredObservation,
+                    message.AgentId,
+                    message.EquipmentIndex,
+                    "retired-before-drop");
+                ResolveObservedWorldItemIdentity(retiredObservation, message.WorldItemId);
+            }
+            if (hasAgent)
+                ApplyRetiredDropTransition(message, agentInfo);
             appliedDropIds.Add(message.DropId);
             Logger.Debug(
-                "[WeaponDrop] Ignored retired drop={DropId} worldItem={WorldItemId}",
+                "[WeaponDrop] Applied retired drop transition={DropId} worldItem={WorldItemId}",
                 message.DropId,
                 message.WorldItemId);
-            return;
-        }
-
-        if (!networkAgentRegistry.TryGetAgentInfo(message.AgentId, out CoopAgentInfo agentInfo))
-        {
-            Logger.Warning("[WeaponDrop] No agent found for drop={DropId} agent={AgentId}", message.DropId, message.AgentId);
             return;
         }
 
@@ -428,7 +465,8 @@ public class WeaponDropHandler : IWeaponDropHandler
             {
                 if (observedDrop.PendingPickupConsumed)
                 {
-                    ApplyCurrentEquipment(message, agentInfo);
+                    if (hasAgent)
+                        ApplyCurrentEquipment(message, agentInfo);
                     appliedDropIds.Add(message.DropId);
                     RetireWorldItem(message.WorldItemId);
                     ResolveObservedWorldItemIdentity(observedDrop, message.WorldItemId);
@@ -441,9 +479,10 @@ public class WeaponDropHandler : IWeaponDropHandler
             if (!ReconcileObservedDrop(message, ref canonical, observedDrop, out SpawnedItemEntity observedItem))
                 return;
 
-            ApplyCurrentEquipment(message, agentInfo);
+            if (hasAgent)
+                ApplyCurrentEquipment(message, agentInfo);
             RecordApplied(message, observedItem);
-            if (observedDrop.HasPendingPickup)
+            if (observedDrop.HasPendingPickup && message.WorldItemId != Guid.Empty)
                 remainingWorldItemAmounts[message.WorldItemId] = observedDrop.PendingRemainingAmount;
             ResolveObservedWorldItemIdentity(observedDrop, message.WorldItemId);
             Logger.Debug(
@@ -461,6 +500,18 @@ public class WeaponDropHandler : IWeaponDropHandler
             out SpawnedItemEntity registeredItem,
             out bool blocked);
         if (blocked) return;
+
+        if (!hasAgent)
+        {
+            if (registeredItem == null &&
+                !TrySpawnCanonical(message, ref canonical, out registeredItem))
+            {
+                return;
+            }
+
+            RecordApplied(message, registeredItem);
+            return;
+        }
 
         if (!ApplyAuthoritativeTransition(
                 message,
@@ -642,6 +693,21 @@ public class WeaponDropHandler : IWeaponDropHandler
             message.CurrentEquipment.Apply(agentInfo.Agent);
     }
 
+    private static void ApplyRetiredDropTransition(
+        NetworkWeaponDropped message,
+        CoopAgentInfo agentInfo)
+    {
+        Agent agent = agentInfo.Agent;
+        if (agent?.Equipment == null) return;
+
+        if (!agent.Equipment[message.EquipmentIndex].IsEmpty)
+        {
+            using (new AllowedThread())
+                agent.RemoveEquippedWeapon(message.EquipmentIndex);
+        }
+        ApplyCurrentEquipment(message, agentInfo);
+    }
+
     private bool TryGetRegisteredCanonical(
         NetworkWeaponDropped message,
         MissionWeapon canonical,
@@ -737,9 +803,37 @@ public class WeaponDropHandler : IWeaponDropHandler
         bool expectsWorldItem,
         out ObservedDrop observed)
     {
+        if (TryTakeObservedDrop(
+                pendingPickupTombstones,
+                agentId,
+                equipmentIndex,
+                canonical,
+                expectsWorldItem,
+                out observed))
+        {
+            return true;
+        }
+
+        return TryTakeObservedDrop(
+            pendingDrops,
+            agentId,
+            equipmentIndex,
+            canonical,
+            expectsWorldItem,
+            out observed);
+    }
+
+    private bool TryTakeObservedDrop(
+        Dictionary<(Guid AgentId, EquipmentIndex Slot), Queue<ObservedDrop>> observations,
+        Guid agentId,
+        EquipmentIndex equipmentIndex,
+        MissionWeapon canonical,
+        bool expectsWorldItem,
+        out ObservedDrop observed)
+    {
         var key = (agentId, equipmentIndex);
         observed = null;
-        if (!pendingDrops.TryGetValue(key, out Queue<ObservedDrop> queue) || queue.Count == 0)
+        if (!observations.TryGetValue(key, out Queue<ObservedDrop> queue) || queue.Count == 0)
             return false;
 
         var retained = new Queue<ObservedDrop>();
@@ -758,9 +852,7 @@ public class WeaponDropHandler : IWeaponDropHandler
                 continue;
             }
 
-            if (observed == null && candidate.HasPendingPickup)
-                retained.Enqueue(candidate);
-            else if (observed == null)
+            if (observed == null)
             {
                 AbandonObservedWorldItemIdentity(candidate);
                 DiscardObservedDrop(candidate, agentId, equipmentIndex, "superseded-authoritative");
@@ -770,10 +862,31 @@ public class WeaponDropHandler : IWeaponDropHandler
         }
 
         if (retained.Count == 0)
-            pendingDrops.Remove(key);
+            observations.Remove(key);
         else
-            pendingDrops[key] = retained;
+            observations[key] = retained;
         return observed != null;
+    }
+
+    private void RetainPendingPickupTombstone(
+        (Guid AgentId, EquipmentIndex Slot) key,
+        ObservedDrop observed,
+        string reason)
+    {
+        AbandonObservedWorldItemIdentity(observed, awaitLateResolution: true);
+        DiscardObservedDrop(observed, key.AgentId, key.Slot, reason);
+        if (!pendingPickupTombstones.TryGetValue(key, out Queue<ObservedDrop> tombstones))
+        {
+            tombstones = new Queue<ObservedDrop>();
+            pendingPickupTombstones.Add(key, tombstones);
+        }
+
+        while (tombstones.Count >= MaxPendingPickupTombstonesPerSlot)
+        {
+            ObservedDrop discarded = tombstones.Dequeue();
+            AbandonObservedWorldItemIdentity(discarded);
+        }
+        tombstones.Enqueue(observed);
     }
 
     private void RecordPendingObservedPickup(WeaponPickedup pickup)
@@ -791,14 +904,30 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     private void ResolveObservedWorldItemIdentity(ObservedDrop observed, Guid worldItemId)
     {
-        if (observed?.Item == null || worldItemId == Guid.Empty) return;
+        if (observed?.Item == null) return;
+        if (worldItemId == Guid.Empty)
+        {
+            AbandonObservedWorldItemIdentity(observed);
+            return;
+        }
         messageBroker.Publish(this, new WorldItemIdentityResolved(observed.Item, worldItemId));
     }
 
-    private void AbandonObservedWorldItemIdentity(ObservedDrop observed)
+    private void AbandonObservedWorldItemIdentity(
+        ObservedDrop observed,
+        bool awaitLateResolution = false)
     {
-        if (observed?.Item != null)
-            messageBroker.Publish(this, new WorldItemIdentityAbandoned(observed.Item));
+        if (observed?.Item == null ||
+            (observed.IdentityAbandoned &&
+             observed.AwaitingLateResolution == awaitLateResolution))
+        {
+            return;
+        }
+
+        observed.MarkIdentityAbandoned(awaitLateResolution);
+        messageBroker.Publish(
+            this,
+            new WorldItemIdentityAbandoned(observed.Item, awaitLateResolution));
     }
 
     private void DiscardObservedDrop(
@@ -889,9 +1018,17 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     private void RetireWorldItem(Guid worldItemId)
     {
+        if (worldItemId == Guid.Empty) return;
+
         retiredWorldItemIds.Add(worldItemId);
         activeDrops.Remove(worldItemId);
         remainingWorldItemAmounts.Remove(worldItemId);
+        if (worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity item) &&
+            worldItemSpawner.IsPresent(item) &&
+            !worldItemSpawner.TryRemove(item))
+        {
+            Logger.Error("[WeaponDrop] Failed to remove retired world item={WorldItemId}", worldItemId);
+        }
         worldItemRegistry.Remove(worldItemId);
     }
 
@@ -899,6 +1036,25 @@ public class WeaponDropHandler : IWeaponDropHandler
         (Guid AgentId, EquipmentIndex Slot) key,
         ObservedDrop observed)
     {
+        CancellationToken cancellationToken = expiryCancellation.Token;
+        _ = ScheduleObservedDropExpiryAsync(key, observed, cancellationToken);
+    }
+
+    private async Task ScheduleObservedDropExpiryAsync(
+        (Guid AgentId, EquipmentIndex Slot) key,
+        ObservedDrop observed,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(ObservedDropTimeout, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (cancellationToken.IsCancellationRequested) return;
         GameThread.EnqueueSafe(
             () => CheckObservedDropExpiry(key, observed),
             context: nameof(CheckObservedDropExpiry));
@@ -915,13 +1071,7 @@ public class WeaponDropHandler : IWeaponDropHandler
             return;
         }
 
-        if (DateTime.UtcNow < observed.ExpiresAtUtc)
-        {
-            ScheduleObservedDropExpiry(key, observed);
-            return;
-        }
-
-        if (observed.HasPendingPickup) return;
+        if (DateTime.UtcNow < observed.ExpiresAtUtc) return;
 
         var retained = new Queue<ObservedDrop>();
         while (queue.Count > 0)
@@ -934,6 +1084,12 @@ public class WeaponDropHandler : IWeaponDropHandler
             pendingDrops.Remove(key);
         else
             pendingDrops[key] = retained;
+
+        if (observed.HasPendingPickup)
+        {
+            RetainPendingPickupTombstone(key, observed, "authoritative-timeout");
+            return;
+        }
 
         AbandonObservedWorldItemIdentity(observed);
         if (observed.Item != null && worldItemSpawner.IsPresent(observed.Item))

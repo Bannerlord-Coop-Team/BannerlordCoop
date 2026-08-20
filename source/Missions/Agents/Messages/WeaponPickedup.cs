@@ -108,10 +108,14 @@ namespace Missions.Agents.Messages
     public readonly struct WorldItemIdentityAbandoned : IEvent
     {
         public SpawnedItemEntity WorldItem { get; }
+        public bool AwaitLateResolution { get; }
 
-        public WorldItemIdentityAbandoned(SpawnedItemEntity worldItem)
+        public WorldItemIdentityAbandoned(
+            SpawnedItemEntity worldItem,
+            bool awaitLateResolution = false)
         {
             WorldItem = worldItem;
+            AwaitLateResolution = awaitLateResolution;
         }
     }
 }

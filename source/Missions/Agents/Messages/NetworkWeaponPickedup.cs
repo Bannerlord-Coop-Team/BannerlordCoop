@@ -59,6 +59,9 @@ namespace Missions.Agents.Messages
         [ProtoMember(16)]
         public short ResultingSlotDataValue { get; }
 
+        [ProtoMember(17)]
+        public bool IsIdentityCorrection { get; }
+
         public NetworkWeaponPickedup(
             Guid agentId, 
             EquipmentIndex equipmentIndex,
@@ -75,7 +78,8 @@ namespace Missions.Agents.Messages
             string resultingSlotItemObjectId = null,
             string resultingSlotItemModifierId = null,
             Banner resultingSlotBanner = null,
-            short resultingSlotDataValue = 0)
+            short resultingSlotDataValue = 0,
+            bool isIdentityCorrection = false)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
@@ -93,6 +97,7 @@ namespace Missions.Agents.Messages
             ResultingSlotItemModifierId = resultingSlotItemModifierId;
             ResultingSlotBanner = resultingSlotBanner;
             ResultingSlotDataValue = resultingSlotDataValue;
+            IsIdentityCorrection = isIdentityCorrection;
         }
     }
 }
