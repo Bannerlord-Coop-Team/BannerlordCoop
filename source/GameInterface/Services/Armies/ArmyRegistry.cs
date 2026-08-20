@@ -42,7 +42,7 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
         {
             foreach (var army in kingdom.Armies)
             {
-                RegisterExistingObject(kingdom.StringId, army);
+                RegisterExistingObject(army.LeaderParty.StringId, army);
             }
         }
     }

@@ -54,6 +54,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
         messageBroker.Subscribe<NetworkChangeKingdomPolicy>(HandleNetworkChangeKingdomPolicy);
         messageBroker.Subscribe<NetworkChangeKingdomDecisionVote>(HandleNetworkChangeKingdomDecisionVote);
+        messageBroker.Subscribe<NetworkKingdomDecisionRoundStatus>(HandleNetworkKingdomDecisionRoundStatus);
         messageBroker.Subscribe<NetworkKingdomDecisionResolved>(HandleNetworkKingdomDecisionResolved);
         messageBroker.Subscribe<NetworkPlayerKingdomCreated>(HandleNetworkPlayerKingdomCreated);
         messageBroker.Subscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
@@ -365,6 +366,11 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Publish(this, message);
     }
 
+    private void HandleNetworkKingdomDecisionRoundStatus(MessagePayload<NetworkKingdomDecisionRoundStatus> obj)
+    {
+        messageBroker.Publish(this, new ApplyKingdomDecisionRoundStatus(obj.What.Status));
+    }
+
     private void HandleNetworkChangeKingdomPolicy(MessagePayload<NetworkChangeKingdomPolicy> obj)
     {
         var payload = obj.What;
@@ -443,6 +449,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
         messageBroker.Unsubscribe<NetworkChangeKingdomPolicy>(HandleNetworkChangeKingdomPolicy);
         messageBroker.Unsubscribe<NetworkChangeKingdomDecisionVote>(HandleNetworkChangeKingdomDecisionVote);
+        messageBroker.Unsubscribe<NetworkKingdomDecisionRoundStatus>(HandleNetworkKingdomDecisionRoundStatus);
         messageBroker.Unsubscribe<NetworkKingdomDecisionResolved>(HandleNetworkKingdomDecisionResolved);
         messageBroker.Unsubscribe<NetworkPlayerKingdomCreated>(HandleNetworkPlayerKingdomCreated);
         messageBroker.Unsubscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
