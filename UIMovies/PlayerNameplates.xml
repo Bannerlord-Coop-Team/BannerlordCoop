@@ -9,10 +9,12 @@
           <ItemTemplate>
             <NameMarkerListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="40"
                                  Position="@ScreenPosition" Distance="@Distance" IsMarkerEnabled="@IsEnabled"
-                                 NameTextWidget="NameText" TypeVisualWidget="TypeVisual"
+                                 NameTextWidget="NameContainer\NameText"
+                                 TypeVisualWidget="NameContainer\TypeVisual"
                                  FarAlphaTarget="1" FarDistanceCutoff="250" CloseDistanceCutoff="25">
               <Children>
-                <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
+                <ListPanel Id="NameContainer"
+                           WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
                            LayoutImp.LayoutMethod="HorizontalLeftToRight">
                   <Children>
                     <BrushWidget Id="TypeVisual" IsVisible="false"

@@ -7,6 +7,7 @@ using GameInterface.Services.UI.Messages;
 using GameInterface.Services.UI.PlayerNameplates;
 using System;
 using System.IO;
+using System.Xml.Linq;
 using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
@@ -94,6 +95,21 @@ public class PlayerNameplatesOptionsTests
         Assert.Equal(
             expected,
             new PlayerNameplateEligibility().IsAlliedTeam(isPlayerTeam, isEnemyOfPlayerTeam));
+    }
+
+    [Fact]
+    public void PlayerNameplatesMovie_ReferencesNestedMarkerWidgetsByPath()
+    {
+        var document = XDocument.Load(PopupUIMovieBindingTests.FindMoviePath("PlayerNameplates.xml"));
+        var marker = Assert.Single(document.Descendants("NameMarkerListPanel"));
+
+        Assert.Equal(@"NameContainer\NameText", marker.Attribute("NameTextWidget")?.Value);
+        Assert.Equal(@"NameContainer\TypeVisual", marker.Attribute("TypeVisualWidget")?.Value);
+
+        var container = Assert.Single(marker.Descendants(),
+            element => element.Attribute("Id")?.Value == "NameContainer");
+        Assert.Single(container.Descendants(), element => element.Attribute("Id")?.Value == "NameText");
+        Assert.Single(container.Descendants(), element => element.Attribute("Id")?.Value == "TypeVisual");
     }
 
     private static string CreateTempFilePath()
