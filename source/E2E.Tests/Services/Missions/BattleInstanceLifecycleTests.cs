@@ -50,10 +50,43 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 session: session,
                 missionContext: context);
 
-            lifecycle.Leave();
+            lifecycle.Leave(wasRetreat: false);
 
             Assert.Empty(context.ControllersInMission);
             Assert.Equal(1, worldItemRegistry.ClearCalls);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public void Leave_SendsRetreatSignalOnlyForUnresolvedRetreat(bool wasRetreat, int expectedRetreatMessages)
+    {
+        var (mapEventId, _) = SetupCoopBattle("A", "B");
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            var session = new BattleSession(
+                client.Resolve<IControllerIdProvider>(),
+                client.Resolve<IBattleHostRegistry>());
+            Assert.True(session.TryBegin(mapEventId));
+
+            using var lifecycle = new BattleInstanceLifecycle(
+                client.Resolve<IBattleNetwork>(),
+                client.Resolve<INetwork>(),
+                client.Resolve<IMessageBroker>(),
+                objectManager: null,
+                coopMissionComponent: null,
+                worldItemRegistry: new RecordingWorldItemRegistry(),
+                session: session,
+                missionContext: client.Resolve<IMissionContext>());
+
+            lifecycle.Leave(wasRetreat);
+
+            Assert.Equal(expectedRetreatMessages,
+                client.NetworkSentMessages.GetMessageCount<NetworkBattleRetreated>());
+            Assert.Equal(1, client.NetworkSentMessages.GetMessageCount<NetworkMissionLeft>());
         });
     }
 

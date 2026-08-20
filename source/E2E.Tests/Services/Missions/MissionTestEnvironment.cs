@@ -180,8 +180,12 @@ public class MissionTestEnvironment : E2ETestEnvironment
     {
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(this,
-                new MissionMemberDeparted(controllerId, mapEventId, wasRetreat, isInstanceEmpty));
+            if (wasRetreat)
+            {
+                Server.Resolve<IMessageBroker>().Publish(this, new BattlePartyRetreated(controllerId, mapEventId));
+            }
+
+            Server.Resolve<IMessageBroker>().Publish(this, new MissionMemberDeparted(controllerId, mapEventId, wasRetreat, isInstanceEmpty));
         });
     }
 

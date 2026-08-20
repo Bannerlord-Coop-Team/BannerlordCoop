@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Participation;
 using HarmonyLib;
 using Missions.Messages;
 using System.Linq;
@@ -55,6 +56,32 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
         AssertCaptiveOf(Server, setup.RemainingHeroId, setup.EnemyPartyId);
     }
 
+    [Fact]
+    public void NetworkBattleRetreated_UsesAuthenticatedSendingPeerParty()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle(EnemyController, RemainingController, RetreaterController);
+        var authenticatedRetreater = Clients.ElementAt(2);
+
+        Server.Call(() => Server.Resolve<GameInterface.Services.Players.IPlayerManager>()
+            .SetPeer(RetreaterController, authenticatedRetreater.NetPeer));
+        authenticatedRetreater.Call(() => authenticatedRetreater.Resolve<Common.Network.INetwork>()
+            .SendAll(new NetworkBattleRetreated(mapEventId)));
+
+        AssertRetreated(mapEventId, partyIds[2], expected: true);
+        AssertRetreated(mapEventId, partyIds[1], expected: false);
+    }
+
+    [Fact]
+    public void NormalMissionLeave_DoesNotMarkPartyRetreated()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle(EnemyController, RemainingController, RetreaterController);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
+            new MissionMemberDeparted(RetreaterController, mapEventId, wasRetreat: true, isInstanceEmpty: false)));
+
+        AssertRetreated(mapEventId, partyIds[2], expected: false);
+    }
+
     private OutcomeSetup SetupBattle()
     {
         var (mapEventId, partyIds, heroIds) = SetupCoopBattleWithHeroes(EnemyController, RemainingController, RetreaterController);
@@ -105,6 +132,17 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
 
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
             new AuthoritativeBattleConclusionRequested(mapEventId, BattleState.AttackerVictory, hostEpoch: 1)), disabledMethods);
+    }
+
+    private void AssertRetreated(string mapEventId, string partyId, bool expected)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.Equal(expected,
+                Server.Resolve<IRetreatedMapEventPartyTracker>().IsRetreated(mapEvent, party.Party));
+        });
     }
 
     private static void AssertNotCaptive(EnvironmentInstance instance, string heroId)

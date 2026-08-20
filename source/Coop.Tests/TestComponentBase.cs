@@ -20,6 +20,7 @@ using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -128,6 +129,7 @@ internal abstract class TestComponentBase
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
+        RegisterMock<IRetreatedMapEventPartyTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
