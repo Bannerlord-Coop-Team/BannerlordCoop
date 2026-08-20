@@ -62,7 +62,12 @@ public class WeaponPickupSyncTests
             previousSlotAmount: 3,
             previousWorldItemAmount: 9,
             resultingSlotAmount: 7,
-            resultingWorldItemAmount: 5);
+            resultingWorldItemAmount: 5,
+            worldItemConsumed: false,
+            resultingSlotItemObjectId: "ItemObject_existing_ammo",
+            resultingSlotItemModifierId: "ItemModifier_test",
+            resultingSlotBanner: banner,
+            resultingSlotDataValue: 7);
         PropertyInfo? property = typeof(NetworkWeaponPickedup).GetProperty(
             nameof(NetworkWeaponPickedup.CurrentEquipment));
         Assert.NotNull(property);
@@ -95,6 +100,11 @@ public class WeaponPickupSyncTests
         Assert.Equal(9, received.PreviousWorldItemAmount);
         Assert.Equal(7, received.ResultingSlotAmount);
         Assert.Equal(5, received.ResultingWorldItemAmount);
+        Assert.False(received.WorldItemConsumed);
+        Assert.Equal("ItemObject_existing_ammo", received.ResultingSlotItemObjectId);
+        Assert.Equal("ItemModifier_test", received.ResultingSlotItemModifierId);
+        Assert.Equal(banner.Serialize(), received.ResultingSlotBanner.Serialize());
+        Assert.Equal(7, received.ResultingSlotDataValue);
     }
 
     [Fact]
@@ -209,6 +219,7 @@ public class WeaponPickupSyncTests
             SpawnedItemEntity worldItem = ObjectHelper.SkipConstructor<SpawnedItemEntity>();
             CoopAgentInfo agentInfo = CreateAgentInfo(agent);
             MissionWeapon weapon = default;
+            MissionWeapon resultingWeapon = agent.Equipment[EquipmentIndex.Weapon2];
             var equipment = new AgentEquipmentData(
                 EquipmentIndex.Weapon0,
                 EquipmentIndex.Weapon2,
@@ -223,7 +234,9 @@ public class WeaponPickupSyncTests
                 previousSlotAmount: 0,
                 previousWorldItemAmount: 9,
                 resultingSlotAmount: 7,
-                resultingWorldItemAmount: 5);
+                resultingWorldItemAmount: 5,
+                worldItemConsumed: true,
+                resultingSlotWeapon: ref resultingWeapon);
 
             Assert.Equal(new[] { "pickup", "wield" }, ApplyCalls);
             Assert.Equal(new short[] { 0, 7 }, AppliedSlotAmounts);
@@ -284,6 +297,7 @@ public class WeaponPickupSyncTests
             InitializeEquipmentSlot(agent, EquipmentIndex.Weapon2);
             CoopAgentInfo agentInfo = CreateAgentInfo(agent);
             MissionWeapon weapon = default;
+            MissionWeapon resultingWeapon = agent.Equipment[EquipmentIndex.Weapon2];
             var equipment = new AgentEquipmentData(
                 EquipmentIndex.Weapon0,
                 EquipmentIndex.Weapon2,
@@ -298,7 +312,9 @@ public class WeaponPickupSyncTests
                 previousSlotAmount: 3,
                 previousWorldItemAmount: 9,
                 resultingSlotAmount: 7,
-                resultingWorldItemAmount: 5);
+                resultingWorldItemAmount: 5,
+                worldItemConsumed: true,
+                resultingSlotWeapon: ref resultingWeapon);
 
             Assert.Equal(new[] { "pickup", "wield" }, ApplyCalls);
             Assert.Equal(new short[] { 3, 7 }, AppliedSlotAmounts);

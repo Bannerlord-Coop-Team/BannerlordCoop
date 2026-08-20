@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Missions.Agents.Packets;
+using System;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -21,6 +22,8 @@ namespace Missions.Agents.Messages
         public short PreviousWorldItemAmount { get; }
         public short ResultingSlotAmount { get; }
         public short ResultingWorldItemAmount { get; }
+        public bool WorldItemConsumed { get; }
+        public MissionWeapon ResultingSlotWeapon { get; }
 
         public WeaponPickedup(
             Agent agent,
@@ -33,7 +36,9 @@ namespace Missions.Agents.Messages
             short previousSlotAmount,
             short previousWorldItemAmount,
             short resultingSlotAmount,
-            short resultingWorldItemAmount)
+            short resultingWorldItemAmount,
+            bool worldItemConsumed,
+            MissionWeapon resultingSlotWeapon)
         {
             Agent = agent;
             WorldItem = worldItem;
@@ -46,6 +51,67 @@ namespace Missions.Agents.Messages
             PreviousWorldItemAmount = previousWorldItemAmount;
             ResultingSlotAmount = resultingSlotAmount;
             ResultingWorldItemAmount = resultingWorldItemAmount;
+            WorldItemConsumed = worldItemConsumed;
+            ResultingSlotWeapon = resultingSlotWeapon;
+        }
+    }
+
+    /// <summary>Internal confirmation that an authoritative pickup was applied to an agent slot.</summary>
+    public readonly struct WeaponPickupApplied : IEvent
+    {
+        public Guid AgentId { get; }
+        public EquipmentIndex EquipmentIndex { get; }
+        public Guid WorldItemId { get; }
+        public short ResultingWorldItemAmount { get; }
+        public bool WorldItemConsumed { get; }
+
+        public WeaponPickupApplied(
+            Guid agentId,
+            EquipmentIndex equipmentIndex,
+            Guid worldItemId,
+            short resultingWorldItemAmount,
+            bool worldItemConsumed)
+        {
+            AgentId = agentId;
+            EquipmentIndex = equipmentIndex;
+            WorldItemId = worldItemId;
+            ResultingWorldItemAmount = resultingWorldItemAmount;
+            WorldItemConsumed = worldItemConsumed;
+        }
+    }
+
+    /// <summary>Maps an observed runtime item to the canonical identity assigned by its owner.</summary>
+    public readonly struct WorldItemIdentityResolved : IEvent
+    {
+        public SpawnedItemEntity WorldItem { get; }
+        public Guid WorldItemId { get; }
+
+        public WorldItemIdentityResolved(SpawnedItemEntity worldItem, Guid worldItemId)
+        {
+            WorldItem = worldItem;
+            WorldItemId = worldItemId;
+        }
+    }
+
+    /// <summary>Marks an observed runtime item that is waiting for its owner's canonical identity.</summary>
+    public readonly struct WorldItemIdentityPending : IEvent
+    {
+        public SpawnedItemEntity WorldItem { get; }
+
+        public WorldItemIdentityPending(SpawnedItemEntity worldItem)
+        {
+            WorldItem = worldItem;
+        }
+    }
+
+    /// <summary>Clears a pending marker when an unclaimed observation expires.</summary>
+    public readonly struct WorldItemIdentityAbandoned : IEvent
+    {
+        public SpawnedItemEntity WorldItem { get; }
+
+        public WorldItemIdentityAbandoned(SpawnedItemEntity worldItem)
+        {
+            WorldItem = worldItem;
         }
     }
 }

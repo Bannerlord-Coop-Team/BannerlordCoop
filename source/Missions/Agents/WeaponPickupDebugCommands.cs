@@ -6,6 +6,7 @@ using GameInterface.Services.ObjectManager;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Battles;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -92,29 +93,41 @@ internal static class WeaponPickupDebugCommands
     {
         if (args.Count > 1)
             return "Usage: coop.debug.weapon_pickup.state [agentId]";
-
         if (!TryResolveBattleAgent(args, out var registry, out var info, out var error))
             return error;
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "WEAPON_PICKUP_STATE error=object-manager-unavailable";
+        if (!ContainerProvider.TryResolve<INetworkWorldItemRegistry>(out var worldItemRegistry))
+            return "WEAPON_PICKUP_STATE error=world-item-registry-unavailable";
 
         Agent agent = info.Agent;
-        string slots = string.Join(",", Enumerable.Range(
+        var slotStates = Enumerable.Range(
                 (int)EquipmentIndex.WeaponItemBeginSlot,
                 (int)EquipmentIndex.NumAllWeaponSlots - (int)EquipmentIndex.WeaponItemBeginSlot)
             .Select(index =>
             {
                 var slot = (EquipmentIndex)index;
-                return $"{index}:{GetItemId(objectManager, agent.Equipment[slot].Item)}";
-            }));
-        string amounts = string.Join(",", Enumerable.Range(
-                (int)EquipmentIndex.WeaponItemBeginSlot,
-                (int)EquipmentIndex.NumAllWeaponSlots - (int)EquipmentIndex.WeaponItemBeginSlot)
-            .Select(index =>
+                MissionWeapon weapon = agent.Equipment[slot];
+                return new
+                {
+                    index,
+                    item = GetItemId(objectManager, weapon.Item),
+                    amount = GetWeaponAmount(weapon),
+                };
+            })
+            .ToArray();
+        var worldItems = worldItemRegistry.GetAll()
+            .Select(pair => new
             {
-                var slot = (EquipmentIndex)index;
-                return $"{index}:{GetWeaponAmount(agent.Equipment[slot])}";
-            }));
+                id = pair.Key.ToString("N"),
+                item = GetItemId(objectManager, pair.Value?.WeaponCopy.Item),
+                amount = pair.Value == null ? 0 : pair.Value.WeaponCopy.Amount,
+                active = pair.Value != null && !IsDroppedItemInactive(pair.Value),
+            })
+            .OrderBy(item => item.id)
+            .ToArray();
+        string slots = string.Join(",", slotStates.Select(slot => $"{slot.index}:{slot.item}"));
+        string amounts = string.Join(",", slotStates.Select(slot => $"{slot.index}:{slot.amount}"));
         string fixturePhase = fixture == null
             ? "inactive"
             : fixture.AgentId == info.AgentId ? fixture.Phase : "other-agent";
@@ -122,12 +135,55 @@ internal static class WeaponPickupDebugCommands
             ? false
             : fixture.DroppedItem != null && !fixture.DroppedItem.IsDeactivated;
         bool fieldBattle = MobileParty.MainParty?.MapEvent?.IsFieldBattle == true;
+        bool siegeAssault = MobileParty.MainParty?.MapEvent?.IsSiegeAssault == true;
+        CoopBattleController controller = Mission.Current.GetMissionBehavior<CoopBattleController>();
+        EquipmentIndex candidateSlot = fixture?.AgentId == info.AgentId
+            ? fixture.Slot
+            : agent.GetPrimaryWieldedItemIndex();
+        if (!IsPopulatedWeaponSlot(agent, candidateSlot))
+        {
+            candidateSlot = Enumerable.Range(
+                    (int)EquipmentIndex.WeaponItemBeginSlot,
+                    (int)EquipmentIndex.ExtraWeaponSlot - (int)EquipmentIndex.WeaponItemBeginSlot)
+                .Select(index => (EquipmentIndex)index)
+                .FirstOrDefault(slot => IsPopulatedWeaponSlot(agent, slot));
+        }
+        string candidateItem = fixture?.AgentId == info.AgentId
+            ? fixture.ItemId
+            : IsPopulatedWeaponSlot(agent, candidateSlot)
+                ? GetItemId(objectManager, agent.Equipment[candidateSlot].Item)
+                : null;
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            fieldBattle,
+            siegeAssault,
+            instanceId = controller.Session.InstanceId,
+            ownControllerId = controller.Session.OwnControllerId,
+            isBattleHost = controller.Session.IsLocalHost,
+            agentId = info.AgentId.ToString("N"),
+            authority = info.CurrentAuthority,
+            originalOwner = info.OriginalOwner,
+            locallyControlled = registry.IsLocallyControlled(info.AgentId),
+            active = agent.IsActive(),
+            primaryWieldedSlot = (int)agent.GetPrimaryWieldedItemIndex(),
+            offhandWieldedSlot = (int)agent.GetOffhandWieldedItemIndex(),
+            slots = slotStates,
+            worldItems,
+            fixture = fixturePhase,
+            fixtureSlot = candidateItem == null ? -1 : (int)candidateSlot,
+            fixtureItem = candidateItem,
+            fixtureWorldItemId = fixture?.AgentId == info.AgentId
+                ? fixture.WorldItemId.ToString("N")
+                : null,
+            worldItemActive,
+        });
 
         return $"WEAPON_PICKUP_STATE fieldBattle={fieldBattle} agent={info.AgentId:N} " +
             $"authority={info.CurrentAuthority} originalOwner={info.OriginalOwner} " +
             $"local={registry.IsLocallyControlled(info.AgentId)} active={agent.IsActive()} " +
             $"main={(int)agent.GetPrimaryWieldedItemIndex()} off={(int)agent.GetOffhandWieldedItemIndex()} " +
-            $"slots={slots} amounts={amounts} fixture={fixturePhase} worldItemActive={worldItemActive}";
+            $"slots={slots} amounts={amounts} fixture={fixturePhase} worldItemActive={worldItemActive}" +
+            Environment.NewLine + "LIVE_TEST_JSON=" + structuredState;
     }
 
     [CommandLineArgumentFunction("fixture_drop", "coop.debug.weapon_pickup")]
@@ -628,10 +684,9 @@ internal static class WeaponPickupDebugCommands
         info = null;
         error = null;
         Agent agent = Agent.Main;
-        if (Mission.Current?.GetMissionBehavior<CoopBattleController>() == null ||
-            MobileParty.MainParty?.MapEvent?.IsFieldBattle != true)
+        if (Mission.Current?.GetMissionBehavior<CoopBattleController>() == null)
         {
-            error = "not-a-coop-field-battle";
+            error = "not-a-coop-battle";
             return false;
         }
         if (agent == null || !agent.IsActive() || agent.Mission != Mission.Current)
@@ -658,10 +713,9 @@ internal static class WeaponPickupDebugCommands
         registry = null;
         info = null;
         error = null;
-        if (Mission.Current?.GetMissionBehavior<CoopBattleController>() == null ||
-            MobileParty.MainParty?.MapEvent?.IsFieldBattle != true)
+        if (Mission.Current?.GetMissionBehavior<CoopBattleController>() == null)
         {
-            error = "WEAPON_PICKUP_STATE error=not-a-coop-field-battle";
+            error = "WEAPON_PICKUP_STATE error=not-a-coop-battle";
             return false;
         }
         if (!ContainerProvider.TryResolve(out registry))

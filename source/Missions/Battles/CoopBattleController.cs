@@ -429,6 +429,8 @@ public class CoopBattleController : CoopMissionController
             siegeEngineDeployment.CatchUpJoiner(controllerId);
             siegeMachineState.CatchUpJoiner(controllerId);
             Deployment.CatchUpJoiner(controllerId);
+            if (Session.IsLocalHost)
+                coopMissionComponent.WeaponDropHandler.CatchUpJoiner(controllerId);
 
             if (Session.IsLocalHost && ResultCommitter.TryGetResolvedState(out var battleState))
             {

@@ -63,6 +63,7 @@ namespace Missions.Agents.Patches
         static void Postfix(
             SpawnedItemEntity spawnedItemEntity,
             Agent __instance,
+            bool removeWeapon,
             PickupState __state)
         {
             if (AllowedThread.IsThisThreadAllowed()) return;
@@ -71,6 +72,7 @@ namespace Missions.Agents.Patches
             if (controller?.IsSpectatorAgent(__instance) == true) return;
 
             MissionWeapon weapon = spawnedItemEntity.WeaponCopy;
+            MissionWeapon resultingSlotWeapon = GetSlotWeapon(__instance, __state.EquipmentIndex);
             WeaponPickedup message = new WeaponPickedup(
                 __instance,
                 spawnedItemEntity,
@@ -82,7 +84,9 @@ namespace Missions.Agents.Patches
                 __state.SlotAmount,
                 __state.WorldItemAmount,
                 GetSlotAmount(__instance, __state.EquipmentIndex),
-                weapon.Amount);
+                weapon.Amount,
+                removeWeapon,
+                resultingSlotWeapon);
             MessageBroker.Instance.Publish(__instance, message);
         }
 
@@ -94,6 +98,15 @@ namespace Missions.Agents.Patches
 
             MissionWeapon weapon = agent.Equipment[equipmentIndex];
             return weapon.IsEmpty ? (short)0 : weapon.Amount;
+        }
+
+        private static MissionWeapon GetSlotWeapon(Agent agent, EquipmentIndex equipmentIndex)
+        {
+            if (equipmentIndex < EquipmentIndex.WeaponItemBeginSlot ||
+                equipmentIndex >= EquipmentIndex.NumAllWeaponSlots)
+                return default;
+
+            return agent.Equipment[equipmentIndex];
         }
     }
 }

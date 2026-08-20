@@ -44,6 +44,21 @@ namespace Missions.Agents.Messages
         [ProtoMember(11)]
         public short ResultingWorldItemAmount { get; }
 
+        [ProtoMember(12)]
+        public bool WorldItemConsumed { get; }
+
+        [ProtoMember(13)]
+        public string ResultingSlotItemObjectId { get; }
+
+        [ProtoMember(14)]
+        public string ResultingSlotItemModifierId { get; }
+
+        [ProtoMember(15)]
+        public Banner ResultingSlotBanner { get; }
+
+        [ProtoMember(16)]
+        public short ResultingSlotDataValue { get; }
+
         public NetworkWeaponPickedup(
             Guid agentId, 
             EquipmentIndex equipmentIndex,
@@ -55,7 +70,12 @@ namespace Missions.Agents.Messages
             short previousSlotAmount,
             short previousWorldItemAmount,
             short resultingSlotAmount,
-            short resultingWorldItemAmount)
+            short resultingWorldItemAmount,
+            bool worldItemConsumed,
+            string resultingSlotItemObjectId = null,
+            string resultingSlotItemModifierId = null,
+            Banner resultingSlotBanner = null,
+            short resultingSlotDataValue = 0)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
@@ -68,6 +88,11 @@ namespace Missions.Agents.Messages
             PreviousWorldItemAmount = previousWorldItemAmount;
             ResultingSlotAmount = resultingSlotAmount;
             ResultingWorldItemAmount = resultingWorldItemAmount;
+            WorldItemConsumed = worldItemConsumed;
+            ResultingSlotItemObjectId = resultingSlotItemObjectId;
+            ResultingSlotItemModifierId = resultingSlotItemModifierId;
+            ResultingSlotBanner = resultingSlotBanner;
+            ResultingSlotDataValue = resultingSlotDataValue;
         }
     }
 }
