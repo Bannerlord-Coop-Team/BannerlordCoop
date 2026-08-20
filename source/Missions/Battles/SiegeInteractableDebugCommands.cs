@@ -127,14 +127,14 @@ internal static class SiegeInteractableDebugCommands
     public static string Capture(List<string> args)
     {
         if (ModInformation.IsClient)
-            return "This command can only be used by the server";
+            return Failure("This command can only be used by the server");
         if (args.Count != 3)
-            return "Usage: coop.debug.battle.siege_interactable_capture <machineType> <firstControllerId> <secondControllerId>";
+            return Failure("Usage: coop.debug.battle.siege_interactable_capture <machineType> <firstControllerId> <secondControllerId>");
         if (!ContainerProvider.TryResolve<BattleDebugRouteHandler>(out var routeHandler)
             || !ContainerProvider.TryResolve<INetwork>(out var network)
             || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
         {
-            return "Unable to resolve campaign network services";
+            return Failure("Unable to resolve campaign network services");
         }
 
         fixture = new FixtureState(
@@ -151,7 +151,7 @@ internal static class SiegeInteractableDebugCommands
                 SiegeInteractableFixtureAction.Capture))
             {
                 fixture = null;
-                return $"Unable to capture siege interactable fixture on {controllerId}";
+                return Failure($"Unable to capture siege interactable fixture on {controllerId}");
             }
         }
 
@@ -167,12 +167,12 @@ internal static class SiegeInteractableDebugCommands
                 out var report))
             {
                 fixture = null;
-                return $"Timed out capturing siege interactable fixture on {controllerId}";
+                return Failure($"Timed out capturing siege interactable fixture on {controllerId}");
             }
             if (!report.Success)
             {
                 fixture = null;
-                return $"Failed to capture siege interactable fixture on {controllerId}: {report.Error}";
+                return Failure($"Failed to capture siege interactable fixture on {controllerId}: {report.Error}");
             }
             fixture.CaptureReports[controllerId] = report;
             captures.Add(ReportResult(report));
@@ -185,7 +185,7 @@ internal static class SiegeInteractableDebugCommands
         if (!capturesMatch)
         {
             fixture = null;
-            return "Clients captured different siege interactable state";
+            return Failure("Clients captured different siege interactable state");
         }
 
         fixture.MachineId = firstCapture.MachineId;
@@ -193,6 +193,8 @@ internal static class SiegeInteractableDebugCommands
 
         return Structured(new
         {
+            success = true,
+            error = string.Empty,
             machineId = fixture.MachineId,
             machineType = fixture.MachineType,
             originalGateState = fixture.OriginalGateState,
@@ -205,26 +207,24 @@ internal static class SiegeInteractableDebugCommands
     public static string Action(List<string> args)
     {
         if (ModInformation.IsClient)
-            return "This command can only be used by the server";
+            return Failure("This command can only be used by the server");
         if (args.Count != 2 || !Enum.TryParse(args[1], ignoreCase: true, out SiegeInteractableFixtureAction action)
             || action == SiegeInteractableFixtureAction.Capture || action == SiegeInteractableFixtureAction.Restore)
         {
-            return "Usage: coop.debug.battle.siege_interactable_action <controllerId> <prepare|use|stop>";
+            return Failure("Usage: coop.debug.battle.siege_interactable_action <controllerId> <prepare|use|stop>");
         }
-        if (fixture == null) return "No siege interactable fixture is active";
-        if (!fixture.ControllerIds.Contains(args[0])) return $"Controller {args[0]} is not part of the fixture";
+        if (fixture == null) return Failure("No siege interactable fixture is active");
+        if (!fixture.ControllerIds.Contains(args[0])) return Failure($"Controller {args[0]} is not part of the fixture");
         if (!ContainerProvider.TryResolve<BattleDebugRouteHandler>(out var routeHandler)
             || !ContainerProvider.TryResolve<INetwork>(out var network)
             || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
         {
-            return "Unable to resolve campaign network services";
+            return Failure("Unable to resolve campaign network services");
         }
 
         if (!SendFixtureAction(routeHandler, network, playerManager, args[0], action)
             || !WaitForFixtureReport(routeHandler, args[0], action, ReportTimeout, out var report))
-            return $"Timed out waiting for {action} on {args[0]}";
-        if (!report.Success)
-            return $"Siege interactable {action} failed on {args[0]}: {report.Error}";
+            return Failure($"Timed out waiting for {action} on {args[0]}");
 
         return Structured(ReportResult(report));
     }
@@ -233,13 +233,13 @@ internal static class SiegeInteractableDebugCommands
     public static string State(List<string> args)
     {
         if (args.Count != 0)
-            return "Usage: coop.debug.battle.siege_interactable_state";
+            return Failure("Usage: coop.debug.battle.siege_interactable_state");
         if (ModInformation.IsServer)
-            return "This command can only be used by a client";
+            return Failure("This command can only be used by a client");
 
         var report = BattleDebugRouteHandler.GetLocalSiegeFixtureState();
         return report == null
-            ? "No local siege interactable fixture is active"
+            ? Failure("No local siege interactable fixture is active")
             : Structured(ReportResult(report));
     }
 
@@ -247,15 +247,15 @@ internal static class SiegeInteractableDebugCommands
     public static string Restore(List<string> args)
     {
         if (ModInformation.IsClient)
-            return "This command can only be used by the server";
+            return Failure("This command can only be used by the server");
         if (args.Count != 0)
-            return "Usage: coop.debug.battle.siege_interactable_restore";
-        if (fixture == null) return "No siege interactable fixture is active";
+            return Failure("Usage: coop.debug.battle.siege_interactable_restore");
+        if (fixture == null) return Failure("No siege interactable fixture is active");
         if (!ContainerProvider.TryResolve<BattleDebugRouteHandler>(out var routeHandler)
             || !ContainerProvider.TryResolve<INetwork>(out var network)
             || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
         {
-            return "Unable to resolve campaign network services";
+            return Failure("Unable to resolve campaign network services");
         }
 
         var restoreErrors = new List<string>();
@@ -298,10 +298,12 @@ internal static class SiegeInteractableDebugCommands
         }
 
         if (restoreErrors.Count != 0)
-            return "Failed to restore siege interactable fixture: " + string.Join("; ", restoreErrors);
+            return Failure("Failed to restore siege interactable fixture: " + string.Join("; ", restoreErrors));
 
         return Structured(new
         {
+            success = true,
+            error = string.Empty,
             fixture.MachineId,
             restoredControllers = fixture.RestoreReports.Keys.OrderBy(id => id).ToArray(),
             gateStates = fixture.RestoreReports.Values.Select(report => report.GateState).ToArray(),
@@ -312,10 +314,10 @@ internal static class SiegeInteractableDebugCommands
     public static string Verify(List<string> args)
     {
         if (ModInformation.IsClient)
-            return "This command can only be used by the server";
+            return Failure("This command can only be used by the server");
         if (args.Count != 0)
-            return "Usage: coop.debug.battle.siege_interactable_verify";
-        if (fixture == null) return "No siege interactable fixture is active";
+            return Failure("Usage: coop.debug.battle.siege_interactable_verify");
+        if (fixture == null) return Failure("No siege interactable fixture is active");
 
         bool controllersRestored = fixture.ControllerIds.All(controllerId =>
             fixture.RestoreReports.TryGetValue(controllerId, out var report)
@@ -324,11 +326,15 @@ internal static class SiegeInteractableDebugCommands
             && report.GateState == fixture.OriginalGateState);
         if (!controllersRestored)
         {
-            return "Siege interactable fixture restoration failed";
+            return Failure("Siege interactable fixture restoration failed");
         }
 
         fixture = null;
-        return "LIVE_TEST_JSON=true";
+        return Structured(new
+        {
+            success = true,
+            error = string.Empty,
+        });
     }
 
     private static bool SendFixtureAction(
@@ -373,6 +379,8 @@ internal static class SiegeInteractableDebugCommands
     {
         return new
         {
+            success = report.Success,
+            error = report.Error ?? string.Empty,
             report.ControllerId,
             report.MachineId,
             action = report.Action.ToString(),
@@ -385,6 +393,9 @@ internal static class SiegeInteractableDebugCommands
 
     private static string Structured(object value)
         => "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
+
+    private static string Failure(string error)
+        => Structured(new { success = false, error });
 
     private sealed class FixtureState
     {
