@@ -22,7 +22,7 @@ internal class BattleDebugRouteHandler : IHandler
     private static readonly object SiegeFixtureReportGate = new object();
     private static readonly Dictionary<string, NetworkSiegeInteractableFixtureReport> SiegeFixtureReports =
         new Dictionary<string, NetworkSiegeInteractableFixtureReport>();
-    private static readonly TimeSpan SiegeFixtureActionRetryWindow = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan SiegeFixtureActionRetryWindow = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan SiegeFixtureActionRetryDelay = TimeSpan.FromMilliseconds(100);
 
     private readonly IMessageBroker messageBroker;

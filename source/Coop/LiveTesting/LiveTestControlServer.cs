@@ -28,6 +28,7 @@ namespace Coop.LiveTesting
     internal sealed class LiveTestControlServer : IDisposable
     {
         private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
+        private static readonly TimeSpan SiegeFixtureCommandTimeout = TimeSpan.FromSeconds(90);
 
         private static readonly ILogger Logger;
 
@@ -186,6 +187,12 @@ namespace Coop.LiveTesting
                     false);
             }
 
+            TimeSpan commandTimeout = command.StartsWith(
+                "coop.debug.battle.siege_interactable_",
+                StringComparison.Ordinal)
+                ? SiegeFixtureCommandTimeout
+                : GameThread.BlockingTimeout;
+
             return ExecuteOnGameThread(request, () =>
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
@@ -232,7 +239,7 @@ namespace Coop.LiveTesting
                     hasStructuredResult,
                     structuredResult,
                 });
-            }, true);
+            }, true, commandTimeout);
         }
 
         private LiveTestResponse HandleScreenshot(LiveTestRequest request)
@@ -585,7 +592,8 @@ namespace Coop.LiveTesting
         private LiveTestResponse ExecuteOnGameThread(
             LiveTestRequest request,
             Func<LiveTestResponse> operation,
-            bool timeoutOutcomeUncertain)
+            bool timeoutOutcomeUncertain,
+            TimeSpan? blockingTimeout = null)
         {
             LiveTestResponse response = null;
             Exception operationException = null;
@@ -602,7 +610,7 @@ namespace Coop.LiveTesting
                     {
                         operationException = exception;
                     }
-                }, blocking: true, label: "LiveTestControl." + request.Method);
+                }, blockingTimeout ?? GameThread.BlockingTimeout, "LiveTestControl." + request.Method);
             }
             catch (TimeoutException exception)
             {
@@ -610,7 +618,7 @@ namespace Coop.LiveTesting
                 return Failure(
                     request.Id,
                     "game_thread_timeout",
-                    "The game thread did not complete the request within 30 seconds. The operation may still run later.",
+                    $"The game thread did not complete the request within {(blockingTimeout ?? GameThread.BlockingTimeout).TotalSeconds:0} seconds. The operation may still run later.",
                     timeoutOutcomeUncertain);
             }
 

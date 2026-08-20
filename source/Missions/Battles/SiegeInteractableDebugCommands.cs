@@ -13,7 +13,7 @@ namespace Missions.Battles;
 
 internal static class SiegeInteractableDebugCommands
 {
-    private static readonly TimeSpan ReportTimeout = TimeSpan.FromSeconds(35);
+    private static readonly TimeSpan ReportTimeout = TimeSpan.FromSeconds(75);
     private static FixtureState fixture;
 
     [CommandLineArgumentFunction("siege_interactable_capture", "coop.debug.battle")]
@@ -34,15 +34,29 @@ internal static class SiegeInteractableDebugCommands
             args[0],
             new[] { args[1], args[2] });
 
-        var captures = new List<object>();
         foreach (string controllerId in fixture.ControllerIds)
         {
-            if (!SendAndWait(
+            if (!SendFixtureAction(
                 routeHandler,
                 network,
                 playerManager,
                 controllerId,
+                SiegeInteractableFixtureAction.Capture))
+            {
+                fixture = null;
+                return $"Unable to capture siege interactable fixture on {controllerId}";
+            }
+        }
+
+        var captures = new List<object>();
+        DateTime captureDeadline = DateTime.UtcNow.Add(ReportTimeout);
+        foreach (string controllerId in fixture.ControllerIds)
+        {
+            if (!WaitForFixtureReport(
+                routeHandler,
+                controllerId,
                 SiegeInteractableFixtureAction.Capture,
+                captureDeadline - DateTime.UtcNow,
                 out var report))
             {
                 fixture = null;
@@ -99,7 +113,8 @@ internal static class SiegeInteractableDebugCommands
             return "Unable to resolve campaign network services";
         }
 
-        if (!SendAndWait(routeHandler, network, playerManager, args[0], action, out var report))
+        if (!SendFixtureAction(routeHandler, network, playerManager, args[0], action)
+            || !WaitForFixtureReport(routeHandler, args[0], action, ReportTimeout, out var report))
             return $"Timed out waiting for {action} on {args[0]}";
         if (!report.Success)
             return $"Siege interactable {action} failed on {args[0]}: {report.Error}";
@@ -137,14 +152,31 @@ internal static class SiegeInteractableDebugCommands
         }
 
         var restoreErrors = new List<string>();
+        var restoreControllerIds = new List<string>();
         foreach (string controllerId in fixture.ControllerIds)
         {
-            if (!SendAndWait(
+            if (!SendFixtureAction(
                 routeHandler,
                 network,
                 playerManager,
                 controllerId,
+                SiegeInteractableFixtureAction.Restore))
+            {
+                restoreErrors.Add($"unable to send restore to {controllerId}");
+                continue;
+            }
+
+            restoreControllerIds.Add(controllerId);
+        }
+
+        DateTime restoreDeadline = DateTime.UtcNow.Add(ReportTimeout);
+        foreach (string controllerId in restoreControllerIds)
+        {
+            if (!WaitForFixtureReport(
+                routeHandler,
+                controllerId,
                 SiegeInteractableFixtureAction.Restore,
+                restoreDeadline - DateTime.UtcNow,
                 out var report))
             {
                 restoreErrors.Add($"timed out on {controllerId}");
@@ -192,17 +224,15 @@ internal static class SiegeInteractableDebugCommands
         return "LIVE_TEST_JSON=true";
     }
 
-    private static bool SendAndWait(
+    private static bool SendFixtureAction(
         BattleDebugRouteHandler routeHandler,
         INetwork network,
         IPlayerManager playerManager,
         string controllerId,
-        SiegeInteractableFixtureAction action,
-        out NetworkSiegeInteractableFixtureReport report)
+        SiegeInteractableFixtureAction action)
     {
         if (!playerManager.TryGetPeer(controllerId, out var peer))
         {
-            report = null;
             return false;
         }
 
@@ -213,10 +243,20 @@ internal static class SiegeInteractableDebugCommands
             action,
             fixture.OriginalGateState,
             fixture.MachineType));
+        return true;
+    }
+
+    private static bool WaitForFixtureReport(
+        BattleDebugRouteHandler routeHandler,
+        string controllerId,
+        SiegeInteractableFixtureAction action,
+        TimeSpan timeout,
+        out NetworkSiegeInteractableFixtureReport report)
+    {
         bool received = BattleDebugRouteHandler.WaitForSiegeFixtureReport(
             controllerId,
             action,
-            ReportTimeout,
+            timeout,
             out report);
         GC.KeepAlive(routeHandler);
         return received;
