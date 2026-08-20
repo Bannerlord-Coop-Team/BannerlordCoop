@@ -1,6 +1,9 @@
 ﻿using Common;
 using Common.Messaging;
 using Coop.Core.Server.Services.Kingdoms.Messages;
+using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.Kingdoms.Messages;
+using System;
 
 namespace Coop.Core.Client.Services.Kingdoms.Handlers;
 
@@ -34,6 +37,27 @@ internal class JoinCampaignKingdomBaselineHandler : IHandler
         {
             allianceOfferPendingApplier.Apply(baseline.PendingAllianceOffers);
             peaceOfferPendingApplier.Apply(baseline.PendingPeaceOffers);
+            foreach (var roundVote in GetActiveDecisionVotes(baseline))
+            {
+                if (roundVote?.VoteData == null || string.IsNullOrWhiteSpace(roundVote.ClanId)) continue;
+                messageBroker.Publish(this, new ApplyKingdomDecisionVote(roundVote.ClanId, roundVote.VoteData));
+            }
+            foreach (var roundStatus in GetActiveDecisionRounds(baseline))
+            {
+                messageBroker.Publish(this, new ApplyKingdomDecisionRoundStatus(roundStatus));
+            }
         });
+    }
+
+    internal static KingdomDecisionRoundStatusData[] GetActiveDecisionRounds(
+        NetworkJoinCampaignKingdomBaseline baseline)
+    {
+        return baseline.ActiveDecisionRounds ?? Array.Empty<KingdomDecisionRoundStatusData>();
+    }
+
+    internal static KingdomDecisionRoundVoteData[] GetActiveDecisionVotes(
+        NetworkJoinCampaignKingdomBaseline baseline)
+    {
+        return baseline.ActiveDecisionVotes ?? Array.Empty<KingdomDecisionRoundVoteData>();
     }
 }

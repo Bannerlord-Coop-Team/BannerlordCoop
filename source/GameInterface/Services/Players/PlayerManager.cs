@@ -226,6 +226,11 @@ public class PlayerManager : IPlayerManager
         {
             InvalidatePlayerPartySpeedCache(mobileParty);
         }
+
+        if (obj is Hero hero)
+        {
+            InvalidatePlayerCaravanCaches(hero);
+        }
     }
 
     private void InvalidatePlayerPartySpeedCache(MobileParty mobileParty)
@@ -233,6 +238,20 @@ public class PlayerManager : IPlayerManager
         GameThread.RunSafe(() =>
         {
             mobileParty._partyPureSpeedLastCheckVersion = -1;
+        }, context: nameof(PlayerManager));
+    }
+
+    private void InvalidatePlayerCaravanCaches(Hero hero)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (hero.OwnedCaravans == null) return;
+
+            foreach (var ownedCaravan in hero.OwnedCaravans)
+            {
+                ownedCaravan.Party._partyMemberSizeLastCheckVersion = -1;
+                ownedCaravan.Party.MobileParty._partyPureSpeedLastCheckVersion = -1;
+            }
         }, context: nameof(PlayerManager));
     }
 
