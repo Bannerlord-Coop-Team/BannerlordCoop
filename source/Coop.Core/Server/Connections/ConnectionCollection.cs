@@ -31,9 +31,13 @@ public class ConnectionCollection : IConnectionCollection
         .Select(conn => conn.Value)
         .Where(conn => conn.IsLoading);
 
-    public bool HasCompletedCampaignSynchronization(NetPeer peer) =>
-        ConnectionStates.TryGetValue(peer, out var connection) &&
-        (connection.State is CampaignState || connection.State is MissionState);
+    public bool HasCompletedCampaignSynchronization(NetPeer peer)
+    {
+        if (!ConnectionStates.TryGetValue(peer, out var connection)) return false;
+
+        var state = connection.State;
+        return state is CampaignState || state is MissionState;
+    }
 
     private readonly IMessageBroker messageBroker;
     private readonly ConnectionContext connectionContext;
