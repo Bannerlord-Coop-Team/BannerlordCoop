@@ -338,7 +338,7 @@ public class CoopBattleController : CoopMissionController
         bool hasHideoutMissionController,
         bool hasHideoutAmbushMissionController)
         => !hasHideoutMissionController && !hasHideoutAmbushMissionController;
-        
+
     // Compare current authority with controller id
     private bool? ProbeHeroAgentAuthority(Hero hero)
     {
@@ -538,6 +538,8 @@ public class CoopBattleController : CoopMissionController
         // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
         ResultCommitter.ReportResolvedResult(missionResult);
 
-        lifecycle.Leave();
+        bool wasRetreat = missionResult?.BattleResolved != true && !ResultCommitter.TryGetResolvedState(out _);
+
+        lifecycle.Leave(wasRetreat);
     }
 }
