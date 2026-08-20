@@ -27,6 +27,7 @@ internal class PlayerSiegeTargetScoringPatches
         MethodInfo applyAdjustment = AccessTools.Method(
             typeof(PlayerSiegeTargetScoringPatches),
             nameof(ApplyPlayerSettlementDefense));
+        if (codes.Exists(instruction => instruction.Calls(applyAdjustment))) return codes;
 
         int playerPresenceIndex = FindPlayerPresenceCalculation(
             codes,

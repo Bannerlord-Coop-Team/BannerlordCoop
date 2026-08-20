@@ -118,6 +118,20 @@ public class PlayerSiegeTargetScoringTests
             called.Name == "ApplyPlayerSettlementDefense");
     }
 
+    [Fact]
+    public void Transpiler_AlreadyPatched_ReturnsInstructionsUnchanged()
+    {
+        MethodInfo method = AccessTools.Method(
+            typeof(DefaultTargetScoreCalculatingModel),
+            nameof(DefaultTargetScoreCalculatingModel.GetTargetScoreForFaction));
+        List<CodeInstruction> original = PatchProcessor.GetOriginalInstructions(method).ToList();
+        List<CodeInstruction> patched = PlayerSiegeTargetScoringPatches.Transpiler(original).ToList();
+
+        List<CodeInstruction> repatched = PlayerSiegeTargetScoringPatches.Transpiler(patched).ToList();
+
+        Assert.True(patched.SequenceEqual(repatched));
+    }
+
     private static SettlementDefenderScoreData Defender(
         float strength,
         bool isEligible = true,
