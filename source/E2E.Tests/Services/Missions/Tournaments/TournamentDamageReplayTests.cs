@@ -224,8 +224,10 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void AcceptedPlayerHit_SubmitsTournamentProgressionWithoutActiveDamageContext()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayerHit_SubmitsProgressionOnlyAfterAcceptedDamage(bool blocked)
     {
         using var fixture = new MissionEngineFixture();
         var host = Clients.First();
@@ -235,6 +237,7 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         {
             var mock = fixture.CreateMission(host);
             var controller = host.Resolve<CoopTournamentController>();
+            ICoopMissionComponent component = GetTournamentComponent(controller);
             var registry = host.Resolve<INetworkAgentRegistry>();
             Agent victim = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
@@ -279,20 +282,46 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                         CreateSpawnData(victimId, "victim-slot", "victim", null)
                     }));
 
+            var blow = new Blow(attacker.Index) { InflictedDamage = 100 };
+            var collisionData = new AttackCollisionData
+            {
+                _collisionResult = (int)CombatCollisionResult.StrikeAgent
+            };
+            Assert.False(controller.InterceptBlow(victim, blow, collisionData));
+            component.AgentActionHandler.ObserveBlockedHit(
+                victim,
+                attacker,
+                blocked,
+                in blow,
+                in collisionData);
             InvokeCaptureHitProgression(
                 controller,
                 victim,
                 attacker,
-                new Blow(attacker.Index) { InflictedDamage = 25 },
-                default);
+                blow,
+                collisionData);
 
             var network = Assert.IsType<MockClient>(host.Resolve<INetwork>());
+            Assert.Empty(
+                network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
+
+            InvokeProcessPendingLocalDamage(controller);
+
+            if (blocked)
+            {
+                Assert.Empty(
+                    network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
+                return;
+            }
+
             NetworkSubmitTournamentHitProgression request = Assert.Single(
                 network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
+            Assert.Equal("host", request.Data.AttackerControllerId);
             Assert.Equal("host", request.Data.DamageOriginControllerId);
             Assert.Equal(attackerId, request.Data.AttackerAgentId);
             Assert.Equal(victimId, request.Data.VictimAgentId);
             Assert.Equal(1, request.Data.DamageSequence);
+            Assert.True(request.Data.Fatal);
         });
     }
 
