@@ -169,21 +169,22 @@ internal class BattleDebugRouteHandler : IHandler
             return false;
         }
 
-        var machine = action.Action == SiegeInteractableFixtureAction.Capture
-            ? mission.MissionObjects
-                .OfType<UsableMachine>()
-                .Where(candidate => candidate.GetType().Name.Equals(action.MachineType, StringComparison.Ordinal))
-                .OrderBy(candidate => candidate.Id.Id)
-                .FirstOrDefault()
-            : mission.MissionObjects
-                .OfType<UsableMachine>()
-                .FirstOrDefault(candidate => candidate.Id.Id == action.MachineId);
         var agent = mission.MainAgent;
         if (agent == null || !agent.IsActive())
         {
             readinessError = "local main agent is unavailable";
             return false;
         }
+        var machine = action.Action == SiegeInteractableFixtureAction.Capture
+            ? mission.MissionObjects
+                .OfType<UsableMachine>()
+                .Where(candidate => candidate.GetType().Name.Equals(action.MachineType, StringComparison.Ordinal))
+                .Where(candidate => candidate.StandingPoints.Any(agent.CanUseObject))
+                .OrderBy(candidate => candidate.Id.Id)
+                .FirstOrDefault()
+            : mission.MissionObjects
+                .OfType<UsableMachine>()
+                .FirstOrDefault(candidate => candidate.Id.Id == action.MachineId);
         readinessError = string.Empty;
         if (machine == null)
         {
