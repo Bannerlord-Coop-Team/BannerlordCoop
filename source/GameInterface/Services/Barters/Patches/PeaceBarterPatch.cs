@@ -124,6 +124,7 @@ internal static class PeaceBarterPatch
 
             if (encounterIsActive &&
                 PlayerEncounter.Current._mapEvent == null &&
+                MobileParty.MainParty?.MapEvent == null &&
                 result.Reason == NetworkPeaceBarterResult.InactiveEncounterReason)
                 PlayerEncounter.LeaveEncounter = true;
 

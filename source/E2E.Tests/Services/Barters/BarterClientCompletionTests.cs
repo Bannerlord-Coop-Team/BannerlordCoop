@@ -124,6 +124,57 @@ public class BarterClientCompletionTests : MapEventTestBase
     }
 
     [Fact]
+    public void PeaceBarter_RejectedResult_DoesNotLeavePendingMainPartyMapEvent()
+    {
+        const string contextId = "party-in-pending-map-event";
+        const string requestId = "peace-client-pending-map-event-rejection";
+        var client = Clients.First();
+        var (playerHeroId, playerPartyId, targetHeroId, targetPartyId) = CreateBarterParties(client);
+        var mapEvent = CreateServerMapEvent();
+        SetMockPlayerEncounter(client, targetPartyId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var activeMapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            var previousMainParty = Campaign.Current.MainParty;
+            var previousMapEventSide = playerParty.Party._mapEventSide;
+            Campaign.Current.MainParty = playerParty;
+            playerParty.Party._mapEventSide = activeMapEvent.AttackerSide;
+
+            try
+            {
+                Assert.Null(PlayerEncounter.Current._mapEvent);
+                Assert.Same(activeMapEvent, MobileParty.MainParty.MapEvent);
+                var barter = CreateBarter(client, playerHeroId, playerPartyId, targetHeroId, targetPartyId);
+                SetStaticField(typeof(PeaceBarterPatch), "pendingBarter", barter);
+                SetStaticField(typeof(PeaceBarterPatch), "pendingUiActive", true);
+                SetStaticField(typeof(PeaceBarterPatch), "pendingRequestId", requestId);
+                SetStaticField(typeof(PeaceBarterPatch), "pendingContext", PeaceConversationContext.MapParty);
+                SetStaticField(typeof(PeaceBarterPatch), "pendingContextId", contextId);
+
+                AssertResultClosesUi(
+                    () => PeaceBarterPatch.CompleteRequest(
+                        new NetworkPeaceBarterResult(
+                            contextId,
+                            accepted: false,
+                            playerGold: 500,
+                            reason: NetworkPeaceBarterResult.InactiveEncounterReason,
+                            requestId: requestId),
+                        new ThrowingBarterClientPresentation()),
+                    expectedAccepted: false,
+                    conversationParty: barter.OtherParty.MobileParty,
+                    expectLeaveEncounter: false);
+            }
+            finally
+            {
+                playerParty.Party._mapEventSide = previousMapEventSide;
+                Campaign.Current.MainParty = previousMainParty;
+            }
+        });
+    }
+
+    [Fact]
     public void BanditBarter_AcceptedResult_ClosesUiBeforePresentationFailure()
     {
         const string banditPartyId = "stale-bandit-party";
