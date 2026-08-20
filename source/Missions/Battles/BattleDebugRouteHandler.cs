@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -21,9 +22,12 @@ internal class BattleDebugRouteHandler : IHandler
     private static readonly object SiegeFixtureReportGate = new object();
     private static readonly Dictionary<string, NetworkSiegeInteractableFixtureReport> SiegeFixtureReports =
         new Dictionary<string, NetworkSiegeInteractableFixtureReport>();
+    private static readonly TimeSpan SiegeFixtureActionRetryWindow = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan SiegeFixtureActionRetryDelay = TimeSpan.FromMilliseconds(100);
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly CancellationTokenSource disposal = new CancellationTokenSource();
     private static SiegeInteractableFixtureState siegeFixture;
 
     public BattleDebugRouteHandler(IMessageBroker messageBroker, INetwork network)
@@ -37,6 +41,7 @@ internal class BattleDebugRouteHandler : IHandler
 
     public void Dispose()
     {
+        disposal.Cancel();
         messageBroker.Unsubscribe<NetworkRouteBattleEnemies>(Handle);
         messageBroker.Unsubscribe<NetworkSiegeInteractableFixtureAction>(Handle_SiegeInteractableFixtureAction);
         messageBroker.Unsubscribe<NetworkSiegeInteractableFixtureReport>(Handle_SiegeInteractableFixtureReport);
@@ -45,6 +50,7 @@ internal class BattleDebugRouteHandler : IHandler
         {
             SiegeFixtureReports.Clear();
         }
+        disposal.Dispose();
     }
 
     private static void Handle(MessagePayload<NetworkRouteBattleEnemies> payload)
@@ -93,7 +99,9 @@ internal class BattleDebugRouteHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        GameThread.RunSafe(() => ApplySiegeInteractableFixtureAction(payload.What));
+        QueueSiegeInteractableFixtureAction(
+            payload.What,
+            DateTime.UtcNow.Add(SiegeFixtureActionRetryWindow));
     }
 
     private static void Handle_SiegeInteractableFixtureReport(
@@ -109,14 +117,44 @@ internal class BattleDebugRouteHandler : IHandler
         }
     }
 
-    private void ApplySiegeInteractableFixtureAction(NetworkSiegeInteractableFixtureAction action)
+    private void QueueSiegeInteractableFixtureAction(
+        NetworkSiegeInteractableFixtureAction action,
+        DateTime deadlineUtc)
+    {
+        if (disposal.IsCancellationRequested) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (disposal.IsCancellationRequested) return;
+            if (TryApplySiegeInteractableFixtureAction(action)) return;
+
+            if (DateTime.UtcNow >= deadlineUtc)
+            {
+                SendFixtureReport(
+                    action,
+                    machine: null,
+                    agent: null,
+                    success: false,
+                    error: "siege mission did not become ready for the fixture action");
+                return;
+            }
+
+            Task.Delay(SiegeFixtureActionRetryDelay, disposal.Token).ContinueWith(
+                _ => QueueSiegeInteractableFixtureAction(action, deadlineUtc),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnRanToCompletion,
+                TaskScheduler.Default);
+        });
+    }
+
+    private bool TryApplySiegeInteractableFixtureAction(NetworkSiegeInteractableFixtureAction action)
     {
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
         if (mission == null || !mission.IsSiegeBattle || controller == null
             || controller.Session.OwnControllerId != action.ControllerId)
         {
-            return;
+            return false;
         }
 
         var machine = action.Action == SiegeInteractableFixtureAction.Capture
@@ -129,10 +167,14 @@ internal class BattleDebugRouteHandler : IHandler
                 .OfType<UsableMachine>()
                 .FirstOrDefault(candidate => candidate.Id.Id == action.MachineId);
         var agent = mission.MainAgent;
-        if (machine == null || agent == null || !agent.IsActive())
+        if (agent == null || !agent.IsActive())
+        {
+            return false;
+        }
+        if (machine == null)
         {
             SendFixtureReport(action, machine, agent, false, "machine or local main agent unavailable");
-            return;
+            return true;
         }
 
         try
@@ -171,6 +213,8 @@ internal class BattleDebugRouteHandler : IHandler
         {
             SendFixtureReport(action, machine, agent, false, ex.Message);
         }
+
+        return true;
     }
 
     private void PrepareLocalInteraction(UsableMachine machine, Agent agent)
