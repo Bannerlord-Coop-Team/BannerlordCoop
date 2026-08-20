@@ -57,7 +57,11 @@ internal sealed class ArmyFormationPositionHandler : IHandler
         if (ModInformation.IsServer) return;
 
         MobileParty leaderParty = payload.What.LeaderParty;
-        if (!TryCreateState(leaderParty, leaderParty?.IsControlledByThisInstance() == true, out var state))
+        if (!TryCreateState(
+                leaderParty,
+                leaderParty?.IsControlledByThisInstance() == true,
+                leaderParty?.Position ?? CampaignVec2.Invalid,
+                out var state))
             return;
 
         if (!convergence.CanReport(state))
@@ -91,7 +95,12 @@ internal sealed class ArmyFormationPositionHandler : IHandler
             if (!PeerControlsParty(peer, request.LeaderPartyId)) return;
             if (!objectManager.TryGetObjectWithLogging(request.LeaderPartyId, out MobileParty leaderParty))
                 return;
-            if (!TryCreateState(leaderParty, isControlled: true, out var state)) return;
+            // Recheck attachment proximity at the requested position after the game-thread handoff.
+            if (!TryCreateState(
+                    leaderParty,
+                    isControlled: true,
+                    request.Position,
+                    out var state)) return;
             if (!convergence.ShouldApply(state, request.Position)) return;
 
             CampaignVec2 previousPosition = leaderParty.Position;
@@ -123,6 +132,7 @@ internal sealed class ArmyFormationPositionHandler : IHandler
     private bool TryCreateState(
         MobileParty leaderParty,
         bool isControlled,
+        CampaignVec2 candidateLeaderPosition,
         out ArmyFormationPositionState state)
     {
         state = default;
@@ -134,14 +144,16 @@ internal sealed class ArmyFormationPositionHandler : IHandler
         bool isArmyLeader = army?.LeaderParty == leaderParty;
         bool hasConvergingMember = false;
         bool hasNearbyConvergingMember = false;
+        float attachmentDistanceSquared = 0f;
         if (isArmyLeader && Campaign.Current?.Models?.EncounterModel != null)
         {
-            float attachmentDistanceSquared = leaderParty.IsCurrentlyAtSea
+            attachmentDistanceSquared = leaderParty.IsCurrentlyAtSea
                 ? Campaign.Current.Models.EncounterModel.MaximumAllowedNavalDistanceForEncounteringMobilePartyInArmy
                 : Campaign.Current.Models.EncounterModel.MaximumAllowedLandDistanceForEncounteringMobilePartyInArmy;
             hasConvergingMember = HasConvergingMember(
                 army,
                 leaderParty,
+                candidateLeaderPosition,
                 attachmentDistanceSquared,
                 out hasNearbyConvergingMember);
         }
@@ -157,18 +169,21 @@ internal sealed class ArmyFormationPositionHandler : IHandler
             leaderParty.CurrentSettlement != null,
             leaderParty.IsCurrentlyAtSea,
             hasConvergingMember,
-            hasNearbyConvergingMember);
+            hasNearbyConvergingMember,
+            attachmentDistanceSquared);
         return true;
     }
 
     private static bool HasConvergingMember(
         Army army,
         MobileParty leaderParty,
+        CampaignVec2 candidateLeaderPosition,
         float attachmentDistanceSquared,
         out bool hasNearbyConvergingMember)
     {
         hasNearbyConvergingMember = false;
         bool hasConvergingMember = false;
+        bool hasValidCandidatePosition = candidateLeaderPosition.ToVec2().IsValid;
         // Mirror Army.Tick's non-distance gates so ordinary army travel never sends corrections.
         foreach (MobileParty member in army.Parties)
         {
@@ -181,7 +196,8 @@ internal sealed class ArmyFormationPositionHandler : IHandler
                 continue;
 
             hasConvergingMember = true;
-            if ((member.Position - leaderParty.Position).LengthSquared < attachmentDistanceSquared)
+            if (hasValidCandidatePosition &&
+                (member.Position - candidateLeaderPosition).LengthSquared < attachmentDistanceSquared)
                 hasNearbyConvergingMember = true;
         }
 
