@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.MapEvents.Patches;
+﻿using Common.Messaging;
+using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using System;
 using System.Collections.Generic;
@@ -15,6 +17,7 @@ internal interface INearbyPartyReinforcer
 {
     void Reinforce(MapEvent mapEvent);
     void ReinforceOpenPlayerBattles();
+    void RemoveReinforcementsIfNoPlayers(MapEvent mapEvent, MobileParty removedParty);
 }
 
 /// <summary>Applies nearby AI reinforcements to open player battles on the server.</summary>
@@ -28,9 +31,15 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
         public long NextScanAtTicks { get; set; }
     }
 
+    private readonly IMessageBroker messageBroker;
     private readonly Dictionary<MapEvent, FollowUpScanState> followUpScans = new();
     private readonly List<MapEvent> completedFollowUpScans = new();
     private long nextFollowUpScanAtTicks = long.MaxValue;
+
+    public NearbyPartyReinforcer(IMessageBroker messageBroker)
+    {
+        this.messageBroker = messageBroker;
+    }
 
     public void Reinforce(MapEvent mapEvent)
     {
@@ -99,6 +108,53 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
     }
 
     internal static long FollowUpScanIntervalTicks => CampaignTime.Hours(FollowUpScanIntervalHours).NumTicks;
+
+    public void RemoveReinforcementsIfNoPlayers(MapEvent mapEvent, MobileParty removedParty)
+    {
+        RemoveReinforcementsIfNoPlayers(mapEvent, removedParty, RemoveReinforcements);
+    }
+
+    internal void RemoveReinforcementsIfNoPlayers(
+        MapEvent mapEvent,
+        MobileParty removedParty,
+        Action<MapEventSide> removeReinforcements)
+    {
+        if (mapEvent == null
+            || mapEvent.State != MapEventState.Wait
+            || removedParty?.IsPlayerParty() != true
+            || mapEvent.ContainsPlayerParty())
+        {
+            return;
+        }
+
+        followUpScans.Remove(mapEvent);
+        removeReinforcements(mapEvent.AttackerSide);
+        removeReinforcements(mapEvent.DefenderSide);
+    }
+
+    private void RemoveReinforcements(MapEventSide side)
+    {
+        if (side == null) return;
+
+        var removedParties = new List<MapEventParty>();
+        foreach (var nearbyParty in side._nearbyPartiesAddedToPlayerMapEvent)
+        {
+            foreach (var mapEventParty in side.Parties)
+            {
+                if (mapEventParty.Party == nearbyParty.Party)
+                {
+                    removedParties.Add(mapEventParty);
+                    break;
+                }
+            }
+        }
+
+        side.RemoveNearbyPartiesFromPlayerMapEvent();
+        foreach (var mapEventParty in removedParties)
+        {
+            messageBroker.Publish(side, new MapEventPartyRemoved(side, mapEventParty));
+        }
+    }
 
     internal void Reinforce(
         MapEvent mapEvent,

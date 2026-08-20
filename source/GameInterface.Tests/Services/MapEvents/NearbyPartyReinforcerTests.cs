@@ -11,6 +11,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Services.SiegeEvents;
 using HarmonyLib;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -71,7 +72,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         MarkAsPlayerParty(playerParty);
         InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
         var joins = new List<(MapEventSide Side, MobileParty Party)>();
-        var reinforcer = new NearbyPartyReinforcer();
+        var reinforcer = CreateReinforcer();
         var previousMainParty = Campaign.Current.MainParty;
         var previousEncounter = Campaign.Current.PlayerEncounter;
 
@@ -104,7 +105,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         MarkAsPlayerParty(playerParty);
         InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
         var selectorCalled = false;
-        var reinforcer = new NearbyPartyReinforcer();
+        var reinforcer = CreateReinforcer();
 
         reinforcer.Reinforce(
             mapEvent,
@@ -128,7 +129,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         MarkAsPlayerParty(playerParty);
         InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
         var joins = new List<MobileParty>();
-        var reinforcer = new NearbyPartyReinforcer();
+        var reinforcer = CreateReinforcer();
 
         reinforcer.Reinforce(
             mapEvent,
@@ -177,7 +178,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         }
         var selectorCalled = false;
         var joins = new List<MobileParty>();
-        var reinforcer = new NearbyPartyReinforcer();
+        var reinforcer = CreateReinforcer();
 
         reinforcer.Reinforce(
             mapEvent,
@@ -202,7 +203,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
         mapEvent._battleState = TaleWorlds.Core.BattleState.AttackerVictory;
         var selectorCalled = false;
-        var reinforcer = new NearbyPartyReinforcer();
+        var reinforcer = CreateReinforcer();
 
         reinforcer.Reinforce(
             mapEvent,
@@ -222,7 +223,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         MarkAsPlayerParty(playerParty);
         InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
         var joins = new List<MobileParty>();
-        var reinforcer = new NearbyPartyReinforcer();
+        var reinforcer = CreateReinforcer();
 
         reinforcer.Reinforce(
             mapEvent,
@@ -234,6 +235,48 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
             (side, party) => joins.Add(party));
 
         Assert.Empty(joins);
+    }
+
+    [Fact]
+    public void LastPlayerLeaves_RemovesTrackedNearbyPartiesFromBothSides()
+    {
+        var removedPlayer = CreateMobileParty();
+        var nearbyAlly = CreateMobileParty();
+        var enemyParty = CreateMobileParty();
+        var mapEvent = CreatePlayerBattle(nearbyAlly, enemyParty);
+        MarkAsPlayerParty(removedPlayer);
+        var cleanedSides = new List<MapEventSide>();
+        var reinforcer = CreateReinforcer();
+
+        reinforcer.RemoveReinforcementsIfNoPlayers(
+            mapEvent,
+            removedPlayer,
+            cleanedSides.Add);
+
+        Assert.Collection(
+            cleanedSides,
+            side => Assert.Same(mapEvent.AttackerSide, side),
+            side => Assert.Same(mapEvent.DefenderSide, side));
+    }
+
+    [Fact]
+    public void AnotherPlayerRemains_DoesNotRemoveTrackedNearbyParties()
+    {
+        var removedPlayer = CreateMobileParty();
+        var remainingPlayer = CreateMobileParty();
+        var enemyParty = CreateMobileParty();
+        var mapEvent = CreatePlayerBattle(remainingPlayer, enemyParty);
+        MarkAsPlayerParty(removedPlayer);
+        MarkAsPlayerParty(remainingPlayer);
+        var cleanedSides = new List<MapEventSide>();
+        var reinforcer = CreateReinforcer();
+
+        reinforcer.RemoveReinforcementsIfNoPlayers(
+            mapEvent,
+            removedPlayer,
+            cleanedSides.Add);
+
+        Assert.Empty(cleanedSides);
     }
 
     [Fact]
@@ -267,12 +310,16 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         Assert.Equal(1, reinforcer.ImmediateScanCount);
     }
 
+    private static NearbyPartyReinforcer CreateReinforcer()
+        => new NearbyPartyReinforcer(Mock.Of<IMessageBroker>());
+
     private MapEvent CreatePlayerBattle(MobileParty playerParty, MobileParty enemyParty)
     {
         var attackerSide = CreateSide(CreateMapEventParty(playerParty));
         var defenderSide = CreateSide(CreateMapEventParty(enemyParty));
         var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
         SidesField.SetValue(mapEvent, new[] { defenderSide, attackerSide });
+        mapEvent._state = MapEventState.Wait;
         return mapEvent;
     }
 
@@ -330,6 +377,10 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         }
 
         public void ReinforceOpenPlayerBattles()
+        {
+        }
+
+        public void RemoveReinforcementsIfNoPlayers(MapEvent mapEvent, MobileParty removedParty)
         {
         }
 

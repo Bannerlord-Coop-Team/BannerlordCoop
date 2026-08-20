@@ -87,6 +87,20 @@ internal class MapEventPatches
         }
     }
 
+    [HarmonyPatch(nameof(MapEvent.RemoveInvolvedPartyInternal))]
+    [HarmonyPostfix]
+    private static void Postfix_RemoveInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
+    {
+        if (ModInformation.IsClient
+            || mapEventParty?.Party?.MobileParty is not MobileParty removedParty
+            || !ContainerProvider.TryResolve<INearbyPartyReinforcer>(out var reinforcer))
+        {
+            return;
+        }
+
+        reinforcer.RemoveReinforcementsIfNoPlayers(__instance, removedParty);
+    }
+
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]

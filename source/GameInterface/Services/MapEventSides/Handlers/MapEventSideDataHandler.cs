@@ -92,6 +92,8 @@ internal class MapEventSideDataHandler : IHandler
                 using (new AllowedThread())
                 {
                     side._battleParties.Remove(party);
+                    if (party.Party?.MobileParty != null)
+                        side._nearbyPartiesAddedToPlayerMapEvent.Remove(party.Party.MobileParty);
                     if (party.Party?.MapEventSide == side) party.Party._mapEventSide = null;
                 }
             }
