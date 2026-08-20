@@ -7,7 +7,6 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Interfaces;
 
@@ -21,6 +20,11 @@ public interface ISessionInteractionsPlayerDataInterface : IGameAbstraction
     void SetKnowTournaments(string playerHeroId, bool knowTournaments);
     void UpdateWarningTime(string playerHeroId, long warningTimeNumTicks);
     void AddSettlementSneakedIn(string playerHeroId, string settlementId);
+    void UpdateDrinkThisDayInSettlement(string playerHeroId, string settlementId);
+    void UpdateHasBoughtTunToParty(string playerHeroId, bool hasBought);
+    void UpdateHasMetRandomBroker(string playerHeroId, bool hasMet);
+    bool DailyTickDrinkThisDayInSettlement();
+    bool WeeklyTickHasBoughtToTunToParty();
     void RemoveInteractedVillagersForAllPlayers(string mobilePartyId);
     void RemoveInteractedCaravanForAllPlayers(string mobilePartyId);
     void RemoveInteractedBanditsForAllPlayers(string mobilePartyId);
@@ -130,6 +134,55 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         AddToList(playerHeroId, InteractionsPlayerData.PlayerAlreadySneakedSettlements, settlementId);
     }
 
+    public void UpdateDrinkThisDayInSettlement(string playerHeroId, string settlementId)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerHeroId] = settlementId;
+    }
+
+    public void UpdateHasBoughtTunToParty(string playerHeroId, bool hasBought)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerHasBoughtTunToParty[playerHeroId] = hasBought;
+    }
+
+    public void UpdateHasMetRandomBroker(string playerHeroId, bool hasMet)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerHasMetRansomBroker[playerHeroId] = hasMet;
+    }
+
+    public bool DailyTickDrinkThisDayInSettlement()
+    {
+        bool hasUpdated = false;
+        foreach (var playerData in InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement)
+        {
+            if (playerData.Value != null)
+            {
+                InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerData.Key] = null;
+                hasUpdated = true;
+            }
+        }
+        return hasUpdated;
+    }
+
+    public bool WeeklyTickHasBoughtToTunToParty()
+    {
+        bool hasUpdated = false;
+        foreach (var playerData in InteractionsPlayerData.PlayerHasBoughtTunToParty)
+        {
+            if (playerData.Value == true)
+            {
+                InteractionsPlayerData.PlayerHasBoughtTunToParty[playerData.Key] = false;
+                hasUpdated = true;
+            }
+        }
+        return hasUpdated;
+    }
+
     private void RemoveInteractedPartyForAllPlayers(string mobilePartyId, Dictionary<string, Dictionary<string, int>> interactionDictionary)
     {
         foreach (var player in playerManager.Players)
@@ -217,6 +270,18 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         if (!InteractionsPlayerData.PlayerAlreadySneakedSettlements.ContainsKey(playerHeroId))
         {
             InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId] = new List<string>();
+        }
+        if (!InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerHeroId] = null;
+        }
+        if (!InteractionsPlayerData.PlayerHasBoughtTunToParty.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerHasBoughtTunToParty[playerHeroId] = false;
+        }
+        if (!InteractionsPlayerData.PlayerHasMetRansomBroker.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerHasMetRansomBroker[playerHeroId] = false;
         }
     }
 

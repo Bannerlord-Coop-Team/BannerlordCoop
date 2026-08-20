@@ -13,6 +13,9 @@ namespace GameInterface.Services.MobileParties;
 /// _knowTournaments is used to allow a player to enter practice fights after they have spoken with an arena master
 /// _warningTime is used to give clients a 6 day warning before sending a message to the server to remove a companion
 /// _alreadySneakedSettlements is used to save when a player establishes a contact in a settlement
+/// _orderedDrinkThisDayInSettlement is used to keep track of a settlement a player bought a drink at in the last day
+/// _hasBoughtToParty is true when a player buys drinks for their party at a tavern for a temporary morale boost
+/// _hasMetRansomBroker is used to determine whether or not the ransom broker intro dialogue is used when talking in taverns
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class InteractionsPlayerData
@@ -49,6 +52,18 @@ public class InteractionsPlayerData
     [ProtoMember(8)]
     public Dictionary<string, List<string>> PlayerAlreadySneakedSettlements { get; }
 
+    // Dictionary<PlayerHeroId, SettlementId>
+    [ProtoMember(9)]
+    public Dictionary<string, string> PlayerOrderedDrinkThisDayInSettlement { get; }
+
+    // Dictionary<PlayerHeroId, HasBoughtTunToParty>
+    [ProtoMember(10)]
+    public Dictionary<string, bool> PlayerHasBoughtTunToParty { get; }
+
+    // Dictionary<PlayerHeroId, HasMetRahsomBroker>
+    [ProtoMember(11)]
+    public Dictionary<string, bool> PlayerHasMetRansomBroker { get; }
+
     public InteractionsPlayerData(
         Dictionary<string, Dictionary<string, int>> playerInteractedVillagers,
         Dictionary<string, Dictionary<string, int>> playerInteractedCaravans,
@@ -57,7 +72,10 @@ public class InteractionsPlayerData
         Dictionary<string, List<string>> playerMetArenaMasters,
         Dictionary<string, bool> playerKnowTournaments,
         Dictionary<string, long> playerWarningTime,
-        Dictionary<string, List<string>> playerAlreadySneakedSettlements)
+        Dictionary<string, List<string>> playerAlreadySneakedSettlements,
+        Dictionary<string, string> playerOrderedDrinkThisDayInSettlement,
+        Dictionary<string, bool> playerHasBoughtTunToParty,
+        Dictionary<string, bool> playerHasMetRansomBroker)
     {
         PlayerInteractedVillagers = playerInteractedVillagers ?? new();
         PlayerInteractedCaravans = playerInteractedCaravans ?? new();
@@ -67,5 +85,8 @@ public class InteractionsPlayerData
         PlayerKnowTournaments = playerKnowTournaments ?? new();
         PlayerWarningTime = playerWarningTime ?? new();
         PlayerAlreadySneakedSettlements = playerAlreadySneakedSettlements ?? new();
+        PlayerOrderedDrinkThisDayInSettlement = playerOrderedDrinkThisDayInSettlement ?? new();
+        PlayerHasBoughtTunToParty = playerHasBoughtTunToParty ?? new();
+        PlayerHasMetRansomBroker = playerHasMetRansomBroker ?? new();
     }
 }
