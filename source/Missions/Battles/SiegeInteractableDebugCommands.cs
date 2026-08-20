@@ -38,14 +38,29 @@ internal static class SiegeInteractableDebugCommands
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
         var session = controller?.Session;
         var mainAgent = mission?.MainAgent;
+        var deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
         bool siegeMission = mission?.IsSiegeBattle == true;
         bool hasBattleController = controller != null;
         bool sessionStarted = session?.HasInstance == true;
         bool joinedSiegeAssault = MobileParty.MainParty?.MapEvent?.IsSiegeAssault == true;
+        bool deploymentPhaseActive = deploymentController != null;
+        bool deploymentTeamSetupOver = deploymentController?.TeamSetupOver == true;
+        bool deploymentCommitted = controller?.Deployment.IsCommitted == true;
+        bool deploymentFinished = mission?.IsDeploymentFinished == true;
+        bool deploymentComplete = deploymentFinished
+            && !deploymentPhaseActive
+            && deploymentCommitted;
         bool mainAgentActive = mainAgent?.IsActive() == true;
         bool mainAgentInMission = mainAgent != null && mainAgent.Mission == mission;
         string ownControllerId = session?.OwnControllerId ?? string.Empty;
         bool expectedControllerMatches = ownControllerId == expectedControllerId;
+        bool deploymentFinishReady = isClient
+            && siegeMission
+            && hasBattleController
+            && sessionStarted
+            && joinedSiegeAssault
+            && expectedControllerMatches
+            && (deploymentComplete || (deploymentPhaseActive && deploymentTeamSetupOver));
         bool agentRegistered = false;
         bool locallyControlled = false;
         bool agentAuthorityMatchesSession = false;
@@ -74,6 +89,12 @@ internal static class SiegeInteractableDebugCommands
         if (!expectedControllerMatches)
         {
             errors.Add("controller-id-mismatch");
+        }
+        if (!deploymentComplete)
+        {
+            errors.Add(deploymentPhaseActive && !deploymentTeamSetupOver
+                ? "deployment-team-setup-incomplete"
+                : "local-deployment-incomplete");
         }
 
         if (!ContainerProvider.TryResolve<Missions.INetworkAgentRegistry>(out var registry))
@@ -113,6 +134,12 @@ internal static class SiegeInteractableDebugCommands
             hasBattleController,
             sessionStarted,
             joinedSiegeAssault,
+            deploymentPhaseActive,
+            deploymentTeamSetupOver,
+            deploymentCommitted,
+            deploymentFinished,
+            deploymentComplete,
+            deploymentFinishReady,
             mainAgentActive,
             mainAgentInMission,
             expectedControllerMatches,
@@ -122,6 +149,123 @@ internal static class SiegeInteractableDebugCommands
             errors = errors.ToArray(),
         });
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("siege_interactable_finish_deployment", "coop.debug.battle")]
+    public static string FinishDeployment(List<string> args)
+    {
+        string expectedControllerId = args.Count == 1 ? args[0] : string.Empty;
+        var errors = new List<string>();
+        if (args.Count != 1 || string.IsNullOrEmpty(expectedControllerId))
+        {
+            errors.Add("expected-controller-id-required");
+        }
+
+        bool isClient = ModInformation.IsClient;
+        if (!isClient)
+        {
+            errors.Add("not-a-client");
+        }
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        var session = controller?.Session;
+        string ownControllerId = session?.OwnControllerId ?? string.Empty;
+        bool siegeMission = mission?.IsSiegeBattle == true;
+        bool hasBattleController = controller != null;
+        bool sessionStarted = session?.HasInstance == true;
+        bool joinedSiegeAssault = MobileParty.MainParty?.MapEvent?.IsSiegeAssault == true;
+        bool expectedControllerMatches = ownControllerId == expectedControllerId;
+        var deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
+        bool deploymentPhaseActive = deploymentController != null;
+        bool deploymentTeamSetupOver = deploymentController?.TeamSetupOver == true;
+        bool deploymentCommitted = controller?.Deployment.IsCommitted == true;
+        bool deploymentFinished = mission?.IsDeploymentFinished == true;
+        bool deploymentComplete = deploymentFinished
+            && !deploymentPhaseActive
+            && deploymentCommitted;
+
+        if (!siegeMission)
+        {
+            errors.Add("siege-mission-unavailable");
+        }
+        if (!hasBattleController)
+        {
+            errors.Add("battle-controller-unavailable");
+        }
+        if (!sessionStarted)
+        {
+            errors.Add("battle-session-unavailable");
+        }
+        if (!joinedSiegeAssault)
+        {
+            errors.Add("siege-assault-not-joined");
+        }
+        if (!expectedControllerMatches)
+        {
+            errors.Add("controller-id-mismatch");
+        }
+
+        if (errors.Count != 0)
+        {
+            return DeploymentCompletionResult(
+                false,
+                string.Join(",", errors),
+                expectedControllerId,
+                false);
+        }
+
+        if (deploymentComplete)
+        {
+            return DeploymentCompletionResult(
+                true,
+                string.Empty,
+                expectedControllerId,
+                true);
+        }
+
+        if (!deploymentTeamSetupOver)
+        {
+            return DeploymentCompletionResult(
+                false,
+                "deployment-team-setup-incomplete",
+                expectedControllerId,
+                false);
+        }
+
+        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+        if (deploymentHandler == null)
+        {
+            return DeploymentCompletionResult(
+                false,
+                "deployment-handler-unavailable",
+                expectedControllerId,
+                false);
+        }
+
+        try
+        {
+            deploymentHandler.FinishDeployment();
+        }
+        catch (Exception exception)
+        {
+            return DeploymentCompletionResult(
+                false,
+                exception.Message,
+                expectedControllerId,
+                false);
+        }
+
+        deploymentComplete = mission.IsDeploymentFinished
+            && mission.GetMissionBehavior<DeploymentMissionController>() == null
+            && controller.Deployment.IsCommitted;
+        return DeploymentCompletionResult(
+            deploymentComplete,
+            deploymentComplete ? string.Empty : "deployment-finish-did-not-complete",
+            expectedControllerId,
+            false);
+    }
+#endif
 
     [CommandLineArgumentFunction("siege_interactable_capture", "coop.debug.battle")]
     public static string Capture(List<string> args)
@@ -390,6 +534,49 @@ internal static class SiegeInteractableDebugCommands
             report.SimulatedLocally,
         };
     }
+
+#if DEBUG
+    private static string DeploymentCompletionResult(
+        bool success,
+        string error,
+        string expectedControllerId,
+        bool alreadyCompleted)
+    {
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        var session = controller?.Session;
+        var deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
+        var mainAgent = mission?.MainAgent;
+        bool deploymentPhaseActive = deploymentController != null;
+        bool deploymentTeamSetupOver = deploymentController?.TeamSetupOver == true;
+        bool deploymentCommitted = controller?.Deployment.IsCommitted == true;
+        bool deploymentFinished = mission?.IsDeploymentFinished == true;
+        bool deploymentComplete = deploymentFinished
+            && !deploymentPhaseActive
+            && deploymentCommitted;
+        string ownControllerId = session?.OwnControllerId ?? string.Empty;
+        return Structured(new
+        {
+            success,
+            error,
+            expectedControllerId,
+            ownControllerId,
+            siegeMission = mission?.IsSiegeBattle == true,
+            hasBattleController = controller != null,
+            sessionStarted = session?.HasInstance == true,
+            joinedSiegeAssault = MobileParty.MainParty?.MapEvent?.IsSiegeAssault == true,
+            expectedControllerMatches = ownControllerId == expectedControllerId,
+            deploymentPhaseActive,
+            deploymentTeamSetupOver,
+            deploymentCommitted,
+            deploymentFinished,
+            deploymentComplete,
+            alreadyCompleted,
+            mainAgentActive = mainAgent?.IsActive() == true,
+            mainAgentInMission = mainAgent != null && mainAgent.Mission == mission,
+        });
+    }
+#endif
 
     private static string Structured(object value)
         => "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
