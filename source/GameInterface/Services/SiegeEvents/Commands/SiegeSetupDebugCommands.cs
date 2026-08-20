@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using Autofac;
 using Common;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using System;
@@ -157,70 +158,42 @@ internal static class SiegeSetupDebugCommands
         });
     }
 
-    [CommandLineArgumentFunction("setup_join_active_assault", "coop.debug.siege")]
-    public static string JoinActiveAssault(List<string> args)
-    {
-        if (!TryGetClientSettlement(args, out Settlement settlement, out string error))
-            return Failure("join-active-assault", error);
-
-        var party = MobileParty.MainParty;
-        bool readyToJoin = party != null && party.BesiegerCamp != null && party.MapEvent == null &&
-            settlement.Party.MapEvent?.IsSiegeAssault == true && PlayerEncounter.Current == null;
-        if (readyToJoin)
-            SiegeDebugCommand.JoinActiveAssault(args);
-
-        var encounter = PlayerEncounter.Current;
-        string currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
-        bool joined = party?.MapEvent?.IsSiegeAssault == true && PlayerEncounter.Battle?.IsSiegeAssault == true;
-        return Result(new
-        {
-            success = readyToJoin && joined && currentMenu == "menu_siege_strategies",
-            action = "join-active-assault",
-            settlement = settlement.StringId,
-            readyToJoin,
-            joined,
-            currentMenu,
-        });
-    }
-
-    [CommandLineArgumentFunction("setup_begin_assault", "coop.debug.siege")]
-    public static string BeginAssault(List<string> args)
+    [CommandLineArgumentFunction("setup_start_mission", "coop.debug.siege")]
+    public static string StartMission(List<string> args)
     {
         if (args.Count != 0)
-            return Failure("begin-assault", "expected no arguments");
+            return Failure("start-mission", "expected no arguments");
         if (ModInformation.IsServer)
-            return Failure("begin-assault", "command must run on a client");
+            return Failure("start-mission", "command must run on a client");
 
         var party = MobileParty.MainParty;
-        var encounter = PlayerEncounter.Current;
-        var settlement = party?.BesiegedSettlement;
-        bool readyToBegin = party?.MapEvent?.IsSiegeAssault == true &&
-            PlayerEncounter.Battle?.IsSiegeAssault == true && settlement != null &&
-            PlayerSiege.PlayerSiegeEvent != null &&
-            settlement.CurrentSiegeState == Settlement.SiegeState.OnTheWalls;
-        if (!readyToBegin)
+        var mapEvent = party?.MapEvent;
+        if (mapEvent?.IsSiegeAssault != true)
         {
             return Result(new
             {
                 success = false,
-                action = "begin-assault",
-                readyToBegin,
-                siegeAssault = party?.MapEvent?.IsSiegeAssault == true,
-                encounterSiegeAssault = PlayerEncounter.Battle?.IsSiegeAssault == true,
-                playerSiegeActive = PlayerSiege.PlayerSiegeEvent != null,
-                settlement = settlement?.StringId,
+                action = "start-mission",
+                siegeAssault = false,
             });
         }
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !objectManager.TryGetId(mapEvent, out var mapEventId) ||
+            !objectManager.TryGetId(party, out var partyId))
+            return Failure("start-mission", "unable to resolve the local battle ids");
+        var coordinator = BattleStartCoordinator.Instance;
+        if (coordinator == null)
+            return Failure("start-mission", "battle start coordinator is unavailable");
 
         try
         {
-            PlayerSiege.StartSiegeMission(settlement);
+            bool accepted = coordinator.RequestBlocking(BattleStartMode.Mission, mapEventId, partyId);
             return Result(new
             {
-                success = true,
-                action = "begin-assault",
-                settlement = settlement.StringId,
-                missionStartRequested = true,
+                success = accepted,
+                action = "start-mission",
+                mapEventId,
+                requestAccepted = accepted,
             });
         }
         catch (Exception exception)
@@ -228,8 +201,8 @@ internal static class SiegeSetupDebugCommands
             return Result(new
             {
                 success = false,
-                action = "begin-assault",
-                settlement = settlement.StringId,
+                action = "start-mission",
+                mapEventId,
                 exceptionType = exception.GetType().FullName,
                 exceptionMessage = exception.Message,
             });
