@@ -18,6 +18,12 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using static TaleWorlds.Library.CommandLineFunctionality;
+#if DEBUG
+using GameInterface.Services.UI.CoopOptions;
+using System.Text.Json;
+using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.ScreenSystem;
+#endif
 
 namespace GameInterface.Services.GameDebug.Commands;
 
@@ -167,6 +173,70 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
     }
 
 #if DEBUG
+    [CommandLineArgumentFunction("open_player_nameplates_options", "coop.debug.ui")]
+    public static string OpenPlayerNameplatesOptions(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.open_player_nameplates_options";
+        if (LoadingWindow.IsLoadingWindowActive)
+            return "Wait for the loading window to close before opening co-op options.";
+        if (MapScreen.Instance == null)
+            return "The campaign map screen is unavailable.";
+
+        if (ScreenManager.TopScreen is CoopOptionsUI)
+            return "Co-op options screen is already open.";
+
+        try
+        {
+            var optionsScreen = ViewCreatorManager.CreateScreenView<CoopOptionsUI>() as CoopOptionsUI;
+            if (optionsScreen == null)
+                return "Unable to create the player nameplates options screen.";
+            optionsScreen.SelectPlayerNameplatesTabForDebug();
+            ScreenManager.PushScreen(optionsScreen);
+        }
+        catch (Exception ex)
+        {
+            return CommandHelpers.FormatException("Open player nameplates options", ex);
+        }
+
+        return GetPlayerNameplatesOptionsScreenState();
+    }
+
+    [CommandLineArgumentFunction("player_nameplates_options_screen_state", "coop.debug.ui")]
+    public static string PlayerNameplatesOptionsScreenState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.player_nameplates_options_screen_state";
+
+        return GetPlayerNameplatesOptionsScreenState();
+    }
+
+    [CommandLineArgumentFunction("close_player_nameplates_options", "coop.debug.ui")]
+    public static string ClosePlayerNameplatesOptions(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.close_player_nameplates_options";
+        if (!(ScreenManager.TopScreen is CoopOptionsUI))
+            return "Player nameplates options screen is not open.";
+
+        ScreenManager.PopScreen();
+        return GetPlayerNameplatesOptionsScreenState();
+    }
+
+    private static string GetPlayerNameplatesOptionsScreenState()
+    {
+        var optionsScreen = ScreenManager.TopScreen as CoopOptionsUI;
+        return "LIVE_TEST_JSON=" + JsonSerializer.Serialize(new
+        {
+            active = optionsScreen != null,
+            playerNameplatesTabSelected = optionsScreen?.IsPlayerNameplatesTabSelectedForDebug == true
+        });
+    }
+
     [CommandLineArgumentFunction("map_click_offset", "coop.debug.ui")]
     public static string MapClickOffset(List<string> args)
     {
