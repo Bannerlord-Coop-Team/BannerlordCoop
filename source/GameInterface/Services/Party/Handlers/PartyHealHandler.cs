@@ -48,7 +48,7 @@ internal class PartyHealHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty)) continue;
 
             // Skip healing mobile parties that are in a MapEvent
-            if (mobileParty.MapEvent != null) return;
+            if (mobileParty.MapEvent != null) continue;
 
             obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(mobileParty.Party, (float)CampaignTime.HoursInDay);
         }
