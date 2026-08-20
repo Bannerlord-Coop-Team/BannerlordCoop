@@ -262,6 +262,54 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void SiegeAmbush_EarlyDefenderPullBackApply_DoesNotBlockResultReadyCompletion()
+    {
+        var battle = SetupInteraction(MapEvent.BattleTypes.None, isSiegeAmbush: true,
+            includeAiParties: false);
+        var participants = Clients.Take(2).ToArray();
+        EnterBattle(participants[0], battle.MapEventId);
+        EnterBattle(participants[1], battle.MapEventId);
+        Server.SimulateMessage(participants[0].NetPeer,
+            new NetworkMissionEntered("attacker", battle.MapEventId));
+        Server.SimulateMessage(participants[1].NetPeer,
+            new NetworkMissionEntered("defender", battle.MapEventId));
+        BattleState? finalizedState = null;
+        Server.Call(() => Server.Resolve<IMessageBroker>().Subscribe<MapEventFinalized>(
+            payload => finalizedState = payload.What.MapEvent.BattleState));
+
+        participants[0].Call(() =>
+        {
+            Assert.True(participants[0].Resolve<IBattleHostRegistry>().TryGet(
+                battle.MapEventId,
+                out var assignment));
+            var network = participants[0].Resolve<INetwork>();
+            network.SendAll(new NetworkChangeBattleState(
+                battle.MapEventId,
+                BattleState.DefenderPullBack,
+                assignment.Epoch));
+            network.SendAll(new NetworkBattleResultReady(
+                battle.MapEventId,
+                BattleState.DefenderPullBack,
+                assignment.Epoch));
+        }, MapEventDisabledMethods);
+
+        participants[1].Call(() =>
+        {
+            Assert.True(participants[1].Resolve<IBattleHostRegistry>().TryGet(
+                battle.MapEventId,
+                out var assignment));
+            participants[1].Resolve<INetwork>().SendAll(new NetworkBattleResultReady(
+                battle.MapEventId,
+                BattleState.DefenderPullBack,
+                assignment.Epoch));
+        }, MapEventDisabledMethods);
+
+        Assert.Equal(BattleState.None, finalizedState);
+        Server.Call(() => Assert.False(
+            Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out _)));
+    }
+
+    [Fact]
     public void SiegeAmbush_MissionEndWaitsForAuthoritativeCompletion()
     {
         var battle = SetupInteraction(MapEvent.BattleTypes.None, isSiegeAmbush: true,

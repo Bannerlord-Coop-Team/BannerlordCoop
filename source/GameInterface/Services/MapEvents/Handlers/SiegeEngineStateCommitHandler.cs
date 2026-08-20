@@ -6,9 +6,13 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -59,10 +63,42 @@ internal class SiegeEngineStateCommitHandler : IHandler
                 return;
             }
 
-            siegeEvent.SetSiegeEngineStatesAfterSiegeMission(
-                SiegeEngineStateConverter.ToMissionWeapons(obj.AttackerEngines),
-                SiegeEngineStateConverter.ToMissionWeapons(obj.DefenderEngines));
+            var attackerWeapons = SiegeEngineStateConverter.ToMissionWeapons(obj.AttackerEngines);
+            var defenderWeapons = SiegeEngineStateConverter.ToMissionWeapons(obj.DefenderEngines);
+            if (mapEvent.IsSiegeAmbush)
+            {
+                SetAmbushEngineStatesForSide(siegeEvent, siegeEvent.BesiegerCamp, attackerWeapons);
+                SetAmbushEngineStatesForSide(siegeEvent, siegeEvent.BesiegedSettlement, defenderWeapons);
+            }
+            else
+            {
+                siegeEvent.SetSiegeEngineStatesAfterSiegeMission(attackerWeapons, defenderWeapons);
+            }
         });
+    }
+
+    internal static void SetAmbushEngineStatesForSide(
+        SiegeEvent siegeEvent,
+        ISiegeEventSide side,
+        IEnumerable<IMissionSiegeWeapon> missionSiegeEngineData)
+    {
+        var missionWeapons = missionSiegeEngineData?.ToList();
+        if (missionWeapons == null || missionWeapons.Count == 0)
+            return;
+
+        int missionWeaponIndex = missionWeapons.Count - 1;
+        for (int engineIndex = side.SiegeEngines.DeployedSiegeEngines.Count - 1; engineIndex >= 0; engineIndex--)
+        {
+            var engine = side.SiegeEngines.DeployedSiegeEngines[engineIndex];
+            if (!engine.IsActive)
+                continue;
+
+            var missionWeapon = missionWeapons[missionWeaponIndex--];
+            if (missionWeapon.Health > 0f)
+                engine.SetHitpoints(missionWeapon.Health);
+            else
+                siegeEvent.BreakSiegeEngine(side, engine.SiegeEngine);
+        }
     }
 
     public void Dispose()

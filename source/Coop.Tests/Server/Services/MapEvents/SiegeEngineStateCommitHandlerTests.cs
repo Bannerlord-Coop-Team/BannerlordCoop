@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Tests.Utils;
+using Common.Util;
 using Coop.Tests;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
@@ -8,8 +9,12 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 using Xunit;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace Coop.Tests.Server.Services.MapEvents;
 
@@ -85,6 +90,26 @@ public class SiegeEngineStateCommitHandlerTests : IDisposable
         objectManager.Verify(
             manager => manager.TryGetObjectWithLogging<MapEvent>(MapEventId, out It.Ref<MapEvent>.IsAny),
             Times.Once);
+    }
+
+    [Fact]
+    public void AmbushReport_UpdatesSurvivingMeleeEngineHitPoints()
+    {
+        var engineType = new SiegeEngineType();
+        var engine = new SiegeEngineConstructionProgress(engineType, progress: 1f, maxHitPoints: 100f);
+        var container = new SiegeEnginesContainer(BattleSideEnum.Attacker, siegePreparations: null);
+        container.DeploySiegeEngineAtIndex(engine, index: 0);
+        var side = new Mock<ISiegeEventSide>();
+        side.SetupGet(value => value.SiegeEngines).Returns(container);
+        var missionWeapon = MissionSiegeWeapon.CreateCampaignWeapon(engineType, 0, 45f, 100f);
+
+        SiegeEngineStateCommitHandler.SetAmbushEngineStatesForSide(
+            ObjectHelper.SkipConstructor<SiegeEvent>(),
+            side.Object,
+            new[] { missionWeapon });
+
+        Assert.Equal(45f, engine.Hitpoints);
+        Assert.Contains(engine, container.DeployedSiegeEngines);
     }
 
     private static NetworkSiegeEngineStatesReport Report(int hostEpoch)

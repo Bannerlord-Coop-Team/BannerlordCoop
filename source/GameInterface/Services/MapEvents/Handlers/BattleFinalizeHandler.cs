@@ -259,62 +259,72 @@ internal class BattleFinalizeHandler : IHandler
         string[] playerPartyIds = null;
         GameThread.RunSafe(() =>
         {
-            if (siegeMapEventLeaderReconciler.RestoreBeforeFinalize(
-                    mapEvent,
-                    out var replacedLeader,
-                    out var restoredLeader))
+            bool finalizeCompleted = false;
+            try
             {
-                Logger.Warning(
-                    "Restored siege map event leader before finalization. Replaced={ReplacedLeader}, Restored={RestoredLeader}",
-                    replacedLeader?.MobileParty?.StringId ?? replacedLeader?.Settlement?.StringId,
-                    restoredLeader?.MobileParty?.StringId ?? restoredLeader?.Settlement?.StringId);
+                if (siegeMapEventLeaderReconciler.RestoreBeforeFinalize(
+                        mapEvent,
+                        out var replacedLeader,
+                        out var restoredLeader))
+                {
+                    Logger.Warning(
+                        "Restored siege map event leader before finalization. Replaced={ReplacedLeader}, Restored={RestoredLeader}",
+                        replacedLeader?.MobileParty?.StringId ?? replacedLeader?.Settlement?.StringId,
+                        restoredLeader?.MobileParty?.StringId ?? restoredLeader?.Settlement?.StringId);
+                }
+
+                playerPartyIds = MapEventPlayerPartyCollector.Combine(
+                    knownPlayerPartyIds,
+                    MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
+
+                var excludedIds = CollectExcludedPlayerPartyIds(mapEvent);
+                if (excludedIds.Count > 0)
+                    playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
+                var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
+                var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
+
+                // A winning inside defender is kept off the close above, but nothing seats it on the siege-defeated
+                // menu: the server tears the SiegeEvent/MapEvent down via replication, bypassing vanilla's local
+                // siege-end routing, so the winner falls through to the settlement arrival menu. Capture its parties
+                // + settlement now (finalize clears them) and prompt after finalize (below), behind the event destroy.
+                string defenderVictorySettlementId = null;
+                string[] defenderVictoryPartyIds = null;
+                if (mapEvent.IsSiegeAssault && mapEvent.BattleState == BattleState.DefenderVictory)
+                {
+                    defenderVictoryPartyIds = CollectWinningInsideDefenderPartyIds(mapEvent);
+                    if (defenderVictoryPartyIds.Length > 0)
+                        objectManager.TryGetId(mapEvent.MapEventSettlement, out defenderVictorySettlementId);
+                }
+
+                // The battle is over — drop its server-side troop reserves (ledger entry + flatten cache) so they
+                // don't leak per battle. Done before FinalizeEventAux clears the parties, so the flatten-cache
+                // cleanup can still enumerate them. No-op on a client (its ledger is never populated).
+                reserveBuilder.ForgetMapEvent(mapEvent);
+
+                // A siege assault that ends without a victor (attackers retreated or abandoned the fight)
+                // keeps the siege in vanilla; a bare finalize would lift it. Victories finalize normally:
+                // attacker victory captures the settlement, defender victory breaks the siege.
+                if (mapEvent.IsSiegeAssault
+                    && mapEvent.BattleState != BattleState.AttackerVictory
+                    && mapEvent.BattleState != BattleState.DefenderVictory)
+                {
+                    mapEvent._keepSiegeEvent = true;
+                    mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
+                }
+
+                mapEvent.FinalizeEventAux();
+                finalizeCompleted = true;
+                MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
+
+                // After the destroy (same game thread, so behind it on the reliable-ordered channel).
+                if (!string.IsNullOrEmpty(defenderVictorySettlementId))
+                    network.SendAll(new NetworkPromptSiegeDefenderVictory(defenderVictorySettlementId, defenderVictoryPartyIds));
             }
-
-            playerPartyIds = MapEventPlayerPartyCollector.Combine(
-                knownPlayerPartyIds,
-                MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
-
-            var excludedIds = CollectExcludedPlayerPartyIds(mapEvent);
-            if (excludedIds.Count > 0)
-                playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
-            var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
-            var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
-
-            // A winning inside defender is kept off the close above, but nothing seats it on the siege-defeated
-            // menu: the server tears the SiegeEvent/MapEvent down via replication, bypassing vanilla's local
-            // siege-end routing, so the winner falls through to the settlement arrival menu. Capture its parties
-            // + settlement now (finalize clears them) and prompt after finalize (below), behind the event destroy.
-            string defenderVictorySettlementId = null;
-            string[] defenderVictoryPartyIds = null;
-            if (mapEvent.IsSiegeAssault && mapEvent.BattleState == BattleState.DefenderVictory)
+            finally
             {
-                defenderVictoryPartyIds = CollectWinningInsideDefenderPartyIds(mapEvent);
-                if (defenderVictoryPartyIds.Length > 0)
-                    objectManager.TryGetId(mapEvent.MapEventSettlement, out defenderVictorySettlementId);
+                if (!finalizeCompleted)
+                    UnmarkFinalized(mapEvent);
             }
-
-            // The battle is over — drop its server-side troop reserves (ledger entry + flatten cache) so they
-            // don't leak per battle. Done before FinalizeEventAux clears the parties, so the flatten-cache
-            // cleanup can still enumerate them. No-op on a client (its ledger is never populated).
-            reserveBuilder.ForgetMapEvent(mapEvent);
-
-            // A siege assault that ends without a victor (attackers retreated or abandoned the fight)
-            // keeps the siege in vanilla; a bare finalize would lift it. Victories finalize normally:
-            // attacker victory captures the settlement, defender victory breaks the siege.
-            if (mapEvent.IsSiegeAssault
-                && mapEvent.BattleState != BattleState.AttackerVictory
-                && mapEvent.BattleState != BattleState.DefenderVictory)
-            {
-                mapEvent._keepSiegeEvent = true;
-                mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
-            }
-
-            mapEvent.FinalizeEventAux();
-            MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
-
-            // After the destroy (same game thread, so behind it on the reliable-ordered channel).
-            if (!string.IsNullOrEmpty(defenderVictorySettlementId))
-                network.SendAll(new NetworkPromptSiegeDefenderVictory(defenderVictorySettlementId, defenderVictoryPartyIds));
         }, blocking: true, context: nameof(FinalizeAndCollectPlayers));
         return playerPartyIds ?? Array.Empty<string>();
     }
@@ -337,6 +347,12 @@ internal class BattleFinalizeHandler : IHandler
             ServerBattleModeArbiter.Release(mapEventIdForRelease);
 
         return true;
+    }
+
+    private void UnmarkFinalized(MapEvent mapEvent)
+    {
+        lock (finalizedMapEventsLock)
+            finalizedMapEvents.Remove(mapEvent);
     }
 
     // [Server, game thread] Player parties that must keep their encounter through the finalize:
