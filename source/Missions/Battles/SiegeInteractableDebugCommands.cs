@@ -23,7 +23,8 @@ internal static class SiegeInteractableDebugCommands
             return "This command can only be used by the server";
         if (args.Count != 3)
             return "Usage: coop.debug.battle.siege_interactable_capture <machineType> <firstControllerId> <secondControllerId>";
-        if (!ContainerProvider.TryResolve<INetwork>(out var network)
+        if (!ContainerProvider.TryResolve<BattleDebugRouteHandler>(out var routeHandler)
+            || !ContainerProvider.TryResolve<INetwork>(out var network)
             || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
         {
             return "Unable to resolve campaign network services";
@@ -37,6 +38,7 @@ internal static class SiegeInteractableDebugCommands
         foreach (string controllerId in fixture.ControllerIds)
         {
             if (!SendAndWait(
+                routeHandler,
                 network,
                 playerManager,
                 controllerId,
@@ -90,13 +92,14 @@ internal static class SiegeInteractableDebugCommands
         }
         if (fixture == null) return "No siege interactable fixture is active";
         if (!fixture.ControllerIds.Contains(args[0])) return $"Controller {args[0]} is not part of the fixture";
-        if (!ContainerProvider.TryResolve<INetwork>(out var network)
+        if (!ContainerProvider.TryResolve<BattleDebugRouteHandler>(out var routeHandler)
+            || !ContainerProvider.TryResolve<INetwork>(out var network)
             || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
         {
             return "Unable to resolve campaign network services";
         }
 
-        if (!SendAndWait(network, playerManager, args[0], action, out var report))
+        if (!SendAndWait(routeHandler, network, playerManager, args[0], action, out var report))
             return $"Timed out waiting for {action} on {args[0]}";
         if (!report.Success)
             return $"Siege interactable {action} failed on {args[0]}: {report.Error}";
@@ -126,7 +129,8 @@ internal static class SiegeInteractableDebugCommands
         if (args.Count != 0)
             return "Usage: coop.debug.battle.siege_interactable_restore";
         if (fixture == null) return "No siege interactable fixture is active";
-        if (!ContainerProvider.TryResolve<INetwork>(out var network)
+        if (!ContainerProvider.TryResolve<BattleDebugRouteHandler>(out var routeHandler)
+            || !ContainerProvider.TryResolve<INetwork>(out var network)
             || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
         {
             return "Unable to resolve campaign network services";
@@ -136,6 +140,7 @@ internal static class SiegeInteractableDebugCommands
         foreach (string controllerId in fixture.ControllerIds)
         {
             if (!SendAndWait(
+                routeHandler,
                 network,
                 playerManager,
                 controllerId,
@@ -188,6 +193,7 @@ internal static class SiegeInteractableDebugCommands
     }
 
     private static bool SendAndWait(
+        BattleDebugRouteHandler routeHandler,
         INetwork network,
         IPlayerManager playerManager,
         string controllerId,
@@ -207,11 +213,13 @@ internal static class SiegeInteractableDebugCommands
             action,
             fixture.OriginalGateState,
             fixture.MachineType));
-        return BattleDebugRouteHandler.WaitForSiegeFixtureReport(
+        bool received = BattleDebugRouteHandler.WaitForSiegeFixtureReport(
             controllerId,
             action,
             ReportTimeout,
             out report);
+        GC.KeepAlive(routeHandler);
+        return received;
     }
 
     private static object ReportResult(NetworkSiegeInteractableFixtureReport report)

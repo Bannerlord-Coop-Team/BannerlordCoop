@@ -104,7 +104,7 @@ internal class BattleDebugRouteHandler : IHandler
             DateTime.UtcNow.Add(SiegeFixtureActionRetryWindow));
     }
 
-    private static void Handle_SiegeInteractableFixtureReport(
+    private void Handle_SiegeInteractableFixtureReport(
         MessagePayload<NetworkSiegeInteractableFixtureReport> payload)
     {
         if (ModInformation.IsClient) return;
