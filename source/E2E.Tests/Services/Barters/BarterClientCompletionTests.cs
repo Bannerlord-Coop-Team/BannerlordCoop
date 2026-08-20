@@ -1,4 +1,4 @@
-using E2E.Tests.Environment.Instance;
+﻿using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Bandits.Patches;
@@ -9,6 +9,8 @@ using GameInterface.Services.Entity;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -18,6 +20,8 @@ namespace E2E.Tests.Services.Barters;
 public class BarterClientCompletionTests : MapEventTestBase
 {
     private static bool barterCloseObserved;
+    private static bool barterClosedObserved;
+    private static MobileParty? conversationPartyOverride;
 
     public BarterClientCompletionTests(ITestOutputHelper output) : base(output)
     {
@@ -40,13 +44,82 @@ public class BarterClientCompletionTests : MapEventTestBase
             SetStaticField(typeof(PeaceBarterPatch), "pendingContext", PeaceConversationContext.Settlement);
             SetStaticField(typeof(PeaceBarterPatch), "pendingContextId", contextId);
 
-            AssertAcceptedResultClosesUi(() => PeaceBarterPatch.CompleteRequest(
-                new NetworkPeaceBarterResult(
-                    contextId,
-                    accepted: true,
-                    playerGold: 500,
-                    requestId: requestId),
-                new ThrowingBarterClientPresentation()));
+            AssertResultClosesUi(
+                () => PeaceBarterPatch.CompleteRequest(
+                    new NetworkPeaceBarterResult(
+                        contextId,
+                        accepted: true,
+                        playerGold: 500,
+                        requestId: requestId),
+                    new ThrowingBarterClientPresentation()),
+                expectedAccepted: true);
+        });
+    }
+
+    [Fact]
+    public void PeaceBarter_RejectedResult_ClosesUi()
+    {
+        const string contextId = "stale-party";
+        const string requestId = "peace-client-rejection";
+        var client = Clients.First();
+        var (playerHeroId, playerPartyId, targetHeroId, targetPartyId) = CreateBarterParties(client);
+        SetMockPlayerEncounter(client, targetPartyId);
+
+        client.Call(() =>
+        {
+            var barter = CreateBarter(client, playerHeroId, playerPartyId, targetHeroId, targetPartyId);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingBarter", barter);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingUiActive", true);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingRequestId", requestId);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingContext", PeaceConversationContext.MapParty);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingContextId", contextId);
+
+            AssertResultClosesUi(
+                () => PeaceBarterPatch.CompleteRequest(
+                    new NetworkPeaceBarterResult(
+                        contextId,
+                        accepted: false,
+                        playerGold: 500,
+                        reason: NetworkPeaceBarterResult.InactiveEncounterReason,
+                        requestId: requestId),
+                    new ThrowingBarterClientPresentation()),
+                expectedAccepted: false,
+                conversationParty: barter.OtherParty.MobileParty,
+                expectLeaveEncounter: true);
+        });
+    }
+
+    [Fact]
+    public void PeaceBarter_RejectedResult_DoesNotLeaveMapEvent()
+    {
+        const string contextId = "party-in-map-event";
+        const string requestId = "peace-client-map-event-rejection";
+        var client = Clients.First();
+        var (playerHeroId, playerPartyId, targetHeroId, targetPartyId) = CreateBarterParties(client);
+        var mapEventId = TestEnvironment.CreateRegisteredObject<MapEvent>();
+        SetMockPlayerEncounter(client, targetPartyId, mapEventId);
+
+        client.Call(() =>
+        {
+            var barter = CreateBarter(client, playerHeroId, playerPartyId, targetHeroId, targetPartyId);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingBarter", barter);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingUiActive", true);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingRequestId", requestId);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingContext", PeaceConversationContext.MapParty);
+            SetStaticField(typeof(PeaceBarterPatch), "pendingContextId", contextId);
+
+            AssertResultClosesUi(
+                () => PeaceBarterPatch.CompleteRequest(
+                    new NetworkPeaceBarterResult(
+                        contextId,
+                        accepted: false,
+                        playerGold: 500,
+                        reason: NetworkPeaceBarterResult.InactiveEncounterReason,
+                        requestId: requestId),
+                    new ThrowingBarterClientPresentation()),
+                expectedAccepted: false,
+                conversationParty: barter.OtherParty.MobileParty,
+                expectLeaveEncounter: false);
         });
     }
 
@@ -66,13 +139,15 @@ public class BarterClientCompletionTests : MapEventTestBase
             SetStaticField(typeof(BanditBarterPatch), "pendingRequestId", requestId);
             SetStaticField(typeof(BanditBarterPatch), "pendingUiActive", true);
 
-            AssertAcceptedResultClosesUi(() => BanditBarterPatch.CompleteRequest(
-                new NetworkBanditBarterResult(
-                    banditPartyId,
-                    accepted: true,
-                    playerGold: 500,
-                    requestId: requestId),
-                new ThrowingBarterClientPresentation()));
+            AssertResultClosesUi(
+                () => BanditBarterPatch.CompleteRequest(
+                    new NetworkBanditBarterResult(
+                        banditPartyId,
+                        accepted: true,
+                        playerGold: 500,
+                        requestId: requestId),
+                    new ThrowingBarterClientPresentation()),
+                expectedAccepted: true);
         });
     }
 
@@ -121,35 +196,66 @@ public class BarterClientCompletionTests : MapEventTestBase
         return new BarterData(playerHero, targetHero, playerParty.Party, targetParty.Party, null);
     }
 
-    private static void AssertAcceptedResultClosesUi(Action completeRequest)
+    private static void AssertResultClosesUi(
+        Action completeRequest,
+        bool expectedAccepted,
+        MobileParty? conversationParty = null,
+        bool expectLeaveEncounter = false)
     {
         var harmony = new Harmony($"e2e.barter-client-completion.{Guid.NewGuid():N}");
         barterCloseObserved = false;
+        barterClosedObserved = false;
+        if (conversationParty != null)
+            PlayerEncounter.LeaveEncounter = false;
         BarterManager.Instance.LastBarterIsAccepted = false;
+        BarterManager.Instance.Closed += CaptureBarterClosed;
+        conversationPartyOverride = conversationParty;
         harmony.Patch(
             AccessTools.Method(typeof(BarterManager), nameof(BarterManager.Close)),
             prefix: new HarmonyMethod(
                 typeof(BarterClientCompletionTests),
                 nameof(CaptureBarterClose)));
+        if (conversationParty != null)
+        {
+            harmony.Patch(
+                AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.ConversationParty)),
+                prefix: new HarmonyMethod(
+                    typeof(BarterClientCompletionTests),
+                    nameof(GetConversationParty)));
+        }
 
         try
         {
             completeRequest();
             Assert.True(barterCloseObserved);
-            Assert.True(BarterManager.Instance.LastBarterIsAccepted);
+            Assert.True(barterClosedObserved);
+            Assert.Equal(expectedAccepted, BarterManager.Instance.LastBarterIsAccepted);
+            if (conversationParty != null)
+                Assert.Equal(expectLeaveEncounter, PlayerEncounter.LeaveEncounter);
         }
         finally
         {
             PeaceBarterPatch.ClearPendingRequest();
             BanditBarterPatch.ClearPendingRequest();
             BarterManager.Instance.LastBarterIsAccepted = false;
+            BarterManager.Instance.Closed -= CaptureBarterClosed;
+            conversationPartyOverride = null;
+            if (conversationParty != null)
+            {
+                PlayerEncounter.LeaveEncounter = false;
+                Campaign.Current.PlayerEncounter = null;
+            }
             harmony.UnpatchAll(harmony.Id);
         }
     }
 
-    private static bool CaptureBarterClose()
+    private static void CaptureBarterClose() => barterCloseObserved = true;
+
+    private static void CaptureBarterClosed() => barterClosedObserved = true;
+
+    private static bool GetConversationParty(ref MobileParty __result)
     {
-        barterCloseObserved = true;
+        __result = conversationPartyOverride!;
         return false;
     }
 

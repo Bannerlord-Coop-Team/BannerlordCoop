@@ -232,7 +232,7 @@ internal sealed class PeaceBarterHandler : IHandler
                 engagement.PartyId != request.ContextId ||
                 engagement.EngagerPartyId != playerPartyId)
             {
-                reason = "The peace encounter is no longer active.";
+                reason = NetworkPeaceBarterResult.InactiveEncounterReason;
                 return false;
             }
 
