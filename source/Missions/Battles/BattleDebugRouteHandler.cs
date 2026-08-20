@@ -126,7 +126,7 @@ internal class BattleDebugRouteHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (disposal.IsCancellationRequested) return;
-            if (TryApplySiegeInteractableFixtureAction(action)) return;
+            if (TryApplySiegeInteractableFixtureAction(action, out string readinessError)) return;
 
             if (DateTime.UtcNow >= deadlineUtc)
             {
@@ -135,7 +135,7 @@ internal class BattleDebugRouteHandler : IHandler
                     machine: null,
                     agent: null,
                     success: false,
-                    error: "siege mission did not become ready for the fixture action");
+                    error: "siege mission did not become ready for the fixture action: " + readinessError);
                 return;
             }
 
@@ -147,12 +147,25 @@ internal class BattleDebugRouteHandler : IHandler
         });
     }
 
-    private bool TryApplySiegeInteractableFixtureAction(NetworkSiegeInteractableFixtureAction action)
+    private bool TryApplySiegeInteractableFixtureAction(
+        NetworkSiegeInteractableFixtureAction action,
+        out string readinessError)
     {
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
-        if (mission == null || !mission.IsSiegeBattle || controller == null)
+        if (mission == null)
         {
+            readinessError = "no current mission";
+            return false;
+        }
+        if (!mission.IsSiegeBattle)
+        {
+            readinessError = "current mission is not marked as a siege battle";
+            return false;
+        }
+        if (controller == null)
+        {
+            readinessError = "siege mission has no co-op battle controller";
             return false;
         }
 
@@ -168,8 +181,10 @@ internal class BattleDebugRouteHandler : IHandler
         var agent = mission.MainAgent;
         if (agent == null || !agent.IsActive())
         {
+            readinessError = "local main agent is unavailable";
             return false;
         }
+        readinessError = string.Empty;
         if (machine == null)
         {
             SendFixtureReport(action, machine, agent, false, "machine or local main agent unavailable");
