@@ -109,13 +109,7 @@ public class ServerBattleCompletionHandler : IHandler
             if (!hostRegistry.TryGet(instanceId, out var assignment))
                 return;
 
-            bool isVictory = result.BattleState == BattleState.AttackerVictory
-                || result.BattleState == BattleState.DefenderVictory;
-            bool isAmbushCompletion = result.BattleState == BattleState.DefenderPullBack
-                && objectManager.TryGetObject<MapEvent>(instanceId, out var resultMapEvent)
-                && resultMapEvent.IsSiegeAmbush
-                && resultMapEvent.BattleState == BattleState.None;
-            if (!isVictory && !isAmbushCompletion)
+            if (!IsSupportedBattleResult(instanceId, result.BattleState))
                 return;
 
             bool canConclude = !HasPendingJoiners(instanceId);
@@ -146,6 +140,17 @@ public class ServerBattleCompletionHandler : IHandler
 
             PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
         }
+    }
+
+    private bool IsSupportedBattleResult(string instanceId, BattleState battleState)
+    {
+        if (battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
+            return true;
+
+        return battleState == BattleState.DefenderPullBack
+            && objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent)
+            && mapEvent.IsSiegeAmbush
+            && mapEvent.BattleState == BattleState.None;
     }
 
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
