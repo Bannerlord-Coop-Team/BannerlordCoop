@@ -591,6 +591,8 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_RegisterBlow(Agent __instance, Blow blow)
     {
         if (!AgentMirror.TryGet(__instance, out var victim)) return true;
+        if (TryActiveMock(out var registrationMock))
+            registrationMock.LastRegisteredBlow = blow;
 
         // Model Mission.OnAgentHit's missile lookup: for a missile blow it indexes Mission._missilesDictionary
         // by blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex and throws KeyNotFound when that projectile is

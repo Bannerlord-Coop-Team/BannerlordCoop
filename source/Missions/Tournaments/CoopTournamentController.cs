@@ -93,9 +93,6 @@ public class CoopTournamentController : CoopMissionController
         public AttackCollisionData CollisionData { get; }
         public long ReadyEpoch { get; }
         public long GuardCandidateId { get; }
-        public WeaponComponentData AttackerWeapon { get; private set; }
-        public float ShotDifficulty { get; private set; }
-        public bool HasHitProgression { get; private set; }
 
         public PendingLocalTournamentDamage(
             string matchId,
@@ -117,15 +114,6 @@ public class CoopTournamentController : CoopMissionController
             CollisionData = collisionData;
             ReadyEpoch = readyEpoch;
             GuardCandidateId = guardCandidateId;
-        }
-
-        public void RecordHitProgression(
-            WeaponComponentData attackerWeapon,
-            float shotDifficulty)
-        {
-            AttackerWeapon = attackerWeapon;
-            ShotDifficulty = shotDifficulty;
-            HasHitProgression = true;
         }
     }
 
@@ -516,7 +504,7 @@ public class CoopTournamentController : CoopMissionController
         else
             blow.OwnerId = -1;
 
-        if (blow.IsMissile)
+        if (blow.IsMissile && message.OriginControllerId != session.OwnControllerId)
         {
             blow.WeaponRecord._isMissile = false;
             blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = -1;
@@ -553,17 +541,7 @@ public class CoopTournamentController : CoopMissionController
         if (!CanCaptureHitProgression(affectedAgent, affectorAgent)) return;
 
         NetworkApplyTournamentDamage damage = activeDamageMessage;
-        if (damage == null)
-        {
-            RecordPendingHitProgression(
-                affectedAgent,
-                affectorAgent,
-                attackerWeapon,
-                shotDifficulty);
-            return;
-        }
-
-        if (damage.OriginControllerId == session.OwnControllerId)
+        if (damage == null || damage.OriginControllerId != session.OwnControllerId)
             return;
 
         SubmitHitProgression(
@@ -579,23 +557,9 @@ public class CoopTournamentController : CoopMissionController
     }
 
     private bool CanCaptureHitProgression(Agent affectedAgent, Agent affectorAgent)
-        => session.IsLocalHost &&
-           snapshot?.Phase == TournamentSessionPhase.LiveMatch &&
+        => snapshot?.Phase == TournamentSessionPhase.LiveMatch &&
            affectedAgent != null &&
            affectorAgent != null;
-
-    private void RecordPendingHitProgression(
-        Agent affectedAgent,
-        Agent affectorAgent,
-        WeaponComponentData attackerWeapon,
-        float shotDifficulty)
-    {
-        PendingLocalTournamentDamage pending = pendingLocalDamage.FirstOrDefault(candidate =>
-            !candidate.HasHitProgression &&
-            ReferenceEquals(candidate.Victim, affectedAgent) &&
-            ReferenceEquals(candidate.Attacker, affectorAgent));
-        pending?.RecordHitProgression(attackerWeapon, shotDifficulty);
-    }
 
     private void SubmitHitProgression(
         Agent affectedAgent,
@@ -1175,21 +1139,7 @@ public class CoopTournamentController : CoopMissionController
                 in blow,
                 in collisionData);
             network.SendAll(message);
-            bool fatal = pending.Blow.InflictedDamage >= pending.Victim.Health;
             ApplyTournamentDamage(message);
-            if (session.IsLocalHost && pending.HasHitProgression)
-            {
-                SubmitHitProgression(
-                    pending.Victim,
-                    pending.Attacker,
-                    pending.AttackerWeapon,
-                    in blow,
-                    in collisionData,
-                    pending.ShotDifficulty,
-                    message.OriginControllerId,
-                    message.Sequence,
-                    fatal);
-            }
         }
     }
 

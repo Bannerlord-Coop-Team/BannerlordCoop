@@ -27,7 +27,7 @@ internal sealed partial class TournamentSessionHandler
             if (!IsValidProgressionData(data) ||
                 !sessionRegistry.TryGet(data.SessionId, out snapshot) ||
                 snapshot.Phase != TournamentSessionPhase.LiveMatch ||
-                snapshot.HostControllerId != player.ControllerId ||
+                data.DamageOriginControllerId != player.ControllerId ||
                 snapshot.CurrentMatchId != data.MatchId ||
                 snapshot.Revision != data.Revision ||
                 snapshot.BracketRevision != data.BracketRevision ||
@@ -47,6 +47,7 @@ internal sealed partial class TournamentSessionHandler
                 !contestant.IsHuman ||
                 contestant.IsReplaced ||
                 contestant.ControllerId != data.AttackerControllerId ||
+                contestant.ControllerId != player.ControllerId ||
                 !TryResolveWeapon(data, out var weapon))
             {
                 SendCanonical(peer, snapshot);
@@ -118,7 +119,7 @@ internal sealed partial class TournamentSessionHandler
         return weapon != null;
     }
 
-    private static bool IsValidProgressionData(TournamentHitProgressionData data)
+    internal static bool IsValidProgressionData(TournamentHitProgressionData data)
     {
         return data != null &&
             !string.IsNullOrEmpty(data.SessionId) && data.SessionId.Length <= 256 &&
@@ -131,7 +132,7 @@ internal sealed partial class TournamentSessionHandler
             (data.WeaponItemId?.Length ?? 0) <= 256 &&
             data.AttackType >= 0 && data.AttackType <= 16 &&
             IsFinite(data.MovementSpeedModifier) &&
-            IsFinite(data.ShotDifficulty) && data.ShotDifficulty >= 0f &&
+            IsFinite(data.ShotDifficulty) && data.ShotDifficulty >= -1f &&
             IsFinite(data.HitpointRatio) && data.HitpointRatio >= 0f && data.HitpointRatio <= 1f &&
             IsFinite(data.DamageAmount) && data.DamageAmount >= 0f;
     }

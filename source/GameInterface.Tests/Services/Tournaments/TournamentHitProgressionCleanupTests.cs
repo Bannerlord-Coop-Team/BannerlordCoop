@@ -12,6 +12,22 @@ namespace GameInterface.Tests.Services.Tournaments;
 
 public class TournamentHitProgressionCleanupTests
 {
+    [Theory]
+    [InlineData(-1f, true)]
+    [InlineData(-1.01f, false)]
+    public void ProgressionValidation_AcceptsOnlyVanillaMeleeSentinelBelowZero(
+        float shotDifficulty,
+        bool expected)
+    {
+        TournamentHitProgressionData progression = CreateProgression(
+            "player",
+            "player",
+            1,
+            shotDifficulty);
+
+        Assert.Equal(expected, TournamentSessionHandler.IsValidProgressionData(progression));
+    }
+
     [Fact]
     public void HitProgressionDedupeKey_UsesDamageOriginAcrossHostMigration()
     {
@@ -76,7 +92,8 @@ public class TournamentHitProgressionCleanupTests
     private static TournamentHitProgressionData CreateProgression(
         string attackerControllerId,
         string damageOriginControllerId,
-        long damageSequence) =>
+        long damageSequence,
+        float shotDifficulty = 0f) =>
         new(
             "session",
             "match",
@@ -90,7 +107,7 @@ public class TournamentHitProgressionCleanupTests
             null,
             -1,
             1f,
-            0f,
+            shotDifficulty,
             0.5f,
             10f,
             0,

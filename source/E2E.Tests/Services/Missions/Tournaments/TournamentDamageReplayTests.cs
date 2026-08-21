@@ -294,14 +294,8 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                 blocked,
                 in blow,
                 in collisionData);
-            InvokeCaptureHitProgression(
-                controller,
-                victim,
-                attacker,
-                blow,
-                collisionData);
-
             var network = Assert.IsType<MockClient>(host.Resolve<INetwork>());
+            var battleNetwork = Assert.IsType<MockBattleNetwork>(host.Resolve<IBattleNetwork>());
             Assert.Empty(
                 network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
 
@@ -314,6 +308,19 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                 return;
             }
 
+            NetworkApplyTournamentDamage acceptedDamage = Assert.Single(
+                battleNetwork.NetworkSentMessages.GetMessages<NetworkApplyTournamentDamage>());
+            SetField(controller, "activeDamageMessage", acceptedDamage);
+            SetField(controller, "activeDamageFatal", true);
+            InvokeCaptureHitProgression(
+                controller,
+                victim,
+                attacker,
+                blow,
+                collisionData,
+                shotDifficulty: -1f);
+            SetField(controller, "activeDamageMessage", null);
+
             NetworkSubmitTournamentHitProgression request = Assert.Single(
                 network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
             Assert.Equal("host", request.Data.AttackerControllerId);
@@ -321,7 +328,60 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             Assert.Equal(attackerId, request.Data.AttackerAgentId);
             Assert.Equal(victimId, request.Data.VictimAgentId);
             Assert.Equal(1, request.Data.DamageSequence);
+            Assert.Equal(-1f, request.Data.ShotDifficulty);
             Assert.True(request.Data.Fatal);
+        });
+    }
+
+    [Theory]
+    [InlineData("origin", true)]
+    [InlineData("observer", false)]
+    public void MissileReplay_PreservesMetadataOnlyOnDamageOrigin(
+        string localControllerId,
+        bool expectedMissile)
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, localControllerId);
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            var controller = client.Resolve<CoopTournamentController>();
+            var registry = client.Resolve<INetworkAgentRegistry>();
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            Guid victimId = Guid.NewGuid();
+            Guid attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("victim-owner", victimId, victim));
+            Assert.True(registry.TryRegisterAgent("origin", attackerId, attacker));
+            SetField(controller, "snapshot", CreateLiveSnapshot());
+
+            const int missileIndex = 99;
+            if (expectedMissile)
+                mock.RegisterMissile(missileIndex);
+            var blow = new Blow(attacker.Index) { InflictedDamage = 10 };
+            blow.WeaponRecord._isMissile = true;
+            blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = missileIndex;
+            var message = new NetworkApplyTournamentDamage(
+                "session",
+                "match",
+                1,
+                "origin",
+                1,
+                victimId,
+                attackerId,
+                blow,
+                default);
+
+            InvokeApplyTournamentDamage(controller, message);
+
+            Assert.Equal(expectedMissile, mock.LastRegisteredBlow.IsMissile);
+            Assert.Equal(
+                expectedMissile ? missileIndex : -1,
+                mock.LastRegisteredBlow.WeaponRecord.AffectorWeaponSlotOrMissileIndex);
         });
     }
 
@@ -583,7 +643,9 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         Agent victim,
         Agent attacker,
         Blow blow,
-        AttackCollisionData collisionData)
+        AttackCollisionData collisionData,
+        WeaponComponentData attackerWeapon = null,
+        float shotDifficulty = -1f)
     {
         MethodInfo capture = typeof(CoopTournamentController).GetMethod(
             "CaptureHitProgression",
@@ -591,7 +653,7 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         Assert.NotNull(capture);
         capture.Invoke(
             controller,
-            new object[] { victim, attacker, null, blow, collisionData, 0f });
+            new object[] { victim, attacker, attackerWeapon, blow, collisionData, shotDifficulty });
     }
 
     private static TournamentAgentSpawnData CreateSpawnData(
