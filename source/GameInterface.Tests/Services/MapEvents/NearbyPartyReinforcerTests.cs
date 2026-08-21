@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.Players;
@@ -40,6 +41,8 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         typeof(MapEvent).GetField("_sides", BindingFlags.NonPublic | BindingFlags.Instance)!;
     private static readonly FieldInfo BattlePartiesField =
         typeof(MapEventSide).GetField("_battleParties", BindingFlags.NonPublic | BindingFlags.Instance)!;
+    private static readonly FieldInfo NearbyPartiesField =
+        typeof(MapEventSide).GetField("_nearbyPartiesAddedToPlayerMapEvent", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
     private readonly ConditionalWeakTable<object, ControlledObjectInfo> playerObjects =
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
@@ -238,20 +241,25 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     }
 
     [Fact]
-    public void LastPlayerLeaves_RemovesTrackedNearbyPartiesFromBothSides()
+    public void PlayersLeaveInOrder_RemovesReinforcementsOnlyAfterLastPlayer()
     {
-        var removedPlayer = CreateMobileParty();
-        var nearbyAlly = CreateMobileParty();
+        var firstPlayer = CreateMobileParty();
+        var lastPlayer = CreateMobileParty();
         var enemyParty = CreateMobileParty();
-        var mapEvent = CreatePlayerBattle(nearbyAlly, enemyParty);
-        MarkAsPlayerParty(removedPlayer);
+        var mapEvent = CreatePlayerBattle(firstPlayer, enemyParty);
+        AddMapEventParty(mapEvent.AttackerSide, lastPlayer);
+        MarkAsPlayerParty(firstPlayer);
+        MarkAsPlayerParty(lastPlayer);
         var cleanedSides = new List<MapEventSide>();
         var reinforcer = CreateReinforcer();
 
-        reinforcer.RemoveReinforcementsIfNoPlayers(
-            mapEvent,
-            removedPlayer,
-            cleanedSides.Add);
+        RemoveMapEventParty(mapEvent.AttackerSide, firstPlayer);
+        reinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, firstPlayer, cleanedSides.Add);
+
+        Assert.Empty(cleanedSides);
+
+        RemoveMapEventParty(mapEvent.AttackerSide, lastPlayer);
+        reinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, lastPlayer, cleanedSides.Add);
 
         Assert.Collection(
             cleanedSides,
@@ -260,23 +268,73 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     }
 
     [Fact]
-    public void AnotherPlayerRemains_DoesNotRemoveTrackedNearbyParties()
+    public void TrackedReinforcementLeavesBeforePlayers_RemovesStaleTracking()
     {
-        var removedPlayer = CreateMobileParty();
-        var remainingPlayer = CreateMobileParty();
+        var playerParty = CreateMobileParty();
         var enemyParty = CreateMobileParty();
-        var mapEvent = CreatePlayerBattle(remainingPlayer, enemyParty);
-        MarkAsPlayerParty(removedPlayer);
-        MarkAsPlayerParty(remainingPlayer);
+        var removedReinforcement = CreateMobileParty();
+        var mapEvent = CreatePlayerBattle(playerParty, enemyParty);
+        MarkAsPlayerParty(playerParty);
+        mapEvent.AttackerSide._nearbyPartiesAddedToPlayerMapEvent.Add(removedReinforcement);
         var cleanedSides = new List<MapEventSide>();
         var reinforcer = CreateReinforcer();
 
         reinforcer.RemoveReinforcementsIfNoPlayers(
             mapEvent,
-            removedPlayer,
+            removedReinforcement,
             cleanedSides.Add);
 
+        Assert.Empty(mapEvent.AttackerSide._nearbyPartiesAddedToPlayerMapEvent);
         Assert.Empty(cleanedSides);
+    }
+
+    [Fact]
+    public void PlayerRejoinsAfterCleanup_LastPlayerCleanupRunsAgain()
+    {
+        var firstPlayer = CreateMobileParty();
+        var rejoiningPlayer = CreateMobileParty();
+        var enemyParty = CreateMobileParty();
+        var mapEvent = CreatePlayerBattle(firstPlayer, enemyParty);
+        MarkAsPlayerParty(firstPlayer);
+        MarkAsPlayerParty(rejoiningPlayer);
+        var cleanedSides = new List<MapEventSide>();
+        var reinforcer = CreateReinforcer();
+
+        RemoveMapEventParty(mapEvent.AttackerSide, firstPlayer);
+        reinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, firstPlayer, cleanedSides.Add);
+        AddMapEventParty(mapEvent.AttackerSide, rejoiningPlayer);
+        RemoveMapEventParty(mapEvent.AttackerSide, rejoiningPlayer);
+        reinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, rejoiningPlayer, cleanedSides.Add);
+
+        Assert.Equal(4, cleanedSides.Count);
+    }
+
+    [Fact]
+    public void PartyRemovalAnnouncement_UsesHandlerOwnedReinforcerWithPatchesLive()
+    {
+        var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
+        var removedParty = CreateMobileParty();
+        using var reinforcer = new RecordingReinforcer(mapEvent, removedParty);
+        using var messageBroker = new MessageBroker();
+        using var handler = new NearbyPartyReinforcementHandler(messageBroker, reinforcer);
+
+        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
+        if (ownsGameThreadMark)
+            GameThread.Instance.MarkGameThread();
+
+        try
+        {
+            using (new AllowedThread())
+                messageBroker.Publish(mapEvent, new PartyRemovedFromMapEvent(removedParty));
+        }
+        finally
+        {
+            if (ownsGameThreadMark)
+                GameThread.Instance.RestoreGameThread(0);
+        }
+
+        Assert.True(reinforcer.WaitForCleanup());
+        Assert.Equal(1, reinforcer.CleanupCount);
     }
 
     [Fact]
@@ -327,7 +385,22 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     {
         var side = (MapEventSide)FormatterServices.GetUninitializedObject(typeof(MapEventSide));
         BattlePartiesField.SetValue(side, new MBList<MapEventParty>(parties));
+        NearbyPartiesField.SetValue(side, new MBList<MobileParty>());
         return side;
+    }
+
+    private static void AddMapEventParty(MapEventSide side, MobileParty mobileParty)
+    {
+        side._battleParties.Add(CreateMapEventParty(mobileParty));
+    }
+
+    private static void RemoveMapEventParty(MapEventSide side, MobileParty mobileParty)
+    {
+        for (int i = side._battleParties.Count - 1; i >= 0; i--)
+        {
+            if (side._battleParties[i].Party == mobileParty.Party)
+                side._battleParties.RemoveAt(i);
+        }
     }
 
     private static MapEventParty CreateMapEventParty(MobileParty mobileParty)
@@ -357,14 +430,18 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     private sealed class RecordingReinforcer : INearbyPartyReinforcer, IDisposable
     {
         private readonly MapEvent expectedMapEvent;
+        private readonly MobileParty? expectedRemovedParty;
         private readonly ManualResetEventSlim immediateScanCompleted = new(false);
+        private readonly ManualResetEventSlim cleanupCompleted = new(false);
 
-        public RecordingReinforcer(MapEvent expectedMapEvent)
+        public RecordingReinforcer(MapEvent expectedMapEvent, MobileParty? expectedRemovedParty = null)
         {
             this.expectedMapEvent = expectedMapEvent;
+            this.expectedRemovedParty = expectedRemovedParty;
         }
 
         public int ImmediateScanCount { get; private set; }
+        public int CleanupCount { get; private set; }
 
         public void Reinforce(MapEvent mapEvent)
         {
@@ -382,13 +459,21 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
 
         public void RemoveReinforcementsIfNoPlayers(MapEvent mapEvent, MobileParty removedParty)
         {
+            Assert.Same(expectedMapEvent, mapEvent);
+            Assert.Same(expectedRemovedParty, removedParty);
+            Assert.True(GameThread.Instance.IsGameThread);
+            Assert.False(AllowedThread.IsThisThreadAllowed());
+            CleanupCount++;
+            cleanupCompleted.Set();
         }
 
         public bool WaitForImmediateScan() => immediateScanCompleted.Wait(TimeSpan.FromSeconds(5));
+        public bool WaitForCleanup() => cleanupCompleted.Wait(TimeSpan.FromSeconds(5));
 
         public void Dispose()
         {
             immediateScanCompleted.Dispose();
+            cleanupCompleted.Dispose();
         }
     }
 }

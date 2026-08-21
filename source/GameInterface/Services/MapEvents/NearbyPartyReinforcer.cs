@@ -119,41 +119,65 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
         MobileParty removedParty,
         Action<MapEventSide> removeReinforcements)
     {
-        if (mapEvent == null
-            || mapEvent.State != MapEventState.Wait
-            || removedParty?.IsPlayerParty() != true
+        if (mapEvent == null || removedParty == null)
+            return;
+
+        RemoveTrackedParty(mapEvent.AttackerSide, removedParty);
+        RemoveTrackedParty(mapEvent.DefenderSide, removedParty);
+
+        if (mapEvent.State != MapEventState.Wait
+            || !removedParty.IsPlayerParty()
             || mapEvent.ContainsPlayerParty())
         {
             return;
         }
 
         followUpScans.Remove(mapEvent);
+        RecalculateNextFollowUpScan();
         removeReinforcements(mapEvent.AttackerSide);
         removeReinforcements(mapEvent.DefenderSide);
     }
 
     private void RemoveReinforcements(MapEventSide side)
     {
-        if (side == null) return;
+        if (side == null || side._nearbyPartiesAddedToPlayerMapEvent.Count == 0)
+            return;
 
-        var removedParties = new List<MapEventParty>();
-        foreach (var nearbyParty in side._nearbyPartiesAddedToPlayerMapEvent)
+        var nearbyParties = new List<MobileParty>(side._nearbyPartiesAddedToPlayerMapEvent);
+
+        // Clear first because each authoritative removal re-enters the removal patch.
+        side._nearbyPartiesAddedToPlayerMapEvent.Clear();
+        foreach (var nearbyParty in nearbyParties)
         {
+            if (nearbyParty?.MapEventSide != side)
+                continue;
+
+            MapEventParty removedParty = null;
             foreach (var mapEventParty in side.Parties)
             {
                 if (mapEventParty.Party == nearbyParty.Party)
                 {
-                    removedParties.Add(mapEventParty);
+                    removedParty = mapEventParty;
                     break;
                 }
             }
-        }
 
-        side.RemoveNearbyPartiesFromPlayerMapEvent();
-        foreach (var mapEventParty in removedParties)
-        {
-            messageBroker.Publish(side, new MapEventPartyRemoved(side, mapEventParty));
+            nearbyParty.MapEventSide = null;
+            if (removedParty != null)
+                messageBroker.Publish(side, new MapEventPartyRemoved(side, removedParty));
         }
+    }
+
+    private static void RemoveTrackedParty(MapEventSide side, MobileParty removedParty)
+    {
+        side?._nearbyPartiesAddedToPlayerMapEvent.Remove(removedParty);
+    }
+
+    private void RecalculateNextFollowUpScan()
+    {
+        nextFollowUpScanAtTicks = long.MaxValue;
+        foreach (var state in followUpScans.Values)
+            nextFollowUpScanAtTicks = Math.Min(nextFollowUpScanAtTicks, state.NextScanAtTicks);
     }
 
     internal void Reinforce(

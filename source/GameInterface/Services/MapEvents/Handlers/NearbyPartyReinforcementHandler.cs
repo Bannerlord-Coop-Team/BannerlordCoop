@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -21,12 +22,14 @@ internal sealed class NearbyPartyReinforcementHandler : IHandler
         this.nearbyPartyReinforcer = nearbyPartyReinforcer;
 
         messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
+        messageBroker.Subscribe<PartyRemovedFromMapEvent>(Handle_PartyRemovedFromMapEvent);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
+        messageBroker.Unsubscribe<PartyRemovedFromMapEvent>(Handle_PartyRemovedFromMapEvent);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -42,6 +45,21 @@ internal sealed class NearbyPartyReinforcementHandler : IHandler
 
             using (AllowedThread.Suspend())
                 nearbyPartyReinforcer.Reinforce(mapEvent);
+        });
+    }
+
+    private void Handle_PartyRemovedFromMapEvent(MessagePayload<PartyRemovedFromMapEvent> payload)
+    {
+        if (!ModInformation.IsServer)
+            return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (payload.Who is not MapEvent mapEvent)
+                return;
+
+            using (AllowedThread.Suspend())
+                nearbyPartyReinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, payload.What.RemovedParty);
         });
     }
 

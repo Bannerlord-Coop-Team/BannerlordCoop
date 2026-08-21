@@ -92,13 +92,12 @@ internal class MapEventPatches
     private static void Postfix_RemoveInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
         if (ModInformation.IsClient
-            || mapEventParty?.Party?.MobileParty is not MobileParty removedParty
-            || !ContainerProvider.TryResolve<INearbyPartyReinforcer>(out var reinforcer))
+            || mapEventParty?.Party?.MobileParty is not MobileParty removedParty)
         {
             return;
         }
 
-        reinforcer.RemoveReinforcementsIfNoPlayers(__instance, removedParty);
+        MessageBroker.Instance.Publish(__instance, new PartyRemovedFromMapEvent(removedParty));
     }
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
