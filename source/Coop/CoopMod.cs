@@ -122,14 +122,15 @@ namespace Coop
             }
             ManagedServerConfig.Password = serverPassword;
             ManagedServerConfig.Visibility = serverVisibility;
+            
+            informationalVersion = typeof(ModInformation).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? "unknown";
 
             SetupLogging();
             InitializeCrashReporting();
             
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
-            informationalVersion = typeof(ModInformation).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion ?? "unknown";
             CoopLogHeader(moduleInfoProvider);
             Logger.Verbose("Coop Mod Module Started");
             
