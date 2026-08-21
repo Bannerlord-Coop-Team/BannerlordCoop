@@ -131,23 +131,35 @@ internal class BattleDebugRouteHandler : IHandler
             if (DateTime.UtcNow >= deadlineUtc)
             {
 #if DEBUG
+                var mission = Mission.Current;
+                var agent = mission?.MainAgent;
+                var stagedMachine = siegeFixture == null || mission == null
+                    ? null
+                    : mission.MissionObjects
+                        .OfType<UsableMachine>()
+                        .FirstOrDefault(candidate => candidate.Id.Id == siegeFixture.MachineId);
                 if (action.Action == SiegeInteractableFixtureAction.Capture
                     && readinessError == "no locally eligible siege machine is registered")
                 {
-                    var mission = Mission.Current;
-                    var agent = mission?.MainAgent;
                     if (mission != null && agent != null && agent.IsActive())
                     {
                         readinessError += "; " + DescribeDebugCaptureEligibility(mission, action.MachineType, agent);
                     }
                 }
-#endif
+                SendFixtureReport(
+                    action,
+                    stagedMachine,
+                    agent,
+                    success: false,
+                    error: "siege mission did not become ready for the fixture action: " + readinessError);
+#else
                 SendFixtureReport(
                     action,
                     machine: null,
                     agent: null,
                     success: false,
                     error: "siege mission did not become ready for the fixture action: " + readinessError);
+#endif
                 return;
             }
 
@@ -187,16 +199,37 @@ internal class BattleDebugRouteHandler : IHandler
             readinessError = "local main agent is unavailable";
             return false;
         }
-        var machine = action.Action == SiegeInteractableFixtureAction.Capture
-            ? mission.MissionObjects
+        UsableMachine machine;
+        if (action.Action == SiegeInteractableFixtureAction.Capture)
+        {
+            var candidates = mission.MissionObjects
                 .OfType<UsableMachine>()
                 .Where(candidate => candidate.GetType().Name.Equals(action.MachineType, StringComparison.Ordinal))
-                .Where(candidate => candidate.StandingPoints.Any(agent.CanUseObject))
                 .OrderBy(candidate => candidate.Id.Id)
-                .FirstOrDefault()
-            : mission.MissionObjects
+                .ToArray();
+#if DEBUG
+            machine = action.MachineId > 0
+                ? candidates.FirstOrDefault(candidate => candidate.Id.Id == action.MachineId)
+                : siegeFixture == null
+                    ? candidates.FirstOrDefault(candidate => CanStageDebugCapture(candidate, agent))
+                    : candidates.FirstOrDefault(candidate => candidate.Id.Id == siegeFixture.MachineId);
+#else
+            machine = candidates.FirstOrDefault(candidate => candidate.StandingPoints.Any(agent.CanUseObject));
+#endif
+        }
+        else
+        {
+#if DEBUG
+            int machineId = action.Action == SiegeInteractableFixtureAction.Restore && action.MachineId <= 0
+                ? siegeFixture?.MachineId ?? -1
+                : action.MachineId;
+#else
+            int machineId = action.MachineId;
+#endif
+            machine = mission.MissionObjects
                 .OfType<UsableMachine>()
-                .FirstOrDefault(candidate => candidate.Id.Id == action.MachineId);
+                .FirstOrDefault(candidate => candidate.Id.Id == machineId);
+        }
         if (machine == null)
         {
             readinessError = action.Action == SiegeInteractableFixtureAction.Capture
@@ -212,11 +245,15 @@ internal class BattleDebugRouteHandler : IHandler
             switch (action.Action)
             {
                 case SiegeInteractableFixtureAction.Capture:
+#if DEBUG
+                    if (!TryStageDebugCapture(machine, agent, out readinessError)) return false;
+#else
                     siegeFixture = new SiegeInteractableFixtureState(
                         machine.Id.Id,
                         agent.Position,
                         agent.LookDirection,
                         machine is CastleGate captureGate ? (int)captureGate.State : -1);
+#endif
                     break;
                 case SiegeInteractableFixtureAction.Prepare:
                     PrepareLocalInteraction(machine, agent);
@@ -231,7 +268,7 @@ internal class BattleDebugRouteHandler : IHandler
                     }
                     break;
                 case SiegeInteractableFixtureAction.Restore:
-                    RestoreLocalFixture(machine, agent);
+                    if (!TryRestoreLocalFixture(machine, agent, out readinessError)) return false;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(action.Action));
@@ -259,12 +296,23 @@ internal class BattleDebugRouteHandler : IHandler
             agent.StopUsingGameObject(isSuccessful: true);
         }
 
+#if DEBUG
+        var standingPoint = siegeFixture.StandingPoint;
+        if (standingPoint == null || standingPoint.HasUser || !agent.CanUseObject(standingPoint))
+#else
         var standingPoint = machine.StandingPoints.FirstOrDefault(agent.CanUseObject);
         if (standingPoint == null)
+#endif
         {
             throw new InvalidOperationException("no locally eligible standing point was found");
         }
 
+        PositionAgentAtStandingPoint(agent, standingPoint);
+        siegeFixture.StandingPoint = standingPoint;
+    }
+
+    private static void PositionAgentAtStandingPoint(Agent agent, StandingPoint standingPoint)
+    {
         var frame = standingPoint.GetUserFrameForAgent(agent);
         var direction = frame.Rotation.f.AsVec2.Normalized();
         var offset = new Vec3(direction.x, direction.y, 0f) * 1.25f;
@@ -272,10 +320,65 @@ internal class BattleDebugRouteHandler : IHandler
         agent.LookDirection = new Vec3(direction.x, direction.y, 0f);
         agent.SetMovementDirection(in direction);
         agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
-        siegeFixture.StandingPoint = standingPoint;
     }
 
 #if DEBUG
+    private static bool CanStageDebugCapture(UsableMachine machine, Agent agent)
+    {
+        return agent.IsAbleToUseMachine()
+            && machine.StandingPoints.Any(standingPoint =>
+                !standingPoint.HasUser
+                && standingPoint.IsUsableByAgent(agent));
+    }
+
+    private static StandingPoint FindDebugStagedStandingPoint(UsableMachine machine, Agent agent)
+    {
+        return machine.StandingPoints.FirstOrDefault(standingPoint =>
+            !standingPoint.HasUser
+            && agent.CanUseObject(standingPoint));
+    }
+
+    private static bool TryStageDebugCapture(
+        UsableMachine machine,
+        Agent agent,
+        out string readinessError)
+    {
+        if (siegeFixture == null || siegeFixture.MachineId != machine.Id.Id)
+        {
+            siegeFixture = new SiegeInteractableFixtureState(
+                machine.Id.Id,
+                agent.Position,
+                agent.LookDirection,
+                machine is CastleGate captureGate ? (int)captureGate.State : -1);
+            siegeFixture.CaptureDebugStagingState(machine, agent);
+        }
+
+        machine.Activate();
+        foreach (var candidateStandingPoint in machine.StandingPoints)
+        {
+            candidateStandingPoint.SetIsDisabledForPlayersSynched(false);
+        }
+
+        if (agent.MountAgent != null)
+        {
+            agent.Mount(agent.MountAgent);
+            readinessError = "waiting for the local main agent to dismount for fixture staging";
+            return false;
+        }
+
+        var standingPoint = FindDebugStagedStandingPoint(machine, agent);
+        if (standingPoint == null)
+        {
+            readinessError = "requested shared machine has no locally eligible standing point after fixture staging";
+            return false;
+        }
+
+        PositionAgentAtStandingPoint(agent, standingPoint);
+        siegeFixture.StandingPoint = standingPoint;
+        readinessError = string.Empty;
+        return true;
+    }
+
     private static string DescribeDebugCaptureEligibility(
         Mission mission,
         string machineType,
@@ -327,8 +430,12 @@ internal class BattleDebugRouteHandler : IHandler
         }
     }
 
-    private void RestoreLocalFixture(UsableMachine machine, Agent agent)
+    private bool TryRestoreLocalFixture(
+        UsableMachine machine,
+        Agent agent,
+        out string readinessError)
     {
+        readinessError = string.Empty;
         if (agent.CurrentlyUsedGameObject != null)
         {
             agent.StopUsingGameObject(isSuccessful: true);
@@ -342,8 +449,16 @@ internal class BattleDebugRouteHandler : IHandler
             agent.SetMovementDirection(in movementDirection);
         }
 
+#if DEBUG
+        if (siegeFixture != null && siegeFixture.MachineId == machine.Id.Id
+            && !siegeFixture.TryRestoreDebugStaging(machine, agent, out readinessError))
+        {
+            return false;
+        }
+#endif
         RestoreGate(machine, siegeFixture?.OriginalGateState ?? -1);
         siegeFixture = null;
+        return true;
     }
 
     internal static void RestoreGate(UsableMachine machine, int originalGateState)
@@ -470,6 +585,15 @@ internal class BattleDebugRouteHandler : IHandler
         public int OriginalGateState { get; }
         public StandingPoint StandingPoint { get; set; }
 
+#if DEBUG
+        private Agent OriginalMount { get; set; }
+        private Vec3 OriginalMountPosition { get; set; }
+        private Vec3 OriginalMountLookDirection { get; set; }
+        private bool OriginalMachineDeactivated { get; set; }
+        private bool[] OriginalStandingPointDeactivation { get; set; }
+        private bool[] OriginalStandingPointPlayerDisablement { get; set; }
+#endif
+
         public SiegeInteractableFixtureState(
             int machineId,
             Vec3 originalPosition,
@@ -481,5 +605,95 @@ internal class BattleDebugRouteHandler : IHandler
             OriginalLookDirection = originalLookDirection;
             OriginalGateState = originalGateState;
         }
+
+#if DEBUG
+        public void CaptureDebugStagingState(UsableMachine machine, Agent agent)
+        {
+            OriginalMount = agent.MountAgent;
+            if (OriginalMount != null)
+            {
+                OriginalMountPosition = OriginalMount.Position;
+                OriginalMountLookDirection = OriginalMount.LookDirection;
+            }
+            OriginalMachineDeactivated = machine.IsDeactivated;
+            OriginalStandingPointDeactivation = machine.StandingPoints
+                .Select(standingPoint => standingPoint.IsDeactivated)
+                .ToArray();
+            OriginalStandingPointPlayerDisablement = machine.StandingPoints
+                .Select(standingPoint => standingPoint.IsDisabledForPlayers)
+                .ToArray();
+        }
+
+        public bool TryRestoreDebugStaging(
+            UsableMachine machine,
+            Agent agent,
+            out string readinessError)
+        {
+            if (OriginalMachineDeactivated)
+            {
+                machine.Deactivate();
+            }
+            else
+            {
+                machine.Activate();
+            }
+
+            int pointCount = Math.Min(
+                machine.StandingPoints.Count,
+                Math.Min(
+                    OriginalStandingPointDeactivation.Length,
+                    OriginalStandingPointPlayerDisablement.Length));
+            for (int index = 0; index < pointCount; index++)
+            {
+                var standingPoint = machine.StandingPoints[index];
+                standingPoint.SetIsDeactivatedSynched(OriginalStandingPointDeactivation[index]);
+                standingPoint.SetIsDisabledForPlayersSynched(OriginalStandingPointPlayerDisablement[index]);
+            }
+
+            if (OriginalMount == null)
+            {
+                if (agent.MountAgent == null)
+                {
+                    readinessError = string.Empty;
+                    return true;
+                }
+
+                agent.Mount(agent.MountAgent);
+                readinessError = "waiting for the local main agent to dismount during fixture restore";
+                return false;
+            }
+
+            if (!OriginalMount.IsActive())
+            {
+                readinessError = "the original local mount is unavailable during fixture restore";
+                return false;
+            }
+
+            OriginalMount.TeleportToPosition(OriginalMountPosition);
+            OriginalMount.LookDirection = OriginalMountLookDirection;
+            if (agent.MountAgent == OriginalMount)
+            {
+                readinessError = string.Empty;
+                return true;
+            }
+
+            if (agent.MountAgent != null)
+            {
+                agent.Mount(agent.MountAgent);
+                readinessError = "waiting for the local main agent to leave an unexpected mount during fixture restore";
+                return false;
+            }
+
+            if (OriginalMount.RiderAgent != null && OriginalMount.RiderAgent != agent)
+            {
+                readinessError = "the original local mount has a different rider during fixture restore";
+                return false;
+            }
+
+            agent.Mount(OriginalMount);
+            readinessError = "waiting for the local main agent to remount during fixture restore";
+            return false;
+        }
+#endif
     }
 }

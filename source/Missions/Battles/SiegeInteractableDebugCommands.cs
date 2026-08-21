@@ -285,6 +285,9 @@ internal static class SiegeInteractableDebugCommands
             args[0],
             new[] { args[1], args[2] });
 
+#if DEBUG
+        return CaptureDebugFixture(routeHandler, network, playerManager);
+#else
         foreach (string controllerId in fixture.ControllerIds)
         {
             if (!SendFixtureAction(
@@ -345,6 +348,7 @@ internal static class SiegeInteractableDebugCommands
             controllers = fixture.ControllerIds,
             captures,
         });
+#endif
     }
 
     [CommandLineArgumentFunction("siege_interactable_action", "coop.debug.battle")]
@@ -500,6 +504,12 @@ internal static class SiegeInteractableDebugCommands
             action,
             fixture.OriginalGateState,
             fixture.MachineType));
+#if DEBUG
+        if (action == SiegeInteractableFixtureAction.Capture)
+        {
+            fixture.CaptureRequestControllerIds.Add(controllerId);
+        }
+#endif
         return true;
     }
 
@@ -536,6 +546,143 @@ internal static class SiegeInteractableDebugCommands
     }
 
 #if DEBUG
+    private static string CaptureDebugFixture(
+        BattleDebugRouteHandler routeHandler,
+        INetwork network,
+        IPlayerManager playerManager)
+    {
+        var captures = new List<object>();
+        foreach (string controllerId in fixture.ControllerIds)
+        {
+            if (!SendFixtureAction(
+                routeHandler,
+                network,
+                playerManager,
+                controllerId,
+                SiegeInteractableFixtureAction.Capture))
+            {
+                return FailDebugCapture(
+                    routeHandler,
+                    network,
+                    playerManager,
+                    $"Unable to capture siege interactable fixture on {controllerId}");
+            }
+
+            if (!WaitForFixtureReport(
+                routeHandler,
+                controllerId,
+                SiegeInteractableFixtureAction.Capture,
+                ReportTimeout,
+                out var report))
+            {
+                return FailDebugCapture(
+                    routeHandler,
+                    network,
+                    playerManager,
+                    $"Timed out capturing siege interactable fixture on {controllerId}");
+            }
+
+            fixture.CaptureReports[controllerId] = report;
+            if (!report.Success)
+            {
+                return FailDebugCapture(
+                    routeHandler,
+                    network,
+                    playerManager,
+                    $"Failed to capture siege interactable fixture on {controllerId}: {report.Error}");
+            }
+
+            if (fixture.MachineId < 0)
+            {
+                fixture.MachineId = report.MachineId;
+                fixture.OriginalGateState = report.GateState;
+            }
+            else if (report.MachineId != fixture.MachineId || report.GateState != fixture.OriginalGateState)
+            {
+                return FailDebugCapture(
+                    routeHandler,
+                    network,
+                    playerManager,
+                    "Clients captured different siege interactable state");
+            }
+
+            captures.Add(ReportResult(report));
+        }
+
+        return Structured(new
+        {
+            success = true,
+            error = string.Empty,
+            machineId = fixture.MachineId,
+            machineType = fixture.MachineType,
+            originalGateState = fixture.OriginalGateState,
+            controllers = fixture.ControllerIds,
+            captures,
+        });
+    }
+
+    private static string FailDebugCapture(
+        BattleDebugRouteHandler routeHandler,
+        INetwork network,
+        IPlayerManager playerManager,
+        string error)
+    {
+        string restoreError = RestoreCapturedDebugFixtures(routeHandler, network, playerManager);
+        fixture = null;
+        return string.IsNullOrEmpty(restoreError)
+            ? Failure(error)
+            : Failure(error + "; " + restoreError);
+    }
+
+    private static string RestoreCapturedDebugFixtures(
+        BattleDebugRouteHandler routeHandler,
+        INetwork network,
+        IPlayerManager playerManager)
+    {
+        var errors = new List<string>();
+        foreach (string controllerId in fixture.CaptureRequestControllerIds.OrderBy(id => id))
+        {
+            if (fixture.CaptureReports.TryGetValue(controllerId, out var capture)
+                && capture.MachineId > 0)
+            {
+                fixture.MachineId = capture.MachineId;
+                fixture.OriginalGateState = capture.GateState;
+            }
+
+            if (!SendFixtureAction(
+                routeHandler,
+                network,
+                playerManager,
+                controllerId,
+                SiegeInteractableFixtureAction.Restore))
+            {
+                errors.Add($"unable to send capture cleanup to {controllerId}");
+                continue;
+            }
+
+            if (!WaitForFixtureReport(
+                routeHandler,
+                controllerId,
+                SiegeInteractableFixtureAction.Restore,
+                ReportTimeout,
+                out var restore))
+            {
+                errors.Add($"timed out cleaning up {controllerId}");
+                continue;
+            }
+
+            if (!restore.Success)
+            {
+                errors.Add($"failed cleaning up {controllerId}: {restore.Error}");
+                continue;
+            }
+
+            fixture.RestoreReports[controllerId] = restore;
+        }
+
+        return string.Join("; ", errors);
+    }
+
     private static string DeploymentCompletionResult(
         bool success,
         string error,
@@ -590,6 +737,10 @@ internal static class SiegeInteractableDebugCommands
         public string MachineType { get; }
         public int OriginalGateState { get; set; } = -1;
         public string[] ControllerIds { get; }
+#if DEBUG
+        public HashSet<string> CaptureRequestControllerIds { get; } =
+            new HashSet<string>();
+#endif
         public Dictionary<string, NetworkSiegeInteractableFixtureReport> CaptureReports { get; } =
             new Dictionary<string, NetworkSiegeInteractableFixtureReport>();
         public Dictionary<string, NetworkSiegeInteractableFixtureReport> RestoreReports { get; } =
