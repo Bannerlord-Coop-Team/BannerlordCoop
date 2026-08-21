@@ -101,4 +101,143 @@ namespace Missions.Agents.Messages
             IsCatchUp = isCatchUp;
         }
     }
+
+    [ProtoContract(SkipConstructor = true)]
+    public sealed class NetworkWeaponDropResyncRequest : IEvent
+    {
+        [ProtoMember(1)]
+        public Guid WorldItemId { get; }
+
+        [ProtoMember(2)]
+        public string RequesterControllerId { get; }
+
+        [ProtoMember(3)]
+        public Guid[] AgentIds { get; } = Array.Empty<Guid>();
+
+        [ProtoMember(4)]
+        public EquipmentIndex[] EquipmentIndices { get; } = Array.Empty<EquipmentIndex>();
+
+        [ProtoMember(5)]
+        public Guid RequestId { get; }
+
+        [ProtoMember(6)]
+        public Guid[] RequiredPickupIds { get; } = Array.Empty<Guid>();
+
+        public NetworkWeaponDropResyncRequest(
+            Guid worldItemId,
+            string requesterControllerId,
+            Guid[] agentIds,
+            EquipmentIndex[] equipmentIndices,
+            Guid requestId = default,
+            Guid[] requiredPickupIds = null)
+        {
+            WorldItemId = worldItemId;
+            RequesterControllerId = requesterControllerId;
+            AgentIds = agentIds ?? Array.Empty<Guid>();
+            EquipmentIndices = equipmentIndices ?? Array.Empty<EquipmentIndex>();
+            RequestId = requestId;
+            RequiredPickupIds = requiredPickupIds ?? Array.Empty<Guid>();
+        }
+    }
+
+    [ProtoContract(SkipConstructor = true)]
+    public sealed class NetworkWeaponPickupSlotState : IEvent
+    {
+        [ProtoMember(1)]
+        public Guid AgentId { get; }
+
+        [ProtoMember(2)]
+        public EquipmentIndex EquipmentIndex { get; }
+
+        [ProtoMember(3)]
+        public string ItemObjectId { get; }
+
+        [ProtoMember(4)]
+        public string ItemModifierId { get; }
+
+        [ProtoMember(5)]
+        public string BannerCode { get; }
+
+        [ProtoMember(6)]
+        public short DataValue { get; }
+
+        [ProtoMember(7)]
+        public AgentEquipmentData Equipment { get; }
+
+        [ProtoMember(8)]
+        public Guid RequestId { get; }
+
+        [ProtoMember(9)]
+        public Guid WorldItemId { get; }
+
+        [ProtoMember(10)]
+        public long StateRevision { get; }
+
+        [ProtoMember(11)]
+        public string ResponderControllerId { get; }
+
+        public NetworkWeaponPickupSlotState(
+            Guid agentId,
+            EquipmentIndex equipmentIndex,
+            string itemObjectId,
+            string itemModifierId,
+            string bannerCode,
+            short dataValue,
+            AgentEquipmentData equipment,
+            Guid requestId = default,
+            Guid worldItemId = default,
+            long stateRevision = 0,
+            string responderControllerId = null)
+        {
+            AgentId = agentId;
+            EquipmentIndex = equipmentIndex;
+            ItemObjectId = itemObjectId;
+            ItemModifierId = itemModifierId;
+            BannerCode = bannerCode;
+            DataValue = dataValue;
+            Equipment = equipment;
+            RequestId = requestId;
+            WorldItemId = worldItemId;
+            StateRevision = stateRevision;
+            ResponderControllerId = responderControllerId;
+        }
+    }
+
+    [ProtoContract(SkipConstructor = true)]
+    public sealed class NetworkWeaponDropStateResponse : IEvent
+    {
+        [ProtoMember(1)]
+        public Guid RequestId { get; }
+
+        [ProtoMember(2)]
+        public Guid WorldItemId { get; }
+
+        [ProtoMember(3)]
+        public long StateRevision { get; }
+
+        [ProtoMember(4)]
+        public bool WorldItemConsumed { get; }
+
+        [ProtoMember(5)]
+        public NetworkWeaponDropped Drop { get; }
+
+        [ProtoMember(6)]
+        public Guid[] IncludedPickupIds { get; } = Array.Empty<Guid>();
+
+        public NetworkWeaponDropStateResponse(
+            Guid requestId,
+            Guid worldItemId,
+            long stateRevision,
+            bool worldItemConsumed,
+            NetworkWeaponDropped drop,
+            Guid[] includedPickupIds)
+        {
+            RequestId = requestId;
+            WorldItemId = worldItemId;
+            StateRevision = stateRevision;
+            WorldItemConsumed = worldItemConsumed;
+            Drop = drop;
+            IncludedPickupIds = includedPickupIds ?? Array.Empty<Guid>();
+        }
+    }
 }

@@ -62,6 +62,18 @@ namespace Missions.Agents.Messages
         [ProtoMember(17)]
         public bool IsIdentityCorrection { get; }
 
+        [ProtoMember(18)]
+        public short WorldItemDataValue { get; }
+
+        [ProtoMember(19)]
+        public bool HasWorldItemDataValue { get; }
+
+        [ProtoMember(20)]
+        public string WorldItemModifierId { get; }
+
+        [ProtoMember(21)]
+        public Guid PickupId { get; }
+
         public NetworkWeaponPickedup(
             Guid agentId, 
             EquipmentIndex equipmentIndex,
@@ -79,7 +91,11 @@ namespace Missions.Agents.Messages
             string resultingSlotItemModifierId = null,
             Banner resultingSlotBanner = null,
             short resultingSlotDataValue = 0,
-            bool isIdentityCorrection = false)
+            bool isIdentityCorrection = false,
+            short worldItemDataValue = 0,
+            bool hasWorldItemDataValue = false,
+            string worldItemModifierId = null,
+            Guid pickupId = default)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
@@ -98,6 +114,10 @@ namespace Missions.Agents.Messages
             ResultingSlotBanner = resultingSlotBanner;
             ResultingSlotDataValue = resultingSlotDataValue;
             IsIdentityCorrection = isIdentityCorrection;
+            WorldItemDataValue = worldItemDataValue;
+            HasWorldItemDataValue = hasWorldItemDataValue;
+            WorldItemModifierId = worldItemModifierId;
+            PickupId = pickupId;
         }
     }
 }

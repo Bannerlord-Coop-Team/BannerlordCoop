@@ -425,6 +425,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             }
 
             agentInfo.CurrentAuthority = controllerId;
+            agentInfo.AuthorityRevision++;
             agentInfo.ClearAuthoritativeEquipment();
 
             if (!ControllerAgentMap.TryGetValue(controllerId, out var newAgents))
@@ -451,6 +452,7 @@ public class CoopAgentInfo
     public string OriginalOwner { get; }
     public string MovementScopeId { get; }
     public string CurrentAuthority { get; internal set; }
+    public long AuthorityRevision { get; internal set; }
 
     internal void RecordAuthoritativeEquipment(AgentEquipmentData equipment)
     {

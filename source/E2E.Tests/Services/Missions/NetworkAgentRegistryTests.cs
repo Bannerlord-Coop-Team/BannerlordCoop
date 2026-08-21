@@ -42,12 +42,14 @@ public class NetworkAgentRegistryTests
         Assert.True(registry.TryGetAgentInfo(id, out var before));
         Assert.Equal("host", before.CurrentAuthority);
         Assert.Equal("host", before.OriginalOwner);
+        Assert.Equal(0, before.AuthorityRevision);
 
         Assert.True(registry.TryTransferAuthority("me", id));
 
         Assert.True(registry.TryGetAgentInfo(id, out var after));
         Assert.Equal("me", after.CurrentAuthority);   // authority moved to the successor
         Assert.Equal("host", after.OriginalOwner);     // original owner is preserved
+        Assert.Equal(1, after.AuthorityRevision);
     }
 
     [Fact]

@@ -305,7 +305,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                         3,
                         2,
                         false,
-                        resultingWeapon));
+                        resultingWeapon,
+                        pickupId: Guid.NewGuid()));
 
                 MissionWeapon staleWeapon = CreateWeapon(itemObject);
                 staleWeapon.Amount = 5;
@@ -321,6 +322,17 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                 Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity retained));
                 Assert.Equal(2, retained.WeaponCopy.Amount);
                 Assert.Equal(0, spawner.SpawnCount);
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(
+                        pickerId,
+                        worldItemId,
+                        itemObjectId,
+                        staleWeapon));
+
+                Assert.Same(itemObject, picker.Equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Equal(3, picker.Equipment[EquipmentIndex.Weapon0].Amount);
             }
             finally
             {
@@ -489,7 +501,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void UncorrelatedRuntimePickup_BroadcastsWithoutStableWorldItemIdentity()
+    public void UncorrelatedRuntimePickup_IsRejectedWithoutDetachedBroadcast()
     {
         RunWithAgentShims(observer =>
         {
@@ -536,9 +548,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                         true,
                         weapon));
 
-                NetworkWeaponPickedup sent = Assert.Single(
-                    network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
-                Assert.Equal(Guid.Empty, sent.WorldItemId);
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+                Assert.True(picker.Equipment[EquipmentIndex.Weapon0].IsEmpty);
             }
             finally
             {
@@ -638,7 +649,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void AuthoritativeDropAfterPickupExpiry_RetiresLateCanonicalItem()
+    public void AuthoritativeDropAfterPickupExpiry_IsNotClaimedByOldObservation()
     {
         RunWithAgentShims(observer =>
         {
@@ -706,53 +717,22 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                         weapon));
 
                 ExpirePendingObservedDrop(dropHandler, dropperId, EquipmentIndex.Weapon0);
-                NetworkWeaponPickedup released = Assert.Single(
-                    network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
-                Assert.Equal(Guid.Empty, released.WorldItemId);
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+                Assert.True(picker.Equipment[EquipmentIndex.Weapon0].IsEmpty);
 
                 messageBroker.Publish(
                     this,
                     CreateDropMessage(dropperId, worldItemId, itemObjectId, weapon));
 
-                NetworkWeaponPickedup[] sent = network.NetworkSentMessages
-                    .GetMessages<NetworkWeaponPickedup>()
-                    .ToArray();
-                Assert.Equal(2, sent.Length);
-                Assert.False(sent[0].IsIdentityCorrection);
-                Assert.True(sent[1].IsIdentityCorrection);
-                Assert.Equal(worldItemId, sent[1].WorldItemId);
-                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
-                Assert.Equal(0, spawner.SpawnCount);
-
-                var peerWorldItemRegistry = new NetworkWorldItemRegistry();
-                var peerSpawner = new RecordingWorldItemSpawner();
-                using var peerMessageBroker = new MessageBroker();
-                using var peerDropHandler = CreateHandler(
-                    observer,
-                    agentRegistry,
-                    peerWorldItemRegistry,
-                    objectManager,
-                    peerSpawner,
-                    peerMessageBroker);
-                using var peerPickupHandler = new WeaponPickupHandler(
-                    agentRegistry,
-                    peerWorldItemRegistry,
-                    network,
-                    peerMessageBroker,
-                    objectManager);
-                peerMessageBroker.Publish(
-                    this,
-                    CreateDropMessage(dropperId, worldItemId, itemObjectId, weapon));
-                Assert.True(peerWorldItemRegistry.TryGet(worldItemId, out _));
-                peerMessageBroker.Publish(this, sent[1]);
-                Common.GameThread.Instance.Update(TimeSpan.Zero);
-                Assert.False(peerWorldItemRegistry.TryGet(worldItemId, out _));
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out _));
+                Assert.Equal(1, spawner.SpawnCount);
 
                 network.NetworkSentMessages.Clear();
-                peerDropHandler.CatchUpJoiner("peer-later-joiner");
-                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponDropped>());
                 dropHandler.CatchUpJoiner("later-joiner");
-                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponDropped>());
+                NetworkWeaponDropped catchUp = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropped>());
+                Assert.Equal(worldItemId, catchUp.WorldItemId);
             }
             finally
             {
@@ -850,7 +830,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MismatchedAuthoritativeDrop_ReleasesDeferredPickupWithoutCanonicalIdentity()
+    public void MismatchedAuthoritativeDrop_RejectsDeferredPickupWithoutCanonicalIdentity()
     {
         RunWithAgentShims(observer =>
         {
@@ -928,10 +908,9 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                         canonicalItemId,
                         canonicalWeapon));
 
-                NetworkWeaponPickedup sent = Assert.Single(
-                    network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
-                Assert.Equal(pickerId, sent.AgentId);
-                Assert.Equal(Guid.Empty, sent.WorldItemId);
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+                Assert.True(picker.Equipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out _));
             }
             finally
             {
@@ -942,7 +921,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void EmptyAuthoritativeWorldItemId_ReleasesDeferredPickup()
+    public void EmptyAuthoritativeWorldItemId_RejectsDeferredPickup()
     {
         RunWithAgentShims(observer =>
         {
@@ -1017,10 +996,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                         weapon,
                         dropId: Guid.NewGuid()));
 
-                NetworkWeaponPickedup sent = Assert.Single(
-                    network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
-                Assert.Equal(pickerId, sent.AgentId);
-                Assert.Equal(Guid.Empty, sent.WorldItemId);
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+                Assert.True(picker.Equipment[EquipmentIndex.Weapon0].IsEmpty);
             }
             finally
             {
@@ -1248,6 +1225,82 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PickupBeforeAgentRegistration_AppliesSlotWhenAgentBecomesActive()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon weapon = CreateWeapon(itemObject);
+                MissionEquipment equipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+
+                var spawner = new RecordingWorldItemSpawner();
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    network,
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(agentId, worldItemId, itemObjectId, weapon));
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity worldItem));
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickedup(
+                        agentId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        itemObjectId,
+                        null,
+                        null,
+                        default,
+                        0,
+                        1,
+                        1,
+                        0,
+                        true,
+                        pickupId: Guid.NewGuid()));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+                Assert.False(spawner.IsPresent(worldItem));
+                Assert.True(equipment[EquipmentIndex.Weapon0].IsEmpty);
+
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+                pickupHandler.Tick(1f);
+
+                Assert.Same(itemObject, equipment[EquipmentIndex.Weapon0].Item);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
     public void ObservedDropExpiry_DoesNotQueueAnActionBeforeDeadline()
     {
         RunWithAgentShims(observer =>
@@ -1296,7 +1349,64 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PendingPickupCorrelations_StayWithinPerSlotLimit()
+    public void ObservedDropExpiry_DoesNotRollbackAfterLocalAuthorityTransfer()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject observedItemObject = RegisterItem(objectManager, out _);
+            ItemObject localItemObject = RegisterItem(objectManager, out _);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon observedWeapon = CreateWeapon(observedItemObject);
+                MissionWeapon localWeapon = CreateWeapon(localItemObject);
+                MissionEquipment equipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity observedItem = spawner.AddPresent(observedWeapon);
+                using var messageBroker = new MessageBroker();
+                using var handler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+
+                messageBroker.Publish(
+                    this,
+                    new WeaponDropped(
+                        agent,
+                        EquipmentIndex.Weapon0,
+                        observedWeapon,
+                        observedItem));
+
+                Assert.True(agentRegistry.TryTransferAuthority("observer", agentId));
+                equipment[EquipmentIndex.Weapon0] = localWeapon;
+                ExpirePendingObservedDrop(handler, agentId, EquipmentIndex.Weapon0);
+
+                Assert.Same(localItemObject, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Equal(0, AgentEquipmentShim.GetRemoveCount(agent));
+                Assert.Equal(0, AgentEquipmentShim.GetEquipCount(agent));
+                Assert.False(spawner.IsPresent(observedItem));
+            }
+            finally
+            {
+                objectManager.Remove(observedItemObject);
+                objectManager.Remove(localItemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void PendingPickupObservations_StayWithinPerSlotLimitWithoutDetachedFallback()
     {
         RunWithAgentShims(observer =>
         {
@@ -1371,25 +1481,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                         dropHandler,
                         dropperId,
                         EquipmentIndex.Weapon0));
-                NetworkWeaponPickedup released = Assert.Single(
-                    network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
-                Assert.Equal(Guid.Empty, released.WorldItemId);
-                Assert.False(released.IsIdentityCorrection);
-
-                Guid lateWorldItemId = Guid.NewGuid();
-                network.NetworkSentMessages.Clear();
-                messageBroker.Publish(
-                    this,
-                    CreateDropMessage(
-                        dropperId,
-                        lateWorldItemId,
-                        itemObjectId,
-                        weapon));
-                NetworkWeaponPickedup correction = Assert.Single(
-                    network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
-                Assert.True(correction.IsIdentityCorrection);
-                Assert.Equal(lateWorldItemId, correction.WorldItemId);
-                Assert.False(worldItemRegistry.TryGet(lateWorldItemId, out _));
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
             }
             finally
             {
@@ -1583,7 +1675,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void ObservedDropTimeout_AfterAuthoritativePickup_PreservesPopulatedSlot()
+    public void ObservedDropTimeout_AfterIdentitylessPickup_RestoresObservedWeapon()
     {
         RunWithAgentShims(observer =>
         {
@@ -1649,7 +1741,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                 ExpirePendingObservedDrop(handler, agentId, EquipmentIndex.Weapon0);
 
                 Assert.False(spawner.IsPresent(observedItem));
-                Assert.Same(replacementItemObject, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Same(observedItemObject, equipment[EquipmentIndex.Weapon0].Item);
                 Assert.Equal(0, AgentEquipmentShim.GetRemoveCount(agent));
                 Assert.Equal(1, AgentEquipmentShim.GetEquipCount(agent));
             }
@@ -1657,6 +1749,228 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             {
                 objectManager.Remove(observedItemObject);
                 objectManager.Remove(replacementItemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void ObservedPartialPickupTimeout_RetainsRemainderUntilAuthoritativeDrop()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent dropper = ObjectHelper.SkipConstructor<Agent>();
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon droppedWeapon = CreateWeapon(itemObject);
+                droppedWeapon.Amount = 5;
+                MissionWeapon resultingWeapon = CreateWeapon(itemObject);
+                resultingWeapon.Amount = 3;
+                AgentEquipmentShim.Track(dropper, CreateEquipment(default));
+                AgentEquipmentShim.Track(picker, CreateEquipment(resultingWeapon));
+
+                Guid dropperId = Guid.NewGuid();
+                Guid pickerId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", dropperId, dropper));
+                Assert.True(agentRegistry.TryRegisterAgent("observer", pickerId, picker));
+
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity observedItem = spawner.AddPresent(droppedWeapon);
+                observedItem.Id = new MissionObjectId(82, true);
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    network,
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    new WeaponDropped(
+                        dropper,
+                        EquipmentIndex.Weapon0,
+                        droppedWeapon,
+                        observedItem));
+                observedItem._weapon.Amount = 2;
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickedup(
+                        picker,
+                        observedItem,
+                        EquipmentIndex.Weapon0,
+                        itemObject,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        5,
+                        3,
+                        2,
+                        false,
+                        resultingWeapon,
+                        pickupId: Guid.NewGuid()));
+
+                ExpirePendingObservedDrop(dropHandler, dropperId, EquipmentIndex.Weapon0);
+
+                Assert.True(spawner.IsPresent(observedItem));
+                Assert.Equal(2, observedItem.WeaponCopy.Amount);
+                Assert.Equal(1, GetPendingObservedDropCount(
+                    dropHandler,
+                    dropperId,
+                    EquipmentIndex.Weapon0));
+                Assert.Equal(0, AgentEquipmentShim.GetEquipCount(dropper));
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(
+                        dropperId,
+                        worldItemId,
+                        itemObjectId,
+                        droppedWeapon));
+
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity registered));
+                Assert.Same(observedItem, registered);
+                Assert.Equal(2, registered.WeaponCopy.Amount);
+                Assert.Equal(0, spawner.SpawnCount);
+                Assert.Equal(0, GetPendingObservedDropCount(
+                    dropHandler,
+                    dropperId,
+                    EquipmentIndex.Weapon0));
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void ConsumedPickupAfterObservedPartialTimeout_RechecksExpiry()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out _);
+            try
+            {
+                Agent dropper = ObjectHelper.SkipConstructor<Agent>();
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon droppedWeapon = CreateWeapon(itemObject);
+                droppedWeapon.Amount = 5;
+                MissionWeapon partialResult = CreateWeapon(itemObject);
+                partialResult.Amount = 3;
+                MissionWeapon consumedResult = CreateWeapon(itemObject);
+                consumedResult.Amount = 5;
+                AgentEquipmentShim.Track(dropper, CreateEquipment(default));
+                AgentEquipmentShim.Track(picker, CreateEquipment(consumedResult));
+
+                Guid dropperId = Guid.NewGuid();
+                Guid pickerId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", dropperId, dropper));
+                Assert.True(agentRegistry.TryRegisterAgent("observer", pickerId, picker));
+
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity observedItem = spawner.AddPresent(droppedWeapon);
+                observedItem.Id = new MissionObjectId(83, true);
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    network,
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    new WeaponDropped(
+                        dropper,
+                        EquipmentIndex.Weapon0,
+                        droppedWeapon,
+                        observedItem));
+                observedItem._weapon.Amount = 2;
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickedup(
+                        picker,
+                        observedItem,
+                        EquipmentIndex.Weapon0,
+                        itemObject,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        5,
+                        3,
+                        2,
+                        false,
+                        partialResult,
+                        pickupId: Guid.NewGuid()));
+                ExpirePendingObservedDrop(dropHandler, dropperId, EquipmentIndex.Weapon0);
+
+                Assert.Equal(1, GetPendingObservedDropCount(
+                    dropHandler,
+                    dropperId,
+                    EquipmentIndex.Weapon0));
+
+                Assert.True(spawner.TryRemove(observedItem));
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickedup(
+                        picker,
+                        observedItem,
+                        EquipmentIndex.Weapon0,
+                        itemObject,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        3,
+                        2,
+                        5,
+                        0,
+                        true,
+                        consumedResult,
+                        previousSlotWeapon: partialResult,
+                        pickupId: Guid.NewGuid()));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Equal(0, GetPendingObservedDropCount(
+                    dropHandler,
+                    dropperId,
+                    EquipmentIndex.Weapon0));
+                Assert.Same(itemObject, dropper.Equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Equal(1, AgentEquipmentShim.GetEquipCount(dropper));
+                Assert.True(picker.Equipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
             }
         });
     }
@@ -1890,6 +2204,65 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void MismatchedRegisteredItem_RemainsRegisteredWhenRemovalFails()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject canonicalItem = RegisterItem(objectManager, out string canonicalItemId);
+            ItemObject mismatchedItem = RegisterItem(objectManager, out _);
+            try
+            {
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity mismatchedWorldItem =
+                    spawner.AddPresent(CreateWeapon(mismatchedItem));
+                worldItemRegistry.Register(worldItemId, mismatchedWorldItem);
+                spawner.FailRemovals = true;
+
+                using var messageBroker = new MessageBroker();
+                using var handler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                NetworkWeaponDropped message = CreateDropMessage(
+                    agentId,
+                    worldItemId,
+                    canonicalItemId,
+                    CreateWeapon(canonicalItem));
+
+                messageBroker.Publish(this, message);
+
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity registered));
+                Assert.Same(mismatchedWorldItem, registered);
+                Assert.True(spawner.IsPresent(mismatchedWorldItem));
+                Assert.Equal(0, spawner.SpawnCount);
+                Assert.Equal(1, spawner.PresentCount);
+
+                spawner.FailRemovals = false;
+                messageBroker.Publish(this, message);
+
+                Assert.False(spawner.IsPresent(mismatchedWorldItem));
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out registered));
+                Assert.Same(canonicalItem, registered.WeaponCopy.Item);
+                Assert.Equal(1, spawner.SpawnCount);
+                Assert.Equal(1, spawner.PresentCount);
+            }
+            finally
+            {
+                objectManager.Remove(canonicalItem);
+                objectManager.Remove(mismatchedItem);
+            }
+        });
+    }
+
+    [Fact]
     public void CatchUp_ReplaysActiveWorldItemWithoutEquipmentMutation()
     {
         RunWithAgentShims(observer =>
@@ -2018,7 +2391,172 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PickupBeforeCatchUp_AppliesDetachedAndPreventsWorldItemRespawn()
+    public void PickupWithMismatchedRegistration_WaitsForDropRepair()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject expectedItem = RegisterItem(objectManager, out string expectedItemId);
+            ItemObject wrongItem = RegisterItem(objectManager, out _);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon expectedWeapon = CreateWeapon(expectedItem);
+                MissionWeapon wrongWeapon = CreateWeapon(wrongItem);
+                MissionEquipment equipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity wrongWorldItem = spawner.AddPresent(wrongWeapon);
+                worldItemRegistry.Register(worldItemId, wrongWorldItem);
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    observer.Resolve<IBattleNetwork>(),
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickedup(
+                        agentId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        expectedItemId,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        1,
+                        1,
+                        0,
+                        true,
+                        worldItemDataValue: expectedWeapon.RawDataForNetwork,
+                        hasWorldItemDataValue: true));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.True(equipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity registered));
+                Assert.Same(wrongWorldItem, registered);
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(agentId, worldItemId, expectedItemId, expectedWeapon));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(expectedItem, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.False(spawner.IsPresent(wrongWorldItem));
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+                Assert.Equal(1, spawner.SpawnCount);
+            }
+            finally
+            {
+                objectManager.Remove(expectedItem);
+                objectManager.Remove(wrongItem);
+            }
+        });
+    }
+
+    [Fact]
+    public void PartialPickupWithMismatchedWeaponData_WaitsForDropRepair()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon expectedWeapon = CreateWeapon(itemObject);
+                expectedWeapon.Amount = 5;
+                MissionWeapon wrongWeapon = new MissionWeapon(
+                    itemObject,
+                    null,
+                    null,
+                    (short)(expectedWeapon.RawDataForNetwork + 1));
+                MissionEquipment equipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity wrongWorldItem = spawner.AddPresent(wrongWeapon);
+                worldItemRegistry.Register(worldItemId, wrongWorldItem);
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    observer.Resolve<IBattleNetwork>(),
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickedup(
+                        agentId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        itemObjectId,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        5,
+                        3,
+                        2,
+                        false,
+                        worldItemDataValue: expectedWeapon.RawDataForNetwork,
+                        hasWorldItemDataValue: true));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.True(equipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.True(spawner.IsPresent(wrongWorldItem));
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(agentId, worldItemId, itemObjectId, expectedWeapon));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(itemObject, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Equal(3, equipment[EquipmentIndex.Weapon0].Amount);
+                Assert.False(spawner.IsPresent(wrongWorldItem));
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity remaining));
+                Assert.Equal(2, remaining.WeaponCopy.Amount);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void PickupBeforeCatchUp_AppliesCanonicalConsumedResultWithoutRespawn()
     {
         RunWithAgentShims(observer =>
         {
@@ -2090,6 +2628,122 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void CatchUpAfterManyConsumedWorldItems_DoesNotRespawnAppliedDrop()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            ItemObject laterItem = RegisterItem(objectManager, out _);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon weapon = CreateWeapon(itemObject);
+                MissionEquipment equipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                var spawner = new RecordingWorldItemSpawner();
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                dropHandler.ConfigureLocalHostProvider(() => true);
+                NetworkWeaponDropped drop = CreateDropMessage(
+                    agentId,
+                    worldItemId,
+                    itemObjectId,
+                    weapon);
+
+                messageBroker.Publish(this, drop);
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                Assert.Equal(1, spawner.SpawnCount);
+
+                Guid consumedPickupId = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickupApplied(
+                        agentId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        resultingWorldItemAmount: 0,
+                        worldItemConsumed: true,
+                        pickupId: consumedPickupId));
+                const int rolloverCount = 513;
+                for (int i = 0; i < rolloverCount; i++)
+                {
+                    Guid rolloverWorldItemId = Guid.NewGuid();
+                    messageBroker.Publish(
+                        this,
+                        CreateDropMessage(
+                            agentId,
+                            rolloverWorldItemId,
+                            itemObjectId,
+                            weapon));
+                    messageBroker.Publish(
+                        this,
+                        new WeaponPickupApplied(
+                            agentId,
+                            EquipmentIndex.Weapon0,
+                            rolloverWorldItemId,
+                            resultingWorldItemAmount: 0,
+                            worldItemConsumed: true,
+                            pickupId: Guid.NewGuid()));
+                }
+
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                Assert.Equal(rolloverCount + 1, spawner.SpawnCount);
+                MissionWeapon laterWeapon = CreateWeapon(laterItem);
+                equipment[EquipmentIndex.Weapon0] = laterWeapon;
+                int removeCount = AgentEquipmentShim.GetRemoveCount(agent);
+
+                messageBroker.Publish(this, drop);
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Equal(rolloverCount + 1, spawner.SpawnCount);
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+                Assert.Same(laterItem, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Equal(removeCount, AgentEquipmentShim.GetRemoveCount(agent));
+
+                network.NetworkSentMessages.Clear();
+                Guid requestId = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        requestId,
+                        new[] { consumedPickupId }));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                NetworkWeaponDropStateResponse response = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.Equal(requestId, response.RequestId);
+                Assert.True(response.WorldItemConsumed);
+                Assert.Null(response.Drop);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+                objectManager.Remove(laterItem);
+            }
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -2113,6 +2767,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                 var worldItemRegistry = new NetworkWorldItemRegistry();
                 Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
 
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
                 var spawner = new RecordingWorldItemSpawner();
                 using var messageBroker = new MessageBroker();
                 using var dropHandler = CreateHandler(
@@ -2122,28 +2778,19 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                     objectManager,
                     spawner,
                     messageBroker);
-                using var pickupHandler = new WeaponPickupHandler(
-                    agentRegistry,
-                    worldItemRegistry,
-                    observer.Resolve<IBattleNetwork>(),
-                    messageBroker,
-                    objectManager);
+                dropHandler.ConfigureLocalHostProvider(() => true);
 
                 messageBroker.Publish(
                     this,
-                    new NetworkWeaponPickedup(
+                    new WeaponPickupApplied(
                         agentId,
                         EquipmentIndex.Weapon0,
                         worldItemId,
-                        itemObjectId,
-                        null,
-                        null,
-                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
-                        0,
-                        5,
-                        3,
-                        2,
-                        false));
+                        resultingWorldItemAmount: 2,
+                        worldItemConsumed: false,
+                        pickupId: Guid.NewGuid()));
+                ExpireWorldItemTransitionState(dropHandler, worldItemId);
+                dropHandler.Tick(1f);
                 messageBroker.Publish(
                     this,
                     CreateDropMessage(
@@ -2157,6 +2804,105 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
                 Assert.Equal(1, spawner.SpawnCount);
                 Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity remainingItem));
                 Assert.Equal(2, remainingItem.WeaponCopy.Amount);
+
+                Assert.True(spawner.TryRemove(remainingItem));
+                network.NetworkSentMessages.Clear();
+                Guid requestId = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        requestId));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                NetworkWeaponDropStateResponse response = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.Equal(requestId, response.RequestId);
+                Assert.False(response.WorldItemConsumed);
+                Assert.Equal(remainingItem.WeaponCopy.RawDataForNetwork, response.Drop.DataValue);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void ConsumedCatchUpOnlyDrop_PreservesTerminalStateAfterPreDropExpiry()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon weapon = CreateWeapon(itemObject);
+                AgentEquipmentShim.Track(agent, CreateEquipment(default));
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                Guid pickupId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                var spawner = new RecordingWorldItemSpawner();
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                dropHandler.ConfigureLocalHostProvider(() => true);
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(
+                        agentId,
+                        worldItemId,
+                        itemObjectId,
+                        weapon,
+                        isCatchUp: true));
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickupApplied(
+                        agentId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        resultingWorldItemAmount: 0,
+                        worldItemConsumed: true,
+                        pickupId: pickupId));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                ExpireWorldItemTransitionState(dropHandler, worldItemId);
+                dropHandler.Tick(1f);
+                network.NetworkSentMessages.Clear();
+                Guid requestId = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        requestId,
+                        new[] { pickupId }));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                NetworkWeaponDropStateResponse response = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.Equal(requestId, response.RequestId);
+                Assert.True(response.WorldItemConsumed);
+                Assert.Null(response.Drop);
             }
             finally
             {
@@ -2323,6 +3069,1536 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void CatchUpBeforeLiveDrop_DoesNotSuppressSlotTransition()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon weapon = CreateWeapon(itemObject);
+                MissionEquipment equipment = CreateEquipment(weapon);
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+
+                var spawner = new RecordingWorldItemSpawner();
+                using var messageBroker = new MessageBroker();
+                using var handler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(
+                        agentId,
+                        worldItemId,
+                        itemObjectId,
+                        weapon,
+                        isCatchUp: true));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(itemObject, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out _));
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(agentId, worldItemId, itemObjectId, weapon));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.True(equipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out _));
+                Assert.Equal(1, spawner.SpawnCount);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void ConsumedPickupBeforeDrop_PreservesNewerSlotState()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon weapon = CreateWeapon(itemObject);
+                MissionEquipment equipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+
+                var spawner = new RecordingWorldItemSpawner();
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    observer.Resolve<IBattleNetwork>(),
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickedup(
+                        agentId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        itemObjectId,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        1,
+                        1,
+                        0,
+                        true,
+                        worldItemDataValue: weapon.RawDataForNetwork,
+                        hasWorldItemDataValue: true));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(itemObject, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(agentId, worldItemId, itemObjectId, weapon));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(itemObject, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+                Assert.Equal(0, spawner.SpawnCount);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void ConsumedPickupBeforeDifferentAgentDrop_ClearsDropperOnly()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent dropper = ObjectHelper.SkipConstructor<Agent>();
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon weapon = CreateWeapon(itemObject);
+                MissionEquipment dropperEquipment = CreateEquipment(weapon);
+                MissionEquipment pickerEquipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(dropper, dropperEquipment);
+                AgentEquipmentShim.Track(picker, pickerEquipment);
+
+                Guid dropperId = Guid.NewGuid();
+                Guid pickerId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", dropperId, dropper));
+                Assert.True(agentRegistry.TryRegisterAgent("picker", pickerId, picker));
+
+                var spawner = new RecordingWorldItemSpawner();
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    observer.Resolve<IBattleNetwork>(),
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickedup(
+                        pickerId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        itemObjectId,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        1,
+                        1,
+                        0,
+                        true,
+                        worldItemDataValue: weapon.RawDataForNetwork,
+                        hasWorldItemDataValue: true));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(itemObject, pickerEquipment[EquipmentIndex.Weapon0].Item);
+                Assert.Same(itemObject, dropperEquipment[EquipmentIndex.Weapon0].Item);
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(dropperId, worldItemId, itemObjectId, weapon));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(itemObject, pickerEquipment[EquipmentIndex.Weapon0].Item);
+                Assert.True(dropperEquipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+                Assert.Equal(0, spawner.SpawnCount);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void ReversedPartialPickups_DrainAfterRemovedPredecessorAdvancesState()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent firstPicker = ObjectHelper.SkipConstructor<Agent>();
+                Agent secondPicker = ObjectHelper.SkipConstructor<Agent>();
+                MissionEquipment firstEquipment = CreateEquipment(default);
+                MissionEquipment secondEquipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(firstPicker, firstEquipment);
+                AgentEquipmentShim.Track(secondPicker, secondEquipment);
+
+                Guid firstPickerId = Guid.NewGuid();
+                Guid secondPickerId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("first", firstPickerId, firstPicker));
+                Assert.True(agentRegistry.TryRegisterAgent("second", secondPickerId, secondPicker));
+                Assert.True(agentRegistry.RemoveAgent(firstPickerId));
+
+                MissionWeapon amountTen = CreateWeapon(itemObject);
+                amountTen.Amount = 10;
+                MissionWeapon amountSeven = amountTen;
+                amountSeven.Amount = 7;
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity worldItem = spawner.AddPresent(amountTen);
+                worldItemRegistry.Register(worldItemId, worldItem);
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    observer.Resolve<IBattleNetwork>(),
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickedup(
+                        secondPickerId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        itemObjectId,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        7,
+                        3,
+                        4,
+                        false,
+                        worldItemDataValue: amountSeven.RawDataForNetwork,
+                        hasWorldItemDataValue: true));
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickedup(
+                        firstPickerId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        itemObjectId,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        10,
+                        3,
+                        7,
+                        false,
+                        worldItemDataValue: amountTen.RawDataForNetwork,
+                        hasWorldItemDataValue: true));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.True(firstEquipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.Equal(3, secondEquipment[EquipmentIndex.Weapon0].Amount);
+                Assert.Equal(4, worldItem.WeaponCopy.Amount);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void PartialPickupAfterResultingCatchUp_PreservesNewerSlotState()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon previousWorldWeapon = CreateWeapon(itemObject);
+                previousWorldWeapon.Amount = 5;
+                MissionWeapon resultingWorldWeapon = previousWorldWeapon;
+                resultingWorldWeapon.Amount = 2;
+                MissionEquipment equipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(agent, equipment);
+
+                Guid agentId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+
+                var spawner = new RecordingWorldItemSpawner();
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    observer.Resolve<IBattleNetwork>(),
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(
+                        agentId,
+                        worldItemId,
+                        itemObjectId,
+                        resultingWorldWeapon,
+                        isCatchUp: true));
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickedup(
+                        agentId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        itemObjectId,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        5,
+                        3,
+                        2,
+                        false,
+                        worldItemDataValue: previousWorldWeapon.RawDataForNetwork,
+                        hasWorldItemDataValue: true));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(itemObject, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Equal(3, equipment[EquipmentIndex.Weapon0].Amount);
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity remaining));
+                Assert.Equal(2, remaining.WeaponCopy.Amount);
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(
+                        agentId,
+                        worldItemId,
+                        itemObjectId,
+                        previousWorldWeapon));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Same(itemObject, equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Equal(3, equipment[EquipmentIndex.Weapon0].Amount);
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out remaining));
+                Assert.Equal(2, remaining.WeaponCopy.Amount);
+                Assert.Equal(1, spawner.SpawnCount);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void AbandonedSuccessivePickups_RollBackInReverseOrder()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out _);
+            try
+            {
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                MissionEquipment equipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(picker, equipment);
+                Guid pickerId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                Assert.True(agentRegistry.TryRegisterAgent("observer", pickerId, picker));
+
+                MissionWeapon worldWeapon = CreateWeapon(itemObject);
+                worldWeapon.Amount = 10;
+                MissionWeapon firstResult = CreateWeapon(itemObject);
+                firstResult.Amount = 3;
+                MissionWeapon secondResult = firstResult;
+                secondResult.Amount = 6;
+                SpawnedItemEntity worldItem = new RecordingWorldItemSpawner().AddPresent(worldWeapon);
+                worldItem.Id = new MissionObjectId(91, true);
+
+                using var messageBroker = new MessageBroker();
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    new NetworkWorldItemRegistry(),
+                    observer.Resolve<IBattleNetwork>(),
+                    messageBroker,
+                    objectManager);
+                messageBroker.Publish(this, new WorldItemIdentityPending(worldItem));
+
+                equipment[EquipmentIndex.Weapon0] = firstResult;
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickedup(
+                        picker,
+                        worldItem,
+                        EquipmentIndex.Weapon0,
+                        itemObject,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        10,
+                        3,
+                        7,
+                        false,
+                        firstResult));
+
+                equipment[EquipmentIndex.Weapon0] = secondResult;
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickedup(
+                        picker,
+                        worldItem,
+                        EquipmentIndex.Weapon0,
+                        itemObject,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        3,
+                        7,
+                        6,
+                        4,
+                        false,
+                        secondResult,
+                        previousSlotWeapon: firstResult));
+
+                messageBroker.Publish(this, new WorldItemIdentityAbandoned(worldItem));
+
+                Assert.True(equipment[EquipmentIndex.Weapon0].IsEmpty);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void PendingIdentityLimit_RestoresObservationBeforeAuthoritativeDrop()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Agent dropper = ObjectHelper.SkipConstructor<Agent>();
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon droppedWeapon = CreateWeapon(itemObject);
+                droppedWeapon.Amount = 10;
+                MissionEquipment dropperEquipment = CreateEquipment(default);
+                MissionEquipment pickerEquipment = CreateEquipment(default);
+                AgentEquipmentShim.Track(dropper, dropperEquipment);
+                AgentEquipmentShim.Track(picker, pickerEquipment);
+
+                Guid dropperId = Guid.NewGuid();
+                Guid pickerId = Guid.NewGuid();
+                Guid worldItemId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", dropperId, dropper));
+                Assert.True(agentRegistry.TryRegisterAgent("observer", pickerId, picker));
+
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity observedItem = spawner.AddPresent(droppedWeapon);
+                observedItem.Id = new MissionObjectId(92, true);
+                using var messageBroker = new MessageBroker();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    observer.Resolve<IBattleNetwork>(),
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(
+                    this,
+                    new WeaponDropped(
+                        dropper,
+                        EquipmentIndex.Weapon0,
+                        droppedWeapon,
+                        observedItem));
+
+                MissionWeapon previousSlotWeapon = default;
+                for (short pickupNumber = 1; pickupNumber <= 9; pickupNumber++)
+                {
+                    MissionWeapon resultingSlotWeapon = CreateWeapon(itemObject);
+                    resultingSlotWeapon.Amount = pickupNumber;
+                    pickerEquipment[EquipmentIndex.Weapon0] = resultingSlotWeapon;
+                    observedItem._weapon.Amount = (short)(10 - pickupNumber);
+                    messageBroker.Publish(
+                        this,
+                        new WeaponPickedup(
+                            picker,
+                            observedItem,
+                            EquipmentIndex.Weapon0,
+                            itemObject,
+                            null,
+                            null,
+                            new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                            (short)(pickupNumber - 1),
+                            (short)(11 - pickupNumber),
+                            pickupNumber,
+                            (short)(10 - pickupNumber),
+                            false,
+                            resultingSlotWeapon,
+                            previousSlotWeapon));
+                    previousSlotWeapon = resultingSlotWeapon;
+                }
+
+                Assert.True(pickerEquipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.Same(itemObject, dropperEquipment[EquipmentIndex.Weapon0].Item);
+                Assert.False(spawner.IsPresent(observedItem));
+
+                messageBroker.Publish(
+                    this,
+                    CreateDropMessage(
+                        dropperId,
+                        worldItemId,
+                        itemObjectId,
+                        droppedWeapon));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.True(dropperEquipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out _));
+                Assert.Equal(1, spawner.SpawnCount);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void PendingNetworkLimit_SlotRepairSupersedesDelayedPickups()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Guid worldItemId = Guid.NewGuid();
+                Guid pickerId = Guid.NewGuid();
+                Guid secondPickerId = Guid.NewGuid();
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                Agent secondPicker = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon ownerSlotWeapon = CreateWeapon(itemObject);
+                ownerSlotWeapon.Amount = 20;
+                MissionWeapon secondOwnerSlotWeapon = CreateWeapon(itemObject);
+                secondOwnerSlotWeapon.Amount = 30;
+                AgentEquipmentShim.Track(picker, CreateEquipment(ownerSlotWeapon));
+                AgentEquipmentShim.Track(secondPicker, CreateEquipment(secondOwnerSlotWeapon));
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                Assert.True(agentRegistry.TryRegisterAgent("observer", pickerId, picker));
+                Assert.True(agentRegistry.TryRegisterAgent("observer", secondPickerId, secondPicker));
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                network.NetworkSentMessages.Clear();
+                using var messageBroker = new MessageBroker();
+                int localRequestCount = 0;
+                Action<MessagePayload<NetworkWeaponDropResyncRequest>> countLocalRequest =
+                    _ => localRequestCount++;
+                messageBroker.Subscribe(countLocalRequest);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    worldItemRegistry,
+                    network,
+                    messageBroker,
+                    objectManager,
+                    observer.Resolve<GameInterface.Services.Entity.IControllerIdProvider>());
+
+                var pickupIds = new HashSet<Guid>();
+                for (short pickupNumber = 1; pickupNumber <= 9; pickupNumber++)
+                {
+                    Guid pickupId = Guid.NewGuid();
+                    pickupIds.Add(pickupId);
+                    messageBroker.Publish(
+                        this,
+                        new NetworkWeaponPickedup(
+                            pickerId,
+                            EquipmentIndex.Weapon0,
+                            worldItemId,
+                            itemObjectId,
+                            null,
+                            null,
+                            default,
+                            0,
+                            pickupNumber,
+                            1,
+                            (short)(pickupNumber - 1),
+                            false,
+                            pickupId: pickupId));
+                }
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                NetworkWeaponDropResyncRequest request = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropResyncRequest>());
+                Assert.Equal(worldItemId, request.WorldItemId);
+                Assert.Equal("observer", request.RequesterControllerId);
+                Assert.NotEqual(Guid.Empty, request.RequestId);
+                Assert.Equal(new[] { pickerId }, request.AgentIds);
+                Assert.Equal(new[] { EquipmentIndex.Weapon0 }, request.EquipmentIndices);
+                Assert.True(pickupIds.SetEquals(request.RequiredPickupIds));
+                Assert.Equal(1, localRequestCount);
+
+                network.NetworkSentMessages.Clear();
+                for (short pickupNumber = 10; pickupNumber <= 17; pickupNumber++)
+                {
+                    Guid pickupId = Guid.NewGuid();
+                    pickupIds.Add(pickupId);
+                    messageBroker.Publish(
+                        this,
+                        new NetworkWeaponPickedup(
+                            secondPickerId,
+                            EquipmentIndex.Weapon0,
+                            worldItemId,
+                            itemObjectId,
+                            null,
+                            null,
+                            default,
+                            0,
+                            pickupNumber,
+                            1,
+                            (short)(pickupNumber - 1),
+                            false,
+                            pickupId: pickupId));
+                }
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                NetworkWeaponDropResyncRequest mergedRequest = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropResyncRequest>());
+                Assert.Equal(request.RequestId, mergedRequest.RequestId);
+                Assert.True(pickupIds.SetEquals(mergedRequest.RequiredPickupIds));
+                Assert.True(
+                    new HashSet<Guid> { pickerId, secondPickerId }
+                        .SetEquals(mergedRequest.AgentIds));
+                request = mergedRequest;
+                network.NetworkSentMessages.Clear();
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickupSlotState(
+                        pickerId,
+                        EquipmentIndex.Weapon0,
+                        itemObjectId,
+                        null,
+                        null,
+                        ownerSlotWeapon.RawDataForNetwork,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        request.RequestId,
+                        worldItemId,
+                        stateRevision: 0,
+                        responderControllerId: "observer"));
+                Assert.True(agentRegistry.RemoveAgent(secondPickerId));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                pickupHandler.Tick(4f);
+                FieldInfo repeatedMergeRequestsField = typeof(WeaponPickupHandler).GetField(
+                    "latestResyncRequests",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(repeatedMergeRequestsField);
+                var repeatedMergeRequests = Assert.IsAssignableFrom<System.Collections.IDictionary>(
+                    repeatedMergeRequestsField.GetValue(pickupHandler));
+                object repeatedMergeRequest = repeatedMergeRequests[worldItemId];
+                MethodInfo mergeRequest = repeatedMergeRequest.GetType().GetMethod(
+                    "Merge",
+                    BindingFlags.Instance | BindingFlags.Public);
+                PropertyInfo repeatedPendingTargets = repeatedMergeRequest.GetType().GetProperty(
+                    "PendingTargets",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.NotNull(mergeRequest);
+                Assert.NotNull(repeatedPendingTargets);
+                var repeatedTarget = new HashSet<(Guid AgentId, EquipmentIndex Slot)>
+                {
+                    (secondPickerId, EquipmentIndex.Weapon0),
+                };
+                mergeRequest.Invoke(
+                    repeatedMergeRequest,
+                    new object[] { repeatedTarget, new HashSet<Guid>() });
+                pickupHandler.Tick(1f);
+                Assert.DoesNotContain(
+                    (secondPickerId, EquipmentIndex.Weapon0),
+                    Assert.IsAssignableFrom<
+                        IEnumerable<(Guid AgentId, EquipmentIndex Slot)>>(
+                        repeatedPendingTargets.GetValue(repeatedMergeRequest)));
+                network.NetworkSentMessages.Clear();
+
+                Assert.True(
+                    agentRegistry.TryRegisterAgent(
+                        "observer",
+                        secondPickerId,
+                        secondPicker));
+                mergeRequest.Invoke(
+                    repeatedMergeRequest,
+                    new object[] { repeatedTarget, new HashSet<Guid>() });
+                Assert.Contains(
+                    (secondPickerId, EquipmentIndex.Weapon0),
+                    Assert.IsAssignableFrom<
+                        IEnumerable<(Guid AgentId, EquipmentIndex Slot)>>(
+                        repeatedPendingTargets.GetValue(repeatedMergeRequest)));
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickupSlotState(
+                        secondPickerId,
+                        EquipmentIndex.Weapon0,
+                        itemObjectId,
+                        null,
+                        null,
+                        secondOwnerSlotWeapon.RawDataForNetwork,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        request.RequestId,
+                        worldItemId,
+                        stateRevision: 0,
+                        responderControllerId: "observer"));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                for (short pickupNumber = 18; pickupNumber <= 26; pickupNumber++)
+                {
+                    Guid pickupId = Guid.NewGuid();
+                    pickupIds.Add(pickupId);
+                    messageBroker.Publish(
+                        this,
+                        new NetworkWeaponPickedup(
+                            secondPickerId,
+                            EquipmentIndex.Weapon0,
+                            worldItemId,
+                            itemObjectId,
+                            null,
+                            null,
+                            default,
+                            0,
+                            pickupNumber,
+                            1,
+                            (short)(pickupNumber - 1),
+                            false,
+                            pickupId: pickupId));
+                }
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                request = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropResyncRequest>());
+                Assert.True(pickupIds.SetEquals(request.RequiredPickupIds));
+                network.NetworkSentMessages.Clear();
+                Assert.True(agentRegistry.RemoveAgent(secondPickerId));
+                pickupHandler.Tick(1f);
+
+                FieldInfo requestsAfterResponseField = typeof(WeaponPickupHandler).GetField(
+                    "latestResyncRequests",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(requestsAfterResponseField);
+                var requestsAfterResponse = Assert.IsAssignableFrom<System.Collections.IDictionary>(
+                    requestsAfterResponseField.GetValue(pickupHandler));
+                object requestAfterResponse = requestsAfterResponse[worldItemId];
+                PropertyInfo pendingTargetsProperty = requestAfterResponse.GetType().GetProperty(
+                    "PendingTargets",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.NotNull(pendingTargetsProperty);
+                Assert.Contains(
+                    (secondPickerId, EquipmentIndex.Weapon0),
+                    Assert.IsAssignableFrom<
+                        IEnumerable<(Guid AgentId, EquipmentIndex Slot)>>(
+                        pendingTargetsProperty.GetValue(requestAfterResponse)));
+
+                MissionWeapon delayedWorldWeapon = CreateWeapon(itemObject);
+                delayedWorldWeapon.Amount = 1;
+                SpawnedItemEntity delayedWorldItem =
+                    new RecordingWorldItemSpawner().AddPresent(delayedWorldWeapon);
+                worldItemRegistry.Register(worldItemId, delayedWorldItem);
+                messageBroker.Publish(
+                    this,
+                    new WorldItemIdentityResolved(delayedWorldItem, worldItemId));
+
+                Assert.Equal(20, picker.Equipment[EquipmentIndex.Weapon0].Amount);
+                Assert.Equal(30, secondPicker.Equipment[EquipmentIndex.Weapon0].Amount);
+
+                network.NetworkSentMessages.Clear();
+                pickupHandler.Tick(5f);
+                NetworkWeaponDropResyncRequest retry = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropResyncRequest>());
+                Assert.Equal(request.RequestId, retry.RequestId);
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropStateResponse(
+                        request.RequestId,
+                        worldItemId,
+                        stateRevision: 1,
+                        worldItemConsumed: true,
+                        drop: null,
+                        includedPickupIds: request.RequiredPickupIds));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                FieldInfo activeRequestsField = typeof(WeaponPickupHandler).GetField(
+                    "latestResyncRequests",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(activeRequestsField);
+                var activeRequests = Assert.IsAssignableFrom<System.Collections.IDictionary>(
+                    activeRequestsField.GetValue(pickupHandler));
+                object activeRequest = activeRequests[worldItemId];
+                PropertyInfo requiredIdsProperty = activeRequest.GetType().GetProperty(
+                    "RequiredPickupIds",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.NotNull(requiredIdsProperty);
+                Assert.Empty(
+                    Assert.IsAssignableFrom<System.Collections.IEnumerable>(
+                        requiredIdsProperty.GetValue(activeRequest)));
+
+                network.NetworkSentMessages.Clear();
+                for (int i = 0; i < 5; i++)
+                    pickupHandler.Tick(1f);
+                Assert.Equal(
+                    4,
+                    network.NetworkSentMessages
+                        .GetMessages<NetworkWeaponDropResyncRequest>()
+                        .Count());
+                network.NetworkSentMessages.Clear();
+                pickupHandler.Tick(1f);
+                Assert.Empty(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropResyncRequest>());
+
+                foreach (string fieldName in new[]
+                         {
+                             "latestResyncRequests",
+                             "appliedWorldStateRevisions",
+                             "appliedSlotStateRevisions",
+                         })
+                {
+                    FieldInfo field = typeof(WeaponPickupHandler).GetField(
+                        fieldName,
+                        BindingFlags.Instance | BindingFlags.NonPublic);
+                    Assert.NotNull(field);
+                    Assert.Empty(
+                        Assert.IsAssignableFrom<System.Collections.IDictionary>(
+                            field.GetValue(pickupHandler)));
+                }
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void SlotRepair_HigherAuthorityRevisionSupersedesEarlierResponse()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Guid worldItemId = Guid.NewGuid();
+                Guid pickerId = Guid.NewGuid();
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon initialWeapon = CreateWeapon(itemObject);
+                initialWeapon.Amount = 1;
+                MissionWeapon currentWeapon = CreateWeapon(itemObject);
+                currentWeapon.Amount = 20;
+                AgentEquipmentShim.Track(picker, CreateEquipment(initialWeapon));
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                Assert.True(agentRegistry.TryRegisterAgent("observer", pickerId, picker));
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                network.NetworkSentMessages.Clear();
+                using var messageBroker = new MessageBroker();
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    new NetworkWorldItemRegistry(),
+                    network,
+                    messageBroker,
+                    objectManager,
+                    observer.Resolve<GameInterface.Services.Entity.IControllerIdProvider>());
+
+                var pickupIds = new HashSet<Guid>();
+                for (short pickupNumber = 1; pickupNumber <= 9; pickupNumber++)
+                {
+                    Guid pickupId = Guid.NewGuid();
+                    pickupIds.Add(pickupId);
+                    messageBroker.Publish(
+                        this,
+                        new NetworkWeaponPickedup(
+                            pickerId,
+                            EquipmentIndex.Weapon0,
+                            worldItemId,
+                            itemObjectId,
+                            null,
+                            null,
+                            default,
+                            0,
+                            pickupNumber,
+                            1,
+                            (short)(pickupNumber - 1),
+                            false,
+                            pickupId: pickupId));
+                }
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                NetworkWeaponDropResyncRequest request = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropResyncRequest>());
+                Assert.True(pickupIds.SetEquals(request.RequiredPickupIds));
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropStateResponse(
+                        request.RequestId,
+                        worldItemId,
+                        stateRevision: 1,
+                        worldItemConsumed: true,
+                        drop: null,
+                        includedPickupIds: request.RequiredPickupIds));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                Assert.Equal(1, picker.Equipment[EquipmentIndex.Weapon0].Amount);
+
+                MissionWeapon oldWeapon = CreateWeapon(itemObject);
+                oldWeapon.Amount = 5;
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickupSlotState(
+                        pickerId,
+                        EquipmentIndex.Weapon0,
+                        itemObjectId,
+                        null,
+                        null,
+                        oldWeapon.RawDataForNetwork,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        request.RequestId,
+                        worldItemId,
+                        stateRevision: 0,
+                        responderControllerId: "observer"));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                Assert.Equal(5, picker.Equipment[EquipmentIndex.Weapon0].Amount);
+
+                network.NetworkSentMessages.Clear();
+                pickupHandler.Tick(1f);
+                NetworkWeaponDropResyncRequest graceRetry = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropResyncRequest>());
+                Assert.Equal(request.RequestId, graceRetry.RequestId);
+                Assert.Equal(new[] { pickerId }, graceRetry.AgentIds);
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponPickupSlotState(
+                        pickerId,
+                        EquipmentIndex.Weapon0,
+                        itemObjectId,
+                        null,
+                        null,
+                        currentWeapon.RawDataForNetwork,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        request.RequestId,
+                        worldItemId,
+                        stateRevision: 1,
+                        responderControllerId: "new-owner"));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Equal(20, picker.Equipment[EquipmentIndex.Weapon0].Amount);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void ResyncRequest_ReturnsOwnedWorldItemAndAgentSlotState()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out _);
+            try
+            {
+                Agent dropper = ObjectHelper.SkipConstructor<Agent>();
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon droppedWeapon = CreateWeapon(itemObject);
+                MissionWeapon pickedWeapon = CreateWeapon(itemObject);
+                pickedWeapon.Amount = 2;
+                AgentEquipmentShim.Track(dropper, CreateEquipment(default));
+                AgentEquipmentShim.Track(picker, CreateEquipment(pickedWeapon));
+
+                Guid dropperId = Guid.NewGuid();
+                Guid pickerId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                Assert.True(agentRegistry.TryRegisterAgent("observer", dropperId, dropper));
+                Assert.True(agentRegistry.TryRegisterAgent("observer", pickerId, picker));
+
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                var spawner = new RecordingWorldItemSpawner();
+                SpawnedItemEntity worldItem = spawner.AddPresent(droppedWeapon);
+                worldItem.Id = new MissionObjectId(93, true);
+                using var messageBroker = new MessageBroker();
+                var controllerIdProvider =
+                    observer.Resolve<GameInterface.Services.Entity.IControllerIdProvider>();
+                using var dropHandler = CreateHandler(
+                    observer,
+                    agentRegistry,
+                    worldItemRegistry,
+                    objectManager,
+                    spawner,
+                    messageBroker,
+                    controllerIdProvider);
+                bool isLocalHost = false;
+                dropHandler.ConfigureLocalHostProvider(() => isLocalHost);
+
+                messageBroker.Publish(
+                    this,
+                    new WeaponDropped(
+                        dropper,
+                        EquipmentIndex.Weapon0,
+                        droppedWeapon,
+                        worldItem));
+                Assert.True(worldItemRegistry.TryGetId(worldItem, out Guid worldItemId));
+                network.NetworkSentMessages.Clear();
+
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        Guid.NewGuid()));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                Assert.Empty(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+
+                isLocalHost = true;
+                network.NetworkSentMessages.Clear();
+                Assert.True(agentRegistry.RemoveAgent(dropperId));
+
+                Guid requestId = Guid.NewGuid();
+                Guid requiredPickupId = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        new[] { pickerId },
+                        new[] { EquipmentIndex.Weapon0 },
+                        requestId,
+                        new[] { requiredPickupId }));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                Assert.Empty(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickupApplied(
+                        pickerId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        resultingWorldItemAmount: 1,
+                        worldItemConsumed: false,
+                        pickupId: requiredPickupId));
+
+                NetworkWeaponDropStateResponse response = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.Equal(requestId, response.RequestId);
+                Assert.False(response.WorldItemConsumed);
+                Assert.True(response.Drop.IsCatchUp);
+                Assert.Equal(worldItemId, response.Drop.WorldItemId);
+                NetworkWeaponPickupSlotState slotState = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponPickupSlotState>());
+                Assert.Equal(requestId, slotState.RequestId);
+                Assert.Equal(pickerId, slotState.AgentId);
+                Assert.Equal(EquipmentIndex.Weapon0, slotState.EquipmentIndex);
+                Assert.Equal(itemObject, picker.Equipment[EquipmentIndex.Weapon0].Item);
+                Assert.Equal(pickedWeapon.RawDataForNetwork, slotState.DataValue);
+
+                NetworkWeaponDropStateResponse localResponse = null;
+                Action<MessagePayload<NetworkWeaponDropStateResponse>> captureLocalResponse =
+                    payload => localResponse = payload.What;
+                messageBroker.Subscribe(captureLocalResponse);
+                network.NetworkSentMessages.Clear();
+                Guid localRequestId = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        controllerIdProvider.ControllerId,
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        localRequestId));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.Empty(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.NotNull(localResponse);
+                Assert.Equal(localRequestId, localResponse.RequestId);
+
+                network.NetworkSentMessages.Clear();
+                Guid consumedRequestId = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickupApplied(
+                        pickerId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        resultingWorldItemAmount: 0,
+                        worldItemConsumed: true,
+                        pickupId: Guid.NewGuid()));
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        consumedRequestId));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                NetworkWeaponDropStateResponse consumedResponse = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.Equal(consumedRequestId, consumedResponse.RequestId);
+                Assert.True(consumedResponse.WorldItemConsumed);
+                Assert.Null(consumedResponse.Drop);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
+    public void UnresolvedPreDropState_IsBoundedAndExpiresAsOneRecord()
+    {
+        RunWithAgentShims(observer =>
+        {
+            using var messageBroker = new MessageBroker();
+            using var handler = new WeaponDropHandler(
+                observer.Resolve<INetworkAgentRegistry>(),
+                new NetworkWorldItemRegistry(),
+                messageBroker,
+                observer.Resolve<IBattleNetwork>(),
+                observer.Resolve<IObjectManager>(),
+                new RecordingWorldItemSpawner());
+            handler.ConfigureLocalHostProvider(() => true);
+
+            MethodInfo getOrCreate = typeof(WeaponDropHandler).GetMethod(
+                "GetOrCreateWorldItemTransitionState",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(getOrCreate);
+            for (int i = 0; i < 257; i++)
+                getOrCreate.Invoke(handler, new object[] { Guid.NewGuid() });
+
+            FieldInfo statesField = typeof(WeaponDropHandler).GetField(
+                "worldItemTransitionStates",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(statesField);
+            var states = Assert.IsAssignableFrom<System.Collections.IDictionary>(
+                statesField.GetValue(handler));
+            Assert.Equal(256, states.Count);
+            FieldInfo stateOrderField = typeof(WeaponDropHandler).GetField(
+                "preDropStateOrder",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(stateOrderField);
+            var stateOrder = Assert.IsAssignableFrom<System.Collections.ICollection>(
+                stateOrderField.GetValue(handler));
+            Assert.Equal(256, stateOrder.Count);
+
+            object expiringState = states.Values.Cast<object>().First();
+            PropertyInfo expiresProperty = expiringState.GetType().GetProperty(
+                "ExpiresAtUtc",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.NotNull(expiresProperty);
+            expiresProperty.SetValue(expiringState, DateTime.MinValue);
+
+            handler.Tick(1f);
+
+            Assert.Equal(255, states.Count);
+            Assert.Equal(255, stateOrder.Count);
+
+            MethodInfo markLive = typeof(WeaponDropHandler).GetMethod(
+                "MarkLiveDropApplied",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(markLive);
+            foreach (Guid worldItemId in states.Keys.Cast<Guid>().ToArray())
+                markLive.Invoke(handler, new object[] { worldItemId });
+            Assert.Equal(0, stateOrder.Count);
+
+            Guid pendingRequestId = Guid.NewGuid();
+            messageBroker.Publish(
+                this,
+                new NetworkWeaponDropResyncRequest(
+                    Guid.NewGuid(),
+                    "requester",
+                    Array.Empty<Guid>(),
+                    Array.Empty<EquipmentIndex>(),
+                    pendingRequestId));
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+            FieldInfo requestsField = typeof(WeaponDropHandler).GetField(
+                "pendingResyncRequests",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo requestOrderField = typeof(WeaponDropHandler).GetField(
+                "pendingResyncRequestOrder",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(requestsField);
+            Assert.NotNull(requestOrderField);
+            var requests = Assert.IsAssignableFrom<System.Collections.IDictionary>(
+                requestsField.GetValue(handler));
+            var requestOrder = Assert.IsAssignableFrom<System.Collections.ICollection>(
+                requestOrderField.GetValue(handler));
+            Assert.Equal(1, requests.Count);
+            Assert.Equal(1, requestOrder.Count);
+
+            object pendingRequest = requests[pendingRequestId];
+            FieldInfo requestExpiry = pendingRequest.GetType().GetField(
+                "<ExpiresAtUtc>k__BackingField",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(requestExpiry);
+            requestExpiry.SetValue(pendingRequest, DateTime.MinValue);
+            handler.Tick(1f);
+
+            Assert.Equal(0, requests.Count);
+            Assert.Equal(0, requestOrder.Count);
+        });
+    }
+
+    [Fact]
+    public void ResyncResponder_AcknowledgesAll513ConsumedPickupIds()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+            network.RouteMessages = false;
+            network.NetworkSentMessages.Clear();
+            using var messageBroker = new MessageBroker();
+            using var handler = new WeaponDropHandler(
+                observer.Resolve<INetworkAgentRegistry>(),
+                new NetworkWorldItemRegistry(),
+                messageBroker,
+                network,
+                observer.Resolve<IObjectManager>(),
+                new RecordingWorldItemSpawner());
+            handler.ConfigureLocalHostProvider(() => true);
+            Guid worldItemId = Guid.NewGuid();
+            Guid agentId = Guid.NewGuid();
+            var pickupIds = new Guid[513];
+            for (int i = 0; i < pickupIds.Length; i++)
+            {
+                pickupIds[i] = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickupApplied(
+                        agentId,
+                        EquipmentIndex.Weapon0,
+                        worldItemId,
+                        resultingWorldItemAmount: (short)Math.Max(0, 512 - i),
+                        worldItemConsumed: i == pickupIds.Length - 1,
+                        pickupId: pickupIds[i]));
+            }
+
+            Guid requestId = Guid.NewGuid();
+            foreach (Guid[] requiredIds in new[]
+                     {
+                         pickupIds.Take(512).ToArray(),
+                         pickupIds.Skip(512).ToArray(),
+                     })
+            {
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        requestId,
+                        requiredIds));
+            }
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+            NetworkWeaponDropStateResponse[] responses = network.NetworkSentMessages
+                .GetMessages<NetworkWeaponDropStateResponse>()
+                .ToArray();
+            Assert.Equal(2, responses.Length);
+            Assert.All(responses, response => Assert.Equal(requestId, response.RequestId));
+            Assert.All(responses, response => Assert.True(response.WorldItemConsumed));
+            Assert.All(
+                responses,
+                response => Assert.InRange(response.IncludedPickupIds.Length, 0, 512));
+            Assert.Equal(pickupIds.Take(512), responses[0].IncludedPickupIds);
+            Assert.Equal(pickupIds.Skip(512), responses[1].IncludedPickupIds);
+            Assert.True(
+                new HashSet<Guid>(pickupIds).IsSubsetOf(
+                    responses.SelectMany(response => response.IncludedPickupIds)));
+        });
+    }
+
+    [Fact]
+    public void MissingLiveWorldItem_RemainsAvailableForCatchUpAndRepair()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out string itemObjectId);
+            try
+            {
+                Guid worldItemId = Guid.NewGuid();
+                var worldItemRegistry = new NetworkWorldItemRegistry();
+                var network = Assert.IsType<MockBattleNetwork>(observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                var spawner = new RecordingWorldItemSpawner();
+                using var messageBroker = new MessageBroker();
+                using var handler = new WeaponDropHandler(
+                    observer.Resolve<INetworkAgentRegistry>(),
+                    worldItemRegistry,
+                    messageBroker,
+                    network,
+                    objectManager,
+                    spawner);
+
+                NetworkWeaponDropped drop = CreateDropMessage(
+                    Guid.NewGuid(),
+                    worldItemId,
+                    itemObjectId,
+                    CreateWeapon(itemObject));
+                messageBroker.Publish(this, drop);
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity item));
+                Assert.True(spawner.TryRemove(item));
+
+                network.NetworkSentMessages.Clear();
+                handler.CatchUpJoiner("later-joiner");
+                NetworkWeaponDropped catchUp = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropped>());
+                Assert.True(catchUp.IsCatchUp);
+                Assert.Equal(worldItemId, catchUp.WorldItemId);
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+
+                handler.Tick(1f);
+
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+                messageBroker.Publish(this, catchUp);
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity repairedItem));
+                Assert.Equal(2, spawner.SpawnCount);
+
+                FieldInfo expiryField = typeof(WeaponDropHandler).GetField(
+                    "activeDropRemainingLifeTime",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(expiryField);
+                var remainingLifeTimes = Assert.IsType<Dictionary<Guid, float>>(
+                    expiryField.GetValue(handler));
+
+                remainingLifeTimes[worldItemId] = 0f;
+                handler.ConfigureLocalHostProvider(() => true);
+                network.NetworkSentMessages.Clear();
+                handler.Tick(1f);
+                handler.CatchUpJoiner("live-item-joiner");
+
+                Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropped>());
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out _));
+
+                network.NetworkSentMessages.Clear();
+                Guid liveRequestId = Guid.NewGuid();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        liveRequestId));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                NetworkWeaponDropStateResponse liveResponse = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.Equal(liveRequestId, liveResponse.RequestId);
+                Assert.False(liveResponse.WorldItemConsumed);
+                Assert.True(worldItemRegistry.TryGet(worldItemId, out _));
+
+                Assert.True(spawner.TryRemove(repairedItem));
+                const float earlierRemainingLifeTime = 60f;
+                remainingLifeTimes[worldItemId] = earlierRemainingLifeTime;
+                messageBroker.Publish(this, catchUp);
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                Assert.True(worldItemRegistry.TryGet(
+                    worldItemId,
+                    out SpawnedItemEntity preExpiryRepair));
+                Assert.Equal(3, spawner.SpawnCount);
+                Assert.Equal(earlierRemainingLifeTime, remainingLifeTimes[worldItemId]);
+
+                Assert.True(spawner.TryRemove(preExpiryRepair));
+                Guid activeRequestId = Guid.NewGuid();
+                network.NetworkSentMessages.Clear();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        activeRequestId));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                NetworkWeaponDropStateResponse activeResponse = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.False(activeResponse.WorldItemConsumed);
+
+                Guid requestId = Guid.NewGuid();
+                Guid requiredPickupId = Guid.NewGuid();
+                network.NetworkSentMessages.Clear();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        requestId,
+                        new[] { requiredPickupId }));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                Assert.Empty(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+
+                remainingLifeTimes[worldItemId] = 0f;
+                messageBroker.Publish(this, catchUp);
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+                NetworkWeaponDropStateResponse expiredResponse = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.Equal(requestId, expiredResponse.RequestId);
+                Assert.True(expiredResponse.WorldItemConsumed);
+                Assert.Null(expiredResponse.Drop);
+                Assert.Equal(new[] { requiredPickupId }, expiredResponse.IncludedPickupIds);
+                Assert.Equal(3, spawner.SpawnCount);
+
+                network.NetworkSentMessages.Clear();
+                messageBroker.Publish(
+                    this,
+                    new NetworkWeaponDropResyncRequest(
+                        worldItemId,
+                        "requester",
+                        Array.Empty<Guid>(),
+                        Array.Empty<EquipmentIndex>(),
+                        activeRequestId));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+                NetworkWeaponDropStateResponse terminalRetry = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponDropStateResponse>());
+                Assert.Equal(activeRequestId, terminalRetry.RequestId);
+                Assert.True(terminalRetry.WorldItemConsumed);
+                Assert.True(terminalRetry.StateRevision > activeResponse.StateRevision);
+
+                network.NetworkSentMessages.Clear();
+                handler.Tick(1f);
+                handler.CatchUpJoiner("expired-joiner");
+
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponDropped>());
+                Assert.False(worldItemRegistry.TryGet(worldItemId, out _));
+                FieldInfo activeDropsField = typeof(WeaponDropHandler).GetField(
+                    "activeDrops",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(activeDropsField);
+                Assert.Empty(
+                    Assert.IsAssignableFrom<System.Collections.IDictionary>(
+                        activeDropsField.GetValue(handler)));
+                FieldInfo pendingRequestsField = typeof(WeaponDropHandler).GetField(
+                    "pendingResyncRequests",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(pendingRequestsField);
+                Assert.Empty(
+                    Assert.IsAssignableFrom<System.Collections.IDictionary>(
+                        pendingRequestsField.GetValue(handler)));
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
     private void RunWithAgentShims(Action<EnvironmentInstance> test)
     {
         var harmony = new Harmony("e2e.weapon-drop-convergence." + Guid.NewGuid().ToString("N"));
@@ -2347,14 +4623,16 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         INetworkWorldItemRegistry worldItemRegistry,
         IObjectManager objectManager,
         IWeaponDropWorldItemSpawner spawner,
-        IMessageBroker messageBroker) =>
+        IMessageBroker messageBroker,
+        GameInterface.Services.Entity.IControllerIdProvider controllerIdProvider = null) =>
         new WeaponDropHandler(
             agentRegistry,
             worldItemRegistry,
             messageBroker,
             observer.Resolve<IBattleNetwork>(),
             objectManager,
-            spawner);
+            spawner,
+            controllerIdProvider);
 
     private static NetworkWeaponDropped CreateDropMessage(
         Guid agentId,
@@ -2449,6 +4727,25 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         expiry.Invoke(handler, new[] { key, observed });
     }
 
+    private static void ExpireWorldItemTransitionState(
+        WeaponDropHandler handler,
+        Guid worldItemId)
+    {
+        FieldInfo statesField = typeof(WeaponDropHandler).GetField(
+            "worldItemTransitionStates",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(statesField);
+        var states = Assert.IsAssignableFrom<System.Collections.IDictionary>(
+            statesField.GetValue(handler));
+        object state = states[worldItemId];
+        Assert.NotNull(state);
+        PropertyInfo expiresProperty = state.GetType().GetProperty(
+            "ExpiresAtUtc",
+            BindingFlags.Instance | BindingFlags.Public);
+        Assert.NotNull(expiresProperty);
+        expiresProperty.SetValue(state, DateTime.MinValue);
+    }
+
     private static int GetPendingObservedDropCount(
         WeaponDropHandler handler,
         Guid agentId,
@@ -2458,9 +4755,12 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             "pendingDrops",
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(pendingField);
-        object pending = pendingField.GetValue(handler);
+        var pending = Assert.IsAssignableFrom<System.Collections.IDictionary>(
+            pendingField.GetValue(handler));
         object key = (agentId, equipmentIndex);
-        object queue = pending.GetType().GetProperty("Item").GetValue(pending, new[] { key });
+        if (!pending.Contains(key)) return 0;
+
+        object queue = pending[key];
         return (int)queue.GetType().GetProperty("Count").GetValue(queue);
     }
 
@@ -2504,6 +4804,12 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             prefix: Prefix(nameof(AgentEquipmentShim.IsWorldItemAvailable)));
         harmony.Patch(
             AccessTools.Method(
+                typeof(AgentEquipmentData),
+                nameof(AgentEquipmentData.Apply),
+                new[] { typeof(Agent) }),
+            prefix: Prefix(nameof(AgentEquipmentShim.SkipEquipmentApply)));
+        harmony.Patch(
+            AccessTools.Method(
                 typeof(Agent),
                 nameof(Agent.DropItem),
                 new[] { typeof(EquipmentIndex), typeof(WeaponClass) }),
@@ -2515,10 +4821,12 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
 
     private sealed class RecordingWorldItemSpawner : IWeaponDropWorldItemSpawner
     {
-        private readonly HashSet<SpawnedItemEntity> presentItems = new();
+        private readonly List<SpawnedItemEntity> presentItems = new();
 
         public int SpawnCount { get; private set; }
         public SpawnedItemEntity LastSpawnedItem { get; private set; }
+        public bool FailRemovals { get; set; }
+        public int PresentCount => presentItems.Count;
 
         public SpawnedItemEntity AddPresent(MissionWeapon weapon)
         {
@@ -2529,7 +4837,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         }
 
         public bool IsPresent(SpawnedItemEntity item) =>
-            item != null && presentItems.Contains(item);
+            item != null && presentItems.Any(presentItem => ReferenceEquals(presentItem, item));
 
         public bool TryGetState(
             SpawnedItemEntity item,
@@ -2557,8 +4865,18 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             return true;
         }
 
-        public bool TryRemove(SpawnedItemEntity item) =>
-            item == null || presentItems.Remove(item);
+        public bool TryRemove(SpawnedItemEntity item)
+        {
+            if (item == null) return true;
+            if (FailRemovals) return false;
+
+            int index = presentItems.FindIndex(
+                presentItem => ReferenceEquals(presentItem, item));
+            if (index < 0) return false;
+
+            presentItems.RemoveAt(index);
+            return true;
+        }
     }
 
     private static class AgentEquipmentShim
@@ -2680,6 +4998,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             __result = true;
             return false;
         }
+
+        public static bool SkipEquipmentApply() => false;
 
         public static bool DropItem(Agent __instance, EquipmentIndex itemIndex)
         {

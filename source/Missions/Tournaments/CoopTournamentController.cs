@@ -140,6 +140,8 @@ public class CoopTournamentController : CoopMissionController
         this.missionContext = missionContext;
         spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
         session = new TournamentMissionSession(controllerIdProvider);
+        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+            () => session.IsLocalHost);
         matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
         agentSpawner = new TournamentAgentSpawner(objectManager, controllerIdProvider, coopMissionComponent);
         manifestBuilder = new TournamentSpawnManifestBuilder(objectManager, coopMissionComponent);

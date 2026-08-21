@@ -75,6 +75,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         // binding map are SHARED state, so the components are constructed here around single
         // instances instead of DI-resolving them (transient injection would give each its own).
         session = new LocationSession(controllerIdProvider, hostRegistry);
+        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+            () => session.IsLocalHost);
         var bindingMap = new LocationAgentBindingMap();
         partyAgentMap = new LocationPartyAgentMap();
 

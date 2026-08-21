@@ -24,6 +24,9 @@ namespace Missions.Agents.Messages
         public short ResultingWorldItemAmount { get; }
         public bool WorldItemConsumed { get; }
         public MissionWeapon ResultingSlotWeapon { get; }
+        public MissionWeapon PreviousSlotWeapon { get; }
+        public AgentEquipmentData PreviousEquipment { get; }
+        public Guid PickupId { get; }
 
         public WeaponPickedup(
             Agent agent,
@@ -38,7 +41,10 @@ namespace Missions.Agents.Messages
             short resultingSlotAmount,
             short resultingWorldItemAmount,
             bool worldItemConsumed,
-            MissionWeapon resultingSlotWeapon)
+            MissionWeapon resultingSlotWeapon,
+            MissionWeapon previousSlotWeapon = default,
+            AgentEquipmentData previousEquipment = default,
+            Guid pickupId = default)
         {
             Agent = agent;
             WorldItem = worldItem;
@@ -53,6 +59,9 @@ namespace Missions.Agents.Messages
             ResultingWorldItemAmount = resultingWorldItemAmount;
             WorldItemConsumed = worldItemConsumed;
             ResultingSlotWeapon = resultingSlotWeapon;
+            PreviousSlotWeapon = previousSlotWeapon;
+            PreviousEquipment = previousEquipment;
+            PickupId = pickupId;
         }
     }
 
@@ -64,19 +73,35 @@ namespace Missions.Agents.Messages
         public Guid WorldItemId { get; }
         public short ResultingWorldItemAmount { get; }
         public bool WorldItemConsumed { get; }
+        public bool SlotTransitionApplied { get; }
+        public Guid PickupId { get; }
 
         public WeaponPickupApplied(
             Guid agentId,
             EquipmentIndex equipmentIndex,
             Guid worldItemId,
             short resultingWorldItemAmount,
-            bool worldItemConsumed)
+            bool worldItemConsumed,
+            bool slotTransitionApplied = true,
+            Guid pickupId = default)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
             WorldItemId = worldItemId;
             ResultingWorldItemAmount = resultingWorldItemAmount;
             WorldItemConsumed = worldItemConsumed;
+            SlotTransitionApplied = slotTransitionApplied;
+            PickupId = pickupId;
+        }
+    }
+
+    public readonly struct AcceptedWeaponDropStateResponse : IEvent
+    {
+        public NetworkWeaponDropStateResponse Response { get; }
+
+        public AcceptedWeaponDropStateResponse(NetworkWeaponDropStateResponse response)
+        {
+            Response = response;
         }
     }
 
@@ -108,14 +133,20 @@ namespace Missions.Agents.Messages
     public readonly struct WorldItemIdentityAbandoned : IEvent
     {
         public SpawnedItemEntity WorldItem { get; }
-        public bool AwaitLateResolution { get; }
 
-        public WorldItemIdentityAbandoned(
-            SpawnedItemEntity worldItem,
-            bool awaitLateResolution = false)
+        public WorldItemIdentityAbandoned(SpawnedItemEntity worldItem)
         {
             WorldItem = worldItem;
-            AwaitLateResolution = awaitLateResolution;
+        }
+    }
+
+    public readonly struct PendingWorldItemPickupsRejected : IEvent
+    {
+        public SpawnedItemEntity WorldItem { get; }
+
+        public PendingWorldItemPickupsRejected(SpawnedItemEntity worldItem)
+        {
+            WorldItem = worldItem;
         }
     }
 }
