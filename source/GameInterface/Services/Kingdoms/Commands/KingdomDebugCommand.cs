@@ -11,6 +11,7 @@ using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Newtonsoft.Json;
 using SandBox.GauntletUI;
 using Serilog;
 using System;
@@ -24,6 +25,8 @@ using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
@@ -37,6 +40,7 @@ namespace GameInterface.Services.Kingdoms.Commands;
 public class KingdomDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomDebugCommand>();
+    private static PolicyTimeoutFixture pendingPolicyTimeoutFixture;
     private enum CollectionTarget
     {
         Armies,
@@ -181,6 +185,233 @@ public class KingdomDebugCommand
             $"clanShown={kingdomScreen?.DataSource?.Clan?.Show ?? false} " +
             $"kingdom={kingdomScreen?.DataSource?.Kingdom?.Name} " +
             $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}";
+    }
+
+    [CommandLineArgumentFunction("policy_timeout_capture", "coop.debug.kingdom")]
+    public static string CapturePolicyTimeoutFixture(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.policy_timeout_capture";
+        if (pendingPolicyTimeoutFixture != null) return "A policy-timeout fixture lifecycle is already active.";
+        if (!TryGetObjectManager(out var objectManager) || !TryGetPlayerManager(out var playerManager))
+            return "Unable to resolve policy-timeout fixture services.";
+        if (!playerManager.TryGetPlayer("testclient", out var player))
+            return "No registered player has controller id 'testclient'.";
+        if (!objectManager.TryGetObject(player.ClanId, out Clan proposerClan) || proposerClan.Kingdom == null)
+            return "The testclient clan is not in a kingdom.";
+
+        Kingdom kingdom = proposerClan.Kingdom;
+        if (kingdom.UnresolvedDecisions.Count > 0)
+            return $"Kingdom {kingdom.StringId} already has an unresolved decision.";
+
+        PolicyObject policy = PolicyObject.All
+            .Where(candidate => !kingdom.ActivePolicies.Contains(candidate))
+            .OrderBy(candidate => candidate.StringId)
+            .FirstOrDefault();
+        if (policy == null) return $"Kingdom {kingdom.StringId} has every policy active.";
+        if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
+            !objectManager.TryGetIdWithLogging(proposerClan, out string proposerClanId) ||
+            !objectManager.TryGetIdWithLogging(policy, out string policyId))
+            return "Unable to resolve policy-timeout fixture ids.";
+
+        return PolicyTimeoutJsonResult(new
+        {
+            success = true,
+            controllerId = player.ControllerId,
+            kingdomId,
+            kingdomName = kingdom.Name.ToString(),
+            proposerClanId,
+            policyId,
+            policyName = policy.Name.ToString(),
+            policyWasActive = false,
+            unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
+        });
+    }
+
+    [CommandLineArgumentFunction("policy_timeout_stage", "coop.debug.kingdom")]
+    public static string StagePolicyTimeoutFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.policy_timeout_stage <kingdomId> <proposerClanId> <policyId> <policyWasActive>";
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 4 || !bool.TryParse(args[3], out bool policyWasActive)) return usage;
+        if (pendingPolicyTimeoutFixture != null) return "A policy-timeout fixture lifecycle is already active.";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
+        if (!objectManager.TryGetObject(args[1], out Clan proposerClan)) return $"Clan with ID: '{args[1]}' not found";
+        if (!objectManager.TryGetObject(args[2], out PolicyObject policy)) return $"PolicyObject with ID: '{args[2]}' not found";
+        if (proposerClan.Kingdom != kingdom) return $"Clan {args[1]} is not in kingdom {args[0]}.";
+        if (kingdom.UnresolvedDecisions.Count > 0)
+            return $"Kingdom {args[0]} no longer has a clean decision fixture.";
+        if (kingdom.ActivePolicies.Contains(policy) != policyWasActive)
+            return $"Policy {args[2]} changed after fixture capture.";
+
+        var fixture = new PolicyTimeoutFixture(
+            kingdom,
+            proposerClan,
+            policy,
+            args[0],
+            args[1],
+            args[2],
+            policyWasActive);
+        pendingPolicyTimeoutFixture = fixture;
+
+        var decision = new KingdomPolicyDecision(fixture.ProposerClan, fixture.Policy, fixture.PolicyWasActive);
+        fixture.Kingdom.AddDecision(decision, true);
+        fixture.DecisionStaged = true;
+        int decisionIndex = fixture.Kingdom._unresolvedDecisions.IndexOf(decision) + 1;
+        if (decisionIndex <= 0) return "The policy-timeout decision was not added to the kingdom.";
+
+        return PolicyTimeoutJsonResult(new
+        {
+            success = true,
+            fixture.KingdomId,
+            fixture.PolicyId,
+            decisionIndex,
+            votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
+        });
+    }
+
+    [CommandLineArgumentFunction("policy_timeout_state", "coop.debug.kingdom")]
+    public static string GetPolicyTimeoutState(List<string> args)
+    {
+        if (ModInformation.IsServer) return "Command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.policy_timeout_state";
+
+        var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
+        DecisionItemBaseVM decision = kingdomScreen?.DataSource?.Decision?.CurrentDecision;
+        string decisionTitle = decision?.TitleText ?? string.Empty;
+        return PolicyTimeoutJsonResult(new
+        {
+            success = true,
+            kingdomScreenActive = Game.Current?.GameStateManager?.ActiveState is KingdomState,
+            topScreenIsKingdom = kingdomScreen != null,
+            decisionPresent = decision != null,
+            decisionActive = decision?.IsActive ?? false,
+            decisionTitle,
+            hasVotingCountdown = decisionTitle.IndexOf("Voting ends in", StringComparison.OrdinalIgnoreCase) >= 0,
+            inquiryActive = InformationManager.IsAnyInquiryActive()
+        });
+    }
+
+    [CommandLineArgumentFunction("policy_timeout_restore", "coop.debug.kingdom")]
+    public static string RestorePolicyTimeoutFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.policy_timeout_restore <kingdomId> <proposerClanId> <policyId> <policyWasActive>";
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 4 || !bool.TryParse(args[3], out bool policyWasActive)) return usage;
+        if (!TryMatchPendingPolicyTimeoutFixture(args[0], args[1], args[2], policyWasActive, out var fixture, out string error))
+            return error;
+
+        KingdomPolicyDecision stagedDecision = fixture.Kingdom.UnresolvedDecisions
+            .OfType<KingdomPolicyDecision>()
+            .FirstOrDefault(decision => decision.Policy == fixture.Policy);
+        if (stagedDecision != null) fixture.Kingdom.RemoveDecision(stagedDecision);
+
+        bool policyIsActive = fixture.Kingdom.ActivePolicies.Contains(fixture.Policy);
+        if (fixture.PolicyWasActive && !policyIsActive)
+        {
+            fixture.Kingdom.AddPolicy(fixture.Policy);
+        }
+        else if (!fixture.PolicyWasActive && policyIsActive)
+        {
+            fixture.Kingdom.RemovePolicy(fixture.Policy);
+        }
+
+        pendingPolicyTimeoutFixture = null;
+        return PolicyTimeoutJsonResult(new
+        {
+            success = true,
+            fixture.KingdomId,
+            fixture.PolicyId,
+            restoredPolicyActive = fixture.Kingdom.ActivePolicies.Contains(fixture.Policy),
+            unresolvedDecisionCount = fixture.Kingdom.UnresolvedDecisions.Count
+        });
+    }
+
+    [CommandLineArgumentFunction("policy_timeout_verify", "coop.debug.kingdom")]
+    public static string VerifyPolicyTimeoutFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.policy_timeout_verify <kingdomId> <policyId> <policyWasActive>";
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 3 || !bool.TryParse(args[2], out bool policyWasActive)) return usage;
+        if (pendingPolicyTimeoutFixture != null) return "The policy-timeout fixture lifecycle is still active.";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
+        if (!objectManager.TryGetObject(args[1], out PolicyObject policy)) return $"PolicyObject with ID: '{args[1]}' not found";
+
+        bool policyIsActive = kingdom.ActivePolicies.Contains(policy);
+        bool decisionPresent = kingdom.UnresolvedDecisions
+            .OfType<KingdomPolicyDecision>()
+            .Any(decision => decision.Policy == policy);
+        bool success = policyIsActive == policyWasActive && !decisionPresent && kingdom.UnresolvedDecisions.Count == 0;
+        return PolicyTimeoutJsonResult(new
+        {
+            success,
+            kingdomId = args[0],
+            policyId = args[1],
+            expectedPolicyActive = policyWasActive,
+            policyIsActive,
+            decisionPresent,
+            unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
+        });
+    }
+
+    private static bool TryMatchPendingPolicyTimeoutFixture(
+        string kingdomId,
+        string proposerClanId,
+        string policyId,
+        bool policyWasActive,
+        out PolicyTimeoutFixture fixture,
+        out string error)
+    {
+        fixture = pendingPolicyTimeoutFixture;
+        error = string.Empty;
+        if (fixture == null)
+        {
+            error = "No policy-timeout fixture has been captured.";
+            return false;
+        }
+        if (fixture.KingdomId != kingdomId || fixture.ProposerClanId != proposerClanId ||
+            fixture.PolicyId != policyId || fixture.PolicyWasActive != policyWasActive)
+        {
+            error = "The policy-timeout fixture arguments do not match the captured state.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string PolicyTimeoutJsonResult(object value) =>
+        "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
+
+    private sealed class PolicyTimeoutFixture
+    {
+        public Kingdom Kingdom { get; }
+        public Clan ProposerClan { get; }
+        public PolicyObject Policy { get; }
+        public string KingdomId { get; }
+        public string ProposerClanId { get; }
+        public string PolicyId { get; }
+        public bool PolicyWasActive { get; }
+        public bool DecisionStaged { get; set; }
+
+        public PolicyTimeoutFixture(
+            Kingdom kingdom,
+            Clan proposerClan,
+            PolicyObject policy,
+            string kingdomId,
+            string proposerClanId,
+            string policyId,
+            bool policyWasActive)
+        {
+            Kingdom = kingdom;
+            ProposerClan = proposerClan;
+            Policy = policy;
+            KingdomId = kingdomId;
+            ProposerClanId = proposerClanId;
+            PolicyId = policyId;
+            PolicyWasActive = policyWasActive;
+        }
     }
 
     // coop.debug.kingdom.create Derthert Vlandia_Reborn
