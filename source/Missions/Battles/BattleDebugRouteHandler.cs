@@ -359,9 +359,8 @@ internal class BattleDebugRouteHandler : IHandler
             candidateStandingPoint.SetIsDisabledForPlayersSynched(false);
         }
 
-        if (agent.MountAgent != null)
+        if (!TrySetDebugMount(agent, null))
         {
-            agent.Mount(agent.MountAgent);
             readinessError = "waiting for the local main agent to dismount for fixture staging";
             return false;
         }
@@ -377,6 +376,14 @@ internal class BattleDebugRouteHandler : IHandler
         siegeFixture.StandingPoint = standingPoint;
         readinessError = string.Empty;
         return true;
+    }
+
+    private static bool TrySetDebugMount(Agent agent, Agent mount)
+    {
+        if (ReferenceEquals(agent.MountAgent, mount)) return true;
+
+        agent.MountAgent = mount;
+        return ReferenceEquals(agent.MountAgent, mount);
     }
 
     private static string DescribeDebugCaptureEligibility(
@@ -652,13 +659,12 @@ internal class BattleDebugRouteHandler : IHandler
 
             if (OriginalMount == null)
             {
-                if (agent.MountAgent == null)
+                if (BattleDebugRouteHandler.TrySetDebugMount(agent, null))
                 {
                     readinessError = string.Empty;
                     return true;
                 }
 
-                agent.Mount(agent.MountAgent);
                 readinessError = "waiting for the local main agent to dismount during fixture restore";
                 return false;
             }
@@ -671,7 +677,7 @@ internal class BattleDebugRouteHandler : IHandler
 
             OriginalMount.TeleportToPosition(OriginalMountPosition);
             OriginalMount.LookDirection = OriginalMountLookDirection;
-            if (agent.MountAgent == OriginalMount)
+            if (ReferenceEquals(agent.MountAgent, OriginalMount))
             {
                 readinessError = string.Empty;
                 return true;
@@ -679,9 +685,11 @@ internal class BattleDebugRouteHandler : IHandler
 
             if (agent.MountAgent != null)
             {
-                agent.Mount(agent.MountAgent);
-                readinessError = "waiting for the local main agent to leave an unexpected mount during fixture restore";
-                return false;
+                if (!BattleDebugRouteHandler.TrySetDebugMount(agent, null))
+                {
+                    readinessError = "waiting for the local main agent to leave an unexpected mount during fixture restore";
+                    return false;
+                }
             }
 
             if (OriginalMount.RiderAgent != null && OriginalMount.RiderAgent != agent)
@@ -690,7 +698,12 @@ internal class BattleDebugRouteHandler : IHandler
                 return false;
             }
 
-            agent.Mount(OriginalMount);
+            if (BattleDebugRouteHandler.TrySetDebugMount(agent, OriginalMount))
+            {
+                readinessError = string.Empty;
+                return true;
+            }
+
             readinessError = "waiting for the local main agent to remount during fixture restore";
             return false;
         }
