@@ -152,19 +152,15 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
             if (nearbyParty?.MapEventSide != side)
                 continue;
 
-            MapEventParty removedParty = null;
-            foreach (var mapEventParty in side.Parties)
-            {
-                if (mapEventParty.Party == nearbyParty.Party)
-                {
-                    removedParty = mapEventParty;
-                    break;
-                }
-            }
+            // The setter recursively removes attached army parties, so snapshot the whole side.
+            var partiesBeforeRemoval = new List<MapEventParty>(side.Parties);
 
             nearbyParty.MapEventSide = null;
-            if (removedParty != null)
-                messageBroker.Publish(side, new MapEventPartyRemoved(side, removedParty));
+            foreach (var removedParty in partiesBeforeRemoval)
+            {
+                if (!side.Parties.Contains(removedParty))
+                    messageBroker.Publish(side, new MapEventPartyRemoved(side, removedParty));
+            }
         }
     }
 

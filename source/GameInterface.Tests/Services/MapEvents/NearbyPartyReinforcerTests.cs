@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Tests.Bootstrap;
@@ -41,6 +42,8 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         typeof(MapEvent).GetField("_sides", BindingFlags.NonPublic | BindingFlags.Instance)!;
     private static readonly FieldInfo BattlePartiesField =
         typeof(MapEventSide).GetField("_battleParties", BindingFlags.NonPublic | BindingFlags.Instance)!;
+    private static readonly FieldInfo MapEventField =
+        typeof(MapEventSide).GetField("_mapEvent", BindingFlags.NonPublic | BindingFlags.Instance)!;
     private static readonly FieldInfo NearbyPartiesField =
         typeof(MapEventSide).GetField("_nearbyPartiesAddedToPlayerMapEvent", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
@@ -307,6 +310,62 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         reinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, rejoiningPlayer, cleanedSides.Add);
 
         Assert.Equal(4, cleanedSides.Count);
+    }
+
+    [Fact]
+    public void AttachedArmyCleanup_PublishesEveryRecursivelyRemovedParty()
+    {
+        var removedPlayer = CreateMobileParty();
+        var nearbyArmyLeader = CreateMobileParty();
+        var attachedArmyParty = CreateMobileParty();
+        var enemyParty = CreateMobileParty();
+        var mapEvent = CreatePlayerBattle(nearbyArmyLeader, enemyParty);
+        var side = mapEvent.AttackerSide;
+        var leaderMapEventParty = side.Parties[0];
+        var attachedMapEventParty = CreateMapEventParty(attachedArmyParty);
+        side._battleParties.Add(attachedMapEventParty);
+        MapEventField.SetValue(side, mapEvent);
+        nearbyArmyLeader.Party._mapEventSide = side;
+        attachedArmyParty.Party._mapEventSide = side;
+        nearbyArmyLeader._attachedParties = new MBList<MobileParty> { attachedArmyParty };
+        attachedArmyParty._attachedParties = new MBList<MobileParty>();
+        attachedArmyParty._attachedTo = nearbyArmyLeader;
+        var army = (Army)FormatterServices.GetUninitializedObject(typeof(Army));
+        army.LeaderParty = nearbyArmyLeader;
+        nearbyArmyLeader._army = army;
+        attachedArmyParty._army = army;
+        // Keep the uninitialized fixture out of vanilla's post-removal movement reset.
+        nearbyArmyLeader._isCurrentlyUsedByAQuest = true;
+        side._nearbyPartiesAddedToPlayerMapEvent.Add(nearbyArmyLeader);
+        MarkAsPlayerParty(removedPlayer);
+        var publishedRemovals = new List<(object Source, MapEventPartyRemoved Message)>();
+        var messageBroker = new Mock<IMessageBroker>();
+        messageBroker
+            .Setup(broker => broker.Publish(
+                It.IsAny<object>(),
+                It.IsAny<MapEventPartyRemoved>()))
+            .Callback<object, MapEventPartyRemoved>((source, message) =>
+                publishedRemovals.Add((source, message)));
+        var reinforcer = new NearbyPartyReinforcer(messageBroker.Object);
+
+        reinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, removedPlayer);
+
+        Assert.Null(nearbyArmyLeader.MapEventSide);
+        Assert.Null(attachedArmyParty.MapEventSide);
+        Assert.DoesNotContain(leaderMapEventParty, side.Parties);
+        Assert.DoesNotContain(attachedMapEventParty, side.Parties);
+        Assert.Collection(
+            publishedRemovals,
+            removal =>
+            {
+                Assert.Same(side, removal.Source);
+                Assert.Same(leaderMapEventParty, removal.Message.MapEventParty);
+            },
+            removal =>
+            {
+                Assert.Same(side, removal.Source);
+                Assert.Same(attachedMapEventParty, removal.Message.MapEventParty);
+            });
     }
 
     [Fact]
