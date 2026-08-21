@@ -229,6 +229,7 @@
                       </Children>
                     </ListPanel>
                     <!-- End of Filter Buttons -->
+
                     <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52"
                                 IsVisible="@IsSteamLobbyStatusVisible" Brush="Clan.TabControl.Text"
                                 Brush.FontSize="24" Brush.FontColor="#B8B8B8FF"
@@ -362,6 +363,50 @@
                                          IsDisabled="@IsNextSteamLobbyPageDisabled"
                                          Command.Click="ActionNextSteamLobbyPage"
                                          Parameter.Text="@NextPageButtonText"/>
+                      </Children>
+                    </ListPanel>
+                  </Children>
+                </ListPanel>
+
+                <!-- Last Connection Tab -->
+                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                           IsVisible="@IsLastConnectionTabVisible"
+                           StackLayout.LayoutMethod="VerticalTopToBottom">
+                  <Children>
+                    <!-- Empty state -->
+                    <TextWidget IsVisible="@HasNoLastConnection"
+                                WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="60"
+                                Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
+                                Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center"
+                                Text="No previous connections saved. Join a server to save it here."/>
+
+                    <!-- Last direct connection row -->
+                    <ListPanel IsVisible="@HasLastDirectConnection"
+                               WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                               MarginBottom="12" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
+                                    Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center"
+                                    Text="@LastDirectConnectionText"/>
+                        <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                         VerticalAlignment="Center"
+                                         Command.Click="ActionConnect" Parameter.Text="@ReconnectButtonText"/>
+                      </Children>
+                    </ListPanel>
+
+                    <!-- Last Steam lobby row -->
+                    <ListPanel IsVisible="@HasLastSteamLobby"
+                               WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                               StackLayout.LayoutMethod="HorizontalLeftToRight">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
+                                    Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center"
+                                    Text="@LastSteamLobbyText"/>
+                        <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                         VerticalAlignment="Center"
+                                         Command.Click="ActionReconnectSteamLobby" Parameter.Text="@ReconnectButtonText"/>
                       </Children>
                     </ListPanel>
                   </Children>

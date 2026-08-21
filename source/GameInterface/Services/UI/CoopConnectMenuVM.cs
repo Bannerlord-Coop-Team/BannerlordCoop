@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
+using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.Donate;
 using GameInterface.Services.UI.Messages;
 using System;
@@ -30,12 +31,14 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 {
     public const string DirectTabId = "direct";
     public const string SteamLobbiesTabId = "steam_lobbies";
+    public const string LastConnectionTabId = "last_connection";
     public const int SteamLobbyPageSize = 4;
 
     public event Action SteamLobbiesTabActivated;
 
     private readonly ISteamLobbyBrowser steamLobbyBrowser;
     private readonly IMessageBroker messageBroker;
+    private readonly ICoopOptionsStore optionsStore;
     private readonly List<SteamLobbyListItemVM> discoveredSteamLobbies = new();
 
     private CoopConnectionTabVM selectedTab;
@@ -49,6 +52,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     private int filteredSteamLobbyCount;
     private long filteredSteamLobbyPlayerCount;
     private int steamLobbyPageIndex;
+    private ulong lastSteamLobbyId;
+    private string lastSteamLobbyHostName = string.Empty;
+    private bool hasLastDirectConnection;
 
     public string JoinButtonText => "Join";
     public string RefreshButtonText => "Refresh";
@@ -61,6 +67,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string CreditsButtonText => "Credits";
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
+    public string ReconnectButtonText => "Reconnect";
     public string SteamLobbiesHeaderText =>
         $"Hosted Steam Servers ({filteredSteamLobbyCount} servers; " +
         $"{filteredSteamLobbyPlayerCount} players)";
@@ -106,22 +113,26 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string connectPassword = "";
 
     public CoopConnectMenuVM()
-        : this(SessionDiscovery.SteamLobbyBrowser, MessageBroker.Instance)
+        : this(SessionDiscovery.SteamLobbyBrowser, MessageBroker.Instance, new CoopOptionsStore())
     {
     }
 
-    public CoopConnectMenuVM(ISteamLobbyBrowser steamLobbyBrowser, IMessageBroker messageBroker)
+    public CoopConnectMenuVM(ISteamLobbyBrowser steamLobbyBrowser, IMessageBroker messageBroker,
+        ICoopOptionsStore optionsStore = null)
     {
         this.steamLobbyBrowser = steamLobbyBrowser;
         this.messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
+        this.optionsStore = optionsStore ?? new CoopOptionsStore();
 
         Tabs = new MBBindingList<CoopConnectionTabVM>
         {
             new CoopConnectionTabVM(DirectTabId, "Direct", SelectTab),
             new CoopConnectionTabVM(SteamLobbiesTabId, "Steam Lobbies", SelectTab),
+            new CoopConnectionTabVM(LastConnectionTabId, "Last Connection", SelectTab),
         };
         SteamLobbies = new MBBindingList<SteamLobbyListItemVM>();
 
+        LoadLastConnection();
         SelectTab(Tabs[0]);
     }
 
@@ -197,6 +208,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             OnPropertyChanged(nameof(SelectedTab));
             OnPropertyChanged(nameof(IsDirectTabVisible));
             OnPropertyChanged(nameof(IsSteamLobbiesTabVisible));
+            OnPropertyChanged(nameof(IsLastConnectionTabVisible));
         }
     }
 
@@ -205,6 +217,12 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     [DataSourceProperty]
     public bool IsSteamLobbiesTabVisible => SelectedTab?.Id == SteamLobbiesTabId;
+
+    [DataSourceProperty]
+    public bool IsLastConnectionTabVisible => SelectedTab?.Id == LastConnectionTabId;
+
+    [DataSourceProperty]
+    public bool HasNoLastConnection => !HasLastDirectConnection && !HasLastSteamLobby;
 
     [DataSourceProperty]
     public bool IsRefreshingSteamLobbies
@@ -296,6 +314,33 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             OnPropertyChanged(nameof(Password));
         }
     }
+
+    [DataSourceProperty]
+    public bool HasLastDirectConnection
+    {
+        get => hasLastDirectConnection;
+        private set
+        {
+            if (hasLastDirectConnection == value) return;
+
+            hasLastDirectConnection = value;
+            OnPropertyChanged(nameof(HasLastDirectConnection));
+            OnPropertyChanged(nameof(LastDirectConnectionText));
+        }
+    }
+
+    [DataSourceProperty]
+    public string LastDirectConnectionText => hasLastDirectConnection
+        ? $"Reconnect to {connectIP}:{connectPort}"
+        : string.Empty;
+
+    [DataSourceProperty]
+    public bool HasLastSteamLobby => lastSteamLobbyId != 0;
+
+    [DataSourceProperty]
+    public string LastSteamLobbyText => lastSteamLobbyId != 0
+        ? $"Reconnect to {lastSteamLobbyHostName}"
+        : string.Empty;
 
     public void ActionCycleSteamLobbyPasswordFilter()
     {
@@ -398,12 +443,20 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             }
 
             messageBroker.Publish(this, new AttemptJoin(ip, port, connectPassword, steamInvites));
+            SaveDirectConnection();
         }
         catch (Exception ex)
         {
             InformationManager.DisplayMessage(new InformationMessage(
                 $"ERROR: The connection address could not be resolved: {ex.Message}"));
         }
+    }
+
+    public void ActionReconnectSteamLobby()
+    {
+        if (disposed || lastSteamLobbyId == 0) return;
+
+        messageBroker.Publish(this, new JoinSteamLobby(lastSteamLobbyId));
     }
 
     public void ActionCancel()
@@ -567,7 +620,108 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     {
         if (disposed || lobbyId == 0) return;
 
+        SaveSteamLobby(lobbyId);
         messageBroker.Publish(this, new JoinSteamLobby(lobbyId));
+    }
+
+    private void LoadLastConnection()
+    {
+        try
+        {
+            var options = optionsStore.LoadOrDefault();
+            if (!options.TryGetSection<LastConnectionData>(
+                LastConnectionData.TabId, LastConnectionData.SectionId, out var data))
+            {
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(data.DirectIp))
+            {
+                connectIP = data.DirectIp;
+                connectPort = data.DirectPort ?? connectPort;
+                connectPassword = data.DirectPassword ?? string.Empty;
+                hasLastDirectConnection = true;
+            }
+
+            if (data.SteamLobbyId != 0)
+            {
+                lastSteamLobbyId = data.SteamLobbyId;
+                lastSteamLobbyHostName = data.SteamLobbyHostName ?? string.Empty;
+            }
+        }
+        catch
+        {
+            // corrupt or missing file — start with defaults
+        }
+    }
+
+    private void SaveDirectConnection()
+    {
+        try
+        {
+            var options = optionsStore.LoadOrDefault();
+            if (options.TryGetSection<LastConnectionData>(
+                LastConnectionData.TabId, LastConnectionData.SectionId, out var existing))
+            {
+                existing.DirectIp = connectIP;
+                existing.DirectPort = connectPort;
+                existing.DirectPassword = connectPassword;
+                options.SetSection(LastConnectionData.TabId, LastConnectionData.SectionId, existing);
+            }
+            else
+            {
+                options.SetSection(LastConnectionData.TabId, LastConnectionData.SectionId,
+                    new LastConnectionData
+                    {
+                        DirectIp = connectIP,
+                        DirectPort = connectPort,
+                        DirectPassword = connectPassword,
+                    });
+            }
+            optionsStore.Save(options);
+            HasLastDirectConnection = true;
+        }
+        catch
+        {
+            // IO failure — not critical
+        }
+    }
+
+    private void SaveSteamLobby(ulong lobbyId)
+    {
+        var hostName = discoveredSteamLobbies.FirstOrDefault(l => l.LobbyId == lobbyId)?.HostText
+            ?? string.Empty;
+
+        try
+        {
+            var options = optionsStore.LoadOrDefault();
+            if (options.TryGetSection<LastConnectionData>(
+                LastConnectionData.TabId, LastConnectionData.SectionId, out var existing))
+            {
+                existing.SteamLobbyId = lobbyId;
+                existing.SteamLobbyHostName = hostName;
+                options.SetSection(LastConnectionData.TabId, LastConnectionData.SectionId, existing);
+            }
+            else
+            {
+                options.SetSection(LastConnectionData.TabId, LastConnectionData.SectionId,
+                    new LastConnectionData
+                    {
+                        SteamLobbyId = lobbyId,
+                        SteamLobbyHostName = hostName,
+                    });
+            }
+            optionsStore.Save(options);
+        }
+        catch
+        {
+            // IO failure — not critical
+        }
+
+        lastSteamLobbyId = lobbyId;
+        lastSteamLobbyHostName = hostName;
+        OnPropertyChanged(nameof(HasLastSteamLobby));
+        OnPropertyChanged(nameof(LastSteamLobbyText));
     }
 
     private static bool IsLoopbackAddress(string address)
