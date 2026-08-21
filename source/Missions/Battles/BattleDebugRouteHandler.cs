@@ -130,6 +130,18 @@ internal class BattleDebugRouteHandler : IHandler
 
             if (DateTime.UtcNow >= deadlineUtc)
             {
+#if DEBUG
+                if (action.Action == SiegeInteractableFixtureAction.Capture
+                    && readinessError == "no locally eligible siege machine is registered")
+                {
+                    var mission = Mission.Current;
+                    var agent = mission?.MainAgent;
+                    if (mission != null && agent != null && agent.IsActive())
+                    {
+                        readinessError += "; " + DescribeDebugCaptureEligibility(mission, action.MachineType, agent);
+                    }
+                }
+#endif
                 SendFixtureReport(
                     action,
                     machine: null,
@@ -262,6 +274,44 @@ internal class BattleDebugRouteHandler : IHandler
         agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
         siegeFixture.StandingPoint = standingPoint;
     }
+
+#if DEBUG
+    private static string DescribeDebugCaptureEligibility(
+        Mission mission,
+        string machineType,
+        Agent agent)
+    {
+        var candidates = mission.MissionObjects
+            .OfType<UsableMachine>()
+            .Where(candidate => candidate.GetType().Name.Equals(machineType, StringComparison.Ordinal))
+            .OrderBy(candidate => candidate.Id.Id)
+            .ToArray();
+        if (candidates.Length == 0)
+        {
+            return "no " + machineType + " candidates were registered";
+        }
+
+        var candidateDetails = candidates.Select(candidate =>
+        {
+            var points = candidate.StandingPoints.ToArray();
+            return "id=" + candidate.Id.Id
+                + ",gateState=" + (candidate is CastleGate gate ? (int)gate.State : -1)
+                + ",points=" + points.Length
+                + ",eligible=" + points.Count(agent.CanUseObject)
+                + ",disabled=" + points.Count(point => point.IsDisabledForAgent(agent))
+                + ",unusable=" + points.Count(point => !point.IsUsableByAgent(agent))
+                + ",deactivated=" + points.Count(point => point.IsDeactivated)
+                + ",disabledForPlayers=" + points.Count(point => point.IsDisabledForPlayers)
+                + ",occupied=" + points.Count(point => point.HasUser);
+        });
+        return "agent(player=" + agent.IsPlayerControlled
+            + ",ai=" + agent.IsAIControlled
+            + ",machineReady=" + agent.IsAbleToUseMachine()
+            + ",mounted=" + (agent.MountAgent != null)
+            + ",team=" + (agent.Team?.Side.ToString() ?? "none")
+            + "); candidates=[" + string.Join(";", candidateDetails) + "]";
+    }
+#endif
 
     private void UsePreparedInteraction(UsableMachine machine, Agent agent)
     {
