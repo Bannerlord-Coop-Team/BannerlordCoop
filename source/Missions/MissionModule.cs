@@ -47,8 +47,17 @@ public class MissionModule : Module
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
             .InstancePerDependency();
+        builder.RegisterType<MovementNetworkSettings>()
+            .As<IMovementNetworkSettings>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementPriorityScheduler>()
+            .As<IMovementPriorityScheduler>()
+            .InstancePerDependency();
         builder.RegisterType<MovementTrafficBudget>()
             .As<IMovementTrafficBudget>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementTrafficBudgetFactory>()
+            .As<IMovementTrafficBudgetFactory>()
             .InstancePerDependency();
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()

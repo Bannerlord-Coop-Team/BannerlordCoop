@@ -2296,6 +2296,23 @@ public class MapEventDebugCommands
 
         return $"Late-join fixture mission exit requested for {requested} player(s).";
     }
+
+    /// <summary>Returns both fixture clients to campaign and restores the server-side battle state.</summary>
+    [CommandLineArgumentFunction("late_join_mode_restore", "coop.debug.mapevent")]
+    public static string RestoreLateJoinModeFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.late_join_mode_restore";
+
+        string exitResult = ExitLateJoinModeFixtureMissions(args);
+        if (lateJoinModeFixture == null)
+            return exitResult;
+
+        string cleanupResult = CleanupLateJoinModeFixture(args);
+        return $"{exitResult} {cleanupResult}";
+    }
 #endif
 
     // coop.debug.mapevent.late_join_mode_state PlayerTwo

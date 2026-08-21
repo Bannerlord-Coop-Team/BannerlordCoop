@@ -54,6 +54,7 @@ public class MockBattleNetwork : IBattleNetwork
     public List<SerializedPacketSend> SerializedPacketSends { get; } = new();
     public int MaxUnreliablePayloadBytes { get; set; } = 1000;
     public Dictionary<string, int> ControllerPayloadBytes { get; } = new();
+    public bool RouteMessages { get; set; } = true;
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
@@ -67,19 +68,22 @@ public class MockBattleNetwork : IBattleNetwork
     public void SendAll(IMessage message)
     {
         NetworkSentMessages.Add(message);
-        router.SendAll(this, message);
+        if (RouteMessages)
+            router.SendAll(this, message);
     }
 
     public void Send(string controllerId, IMessage message)
     {
         NetworkSentMessages.Add(message);
-        router.Send(this, controllerId, message);
+        if (RouteMessages)
+            router.Send(this, controllerId, message);
     }
 
     public void SendAllBut(string controllerId, IMessage message)
     {
         NetworkSentMessages.Add(message);
-        router.SendAllBut(this, controllerId, message);
+        if (RouteMessages)
+            router.SendAllBut(this, controllerId, message);
     }
 
     // Packet broadcasts are captured for sender-path assertions; packet-level mesh routing isn't exercised.

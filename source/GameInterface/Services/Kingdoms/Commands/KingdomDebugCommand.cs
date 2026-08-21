@@ -25,6 +25,7 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -36,7 +37,6 @@ namespace GameInterface.Services.Kingdoms.Commands;
 public class KingdomDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomDebugCommand>();
-
     private enum CollectionTarget
     {
         Armies,
@@ -142,6 +142,20 @@ public class KingdomDebugCommand
         return "KINGDOM_SCREEN_OPENED";
     }
 
+    [CommandLineArgumentFunction("open_decision", "coop.debug.kingdom")]
+    public static string OpenKingdomDecisionScreen(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+            return message;
+        if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
+        if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
+
+        KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(decision);
+        Game.Current.GameStateManager.PushState(kingdomState, 0);
+        return "KINGDOM_DECISION_SCREEN_OPENED";
+    }
+
     [CommandLineArgumentFunction("close", "coop.debug.kingdom")]
     public static string CloseKingdomScreen(List<string> args)
     {
@@ -163,6 +177,7 @@ public class KingdomDebugCommand
         var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
         return $"KINGDOM_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is KingdomState} " +
             $"topScreen={kingdomScreen != null} dataSource={kingdomScreen?.DataSource != null} " +
+            $"decisionActive={kingdomScreen?.DataSource?.Decision?.IsActive ?? false} " +
             $"clanShown={kingdomScreen?.DataSource?.Clan?.Show ?? false} " +
             $"kingdom={kingdomScreen?.DataSource?.Kingdom?.Name} " +
             $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}";
@@ -289,7 +304,7 @@ public class KingdomDebugCommand
             return "This command can only be run on the server.";
         }
 
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.kingdom.force_player_join_kingdom <controllerId> <kingdomId>";
         }
@@ -605,9 +620,9 @@ public class KingdomDebugCommand
             return message;
         }
 
-        if (args.Count < 4)
+        if (args.Count < 4 || args.Count > 5)
         {
-            return "Usage: coop.debug.kingdom.vote_decision <kingdomId> <decisionIndex> <outcomeIndex|abstain> <supportWeight>";
+            return "Usage: coop.debug.kingdom.vote_decision <kingdomId> <decisionIndex> <outcomeIndex|abstain> <supportWeight> [isFinal]";
         }
 
         bool isAbstain = args[2].Equals("abstain", StringComparison.OrdinalIgnoreCase);
@@ -626,6 +641,12 @@ public class KingdomDebugCommand
             return $"Support weight is invalid: {args[3]}. Use Choose, StayNeutral, SlightlyFavor, StronglyFavor, or FullyPush.";
         }
 
+        bool finalVote = false;
+        if (args.Count == 5 && !bool.TryParse(args[4], out finalVote))
+        {
+            return $"Unable to parse {args[4]} as a boolean.";
+        }
+
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
@@ -636,14 +657,14 @@ public class KingdomDebugCommand
         }
 
         MessageBroker.Instance.Publish(decision, new KingdomDecisionVoteRequested(
-            new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain)));
+            new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain, finalVote)));
 
-        return $"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}.";
+        return $"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}, final={finalVote}.";
     }
 
     // coop.debug.kingdom.resolve_decision
     /// <summary>
-    /// Forces a queued player kingdom decision to resolve through the coop vote manager.
+    /// Resolves a queued player kingdom decision after every vote or the shared deadline.
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index</param>
     /// <returns>result message</returns>
@@ -660,7 +681,7 @@ public class KingdomDebugCommand
             return "Unable to resolve KingdomDecisionVoteManager";
         }
 
-        return voteManager.TryResolveDecision(decision, force: true)
+        return voteManager.TryResolveDecision(decision)
             ? $"Resolved {decision.GetType().Name} through player vote manager."
             : $"Could not resolve {decision.GetType().Name} through player vote manager.";
     }

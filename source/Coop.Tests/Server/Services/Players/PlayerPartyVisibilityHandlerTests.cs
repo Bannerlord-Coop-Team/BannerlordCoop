@@ -2,10 +2,14 @@
 using Common.Network;
 using Common.Network.Messages;
 using Common.Tests.Utils;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Players.Handlers;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -15,6 +19,7 @@ using Moq;
 using System;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -82,6 +87,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         using var handler = new PlayerPartyVisibilityHandler(
             broker,
             playerManager.Object,
+            Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<INetwork>(),
             Mock.Of<ISiegeEventInterface>());
@@ -106,6 +112,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         using var handler = new PlayerPartyVisibilityHandler(
             broker,
             playerManager.Object,
+            Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<INetwork>(),
             Mock.Of<ISiegeEventInterface>());
@@ -137,6 +144,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         using var handler = new PlayerPartyVisibilityHandler(
             broker,
             playerManager.Object,
+            Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<INetwork>(),
             siegeEventInterface.Object);
@@ -172,6 +180,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         using var handler = new PlayerPartyVisibilityHandler(
             broker,
             playerManager.Object,
+            Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<INetwork>(),
             Mock.Of<ISiegeEventInterface>());
@@ -207,6 +216,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         using var handler = new PlayerPartyVisibilityHandler(
             broker,
             playerManager.Object,
+            Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<INetwork>(),
             Mock.Of<ISiegeEventInterface>());
@@ -216,6 +226,148 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
         Assert.False(party.IsActive);
         objectManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void CaptivityRelease_OfflineOwner_LeavesPartyInactiveHiddenAndWithoutVisual()
+    {
+        var player = CreatePlayer();
+        var party = CreateParty();
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var (playerManager, connectionCollection, objectManager) =
+            CreateReleaseMocks(player, party, peer, isConnected: false, isSynchronized: false);
+        var network = new Mock<INetwork>();
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            connectionCollection.Object,
+            objectManager.Object,
+            network.Object,
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
+
+        Assert.False(party.IsActive);
+        Assert.False(party.IsVisible);
+        network.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void CaptivityRelease_SynchronizedAtSeaOwner_ActivatesAndShowsParty()
+    {
+        var player = CreatePlayer();
+        var party = CreateParty(isActive: false);
+        party._isCurrentlyAtSea = true;
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var (playerManager, connectionCollection, objectManager) =
+            CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: true);
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            connectionCollection.Object,
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
+
+        Assert.True(party.IsActive);
+        Assert.True(party.IsVisible);
+        Assert.True(party.IsInspected);
+    }
+
+    [Fact]
+    public void CaptivityRelease_LoadingOwner_LeavesPartyParked()
+    {
+        var player = CreatePlayer();
+        var party = CreateParty();
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var (playerManager, connectionCollection, objectManager) =
+            CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: false);
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            connectionCollection.Object,
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
+
+        Assert.False(party.IsActive);
+        Assert.False(party.IsVisible);
+    }
+
+    [Fact]
+    public void CaptivityRelease_LoadingOwner_ActivatesAfterCampaignSynchronization()
+    {
+        var player = CreatePlayer();
+        var party = CreateParty();
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var (playerManager, connectionCollection, objectManager) =
+            CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: false);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party))
+            .Returns(true);
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            connectionCollection.Object,
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
+        Assert.False(party.IsActive);
+
+        broker.Publish(this, new PlayerCampaignSynchronized(peer));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.True(party.IsActive);
+    }
+
+    [Fact]
+    public void CaptivityRelease_DeferredMapEventParking_RemainsInactiveAfterFinalization()
+    {
+        var player = CreatePlayer();
+        var party = CreateParty();
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
+        var mapEventSide = (MapEventSide)FormatterServices.GetUninitializedObject(typeof(MapEventSide));
+        AccessTools.Field(typeof(MapEventSide), "_mapEvent").SetValue(mapEventSide, mapEvent);
+        party.Party._mapEventSide = mapEventSide;
+
+        var (playerManager, connectionCollection, objectManager) =
+            CreateReleaseMocks(player, party, peer, isConnected: false, isSynchronized: false);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party))
+            .Returns(true);
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            connectionCollection.Object,
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerDisconnected(peer, default));
+        GameThread.Run(() => { }, blocking: true);
+        Assert.True(party.IsActive);
+        Assert.Single(broker.GetMessagesFromType<PlayerDisconnectedFromMapEvent>());
+
+        party.Party._mapEventSide = null;
+        broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
+        Assert.False(party.IsActive);
+
+        broker.Publish(this, new MapEventFinalized(mapEvent));
+
+        Assert.False(party.IsActive);
+        Assert.False(party.IsVisible);
     }
 
     [Fact]
@@ -238,6 +390,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         using var handler = new PlayerPartyVisibilityHandler(
             broker,
             playerManager.Object,
+            Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<INetwork>(),
             Mock.Of<ISiegeEventInterface>());
@@ -246,6 +399,32 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
         playerManager.Verify(manager => manager.ClearPeer(peer), Times.Once);
         Assert.Single(broker.GetMessagesFromType<PlayerConnectionStateChanged>());
+    }
+
+    private static (Mock<IPlayerManager>, Mock<IConnectionCollection>, Mock<IObjectManager>)
+        CreateReleaseMocks(
+            Player player,
+            MobileParty party,
+            NetPeer peer,
+            bool isConnected,
+            bool isSynchronized)
+    {
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager.SetupGet(manager => manager.Players).Returns(new[] { player });
+        playerManager.Setup(manager => manager.TryGetPlayer(peer, out player)).Returns(true);
+        playerManager.Setup(manager => manager.TryGetPeer(player.ControllerId, out peer)).Returns(true);
+        playerManager.Setup(manager => manager.IsConnected(player)).Returns(isConnected);
+
+        string partyId = player.MobilePartyId;
+        var objectManager = new Mock<IObjectManager>();
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(party, out partyId)).Returns(true);
+
+        var connectionCollection = new Mock<IConnectionCollection>();
+        connectionCollection
+            .Setup(collection => collection.HasCompletedCampaignSynchronization(peer))
+            .Returns(isSynchronized);
+
+        return (playerManager, connectionCollection, objectManager);
     }
 
     private static Player CreatePlayer() =>
