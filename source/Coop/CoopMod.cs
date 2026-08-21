@@ -125,6 +125,14 @@ namespace Coop
 
             SetupLogging();
             InitializeCrashReporting();
+            
+            var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
+            informationalVersion = typeof(ModInformation).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? "unknown";
+            CoopLogHeader(moduleInfoProvider);
+            Logger.Verbose("Coop Mod Module Started");
+            
             Updateables.Add(new FpsLogger());
 
 #if DEBUG
@@ -137,8 +145,9 @@ namespace Coop
             // Creates the handler during launch
             if (!isServer)
             {
+                
                 unsupportedModuleWarning = new UnsupportedModuleWarningHandler(
-                    new TaleWorldsModuleInfoProvider(),
+                    moduleInfoProvider,
                     new CoopOptionsStore(),
                     exception => Logger.Warning(
                         exception,
@@ -261,19 +270,33 @@ namespace Coop
 #else
                 .MinimumLevel.Information();
 #endif
-
             Logger = LogManager.GetLogger<CoopMod>();
+        }
 
-            informationalVersion = ModInformation.BuildVersion;
-            Logger.Information("BannerlordCoop build {Build}", informationalVersion);
+        private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
+        {
+            var modules = moduleInfoProvider.GetModuleInfos().ToArray();
+            var native = modules.First(m => m.IsOfficial && m.Id.Equals("Native",  StringComparison.OrdinalIgnoreCase));
+            
+            Logger.Information("========================================================");
+            Logger.Information("Bannerlord Coop - {client}", isServer ? "Server" : "Client");
+            Logger.Information("Game Version: {major}.{minor}.{revision}", native.Version.Major, native.Version.Minor, native.Version.Revision);
+            Logger.Information("Coop Build {version}", informationalVersion);
             Logger.Information(
                 "[Protobuf] MonoRuntime={MonoRuntime} AutoCompile={AutoCompile} StructFactoryWorkaround={StructFactoryWorkaround} CLRVersion={ClrVersion}",
                 ProtoBufSerializer.IsMonoRuntime,
                 ProtoBufSerializer.AutoCompileEnabled,
                 ProtoBufSerializer.StructFactoryWorkaroundEnabled,
                 Environment.Version);
+            Logger.Information("Current modules:" );
 
-            Logger.Verbose("Coop Mod Module Started");
+            foreach (var module in modules)
+            {
+                string official = module.IsOfficial ? "Official" : "Unofficial";
+                Logger.Information("{official} {version} {name}", official, module.Version.ToString(), module.Id);
+            }
+            
+            Logger.Information("========================================================");
         }
 
         private void InitializeCrashReporting()
