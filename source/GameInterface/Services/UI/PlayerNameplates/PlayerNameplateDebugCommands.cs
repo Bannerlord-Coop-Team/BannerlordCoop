@@ -113,7 +113,7 @@ public static class PlayerNameplateDebugCommands
     }
 
 #if DEBUG
-    private const int SiegeFixtureMaximumRegularTroops = 3;
+    private const int SiegeFixtureMaximumRegularTroops = 1;
 
     private static SiegeRosterFixture siegeRosterFixture;
 

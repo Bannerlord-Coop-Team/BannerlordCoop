@@ -58,11 +58,11 @@ public class MapEventDebugCommandsFixtureRosterTests
         roster.data[2] = new TroopRosterElement(regularTroop) { Number = 8 };
         roster._count = 3;
 
-        MapEventDebugCommands.LimitLateJoinModeFixtureRoster(roster, 3);
+        MapEventDebugCommands.LimitLateJoinModeFixtureRoster(roster, 1);
 
         Assert.Equal(1, roster.GetTroopCount(leader));
         Assert.Equal(1, roster.GetTroopCount(companion));
-        Assert.Equal(3, roster.GetTroopCount(regularTroop));
+        Assert.Equal(1, roster.GetTroopCount(regularTroop));
     }
 
     [Fact]
