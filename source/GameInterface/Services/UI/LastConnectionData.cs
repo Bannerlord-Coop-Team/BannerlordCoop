@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace GameInterface.Services.UI;
 
+/// <summary>Persisted data for the last direct-connection and Steam lobby the player joined.</summary>
 public class LastConnectionData
 {
     public const string TabId = "Connection";

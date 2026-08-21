@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network.Session;
 using GameInterface.Services.UI;
+using GameInterface.Services.UI.CoopOptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -324,6 +325,147 @@ public class CoopConnectMenuVMTests
     private static string[] VisibleHosts(CoopConnectMenuVM viewModel)
     {
         return viewModel.SteamLobbies.Select(lobby => lobby.HostText).ToArray();
+    }
+
+    [Fact]
+    public void LastConnectionTab_IsVisible_WhenSelected()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        Assert.False(viewModel.IsLastConnectionTabVisible);
+
+        SelectLastConnectionTab(viewModel);
+
+        Assert.True(viewModel.IsLastConnectionTabVisible);
+        Assert.False(viewModel.IsDirectTabVisible);
+        Assert.False(viewModel.IsSteamLobbiesTabVisible);
+    }
+
+    [Fact]
+    public void LastConnection_HasNoLastConnection_Initially()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        Assert.True(viewModel.HasNoLastConnection);
+        Assert.False(viewModel.HasLastDirectConnection);
+        Assert.False(viewModel.HasLastSteamLobby);
+    }
+
+    [Fact]
+    public void LastConnection_DirectConnection_SavedAfterConnect()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        viewModel.Ip = "127.0.0.1";
+        viewModel.Port = "4200";
+        viewModel.Password = "secret";
+        viewModel.ActionConnect();
+
+        Assert.True(viewModel.HasLastDirectConnection);
+        Assert.False(viewModel.HasNoLastConnection);
+        Assert.Contains("127.0.0.1:4200", viewModel.LastDirectConnectionText);
+
+        var saved = store.Options.GetSectionOrDefault<LastConnectionData>(
+            LastConnectionData.TabId, LastConnectionData.SectionId, null);
+        Assert.NotNull(saved);
+        Assert.Equal("127.0.0.1", saved.DirectIp);
+        Assert.Equal("4200", saved.DirectPort);
+        Assert.Equal("secret", saved.DirectPassword);
+    }
+
+    [Fact]
+    public void LastConnection_DirectConnection_LoadedByNewInstance()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+
+        using (var viewModel = new CoopConnectMenuVM(browser, messageBroker, store))
+        {
+            viewModel.Ip = "10.0.0.1";
+            viewModel.Port = "5000";
+            viewModel.Password = "";
+            viewModel.ActionConnect();
+        }
+
+        using var viewModel2 = new CoopConnectMenuVM(browser, messageBroker, store);
+        Assert.True(viewModel2.HasLastDirectConnection);
+        Assert.Equal("10.0.0.1", viewModel2.Ip);
+        Assert.Equal("5000", viewModel2.Port);
+        Assert.Contains("10.0.0.1:5000", viewModel2.LastDirectConnectionText);
+    }
+
+    [Fact]
+    public void LastConnection_SteamLobby_SavedAfterJoin()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(CreateLobby(999, "Castle Keep"));
+        viewModel.SteamLobbies[0].ExecuteJoin();
+
+        Assert.True(viewModel.HasLastSteamLobby);
+        Assert.False(viewModel.HasNoLastConnection);
+        Assert.Contains("Castle Keep", viewModel.LastSteamLobbyText);
+
+        var saved = store.Options.GetSectionOrDefault<LastConnectionData>(
+            LastConnectionData.TabId, LastConnectionData.SectionId, null);
+        Assert.NotNull(saved);
+        Assert.Equal(999UL, saved.SteamLobbyId);
+        Assert.Equal("Castle Keep", saved.SteamLobbyHostName);
+    }
+
+    [Fact]
+    public void LastConnection_SteamLobby_LoadedByNewInstance()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+
+        using (var viewModel = new CoopConnectMenuVM(browser, messageBroker, store))
+        {
+            SelectSteamLobbiesTab(viewModel);
+            browser.Complete(CreateLobby(42, "Iron Citadel"));
+            viewModel.SteamLobbies[0].ExecuteJoin();
+        }
+
+        using var viewModel2 = new CoopConnectMenuVM(browser, messageBroker, store);
+        Assert.True(viewModel2.HasLastSteamLobby);
+        Assert.Contains("Iron Citadel", viewModel2.LastSteamLobbyText);
+    }
+
+    private static void SelectLastConnectionTab(CoopConnectMenuVM viewModel)
+    {
+        Assert.Equal(CoopConnectMenuVM.LastConnectionTabId, viewModel.Tabs[2].Id);
+        viewModel.Tabs[2].ExecuteSelection();
+    }
+
+    private sealed class TestCoopOptionsStore : ICoopOptionsStore
+    {
+        public CoopOptionsData Options { get; private set; } = new CoopOptionsData();
+
+        public string FilePath => null;
+
+        public bool TryLoad(out CoopOptionsData options)
+        {
+            options = Options;
+            return true;
+        }
+
+        public CoopOptionsData LoadOrDefault() => Options;
+
+        public void Save(CoopOptionsData options) => Options = options;
     }
 
     private sealed class TestSteamLobbyBrowser : ISteamLobbyBrowser
