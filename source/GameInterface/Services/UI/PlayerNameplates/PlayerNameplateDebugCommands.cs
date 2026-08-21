@@ -22,7 +22,10 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View.Screens;
+using TaleWorlds.ScreenSystem;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -117,6 +120,169 @@ public static class PlayerNameplateDebugCommands
     private const int SiegeFixtureMaximumDefenderRegularTroops = 1;
 
     private static SiegeRosterFixture siegeRosterFixture;
+    private static RemotePlayerCameraBehavior remotePlayerCameraBehavior;
+    private static Camera remotePlayerCamera;
+    private static MatrixFrame remotePlayerCameraLocalFrame;
+    private static Agent focusedRemotePlayer;
+    private static string focusedRemotePlayerControllerId;
+    private static string focusedRemotePlayerView = "none";
+
+    private sealed class RemotePlayerCameraBehavior : MissionBehavior
+    {
+        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
+
+        public override void OnPreDisplayMissionTick(float dt)
+        {
+            UpdateRemotePlayerCameraFrame();
+        }
+
+        public override void OnRemoveBehavior()
+        {
+            if (ReferenceEquals(remotePlayerCameraBehavior, this))
+                remotePlayerCameraBehavior = null;
+            ReleaseRemotePlayerCamera();
+        }
+    }
+
+    [CommandLineArgumentFunction("focus_remote", "coop.debug.playermarkers")]
+    public static string FocusRemotePlayer(List<string> args)
+    {
+        if (ModInformation.IsServer) return "Run this command on a client.";
+        if (args.Count > 1)
+            return "Usage: coop.debug.playermarkers.focus_remote [left|right|wide]";
+
+        string view = args.Count == 1 ? args[0].ToLowerInvariant() : "wide";
+        if (view != "left" && view != "right" && view != "wide")
+            return "Usage: coop.debug.playermarkers.focus_remote [left|right|wide]";
+
+        var mission = Mission.Current;
+        var target = mission?.GetMissionBehavior<PlayerNameplateMissionView>()?.Targets
+            .FirstOrDefault(candidate => candidate.Agent?.IsActive() == true);
+        if (target?.Agent == null)
+            return "No active remote player nameplate target is available.";
+        if (!(ScreenManager.TopScreen is MissionScreen missionScreen) || missionScreen.CombatCamera == null)
+            return "The mission screen is not active.";
+        if (target.Agent.AgentVisuals?.GetEntity() == null)
+            return "The remote player target has no active visual entity.";
+
+        ReleaseRemotePlayerCamera();
+        remotePlayerCamera = Camera.CreateCamera();
+        remotePlayerCamera.FillParametersFrom(missionScreen.CombatCamera);
+        var targetOffset = new Vec3(0f, 0f, 1.1f);
+        Vec3 positionOffset;
+        switch (view)
+        {
+            case "right":
+                positionOffset = new Vec3(3.2f, -5.5f, 2.8f);
+                break;
+            case "wide":
+                positionOffset = new Vec3(-5.5f, -9.5f, 4.4f);
+                break;
+            default:
+                positionOffset = new Vec3(-3.2f, -5.5f, 2.8f);
+                break;
+        }
+        remotePlayerCamera.LookAt(positionOffset, targetOffset, Vec3.Up);
+        remotePlayerCameraLocalFrame = remotePlayerCamera.Frame;
+        remotePlayerCamera.Entity = GameEntity.CreateEmpty(
+            mission.Scene,
+            isModifiableFromEditor: false,
+            createPhysics: false,
+            callScriptCallbacks: false);
+        focusedRemotePlayer = target.Agent;
+        focusedRemotePlayerControllerId = target.ControllerId;
+        focusedRemotePlayerView = view;
+        EnsureRemotePlayerCameraBehavior(mission);
+        UpdateRemotePlayerCameraFrame();
+        missionScreen.CustomCamera = remotePlayerCamera;
+        return GetRemotePlayerCameraState();
+    }
+
+    [CommandLineArgumentFunction("camera_state", "coop.debug.playermarkers")]
+    public static string RemotePlayerCameraState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.playermarkers.camera_state";
+
+        return GetRemotePlayerCameraState();
+    }
+
+    private static string GetRemotePlayerCameraState()
+    {
+        if (remotePlayerCamera == null || remotePlayerCamera.Entity == null ||
+            focusedRemotePlayer == null || !focusedRemotePlayer.IsActive() ||
+            !(ScreenManager.TopScreen is MissionScreen missionScreen) || missionScreen.CombatCamera == null)
+        {
+            return "LIVE_TEST_JSON=" + JsonSerializer.Serialize(new { active = false });
+        }
+
+        UpdateRemotePlayerCameraFrame();
+        MatrixFrame cameraEntityFrame = remotePlayerCamera.Entity.GetGlobalFrame();
+        Vec3 renderedPosition = missionScreen.CombatCamera.Position;
+        Vec3 entityDirection = -cameraEntityFrame.rotation.u;
+        entityDirection.Normalize();
+        Vec3 renderedDirection = missionScreen.CombatCamera.Direction;
+        float directionDot =
+            (renderedDirection.X * entityDirection.X) +
+            (renderedDirection.Y * entityDirection.Y) +
+            (renderedDirection.Z * entityDirection.Z);
+        float positionDelta = (renderedPosition - cameraEntityFrame.origin).Length;
+        bool active = ReferenceEquals(missionScreen.CustomCamera, remotePlayerCamera);
+        return "LIVE_TEST_JSON=" + JsonSerializer.Serialize(new
+        {
+            active,
+            controllerId = focusedRemotePlayerControllerId,
+            view = focusedRemotePlayerView,
+            positionDelta,
+            directionDot
+        });
+    }
+
+    private static void EnsureRemotePlayerCameraBehavior(Mission mission)
+    {
+        if (remotePlayerCameraBehavior != null && ReferenceEquals(remotePlayerCameraBehavior.Mission, mission))
+            return;
+
+        remotePlayerCameraBehavior = new RemotePlayerCameraBehavior();
+        mission.AddMissionBehavior(remotePlayerCameraBehavior);
+    }
+
+    private static bool UpdateRemotePlayerCameraFrame()
+    {
+        if (remotePlayerCamera == null || remotePlayerCamera.Entity == null ||
+            focusedRemotePlayer == null || !focusedRemotePlayer.IsActive())
+        {
+            return false;
+        }
+
+        GameEntity visualEntity = focusedRemotePlayer.AgentVisuals?.GetEntity();
+        if (visualEntity == null) return false;
+
+        MatrixFrame visualFrame = visualEntity.GetGlobalFrame();
+        MatrixFrame globalFrame = visualFrame.TransformToParent(in remotePlayerCameraLocalFrame);
+        remotePlayerCamera.Entity.SetGlobalFrame(globalFrame);
+        return true;
+    }
+
+    private static void ReleaseRemotePlayerCamera()
+    {
+        if (remotePlayerCamera == null) return;
+
+        if (ScreenManager.TopScreen is MissionScreen missionScreen &&
+            ReferenceEquals(missionScreen.CustomCamera, remotePlayerCamera))
+        {
+            missionScreen.CustomCamera = null;
+        }
+
+        if (remotePlayerCamera.Entity == null)
+            remotePlayerCamera.ReleaseCamera();
+        else
+            remotePlayerCamera.ReleaseCameraEntity();
+        remotePlayerCamera = null;
+        focusedRemotePlayer = null;
+        focusedRemotePlayerControllerId = null;
+        focusedRemotePlayerView = "none";
+    }
 
     [CommandLineArgumentFunction("players_state", "coop.debug.playermarkers")]
     public static string PlayersState(List<string> args)
