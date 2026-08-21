@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -69,6 +70,51 @@ internal static class SiegeSetupDebugCommands
             preparationConstructed,
             attackerEngines,
             defenderEngines,
+        });
+    }
+
+    [CommandLineArgumentFunction("setup_stage_defenders", "coop.debug.siege")]
+    public static string StageDefenders(List<string> args)
+    {
+        if (args.Count != 2 || !int.TryParse(args[1], out int expectedPlayerCount) || expectedPlayerCount < 1)
+            return Failure("stage-defenders", "expected settlement id and a positive player count");
+        if (!TryGetServerSettlement(args, 2, out IObjectManager objectManager, out Settlement settlement, out string error))
+            return Failure("stage-defenders", error);
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return Failure("stage-defenders", "player manager is unavailable");
+
+        var connectedPlayers = playerManager.Players.Where(playerManager.IsConnected).ToArray();
+        var playerParties = new List<MobileParty>();
+        foreach (var player in connectedPlayers)
+        {
+            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                return Failure("stage-defenders", "a connected player party was not found");
+            playerParties.Add(party);
+        }
+
+        bool cleanBeforeStage = settlement.IsFortification && settlement.SiegeEvent == null &&
+            settlement.Party?.MapEvent == null && connectedPlayers.Length == expectedPlayerCount &&
+            playerParties.All(party => party.IsActive && party.Party != null && party.MapEvent == null &&
+                party.BesiegerCamp == null && party.CurrentSettlement == null);
+        if (cleanBeforeStage)
+        {
+            foreach (var party in playerParties)
+                EnterSettlementAction.ApplyForParty(party, settlement);
+        }
+
+        int stagedPlayerCount = playerParties.Count(party => party.CurrentSettlement == settlement &&
+            party.MapEvent == null && party.BesiegerCamp == null);
+        return Result(new
+        {
+            success = cleanBeforeStage && stagedPlayerCount == expectedPlayerCount,
+            action = "stage-defenders",
+            settlement = settlement.StringId,
+            expectedPlayerCount,
+            connectedPlayerCount = connectedPlayers.Length,
+            cleanBeforeStage,
+            stagedPlayerCount,
+            siegeActive = settlement.SiegeEvent != null,
+            settlementMapEventActive = settlement.Party?.MapEvent != null,
         });
     }
 
@@ -143,12 +189,14 @@ internal static class SiegeSetupDebugCommands
         var encounter = PlayerEncounter.Current;
         var mapEvent = settlement.Party.MapEvent;
         var currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
+        bool localDefenderInsideCastle = party?.CurrentSettlement == settlement;
         return Result(new
         {
-            success = party != null && mapEvent?.IsSiegeAssault == true,
+            success = party != null && localDefenderInsideCastle && mapEvent?.IsSiegeAssault == true,
             action = "state",
             settlement = settlement.StringId,
             siegeAssault = mapEvent?.IsSiegeAssault == true,
+            localDefenderInsideCastle,
             partyInBesiegerCamp = party?.BesiegerCamp != null,
             partyInMapEvent = party?.MapEvent?.IsSiegeAssault == true,
             encounterActive = encounter != null,
@@ -156,6 +204,29 @@ internal static class SiegeSetupDebugCommands
             playerSiegeActive = party != null && PlayerSiege.PlayerSiegeEvent != null,
             currentMenu,
             currentSiegeState = settlement.CurrentSiegeState.ToString(),
+        });
+    }
+
+    [CommandLineArgumentFunction("setup_defender_staging", "coop.debug.siege")]
+    public static string DefenderStaging(List<string> args)
+    {
+        if (!TryGetClientSettlement(args, out Settlement settlement, out string error))
+            return Failure("defender-staging", error);
+
+        var party = MobileParty.MainParty;
+        var settlementMapEvent = settlement.Party?.MapEvent;
+        bool stagingReady = party?.Party != null && party.CurrentSettlement == settlement &&
+            party.MapEvent == null && party.BesiegerCamp == null && settlementMapEvent == null;
+        return Result(new
+        {
+            success = stagingReady,
+            action = "defender-staging",
+            settlement = settlement.StringId,
+            localDefenderInsideCastle = party?.CurrentSettlement == settlement,
+            localPartyReady = party?.Party != null,
+            localPartyMapEventActive = party?.MapEvent != null,
+            localPartyInBesiegerCamp = party?.BesiegerCamp != null,
+            settlementMapEventActive = settlementMapEvent != null,
         });
     }
 
@@ -173,8 +244,10 @@ internal static class SiegeSetupDebugCommands
         var attackerLeader = attackerSide?.LeaderParty;
         bool mapEventActive = mapEvent != null &&
             !mapEvent.IsFinalized && mapEvent.BattleState == BattleState.None;
+        bool localDefenderInsideCastle = party?.CurrentSettlement == settlement;
         bool topologyReady = party?.Party != null && mapEvent?.IsSiegeAssault == true && mapEventActive &&
-            defenderSide != null && attackerSide != null && defenderLeader != null && attackerLeader != null;
+            defenderSide != null && attackerSide != null && defenderLeader != null && attackerLeader != null &&
+            localDefenderInsideCastle;
         return Result(new
         {
             success = topologyReady,
@@ -187,6 +260,8 @@ internal static class SiegeSetupDebugCommands
             defenderLeaderReady = defenderLeader != null,
             attackerLeaderReady = attackerLeader != null,
             localPartyReady = party?.Party != null,
+            localDefenderInsideCastle,
+            localPartyInExpectedMapEvent = party?.MapEvent == mapEvent,
         });
     }
 
@@ -204,8 +279,11 @@ internal static class SiegeSetupDebugCommands
         var attackerLeader = attackerSide?.LeaderParty;
         bool mapEventActive = mapEvent != null &&
             !mapEvent.IsFinalized && mapEvent.BattleState == BattleState.None;
+        bool localDefenderInsideCastle = party?.CurrentSettlement == settlement;
+        bool localPartyOnUnexpectedMapEvent = party?.MapEvent != null && party.MapEvent != mapEvent;
         bool topologyReady = party?.Party != null && mapEvent?.IsSiegeAssault == true && mapEventActive &&
-            defenderSide != null && attackerSide != null && defenderLeader != null && attackerLeader != null;
+            defenderSide != null && attackerSide != null && defenderLeader != null && attackerLeader != null &&
+            localDefenderInsideCastle;
         if (!topologyReady)
         {
             return Result(new
@@ -221,24 +299,32 @@ internal static class SiegeSetupDebugCommands
                 defenderLeaderReady = defenderLeader != null,
                 attackerLeaderReady = attackerLeader != null,
                 localPartyReady = party?.Party != null,
+                localDefenderInsideCastle,
             });
         }
-        if (party.MapEvent != null || party.BesiegerCamp != null || PlayerEncounter.Current != null)
+        if (localPartyOnUnexpectedMapEvent || party.BesiegerCamp != null)
         {
             return Result(new
             {
                 success = false,
                 action = "join-defender",
                 settlement = settlement.StringId,
-                reason = "the local player is already in a siege setup state",
+                reason = "the local player is already in another siege setup state",
+                localPartyOnUnexpectedMapEvent,
+                localPartyInBesiegerCamp = party.BesiegerCamp != null,
             });
         }
 
         try
         {
             PlayerEncounter.Start();
-            PlayerEncounter.Current.SetupFields(attackerLeader, party.Party);
-            PlayerEncounter.JoinBattle(BattleSideEnum.Defender);
+            if (party.MapEvent == mapEvent)
+                PlayerEncounter.Init();
+            else
+            {
+                PlayerEncounter.Current.SetupFields(attackerLeader, party.Party);
+                PlayerEncounter.JoinBattle(BattleSideEnum.Defender);
+            }
         }
         catch (Exception exception)
         {
@@ -254,10 +340,13 @@ internal static class SiegeSetupDebugCommands
 
         return Result(new
         {
-            success = PlayerEncounter.Current != null && PlayerEncounter.Battle?.IsSiegeAssault == true,
+            success = PlayerEncounter.Current != null && PlayerEncounter.Battle?.IsSiegeAssault == true &&
+                party.CurrentSettlement == settlement && party.BesiegerCamp == null,
             action = "join-defender",
             settlement = settlement.StringId,
             topologyReady = true,
+            localDefenderInsideCastle = party.CurrentSettlement == settlement,
+            existingMapEventParty = party.MapEvent == mapEvent,
             encounterActive = PlayerEncounter.Current != null,
             encounterSiegeAssault = PlayerEncounter.Battle?.IsSiegeAssault == true,
         });
