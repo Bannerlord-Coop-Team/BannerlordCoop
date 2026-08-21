@@ -44,8 +44,8 @@ public class PartyReserve
     /// <remarks>
     /// Together with <see cref="SideReserve.PlayerOwnedPartyCount"/> this is what lets every owner guarantee
     /// its player an agent WITHOUT overshooting the allocation. The share is computed as: reserve one troop
-    /// for each of the side's player-owned parties, apportion what remains across the whole side by the same
-    /// cumulative flooring as <see cref="SideOffset"/>, and add the reserved troop back for the party this
+    /// for each of the side's player-owned parties, remove those troops from the party intervals, apportion
+    /// what remains by cumulative flooring, and add the reserved troop back for the party this
     /// client owns. Those pieces sum to exactly the allocation, because the flooring covers the remainder
     /// exactly once and there are exactly as many reserved troops as player-owned parties.
     ///

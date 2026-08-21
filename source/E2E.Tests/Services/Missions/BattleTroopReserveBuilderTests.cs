@@ -88,6 +88,8 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
             var ownedParty = Assert.Single(attackerSide.Parties);
             Assert.Equal(attackerHeroId, ownedParty.Entries[0].CharacterId);
             Assert.Equal(0, ownedParty.PlayerOwnedRank);
+            Assert.True(ownedParty.HasPlayerOwnedPartiesBefore);
+            Assert.Equal(0, ownedParty.PlayerOwnedPartiesBefore);
             Assert.Equal(6, attackerSide.TotalTroops);
             Assert.Equal(6, defenderKnowledge.TotalTroops);
             Assert.Equal(1, attackerSide.PlayerOwnedPartyCount);
@@ -144,6 +146,9 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
             Assert.Equal(beforeDefenders.TotalTroops + 20, afterDefenders.TotalTroops);
             Assert.Equal(beforeDefenders.Parties.Length + 1, afterDefenders.Parties.Length);
             Assert.Equal(20, afterDefenders.Parties.Sum(party => party.Entries.Length));
+            var lateReserve = Assert.Single(afterDefenders.Parties);
+            Assert.True(lateReserve.HasPlayerOwnedPartiesBefore);
+            Assert.Equal(1, lateReserve.PlayerOwnedPartiesBefore);
         });
     }
 

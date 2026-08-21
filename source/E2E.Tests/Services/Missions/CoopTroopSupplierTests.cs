@@ -305,6 +305,38 @@ public class CoopTroopSupplierTests
     }
 
     [Fact]
+    public void PlayerReservations_NeverAllocateMoreThanAnOwnersReserve()
+    {
+        const int total = 128;
+        const int playerParties = 3;
+
+        var first = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        first.SetReserve(new[] { Party("P1", 30, isReceiverPlayerParty: true, playerOwnedRank: 0,
+            playerOwnedPartiesBefore: 0) }, total, playerParties, authoritativeBattleSize: 1000);
+        var middle = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        middle.SetReserve(new[] { Party("P2", 63, isReceiverPlayerParty: true, sideOffset: 30,
+            playerOwnedRank: 1, playerOwnedPartiesBefore: 1) }, total, playerParties,
+            authoritativeBattleSize: 1000);
+        var last = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        last.SetReserve(new[] { Party("P3", 35, isReceiverPlayerParty: true, sideOffset: 93,
+            playerOwnedRank: 2, playerOwnedPartiesBefore: 2) }, total, playerParties,
+            authoritativeBattleSize: 1000);
+
+        var shares = new[]
+        {
+            first.OwnedShareOf(total),
+            middle.OwnedShareOf(total),
+            last.OwnedShareOf(total),
+        };
+
+        Assert.Equal(new[] { 30, 63, 35 }, shares);
+        Assert.Equal(total, shares.Sum());
+        Assert.True(shares[0] <= first.TotalTroops);
+        Assert.True(shares[1] <= middle.TotalTroops);
+        Assert.True(shares[2] <= last.TotalTroops);
+    }
+
+    [Fact]
     public void ExactApportionment_HoldsForAwkwardSplits()
     {
         // Deliberately indivisible: three owners, a total and an allocation that share no clean factor.
@@ -411,8 +443,16 @@ public class CoopTroopSupplierTests
 
         foreach (var allocation in new[] { 2, 3, 7, 50, 100, 337, 999 })
         {
-            Assert.Equal(allocation,
-                p1.OwnedShareOf(allocation) + p2.OwnedShareOf(allocation) + ai.OwnedShareOf(allocation));
+            var shares = new[]
+            {
+                p1.OwnedShareOf(allocation),
+                p2.OwnedShareOf(allocation),
+                ai.OwnedShareOf(allocation),
+            };
+            Assert.Equal(allocation, shares.Sum());
+            Assert.True(shares[0] <= p1.TotalTroops);
+            Assert.True(shares[1] <= p2.TotalTroops);
+            Assert.True(shares[2] <= ai.TotalTroops);
         }
     }
 
