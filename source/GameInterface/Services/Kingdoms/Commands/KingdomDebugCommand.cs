@@ -152,7 +152,30 @@ public class KingdomDebugCommand
         if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
 
         KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(decision);
+#if DEBUG
+        InquiryData inquiry = null;
+        Action<InquiryData, bool, bool> captureInquiry = (data, _, _) => inquiry = data;
+        InformationManager.OnShowInquiry += captureInquiry;
+        try
+        {
+            Game.Current.GameStateManager.PushState(kingdomState, 0);
+        }
+        finally
+        {
+            InformationManager.OnShowInquiry -= captureInquiry;
+        }
+
+        if (inquiry == null || inquiry.AffirmativeAction == null ||
+            !string.Equals(inquiry.TitleText, GameTexts.FindText("str_decision").ToString(), StringComparison.Ordinal))
+        {
+            return "The decision confirmation did not open.";
+        }
+
+        InformationManager.HideInquiry();
+        inquiry.AffirmativeAction();
+#else
         Game.Current.GameStateManager.PushState(kingdomState, 0);
+#endif
         return "KINGDOM_DECISION_SCREEN_OPENED";
     }
 
