@@ -66,6 +66,32 @@ public class MapEventDebugCommandsFixtureRosterTests
     }
 
     [Fact]
+    public void LimitLateJoinModeFixtureRosters_UsesOneRegularTroopAcrossAllRosters()
+    {
+        var firstRoster = TroopRoster.CreateDummyTroopRoster();
+        var secondRoster = TroopRoster.CreateDummyTroopRoster();
+        var firstHero = CreateHeroCharacter();
+        var secondHero = CreateHeroCharacter();
+        var firstRegular = new CharacterObject();
+        var secondRegular = new CharacterObject();
+        firstRoster.data[0] = new TroopRosterElement(firstHero) { Number = 1 };
+        firstRoster.data[1] = new TroopRosterElement(firstRegular) { Number = 8 };
+        firstRoster._count = 2;
+        secondRoster.data[0] = new TroopRosterElement(secondHero) { Number = 1 };
+        secondRoster.data[1] = new TroopRosterElement(secondRegular) { Number = 8 };
+        secondRoster._count = 2;
+
+        MapEventDebugCommands.LimitLateJoinModeFixtureRosters(
+            new[] { firstRoster, secondRoster },
+            1);
+
+        Assert.Equal(1, firstRoster.GetTroopCount(firstHero));
+        Assert.Equal(1, secondRoster.GetTroopCount(secondHero));
+        Assert.Equal(1, firstRoster.GetTroopCount(firstRegular));
+        Assert.Equal(0, secondRoster.GetTroopCount(secondRegular));
+    }
+
+    [Fact]
     public void RestoreLateJoinModeFixtureMemberRoster_RestoresCountsWoundsAndXp()
     {
         var roster = new TroopRoster();

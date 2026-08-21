@@ -113,7 +113,8 @@ public static class PlayerNameplateDebugCommands
     }
 
 #if DEBUG
-    private const int SiegeFixtureMaximumRegularTroops = 1;
+    private const int SiegeFixtureMaximumAttackerRegularTroops = 0;
+    private const int SiegeFixtureMaximumDefenderRegularTroops = 1;
 
     private static SiegeRosterFixture siegeRosterFixture;
 
@@ -274,10 +275,13 @@ public static class PlayerNameplateDebugCommands
         siegeRosterFixture = fixture;
         try
         {
-            foreach (var party in parties)
+            foreach (var party in attackers)
                 MapEventDebugCommands.LimitLateJoinModeFixtureRoster(
                     party.MemberRoster,
-                    SiegeFixtureMaximumRegularTroops);
+                    SiegeFixtureMaximumAttackerRegularTroops);
+            MapEventDebugCommands.LimitLateJoinModeFixtureRosters(
+                defenders.Select(party => party.MemberRoster),
+                SiegeFixtureMaximumDefenderRegularTroops);
 
             if (attackers.Any(party => party.MemberRoster.TotalHealthyCount <= 0) ||
                 defenders.All(party => party.MemberRoster.TotalHealthyCount <= 0))
@@ -297,7 +301,8 @@ public static class PlayerNameplateDebugCommands
             settlementId = settlement.StringId,
             attackerPartyCount = attackers.Length,
             defenderPartyCount = defenders.Length,
-            maximumRegularTroopsPerParty = SiegeFixtureMaximumRegularTroops,
+            maximumAttackerRegularTroopsPerParty = SiegeFixtureMaximumAttackerRegularTroops,
+            maximumDefenderRegularTroopsTotal = SiegeFixtureMaximumDefenderRegularTroops,
             attackerTroops = attackers.Sum(party => party.MemberRoster.TotalHealthyCount),
             defenderTroops = defenders.Sum(party => party.MemberRoster.TotalHealthyCount)
         });

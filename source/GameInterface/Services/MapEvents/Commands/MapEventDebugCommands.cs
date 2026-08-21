@@ -2512,6 +2512,31 @@ public class MapEventDebugCommands
         roster.RemoveZeroCounts();
     }
 
+    internal static void LimitLateJoinModeFixtureRosters(
+        IEnumerable<TroopRoster> rosters,
+        int maximumRegularTroops)
+    {
+        var remainingRegularTroops = maximumRegularTroops;
+        foreach (var roster in rosters)
+        {
+            LimitLateJoinModeFixtureRoster(roster, Math.Max(remainingRegularTroops, 0));
+            remainingRegularTroops -= GetHealthyRegularTroopCount(roster);
+        }
+    }
+
+    private static int GetHealthyRegularTroopCount(TroopRoster roster)
+    {
+        var healthyRegularTroops = 0;
+        for (var index = 0; index < roster.Count; index++)
+        {
+            var element = roster.GetElementCopyAtIndex(index);
+            if (!element.Character.IsHero)
+                healthyRegularTroops += element.Number - element.WoundedNumber;
+        }
+
+        return healthyRegularTroops;
+    }
+
     private static bool RestoreLateJoinModeFixtureRoster(
         string mobilePartyId,
         TroopRosterElement[] memberRoster,
