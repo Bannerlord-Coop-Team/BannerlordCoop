@@ -145,7 +145,6 @@ namespace Coop
             // Creates the handler during launch
             if (!isServer)
             {
-                
                 unsupportedModuleWarning = new UnsupportedModuleWarningHandler(
                     moduleInfoProvider,
                     new CoopOptionsStore(),
