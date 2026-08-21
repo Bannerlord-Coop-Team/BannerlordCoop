@@ -96,6 +96,8 @@ internal readonly struct NetworkRequestPeaceBarter : ICommand
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkPeaceBarterResult : ICommand
 {
+    public const string InactiveEncounterReason = "The peace encounter is no longer active.";
+
     [ProtoMember(1)]
     public readonly string ContextId;
     [ProtoMember(2)]

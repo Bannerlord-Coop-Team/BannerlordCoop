@@ -504,8 +504,9 @@ internal class PlayerCaptivityServerHandler : IHandler
 
     /// <summary>
     /// Server-authoritative release of a player (client) hero from captivity, shared by the client-requested
-    /// and server-initiated paths. Restores the deactivated player party to the map and clears the captivity
-    /// state — which auto-syncs to the clients through <see cref="Hero.PartyBelongedToAsPrisoner"/>.
+    /// and server-initiated paths. Restores the party's captivity state and release position, then lets the
+    /// server visibility handler decide whether its synchronized owner is ready for map activation. The cleared
+    /// captivity state auto-syncs to the clients through <see cref="Hero.PartyBelongedToAsPrisoner"/>.
     /// Re-implements native <see cref="PlayerCaptivity"/>.EndCaptivityInternal for a hero that is not this
     /// instance's main hero; the menu/encounter cleanup the native version does happens on the owning client
     /// instead (<see cref="PlayerCaptivityClientHandler"/>).
@@ -612,7 +613,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (playerHero.IsAlive)
         {
             playerParty.Position = releasePosition;
-            playerParty.IsActive = true;
             playerParty.IgnoreForHours(4);
             if (captorParty?.MobileParty?.IsActive == true)
             {
@@ -638,16 +638,12 @@ internal class PlayerCaptivityServerHandler : IHandler
                 SkillLevelingManager.OnMainHeroReleasedFromCaptivity(PlayerCaptivity.CaptivityStartTime.ElapsedHoursUntilNow);
             }
 
-            if (!playerParty.IsCurrentlyAtSea)
-            {
-                playerParty.Party.UpdateVisibilityAndInspected(playerParty.Position);
-            }
             SyncReleasePosition(playerParty, releasePosition);
 
-            // Rebuild the map mesh after the roster/leader/position are restored, so the freed party's map
-            // figure reflects its (re-mounted) state rather than the stale on-foot captive mesh.
+            // The visibility handler keeps offline/loading owners parked and rebuilds the map figure only
+            // after campaign synchronization has completed.
             playerParty.Party.SetVisualAsDirty();
-            RecreateVisual(playerParty);
+            messageBroker.Publish(this, new PlayerPartyReleasedFromCaptivity(playerParty));
         }
     }
 
@@ -687,33 +683,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         }
 
         network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
-    }
-
-    private void RecreateVisual(MobileParty party)
-    {
-        RemoveVisual(party);
-
-        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return;
-
-        using (new AllowedThread())
-        {
-            party.CreateNewPartyVisual();
-        }
-
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual == null)
-        {
-            Logger.Error("CreateNewPartyVisual did not produce a visual for party {PartyId}", party.StringId);
-            return;
-        }
-
-        if (!objectManager.AddNewObject(partyVisual, out var visualId))
-        {
-            Logger.Error("Failed to register recreated visual for party {PartyId}", party.StringId);
-            return;
-        }
-
-        network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
     }
 
     /// <summary>

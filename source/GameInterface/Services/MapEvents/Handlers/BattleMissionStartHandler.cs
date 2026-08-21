@@ -13,6 +13,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -49,6 +50,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
+    private static long attackMissionStartSequence;
 
     // Server-side: scene inputs chosen once per map event and reused for late entrants.
     private readonly ConcurrentDictionary<string, int> mapEventTerrainSeeds = new ConcurrentDictionary<string, int>();
@@ -302,6 +304,15 @@ internal class BattleMissionStartHandler : IHandler
 
     private void SendMissionStart(IReadOnlyList<MissionParticipant> participants, IMessage message)
     {
+        if (message is NetworkStartAttackMission attackMission)
+        {
+            Logger.Information(
+                "[BattleMissionLifecycle] Sending attack mission start: mapEvent={MapEventId} initiatingParty={InitiatingPartyId} participantCount={ParticipantCount}",
+                attackMission.MapEventId,
+                attackMission.InitiatingPartyId,
+                participants.Count);
+        }
+
         foreach (var participant in participants)
             network.Send(participant.Peer, message);
     }
@@ -409,24 +420,35 @@ internal class BattleMissionStartHandler : IHandler
         // changes from the main thread; doing it from the network thread races its
         // layer lists and crashes the game.
         var message = payload.What;
+        long sequence = Interlocked.Increment(ref attackMissionStartSequence);
+        Logger.Information(
+            "[BattleMissionLifecycle] Received attack mission start: sequence={Sequence} mapEvent={MapEventId} initiatingParty={InitiatingPartyId}",
+            sequence,
+            message.MapEventId,
+            message.InitiatingPartyId);
         GameThread.RunSafe(
-            () => ShowLoadingScreenAndQueueAttackMission(message),
+            () => ShowLoadingScreenAndQueueAttackMission(message, sequence),
             context: nameof(Handle_NetworkStartAttackMission));
     }
 
-    private void ShowLoadingScreenAndQueueAttackMission(NetworkStartAttackMission message)
+    private void ShowLoadingScreenAndQueueAttackMission(NetworkStartAttackMission message, long sequence)
     {
         if (!TryGetValidBattle(nameof(NetworkStartAttackMission), message.MapEventId, out _))
+        {
+            LogAttackMissionLifecycle("rejected before queue", sequence, message.MapEventId);
             return;
+        }
 
         LoadingWindow.EnableGlobalLoadingWindow();
+        LogAttackMissionLifecycle("queued", sequence, message.MapEventId);
 
         // MissionState enables the loading window only after building every mission behavior.
         // Defer that work one frame so the window is rendered before setup can stall the map.
         GameThread.EnqueueSafe(() =>
         {
+            LogAttackMissionLifecycle("executing queued open", sequence, message.MapEventId);
             OpenAttackMission(message.MapEventId, message.RandomTerrainSeed, message.AtmosphereOnCampaign,
-                message.InitiatingPartyId);
+                message.InitiatingPartyId, sequence);
 
             if (MissionState.Current == null)
                 LoadingWindow.DisableGlobalLoadingWindow();
@@ -579,21 +601,26 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     private void OpenAttackMission(string mapEventId, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign,
-        string initiatingPartyId)
+        string initiatingPartyId, long sequence)
     {
         bool spawnGateEngaged = false;
         try
         {
             if (!TryGetValidBattle(nameof(NetworkStartAttackMission), mapEventId, out var battle))
+            {
+                LogAttackMissionLifecycle("rejected at open", sequence, mapEventId);
                 return;
+            }
 
             objectManager.TryGetId(MobileParty.MainParty, out var localPartyId);
             if (!ShouldOpenBattleMission(Hero.MainHero?.IsWounded == true, localPartyId, initiatingPartyId))
             {
                 Logger.Information("Not opening {Message}: the local player is wounded and another player started the battle", nameof(NetworkStartAttackMission));
+                LogAttackMissionLifecycle("rejected wounded non-initiator", sequence, mapEventId);
                 return;
             }
 
+            LogAttackMissionLifecycle("opening", sequence, mapEventId);
             InitializePlayerEncounter(battle);
             MissionInitializerRecord rec2 = missionInitializerResolver.Create(battle, randomTerrainSeed, atmosphereOnCampaign);
 
@@ -616,25 +643,53 @@ internal class BattleMissionStartHandler : IHandler
             {
                 var mission = battleLauncher.OpenCoopFieldBattle(rec2);
                 if (mission != null)
+                {
                     spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+                    Logger.Information(
+                        "[BattleMissionLifecycle] Attack mission opened: sequence={Sequence} mapEvent={MapEventId} scene={Scene} missionStatePresent={MissionStatePresent} missionPresent={MissionPresent}",
+                        sequence,
+                        mapEventId,
+                        mission.SceneName,
+                        MissionState.Current != null,
+                        Mission.Current != null);
+                }
                 else
+                {
                     Logger.Error("[BattleSync] Coop field-battle launcher returned no mission");
+                    LogAttackMissionLifecycle("launcher returned no mission", sequence, mapEventId);
+                }
             }
             else
             {
                 Logger.Error("[BattleSync] ICoopFieldBattleLauncher unavailable; cannot safely open the field battle mission");
+                LogAttackMissionLifecycle("launcher unavailable", sequence, mapEventId);
             }
         }
         catch (Exception e)
         {
             // GameThread runs queued actions unguarded, so a throw from here
             // would escape into the game's main tick and crash it.
-            Logger.Error(e, "Failed to open the battle mission for {Message}", nameof(NetworkStartAttackMission));
+            Logger.Error(e,
+                "[BattleMissionLifecycle] Failed to open attack mission: sequence={Sequence} mapEvent={MapEventId} message={Message}",
+                sequence,
+                mapEventId,
+                nameof(NetworkStartAttackMission));
         }
         finally
         {
             UnwindSpawnGateAfterFailedOpen(spawnGateEngaged);
         }
+    }
+
+    private void LogAttackMissionLifecycle(string stage, long sequence, string mapEventId)
+    {
+        Logger.Information(
+            "[BattleMissionLifecycle] Attack mission {Stage}: sequence={Sequence} mapEvent={MapEventId} missionStatePresent={MissionStatePresent} missionPresent={MissionPresent}",
+            stage,
+            sequence,
+            mapEventId,
+            MissionState.Current != null,
+            Mission.Current != null);
     }
 
     internal static void InitializePlayerEncounter(MapEvent battle)
