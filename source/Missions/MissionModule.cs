@@ -114,6 +114,9 @@ public class MissionModule : Module
         builder.RegisterType<LocationAgentSpawnBatchCodec>()
             .As<ILocationAgentSpawnBatchCodec>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<LocationControllerWithdrawalState>()
+            .As<ILocationControllerWithdrawalState>()
+            .InstancePerDependency();
 
         // BR-102 host-epoch receiver policy. InstancePerDependency so each CoopBattleController (one per
         // battle) is injected a FRESH policy whose accepted-epoch watermark starts clean and never leaks

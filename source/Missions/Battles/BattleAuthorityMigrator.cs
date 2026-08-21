@@ -20,14 +20,19 @@ namespace Missions.Battles;
 /// <summary>
 /// Ownership changes when a player leaves a coop battle. A graceful leave withdraws the player's own-party
 /// troops on every client. A disconnect instead leaves those troops in the battle for the current or promoted
-/// host to adopt. When the departed player was the host, the server promotes a successor. Because that adoption
-/// is local to the acting host, every other registry can keep inherited NPC agents keyed to an earlier host.
-/// The promotion therefore also sweeps: the new host
+/// host to adopt. When the departed player was the host, the server promotes a successor. Every peer applies
+/// the same authority revision, while the promoted peer also revives the adopted AI. The promotion also sweeps:
+/// the new host
 /// adopts every agent still keyed to ANY controller no longer in the mission, not just the departed host's —
 /// otherwise agents the old host merely HELD by adoption would be left driverless.
 /// </summary>
 public interface IBattleAuthorityMigrator : IDisposable
 {
+    /// <summary>
+    /// [Game thread] Apply current authority to a retained former-host record that spawned after migration.
+    /// Every peer corrects its registry; the promoted host also revives battle AI.
+    /// </summary>
+    void ApplyLateSpawnedPuppet(Agent agent, Guid agentId, Agent mount, Guid mountAgentId);
 }
 
 /// <inheritdoc cref="IBattleAuthorityMigrator"/>
@@ -295,22 +300,40 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 controllerId, removed, transferred);
     }
 
-    // [New host] The previous host departed and the server promoted us — adopt its orphaned agents so the
-    // battle continues under us. Published only to the promoted client, so no host check here. A graceful
-    // retreat records a withdrawal and excludes the old host's own party; a disconnect records nothing, so
-    // every already-fielded survivor is adopted.
+    // [All remaining clients] Apply the server's host epoch to registry authority. The promoted host also
+    // revives the adopted agents as battle AI.
     private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
     {
         if (payload.What.MapEventId != session.InstanceId) return;
 
         var previousHost = payload.What.PreviousHostControllerId;
-        AdoptAgentsFrom(previousHost, "host migration", withdrawOwnParty: withdrawnHosts.Remove(previousHost));
+        var newHost = payload.What.NewHostControllerId;
+        long? authorityRevision = payload.What.AuthorityRevision >= 0
+            ? payload.What.AuthorityRevision
+            : null;
+
+        // Keep the two-argument event constructor usable by focused tests and older local publishers.
+        if (string.IsNullOrEmpty(newHost))
+            newHost = session.OwnControllerId;
+
+        if (!session.IsOwn(newHost))
+        {
+            TransferRemoteAuthority(previousHost, newHost, authorityRevision);
+            withdrawnHosts.Remove(previousHost);
+            return;
+        }
+
+        AdoptAgentsFrom(
+            previousHost,
+            "host migration",
+            withdrawOwnParty: withdrawnHosts.Remove(previousHost),
+            authorityRevision);
 
         // The departed host may have inherited NPC agents through an earlier host migration. Other clients can
         // still key those agents to an older absent host, so adopting only the latest host would leave them
         // frozen. Sweep every absent authority in the migration chain. Idempotent: once swept, the agents are
         // keyed to us and a duplicate migration event finds nothing absent-keyed.
-        SweepAgentsOfAbsentControllers(previousHost);
+        SweepAgentsOfAbsentControllers(previousHost, authorityRevision);
 
         // If the battle was already live when we were promoted, release the NPC AI we just adopted — a still-
         // deploying new host has AI ticking off, which would otherwise hold them frozen even though they were
@@ -322,7 +345,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // the mission — NPC orphans left behind by earlier adoptions in the host line that just departed. The
     // withdrawal record is consumed per swept controller for the same reason as the migration adoption above:
     // a departed host's own-party troops withdraw, and only the AI it ran should be (re-)adopted.
-    private void SweepAgentsOfAbsentControllers(string previousHost)
+    private void SweepAgentsOfAbsentControllers(string previousHost, long? authorityRevision)
     {
         var present = new HashSet<string>(missionContext.ControllersInMission);
 
@@ -333,8 +356,91 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             if (session.IsOwn(controllerId)) continue;
             if (present.Contains(controllerId)) continue; // still connected — its owner drives them
 
-            AdoptAgentsFrom(controllerId, "host migration orphan sweep", withdrawOwnParty: withdrawnHosts.Remove(controllerId));
+            AdoptAgentsFrom(
+                controllerId,
+                "host migration orphan sweep",
+                withdrawOwnParty: withdrawnHosts.Remove(controllerId),
+                authorityRevision);
         }
+    }
+
+    private void TransferRemoteAuthority(
+        string previousHost,
+        string newHost,
+        long? authorityRevision)
+    {
+        if (string.IsNullOrEmpty(newHost)) return;
+
+        var absentControllers = new HashSet<string>();
+        if (!string.IsNullOrEmpty(previousHost))
+            absentControllers.Add(previousHost);
+
+        var present = new HashSet<string>(missionContext.ControllersInMission);
+        foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
+        {
+            if (string.IsNullOrEmpty(controllerId)) continue;
+            if (session.IsOwn(controllerId)) continue;
+            if (present.Contains(controllerId)) continue;
+            absentControllers.Add(controllerId);
+        }
+
+        var registry = coopMissionComponent.AgentRegistry;
+        GameThread.RunSafe(() =>
+        {
+            foreach (var controllerId in absentControllers)
+            {
+                foreach (var info in registry.GetAgents(controllerId))
+                {
+                    if (authorityRevision.HasValue)
+                    {
+                        registry.TryTransferAuthority(
+                            newHost,
+                            info.AgentId,
+                            authorityRevision.Value);
+                    }
+                    else
+                    {
+                        registry.TryTransferAuthority(newHost, info.AgentId);
+                    }
+                }
+            }
+        }, context: nameof(TransferRemoteAuthority));
+    }
+
+    public void ApplyLateSpawnedPuppet(
+        Agent agent,
+        Guid agentId,
+        Agent mount,
+        Guid mountAgentId)
+    {
+        if (agent == null || agentId == Guid.Empty) return;
+
+        string hostControllerId = session.HostControllerId;
+        long authorityRevision = session.HostEpoch - 1L;
+        if (string.IsNullOrEmpty(hostControllerId) || authorityRevision < 0) return;
+
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryTransferAuthority(hostControllerId, agentId, authorityRevision)) return;
+        if (mount != null && mountAgentId != Guid.Empty)
+            registry.TryTransferAuthority(hostControllerId, mountAgentId, authorityRevision);
+        if (!session.IsLocalHost || Mission.Current == null || !agent.IsActive()) return;
+
+        bool activateAi = deployment.IsActivated;
+        if (activateAi)
+            Mission.Current.AllowAiTicking = true;
+
+        var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
+        interpolator.Forget(agent);
+        if (mount != null) interpolator.Forget(mount);
+
+        ConvertPuppetToHostAi(agent, activateAi);
+        if (!agent.IsRunningAway && agent.Formation != null)
+            agent.Formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
+
+        Logger.Information(
+            "[BattleSync] Late-adopted agent {AgentId} spawned after host migration at revision {Revision}",
+            agentId,
+            authorityRevision);
     }
 
     // Take over the agents owned by the departed controller: move authority to us (so the movement poller
@@ -343,7 +449,11 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // movement. On departure the old host's own-party troops withdraw instead (despawned by
     // DespawnOwnPartyTroops on every client), so they are excluded here — the disjoint sets are what make the
     // despawn and this adoption race-free.
-    private void AdoptAgentsFrom(string controllerId, string reason, bool withdrawOwnParty)
+    private void AdoptAgentsFrom(
+        string controllerId,
+        string reason,
+        bool withdrawOwnParty,
+        long? authorityRevision = null)
     {
         if (string.IsNullOrEmpty(controllerId)) return;
         if (session.IsOwn(controllerId)) return;
@@ -370,7 +480,19 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             if (adopted.Count > 0)
             {
                 foreach (var info in adopted)
-                    registry.TryTransferAuthority(session.OwnControllerId, info.AgentId);
+                {
+                    if (authorityRevision.HasValue)
+                    {
+                        registry.TryTransferAuthority(
+                            session.OwnControllerId,
+                            info.AgentId,
+                            authorityRevision.Value);
+                    }
+                    else
+                    {
+                        registry.TryTransferAuthority(session.OwnControllerId, info.AgentId);
+                    }
+                }
 
                 if (Mission.Current == null) return;
 

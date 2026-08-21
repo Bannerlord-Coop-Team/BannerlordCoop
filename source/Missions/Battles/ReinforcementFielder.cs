@@ -136,6 +136,7 @@ public class ReinforcementFielder : IReinforcementFielder
     private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
     {
         if (payload.What.MapEventId != session.InstanceId) return;
+        if (!session.IsLocalHost) return;
         PrepareForReserveOwnershipExpansion();
     }
 

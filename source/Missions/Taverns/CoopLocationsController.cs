@@ -55,6 +55,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         ILocationNpcHoldRegistry npcHoldRegistry,
         IBattleAgentBudget agentBudget,
         ILocationAgentSpawnBatchCodec spawnBatchCodec,
+        ILocationControllerWithdrawalState withdrawalState,
         IMissionContext missionContext,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
@@ -86,7 +87,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             messageBroker, coopMissionComponent, session, bindingMap, partyAgentMap, missionContext, npcHoldRegistry);
         npcPuppetSpawner = new LocationPuppetSpawner(
             messageBroker, objectManager, coopMissionComponent, session, bindingMap, partyAgentMap,
-            rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator);
+            rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState);
         populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);

@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
@@ -275,12 +275,21 @@ public class TournamentSpawnManifestBuilder
         if (data.ControllerId != session.OwnControllerId)
             agent.Controller = AgentControllerType.None;
 
-        coopMissionComponent.AgentRegistry.TryRegisterAgent(data.ControllerId, data.AgentId, agent);
+        coopMissionComponent.AgentRegistry.TryRegisterAgent(
+            data.ControllerId,
+            data.ControllerId,
+            data.ControllerId,
+            data.AgentId,
+            0,
+            agent,
+            data.AuthorityRevision);
         if (data.MountAgentId != Guid.Empty)
             coopMissionComponent.AgentRegistry.TryRegisterAgent(
                 data.ControllerId,
                 data.MountAgentId,
-                agent.MountAgent);
+                0,
+                agent.MountAgent,
+                data.MountAuthorityRevision);
     }
     private bool TrySerializeEquipment(
         MissionEquipment missionEquipment,

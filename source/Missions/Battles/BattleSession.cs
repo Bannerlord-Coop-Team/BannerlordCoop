@@ -1,4 +1,4 @@
-using GameInterface.Services.Entity;
+﻿using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 
 namespace Missions.Battles;
@@ -21,6 +21,9 @@ public interface IBattleSession
 
     /// <summary>True if this client is the elected host of this battle. False while no instance is set.</summary>
     bool IsLocalHost { get; }
+
+    /// <summary>The current battle host controller id, or null before assignment.</summary>
+    string HostControllerId { get; }
 
     /// <summary>
     /// The epoch of the current host assignment for this battle (BR-102): the server issues 1 at the
@@ -63,6 +66,11 @@ public class BattleSession : IBattleSession
     public bool HasInstance => InstanceId != null;
 
     public bool IsLocalHost => InstanceId != null && hostRegistry.IsHost(InstanceId);
+
+    public string HostControllerId => InstanceId != null
+        && hostRegistry.TryGet(InstanceId, out var assignment)
+            ? assignment.HostControllerId
+            : null;
 
     public int HostEpoch => InstanceId != null && hostRegistry.TryGet(InstanceId, out var assignment)
         ? assignment.Epoch

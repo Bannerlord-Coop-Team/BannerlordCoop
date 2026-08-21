@@ -18,7 +18,12 @@ public interface INetworkAgentRegistry : IDisposable
     /// <summary>Clears all data.</summary>
     void Clear();
     bool TryRegisterAgent(string controllerId, Guid agentId, Agent agent);
-    bool TryRegisterAgent(string controllerId, Guid agentId, ushort movementId, Agent agent);
+    bool TryRegisterAgent(
+        string controllerId,
+        Guid agentId,
+        ushort movementId,
+        Agent agent,
+        long authorityRevision = 0);
     bool TryRegisterAgent(string controllerId, string originalOwner, Guid agentId, ushort movementId, Agent agent);
     bool TryRegisterAgent(
         string controllerId,
@@ -26,7 +31,8 @@ public interface INetworkAgentRegistry : IDisposable
         string movementScopeId,
         Guid agentId,
         ushort movementId,
-        Agent agent);
+        Agent agent,
+        long authorityRevision = 0);
     bool RemoveController(string controllerId);
     bool RemoveAgent(Guid agentId);
     bool RemoveAgent(Agent agent);
@@ -37,6 +43,7 @@ public interface INetworkAgentRegistry : IDisposable
     bool IsLocallyControlled(Guid agentId);
     bool IsLocallyControlled(Agent agent);
     bool TryTransferAuthority(string controllerId, Guid agentId);
+    bool TryTransferAuthority(string controllerId, Guid agentId, long authorityRevision);
 
     IReadOnlyCollection<CoopAgentInfo> GetAgents(string controllerId);
 
@@ -84,14 +91,25 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
     public bool TryRegisterAgent(string controllerId, Guid agentId, Agent agent)
     {
         return TryRegisterAgent(
-            controllerId, controllerId, controllerId, agentId, 0, agent);
+            controllerId, controllerId, controllerId, agentId, 0, agent, 0);
     }
 
     /// <inheritdoc/>
-    public bool TryRegisterAgent(string controllerId, Guid agentId, ushort movementId, Agent agent)
+    public bool TryRegisterAgent(
+        string controllerId,
+        Guid agentId,
+        ushort movementId,
+        Agent agent,
+        long authorityRevision = 0)
     {
         return TryRegisterAgent(
-            controllerId, controllerId, controllerId, agentId, movementId, agent);
+            controllerId,
+            controllerId,
+            controllerId,
+            agentId,
+            movementId,
+            agent,
+            authorityRevision);
     }
 
     /// <inheritdoc/>
@@ -108,7 +126,8 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             originalOwner,
             agentId,
             movementId,
-            agent);
+            agent,
+            0);
     }
 
     /// <inheritdoc/>
@@ -118,7 +137,8 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         string movementScopeId,
         Guid agentId,
         ushort movementId,
-        Agent agent)
+        Agent agent,
+        long authorityRevision = 0)
     {
         if (string.IsNullOrEmpty(controllerId))
         {
@@ -150,13 +170,20 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             return false;
         }
 
+        if (authorityRevision < 0)
+        {
+            Logger.Error($"{nameof(authorityRevision)} is negative.");
+            return false;
+        }
+
         var agentInfo = new CoopAgentInfo(
             controllerId,
             originalOwner,
             movementScopeId,
             agent,
             agentId,
-            movementId);
+            movementId,
+            authorityRevision);
 
         lock (gate)
         {
@@ -390,6 +417,13 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
     /// <inheritdoc/>
     public bool TryTransferAuthority(string controllerId, Guid agentId)
+        => TryTransferAuthority(controllerId, agentId, authorityRevision: null);
+
+    /// <inheritdoc/>
+    public bool TryTransferAuthority(string controllerId, Guid agentId, long authorityRevision)
+        => TryTransferAuthority(controllerId, agentId, (long?)authorityRevision);
+
+    private bool TryTransferAuthority(string controllerId, Guid agentId, long? authorityRevision)
     {
         if (string.IsNullOrEmpty(controllerId))
         {
@@ -403,6 +437,12 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             return false;
         }
 
+        if (authorityRevision < 0)
+        {
+            Logger.Error($"{nameof(authorityRevision)} is negative.");
+            return false;
+        }
+
         lock (gate)
         {
             if (!IdToInfo.TryGetValue(agentId, out var agentInfo))
@@ -411,9 +451,25 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
                 return false;
             }
 
-            // Idempotent — the target already holds authority, nothing to move.
+            if (authorityRevision < agentInfo.AuthorityRevision)
+            {
+                Logger.Warning(
+                    "Failed to transfer authority for agent {AgentId}: revision {Revision} is older than {CurrentRevision}.",
+                    agentId,
+                    authorityRevision,
+                    agentInfo.AuthorityRevision);
+                return false;
+            }
+
             if (agentInfo.CurrentAuthority == controllerId)
+            {
+                if (authorityRevision > agentInfo.AuthorityRevision)
+                {
+                    agentInfo.AuthorityRevision = authorityRevision.Value;
+                    agentInfo.ClearAuthoritativeEquipment();
+                }
                 return true;
+            }
 
             // Detach from the current authority's list, pruning the entry when it empties so the map
             // stays consistent with RemoveController (which drops the whole key).
@@ -425,7 +481,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             }
 
             agentInfo.CurrentAuthority = controllerId;
-            agentInfo.AuthorityRevision++;
+            agentInfo.AuthorityRevision = authorityRevision ?? agentInfo.AuthorityRevision + 1;
             agentInfo.ClearAuthoritativeEquipment();
 
             if (!ControllerAgentMap.TryGetValue(controllerId, out var newAgents))
@@ -478,7 +534,8 @@ public class CoopAgentInfo
         string movementScopeId,
         Agent agent,
         Guid agentId,
-        ushort movementId)
+        ushort movementId,
+        long authorityRevision = 0)
     {
         OriginalOwner = originalOwner;
         MovementScopeId = movementScopeId;
@@ -486,5 +543,6 @@ public class CoopAgentInfo
         Agent = agent;
         AgentId = agentId;
         MovementId = movementId;
+        AuthorityRevision = authorityRevision;
     }
 }

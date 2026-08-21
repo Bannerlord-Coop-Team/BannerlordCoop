@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
@@ -24,6 +24,40 @@ namespace E2E.Tests.Services.Missions;
 public class BattleMigrationContinuityTests : MissionTestEnvironment
 {
     public BattleMigrationContinuityTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void HostMigration_ObserverAdvancesCatchUpAuthorityRevision()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+        var npcId = Guid.NewGuid();
+
+        observer.Call(() =>
+        {
+            var mock = fixture.CreateMission(observer);
+            var controller = observer.Resolve<CoopBattleController>();
+            var registry = observer.Resolve<INetworkAgentRegistry>();
+            var hosts = observer.Resolve<IBattleHostRegistry>();
+
+            controller.Session.TryBegin("mapEvent1");
+            hosts.Set("mapEvent1", new BattleHostAssignment("B", new[] { "C" }, epoch: 2));
+
+            var npc = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("B", npcId, 0, npc, authorityRevision: 1));
+
+            observer.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkBattleHostAssigned("mapEvent1", "C", Array.Empty<string>(), epoch: 3));
+
+            Assert.True(registry.TryGetAgentInfo(npcId, out var info));
+            Assert.Equal("C", info.CurrentAuthority);
+            Assert.Equal(2, info.AuthorityRevision);
+
+            GC.KeepAlive(controller);
+        });
+    }
 
     [Fact]
     [Trait("Requirement", "BR-016")]

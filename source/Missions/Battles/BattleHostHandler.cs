@@ -881,14 +881,17 @@ internal class BattleHostHandler : IHandler
             message.Epoch,
             string.Join(", ", assignment.SuccessorControllerIds));
 
-        // Migration: the host changed and it is now us — adopt the previous host's orphaned agents so the
-        // battle continues uninterrupted (the controller does the actual adoption with the live mission).
-        if (previousHost != null
-            && previousHost != message.HostControllerId
-            && isLocalHost)
+        // Every peer applies the same authority generation. Only the promoted peer revives the adopted AI.
+        if (previousHost != null && previousHost != message.HostControllerId)
         {
-            Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
-            messageBroker.Publish(this, new BattleHostMigrated(message.MapEventId, previousHost));
+            messageBroker.Publish(this, new BattleHostMigrated(
+                message.MapEventId,
+                previousHost,
+                message.HostControllerId,
+                message.Epoch - 1L));
+
+            if (isLocalHost)
+                Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
         }
     }
 
