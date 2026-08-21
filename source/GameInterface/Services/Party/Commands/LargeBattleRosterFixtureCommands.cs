@@ -5,6 +5,7 @@ using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
@@ -55,7 +56,7 @@ internal static class LargeBattleRosterFixtureCommands
             || addedPerParty > 500)
         {
             return "Usage: coop.debug.mobileparty.large_battle_roster_begin " +
-                   "<firstPartyId> <secondPartyId> <troopsPerParty:1-500>";
+                   "<firstPartyOrControllerId> <secondPartyOrControllerId> <troopsPerParty:1-500>";
         }
         if (fixture != null)
             return "A large-battle roster fixture is already pending restoration.";
@@ -116,7 +117,7 @@ internal static class LargeBattleRosterFixtureCommands
             || (healthyPerParty != 5 && healthyPerParty != 900))
         {
             return "Usage: coop.debug.mobileparty.exact_battle_roster_begin " +
-                   "<firstPartyId> <secondPartyId> <healthyPerParty:5|900>";
+                   "<firstPartyOrControllerId> <secondPartyOrControllerId> <healthyPerParty:5|900>";
         }
 
         return BeginExact(args[0], args[1], healthyPerParty, healthyPerParty);
@@ -136,7 +137,7 @@ internal static class LargeBattleRosterFixtureCommands
             || secondHealthyCount > 1000)
         {
             return "Usage: coop.debug.mobileparty.battle_size_roster_begin " +
-                   "<firstPartyId> <secondPartyId> <firstHealthy:1-1000> <secondHealthy:1-1000>";
+                   "<firstPartyOrControllerId> <secondPartyOrControllerId> <firstHealthy:1-1000> <secondHealthy:1-1000>";
         }
 
         return BeginExact(args[0], args[1], firstHealthyCount, secondHealthyCount);
@@ -256,7 +257,7 @@ internal static class LargeBattleRosterFixtureCommands
             return "Run this command on the server.";
         if (args.Count != 2)
         {
-            return $"Usage: {commandName} <firstPartyId> <secondPartyId>";
+            return $"Usage: {commandName} <firstPartyOrControllerId> <secondPartyOrControllerId>";
         }
         if (!TryGetObjectManager(out IObjectManager objectManager))
             return "Unable to resolve ObjectManager.";
@@ -392,7 +393,15 @@ internal static class LargeBattleRosterFixtureCommands
             return true;
         }
 
-        error = $"Unable to resolve party {id}.";
+        if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)
+            && playerManager.TryGetPlayer(id, out var player)
+            && objectManager.TryGetObject(player.MobilePartyId, out party))
+        {
+            error = null;
+            return true;
+        }
+
+        error = $"Unable to resolve party or player controller {id}.";
         return false;
     }
 
