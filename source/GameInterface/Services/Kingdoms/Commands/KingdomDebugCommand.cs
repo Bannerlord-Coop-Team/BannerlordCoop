@@ -150,8 +150,27 @@ public class KingdomDebugCommand
     public static string OpenKingdomDecisionScreen(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+        if (args.Count < 2) return "Usage: <kingdomId> <decisionIndex>";
+
+        KingdomDecision decision;
+        Kingdom playerKingdom = Clan.PlayerClan?.Kingdom;
+        bool isPlayerKingdom = playerKingdom != null &&
+            (string.Equals(playerKingdom.StringId, args[0], StringComparison.Ordinal) ||
+             string.Equals($"{nameof(Kingdom)}_{playerKingdom.StringId}", args[0], StringComparison.Ordinal));
+        if (isPlayerKingdom)
+        {
+            if (!int.TryParse(args[1], out int index)) return $"Decision index is not a number: {args[1]}";
+
+            int zeroBasedIndex = index - 1;
+            if (zeroBasedIndex < 0 || zeroBasedIndex >= playerKingdom._unresolvedDecisions.Count)
+                return "Decision index is out of bounds.";
+
+            decision = playerKingdom._unresolvedDecisions[zeroBasedIndex];
+        }
+        else if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out decision, out int _, out string message))
+        {
             return message;
+        }
         if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
         if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
 
