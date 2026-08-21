@@ -1,4 +1,6 @@
 ﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using Serilog;
 using System;
@@ -67,21 +69,53 @@ public interface IAiSiegeTerminalPolicy
 }
 
 /// <summary>Resolves an AI siege after vanilla disperses its starving army.</summary>
-internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy
+internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy, IDisposable
 {
     private const string DeferredLeaderSaveKey = "_coop_ai_siege_terminal_leaders";
     private const string DeferredSiegeEventSaveKey = "_coop_ai_siege_terminal_events";
 
     private readonly IAiSiegeAssaultReadiness readiness;
     private readonly ILogger logger;
+    private readonly IMessageBroker messageBroker;
+    private readonly Action<Action> enqueueDeferred;
+    private readonly Action<AiSiegeTerminalTransitionState> resolveTransition;
     private readonly List<AiSiegeTerminalTransitionState> deferredTransitions = new();
 
     public AiSiegeTerminalPolicy(
         IAiSiegeAssaultReadiness readiness,
-        ILogger logger)
+        ILogger logger,
+        IMessageBroker messageBroker)
+        : this(
+            readiness,
+            logger,
+            messageBroker,
+            action => GameThread.EnqueueSafe(action, context: nameof(AiSiegeTerminalPolicy)),
+            null)
+    {
+    }
+
+    internal AiSiegeTerminalPolicy(
+        IAiSiegeAssaultReadiness readiness,
+        ILogger logger,
+        IMessageBroker messageBroker,
+        Action<Action> enqueueDeferred,
+        Action<AiSiegeTerminalTransitionState> resolveTransition)
     {
         this.readiness = readiness;
         this.logger = logger;
+        this.messageBroker = messageBroker;
+        this.enqueueDeferred = enqueueDeferred;
+        if (resolveTransition == null)
+            this.resolveTransition = state => { ResolveFoodProblem(state); };
+        else
+            this.resolveTransition = resolveTransition;
+
+        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
     public AiSiegeTerminalDecision GetDecision(AiSiegeTerminalContext context)
@@ -204,9 +238,17 @@ internal class AiSiegeTerminalPolicy : IAiSiegeTerminalPolicy
         }
     }
 
+    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> _)
+    {
+        if (ModInformation.IsClient || deferredTransitions.Count == 0) return;
+
+        // Finalization still has old-event destroy and encounter-close work to send after this synchronous event.
+        enqueueDeferred(RetryDeferredTransitions);
+    }
+
     public void RetryDeferredTransitions()
     {
-        RetryDeferredTransitions(state => { ResolveFoodProblem(state); });
+        RetryDeferredTransitions(resolveTransition);
     }
 
     internal void RetryDeferredTransitions(Action<AiSiegeTerminalTransitionState> resolve)

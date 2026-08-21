@@ -1,8 +1,11 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents;
 using Moq;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -18,7 +21,8 @@ public class AiSiegeTerminalPolicyTests
     {
         return new AiSiegeTerminalPolicy(
             new Mock<IAiSiegeAssaultReadiness>().Object,
-            new Mock<ILogger>().Object);
+            new Mock<ILogger>().Object,
+            new Mock<IMessageBroker>().Object);
     }
 
     [Fact]
@@ -90,6 +94,50 @@ public class AiSiegeTerminalPolicyTests
             var retry = Assert.Single(retried);
             Assert.Same(state.LeaderParty, retry.LeaderParty);
             Assert.Same(state.SiegeEvent, retry.SiegeEvent);
+        }
+        finally
+        {
+            ModInformation.IsServer = previousRole;
+        }
+    }
+
+    [Fact]
+    public void MapEventFinalized_QueuesRetryUntilAfterEncounterClose()
+    {
+        using var messageBroker = new MessageBroker();
+        var scheduled = new Queue<Action>();
+        var timeline = new List<string>();
+        var state = new AiSiegeTerminalTransitionState(
+            ObjectHelper.SkipConstructor<MobileParty>(),
+            ObjectHelper.SkipConstructor<SiegeEvent>());
+        bool previousRole = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+
+        try
+        {
+            using var policy = new AiSiegeTerminalPolicy(
+                new Mock<IAiSiegeAssaultReadiness>().Object,
+                new Mock<ILogger>().Object,
+                messageBroker,
+                action =>
+                {
+                    timeline.Add("retry queued");
+                    scheduled.Enqueue(action);
+                },
+                _ => timeline.Add("retry"));
+            policy.Defer(state);
+
+            timeline.Add("finalize started");
+            messageBroker.Publish(this, new MapEventFinalized(null));
+            timeline.Add("old event closed");
+
+            Assert.Equal(
+                new[] { "finalize started", "retry queued", "old event closed" },
+                timeline);
+
+            Assert.Single(scheduled).Invoke();
+
+            Assert.Equal("retry", timeline[3]);
         }
         finally
         {
