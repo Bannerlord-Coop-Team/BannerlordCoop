@@ -35,25 +35,6 @@ namespace GameInterface.Services.Heroes.Patches
             return false;
         }
 
-        /// <summary>
-        /// Patch for removing a player being wounded.
-        /// </summary>
-        /// <param name="__instance">Hero instance</param>
-        /// <param name="__result">Patched method's return value</param>
-        /// <returns>FALSE if the player is a human.</returns>
-        [HarmonyPatch(nameof(Hero.IsWounded), MethodType.Getter)]
-        [HarmonyPrefix]
-        internal static bool IsWoundedPrefix(Hero __instance, ref bool __result)
-        {
-            if (__instance.IsHumanPlayerCharacter)
-            {
-                __result = false;
-                return false;
-            }
-
-            return true;
-        }
-
         [HarmonyPatch("OnLoad")]
         [HarmonyPostfix]
         private static void OnLoadPostfix(Hero __instance)
