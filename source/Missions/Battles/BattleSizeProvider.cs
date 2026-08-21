@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Villages.Commands;
-using System;
+﻿using System;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.MountAndBlade;
 
@@ -15,11 +14,6 @@ public class BattleSizeProvider : IBattleSizeProvider
     public int GetBattleSize(MapEvent mapEvent)
     {
         if (mapEvent == null) throw new ArgumentNullException(nameof(mapEvent));
-
-#if DEBUG
-        if (LateJoinModeFixtureBattleSizeOverride.TryGet(mapEvent, out int fixtureBattleSize))
-            return fixtureBattleSize;
-#endif
 
         int configuredBattleSize = mapEvent.IsSiegeAssault
             ? BannerlordConfig.GetRealBattleSizeForSiege()
