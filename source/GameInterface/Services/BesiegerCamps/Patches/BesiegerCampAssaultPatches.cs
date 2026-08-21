@@ -12,17 +12,20 @@ namespace GameInterface.Services.BesiegerCamps.Patches;
 [HarmonyPatch(typeof(BesiegerCamp))]
 internal class BesiegerCampAssaultPatches
 {
+    private static readonly IAiSiegeAssaultReadiness fallbackReadiness = new AiSiegeAssaultReadiness();
+
     [HarmonyPatch(nameof(BesiegerCamp.StartingAssaultOnBesiegedSettlementIsLogical))]
     [HarmonyPrefix]
     private static bool StartingAssaultIsLogicalPrefix(BesiegerCamp __instance, ref bool __result)
     {
-        if (!ContainerProvider.TryResolve<IAiSiegeAssaultReadiness>(out var readiness))
-        {
-            __result = false;
-            return false;
-        }
-
-        __result = readiness.ShouldStartAssault(__instance);
+        __result = ResolveReadiness().ShouldStartAssault(__instance);
         return false;
+    }
+
+    internal static IAiSiegeAssaultReadiness ResolveReadiness()
+    {
+        return ContainerProvider.TryResolve<IAiSiegeAssaultReadiness>(out var readiness)
+            ? readiness
+            : fallbackReadiness;
     }
 }
