@@ -20,6 +20,7 @@ using TaleWorlds.Library;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
@@ -112,6 +113,8 @@ public static class PlayerNameplateDebugCommands
     }
 
 #if DEBUG
+    private static SiegeRosterFixture siegeRosterFixture;
+
     [CommandLineArgumentFunction("players_state", "coop.debug.playermarkers")]
     public static string PlayersState(List<string> args)
     {
@@ -212,12 +215,123 @@ public static class PlayerNameplateDebugCommands
         if (args.Count != 6)
             return "Usage: coop.debug.playermarkers.restore_siege <settlementId> <originalX> <originalY> <originalIsOnLand> <firstControllerId> <secondControllerId>";
 
-        FinalizeSharedMapEvent(new List<string> { args[4], args[5] });
-        string output = SiegeDebugCommand.StopSiege(new List<string> { args[0], args[1], args[2], args[3] });
+        string output = null;
+        bool rostersRestored;
+        try
+        {
+            FinalizeSharedMapEvent(new List<string> { args[4], args[5] });
+            output = SiegeDebugCommand.StopSiege(new List<string> { args[0], args[1], args[2], args[3] });
+        }
+        finally
+        {
+            rostersRestored = RestoreSiegeFixtureRosters(args[0]);
+        }
         bool success = ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
                        objectManager.TryGetObject<Settlement>(args[0], out var settlement) &&
-                       settlement.SiegeEvent == null;
-        return "LIVE_TEST_JSON=" + JsonSerializer.Serialize(new { success, output });
+                       settlement.SiegeEvent == null && rostersRestored;
+        return "LIVE_TEST_JSON=" + JsonSerializer.Serialize(new { success, rostersRestored, output });
+    }
+
+    [CommandLineArgumentFunction("stage_siege_rosters", "coop.debug.playermarkers")]
+    public static string StageSiegeRosters(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Run this command on the server.";
+        if (args.Count != 1) return "Usage: coop.debug.playermarkers.stage_siege_rosters <settlementId>";
+        if (siegeRosterFixture != null) return $"A siege roster fixture is already active for {siegeRosterFixture.SettlementId}.";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            return $"Settlement with id {args[0]} not found.";
+
+        var camp = settlement.SiegeEvent?.BesiegerCamp;
+        if (camp == null) return $"{settlement.Name} is not under siege.";
+
+        var attackers = camp._besiegerParties
+            .Where(party => party?.Party != null)
+            .Select(party => party.Party)
+            .ToArray();
+        var defenders = settlement.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)
+            .Where(party => party?.MemberRoster != null)
+            .ToArray();
+        var parties = attackers.Concat(defenders)
+            .Where(party => party?.MemberRoster != null)
+            .Distinct()
+            .ToArray();
+        if (attackers.Length == 0 || defenders.Length == 0 || parties.Length == 0)
+            return $"Unable to resolve both sides of the siege fixture at {settlement.Name}.";
+
+        var fixture = new SiegeRosterFixture
+        {
+            SettlementId = settlement.StringId,
+            Snapshots = parties.Select(party => new SiegeRosterSnapshot
+            {
+                Party = party,
+                MemberRoster = party.MemberRoster.GetTroopRoster().ToArray()
+            }).ToArray()
+        };
+
+        siegeRosterFixture = fixture;
+        try
+        {
+            foreach (var party in parties)
+                MapEventDebugCommands.LimitLateJoinModeFixtureRoster(party.MemberRoster);
+
+            if (attackers.Any(party => party.MemberRoster.TotalHealthyCount <= 0) ||
+                defenders.All(party => party.MemberRoster.TotalHealthyCount <= 0))
+            {
+                bool restored = RestoreSiegeFixtureRosters(settlement.StringId);
+                return $"The siege roster fixture at {settlement.Name} has no healthy troops after sizing; restored={restored}.";
+            }
+        }
+        catch (Exception exception)
+        {
+            bool restored = RestoreSiegeFixtureRosters(settlement.StringId);
+            return $"Unable to stage the siege roster fixture: {exception.Message}; restored={restored}.";
+        }
+
+        return "LIVE_TEST_JSON=" + JsonSerializer.Serialize(new
+        {
+            settlementId = settlement.StringId,
+            attackerPartyCount = attackers.Length,
+            defenderPartyCount = defenders.Length,
+            attackerTroops = attackers.Sum(party => party.MemberRoster.TotalHealthyCount),
+            defenderTroops = defenders.Sum(party => party.MemberRoster.TotalHealthyCount)
+        });
+    }
+
+    private static bool RestoreSiegeFixtureRosters(string settlementId)
+    {
+        if (siegeRosterFixture == null) return true;
+        if (!string.Equals(siegeRosterFixture.SettlementId, settlementId, StringComparison.Ordinal)) return false;
+
+        var restored = RestoreSiegeFixtureRosters(siegeRosterFixture);
+        if (restored) siegeRosterFixture = null;
+        return restored;
+    }
+
+    private static bool RestoreSiegeFixtureRosters(SiegeRosterFixture fixture)
+    {
+        try
+        {
+            foreach (var snapshot in fixture.Snapshots)
+                MapEventDebugCommands.RestoreLateJoinModeFixtureMemberRoster(snapshot.Party.MemberRoster, snapshot.MemberRoster);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private sealed class SiegeRosterFixture
+    {
+        public string SettlementId { get; set; }
+        public SiegeRosterSnapshot[] Snapshots { get; set; }
+    }
+
+    private sealed class SiegeRosterSnapshot
+    {
+        public PartyBase Party { get; set; }
+        public TroopRosterElement[] MemberRoster { get; set; }
     }
 
     private static void FinalizeSharedMapEvent(IReadOnlyList<string> controllerIds)
