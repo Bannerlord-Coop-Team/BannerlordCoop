@@ -276,7 +276,7 @@ namespace Coop
         private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
         {
             var modules = moduleInfoProvider.GetModuleInfos().ToArray();
-            var native = modules.First(m => m.IsOfficial && m.Id.Equals("Native",  StringComparison.OrdinalIgnoreCase));
+            var native = modules.FirstOrDefault(m => m.IsOfficial && m.Id.Equals("Native",  StringComparison.OrdinalIgnoreCase));
             
             Logger.Information("========================================================");
             Logger.Information("Bannerlord Coop - {client}", isServer ? "Server" : "Client");
