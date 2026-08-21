@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Bandits.Handlers;
 
@@ -304,7 +305,9 @@ internal class BanditInteractionsHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.PlayerBattleId, out var playerBattle)) return;
 
-            playerBattle.SetOverrideWinner(data.PlayerSide);
+            var enemySide = data.PlayerSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+
+            playerBattle.DoSurrender(enemySide);
             playerBattle.Update();
 
             network.Send(obj.Who as NetPeer, new NetworkFinalizeBanditSurrenderClient());

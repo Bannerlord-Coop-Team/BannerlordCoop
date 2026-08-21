@@ -10,6 +10,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -109,6 +110,9 @@ internal class BanditInteractionsCampaignBehaviorPatches
             {
                 PlayerEncounter.StartBattle();
             }
+
+            // Guard against a null created MapEvent
+            if (PlayerEncounter.Battle == null) return false;
 
             // Do surrender on server and send message to client to update post battle screens
             var surrenderMessage = new BanditsSurrenderAsPrisoners(PlayerEncounter.Battle, PlayerEncounter.Battle.PlayerSide);
