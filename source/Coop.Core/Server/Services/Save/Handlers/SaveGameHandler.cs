@@ -101,6 +101,7 @@ internal class SaveGameHandler : IHandler
             current?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
             current?.TradePlayerData ?? empty.TradePlayerData,
             current?.InventoryPlayerData ?? empty.InventoryPlayerData,
+            current?.HeroMeetingData ?? empty.HeroMeetingData,
             current?.AgingPlayerData ?? empty.AgingPlayerData);
 
         coopSessionProvider.CoopSession = session;
@@ -124,6 +125,7 @@ internal class SaveGameHandler : IHandler
             loaded?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
             loaded?.TradePlayerData ?? empty.TradePlayerData,
             loaded?.InventoryPlayerData ?? empty.InventoryPlayerData,
+            loaded?.HeroMeetingData ?? empty.HeroMeetingData,
             loaded?.AgingPlayerData ?? empty.AgingPlayerData);
 
         coopSessionProvider.CoopSession = savedSession;

@@ -47,8 +47,17 @@ public class MissionModule : Module
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
             .InstancePerDependency();
+        builder.RegisterType<MovementNetworkSettings>()
+            .As<IMovementNetworkSettings>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementPriorityScheduler>()
+            .As<IMovementPriorityScheduler>()
+            .InstancePerDependency();
         builder.RegisterType<MovementTrafficBudget>()
             .As<IMovementTrafficBudget>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementTrafficBudgetFactory>()
+            .As<IMovementTrafficBudgetFactory>()
             .InstancePerDependency();
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
@@ -130,6 +139,9 @@ public class MissionModule : Module
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<BattleSizeProvider>()
+            .As<IBattleSizeProvider>()
+            .InstancePerDependency();
 
         // Builds the coop field-battle mission (mirrors SandBoxMissions.OpenBattleMission with coop suppliers,
         // no deployment phase, and the coop behaviors attached). Resolved from the container by the GameInterface
@@ -189,6 +201,9 @@ public class MissionModule : Module
         builder.RegisterType<AgentFormationAssigner>().As<IAgentFormationAssigner>().InstancePerDependency();
         builder.RegisterType<PuppetMountStateRepairer>()
             .As<IPuppetMountStateRepairer>()
+            .InstancePerDependency();
+        builder.RegisterType<AgentNativeMountState>()
+            .As<IAgentNativeMountState>()
             .InstancePerDependency();
 
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();

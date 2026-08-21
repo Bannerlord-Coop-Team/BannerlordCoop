@@ -19,6 +19,8 @@ internal static class CreditsRoster
     {
         "Koung",
         "Lord Zippykins",
+        "FCharles",
+        "FreddyBoyLacroy",
     };
 
     /// <summary>

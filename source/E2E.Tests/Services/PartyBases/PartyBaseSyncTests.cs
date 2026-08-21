@@ -16,7 +16,6 @@ public class PartyBaseSyncTests : SyncTestBase
         PartyBaseId = TestEnvironment.CreateRegisteredObject<PartyBase>();
         TestEnvironment.CreateRegisteredObject<MobileParty>();
         TestEnvironment.CreateRegisteredObject<Settlement>();
-        TestEnvironment.CreateRegisteredObject<ItemRoster>();
         TestEnvironment.CreateRegisteredObject<TroopRoster>();
         TestEnvironment.CreateRegisteredObject<TroopRoster>();
         TestEnvironment.CreateRegisteredObject<Hero>();
@@ -27,8 +26,7 @@ public class PartyBaseSyncTests : SyncTestBase
     {
         Server.ObjectManager.TryGetObject<PartyBase>(PartyBaseId, out var partyBase);
         TestEnvironment.AssertReferenceProperty<PartyBase, MobileParty>(nameof(PartyBase.MobileParty));
-        // ItemRoster is protobuf-serializable, so the dynamic sync sends it by value (a new instance on
-        // the client) rather than by reference - assert value equality, not Assert.Same.
+        // Managed ItemRosters synchronize by registry identity.
         TestEnvironment.AssertProperty<PartyBase, ItemRoster>(nameof(PartyBase.ItemRoster), new ItemRoster(), defaultValue: partyBase.ItemRoster);
         TestEnvironment.AssertReferenceProperty<PartyBase, TroopRoster>(nameof(PartyBase.MemberRoster));
         TestEnvironment.AssertReferenceProperty<PartyBase, TroopRoster>(nameof(PartyBase.PrisonRoster));

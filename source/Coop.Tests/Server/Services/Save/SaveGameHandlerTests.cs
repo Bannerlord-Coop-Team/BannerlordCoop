@@ -278,6 +278,7 @@ public class SaveGameHandlerTests
             empty.InteractionsPlayerData,
             empty.TradePlayerData,
             empty.InventoryPlayerData,
+            empty.HeroMeetingData,
             empty.AgingPlayerData);
     }
 }

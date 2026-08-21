@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
@@ -247,8 +248,22 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
             "Applying player-party hostile demand war between {InitiatorFaction} and {ResponderFaction}",
             initiatorFaction.Name,
             responderFaction.Name);
-        DeclareWarAction.ApplyByPlayerHostility(initiatorFaction, responderFaction);
+        DeclareWarByPlayerHostility(initiatorParty, initiatorFaction, responderFaction);
         VillageHostileFactionStanceHelper.ApplyWarStance(initiatorFaction, responderFaction);
+    }
+
+    private static void DeclareWarByPlayerHostility(PartyBase initiatorParty, IFaction initiatorFaction, IFaction responderFaction)
+    {
+        var previousResolvedMainHero = ResolvedMainHeroContext.ResolvedMainHero;
+        try
+        {
+            ResolvedMainHeroContext.ResolvedMainHero = initiatorParty.LeaderHero;
+            DeclareWarAction.ApplyByPlayerHostility(initiatorFaction, responderFaction);
+        }
+        finally
+        {
+            ResolvedMainHeroContext.ResolvedMainHero = previousResolvedMainHero;
+        }
     }
 
     private static IFaction GetMapFaction(PartyBase party)

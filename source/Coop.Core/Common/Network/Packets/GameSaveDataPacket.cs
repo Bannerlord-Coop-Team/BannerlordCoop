@@ -62,12 +62,15 @@ public readonly struct GameSaveDataPacket : IPacket
     public readonly InventoryPlayerData InventoryPlayerData;
 
     [ProtoMember(10)]
-    public readonly AgingPlayerData AgingPlayerData;
+    public readonly HeroMeetingData HeroMeetingData;
 
     [ProtoMember(11)]
-    public readonly AttachmentIdMap AttachmentIdMap;
+    public readonly AgingPlayerData AgingPlayerData;
 
     [ProtoMember(12)]
+    public readonly AttachmentIdMap AttachmentIdMap;
+
+    [ProtoMember(13)]
     public readonly ServerOptions ServerOptions;
 
     public GameSaveDataPacket(
@@ -80,6 +83,7 @@ public readonly struct GameSaveDataPacket : IPacket
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
+        HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions)
@@ -93,6 +97,7 @@ public readonly struct GameSaveDataPacket : IPacket
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
+        HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;

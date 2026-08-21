@@ -1,8 +1,10 @@
-using Common;
+﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Kingdoms.Extentions;
+using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -157,22 +159,63 @@ namespace GameInterface.Services.Kingdoms.Patches
                             bool isPlayerInvolved =
                                 (decision.DetermineChooser()?.Leader?.IsHumanPlayerCharacter ?? false)
                                 || decision.DetermineSupporters().Any(supporter => supporter.IsPlayer);
+                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
+                            {
+                                if (decision is MakePeaceKingdomDecision d)
+                                {
+                                    MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
+                                    (Kingdom)d.FactionToMakePeaceWith,
+                                    d.Kingdom,
+                                    isPending: false));
+                                }
+
+                                if (decision is StartAllianceDecision startalliancedecision)
+                                {
+                                    MessageBroker.Instance.Publish(null, new AllianceOfferPendingStatusChanged(
+                                        (Kingdom)startalliancedecision.KingdomToStartAllianceWith,
+                                        startalliancedecision.Kingdom,
+                                        isPending: false));
+                                    if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(startalliancedecision))
+                                    {
+                                        CoopKingdomElection._opponentProposedAllianceDecisions.Remove(startalliancedecision);
+                                    }
+                                }
+                            }
                             CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, isPlayerInvolved);
                         }
                         else if (decision.TriggerTime.IsPast)
                         {
                             // An unanswered inbound player peace offer expires as a decline.
                             // It must never fall through to the forced AI resolution path.
-                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision))
+                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
                             {
                                 kingdom.RemoveDecision(decision);
+                                if (decision is MakePeaceKingdomDecision d)
+                                {
+                                    MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
+                                        (Kingdom)d.FactionToMakePeaceWith,
+                                        d.Kingdom,
+                                        isPending: false));
+                                }
+                                if (decision is StartAllianceDecision startalliancedecision)
+                                {
+                                    MessageBroker.Instance.Publish(null, new AllianceOfferPendingStatusChanged(
+                                        (Kingdom)startalliancedecision.KingdomToStartAllianceWith,
+                                        startalliancedecision.Kingdom,
+                                        isPending: false));
+                                    if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(startalliancedecision))
+                                    {
+                                        CoopKingdomElection._opponentProposedAllianceDecisions.Remove(startalliancedecision);
+                                    }
+                                }
                                 CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, true);
                                 continue;
                             }
 
                             if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
-                                voteManager.TryResolveDecision(decision, force: true))
+                                voteManager.HasEligiblePlayerClan(decision))
                             {
+                                voteManager.TryResolveDecision(decision);
                                 continue;
                             }
 

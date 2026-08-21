@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
@@ -50,6 +50,7 @@ namespace Coop.Tests.Client.States
                 new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new()),
                 new TradePlayerData(new(), new(), new()),
                 new InventoryPlayerData(new(), new()),
+                new HeroMeetingData(new()),
                 new AgingPlayerData(new()),
                 new AttachmentIdMap(new()),
                 new ServerOptions(new()));

@@ -1,4 +1,5 @@
 using Common.Logging;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Villages.Interfaces;
 using Serilog;
 using System;
@@ -58,12 +59,26 @@ internal static class MapEventHostileActionConsequences
             }
 
             Logger.Debug("Applying {Source} hostile-action war between {AttackerFaction} and {DefenderFaction}", source, attackerFaction.Name, defenderFaction.Name);
-            DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
+            DeclareWarByPlayerHostility(attackerParty, attackerFaction, defenderFaction);
             VillageHostileFactionStanceHelper.ApplyWarStance(attackerFaction, defenderFaction);
         }
         catch (Exception e)
         {
             Logger.Error(e, "Failed to apply {Source} hostile-action consequences", source);
+        }
+    }
+
+    private static void DeclareWarByPlayerHostility(PartyBase attackerParty, IFaction attackerFaction, IFaction defenderFaction)
+    {
+        var previousResolvedMainHero = ResolvedMainHeroContext.ResolvedMainHero;
+        try
+        {
+            ResolvedMainHeroContext.ResolvedMainHero = attackerParty.LeaderHero;
+            DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
+        }
+        finally
+        {
+            ResolvedMainHeroContext.ResolvedMainHero = previousResolvedMainHero;
         }
     }
 

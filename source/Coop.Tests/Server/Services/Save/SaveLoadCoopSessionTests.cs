@@ -5,12 +5,13 @@ using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
+using GameInterface.Services.Heroes;
+using System.Collections.Generic;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
-using System.Collections.Generic;
 using System.IO;
 using Xunit;
 using Xunit.Abstractions;
@@ -60,6 +61,7 @@ namespace Coop.Tests.Server.Services.Save
                 interactionsPlayerData,
                 new TradePlayerData(new(), new(), new()),
                 new InventoryPlayerData(new(), new()),
+                new HeroMeetingData(new()),
                 new AgingPlayerData(new()));
 
             string saveFile = sessionData.UniqueGameId;
@@ -97,6 +99,14 @@ namespace Coop.Tests.Server.Services.Save
             interactionsPlayerData.PlayerAlreadySneakedSettlements[players[0].HeroId] = new() { "settlement1Id", "settlement2Id" };
             interactionsPlayerData.PlayerAlreadySneakedSettlements[players[1].HeroId] = new() { "settlement2Id", "settlement3Id" };
 
+            var meetingTimes = new Dictionary<string, Dictionary<string, long>>
+            {
+                ["MyHero1"] = new Dictionary<string, long>
+                {
+                    ["lord_6_1"] = 1351,
+                },
+            };
+
             ICoopSession sessionData = new CoopSession(
                 "SaveManagerTest",
                 players,
@@ -107,6 +117,7 @@ namespace Coop.Tests.Server.Services.Save
                 interactionsPlayerData,
                 new TradePlayerData(new(), new(), new()),
                 new InventoryPlayerData(new(), new()),
+                new HeroMeetingData(meetingTimes),
                 new AgingPlayerData(new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
@@ -133,6 +144,7 @@ namespace Coop.Tests.Server.Services.Save
 
                 Assert.Equal(sessionData.InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId], savedSession.InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId]);
             }
+            Assert.Equal(1351, savedSession.HeroMeetingData.PlayerLastMeetingTimes["MyHero1"]["lord_6_1"]);
         }
 
         [Fact]

@@ -40,10 +40,12 @@ public record NetworkGameSaveDataReceived : IEvent
     [ProtoMember(9)]
     public InventoryPlayerData InventoryPlayerData { get; }
     [ProtoMember(10)]
-    public AgingPlayerData AgingPlayerData { get; }
+    public HeroMeetingData HeroMeetingData { get; }
     [ProtoMember(11)]
-    public AttachmentIdMap AttachmentIdMap { get; }
+    public AgingPlayerData AgingPlayerData { get; }
     [ProtoMember(12)]
+    public AttachmentIdMap AttachmentIdMap { get; }
+    [ProtoMember(13)]
     public ServerOptions ServerOptions { get; }
 
     public NetworkGameSaveDataReceived(
@@ -56,6 +58,7 @@ public record NetworkGameSaveDataReceived : IEvent
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
+        HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions)
@@ -69,6 +72,7 @@ public record NetworkGameSaveDataReceived : IEvent
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
+        HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;

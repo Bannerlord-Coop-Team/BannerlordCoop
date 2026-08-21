@@ -14,11 +14,34 @@ public class RemotePlayerHeroHandlerTests
     private readonly TestMessageBroker messageBroker = new();
     private readonly Mock<IHeroInterface> heroInterface = new();
     private readonly Mock<IPlayerManager> playerManager = new();
+    private readonly Mock<IPlayerCreationRollback> playerCreationRollback = new();
     private readonly RemotePlayerHeroHandler handler;
 
     public RemotePlayerHeroHandlerTests()
     {
-        handler = new RemotePlayerHeroHandler(messageBroker, heroInterface.Object, playerManager.Object);
+        handler = new RemotePlayerHeroHandler(
+            messageBroker,
+            heroInterface.Object,
+            playerManager.Object,
+            playerCreationRollback.Object);
+    }
+
+    [Fact]
+    public void PlayerCreationRolledBack_RemovesExactRegistrationAndGraph()
+    {
+        var announcedPlayer = new Player("ctrl", "hero1", "party1", "clan1", "char1");
+        var registeredPlayer = new Player("ctrl", "hero1", "party1", "clan1", "char1");
+        var registrationIds = new[] { "Hero_hero1", "TroopRoster_party1" };
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(announcedPlayer.ControllerId, out registeredPlayer))
+            .Returns(true);
+
+        messageBroker.Publish(this, new NetworkPlayerCreationRolledBack(announcedPlayer, registrationIds));
+
+        playerManager.Verify(manager => manager.RemovePlayer(registeredPlayer), Times.Once);
+        playerCreationRollback.Verify(
+            rollback => rollback.Rollback(announcedPlayer, registrationIds),
+            Times.Once);
     }
 
     private static NetworkNewPlayerHeroCreated NewHeroMessage(out Player player, out byte[] heroData)

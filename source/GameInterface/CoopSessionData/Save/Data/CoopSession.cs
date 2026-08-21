@@ -27,6 +27,7 @@ public interface ICoopSession
     InteractionsPlayerData InteractionsPlayerData { get; }
     TradePlayerData TradePlayerData { get; }
     InventoryPlayerData InventoryPlayerData { get; }
+    HeroMeetingData HeroMeetingData { get; }
     AgingPlayerData AgingPlayerData { get; }
 }
 
@@ -47,6 +48,7 @@ public class CoopSession : ICoopSession
         new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new()),
         new TradePlayerData(new(), new(), new()),
         new InventoryPlayerData(new(), new()),
+        new HeroMeetingData(new()),
         new AgingPlayerData(new()));
 
     [ProtoMember(1)]
@@ -68,6 +70,8 @@ public class CoopSession : ICoopSession
     [ProtoMember(9)]
     public InventoryPlayerData InventoryPlayerData { get; }
     [ProtoMember(10)]
+    public HeroMeetingData HeroMeetingData { get; }
+    [ProtoMember(11)]
     public AgingPlayerData AgingPlayerData { get; }
 
     public CoopSession(
@@ -80,6 +84,7 @@ public class CoopSession : ICoopSession
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
+        HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData)
     {
         UniqueGameId = uniqueGameId;
@@ -91,6 +96,7 @@ public class CoopSession : ICoopSession
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
+        HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
     }
 }
