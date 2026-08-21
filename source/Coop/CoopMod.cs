@@ -128,10 +128,11 @@ namespace Coop
                 ?.InformationalVersion ?? "unknown";
 
             SetupLogging();
-            InitializeCrashReporting();
-            
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
             CoopLogHeader(moduleInfoProvider);
+            InitializeCrashReporting();
+            
+            
             Logger.Verbose("Coop Mod Module Started");
             
             Updateables.Add(new FpsLogger());
