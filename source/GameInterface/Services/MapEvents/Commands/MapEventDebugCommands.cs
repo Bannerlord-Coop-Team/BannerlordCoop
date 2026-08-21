@@ -2093,6 +2093,10 @@ public class MapEventDebugCommands
             return $"Late-join fixture {mapEventId} did not create the required field battle.";
         }
 
+#if DEBUG
+        LateJoinModeFixtureBattleSizeOverride.Set(mapEvent, 64);
+#endif
+
         // Route the first player's Attack through the real server handler. The resulting mission-start and mode
         // broadcasts reach PlayerTwo before its party belongs to the event, reproducing the missed-claim timing.
         messageBroker.Publish(firstPeer, new NetworkBattleStartRequest(
@@ -2409,8 +2413,14 @@ public class MapEventDebugCommands
 
         messageBroker.Publish(typeof(MapEventDebugCommands), new NetworkRequestLeaveBattle(fixture.JoiningPlayerPartyId));
         messageBroker.Publish(typeof(MapEventDebugCommands), new NetworkRequestLeaveBattle(fixture.FirstPlayerPartyId));
-        if (objectManager.TryGetObject<MapEvent>(fixture.MapEventId, out var mapEvent) && !mapEvent.IsFinalized)
-            mapEvent.FinalizeEvent();
+        if (objectManager.TryGetObject<MapEvent>(fixture.MapEventId, out var mapEvent))
+        {
+#if DEBUG
+            LateJoinModeFixtureBattleSizeOverride.Clear(mapEvent);
+#endif
+            if (!mapEvent.IsFinalized)
+                mapEvent.FinalizeEvent();
+        }
         ServerBattleModeArbiter.Release(fixture.MapEventId);
 
         var restored = RestorePartyBehavior(
@@ -3309,6 +3319,36 @@ public class MapEventDebugCommands
 }
 
 #if DEBUG
+/// <summary>Holds the temporary battle-size limit for the active late-join live-test fixture.</summary>
+public static class LateJoinModeFixtureBattleSizeOverride
+{
+    private static readonly object Gate = new object();
+    private static readonly Dictionary<MapEvent, int> BattleSizes = new Dictionary<MapEvent, int>();
+
+    public static void Set(MapEvent mapEvent, int battleSize)
+    {
+        if (mapEvent == null) throw new ArgumentNullException(nameof(mapEvent));
+        if (battleSize <= 0) throw new ArgumentOutOfRangeException(nameof(battleSize));
+
+        lock (Gate)
+            BattleSizes[mapEvent] = battleSize;
+    }
+
+    public static bool TryGet(MapEvent mapEvent, out int battleSize)
+    {
+        lock (Gate)
+            return BattleSizes.TryGetValue(mapEvent, out battleSize);
+    }
+
+    public static void Clear(MapEvent mapEvent)
+    {
+        if (mapEvent == null) return;
+
+        lock (Gate)
+            BattleSizes.Remove(mapEvent);
+    }
+}
+
 /// <summary>[Server -&gt; Client] Ends a live-test fixture mission without resolving its campaign battle.</summary>
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkEndLateJoinModeFixtureMission : IEvent
