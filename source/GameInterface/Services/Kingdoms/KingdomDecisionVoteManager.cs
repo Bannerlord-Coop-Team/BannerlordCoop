@@ -63,6 +63,9 @@ namespace GameInterface.Services.Kingdoms
         void CloseDecision(string kingdomId, int decisionIndex);
         void ClearDecisionState(string kingdomId, int decisionIndex);
         void ClearDecisionState(Kingdom kingdom, int decisionIndex);
+#if DEBUG
+        bool TryExtendDecisionDeadlineForDebug(KingdomDecision decision, TimeSpan duration);
+#endif
     }
 
     public class KingdomDecisionVoteManager : IKingdomDecisionVoteManager, IDisposable
@@ -126,6 +129,19 @@ namespace GameInterface.Services.Kingdoms
                 PublishRoundStatus(state);
             }
         }
+
+#if DEBUG
+        public bool TryExtendDecisionDeadlineForDebug(KingdomDecision decision, TimeSpan duration)
+        {
+            if (!ModInformation.IsServer || duration <= TimeSpan.Zero || !IsDecisionUnresolved(decision)) return false;
+
+            KingdomDecisionVoteState state = GetOrCreateState(decision);
+            state.ExtendDeadline(DateTime.UtcNow + duration);
+            state.LastPublishedRoundStatus = null;
+            PublishRoundStatus(state);
+            return true;
+        }
+#endif
 
         public bool TryCreateVoteData(DecisionOptionVM decisionOption, out KingdomDecisionVoteData voteData, bool isFinal = false)
         {
@@ -2055,6 +2071,13 @@ namespace GameInterface.Services.Kingdoms
                 KingdomId = kingdomId;
                 DecisionIndex = decisionIndex;
             }
+
+#if DEBUG
+            public void ExtendDeadline(DateTime deadlineUtc)
+            {
+                RoundDeadlineUtc = deadlineUtc;
+            }
+#endif
 
             public void RefreshEligibleClanIds(HashSet<string> eligibleClanIds)
             {
