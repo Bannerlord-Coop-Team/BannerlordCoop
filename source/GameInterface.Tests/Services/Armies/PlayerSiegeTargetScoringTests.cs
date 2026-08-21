@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -97,6 +98,55 @@ public class PlayerSiegeTargetScoringTests
 
         Assert.True(attackingStrength >= score.TotalStrength * 2f);
         Assert.False(attackingStrength >= 200f * 2f);
+    }
+
+    [Fact]
+    public void ApplyPlayerSettlementDefense_AfterContainerTeardown_PreservesVanillaPlayerPresenceWeight()
+    {
+        Game previousGame = Game.Current;
+        bool hadPreviousContainer = ContainerProvider.TryGetContainer(out var previousContainer);
+        try
+        {
+            var target = ObjectHelper.SkipConstructor<Settlement>();
+            var otherSettlement = ObjectHelper.SkipConstructor<Settlement>();
+            var mainHero = ObjectHelper.SkipConstructor<Hero>();
+            var mainCharacter = ObjectHelper.SkipConstructor<CharacterObject>();
+            mainCharacter._heroObject = mainHero;
+            mainHero._characterObject = mainCharacter;
+            mainHero._stayingInSettlement = target;
+
+            var game = ObjectHelper.SkipConstructor<Game>();
+            game.PlayerTroop = mainCharacter;
+            Game.Current = game;
+            ContainerProvider.Clear();
+
+            float totalStrength = 200f;
+            float mobileLordStrength = 100f;
+            PlayerSiegeTargetScoringPatches.ApplyPlayerSettlementDefense(
+                target,
+                ref totalStrength,
+                ref mobileLordStrength);
+
+            Assert.Equal(160f, totalStrength);
+            Assert.Equal(80f, mobileLordStrength);
+
+            mainHero._stayingInSettlement = otherSettlement;
+            PlayerSiegeTargetScoringPatches.ApplyPlayerSettlementDefense(
+                target,
+                ref totalStrength,
+                ref mobileLordStrength);
+
+            Assert.Equal(160f, totalStrength);
+            Assert.Equal(80f, mobileLordStrength);
+        }
+        finally
+        {
+            Game.Current = previousGame;
+            if (hadPreviousContainer)
+                ContainerProvider.SetContainer(previousContainer);
+            else
+                ContainerProvider.Clear();
+        }
     }
 
     [Fact]

@@ -16,6 +16,8 @@ namespace GameInterface.Services.Armies.Patches;
     nameof(DefaultTargetScoreCalculatingModel.GetTargetScoreForFaction))]
 internal class PlayerSiegeTargetScoringPatches
 {
+    private const float VanillaPlayerPresenceWeight = 0.8f;
+
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerSiegeTargetScoringPatches>();
 
     [HarmonyTranspiler]
@@ -100,11 +102,21 @@ internal class PlayerSiegeTargetScoringPatches
         => (instruction.opcode == OpCodes.Stloc || instruction.opcode == OpCodes.Stloc_S) &&
            instruction.operand is LocalBuilder;
 
-    private static void ApplyPlayerSettlementDefense(
+    internal static void ApplyPlayerSettlementDefense(
         Settlement targetSettlement,
         ref float totalStrength,
         ref float mobileLordStrength)
     {
+        if (!ContainerProvider.TryGetContainer(out _))
+        {
+            if (Hero.MainHero.CurrentSettlement == targetSettlement)
+            {
+                totalStrength *= VanillaPlayerPresenceWeight;
+                mobileLordStrength *= VanillaPlayerPresenceWeight;
+            }
+            return;
+        }
+
         if (!ContainerProvider.TryResolve<IPlayerSiegeTargetScoring>(out var scoring))
         {
             Logger.Error("Unable to resolve {Scoring}", nameof(IPlayerSiegeTargetScoring));
