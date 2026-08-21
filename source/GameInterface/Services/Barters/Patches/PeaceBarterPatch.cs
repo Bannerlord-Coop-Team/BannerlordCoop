@@ -113,18 +113,29 @@ internal static class PeaceBarterPatch
         var completedBarter = pendingBarter;
         var completedContext = pendingContext;
         var shouldCompleteUi = pendingUiActive;
+        var encounterIsActive = shouldCompleteUi && completedContext == PeaceConversationContext.MapParty &&
+            PlayerEncounter.Current != null &&
+            completedBarter.OtherParty == MobileParty.ConversationParty?.Party;
         ClearPendingRequest();
         if (!result.Accepted)
         {
+            if (shouldCompleteUi && BarterManager.Instance != null)
+                BarterManager.Instance.Close();
+
+            if (encounterIsActive &&
+                PlayerEncounter.Current._mapEvent == null &&
+                MobileParty.MainParty?.MapEvent == null &&
+                result.Reason == NetworkPeaceBarterResult.InactiveEncounterReason)
+                PlayerEncounter.LeaveEncounter = true;
+
+            if (shouldCompleteUi)
+                ContinueConversationIfInProgress();
+
             ShowMessage(string.IsNullOrWhiteSpace(result.Reason)
                 ? "The server rejected the peace barter."
                 : result.Reason);
             return;
         }
-
-        var encounterIsActive = shouldCompleteUi && completedContext == PeaceConversationContext.MapParty &&
-            PlayerEncounter.Current != null &&
-            completedBarter.OtherParty == MobileParty.ConversationParty?.Party;
 
         if (shouldCompleteUi && BarterManager.Instance != null)
         {
@@ -146,19 +157,24 @@ internal static class PeaceBarterPatch
         if (encounterIsActive)
             PlayerEncounter.LeaveEncounter = true;
 
-        if (shouldCompleteUi && Campaign.Current?.ConversationManager?.IsConversationInProgress == true)
-        {
-            try
-            {
-                Campaign.Current.ConversationManager.ContinueConversation();
-            }
-            catch
-            {
-                // The authoritative result has already closed the barter UI.
-            }
-        }
+        if (shouldCompleteUi)
+            ContinueConversationIfInProgress();
 
         MBInformationManager.AddQuickInformation(GameTexts.FindText("str_offer_accepted"));
+    }
+
+    private static void ContinueConversationIfInProgress()
+    {
+        if (Campaign.Current?.ConversationManager?.IsConversationInProgress != true) return;
+
+        try
+        {
+            Campaign.Current.ConversationManager.ContinueConversation();
+        }
+        catch
+        {
+            // The authoritative result has already closed the barter UI.
+        }
     }
 
     internal static void ClearPendingRequest()
