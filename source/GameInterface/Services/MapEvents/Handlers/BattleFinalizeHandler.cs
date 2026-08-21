@@ -420,15 +420,23 @@ internal class BattleFinalizeHandler : IHandler
                 if (!TryMarkFinalized(mapEvent))
                     return;
 
-                var involvedParties = CollectInvolvedParties(mapEvent);
-                playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+                try
+                {
+                    var involvedParties = CollectInvolvedParties(mapEvent);
+                    playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
 
-                reserveBuilder.ForgetMapEvent(mapEvent);
-                mapEvent.FinalizeEventAux();
-                ClearMapEventBackReferences(involvedParties);
-                ResetRaidSettlementState(settlement);
-                ReturnPlayerPartiesToSettlement(playerPartyIds, settlement);
-                shouldReset = true;
+                    reserveBuilder.ForgetMapEvent(mapEvent);
+                    mapEvent.FinalizeEventAux();
+                    ClearMapEventBackReferences(involvedParties);
+                    ResetRaidSettlementState(settlement);
+                    ReturnPlayerPartiesToSettlement(playerPartyIds, settlement);
+                    shouldReset = true;
+                }
+                finally
+                {
+                    if (!mapEvent.IsFinalized)
+                        UnmarkFinalized(mapEvent);
+                }
             },
             blocking: true,
             context: nameof(TryFinalizeRaidDefenderVictoryToVillage));
