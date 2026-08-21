@@ -66,6 +66,8 @@ internal class TradeDataInitializationHandler : IHandler
         tradeRumorsCampaignBehavior._tradeRumors = GetTradeRumors(playerHeroId);
         tradeRumorsCampaignBehavior._enteredSettlements = GetEnteredSettlements(playerHeroId);
 
+        LoadSettlementBribePaidData(playerHeroId);
+
         network.SendAll(new NetworkInitializeServerTradeDataKeys(playerHeroId));
     }
 
@@ -132,5 +134,18 @@ internal class TradeDataInitializationHandler : IHandler
         }
 
         return enteredSettlements;
+    }
+
+    private void LoadSettlementBribePaidData(string playerHeroId)
+    {
+        // Null and key check for players without existing bribe paid data
+        if (tradePlayerData?.PlayerSettlementBribePaid?.ContainsKey(playerHeroId) != true) return;
+
+        foreach (var settlementBribePaid in tradePlayerData.PlayerSettlementBribePaid[playerHeroId])
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementBribePaid.Key, out var settlement)) continue;
+
+            settlement.BribePaid = settlementBribePaid.Value;
+        }
     }
 }
