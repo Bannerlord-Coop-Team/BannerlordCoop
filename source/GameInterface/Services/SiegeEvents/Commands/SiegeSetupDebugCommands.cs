@@ -188,18 +188,24 @@ internal static class SiegeSetupDebugCommands
         var party = MobileParty.MainParty;
         var encounter = PlayerEncounter.Current;
         var mapEvent = settlement.Party.MapEvent;
+        var defenderSide = mapEvent?.DefenderSide;
         var currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
         bool localDefenderInsideCastle = party?.CurrentSettlement == settlement;
+        bool localPartyOnDefenderSide = defenderSide != null && party?.Party?.MapEventSide == defenderSide;
+        bool encounterOwnsMapEvent = encounter != null && ReferenceEquals(PlayerEncounter.Battle, mapEvent);
         return Result(new
         {
-            success = party != null && localDefenderInsideCastle && mapEvent?.IsSiegeAssault == true,
+            success = party != null && localDefenderInsideCastle && localPartyOnDefenderSide &&
+                encounterOwnsMapEvent && mapEvent?.IsSiegeAssault == true,
             action = "state",
             settlement = settlement.StringId,
             siegeAssault = mapEvent?.IsSiegeAssault == true,
             localDefenderInsideCastle,
+            localPartyOnDefenderSide,
             partyInBesiegerCamp = party?.BesiegerCamp != null,
             partyInMapEvent = party?.MapEvent?.IsSiegeAssault == true,
             encounterActive = encounter != null,
+            encounterOwnsMapEvent,
             encounterSiegeAssault = PlayerEncounter.Battle?.IsSiegeAssault == true,
             playerSiegeActive = party != null && PlayerSiege.PlayerSiegeEvent != null,
             currentMenu,
@@ -245,6 +251,7 @@ internal static class SiegeSetupDebugCommands
         bool mapEventActive = mapEvent != null &&
             !mapEvent.IsFinalized && mapEvent.BattleState == BattleState.None;
         bool localDefenderInsideCastle = party?.CurrentSettlement == settlement;
+        bool localPartyOnDefenderSide = defenderSide != null && party?.Party?.MapEventSide == defenderSide;
         bool topologyReady = party?.Party != null && mapEvent?.IsSiegeAssault == true && mapEventActive &&
             defenderSide != null && attackerSide != null && defenderLeader != null && attackerLeader != null &&
             localDefenderInsideCastle;
@@ -262,6 +269,7 @@ internal static class SiegeSetupDebugCommands
             localPartyReady = party?.Party != null,
             localDefenderInsideCastle,
             localPartyInExpectedMapEvent = party?.MapEvent == mapEvent,
+            localPartyOnDefenderSide,
         });
     }
 
@@ -280,7 +288,10 @@ internal static class SiegeSetupDebugCommands
         bool mapEventActive = mapEvent != null &&
             !mapEvent.IsFinalized && mapEvent.BattleState == BattleState.None;
         bool localDefenderInsideCastle = party?.CurrentSettlement == settlement;
+        bool localPartyInExpectedMapEvent = party?.MapEvent == mapEvent;
+        bool localPartyOnDefenderSide = defenderSide != null && party?.Party?.MapEventSide == defenderSide;
         bool localPartyOnUnexpectedMapEvent = party?.MapEvent != null && party.MapEvent != mapEvent;
+        bool localPartyOnUnexpectedMapEventSide = party?.Party?.MapEventSide != null && !localPartyOnDefenderSide;
         bool topologyReady = party?.Party != null && mapEvent?.IsSiegeAssault == true && mapEventActive &&
             defenderSide != null && attackerSide != null && defenderLeader != null && attackerLeader != null &&
             localDefenderInsideCastle;
@@ -302,7 +313,7 @@ internal static class SiegeSetupDebugCommands
                 localDefenderInsideCastle,
             });
         }
-        if (localPartyOnUnexpectedMapEvent || party.BesiegerCamp != null)
+        if (localPartyOnUnexpectedMapEvent || localPartyOnUnexpectedMapEventSide || party.BesiegerCamp != null)
         {
             return Result(new
             {
@@ -311,17 +322,25 @@ internal static class SiegeSetupDebugCommands
                 settlement = settlement.StringId,
                 reason = "the local player is already in another siege setup state",
                 localPartyOnUnexpectedMapEvent,
+                localPartyOnUnexpectedMapEventSide,
+                localPartyOnDefenderSide,
                 localPartyInBesiegerCamp = party.BesiegerCamp != null,
             });
         }
 
         try
         {
-            PlayerEncounter.Start();
-            if (party.MapEvent == mapEvent)
-                PlayerEncounter.Init();
+            if (localPartyInExpectedMapEvent)
+            {
+                if (PlayerEncounter.Current == null || !ReferenceEquals(PlayerEncounter.Battle, mapEvent))
+                {
+                    PlayerEncounter.Start();
+                    PlayerEncounter.Init();
+                }
+            }
             else
             {
+                PlayerEncounter.Start();
                 PlayerEncounter.Current.SetupFields(attackerLeader, party.Party);
                 PlayerEncounter.JoinBattle(BattleSideEnum.Defender);
             }
@@ -338,16 +357,21 @@ internal static class SiegeSetupDebugCommands
             });
         }
 
+        var encounter = PlayerEncounter.Current;
+        bool encounterOwnsMapEvent = encounter != null && ReferenceEquals(PlayerEncounter.Battle, mapEvent);
+        bool joinedPartyOnDefenderSide = party.Party.MapEventSide == defenderSide;
         return Result(new
         {
-            success = PlayerEncounter.Current != null && PlayerEncounter.Battle?.IsSiegeAssault == true &&
-                party.CurrentSettlement == settlement && party.BesiegerCamp == null,
+            success = encounterOwnsMapEvent && joinedPartyOnDefenderSide && party.CurrentSettlement == settlement &&
+                party.BesiegerCamp == null,
             action = "join-defender",
             settlement = settlement.StringId,
             topologyReady = true,
             localDefenderInsideCastle = party.CurrentSettlement == settlement,
-            existingMapEventParty = party.MapEvent == mapEvent,
-            encounterActive = PlayerEncounter.Current != null,
+            existingMapEventParty = localPartyInExpectedMapEvent,
+            localPartyOnDefenderSide = joinedPartyOnDefenderSide,
+            encounterActive = encounter != null,
+            encounterOwnsMapEvent,
             encounterSiegeAssault = PlayerEncounter.Battle?.IsSiegeAssault == true,
         });
     }
