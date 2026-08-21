@@ -138,6 +138,15 @@ public class PlayerSiegeTargetScoringTests
 
             Assert.Equal(160f, totalStrength);
             Assert.Equal(80f, mobileLordStrength);
+
+            game.PlayerTroop = null!;
+            PlayerSiegeTargetScoringPatches.ApplyPlayerSettlementDefense(
+                target,
+                ref totalStrength,
+                ref mobileLordStrength);
+
+            Assert.Equal(160f, totalStrength);
+            Assert.Equal(80f, mobileLordStrength);
         }
         finally
         {

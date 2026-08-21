@@ -109,7 +109,8 @@ internal class PlayerSiegeTargetScoringPatches
     {
         if (!ContainerProvider.TryGetContainer(out _))
         {
-            if (Hero.MainHero.CurrentSettlement == targetSettlement)
+            Hero mainHero = CharacterObject.PlayerCharacter?.HeroObject;
+            if (mainHero != null && mainHero.CurrentSettlement == targetSettlement)
             {
                 totalStrength *= VanillaPlayerPresenceWeight;
                 mobileLordStrength *= VanillaPlayerPresenceWeight;
