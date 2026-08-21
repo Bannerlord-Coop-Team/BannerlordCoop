@@ -483,7 +483,7 @@ coop battle LOSS.";
         return killed;
     }
 
-    private static void Kill(Agent agent)
+    internal static void Kill(Agent agent)
     {
         var blow = new Blow(agent.Index)
         {
