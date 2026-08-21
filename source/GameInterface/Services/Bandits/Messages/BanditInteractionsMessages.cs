@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Bandits.Messages;
 
@@ -65,5 +67,19 @@ public readonly struct RosterScreenAfterBanditEncounter : IEvent
     {
         Parties = parties;
         MainParty = mainParty;
+    }
+}
+
+public readonly struct BanditsSurrenderAsPrisoners : IEvent
+{
+    public readonly MapEvent PlayerBattle;
+    public readonly BattleSideEnum PlayerSide;
+
+    public BanditsSurrenderAsPrisoners(
+        MapEvent playerBattle,
+        BattleSideEnum playerSide)
+    {
+        PlayerBattle = playerBattle;
+        PlayerSide = playerSide;
     }
 }

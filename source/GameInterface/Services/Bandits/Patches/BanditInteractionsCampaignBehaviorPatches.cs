@@ -110,13 +110,9 @@ internal class BanditInteractionsCampaignBehaviorPatches
                 PlayerEncounter.StartBattle();
             }
 
-            PlayerEncounter.Battle?.SetOverrideWinner(PlayerEncounter.Battle.PlayerSide);
-
-            PlayerEncounter.EnemySurrender = true;
-
-            // Nullify player's map event to use patched PlayerEncounter update.
-            // Without this, client gets a duplicate loot screen cycle.
-            if (PlayerEncounter.Battle != null) PlayerEncounter.Current._mapEvent = null;
+            // Do surrender on server and send message to client to update post battle screens
+            var surrenderMessage = new BanditsSurrenderAsPrisoners(PlayerEncounter.Battle, PlayerEncounter.Battle.PlayerSide);
+            MessageBroker.Instance.Publish(__instance, surrenderMessage);
 
             return false;
         }

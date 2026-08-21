@@ -6,11 +6,14 @@ using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Bandits.Handlers;
@@ -49,6 +52,11 @@ internal class BanditInteractionsHandler : IHandler
 
         messageBroker.Subscribe<RosterScreenAfterBanditEncounter>(Handle_RosterScreenAfterBanditEncounter);
         messageBroker.Subscribe<NetworkRosterScreenAfterBanditEncounter>(Handle_NetworkRosterScreenAfterBanditEncounter);
+
+        messageBroker.Subscribe<BanditsSurrenderAsPrisoners>(Handle_BanditsSurrenderAsPrisoners);
+        messageBroker.Subscribe<NetworkBanditsSurrenderAsPrisoners>(Handle_NetworkBanditsSurrenderAsPrisoners);
+
+        messageBroker.Subscribe<NetworkFinalizeBanditSurrenderClient>(Handle_NetworkFinalizeBanditSurrenderClient);
     }
 
     public void Dispose()
@@ -67,6 +75,11 @@ internal class BanditInteractionsHandler : IHandler
 
         messageBroker.Unsubscribe<RosterScreenAfterBanditEncounter>(Handle_RosterScreenAfterBanditEncounter);
         messageBroker.Unsubscribe<NetworkRosterScreenAfterBanditEncounter>(Handle_NetworkRosterScreenAfterBanditEncounter);
+
+        messageBroker.Unsubscribe<BanditsSurrenderAsPrisoners>(Handle_BanditsSurrenderAsPrisoners);
+        messageBroker.Unsubscribe<NetworkBanditsSurrenderAsPrisoners>(Handle_NetworkBanditsSurrenderAsPrisoners);
+
+        messageBroker.Unsubscribe<NetworkFinalizeBanditSurrenderClient>(Handle_NetworkFinalizeBanditSurrenderClient);
     }
 
     private void Handle_SetPlayerBanditInteraction(MessagePayload<SetPlayerBanditInteraction> obj)
@@ -270,6 +283,41 @@ internal class BanditInteractionsHandler : IHandler
                 CampaignEventDispatcher.Instance.OnBanditPartyRecruited(mobileParty);
                 DestroyPartyAction.Apply(mainParty.Party, mobileParty);
             }
+        });
+    }
+
+    private void Handle_BanditsSurrenderAsPrisoners(MessagePayload<BanditsSurrenderAsPrisoners> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.PlayerBattle, out var playerBattleId)) return;
+
+        var message = new NetworkBanditsSurrenderAsPrisoners(playerBattleId, data.PlayerSide);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkBanditsSurrenderAsPrisoners(MessagePayload<NetworkBanditsSurrenderAsPrisoners> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.PlayerBattleId, out var playerBattle)) return;
+
+            playerBattle.SetOverrideWinner(data.PlayerSide);
+            playerBattle.Update();
+
+            network.Send(obj.Who as NetPeer, new NetworkFinalizeBanditSurrenderClient());
+        });
+    }
+
+    private void Handle_NetworkFinalizeBanditSurrenderClient(MessagePayload<NetworkFinalizeBanditSurrenderClient> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            PlayerEncounter.Update();
         });
     }
 

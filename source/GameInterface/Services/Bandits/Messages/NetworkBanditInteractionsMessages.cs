@@ -2,6 +2,8 @@
 using ProtoBuf;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Bandits.Messages;
 
@@ -97,3 +99,24 @@ internal readonly struct NetworkRosterScreenAfterBanditEncounter : ICommand
         MainPartyId = mainPartyId;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkBanditsSurrenderAsPrisoners : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string PlayerBattleId;
+
+    [ProtoMember(2)]
+    public readonly BattleSideEnum PlayerSide;
+
+    public NetworkBanditsSurrenderAsPrisoners(
+        string playerBattleId,
+        BattleSideEnum playerSide)
+    {
+        PlayerBattleId = playerBattleId;
+        PlayerSide = playerSide;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkFinalizeBanditSurrenderClient : ICommand {}
