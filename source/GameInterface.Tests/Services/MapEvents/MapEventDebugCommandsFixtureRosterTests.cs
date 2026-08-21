@@ -10,7 +10,7 @@ namespace GameInterface.Tests.Services.MapEvents;
 public class MapEventDebugCommandsFixtureRosterTests
 {
     [Fact]
-    public void LimitLateJoinModeFixtureRoster_PreservesHealthyTroopsAfterWoundedEntries()
+    public void LimitLateJoinModeFixtureRoster_RemovesRegularTroopsAfterWoundedEntries()
     {
         var roster = new TroopRoster();
         var healthyTroop = new CharacterObject();
@@ -20,9 +20,9 @@ public class MapEventDebugCommandsFixtureRosterTests
 
         MapEventDebugCommands.LimitLateJoinModeFixtureRoster(roster);
 
-        Assert.Equal(6, roster.GetTroopCount(healthyTroop));
+        Assert.Equal(0, roster.GetTroopCount(healthyTroop));
         Assert.Equal(0, roster.GetTroopCount(woundedTroop));
-        Assert.Equal(6, roster.TotalHealthyCount);
+        Assert.Equal(0, roster.TotalHealthyCount);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class MapEventDebugCommandsFixtureRosterTests
 
         Assert.Equal(1, roster.GetTroopCount(leader));
         Assert.Equal(1, roster.GetTroopCount(companion));
-        Assert.Equal(6, roster.GetTroopCount(regularTroop));
+        Assert.Equal(0, roster.GetTroopCount(regularTroop));
     }
 
     [Fact]

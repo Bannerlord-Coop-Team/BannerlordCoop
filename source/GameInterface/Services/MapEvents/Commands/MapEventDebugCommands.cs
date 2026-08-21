@@ -2080,7 +2080,9 @@ public class MapEventDebugCommands
         var opponentMemberRoster = opponentParty.MemberRoster.GetTroopRoster().ToArray();
         LimitLateJoinModeFixtureRoster(firstParty.MemberRoster);
         LimitLateJoinModeFixtureRoster(joiningParty.MemberRoster);
-        LimitLateJoinModeFixtureRoster(opponentParty.MemberRoster);
+        LimitLateJoinModeFixtureRoster(
+            opponentParty.MemberRoster,
+            LateJoinModeFixtureMaximumOpponentRegularTroops);
         if (opponentParty.MemberRoster.TotalHealthyCount <= 0)
         {
             RestoreLateJoinModeFixtureMemberRoster(firstParty.MemberRoster, firstPlayerMemberRoster);
@@ -2477,7 +2479,8 @@ public class MapEventDebugCommands
     }
 
 #if DEBUG
-    private const int LateJoinModeFixtureMaximumRegularTroops = 6;
+    private const int LateJoinModeFixtureMaximumRegularTroops = 0;
+    private const int LateJoinModeFixtureMaximumOpponentRegularTroops = 1;
 
     internal static void LimitLateJoinModeFixtureRoster(TroopRoster roster)
     {
