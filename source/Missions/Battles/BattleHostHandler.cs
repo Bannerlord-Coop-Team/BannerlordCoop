@@ -391,7 +391,7 @@ internal class BattleHostHandler : IHandler
     {
         if (receiver == null) return;
         long allocationRevision = ++reserveSnapshotRevision;
-        int battleSize = battleSizeProvider.GetBattleSize(mapEvent);
+        int battleSize = battleSizeProvider.GetBattleSize();
         foreach (var sideReserve in reserves)
             network.Send(receiver, new NetworkBattleTroopReserve(
                 mapEventId, (int)sideReserve.Side, sideReserve.Parties, sideReserve.TotalTroops,

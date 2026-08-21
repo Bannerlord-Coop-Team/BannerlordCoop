@@ -29,6 +29,7 @@ internal readonly struct ArmyFormationPositionState
     public bool IsCurrentlyAtSea { get; }
     public bool HasConvergingMember { get; }
     public bool HasNearbyConvergingMember { get; }
+    public float AttachmentDistanceSquared { get; }
 
     public ArmyFormationPositionState(
         string leaderPartyId,
@@ -41,7 +42,8 @@ internal readonly struct ArmyFormationPositionState
         bool isInSettlement,
         bool isCurrentlyAtSea,
         bool hasConvergingMember,
-        bool hasNearbyConvergingMember)
+        bool hasNearbyConvergingMember,
+        float attachmentDistanceSquared)
     {
         LeaderPartyId = leaderPartyId;
         Position = position;
@@ -54,6 +56,7 @@ internal readonly struct ArmyFormationPositionState
         IsCurrentlyAtSea = isCurrentlyAtSea;
         HasConvergingMember = hasConvergingMember;
         HasNearbyConvergingMember = hasNearbyConvergingMember;
+        AttachmentDistanceSquared = attachmentDistanceSquared;
     }
 }
 
@@ -78,9 +81,12 @@ internal sealed class ArmyFormationPositionConvergence : IArmyFormationPositionC
     public bool ShouldApply(ArmyFormationPositionState state, CampaignVec2 reportedPosition)
     {
         return IsEligible(state) &&
+            state.HasNearbyConvergingMember &&
+            state.AttachmentDistanceSquared > 0f &&
             reportedPosition.ToVec2().IsValid &&
             reportedPosition.IsOnLand != state.IsCurrentlyAtSea &&
-            reportedPosition != state.Position;
+            reportedPosition != state.Position &&
+            reportedPosition.DistanceSquared(state.Position) <= state.AttachmentDistanceSquared;
     }
 
     public bool CanReport(ArmyFormationPositionState state) =>

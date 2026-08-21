@@ -70,9 +70,11 @@ public class ModConfigTests : IDisposable
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
         Assert.False(config.Difficulty.BirthAndDeath);
         Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
+        Assert.Equal(1000, config.ModOptions.BattleSize);
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
         Assert.True(config.Network.UnknownKeys == null || config.Network.UnknownKeys.Count == 0);
+        Assert.True(config.ModOptions.UnknownKeys == null || config.ModOptions.UnknownKeys.Count == 0);
     }
 
     [Fact]

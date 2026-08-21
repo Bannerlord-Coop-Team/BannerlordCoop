@@ -132,9 +132,6 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // exactly once, which is what lets each owner take a slice that adds up (see PartyReserve).
             var partySide = party.Party?.Side ?? BattleSideEnum.None;
             var partyOffset = partySide == BattleSideEnum.Attacker ? attackerTotal : defenderTotal;
-            var playerOwnedPartiesBefore = partySide == BattleSideEnum.Attacker
-                ? attackerPlayerParties
-                : defenderPlayerParties;
             if (partySide == BattleSideEnum.Attacker) attackerTotal += entries.Count;
             else defenderTotal += entries.Count;
 
@@ -144,6 +141,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
             // Only a present player's own party reserves a player slot. Offline or absent registrations fall
             // to the host and must not reduce the allocation available to the players who entered this battle.
+            int playerOwnedPartiesBefore = partySide == BattleSideEnum.Attacker
+                ? attackerPlayerParties
+                : defenderPlayerParties;
             var playerOwnedRank = -1;
             if (entries.Count > 0
                 && ResolveOwningController(partyOwnerController, null, absentControllers) != null)
@@ -166,8 +166,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId),
                 sideOffset: partyOffset,
                 playerOwnedRank: playerOwnedRank,
-                unreservedSideOffset: partyOffset - playerOwnedPartiesBefore,
-                hasUnreservedSideOffset: true);
+                playerOwnedPartiesBefore: playerOwnedPartiesBefore);
             if (partySide == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else
