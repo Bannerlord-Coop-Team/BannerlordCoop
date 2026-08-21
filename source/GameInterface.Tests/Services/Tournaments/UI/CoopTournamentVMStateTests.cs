@@ -188,6 +188,208 @@ public class CoopTournamentVMStateTests
         Assert.Equal(0, summary.ExpectedPayout);
     }
 
+    [Fact]
+    public void GetAdvanceChoice_ContestantInNextMatch_ReturnsJoin()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            true,
+            0,
+            0,
+            1);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(TournamentPlayerChoice.Join, CoopTournamentVM.GetAdvanceChoice(state));
+    }
+
+    [Fact]
+    public void GetAdvanceChoice_SpectatorWithSkipAllowed_ReturnsSkip()
+    {
+        var snapshot = CreateSnapshot(
+            Array.Empty<TournamentContestantData>(),
+            new[] { "player-a" },
+            Array.Empty<TournamentPlayerChoiceData>(),
+            true,
+            0,
+            0,
+            1);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(TournamentPlayerChoice.Skip, CoopTournamentVM.GetAdvanceChoice(state));
+    }
+
+    [Fact]
+    public void GetAdvanceChoice_SpectatorWithoutSkipAllowed_ReturnsWatch()
+    {
+        var snapshot = CreateSnapshot(
+            Array.Empty<TournamentContestantData>(),
+            new[] { "player-a" },
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(TournamentPlayerChoice.Watch, CoopTournamentVM.GetAdvanceChoice(state));
+    }
+
+    [Fact]
+    public void GetAdvanceChoice_NoEligibleChoice_ReturnsNull()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            true,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.Preparation);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Null(CoopTournamentVM.GetAdvanceChoice(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_LiveMatchSpectator_ReturnsTrue()
+    {
+        var snapshot = CreateSnapshot(
+            Array.Empty<TournamentContestantData>(),
+            new[] { "player-a" },
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.True(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_LiveMatchContestantFighting_ReturnsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_AwaitingChoices_ReturnsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            true,
+            0,
+            0,
+            1);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_NoSnapshot_ReturnsFalse()
+    {
+        var state = CoopTournamentVM.CalculateUIState(null, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void IsLocalInCurrentMatch_ContestantInCurrentMatch_IsTrue()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.True(state.IsInCurrentMatch);
+    }
+
+    [Fact]
+    public void IsLocalInCurrentMatch_RestingContestant_IsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateRestingContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(state.IsInCurrentMatch);
+    }
+
+    [Fact]
+    public void IsLocalInCurrentMatch_PureSpectator_IsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            Array.Empty<TournamentContestantData>(),
+            new[] { "player-a" },
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(state.IsInCurrentMatch);
+    }
+
+    [Fact]
+    public void IsLocalInCurrentMatch_NoLocalPlayer_IsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateContestant("slot-a", "player-b") },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(state.IsInCurrentMatch);
+    }
+
     private static NetworkTournamentBetResult CreateBetResult(
         TournamentSessionSnapshot snapshot,
         long revision,
@@ -217,6 +419,21 @@ public class CoopTournamentVMStateTests
             false,
             true,
             "npc-a");
+
+    private static TournamentContestantData CreateRestingContestant()
+        => CreateContestant("slot-b", "player-a");
+
+    private static TournamentContestantData CreateContestant(string slotId, string controllerId)
+        => new(
+            slotId,
+            "character-b",
+            1,
+            controllerId,
+            "Player B",
+            true,
+            false,
+            true,
+            "npc-b");
 
     private static TournamentSessionSnapshot CreateSnapshot(
         TournamentContestantData[] contestants,

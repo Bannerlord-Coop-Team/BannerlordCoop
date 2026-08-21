@@ -27,6 +27,7 @@ internal sealed class CoopTournamentVM : TournamentVM
         public readonly bool CanLeave;
         public readonly bool CanBet;
         public readonly bool IsMatchActive;
+        public readonly bool IsInCurrentMatch;
         public readonly int ReadyCount;
         public readonly int SkipCount;
         public readonly int VoterCount;
@@ -39,6 +40,7 @@ internal sealed class CoopTournamentVM : TournamentVM
             bool canLeave,
             bool canBet,
             bool isMatchActive,
+            bool isInCurrentMatch,
             int readyCount,
             int skipCount,
             int voterCount,
@@ -50,6 +52,7 @@ internal sealed class CoopTournamentVM : TournamentVM
             CanLeave = canLeave;
             CanBet = canBet;
             IsMatchActive = isMatchActive;
+            IsInCurrentMatch = isInCurrentMatch;
             ReadyCount = readyCount;
             SkipCount = skipCount;
             VoterCount = voterCount;
@@ -89,6 +92,7 @@ internal sealed class CoopTournamentVM : TournamentVM
     private bool canBet;
     private bool isJoinVisible;
     private bool isCoopMatchActive;
+    private bool leaveMenuOpen;
     private string readyCountText;
     private string skipCountText;
     private string selectedChoiceText;
@@ -96,6 +100,7 @@ internal sealed class CoopTournamentVM : TournamentVM
     private bool hasAcceptedBetResult;
     private long acceptedBetSequence;
     private BetSummary acceptedBetSummary;
+    private UIState lastUIState;
 
     public CoopTournamentVM(
         Action disableUI,
@@ -184,11 +189,24 @@ internal sealed class CoopTournamentVM : TournamentVM
         {
             if (isCoopMatchActive == value) return;
             isCoopMatchActive = value;
-            base.IsCurrentMatchActive = value;
+            base.IsCurrentMatchActive = value && !leaveMenuOpen;
             OnPropertyChangedWithValue(value, nameof(IsCoopMatchActive));
             OnPropertyChanged(nameof(ShouldShowUI));
         }
     }
+
+    internal bool IsLeaveMenuOpen
+    {
+        get => leaveMenuOpen;
+        set
+        {
+            if (leaveMenuOpen == value) return;
+            leaveMenuOpen = value;
+            base.IsCurrentMatchActive = isCoopMatchActive && !leaveMenuOpen;
+        }
+    }
+
+    public bool IsInCurrentMatch => lastUIState.IsInCurrentMatch;
 
     [DataSourceProperty]
     public bool ShouldShowUI => TournamentMissionPresentationState
@@ -622,11 +640,27 @@ internal sealed class CoopTournamentVM : TournamentVM
             currentSnapshot != null && (localIsVoter || currentSnapshot.IsCompleted),
             awaitingChoice && localIsInCurrentMatch && hasRemainingBet,
             currentSnapshot?.Phase == TournamentSessionPhase.LiveMatch,
+            localIsInCurrentMatch,
             currentSnapshot?.ReadyCount ?? 0,
             currentSnapshot?.SkipCount ?? 0,
             currentSnapshot?.VoterCount ?? 0,
             selectedChoice);
     }
+
+    internal static TournamentPlayerChoice? GetAdvanceChoice(UIState state)
+    {
+        if (state.CanJoin) return TournamentPlayerChoice.Join;
+        if (state.CanSkip) return TournamentPlayerChoice.Skip;
+        if (state.CanWatch) return TournamentPlayerChoice.Watch;
+        return null;
+    }
+
+    internal static bool ShouldOpenLeaveMenu(UIState state)
+        => state.IsMatchActive && !state.IsInCurrentMatch && state.CanLeave;
+
+    internal TournamentPlayerChoice? GetAdvanceChoice() => GetAdvanceChoice(lastUIState);
+
+    internal bool ShouldOpenLeaveMenu() => ShouldOpenLeaveMenu(lastUIState);
 
     private static TournamentContestantData GetLocalContestant(
         TournamentSessionSnapshot currentSnapshot,
@@ -654,6 +688,7 @@ internal sealed class CoopTournamentVM : TournamentVM
         bool hasRemainingBet = snapshot != null && MaximumBetValue > 0;
         UIState state = CalculateUIState(snapshot, controller.LocalControllerId, hasRemainingBet);
 
+        lastUIState = state;
         CanJoin = state.CanJoin;
         IsJoinVisible = state.CanJoin;
         CanWatch = state.CanWatch;
