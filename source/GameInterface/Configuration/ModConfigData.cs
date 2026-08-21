@@ -82,6 +82,8 @@ public sealed class NetworkConfigData
 
 public sealed class ModOptionsData
 {
+    public int? BattleSize { get; set; }
+
     public bool? FastForwardEnabled { get; set; }
 
     public bool? AutoPauseEnabled { get; set; }

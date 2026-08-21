@@ -4,6 +4,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Commands;
 using GameInterface.Services.MapEvents.TroopSupply;
 using Missions.Agents.Packets;
+using Newtonsoft.Json;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
@@ -560,6 +561,47 @@ internal static class BattleDebugCommands
             $"enemyMovedSinceLast={moved} damageReceivedEvents={ownDamageEvents} " +
             $"resultState={result?.BattleState.ToString() ?? "None"} " +
             $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
+    }
+
+    [CommandLineArgumentFunction("size_state", "coop.debug.battle")]
+    public static string SizeState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.size_state";
+
+        Mission mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        var spawnHandler = mission?.GetMissionBehavior<CoopBattleMissionSpawnHandler>();
+        if (mission == null || controller == null || spawnHandler == null)
+            return "No active coop battle mission";
+        if (!ContainerProvider.TryResolve<IBattleAgentBudget>(out var agentBudget))
+            return "Battle agent budget is unavailable";
+
+        CoopBattleMissionSpawnHandler.BattleSizeState state = spawnHandler.CaptureBattleSizeState();
+        int activeAgents = mission.Agents.Count(agent => agent.IsActive());
+        int targetTotal = state.DefenderTarget + state.AttackerTarget;
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            controllerId = controller.Session.OwnControllerId,
+            state.IsSized,
+            authoritativeBattleSize = state.BattleSize,
+            state.DefenderTotal,
+            state.AttackerTotal,
+            state.DefenderTarget,
+            state.AttackerTarget,
+            authoritativeTargetTotal = targetTotal,
+            state.AllocationRevision,
+            activeAgents,
+            renderedAgentLimit = agentBudget.MaxRenderedAgents,
+        });
+
+        return
+            $"BATTLE_SIZE_STATE battleSize={state.BattleSize}|" +
+            $"defenderTotal={state.DefenderTotal}|attackerTotal={state.AttackerTotal}|" +
+            $"defenderTarget={state.DefenderTarget}|attackerTarget={state.AttackerTarget}|" +
+            $"targetTotal={targetTotal}|activeAgents={activeAgents}|" +
+            $"renderedAgentLimit={agentBudget.MaxRenderedAgents}\n" +
+            $"LIVE_TEST_JSON={structuredState}";
     }
 
     [CommandLineArgumentFunction("charge_owned_formations", "coop.debug.battle")]
