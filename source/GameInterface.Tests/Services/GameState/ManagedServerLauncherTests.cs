@@ -58,6 +58,14 @@ public class ManagedServerLauncherTests
     }
 
     [Fact]
+    public void ResolveCoopModuleId_ReturnsNightlyId_WhenNightlyIsActive()
+    {
+        var moduleIds = new[] { "Native", "CoopNightly" };
+
+        Assert.Equal("CoopNightly", ManagedServerLauncher.ResolveCoopModuleId(moduleIds));
+    }
+
+    [Fact]
     public void CanDedicatedServerHostModules_AcceptsTheStockModuleSet()
     {
         var modules = new List<ModuleInfo>
@@ -67,6 +75,18 @@ public class ManagedServerLauncherTests
             new ModuleInfo("Sandbox", isOfficial: true, isDlc: false, default),
             new ModuleInfo("StoryMode", isOfficial: true, isDlc: false, default),
             new ModuleInfo("Coop", isOfficial: false, isDlc: false, default),
+        };
+
+        Assert.True(ManagedServerLauncher.CanDedicatedServerHostModules(modules));
+    }
+
+    [Fact]
+    public void CanDedicatedServerHostModules_AcceptsTheNightlyModuleSet()
+    {
+        var modules = new List<ModuleInfo>
+        {
+            new ModuleInfo("Native", isOfficial: true, isDlc: false, default),
+            new ModuleInfo("CoopNightly", isOfficial: false, isDlc: false, default),
         };
 
         Assert.True(ManagedServerLauncher.CanDedicatedServerHostModules(modules));

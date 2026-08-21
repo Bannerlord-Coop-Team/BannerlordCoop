@@ -23,8 +23,10 @@ public static class ManagedServerLauncher
     /// <summary>The dedicated-server launcher executable at that deployment's root.</summary>
     public const string DedicatedServerExecutableName = "BannerlordCoopServer.exe";
 
-    /// <summary>The id of this mod's module, whose folder carries the dedicated server.</summary>
+    /// <summary>The id of this mod's stable module, whose folder carries the dedicated server.</summary>
     public const string CoopModuleId = "Coop";
+
+    private const string CoopNightlyModuleId = "CoopNightly";
 
     /// <summary>
     /// The Bannerlord engine executable. Under Steam the current process is the launcher that
@@ -46,7 +48,10 @@ public static class ManagedServerLauncher
         string coopModuleRoot;
         try
         {
-            coopModuleRoot = ModuleHelper.GetModuleFullPath(CoopModuleId);
+            string coopModuleId = ResolveCoopModuleId(GetActiveModuleIds());
+            if (coopModuleId == null) return null;
+
+            coopModuleRoot = ModuleHelper.GetModuleFullPath(coopModuleId);
         }
         catch (Exception)
         {
@@ -94,9 +99,20 @@ public static class ManagedServerLauncher
 
         return modules.All(module =>
             (module.IsOfficial && !module.IsDlc) ||
-            string.Equals(module.Id, CoopModuleId, StringComparison.OrdinalIgnoreCase) ||
+            IsCoopModuleId(module.Id) ||
             (module.Id != null &&
                 module.Id.StartsWith("DedicatedServer.", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    internal static string ResolveCoopModuleId(IEnumerable<string> moduleIds)
+    {
+        return moduleIds?.FirstOrDefault(IsCoopModuleId);
+    }
+
+    private static bool IsCoopModuleId(string moduleId)
+    {
+        return string.Equals(moduleId, CoopModuleId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(moduleId, CoopNightlyModuleId, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>The ids of every currently active module, in load (dependency) order.</summary>
