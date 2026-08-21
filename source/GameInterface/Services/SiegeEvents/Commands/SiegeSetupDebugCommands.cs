@@ -395,6 +395,8 @@ internal static class SiegeSetupDebugCommands
                 siegeAssault = false,
             });
         }
+        if (party?.Party?.MapEventSide != mapEvent.AttackerSide)
+            return Failure("start-mission", "command only supports an attacker-side encounter");
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
             !objectManager.TryGetId(mapEvent, out var mapEventId) ||
             !objectManager.TryGetId(party, out var partyId))
@@ -425,6 +427,39 @@ internal static class SiegeSetupDebugCommands
                 exceptionMessage = exception.Message,
             });
         }
+    }
+
+    [CommandLineArgumentFunction("setup_start_defender_mission", "coop.debug.siege")]
+    public static string StartDefenderMission(List<string> args)
+    {
+        if (args.Count != 2 || !int.TryParse(args[1], out int expectedPlayerCount) || expectedPlayerCount < 1)
+            return Failure("start-defender-mission", "expected settlement id and a positive player count");
+        if (!TryGetServerSettlement(args, 2, out IObjectManager objectManager, out Settlement settlement, out string error))
+            return Failure("start-defender-mission", error);
+        if (!ContainerProvider.TryResolve<BattleMissionStartHandler>(out var missionStartHandler))
+            return Failure("start-defender-mission", "battle mission start handler is unavailable");
+
+        var mapEvent = settlement.Party?.MapEvent;
+        string mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out string id)
+            ? id
+            : mapEvent?.StringId;
+        bool started = missionStartHandler.StartDebugDefenderSiegeMission(
+            mapEvent,
+            expectedPlayerCount,
+            out int participantCount,
+            out string failure);
+        return Result(new
+        {
+            success = started,
+            action = "start-defender-mission",
+            settlement = settlement.StringId,
+            mapEventId,
+            expectedPlayerCount,
+            participantCount,
+            defenderOnly = true,
+            siegeAssault = mapEvent?.IsSiegeAssault == true,
+            reason = failure,
+        });
     }
 
     private static bool TryGetServerSettlement(

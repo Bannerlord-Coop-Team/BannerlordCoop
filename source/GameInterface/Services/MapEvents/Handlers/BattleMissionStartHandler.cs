@@ -255,6 +255,180 @@ internal class BattleMissionStartHandler : IHandler
         }, context: nameof(Handle_NetworkBattleStartRequest));
     }
 
+#if DEBUG
+    internal bool StartDebugDefenderSiegeMission(
+        MapEvent mapEvent,
+        int expectedPlayerCount,
+        out int participantCount,
+        out string failure)
+    {
+        participantCount = 0;
+        failure = null;
+        if (ModInformation.IsClient)
+        {
+            failure = "debug defender mission start must run on the server";
+            return false;
+        }
+        if (expectedPlayerCount < 1)
+        {
+            failure = "the expected defender count must be positive";
+            return false;
+        }
+        if (mapEvent?.IsSiegeAssault != true || mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None)
+        {
+            failure = "the siege assault is not active";
+            return false;
+        }
+        var settlement = mapEvent.MapEventSettlement;
+        if (settlement == null || !settlement.IsFortification || settlement.Party?.MapEvent != mapEvent)
+        {
+            failure = "the siege does not own the expected fortification";
+            return false;
+        }
+        if (!objectManager.TryGetId(mapEvent, out var mapEventId))
+        {
+            failure = "the siege map event is not registered";
+            return false;
+        }
+
+        int connectedPlayerCount = 0;
+        foreach (var player in playerManager.Players)
+        {
+            if (!playerManager.IsConnected(player))
+                continue;
+
+            connectedPlayerCount++;
+            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
+                !party.IsActive || party.Party == null || party.CurrentSettlement != settlement ||
+                party.Party.MapEventSide != mapEvent.DefenderSide ||
+                mapEvent.FindMapEventParty(party.Party) == null)
+            {
+                failure = "a connected player is not an inside-castle defender";
+                return false;
+            }
+            if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || hero.IsWounded)
+            {
+                failure = "a connected defender hero is unavailable or wounded";
+                return false;
+            }
+        }
+        if (connectedPlayerCount != expectedPlayerCount)
+        {
+            failure = "the expected defender count is not connected";
+            return false;
+        }
+        if (!ServerBattleModeArbiter.TryClaimMission(mapEventId, out var isNewMissionClaim))
+        {
+            failure = "another battle mode already owns the siege";
+            return false;
+        }
+        if (!isNewMissionClaim)
+        {
+            failure = "the siege mission is already claimed";
+            return false;
+        }
+
+        bool releaseMissionClaim = true;
+        var reservations = new List<DebugMissionReservation>();
+        try
+        {
+            foreach (var side in mapEvent._sides)
+                side.MakeReadyForMission(null);
+
+            var participants = GetMissionParticipants(mapEvent);
+            participantCount = participants.Count;
+            if (participantCount != expectedPlayerCount)
+            {
+                failure = "the expected defenders are not mission participants";
+                return false;
+            }
+
+            ReserveDebugMissionParticipants(mapEventId, participants, reservations);
+            var snapshot = siegeMissionSnapshots.GetOrAdd(
+                mapEventId,
+                _ => BuildSiegeMissionSnapshot(mapEventId, mapEvent));
+            SendMissionStart(participants, new NetworkStartSiegeMission(
+                snapshot.MapEventId,
+                snapshot.WallLevel,
+                snapshot.WallHitPointRatios,
+                snapshot.AttackerEngines,
+                snapshot.DefenderEngines,
+                initiatingPartyId: null));
+            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Mission));
+            releaseMissionClaim = false;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Failed to start DEBUG defender siege mission for {MapEventId}", mapEventId);
+            failure = "the defender mission start failed";
+            return false;
+        }
+        finally
+        {
+            if (releaseMissionClaim)
+            {
+                try
+                {
+                    CancelDebugMissionReservations(mapEventId, reservations);
+                }
+                catch (Exception exception)
+                {
+                    Logger.Error(exception, "Failed to cancel DEBUG defender siege reservations for {MapEventId}", mapEventId);
+                }
+                finally
+                {
+                    ServerBattleModeArbiter.Release(mapEventId);
+                }
+            }
+        }
+    }
+
+    private void ReserveDebugMissionParticipants(
+        string mapEventId,
+        IReadOnlyList<MissionParticipant> participants,
+        List<DebugMissionReservation> reservations)
+    {
+        foreach (var participant in participants)
+        {
+            var reservation = new DebugMissionReservation(participant, Guid.NewGuid());
+            reservations.Add(reservation);
+            messageBroker.Publish(participant.Peer,
+                new BattleJoinAccepted(mapEventId, participant.ControllerId, reservation.ReservationId));
+        }
+    }
+
+    private void CancelDebugMissionReservations(
+        string mapEventId,
+        IReadOnlyList<DebugMissionReservation> reservations)
+    {
+        foreach (var reservation in reservations)
+        {
+            try
+            {
+                messageBroker.Publish(reservation.Participant.Peer,
+                    new BattleJoinCancelled(mapEventId, reservation.Participant.ControllerId, reservation.ReservationId));
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Failed to cancel DEBUG defender siege reservation for {MapEventId}", mapEventId);
+            }
+        }
+    }
+
+    private sealed class DebugMissionReservation
+    {
+        public MissionParticipant Participant { get; }
+        public Guid ReservationId { get; }
+
+        public DebugMissionReservation(MissionParticipant participant, Guid reservationId)
+        {
+            Participant = participant;
+            ReservationId = reservationId;
+        }
+    }
+#endif
+
     private bool TryGetRequestingParticipant(
         NetPeer requester,
         NetworkBattleStartRequest request,
