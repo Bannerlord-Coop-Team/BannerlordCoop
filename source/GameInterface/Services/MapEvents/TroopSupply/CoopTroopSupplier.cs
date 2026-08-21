@@ -307,6 +307,45 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
     }
 
+#if DEBUG
+    /// <summary>Runs a debug allocation decision while reserve refreshes are blocked.</summary>
+    internal TResult WithSupplyPreview<TResult>(
+        int numberToAllocate,
+        Func<List<IAgentOriginBase>, TResult> action)
+    {
+        if (action == null) throw new ArgumentNullException(nameof(action));
+
+        var origins = new List<IAgentOriginBase>();
+        lock (gate)
+        {
+            if (numberToAllocate > 0)
+            {
+                int slotBudget = agentBudget != null
+                    ? agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current))
+                    : int.MaxValue;
+                int allocated = 0;
+                foreach (var party in parties)
+                {
+                    for (int index = party.Supplied;
+                         allocated < numberToAllocate && index < party.Entries.Length;
+                         index++)
+                    {
+                        var origin = CreateOrigin(party.Entries[index], party.PartyId);
+                        int slots = SlotsForOrigin(origin);
+                        if (slots > slotBudget) return action(origins);
+
+                        allocated++;
+                        slotBudget -= slots;
+                        if (origin != null) origins.Add(origin);
+                    }
+                    if (allocated >= numberToAllocate) break;
+                }
+            }
+            return action(origins);
+        }
+    }
+#endif
+
     /// <summary>Whether this authoritative reserve snapshot still contains a party.</summary>
     public bool ContainsParty(string partyId)
     {
