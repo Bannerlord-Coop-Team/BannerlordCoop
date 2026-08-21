@@ -132,6 +132,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // exactly once, which is what lets each owner take a slice that adds up (see PartyReserve).
             var partySide = party.Party?.Side ?? BattleSideEnum.None;
             var partyOffset = partySide == BattleSideEnum.Attacker ? attackerTotal : defenderTotal;
+            var playerOwnedPartiesBefore = partySide == BattleSideEnum.Attacker
+                ? attackerPlayerParties
+                : defenderPlayerParties;
             if (partySide == BattleSideEnum.Attacker) attackerTotal += entries.Count;
             else defenderTotal += entries.Count;
 
@@ -162,7 +165,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 entriesArray,
                 isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId),
                 sideOffset: partyOffset,
-                playerOwnedRank: playerOwnedRank);
+                playerOwnedRank: playerOwnedRank,
+                unreservedSideOffset: partyOffset - playerOwnedPartiesBefore,
+                hasUnreservedSideOffset: true);
             if (partySide == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else

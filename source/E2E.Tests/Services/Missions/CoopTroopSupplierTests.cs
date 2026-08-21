@@ -22,9 +22,11 @@ public class CoopTroopSupplierTests
     }
 
     private static PartyReserve Party(string id, int count, int supplied = 0, int seedBase = 500,
-        bool isReceiverPlayerParty = false, int sideOffset = 0, int playerOwnedRank = -1)
+        bool isReceiverPlayerParty = false, int sideOffset = 0, int playerOwnedRank = -1,
+        int unreservedSideOffset = -1)
         => new PartyReserve(id, supplied, Entries(count, seedBase), isReceiverPlayerParty, sideOffset,
-            playerOwnedRank);
+            playerOwnedRank, unreservedSideOffset < 0 ? 0 : unreservedSideOffset,
+            hasUnreservedSideOffset: unreservedSideOffset >= 0);
 
     private static int SuppliedFor(CoopTroopSupplier supplier, string partyId)
         => supplier.GetSuppliedByParty().First(p => p.partyId == partyId).supplied;
@@ -265,14 +267,17 @@ public class CoopTroopSupplierTests
         const int playerParties = 3;
 
         var largest = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        largest.SetReserve(new[] { Party("L", 600, isReceiverPlayerParty: true, playerOwnedRank: 0) },
+        largest.SetReserve(new[] { Party("L", 600, isReceiverPlayerParty: true, playerOwnedRank: 0,
+            unreservedSideOffset: 0) },
             sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
         var middle = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         middle.SetReserve(new[] { Party("M", 300, seedBase: 4000, isReceiverPlayerParty: true,
-            sideOffset: 600, playerOwnedRank: 1) }, sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
+            sideOffset: 600, playerOwnedRank: 1, unreservedSideOffset: 599) },
+            sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
         var smallest = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         smallest.SetReserve(new[] { Party("S", 100, seedBase: 8000, isReceiverPlayerParty: true,
-            sideOffset: 900, playerOwnedRank: 2) }, sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
+            sideOffset: 900, playerOwnedRank: 2, unreservedSideOffset: 898) },
+            sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
 
         var shares = new[]
         {
@@ -286,6 +291,38 @@ public class CoopTroopSupplierTests
         Assert.InRange(shares[0], 359, 361);
         Assert.InRange(shares[1], 179, 181);
         Assert.InRange(shares[2], 59, 61);
+    }
+
+    [Fact]
+    public void PlayerReservations_NeverAllocateMoreThanAnOwnersReserve()
+    {
+        const int total = 128;
+        const int playerParties = 3;
+
+        var first = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        first.SetReserve(new[] { Party("P1", 30, isReceiverPlayerParty: true, playerOwnedRank: 0,
+            unreservedSideOffset: 0) }, total, playerParties, authoritativeBattleSize: 1000);
+        var middle = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        middle.SetReserve(new[] { Party("P2", 63, isReceiverPlayerParty: true, sideOffset: 30,
+            playerOwnedRank: 1, unreservedSideOffset: 29) }, total, playerParties,
+            authoritativeBattleSize: 1000);
+        var last = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        last.SetReserve(new[] { Party("P3", 35, isReceiverPlayerParty: true, sideOffset: 93,
+            playerOwnedRank: 2, unreservedSideOffset: 91) }, total, playerParties,
+            authoritativeBattleSize: 1000);
+
+        var shares = new[]
+        {
+            first.OwnedShareOf(total),
+            middle.OwnedShareOf(total),
+            last.OwnedShareOf(total),
+        };
+
+        Assert.Equal(new[] { 30, 63, 35 }, shares);
+        Assert.Equal(total, shares.Sum());
+        Assert.True(shares[0] <= first.TotalTroops);
+        Assert.True(shares[1] <= middle.TotalTroops);
+        Assert.True(shares[2] <= last.TotalTroops);
     }
 
     [Fact]
@@ -324,12 +361,14 @@ public class CoopTroopSupplierTests
 
         // One troop of 1000 - the share that used to round to zero and then top itself up.
         var tiny = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        tiny.SetReserve(new[] { Party("TINY", 1, isReceiverPlayerParty: true, sideOffset: 0, playerOwnedRank: 0) },
+        tiny.SetReserve(new[] { Party("TINY", 1, isReceiverPlayerParty: true, sideOffset: 0,
+            playerOwnedRank: 0, unreservedSideOffset: 0) },
             sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
 
         var big = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         big.SetReserve(new[] { Party("BIG", 999, seedBase: 4000, isReceiverPlayerParty: true, sideOffset: 1,
-            playerOwnedRank: 1) }, sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
+            playerOwnedRank: 1, unreservedSideOffset: 0) }, sideTotal: total,
+            playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
 
         Assert.Equal(allocation, tiny.OwnedShareOf(allocation) + big.OwnedShareOf(allocation));
         Assert.True(tiny.OwnedShareOf(allocation) >= 1, "the small owner still fields its player");
@@ -342,19 +381,30 @@ public class CoopTroopSupplierTests
         const int playerParties = 2;
 
         var p1 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        p1.SetReserve(new[] { Party("P1", 1, isReceiverPlayerParty: true, sideOffset: 0, playerOwnedRank: 0) },
+        p1.SetReserve(new[] { Party("P1", 1, isReceiverPlayerParty: true, sideOffset: 0,
+            playerOwnedRank: 0, unreservedSideOffset: 0) },
             sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
         var p2 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         p2.SetReserve(new[] { Party("P2", 2, seedBase: 3000, isReceiverPlayerParty: true, sideOffset: 1,
-            playerOwnedRank: 1) }, sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
+            playerOwnedRank: 1, unreservedSideOffset: 0) }, sideTotal: total,
+            playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
         var ai = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        ai.SetReserve(new[] { Party("AI", 997, seedBase: 7000, sideOffset: 3) },
+        ai.SetReserve(new[] { Party("AI", 997, seedBase: 7000, sideOffset: 3,
+            unreservedSideOffset: 1) },
             sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
 
         foreach (var allocation in new[] { 2, 3, 7, 50, 100, 337, 999 })
         {
-            Assert.Equal(allocation,
-                p1.OwnedShareOf(allocation) + p2.OwnedShareOf(allocation) + ai.OwnedShareOf(allocation));
+            var shares = new[]
+            {
+                p1.OwnedShareOf(allocation),
+                p2.OwnedShareOf(allocation),
+                ai.OwnedShareOf(allocation),
+            };
+            Assert.Equal(allocation, shares.Sum());
+            Assert.True(shares[0] <= p1.TotalTroops);
+            Assert.True(shares[1] <= p2.TotalTroops);
+            Assert.True(shares[2] <= ai.TotalTroops);
         }
     }
 
@@ -365,14 +415,17 @@ public class CoopTroopSupplierTests
         const int playerParties = 3;
 
         var r0 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        r0.SetReserve(new[] { Party("R0", 10, isReceiverPlayerParty: true, sideOffset: 0, playerOwnedRank: 0) },
+        r0.SetReserve(new[] { Party("R0", 10, isReceiverPlayerParty: true, sideOffset: 0,
+            playerOwnedRank: 0, unreservedSideOffset: 0) },
             sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
         var r1 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         r1.SetReserve(new[] { Party("R1", 10, seedBase: 3000, isReceiverPlayerParty: true, sideOffset: 10,
-            playerOwnedRank: 1) }, sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
+            playerOwnedRank: 1, unreservedSideOffset: 9) }, sideTotal: total,
+            playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
         var r2 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         r2.SetReserve(new[] { Party("R2", 10, seedBase: 6000, isReceiverPlayerParty: true, sideOffset: 20,
-            playerOwnedRank: 2) }, sideTotal: total, playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
+            playerOwnedRank: 2, unreservedSideOffset: 18) }, sideTotal: total,
+            playerOwnedParties: playerParties, authoritativeBattleSize: 1000);
 
         // Two troops, three players: ranks 0 and 1 get them, rank 2 waits for the next wave. Every client
         // reaches the same answer because the ranks come from the server.
@@ -397,7 +450,8 @@ public class CoopTroopSupplierTests
         // A zero share on the side holding the local player's party reads as "origin missing" to the spawn
         // handler, which aborts the battle - the failure this must not reintroduce.
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        supplier.SetReserve(new[] { Party("P1", 10, isReceiverPlayerParty: true, playerOwnedRank: 0) },
+        supplier.SetReserve(new[] { Party("P1", 10, isReceiverPlayerParty: true, playerOwnedRank: 0,
+            unreservedSideOffset: 0) },
             sideTotal: 1000, playerOwnedParties: 1, authoritativeBattleSize: 1000);
 
         Assert.Equal(1, supplier.OwnedShareOf(1));
@@ -449,13 +503,15 @@ public class CoopTroopSupplierTests
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[]
         {
-            Party("P1", 40, supplied: 3, isReceiverPlayerParty: true, sideOffset: 0, playerOwnedRank: 0),
+            Party("P1", 40, supplied: 3, isReceiverPlayerParty: true, sideOffset: 0,
+                playerOwnedRank: 0, unreservedSideOffset: 0),
         }, sideTotal: 100, playerOwnedParties: 2, snapshotRevision: 2, authoritativeBattleSize: 600);
         var generationTwo = supplier.CaptureAllocationSnapshot();
 
         supplier.SetReserve(new[]
         {
-            Party("P1", 50, supplied: 7, isReceiverPlayerParty: true, sideOffset: 150, playerOwnedRank: 1),
+            Party("P1", 50, supplied: 7, isReceiverPlayerParty: true, sideOffset: 150,
+                playerOwnedRank: 1, unreservedSideOffset: 149),
         }, sideTotal: 200, playerOwnedParties: 2, snapshotRevision: 3, authoritativeBattleSize: 1000);
         var generationThree = supplier.CaptureAllocationSnapshot();
 

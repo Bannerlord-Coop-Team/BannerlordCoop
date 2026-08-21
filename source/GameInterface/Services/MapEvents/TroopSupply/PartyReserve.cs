@@ -44,8 +44,8 @@ public class PartyReserve
     /// <remarks>
     /// Together with <see cref="SideReserve.PlayerOwnedPartyCount"/> this is what lets every owner guarantee
     /// its player an agent WITHOUT overshooting the allocation. The share is computed as: reserve one troop
-    /// for each of the side's player-owned parties, apportion what remains across the whole side by the same
-    /// cumulative flooring as <see cref="SideOffset"/>, and add the reserved troop back for the party this
+    /// for each of the side's player-owned parties, remove those troops from the party intervals, apportion
+    /// what remains by cumulative flooring, and add the reserved troop back for the party this
     /// client owns. Those pieces sum to exactly the allocation, because the flooring covers the remainder
     /// exactly once and there are exactly as many reserved troops as player-owned parties.
     ///
@@ -56,8 +56,17 @@ public class PartyReserve
     [ProtoMember(6)]
     public int PlayerOwnedRank { get; }
 
+    /// <summary>This party's side offset after one reserved troop is removed from each preceding player party.</summary>
+    [ProtoMember(7)]
+    public int UnreservedSideOffset { get; }
+
+    /// <summary>Whether <see cref="UnreservedSideOffset"/> was supplied by the server.</summary>
+    [ProtoMember(8)]
+    public bool HasUnreservedSideOffset { get; }
+
     public PartyReserve(string partyId, int suppliedCount, TroopReserveEntry[] entries,
-        bool isReceiverPlayerParty = false, int sideOffset = 0, int playerOwnedRank = -1)
+        bool isReceiverPlayerParty = false, int sideOffset = 0, int playerOwnedRank = -1,
+        int unreservedSideOffset = 0, bool hasUnreservedSideOffset = false)
     {
         PartyId = partyId;
         SuppliedCount = suppliedCount;
@@ -65,5 +74,7 @@ public class PartyReserve
         IsReceiverPlayerParty = isReceiverPlayerParty;
         SideOffset = sideOffset;
         PlayerOwnedRank = playerOwnedRank;
+        UnreservedSideOffset = unreservedSideOffset;
+        HasUnreservedSideOffset = hasUnreservedSideOffset;
     }
 }

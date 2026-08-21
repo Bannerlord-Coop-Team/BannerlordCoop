@@ -33,6 +33,9 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     {
         private readonly int[] partyOffsets;
         private readonly int[] partyCounts;
+        private readonly int[] partyPlayerOwnedRanks;
+        private readonly int[] partyUnreservedOffsets;
+        private readonly bool hasUnreservedOffsets;
         private readonly int playerOwnedPartyCount;
         private readonly bool ownsReceiverPlayerParty;
         private readonly int receiverPlayerRank;
@@ -46,7 +49,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         internal AllocationSnapshot(long revision, int battleSize, int sideTotalTroops, int totalTroops,
             int suppliedTroops,
             int playerOwnedPartyCount, bool ownsReceiverPlayerParty, int receiverPlayerRank,
-            int[] partyOffsets, int[] partyCounts)
+            int[] partyOffsets, int[] partyCounts, int[] partyPlayerOwnedRanks,
+            int[] partyUnreservedOffsets, bool hasUnreservedOffsets)
         {
             Revision = revision;
             BattleSize = battleSize;
@@ -58,6 +62,9 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             this.receiverPlayerRank = receiverPlayerRank;
             this.partyOffsets = partyOffsets;
             this.partyCounts = partyCounts;
+            this.partyPlayerOwnedRanks = partyPlayerOwnedRanks;
+            this.partyUnreservedOffsets = partyUnreservedOffsets;
+            this.hasUnreservedOffsets = hasUnreservedOffsets;
         }
 
         public int OwnedShareOf(int sideAllocation)
@@ -73,7 +80,11 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 if (sideAllocation < playerOwnedPartyCount)
                     return receiverPlayerRank >= 0 && receiverPlayerRank < sideAllocation ? 1 : 0;
 
-                int share = ApportionByInterval(sideAllocation - playerOwnedPartyCount, total);
+                int allocationAfterPlayerReservations = sideAllocation - playerOwnedPartyCount;
+                int share = hasUnreservedOffsets
+                    ? ApportionByUnreservedInterval(allocationAfterPlayerReservations,
+                        total - playerOwnedPartyCount)
+                    : ApportionByInterval(allocationAfterPlayerReservations, total);
                 if (ownsReceiverPlayerParty) share += 1;
                 return Math.Min(share, sideAllocation);
             }
@@ -98,6 +109,25 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             return share;
         }
 
+        private int ApportionByUnreservedInterval(int allocation, int total)
+        {
+            if (allocation <= 0 || total <= 0 || partyCounts == null
+                || partyPlayerOwnedRanks == null || partyUnreservedOffsets == null)
+                return 0;
+
+            int share = 0;
+            for (int i = 0; i < partyCounts.Length; i++)
+            {
+                int count = partyCounts[i] - (partyPlayerOwnedRanks[i] >= 0 ? 1 : 0);
+                if (count <= 0) continue;
+
+                int start = ScaleToAllocation(partyUnreservedOffsets[i], total, allocation);
+                int end = ScaleToAllocation(partyUnreservedOffsets[i] + count, total, allocation);
+                share += end - start;
+            }
+            return share;
+        }
+
         private static int ScaleToAllocation(int position, int total, int allocation)
             => (int)((long)position * allocation / total);
     }
@@ -111,6 +141,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         public int SideOffset;
         /// <summary>Its position among the side's player-owned parties, or -1; see <see cref="PartyReserve.PlayerOwnedRank"/>.</summary>
         public int PlayerOwnedRank;
+        public int UnreservedSideOffset;
+        public bool HasUnreservedSideOffset;
     }
 
     private readonly object gate = new object();
@@ -195,6 +227,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                         Supplied = supplied,
                         SideOffset = party.SideOffset,
                         PlayerOwnedRank = party.PlayerOwnedRank,
+                        UnreservedSideOffset = party.UnreservedSideOffset,
+                        HasUnreservedSideOffset = party.HasUnreservedSideOffset,
                     };
                     // Allocate this client's own party first. Otherwise an army's AI parties can fill the
                     // render cap before the local hero is reserved, leaving deployment without a player agent.
@@ -256,12 +290,18 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             int receiverPlayerRank = -1;
             var partyOffsets = new int[parties.Count];
             var partyCounts = new int[parties.Count];
+            var partyPlayerOwnedRanks = new int[parties.Count];
+            var partyUnreservedOffsets = new int[parties.Count];
+            bool hasUnreservedOffsets = parties.Count > 0;
             for (int i = 0; i < parties.Count; i++)
             {
                 var party = parties[i];
                 int count = party.Entries.Length;
                 partyOffsets[i] = party.SideOffset;
                 partyCounts[i] = count;
+                partyPlayerOwnedRanks[i] = party.PlayerOwnedRank;
+                partyUnreservedOffsets[i] = party.UnreservedSideOffset;
+                hasUnreservedOffsets = hasUnreservedOffsets && party.HasUnreservedSideOffset;
                 total += count;
                 supplied += party.Supplied;
                 if (party.PartyId != playerPartyId) continue;
@@ -279,7 +319,10 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 playerPartyId != null,
                 receiverPlayerRank,
                 partyOffsets,
-                partyCounts);
+                partyCounts,
+                partyPlayerOwnedRanks,
+                partyUnreservedOffsets,
+                hasUnreservedOffsets);
         }
     }
 
