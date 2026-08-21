@@ -59,3 +59,13 @@ public readonly struct UpdateHasMetRansomBroker : IEvent
         HasMetRansomBroker = hasMetRansomBroker;
     }
 }
+
+public readonly struct TavernKeeperFindCompanion : IEvent
+{
+    public readonly Hero MainHero;
+
+    public TavernKeeperFindCompanion(Hero mainHero)
+    {
+        MainHero = mainHero;
+    }
+}

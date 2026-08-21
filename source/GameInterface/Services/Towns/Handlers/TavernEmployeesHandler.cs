@@ -50,6 +50,9 @@ internal class TavernEmployeesHandler : IHandler
 
         messageBroker.Subscribe<UpdateHasMetRansomBroker>(Handle_UpdateHasMetRansomBroker);
         messageBroker.Subscribe<NetworkUpdateHasMetRansomBroker>(Handle_NetworkUpdateHasMetRansomBroker);
+
+        messageBroker.Subscribe<TavernKeeperFindCompanion>(Handle_TavernKeeperFindCompanion);
+        messageBroker.Subscribe<NetworkTavernKeeperFindCompanion>(Handle_NetworkTavernKeeperFindCompanion);
     }
 
     public void Dispose()
@@ -71,6 +74,9 @@ internal class TavernEmployeesHandler : IHandler
 
         messageBroker.Unsubscribe<UpdateHasMetRansomBroker>(Handle_UpdateHasMetRansomBroker);
         messageBroker.Unsubscribe<NetworkUpdateHasMetRansomBroker>(Handle_NetworkUpdateHasMetRansomBroker);
+
+        messageBroker.Unsubscribe<TavernKeeperFindCompanion>(Handle_TavernKeeperFindCompanion);
+        messageBroker.Unsubscribe<NetworkTavernKeeperFindCompanion>(Handle_NetworkTavernKeeperFindCompanion);
     }
 
     private void Handle_DailyTickDrinkThisDayInSettlement(MessagePayload<DailyTickDrinkThisDayInSettlement> obj)
@@ -200,6 +206,26 @@ internal class TavernEmployeesHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
 
             sessionInteractionsPlayerDataInterface.UpdateHasMetRandomBroker(data.MainHeroId, data.HasMetRansomBroker);
+        });
+    }
+
+    private void Handle_TavernKeeperFindCompanion(MessagePayload<TavernKeeperFindCompanion> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
+
+        var message = new NetworkTavernKeeperFindCompanion(mainHeroId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkTavernKeeperFindCompanion(MessagePayload<NetworkTavernKeeperFindCompanion> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+
+            GiveGoldAction.ApplyBetweenCharacters(mainHero, null, 2, false);
         });
     }
 

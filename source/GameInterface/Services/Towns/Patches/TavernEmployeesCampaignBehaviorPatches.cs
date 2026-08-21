@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.Towns.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -89,5 +90,14 @@ internal class TavernEmployeesCampaignBehaviorPatches
             var message = new UpdateHasMetRansomBroker(Hero.MainHero, true);
             MessageBroker.Instance.Publish(__instance, message);
         }
+    }
+
+    [HarmonyPatch(nameof(TavernEmployeesCampaignBehavior.FindCompanionWithType))]
+    [HarmonyPatch(new Type[] { typeof(TavernEmployeesCampaignBehavior.TavernInquiryCompanionType) })]
+    [HarmonyPostfix]
+    public static void FindCompanionWithTypePostfix(TavernEmployeesCampaignBehavior __instance)
+    {
+        var message = new TavernKeeperFindCompanion(Hero.MainHero);
+        MessageBroker.Instance.Publish(__instance, message);
     }
 }

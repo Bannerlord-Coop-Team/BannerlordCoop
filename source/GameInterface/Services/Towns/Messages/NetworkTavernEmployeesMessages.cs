@@ -74,3 +74,15 @@ internal readonly struct NetworkUpdateHasMetRansomBroker : ICommand
         HasMetRansomBroker = hasMetRansomBroker;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkTavernKeeperFindCompanion : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string MainHeroId;
+
+    public NetworkTavernKeeperFindCompanion(string mainHeroId)
+    {
+        MainHeroId = mainHeroId;
+    }
+}
