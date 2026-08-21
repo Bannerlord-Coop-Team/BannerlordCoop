@@ -381,16 +381,19 @@ internal class InteractionPatches
 {
     private sealed class PlayerBattleWindows
     {
+        private readonly bool aiJoinWindowEnabled;
+
         public CampaignTime AiJoinWindowExpiresAt { get; }
         public CampaignTime GoldFoodConsumptionWindowExpiresAt { get; }
 
         public PlayerBattleWindows(int aiJoinWindowHours, int goldFoodConsumptionWindowHours = 24)
         {
+            aiJoinWindowEnabled = aiJoinWindowHours > 0;
             AiJoinWindowExpiresAt = CampaignTime.HoursFromNow(aiJoinWindowHours);
             GoldFoodConsumptionWindowExpiresAt = CampaignTime.HoursFromNow(goldFoodConsumptionWindowHours);
         }
 
-        public bool AiJoinWindowExpired => CampaignTime.Now > AiJoinWindowExpiresAt;
+        public bool AiJoinWindowExpired => !aiJoinWindowEnabled || CampaignTime.Now > AiJoinWindowExpiresAt;
         public bool GoldFoodConsumptionExpired => CampaignTime.Now > GoldFoodConsumptionWindowExpiresAt;
     }
 

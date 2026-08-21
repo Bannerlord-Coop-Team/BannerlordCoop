@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
@@ -197,6 +198,37 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
 
         Assert.False(selectorCalled);
         Assert.Empty(joins);
+    }
+
+    [Fact]
+    public void ZeroHourWindow_DoesNotSelectJoiners()
+    {
+        var previousOptions = ModConfigProvider.ModOptions;
+        try
+        {
+            ModConfigProvider.LoadModConfig(new ModOptionsData
+            {
+                PlayerBattleAiJoinWindowHours = 0
+            });
+            var playerParty = CreateMobileParty();
+            var enemyParty = CreateMobileParty();
+            var mapEvent = CreatePlayerBattle(playerParty, enemyParty);
+            MarkAsPlayerParty(playerParty);
+            InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
+            var selectorCalled = false;
+            var reinforcer = CreateReinforcer();
+
+            reinforcer.Reinforce(
+                mapEvent,
+                (playerSide, enemySide) => selectorCalled = true,
+                (side, party) => { });
+
+            Assert.False(selectorCalled);
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
+        }
     }
 
     [Fact]
