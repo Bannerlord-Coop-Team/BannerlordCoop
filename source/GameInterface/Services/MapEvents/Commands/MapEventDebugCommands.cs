@@ -2481,8 +2481,13 @@ public class MapEventDebugCommands
 
     internal static void LimitLateJoinModeFixtureRoster(TroopRoster roster)
     {
+        LimitLateJoinModeFixtureRoster(roster, LateJoinModeFixtureMaximumRegularTroops);
+    }
+
+    internal static void LimitLateJoinModeFixtureRoster(TroopRoster roster, int maximumRegularTroops)
+    {
         // Keep the DEBUG evidence fixture below the mission deployment agent limit.
-        var remainingRegularTroops = LateJoinModeFixtureMaximumRegularTroops;
+        var remainingRegularTroops = maximumRegularTroops;
         for (var index = roster.Count - 1; index >= 0; index--)
         {
             var element = roster.GetElementCopyAtIndex(index);

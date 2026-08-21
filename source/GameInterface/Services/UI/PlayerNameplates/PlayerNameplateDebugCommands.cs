@@ -113,6 +113,8 @@ public static class PlayerNameplateDebugCommands
     }
 
 #if DEBUG
+    private const int SiegeFixtureMaximumRegularTroops = 3;
+
     private static SiegeRosterFixture siegeRosterFixture;
 
     [CommandLineArgumentFunction("players_state", "coop.debug.playermarkers")]
@@ -273,7 +275,9 @@ public static class PlayerNameplateDebugCommands
         try
         {
             foreach (var party in parties)
-                MapEventDebugCommands.LimitLateJoinModeFixtureRoster(party.MemberRoster);
+                MapEventDebugCommands.LimitLateJoinModeFixtureRoster(
+                    party.MemberRoster,
+                    SiegeFixtureMaximumRegularTroops);
 
             if (attackers.Any(party => party.MemberRoster.TotalHealthyCount <= 0) ||
                 defenders.All(party => party.MemberRoster.TotalHealthyCount <= 0))
@@ -293,6 +297,7 @@ public static class PlayerNameplateDebugCommands
             settlementId = settlement.StringId,
             attackerPartyCount = attackers.Length,
             defenderPartyCount = defenders.Length,
+            maximumRegularTroopsPerParty = SiegeFixtureMaximumRegularTroops,
             attackerTroops = attackers.Sum(party => party.MemberRoster.TotalHealthyCount),
             defenderTroops = defenders.Sum(party => party.MemberRoster.TotalHealthyCount)
         });
