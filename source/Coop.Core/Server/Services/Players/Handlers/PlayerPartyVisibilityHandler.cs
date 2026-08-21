@@ -229,7 +229,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         party.IsActive = true;
         CreateVisual(party, mobilePartyId);
-        party.Party.UpdateVisibilityAndInspected(party.Position);
+        party.IsVisible = true;
+        party.IsInspected = true;
     }
 
     private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
