@@ -135,7 +135,7 @@ public class TestEnvironment
             this.battleSize = battleSize;
         }
 
-        public int GetBattleSize(TaleWorlds.CampaignSystem.MapEvents.MapEvent mapEvent) => battleSize;
+        public int GetBattleSize() => battleSize;
     }
 }
 

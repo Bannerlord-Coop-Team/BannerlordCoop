@@ -58,10 +58,12 @@ namespace GameInterface.Services.Kingdoms.Patches
         private static void OnFrameTickPostfix(KingdomDecisionsVM __instance)
         {
             if (!TryGetVoteManager(out var voteManager)) return;
+            DecisionItemBaseVM currentDecision = __instance.CurrentDecision;
+            if (currentDecision == null) return;
 
-            voteManager.RefreshDecisionTitle(__instance.CurrentDecision);
-            string feedback = voteManager.RefreshDecisionWaitingStatus(__instance.CurrentDecision);
-            IReadOnlyList<string> columns = voteManager.GetDecisionWaitingColumns(__instance.CurrentDecision);
+            voteManager.RefreshDecisionTitle(currentDecision);
+            string feedback = voteManager.RefreshDecisionWaitingStatus(currentDecision);
+            IReadOnlyList<string> columns = voteManager.GetDecisionWaitingColumns(currentDecision);
             KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
             KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, feedback, columns);
         }

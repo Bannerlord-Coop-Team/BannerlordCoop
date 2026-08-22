@@ -7,6 +7,7 @@ using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Tests.Mocks;
 using GameInterface.AutoSync;
+using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
@@ -97,6 +98,7 @@ internal abstract class TestComponentBase
 
         RegisterMock<ILogger>(builder);
         RegisterMock<IGameInterface>(builder);
+        RegisterMock<IModConfig>(builder);
         RegisterMock<IAutoSyncPatchCollector>(builder);
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);

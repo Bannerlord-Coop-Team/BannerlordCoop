@@ -17,7 +17,7 @@ public class MapTimeOptionsTests
 
         try
         {
-            var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), new MessageBroker());
+            var viewModel = CoopOptionsVMTestFactory.Create(new CoopOptionsStore(filePath), new MessageBroker());
             var tab = viewModel.Tabs[1];
 
             Assert.Equal(MapTimeOptionsTabProvider.TabName, tab.Name);
@@ -44,7 +44,7 @@ public class MapTimeOptionsTests
         try
         {
             var store = new CoopOptionsStore(filePath);
-            var viewModel = new CoopOptionsVM(store, new MessageBroker());
+            var viewModel = CoopOptionsVMTestFactory.Create(store, new MessageBroker());
             var tab = viewModel.Tabs[1];
             var section = Assert.IsType<MapTimeSection>(Assert.Single(tab.Sections));
 

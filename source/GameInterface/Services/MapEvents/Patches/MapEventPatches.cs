@@ -78,6 +78,26 @@ internal class MapEventPatches
             __instance,
             __instance._sides.SelectMany(side => side.Parties).ToList());
         MessageBroker.Instance.Publish(__instance, message);
+
+        if (isPlayerJoin && !InteractionPatches.IsInitializingPlayerBattle(__instance))
+        {
+            InteractionPatches.OpenAiJoinWindowAndPublish(
+                __instance,
+                () => MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle()));
+        }
+    }
+
+    [HarmonyPatch(nameof(MapEvent.RemoveInvolvedPartyInternal))]
+    [HarmonyPostfix]
+    private static void Postfix_RemoveInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
+    {
+        if (ModInformation.IsClient
+            || mapEventParty?.Party?.MobileParty is not MobileParty removedParty)
+        {
+            return;
+        }
+
+        MessageBroker.Instance.Publish(__instance, new PartyRemovedFromMapEvent(removedParty));
     }
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
@@ -365,16 +385,19 @@ internal class InteractionPatches
 {
     private sealed class PlayerBattleWindows
     {
+        private readonly bool aiJoinWindowEnabled;
+
         public CampaignTime AiJoinWindowExpiresAt { get; }
         public CampaignTime GoldFoodConsumptionWindowExpiresAt { get; }
 
         public PlayerBattleWindows(int aiJoinWindowHours, int goldFoodConsumptionWindowHours = 24)
         {
+            aiJoinWindowEnabled = aiJoinWindowHours > 0;
             AiJoinWindowExpiresAt = CampaignTime.HoursFromNow(aiJoinWindowHours);
             GoldFoodConsumptionWindowExpiresAt = CampaignTime.HoursFromNow(goldFoodConsumptionWindowHours);
         }
 
-        public bool AiJoinWindowExpired => CampaignTime.Now > AiJoinWindowExpiresAt;
+        public bool AiJoinWindowExpired => !aiJoinWindowEnabled || CampaignTime.Now > AiJoinWindowExpiresAt;
         public bool GoldFoodConsumptionExpired => CampaignTime.Now > GoldFoodConsumptionWindowExpiresAt;
     }
 
@@ -524,10 +547,17 @@ internal class InteractionPatches
             return;
 
         initializingPlayerBattles.Remove(__instance);
-        playerBattleWindows.GetValue(
+        OpenAiJoinWindowAndPublish(
             __instance,
+            () => MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle()));
+    }
+
+    internal static void OpenAiJoinWindowAndPublish(MapEvent mapEvent, Action publish)
+    {
+        playerBattleWindows.GetValue(
+            mapEvent,
             _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
-        MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
+        publish();
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
