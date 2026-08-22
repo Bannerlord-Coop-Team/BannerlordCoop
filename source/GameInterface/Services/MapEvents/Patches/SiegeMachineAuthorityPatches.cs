@@ -113,11 +113,16 @@ internal class SiegeMachineAuthorityPatches
     [HarmonyPrefix]
     private static bool CloseDoorPrefix(CastleGate __instance) => AllowGateToggle(__instance);
 
+    [HarmonyPatch(typeof(CastleGate), "SetAutoOpenState")]
+    [HarmonyPrefix]
+    private static bool SetAutoOpenStatePrefix(CastleGate __instance) => AllowGateToggle(__instance);
+
     // The gate's auto-open logic reacts to nearby agents, including interpolated puppets, so a
     // non-authority client's local toggles must not run; the replicated state applies under suppress.
     private static bool AllowGateToggle(CastleGate gate)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return true;
         if (SiegeMissionAuthorityGate.SuppressCapture) return true;
 
         return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(gate.Id.Id);

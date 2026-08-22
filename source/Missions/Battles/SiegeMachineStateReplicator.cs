@@ -80,6 +80,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // Per-machine simulation claims (machine id -> controller); absent = the mission host. The
     // patch-visible copies live in SiegeMissionAuthorityGate. Game-thread only.
     private readonly Dictionary<int, string> claimedMachines = new Dictionary<int, string>();
+    private readonly Dictionary<int, int> authorityEpochs = new Dictionary<int, int>();
+    private readonly Dictionary<int, int> authorityRevisions = new Dictionary<int, int>();
+    private readonly Dictionary<int, string> authorityHostControllers = new Dictionary<int, string>();
     private readonly Dictionary<int, float> pendingClaimSeconds = new Dictionary<int, float>();
     private readonly Dictionary<int, float> unusedOwnedSeconds = new Dictionary<int, float>();
     // Non-primary machines whose local troop AI is currently gated off because another client simulates them.
@@ -146,6 +149,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
         if (session.IsLocalHost)
         {
+            ReannounceAuthorityAfterPromotion();
             ReactivateIfPromoted();
             EvaluateProximityCrewGrants(elapsed);
         }
@@ -173,6 +177,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             pendingLadderAnimationsById.Clear();
             peerWeaponState.Clear();
             claimedMachines.Clear();
+            authorityEpochs.Clear();
+            authorityRevisions.Clear();
+            authorityHostControllers.Clear();
             pendingClaimSeconds.Clear();
             unusedOwnedSeconds.Clear();
             aiDisabledMachines.Clear();
@@ -199,8 +206,49 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
     }
 
+    // Reset inherited revisions before the promoted host sends any authority or state.
+    private void ReannounceAuthorityAfterPromotion()
+    {
+        var machineIds = new HashSet<int>(authorityRevisions.Keys);
+        foreach (var machine in machines)
+        {
+            machineIds.Add(machine.Id.Id);
+        }
+
+        foreach (var machineId in machineIds)
+        {
+            NormalizeAuthorityForCurrentHost(machineId, initializeIfMissing: true);
+        }
+    }
+
+    private void NormalizeAuthorityForCurrentHost(int machineId, bool initializeIfMissing)
+    {
+        int hostEpoch = session.HostEpoch;
+        bool hasAuthority = authorityRevisions.ContainsKey(machineId);
+        int currentEpoch = GetAuthorityEpoch(machineId);
+        if ((!hasAuthority && !initializeIfMissing)
+            || currentEpoch > hostEpoch
+            || (currentEpoch == hostEpoch && GetAuthorityHostController(machineId) == session.OwnControllerId))
+        {
+            return;
+        }
+
+        authorityEpochs[machineId] = hostEpoch;
+        authorityRevisions[machineId] = 0;
+        authorityHostControllers[machineId] = session.OwnControllerId;
+        lastSent.Remove(machineId);
+        lastSentLadderAnimations.Remove(machineId);
+        network.SendAll(new NetworkSiegeMachineAuthority(
+            machineId,
+            CurrentAuthorityOwner(machineId),
+            hostEpoch,
+            authorityRevision: 0,
+            senderControllerId: session.OwnControllerId));
+    }
+
     // A successor promoted to host had deactivated its machines as a peer; the simulating
     // client must have live machines, so undo it once.
+
     private void ReactivateIfPromoted()
     {
         if (deactivated.Count == 0) return;
@@ -281,15 +329,16 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             && (left.rotation.u - right.rotation.u).LengthSquared < thresholdSquared;
     }
 
-    // BR-102: an outgoing state asserts this sender's simulation authority NOW, so stamp the current
-    // host epoch at the send boundary (CaptureState stays a pure machine read; lastSent keeps the
-    // unstamped capture, whose delta comparison never looks at the epoch).
+    // Stamp the current host epoch, sender and per-machine claim revision at the send boundary.
+    // CaptureState stays a pure machine read; lastSent keeps the unstamped capture.
     private NetworkSiegeMachineState Stamp(NetworkSiegeMachineState state)
     {
         return new NetworkSiegeMachineState(state.MachineId, state.HitPoints, state.DestructionState,
             state.GateState, state.LadderState, state.MoveDistance, state.HasArrived, state.WeaponState,
-            state.AimDirection, state.AimReleaseAngle, session.HostEpoch,
-            state.HasStoneAmmo ? state.StoneAmmo : -1);
+            state.AimDirection, state.AimReleaseAngle, GetSnapshotAuthorityEpoch(state.MachineId),
+            state.HasStoneAmmo ? state.StoneAmmo : -1,
+            session.OwnControllerId,
+            GetAuthorityRevision(state.MachineId));
     }
 
     private NetworkSiegeLadderAnimationState Stamp(NetworkSiegeLadderAnimationState state)
@@ -302,8 +351,24 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             state.FallAngularSpeed,
             state.Frame,
             state.AnimationIndex,
-            session.HostEpoch);
+            GetSnapshotAuthorityEpoch(state.LadderId),
+            session.OwnControllerId,
+            GetAuthorityRevision(state.LadderId));
     }
+
+    private int GetAuthorityRevision(int machineId)
+        => authorityRevisions.TryGetValue(machineId, out var revision) ? revision : 0;
+
+    private int GetAuthorityEpoch(int machineId)
+        => authorityEpochs.TryGetValue(machineId, out var epoch) ? epoch : 0;
+
+    private int GetSnapshotAuthorityEpoch(int machineId)
+        => authorityEpochs.TryGetValue(machineId, out var epoch) ? epoch : session.HostEpoch;
+
+    private string GetAuthorityHostController(int machineId)
+        => authorityHostControllers.TryGetValue(machineId, out var controllerId)
+            ? controllerId
+            : string.Empty;
 
     // BR-102: drop a host-authority message stamped by an earlier hosting generation (a deposed host
     // in flight across a migration). Unstamped (0) senders, an unassigned (0) receiver, and epochs at
@@ -837,6 +902,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (Mission.Current == null || !session.IsLocalHost) return;
 
             RefreshMachineCache();
+            NormalizeAuthorityForCurrentHost(obj.MachineId, initializeIfMissing: false);
+            if (GetAuthorityEpoch(obj.MachineId) > session.HostEpoch) return;
             if (obj.IsRelease)
             {
                 if (claimedMachines.TryGetValue(obj.MachineId, out var owner) && owner == obj.ControllerId)
@@ -869,13 +936,23 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                     return;
                 }
 
-                network.SendAll(new NetworkSiegeMachineAuthority(obj.MachineId, current, session.HostEpoch));
+                network.SendAll(new NetworkSiegeMachineAuthority(
+                    obj.MachineId,
+                    current,
+                    GetSnapshotAuthorityEpoch(obj.MachineId),
+                    GetAuthorityRevision(obj.MachineId),
+                    session.OwnControllerId));
                 return;
             }
 
             if (machinesById.TryGetValue(obj.MachineId, out var machine) && HasLocalPlayerUser(machine))
             {
-                network.SendAll(new NetworkSiegeMachineAuthority(obj.MachineId, string.Empty, session.HostEpoch));
+                network.SendAll(new NetworkSiegeMachineAuthority(
+                    obj.MachineId,
+                    string.Empty,
+                    GetSnapshotAuthorityEpoch(obj.MachineId),
+                    GetAuthorityRevision(obj.MachineId),
+                    session.OwnControllerId));
                 return;
             }
 
@@ -887,7 +964,16 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // [Host, game thread] Record and announce a machine's simulation owner (null = back to the host).
     private void SetMachineAuthority(int machineId, string controllerId)
     {
+        NormalizeAuthorityForCurrentHost(machineId, initializeIfMissing: false);
         bool wasSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
+        int hostEpoch = session.HostEpoch;
+        if (GetAuthorityEpoch(machineId) > hostEpoch) return;
+        int authorityRevision = GetAuthorityEpoch(machineId) == hostEpoch
+            ? GetAuthorityRevision(machineId) + 1
+            : 1;
+        authorityEpochs[machineId] = hostEpoch;
+        authorityRevisions[machineId] = authorityRevision;
+        authorityHostControllers[machineId] = session.OwnControllerId;
         if (string.IsNullOrEmpty(controllerId))
         {
             claimedMachines.Remove(machineId);
@@ -901,7 +987,12 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         ResetSendCacheWhenSimulationMovesHere(machineId, wasSimulatedLocally);
         RefreshMachineGates();
         // BR-102: the arbitration decision is THE host-authority act here — stamp our hosting generation.
-        network.SendAll(new NetworkSiegeMachineAuthority(machineId, controllerId ?? string.Empty, session.HostEpoch));
+        network.SendAll(new NetworkSiegeMachineAuthority(
+            machineId,
+            controllerId ?? string.Empty,
+            hostEpoch,
+            authorityRevision,
+            session.OwnControllerId));
     }
 
     private void Handle_NetworkMachineAuthority(MessagePayload<NetworkSiegeMachineAuthority> payload)
@@ -910,7 +1001,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
         GameThread.RunSafe(() =>
         {
-            if (Mission.Current == null || session.IsLocalHost) return;
+            if (Mission.Current == null) return;
+            if (session.IsLocalHost && obj.HostEpoch <= session.HostEpoch) return;
 
             // BR-102: a deposed host's in-flight arbitration must not move a machine's simulation.
             if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineAuthority))) return;
@@ -918,6 +1010,21 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // Refresh BEFORE mutating, like every sibling handler: on a freshly-opened mission the
             // refresh takes the mission-change clear branch, which would wipe the claim just written.
             RefreshMachineCache();
+            int authorityOrder = CompareAuthorityOrder(
+                obj.HostEpoch,
+                obj.AuthorityRevision,
+                GetAuthorityEpoch(obj.MachineId),
+                GetAuthorityRevision(obj.MachineId));
+            if (authorityOrder < 0) return;
+
+            if (authorityRevisions.ContainsKey(obj.MachineId)
+                && authorityOrder == 0
+                && (CurrentAuthorityOwner(obj.MachineId) != (obj.ControllerId ?? string.Empty)
+                    || GetAuthorityHostController(obj.MachineId) != (obj.SenderControllerId ?? string.Empty)))
+            {
+                return;
+            }
+
             bool wasSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId);
 
             if (string.IsNullOrEmpty(obj.ControllerId))
@@ -928,6 +1035,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             {
                 claimedMachines[obj.MachineId] = obj.ControllerId;
             }
+            authorityEpochs[obj.MachineId] = obj.HostEpoch;
+            authorityRevisions[obj.MachineId] = obj.AuthorityRevision;
+            authorityHostControllers[obj.MachineId] = obj.SenderControllerId ?? string.Empty;
 
             // An unsolicited self-grant is a crew-proximity grant: give our troops time to walk over
             // before the unused-release clock starts.
@@ -940,7 +1050,22 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             PushClaimsToGate();
             ResetSendCacheWhenSimulationMovesHere(obj.MachineId, wasSimulatedLocally);
             RefreshMachineGates();
+            DrainPendingMachineStates();
         });
+    }
+
+    private string CurrentAuthorityOwner(int machineId)
+        => claimedMachines.TryGetValue(machineId, out var owner) ? owner : string.Empty;
+
+    private static int CompareAuthorityOrder(
+        int messageEpoch,
+        int messageRevision,
+        int currentEpoch,
+        int currentRevision)
+    {
+        if (messageEpoch != currentEpoch) return messageEpoch.CompareTo(currentEpoch);
+
+        return messageRevision.CompareTo(currentRevision);
     }
 
     private void ResetSendCacheWhenSimulationMovesHere(int machineId, bool wasSimulatedLocally)
@@ -1031,6 +1156,18 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 applied.Add(pending.Key);
                 continue;
             }
+            var authority = ClassifySnapshotAuthority(
+                pending.Key,
+                pending.Value.HostEpoch,
+                pending.Value.AuthorityRevision,
+                pending.Value.SenderControllerId);
+            if (authority == SnapshotAuthority.Buffer) continue;
+            if (authority == SnapshotAuthority.Drop)
+            {
+                if (applied == null) applied = new List<int>();
+                applied.Add(pending.Key);
+                continue;
+            }
             if (!machinesById.TryGetValue(pending.Key, out var machine)) continue;
 
             SiegeMissionAuthorityGate.SuppressCapture = true;
@@ -1067,6 +1204,18 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         foreach (var pending in pendingLadderAnimationsById)
         {
             if (DropStaleHostEpoch(pending.Value.HostEpoch, nameof(NetworkSiegeLadderAnimationState)))
+            {
+                if (applied == null) applied = new List<int>();
+                applied.Add(pending.Key);
+                continue;
+            }
+            var authority = ClassifySnapshotAuthority(
+                pending.Key,
+                pending.Value.HostEpoch,
+                pending.Value.AuthorityRevision,
+                pending.Value.SenderControllerId);
+            if (authority == SnapshotAuthority.Buffer) continue;
+            if (authority == SnapshotAuthority.Drop)
             {
                 if (applied == null) applied = new List<int>();
                 applied.Add(pending.Key);
@@ -1144,6 +1293,17 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineState))) return;
 
             RefreshMachineCache();
+            var authority = ClassifySnapshotAuthority(
+                obj.MachineId,
+                obj.HostEpoch,
+                obj.AuthorityRevision,
+                obj.SenderControllerId);
+            if (authority == SnapshotAuthority.Drop) return;
+            if (authority == SnapshotAuthority.Buffer)
+            {
+                BufferMachineState(obj);
+                return;
+            }
             if (!machinesById.TryGetValue(obj.MachineId, out var machine))
             {
                 // A net-zero MissionObjects churn (an item spawned and despawned within a poll) can hide
@@ -1196,6 +1356,17 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeLadderAnimationState))) return;
 
             RefreshMachineCache();
+            var authority = ClassifySnapshotAuthority(
+                obj.LadderId,
+                obj.HostEpoch,
+                obj.AuthorityRevision,
+                obj.SenderControllerId);
+            if (authority == SnapshotAuthority.Drop) return;
+            if (authority == SnapshotAuthority.Buffer)
+            {
+                BufferLadderAnimationState(obj);
+                return;
+            }
             if (!machinesById.TryGetValue(obj.LadderId, out var machine))
             {
                 trackedObjectCount = -1;
@@ -1224,12 +1395,67 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private void BufferMachineState(NetworkSiegeMachineState state)
     {
+        if (pendingByMachineId.TryGetValue(state.MachineId, out var existing)
+            && CompareAuthorityOrder(
+                existing.HostEpoch,
+                existing.AuthorityRevision,
+                state.HostEpoch,
+                state.AuthorityRevision) > 0)
+        {
+            return;
+        }
+
         pendingByMachineId[state.MachineId] = state;
     }
 
     private void BufferLadderAnimationState(NetworkSiegeLadderAnimationState state)
     {
+        if (pendingLadderAnimationsById.TryGetValue(state.LadderId, out var existing)
+            && CompareAuthorityOrder(
+                existing.HostEpoch,
+                existing.AuthorityRevision,
+                state.HostEpoch,
+                state.AuthorityRevision) > 0)
+        {
+            return;
+        }
+
         pendingLadderAnimationsById[state.LadderId] = state;
+    }
+
+    private SnapshotAuthority ClassifySnapshotAuthority(
+        int machineId,
+        int hostEpoch,
+        int authorityRevision,
+        string senderControllerId)
+    {
+        if (!authorityRevisions.ContainsKey(machineId)
+            && authorityRevision == 0
+            && session.IsHostController(senderControllerId))
+        {
+            return SnapshotAuthority.Apply;
+        }
+
+        int authorityOrder = CompareAuthorityOrder(
+            hostEpoch,
+            authorityRevision,
+            GetAuthorityEpoch(machineId),
+            GetAuthorityRevision(machineId));
+        if (authorityOrder < 0) return SnapshotAuthority.Drop;
+        if (authorityOrder > 0) return SnapshotAuthority.Buffer;
+        if (GetAuthorityHostController(machineId) == senderControllerId) return SnapshotAuthority.Apply;
+
+        return claimedMachines.TryGetValue(machineId, out var owner)
+            && owner == senderControllerId
+            ? SnapshotAuthority.Apply
+            : SnapshotAuthority.Drop;
+    }
+
+    private enum SnapshotAuthority
+    {
+        Apply,
+        Buffer,
+        Drop,
     }
 
     private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
@@ -1480,13 +1706,18 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             bool isHost = session.IsLocalHost;
             if (isHost)
             {
+                ReannounceAuthorityAfterPromotion();
                 // BR-102: the replay asserts arbitration authority NOW, so it carries the CURRENT epoch
                 // (not the epoch each claim was granted under) — a joiner already holds the newest
                 // assignment the server gave it on entry.
-                int hostEpoch = session.HostEpoch;
-                foreach (var claim in claimedMachines)
+                foreach (var authority in authorityRevisions)
                 {
-                    network.Send(controllerId, new NetworkSiegeMachineAuthority(claim.Key, claim.Value, hostEpoch));
+                    network.Send(controllerId, new NetworkSiegeMachineAuthority(
+                        authority.Key,
+                        CurrentAuthorityOwner(authority.Key),
+                        GetAuthorityEpoch(authority.Key),
+                        authority.Value,
+                        session.OwnControllerId));
                 }
             }
 

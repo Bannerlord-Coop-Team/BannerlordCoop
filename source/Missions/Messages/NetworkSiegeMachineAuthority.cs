@@ -22,11 +22,24 @@ public class NetworkSiegeMachineAuthority : IEvent
     /// </summary>
     [ProtoMember(3)]
     public readonly int HostEpoch;
+    /// <summary>Monotonic per-machine claim generation assigned by the mission host.</summary>
+    [ProtoMember(4)]
+    public readonly int AuthorityRevision;
+    /// <summary>Controller that issued this host-authority decision.</summary>
+    [ProtoMember(5)]
+    public readonly string SenderControllerId;
 
-    public NetworkSiegeMachineAuthority(int machineId, string controllerId, int hostEpoch = 0)
+    public NetworkSiegeMachineAuthority(
+        int machineId,
+        string controllerId,
+        int hostEpoch = 0,
+        int authorityRevision = 0,
+        string senderControllerId = null)
     {
         MachineId = machineId;
         ControllerId = controllerId;
         HostEpoch = hostEpoch;
+        AuthorityRevision = authorityRevision;
+        SenderControllerId = senderControllerId;
     }
 }

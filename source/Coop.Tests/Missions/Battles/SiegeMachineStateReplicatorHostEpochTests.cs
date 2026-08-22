@@ -47,6 +47,8 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         session.SetupGet(s => s.OwnControllerId).Returns("us");
         session.SetupGet(s => s.IsLocalHost).Returns(false);
         session.SetupGet(s => s.HostEpoch).Returns(LocalEpoch);
+        session.Setup(s => s.IsHostController(It.IsAny<string>()))
+            .Returns((string controllerId) => controllerId == "host");
         network.Setup(n => n.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sentToAll.Add);
 
         sut = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object, new HostEpochPolicy());
@@ -99,6 +101,21 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Fact]
+    public void AuthorityAheadOfAStaleLocalHostAssignment_IsAccepted()
+    {
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            9, "peer", hostEpoch: LocalEpoch + 1, authorityRevision: 0,
+            senderControllerId: "promoted-host"));
+        DrainGameThread();
+
+        AssertSingleClaim(machineId: 9, controllerId: "peer");
+        Assert.Equal(LocalEpoch + 1, AuthorityEpochs()[9]);
+        Assert.Equal("promoted-host", AuthorityHostControllers()[9]);
+    }
+
+    [Fact]
     [Trait("Requirement", "BR-102")]
     public void ReceiverWithoutAnAssignment_AcceptsStampedAuthority()
     {
@@ -114,17 +131,130 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     [Fact]
     public void AuthorityMovingHere_InvalidatesThePreviousSimulatorSendCache()
     {
-        broker.Publish(this, new NetworkSiegeMachineAuthority(11, "peer", hostEpoch: LocalEpoch));
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            11, "peer", hostEpoch: LocalEpoch, authorityRevision: 1));
         DrainGameThread();
 
         LastSentStates()[11] = MachineState(machineId: 11, hostEpoch: 0);
         LastSentLadderAnimations()[11] = LadderAnimationState(ladderId: 11, hostEpoch: 0);
 
-        broker.Publish(this, new NetworkSiegeMachineAuthority(11, "us", hostEpoch: LocalEpoch));
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            11, "us", hostEpoch: LocalEpoch, authorityRevision: 2));
         DrainGameThread();
 
         Assert.DoesNotContain(11, LastSentStates());
         Assert.DoesNotContain(11, LastSentLadderAnimations());
+    }
+
+    [Fact]
+    public void SupersededOwnerState_IsDropped_AndCannotReplaceAFutureRevision()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            12, "owner-b", hostEpoch: LocalEpoch, authorityRevision: 2));
+        DrainGameThread();
+
+        broker.Publish(this, MachineState(
+            12, LocalEpoch, senderControllerId: "owner-a", authorityRevision: 1));
+        DrainGameThread();
+
+        Assert.Empty(PendingStates());
+
+        broker.Publish(this, MachineState(
+            12, LocalEpoch, senderControllerId: "owner-c", authorityRevision: 3));
+        broker.Publish(this, MachineState(
+            12, LocalEpoch, senderControllerId: "owner-b", authorityRevision: 2));
+        DrainGameThread();
+
+        var pending = Assert.Single(PendingStates()).Value;
+        Assert.Equal(3, pending.AuthorityRevision);
+        Assert.Equal("owner-c", pending.SenderControllerId);
+
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            12, "owner-c", hostEpoch: LocalEpoch, authorityRevision: 3));
+        DrainGameThread();
+
+        pending = Assert.Single(PendingStates()).Value;
+        Assert.Equal(3, pending.AuthorityRevision);
+        Assert.Equal("owner-c", pending.SenderControllerId);
+    }
+
+    [Fact]
+    public void NewHostEpoch_ReplacesAHigherRevisionFromThePreviousHost()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            13, "owner-a", hostEpoch: LocalEpoch, authorityRevision: 8,
+            senderControllerId: "host"));
+        DrainGameThread();
+
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            13, "owner-b", hostEpoch: LocalEpoch + 1, authorityRevision: 1,
+            senderControllerId: "promoted-host"));
+        DrainGameThread();
+
+        AssertSingleClaim(13, "owner-b");
+        Assert.Equal(LocalEpoch + 1, AuthorityEpochs()[13]);
+        Assert.Equal(1, AuthorityRevisions()[13]);
+        Assert.Equal("promoted-host", AuthorityHostControllers()[13]);
+    }
+
+    [Fact]
+    public void PromotedHostSnapshot_BuffersUntilItsAuthorityDecisionArrives()
+    {
+        broker.Publish(this, MachineState(
+            14,
+            LocalEpoch + 1,
+            senderControllerId: "promoted-host",
+            authorityRevision: 0));
+        DrainGameThread();
+
+        var pending = Assert.Single(PendingStates()).Value;
+        Assert.Equal("promoted-host", pending.SenderControllerId);
+
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            14, string.Empty, hostEpoch: LocalEpoch + 1, authorityRevision: 0,
+            senderControllerId: "promoted-host"));
+        DrainGameThread();
+
+        pending = Assert.Single(PendingStates()).Value;
+        Assert.Equal("promoted-host", pending.SenderControllerId);
+        Assert.Equal(LocalEpoch + 1, AuthorityEpochs()[14]);
+        Assert.Equal("promoted-host", AuthorityHostControllers()[14]);
+    }
+
+    [Fact]
+    public void NewerEpochPendingState_ReplacesHigherRevisionFromPreviousEpoch()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            15, "owner-a", hostEpoch: LocalEpoch, authorityRevision: 8,
+            senderControllerId: "host"));
+        broker.Publish(this, MachineState(
+            15, LocalEpoch, senderControllerId: "owner-a", authorityRevision: 8));
+        broker.Publish(this, MachineState(
+            15, LocalEpoch + 1, senderControllerId: "owner-b", authorityRevision: 0));
+        DrainGameThread();
+
+        var pending = Assert.Single(PendingStates()).Value;
+        Assert.Equal(LocalEpoch + 1, pending.HostEpoch);
+        Assert.Equal(0, pending.AuthorityRevision);
+        Assert.Equal("owner-b", pending.SenderControllerId);
+    }
+
+    [Fact]
+    public void NewerEpochPendingLadderAnimation_ReplacesHigherRevisionFromPreviousEpoch()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            16, "owner-a", hostEpoch: LocalEpoch, authorityRevision: 8,
+            senderControllerId: "host"));
+        broker.Publish(this, LadderAnimationState(
+            16, LocalEpoch, senderControllerId: "owner-a", authorityRevision: 8));
+        broker.Publish(this, LadderAnimationState(
+            16, LocalEpoch + 1, senderControllerId: "owner-b", authorityRevision: 0));
+        DrainGameThread();
+
+        var pending = Assert.Single(PendingLadderAnimations()).Value;
+        Assert.Equal(LocalEpoch + 1, pending.HostEpoch);
+        Assert.Equal(0, pending.AuthorityRevision);
+        Assert.Equal("owner-b", pending.SenderControllerId);
     }
 
     // ------------------------------------------------------------------
@@ -245,6 +375,8 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(3, authority.MachineId);
         Assert.Equal("peer", authority.ControllerId);
         Assert.Equal(LocalEpoch, authority.HostEpoch);
+        Assert.Equal(1, authority.AuthorityRevision);
+        Assert.Equal("us", authority.SenderControllerId);
     }
 
     [Fact]
@@ -270,6 +402,8 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         var authority = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(sentToJoiner));
         Assert.Equal(3, authority.MachineId);
         Assert.Equal(LocalEpoch + 1, authority.HostEpoch);
+        Assert.Equal(0, authority.AuthorityRevision);
+        Assert.Equal("us", authority.SenderControllerId);
     }
 
     [Fact]
@@ -293,11 +427,13 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
             machineId: 30, hitPoints: 42.5f, destructionState: 2, gateState: 1, ladderState: 3,
             moveDistance: 18f, hasArrived: true, weaponState: 4, aimDirection: 0.75f,
             aimReleaseAngle: 0.25f, stoneAmmo: 7);
+        AuthorityRevisions()[30] = 3;
+        AuthorityEpochs()[30] = LocalEpoch + 1;
 
         var stamped = Assert.IsType<NetworkSiegeMachineState>(
             method!.Invoke(sut, new object[] { captured }));
 
-        Assert.Equal(LocalEpoch, stamped.HostEpoch);
+        Assert.Equal(LocalEpoch + 1, stamped.HostEpoch);
         Assert.Equal(30, stamped.MachineId);
         Assert.Equal(42.5f, stamped.HitPoints);
         Assert.Equal(2, stamped.DestructionState);
@@ -310,6 +446,8 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(0.25f, stamped.AimReleaseAngle);
         Assert.True(stamped.HasStoneAmmo);
         Assert.Equal(7, stamped.StoneAmmo);
+        Assert.Equal("us", stamped.SenderControllerId);
+        Assert.Equal(3, stamped.AuthorityRevision);
     }
 
     [Fact]
@@ -333,11 +471,13 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
             fallAngularSpeed: -0.5f,
             frame: frame,
             animationIndex: 17);
+        AuthorityRevisions()[30] = 3;
+        AuthorityEpochs()[30] = LocalEpoch + 1;
 
         var stamped = Assert.IsType<NetworkSiegeLadderAnimationState>(
             method!.Invoke(sut, new object[] { captured }));
 
-        Assert.Equal(LocalEpoch, stamped.HostEpoch);
+        Assert.Equal(LocalEpoch + 1, stamped.HostEpoch);
         Assert.Equal(30, stamped.LadderId);
         Assert.Equal(1.73f, stamped.AnimationSpeed);
         Assert.Equal(0.42f, stamped.AnimationProgress);
@@ -345,23 +485,45 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(-0.5f, stamped.FallAngularSpeed);
         Assert.Equal(frame.origin, stamped.Frame.origin);
         Assert.Equal(17, stamped.AnimationIndex);
+        Assert.Equal("us", stamped.SenderControllerId);
+        Assert.Equal(3, stamped.AuthorityRevision);
     }
 
     // ------------------------------------------------------------------
     // Plumbing
     // ------------------------------------------------------------------
 
-    private static NetworkSiegeMachineState MachineState(int machineId, int hostEpoch)
+    private static NetworkSiegeMachineState MachineState(
+        int machineId,
+        int hostEpoch,
+        string senderControllerId = "host",
+        int authorityRevision = 0)
         => new(machineId, hitPoints: -1f, destructionState: -1, gateState: -1, ladderState: -1,
             moveDistance: -1f, hasArrived: false, weaponState: -1, aimDirection: -1000f,
-            aimReleaseAngle: -1000f, hostEpoch: hostEpoch);
+            aimReleaseAngle: -1000f, hostEpoch: hostEpoch,
+            senderControllerId: senderControllerId, authorityRevision: authorityRevision);
 
-    private static NetworkSiegeLadderAnimationState LadderAnimationState(int ladderId, int hostEpoch)
+    private static NetworkSiegeLadderAnimationState LadderAnimationState(
+        int ladderId,
+        int hostEpoch,
+        string senderControllerId = "host",
+        int authorityRevision = 0)
         => new(ladderId, animationSpeed: -1f, animationProgress: -1f, animationState: 0,
-            fallAngularSpeed: 0f, frame: MatrixFrame.Identity, animationIndex: -1, hostEpoch: hostEpoch);
+            fallAngularSpeed: 0f, frame: MatrixFrame.Identity, animationIndex: -1,
+            hostEpoch: hostEpoch, senderControllerId: senderControllerId,
+            authorityRevision: authorityRevision);
 
     private Dictionary<int, string> ClaimedMachines()
         => GetField<Dictionary<int, string>>("claimedMachines");
+
+    private Dictionary<int, int> AuthorityRevisions()
+        => GetField<Dictionary<int, int>>("authorityRevisions");
+
+    private Dictionary<int, int> AuthorityEpochs()
+        => GetField<Dictionary<int, int>>("authorityEpochs");
+
+    private Dictionary<int, string> AuthorityHostControllers()
+        => GetField<Dictionary<int, string>>("authorityHostControllers");
 
     private void AssertSingleClaim(int machineId, string controllerId)
     {

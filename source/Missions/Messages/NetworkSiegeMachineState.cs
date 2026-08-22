@@ -53,6 +53,12 @@ public class NetworkSiegeMachineState : IEvent
     /// <summary>Whether <see cref="StoneAmmo"/> was captured by the sender.</summary>
     [ProtoMember(13)]
     public readonly bool HasStoneAmmo;
+    /// <summary>Controller that captured this snapshot.</summary>
+    [ProtoMember(14)]
+    public readonly string SenderControllerId;
+    /// <summary>Per-machine claim generation known by the sender.</summary>
+    [ProtoMember(15)]
+    public readonly int AuthorityRevision;
     public NetworkSiegeMachineState(
         int machineId,
         float hitPoints,
@@ -65,7 +71,9 @@ public class NetworkSiegeMachineState : IEvent
         float aimDirection,
         float aimReleaseAngle,
         int hostEpoch = 0,
-        int stoneAmmo = -1)
+        int stoneAmmo = -1,
+        string senderControllerId = null,
+        int authorityRevision = 0)
     {
         MachineId = machineId;
         HitPoints = hitPoints;
@@ -80,5 +88,7 @@ public class NetworkSiegeMachineState : IEvent
         HostEpoch = hostEpoch;
         StoneAmmo = stoneAmmo;
         HasStoneAmmo = stoneAmmo >= 0;
+        SenderControllerId = senderControllerId;
+        AuthorityRevision = authorityRevision;
     }
 }
