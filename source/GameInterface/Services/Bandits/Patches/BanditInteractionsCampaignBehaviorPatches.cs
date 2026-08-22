@@ -106,13 +106,14 @@ internal class BanditInteractionsCampaignBehaviorPatches
         // certain affects like increasing security around settlements.
         if (!doBanditsJoinPlayerSide)
         {
+            MapEvent createdBattle = null;
             if (PlayerEncounter.Battle == null)
             {
-                PlayerEncounter.StartBattle();
+                createdBattle = PlayerEncounter.StartBattle();
             }
 
-            // Guard against a null created MapEvent
-            if (PlayerEncounter.Battle == null) return false;
+            // Guard against a null rejected or unresolved MapEvent
+            if (PlayerEncounter.Battle == null || createdBattle == null) return false;
 
             // Do surrender on server and send message to client to update post battle screens
             var surrenderMessage = new BanditsSurrenderAsPrisoners(PlayerEncounter.Battle, PlayerEncounter.Battle.PlayerSide);
