@@ -1,5 +1,4 @@
 ﻿using Common.Logging;
-using Common.Network.Session;
 using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
 using Serilog;
@@ -59,7 +58,7 @@ internal class IssueOwnershipPersistencePatches
                     .Where(entry => entry?.IssueGiverHero != null && !string.IsNullOrEmpty(entry.OwnerControllerId))
                     .Select(entry => new KeyValuePair<Hero, string>(
                         entry.IssueGiverHero,
-                        MigrateLegacySteamControllerId(entry.OwnerControllerId))));
+                        entry.OwnerControllerId)));
             }
         }
 
@@ -79,15 +78,4 @@ internal class IssueOwnershipPersistencePatches
             .Select(entry => new KeyValuePair<Hero, int>(entry.IssueGiverHero, entry.Generation)));
     }
 
-    private static string MigrateLegacySteamControllerId(string controllerId)
-    {
-        if (!PlatformIdentity.TryMigrateLegacySteamControllerId(controllerId, out var migratedControllerId))
-            return controllerId;
-
-        Logger.Information(
-            "Migrating legacy issue owner Steam controller id {LegacyControllerId} to {ControllerId}",
-            controllerId,
-            migratedControllerId);
-        return migratedControllerId;
-    }
 }

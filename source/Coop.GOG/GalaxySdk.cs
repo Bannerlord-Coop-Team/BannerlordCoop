@@ -99,10 +99,12 @@ internal sealed class GalaxySdk : IGalaxySdk
 
         var listener = new LobbyCreatedListener(onCompleted);
         matchmaking.CreateLobby(
-            ToLobbyType(visibility),
+            gameServer ? LobbyType.LOBBY_TYPE_PUBLIC : ToLobbyType(visibility),
             checked((uint)maxMembers),
             joinable: true,
-            LobbyTopologyType.LOBBY_TOPOLOGY_TYPE_CONNECTIONLESS,
+            gameServer
+                ? LobbyTopologyType.LOBBY_TOPOLOGY_TYPE_FCM
+                : LobbyTopologyType.LOBBY_TOPOLOGY_TYPE_CONNECTIONLESS,
             listener);
     }
 
@@ -123,19 +125,31 @@ internal sealed class GalaxySdk : IGalaxySdk
     {
         if (onCompleted == null) throw new ArgumentNullException(nameof(onCompleted));
 
-        matchmaking.RequestLobbyData(
-            new GalaxyID(lobbyId),
-            new LobbyDataListener(onCompleted));
+        using (var galaxyLobbyId = new GalaxyID(lobbyId))
+        {
+            matchmaking.RequestLobbyData(
+                galaxyLobbyId,
+                new LobbyDataListener(onCompleted));
+        }
     }
 
     public void JoinLobby(ulong lobbyId, Action<ulong, bool> onCompleted)
     {
         if (onCompleted == null) throw new ArgumentNullException(nameof(onCompleted));
 
-        matchmaking.JoinLobby(new GalaxyID(lobbyId), new LobbyEnteredListener(onCompleted));
+        using (var galaxyLobbyId = new GalaxyID(lobbyId))
+        {
+            matchmaking.JoinLobby(galaxyLobbyId, new LobbyEnteredListener(onCompleted));
+        }
     }
 
-    public void LeaveLobby(ulong lobbyId) => matchmaking.LeaveLobby(new GalaxyID(lobbyId));
+    public void LeaveLobby(ulong lobbyId)
+    {
+        using (var galaxyLobbyId = new GalaxyID(lobbyId))
+        {
+            matchmaking.LeaveLobby(galaxyLobbyId);
+        }
+    }
 
     public void SetLobbyData(
         ulong lobbyId,
@@ -155,11 +169,14 @@ internal sealed class GalaxySdk : IGalaxySdk
 
         try
         {
-            matchmaking.SetLobbyData(
-                new GalaxyID(lobbyId),
-                key,
-                value ?? string.Empty,
-                listener);
+            using (var galaxyLobbyId = new GalaxyID(lobbyId))
+            {
+                matchmaking.SetLobbyData(
+                    galaxyLobbyId,
+                    key,
+                    value ?? string.Empty,
+                    listener);
+            }
         }
         catch
         {
@@ -169,11 +186,22 @@ internal sealed class GalaxySdk : IGalaxySdk
         }
     }
 
-    public string GetLobbyData(ulong lobbyId, string key) =>
-        matchmaking.GetLobbyData(new GalaxyID(lobbyId), key);
+    public string GetLobbyData(ulong lobbyId, string key)
+    {
+        using (var galaxyLobbyId = new GalaxyID(lobbyId))
+        {
+            return matchmaking.GetLobbyData(galaxyLobbyId, key);
+        }
+    }
 
-    public ulong GetLobbyOwner(ulong lobbyId) =>
-        matchmaking.GetLobbyOwner(new GalaxyID(lobbyId)).ToUint64();
+    public ulong GetLobbyOwner(ulong lobbyId)
+    {
+        using (var galaxyLobbyId = new GalaxyID(lobbyId))
+        using (GalaxyID ownerId = matchmaking.GetLobbyOwner(galaxyLobbyId))
+        {
+            return ownerId.ToUint64();
+        }
+    }
 
     public bool ShowInviteDialog(string connectionString)
     {
@@ -203,41 +231,42 @@ internal sealed class GalaxySdk : IGalaxySdk
         byte[] data,
         GalaxyP2PSendMode sendMode)
     {
-        return networking.SendP2PPacket(
-            new GalaxyID(remoteUserId),
-            data,
-            checked((uint)data.Length),
-            sendMode == GalaxyP2PSendMode.Reliable
-                ? P2PSendType.P2P_SEND_RELIABLE_IMMEDIATE
-                : P2PSendType.P2P_SEND_UNRELIABLE_IMMEDIATE,
-            channel);
+        using (var remoteGalaxyId = new GalaxyID(remoteUserId))
+        {
+            return networking.SendP2PPacket(
+                remoteGalaxyId,
+                data,
+                checked((uint)data.Length),
+                sendMode == GalaxyP2PSendMode.Reliable
+                    ? P2PSendType.P2P_SEND_RELIABLE_IMMEDIATE
+                    : P2PSendType.P2P_SEND_UNRELIABLE_IMMEDIATE,
+                channel);
+        }
     }
 
-    public string GetConnectionType(ulong remoteUserId) =>
-        networking.GetConnectionType(new GalaxyID(remoteUserId)).ToString();
-
-    private void DrainPackets(uint _, byte channel)
+    public string GetConnectionType(ulong remoteUserId)
     {
-        uint messageSize = 0;
-        while (networking.IsP2PPacketAvailable(ref messageSize, channel))
+        using (var remoteGalaxyId = new GalaxyID(remoteUserId))
         {
-            if (messageSize == 0)
-            {
-                networking.PopP2PPacket(channel);
-                continue;
-            }
+            return networking.GetConnectionType(remoteGalaxyId).ToString();
+        }
+    }
 
-            var data = new byte[messageSize];
-            uint readSize = 0;
-            var sender = new GalaxyID();
-            if (!networking.ReadP2PPacket(data, messageSize, ref readSize, ref sender, channel))
-                break;
+    private void DrainPackets(uint messageSize, byte channel)
+    {
+        if (messageSize == 0) return;
+
+        var data = new byte[messageSize];
+        uint readSize = 0;
+        using (var sender = new GalaxyID())
+        {
+            if (!networking.PeekP2PPacket(data, messageSize, ref readSize, ref sender, channel))
+                return;
 
             if (readSize != data.Length)
                 Array.Resize(ref data, checked((int)readSize));
 
             PacketReceived?.Invoke(sender.ToUint64(), channel, data);
-            messageSize = 0;
         }
     }
 
@@ -378,8 +407,11 @@ internal sealed class GalaxySdk : IGalaxySdk
                 var lobbyIds = new List<ulong>(checked((int)lobbyCount));
                 for (uint index = 0; index < lobbyCount; index++)
                 {
-                    ulong lobbyId = matchmaking.GetLobbyByIndex(index).ToUint64();
-                    if (lobbyId != 0) lobbyIds.Add(lobbyId);
+                    using (GalaxyID galaxyLobbyId = matchmaking.GetLobbyByIndex(index))
+                    {
+                        ulong lobbyId = galaxyLobbyId.ToUint64();
+                        if (lobbyId != 0) lobbyIds.Add(lobbyId);
+                    }
                 }
                 completed(lobbyIds, true);
             }

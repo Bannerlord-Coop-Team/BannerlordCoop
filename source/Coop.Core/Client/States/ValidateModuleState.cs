@@ -178,7 +178,9 @@ public class ValidateModuleState : ClientStateBase
         // Reaching this handshake proves both sides run Coop; only a version mismatch should block it.
         if (obj.What.Matches || string.Equals(obj.What.Reason, UnsupportedCoopModuleReason, StringComparison.Ordinal))
         {
-            network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
+            network.SendAll(new NetworkClientValidate(
+                controllerIdProvider.ControllerId,
+                controllerIdProvider.LegacyControllerId));
         }
         else
         {

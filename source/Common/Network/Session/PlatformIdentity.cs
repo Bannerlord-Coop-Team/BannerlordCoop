@@ -56,18 +56,29 @@ public readonly struct PlatformIdentity : IEquatable<PlatformIdentity>
         return identity.IsValid;
     }
 
-    public static bool TryMigrateLegacySteamControllerId(
-        string controllerId,
+    public static bool TryMigrateLegacyControllerId(
+        string legacyControllerId,
+        PlatformIdentity replacementIdentity,
         out string migratedControllerId)
     {
-        migratedControllerId = controllerId;
-        if (TryParseControllerId(controllerId, out _) ||
-            !ulong.TryParse(controllerId, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+        migratedControllerId = legacyControllerId;
+        if (!replacementIdentity.IsValid ||
+            TryParseControllerId(legacyControllerId, out _) ||
+            !ulong.TryParse(
+                legacyControllerId,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out _) ||
+            (replacementIdentity.IsStorefrontIdentity &&
+                !string.Equals(
+                    legacyControllerId,
+                    replacementIdentity.UserId,
+                    StringComparison.Ordinal)))
         {
             return false;
         }
 
-        migratedControllerId = new PlatformIdentity("steam", controllerId).ControllerId;
+        migratedControllerId = replacementIdentity.ControllerId;
         return true;
     }
 

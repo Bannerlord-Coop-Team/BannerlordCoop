@@ -12,10 +12,9 @@ namespace GameInterface.Tests.Services.Issues.Patches;
 public class ControllerIdPersistenceMigrationTests
 {
     private const string LegacyControllerId = "76561198000000042";
-    private const string MigratedControllerId = "steam:76561198000000042";
 
     [Fact]
-    public void IssueOwnershipSyncData_Load_MigratesLegacySteamControllerId()
+    public void IssueOwnershipSyncData_Load_PreservesUnscopedControllerId()
     {
         var issueGiver = ObjectHelper.SkipConstructor<Hero>();
         var ownershipRegistry = new IssueOwnershipRegistry();
@@ -34,11 +33,11 @@ public class ControllerIdPersistenceMigrationTests
             generationRegistry);
 
         Assert.True(ownershipRegistry.TryGetOwnerControllerId(issueGiver, out var controllerId));
-        Assert.Equal(MigratedControllerId, controllerId);
+        Assert.Equal(LegacyControllerId, controllerId);
     }
 
     [Fact]
-    public void AlternativeSolutionTroopsSyncData_Load_MigratesLegacySteamControllerId()
+    public void AlternativeSolutionTroopsSyncData_Load_PreservesUnscopedControllerId()
     {
         var character = ObjectHelper.SkipConstructor<CharacterObject>();
         var troops = new TroopRoster();
@@ -55,9 +54,8 @@ public class ControllerIdPersistenceMigrationTests
             new TestDataStore(isSaving: false, records),
             troopsRegistry);
 
-        Assert.True(troopsRegistry.TryGet(MigratedControllerId, out var restored));
+        Assert.True(troopsRegistry.TryGet(LegacyControllerId, out var restored));
         Assert.Same(troops, restored);
-        Assert.False(troopsRegistry.TryGet(LegacyControllerId, out _));
     }
 
     private sealed class TestDataStore : IDataStore

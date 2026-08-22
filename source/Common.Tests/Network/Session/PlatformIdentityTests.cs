@@ -64,23 +64,37 @@ public class PlatformIdentityTests
         Assert.False(identity.IsValid);
     }
 
-    [Fact]
-    public void TryMigrateLegacySteamControllerId_NumericId_AddsSteamNamespace()
+    [Theory]
+    [InlineData("steam", "76561198000000042", "steam:76561198000000042")]
+    [InlineData("gog", "123456789", "gog:123456789")]
+    [InlineData("local", "123456789", "local:installation-id")]
+    public void TryMigrateLegacyControllerId_UsesExplicitReplacementIdentity(
+        string provider,
+        string legacyControllerId,
+        string expectedControllerId)
     {
-        Assert.True(PlatformIdentity.TryMigrateLegacySteamControllerId(
-            "76561198000000042",
+        string userId = provider == "local" ? "installation-id" : legacyControllerId;
+
+        Assert.True(PlatformIdentity.TryMigrateLegacyControllerId(
+            legacyControllerId,
+            new PlatformIdentity(provider, userId),
             out var migratedControllerId));
-        Assert.Equal("steam:76561198000000042", migratedControllerId);
+        Assert.Equal(expectedControllerId, migratedControllerId);
     }
 
     [Theory]
-    [InlineData("steam:76561198000000042")]
-    [InlineData("gog:76561198000000042")]
-    [InlineData("PlayerOne")]
-    public void TryMigrateLegacySteamControllerId_NonLegacyId_LeavesValueUnchanged(string controllerId)
+    [InlineData("steam:76561198000000042", "steam", "76561198000000042")]
+    [InlineData("PlayerOne", "steam", "PlayerOne")]
+    [InlineData("123456789", "steam", "76561198000000042")]
+    [InlineData("123456789", "gog", "987654321")]
+    public void TryMigrateLegacyControllerId_InvalidMapping_LeavesValueUnchanged(
+        string controllerId,
+        string provider,
+        string userId)
     {
-        Assert.False(PlatformIdentity.TryMigrateLegacySteamControllerId(
+        Assert.False(PlatformIdentity.TryMigrateLegacyControllerId(
             controllerId,
+            new PlatformIdentity(provider, userId),
             out var migratedControllerId));
         Assert.Equal(controllerId, migratedControllerId);
     }

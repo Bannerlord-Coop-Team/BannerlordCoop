@@ -467,6 +467,107 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Theory]
+        [InlineData("steam", "76561198000000001")]
+        [InlineData("gog", "123456789")]
+        public void NetworkClientValidate_AuthenticatedIdentityMigratesMatchingLegacyRegistration(
+            string providerName,
+            string platformUserId)
+        {
+            var authenticatedIdentity = new PlatformIdentity(providerName, platformUserId);
+            var identityResolver = CreateIdentityResolver(authenticatedIdentity);
+            var currentState = CreateState(identityResolver.Object);
+            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            var legacyPlayer = new Player(
+                platformUserId,
+                "LegacyHero",
+                string.Empty,
+                string.Empty,
+                string.Empty);
+            var migratedPlayer = new Player(
+                authenticatedIdentity.ControllerId,
+                "LegacyHero",
+                string.Empty,
+                string.Empty,
+                string.Empty);
+            var objectManager = serverComponent.Container.Resolve<IObjectManager>();
+            var legacyHero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Assert.True(objectManager.AddExisting(migratedPlayer.HeroId, legacyHero));
+
+            playerManager
+                .Setup(manager => manager.TryGetPlayer(platformUserId, out legacyPlayer))
+                .Returns(true);
+            playerManager
+                .Setup(manager => manager.TryMigrateControllerId(
+                    platformUserId,
+                    authenticatedIdentity.ControllerId,
+                    out migratedPlayer))
+                .Returns(true);
+
+            try
+            {
+                currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                    playerPeer,
+                    new NetworkClientValidate(
+                        authenticatedIdentity.ControllerId,
+                        platformUserId)));
+
+                playerManager.Verify(manager => manager.TryMigrateControllerId(
+                    platformUserId,
+                    authenticatedIdentity.ControllerId,
+                    out migratedPlayer), Times.Once);
+                Assert.Equal(authenticatedIdentity.ControllerId, connectionLogic.ControllerId);
+            }
+            finally
+            {
+                currentState.Dispose();
+            }
+        }
+
+        [Fact]
+        public void NetworkClientValidate_DirectLocalIdentityMigratesLegacyNumericRegistration()
+        {
+            const string legacyControllerId = "76561198000000001";
+            const string controllerId = "local:installation-id";
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            var legacyPlayer = new Player(
+                legacyControllerId,
+                "LegacyHero",
+                string.Empty,
+                string.Empty,
+                string.Empty);
+            var migratedPlayer = new Player(
+                controllerId,
+                "LegacyHero",
+                string.Empty,
+                string.Empty,
+                string.Empty);
+            var objectManager = serverComponent.Container.Resolve<IObjectManager>();
+            var legacyHero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Assert.True(objectManager.AddExisting(migratedPlayer.HeroId, legacyHero));
+
+            playerManager
+                .Setup(manager => manager.TryGetPlayer(legacyControllerId, out legacyPlayer))
+                .Returns(true);
+            playerManager
+                .Setup(manager => manager.TryMigrateControllerId(
+                    legacyControllerId,
+                    controllerId,
+                    out migratedPlayer))
+                .Returns(true);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(controllerId, legacyControllerId)));
+
+            playerManager.Verify(manager => manager.TryMigrateControllerId(
+                legacyControllerId,
+                controllerId,
+                out migratedPlayer), Times.Once);
+            Assert.Equal(controllerId, connectionLogic.ControllerId);
+        }
+
+        [Theory]
         [InlineData("steam", "76561198000000001", "76561198000000002")]
         [InlineData("gog", "123456789", "987654321")]
         public void NetworkClientValidate_RejectsSpoofedStorefrontUserId(

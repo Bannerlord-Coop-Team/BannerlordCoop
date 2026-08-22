@@ -24,6 +24,7 @@ public class ControllerIdProviderTests
         provider.SetControllerAsPlatformIdentity(new PlatformIdentity(providerName, platformUserId));
 
         Assert.Equal(expected, provider.ControllerId);
+        Assert.Equal(platformUserId, provider.LegacyControllerId);
         Assert.Equal(0, store.CallCount);
     }
 

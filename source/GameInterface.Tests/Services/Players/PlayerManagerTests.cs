@@ -297,6 +297,69 @@ public class PlayerManagerTests
         Assert.Same(current, Assert.Single(playerManager.Players));
     }
 
+    [Fact]
+    public void TryMigrateControllerId_RekeysRegistrationAndPeer()
+    {
+        const string legacyControllerId = "123456789";
+        const string controllerId = "gog:123456789";
+        var playerManager = CreatePlayerManager(out _);
+        var registered = new Player(
+            legacyControllerId,
+            "Hero",
+            string.Empty,
+            string.Empty,
+            string.Empty);
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(registered));
+        playerManager.SetPeer(legacyControllerId, peer);
+
+        Assert.True(playerManager.TryMigrateControllerId(
+            legacyControllerId,
+            controllerId,
+            out var migrated));
+
+        Assert.Equal(controllerId, migrated.ControllerId);
+        Assert.False(playerManager.TryGetPlayer(legacyControllerId, out _));
+        Assert.True(playerManager.TryGetPlayer(controllerId, out var byController));
+        Assert.Same(migrated, byController);
+        Assert.True(playerManager.TryGetPlayer(peer, out var byPeer));
+        Assert.Same(migrated, byPeer);
+        Assert.True(playerManager.TryGetPeer(controllerId, out var migratedPeer));
+        Assert.Same(peer, migratedPeer);
+    }
+
+    [Fact]
+    public void TryMigrateControllerId_ReplacesDisconnectedDuplicateWithLegacyCharacter()
+    {
+        const string legacyControllerId = "123456789";
+        const string controllerId = "local:installation-id";
+        var playerManager = CreatePlayerManager(out _);
+        var legacy = new Player(
+            legacyControllerId,
+            "LegacyHero",
+            string.Empty,
+            string.Empty,
+            string.Empty);
+        var duplicate = new Player(
+            controllerId,
+            "DuplicateHero",
+            string.Empty,
+            string.Empty,
+            string.Empty);
+
+        Assert.True(playerManager.AddPlayer(legacy));
+        Assert.True(playerManager.AddPlayer(duplicate));
+
+        Assert.True(playerManager.TryMigrateControllerId(
+            legacyControllerId,
+            controllerId,
+            out var migrated));
+
+        Assert.Equal("LegacyHero", migrated.HeroId);
+        Assert.Same(migrated, Assert.Single(playerManager.Players));
+    }
+
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
             .Field(typeof(PlayerManager), "PlayerObjects")

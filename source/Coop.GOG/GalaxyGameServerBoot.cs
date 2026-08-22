@@ -12,7 +12,6 @@ internal static class GalaxyGameServerBoot
 {
     private const string ClientIdVariable = "BANNERLORDCOOP_GOG_CLIENT_ID";
     private const string ClientSecretVariable = "BANNERLORDCOOP_GOG_CLIENT_SECRET";
-    private const string ServerKeyVariable = "BANNERLORDCOOP_GOG_SERVER_KEY";
 
     private static readonly Serilog.ILogger Logger = LogManager.GetLogger(typeof(GalaxyGameServerBoot));
     private static AuthListener authListener;
@@ -22,8 +21,7 @@ internal static class GalaxyGameServerBoot
 
     public static bool HasConfiguredCredentials =>
         !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ClientIdVariable)) &&
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ClientSecretVariable)) &&
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ServerKeyVariable));
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ClientSecretVariable));
 
     public static bool IsReady => isReady;
     public static event Action Ready;
@@ -49,9 +47,7 @@ internal static class GalaxyGameServerBoot
             initialized = true;
             listener = new AuthListener();
             authListener = listener;
-            GalaxyInstance.GameServerUser().SignInServerKey(
-                Environment.GetEnvironmentVariable(ServerKeyVariable),
-                listener);
+            GalaxyInstance.GameServerUser().SignInAnonymous(listener);
             isReady = false;
             Interlocked.Exchange(ref shutDown, 0);
             started = true;
@@ -119,9 +115,12 @@ internal static class GalaxyGameServerBoot
             if (!started) return;
 
             isReady = true;
-            Logger.Information(
-                "Galaxy game server authenticated as {GalaxyId}",
-                GalaxyInstance.GameServerUser().GetGalaxyID().ToUint64().ToString());
+            using (GalaxyID galaxyId = GalaxyInstance.GameServerUser().GetGalaxyID())
+            {
+                Logger.Information(
+                    "Galaxy game server authenticated as {GalaxyId}",
+                    galaxyId.ToUint64().ToString());
+            }
             Ready?.Invoke();
         }
 

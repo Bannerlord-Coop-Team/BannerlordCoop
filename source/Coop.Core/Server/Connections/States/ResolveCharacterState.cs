@@ -134,7 +134,7 @@ public class ResolveCharacterState : ConnectionStateBase
 
         try
         {
-            ResolveCharacter(peer, obj.What.PlayerId);
+            ResolveCharacter(peer, obj.What.PlayerId, obj.What.LegacyPlayerId);
         }
         catch (Exception e)
         {
@@ -157,9 +157,9 @@ public class ResolveCharacterState : ConnectionStateBase
         }
     }
 
-    private void ResolveCharacter(NetPeer peer, string controllerId)
+    private void ResolveCharacter(NetPeer peer, string controllerId, string legacyControllerId)
     {
-        if (!IdentityClaimMatchesTransport(peer, controllerId))
+        if (!IdentityClaimMatchesTransport(peer, controllerId, legacyControllerId))
         {
             Logger.Error(
                 "Connection supplied controller id {ControllerId} that does not match its authenticated transport identity; disconnecting peer {Peer}",
@@ -174,6 +174,15 @@ public class ResolveCharacterState : ConnectionStateBase
             Logger.Error("Connection supplied an invalid or changed controller id; disconnecting peer {Peer}", peer.Id);
             peer.Disconnect();
             return;
+        }
+
+        if (TryMigrateLegacyControllerId(legacyControllerId, controllerId, out var migratedPlayer))
+        {
+            Logger.Information(
+                "Migrated legacy controller id {LegacyControllerId} to {ControllerId}",
+                legacyControllerId,
+                controllerId);
+            network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(migratedPlayer));
         }
 
         if (playerManager.TryGetPlayer(controllerId, out var player))
@@ -238,7 +247,42 @@ public class ResolveCharacterState : ConnectionStateBase
         ConnectionLogic.CreateCharacter();
     }
 
-    private bool IdentityClaimMatchesTransport(NetPeer peer, string controllerId)
+    private bool TryMigrateLegacyControllerId(
+        string legacyControllerId,
+        string controllerId,
+        out Player player)
+    {
+        player = null;
+        if (!PlatformIdentity.TryParseControllerId(controllerId, out var identity) ||
+            !PlatformIdentity.TryMigrateLegacyControllerId(
+                legacyControllerId,
+                identity,
+                out var migratedControllerId) ||
+            !string.Equals(controllerId, migratedControllerId, StringComparison.Ordinal))
+            return false;
+
+        bool migrated = false;
+        Player migratedPlayer = null;
+        GameThread.Run(() =>
+        {
+            if (!playerManager.TryGetPlayer(legacyControllerId, out var legacyPlayer) ||
+                !objectManager.TryGetObject<Hero>(legacyPlayer.HeroId, out _))
+                return;
+
+            migrated = playerManager.TryMigrateControllerId(
+                legacyControllerId,
+                controllerId,
+                out migratedPlayer);
+        }, blocking: true);
+
+        player = migratedPlayer;
+        return migrated;
+    }
+
+    private bool IdentityClaimMatchesTransport(
+        NetPeer peer,
+        string controllerId,
+        string legacyControllerId)
     {
         var endpoint = new IPEndPoint(peer.Address, peer.Port);
         if (peerIdentityResolver != null &&
@@ -248,11 +292,27 @@ public class ResolveCharacterState : ConnectionStateBase
                 string.Equals(
                     controllerId,
                     authenticatedIdentity.ControllerId,
-                    StringComparison.Ordinal);
+                    StringComparison.Ordinal) &&
+                (string.IsNullOrEmpty(legacyControllerId) ||
+                    string.Equals(
+                        legacyControllerId,
+                        authenticatedIdentity.UserId,
+                        StringComparison.Ordinal));
         }
 
-        return !PlatformIdentity.TryParseControllerId(controllerId, out var claimedIdentity) ||
-            !claimedIdentity.IsStorefrontIdentity;
+        if (PlatformIdentity.TryParseControllerId(controllerId, out var claimedIdentity))
+        {
+            if (claimedIdentity.IsStorefrontIdentity) return false;
+
+            return string.IsNullOrEmpty(legacyControllerId) ||
+                (string.Equals(claimedIdentity.Provider, "local", StringComparison.Ordinal) &&
+                    PlatformIdentity.TryMigrateLegacyControllerId(
+                        legacyControllerId,
+                        claimedIdentity,
+                        out _));
+        }
+
+        return string.IsNullOrEmpty(legacyControllerId);
     }
 
     public override void CreateCharacter()
