@@ -126,6 +126,8 @@ internal class BattleMissionStartHandler : IHandler
         GameThread.RunSafe(() =>
         {
             var operation = "resolve map event";
+            var isNewMissionClaim = false;
+            var startAccepted = false;
 
             try
             {
@@ -164,7 +166,7 @@ internal class BattleMissionStartHandler : IHandler
                 // owns this event. On reject, don't make the sides mission-ready or reply — the requesting client
                 // waits for NetworkStartAttackMission to open the mission, so it simply stays at the encounter menu.
                 operation = "claim mission mode";
-                if (!ServerBattleModeArbiter.TryClaimMission(payload.What.MapEventId, out var isNewMissionClaim))
+                if (!ServerBattleModeArbiter.TryClaimMission(payload.What.MapEventId, out isNewMissionClaim))
                 {
                     mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
@@ -199,6 +201,34 @@ internal class BattleMissionStartHandler : IHandler
                     side.MakeReadyForMission(null);
                 }
 
+                IMessage missionStartMessage;
+                if (mapEvent.IsSiegeAssault)
+                {
+                    operation = "build siege mission snapshot";
+                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
+                    // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
+                    missionStartMessage = new NetworkStartSiegeMission(
+                        snapshot.MapEventId,
+                        snapshot.WallLevel,
+                        snapshot.WallHitPointRatios,
+                        snapshot.AttackerEngines,
+                        snapshot.DefenderEngines,
+                        payload.What.AttackerPartyId);
+                }
+                else
+                {
+                    operation = "build attack mission snapshot";
+                    MissionInitializerRecord missionInitializer = GetOrCreateMissionInitializerSnapshot(
+                        payload.What.MapEventId,
+                        () => missionInitializerResolver.Create(
+                            mapEvent,
+                            RollTerrainSeed(),
+                            GetAtmosphereOnCampaign(mapEvent)));
+                    missionStartMessage = new NetworkStartAttackMission(
+                        payload.What.MapEventId, missionInitializer,
+                        payload.What.AttackerPartyId);
+                }
+
                 operation = "snapshot mission participants";
                 var participants = GetMissionParticipants(mapEvent);
 
@@ -210,37 +240,10 @@ internal class BattleMissionStartHandler : IHandler
                 // flow, rather than re-entrantly during the blocking wait.
                 operation = "send battle start reply";
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
+                startAccepted = true;
 
-                if (mapEvent.IsSiegeAssault)
-                {
-                    operation = "send siege mission snapshot";
-                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
-                    // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
-                    var startMessage = new NetworkStartSiegeMission(
-                        snapshot.MapEventId,
-                        snapshot.WallLevel,
-                        snapshot.WallHitPointRatios,
-                        snapshot.AttackerEngines,
-                        snapshot.DefenderEngines,
-                        payload.What.AttackerPartyId);
-                    SendMissionStart(participants, startMessage);
-                }
-                else
-                {
-                    operation = "build attack mission snapshot";
-                    MissionInitializerRecord missionInitializer = GetOrCreateMissionInitializerSnapshot(
-                        payload.What.MapEventId,
-                        () => missionInitializerResolver.Create(
-                            mapEvent,
-                            RollTerrainSeed(),
-                            GetAtmosphereOnCampaign(mapEvent)));
-
-                    operation = "send attack mission start";
-                    var startMessage = new NetworkStartAttackMission(
-                        payload.What.MapEventId, missionInitializer,
-                        payload.What.AttackerPartyId);
-                    SendMissionStart(participants, startMessage);
-                }
+                operation = "send mission start";
+                SendMissionStart(participants, missionStartMessage);
 
                 // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
                 // greys out the auto-resolve option — a map event is fought as a live mission XOR an auto-resolve,
@@ -251,7 +254,13 @@ internal class BattleMissionStartHandler : IHandler
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to {Operation} for {Message}", operation, nameof(NetworkBattleStartRequest));
-                network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                if (!startAccepted)
+                {
+                    if (isNewMissionClaim)
+                        ServerBattleModeArbiter.Release(payload.What.MapEventId);
+
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                }
             }
         }, context: nameof(Handle_NetworkBattleStartRequest));
     }
