@@ -60,12 +60,16 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
-    public void UntrackedPeer_PassesThroughLive()
+    public void PeerVisibleBeforePlayerConnected_DropsWorldBroadcasts()
     {
         var peer = network.CreatePeer();
 
-        // No channel: a fully-joined or unknown peer receives broadcasts live.
-        Assert.False(queue.TryHandleBroadcast(peer, new FakePacket()));
+        // LiteNetLib adds an accepted peer to fan-out before it raises the connected callback.
+        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
+        Assert.True(NothingSentTo(peer));
+
+        messageBroker.Publish(this, new PlayerConnected(peer));
+        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
     }
 
     [Fact]
@@ -144,12 +148,13 @@ public class ConnectionMessageQueueTests
 
         queue.CompleteCatchUp(peer);
         Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
+        Assert.False(queue.TryHandleBroadcast(peer, new FakePacket()));
     }
 
     [Fact]
-    public void SessionLobbyChangeBypassesTheLoadQueue()
+    public void SessionLobbyChangeBypassesMissingChannel()
     {
-        var peer = Connect();
+        var peer = network.CreatePeer();
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         var packet = MessagePacket.Create(new NetworkSessionLobbyChanged(123), serializer);
 
@@ -217,7 +222,7 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
-    public void DisconnectMidLoad_DropsHeldPackets_AndPeerGoesLive()
+    public void DisconnectMidLoad_DropsHeldAndLatePackets()
     {
         var peer = Connect();
         queue.BeginQueueing(peer);
@@ -225,8 +230,8 @@ public class ConnectionMessageQueueTests
 
         messageBroker.Publish(this, new PlayerDisconnected(peer, default));
 
-        // Untracked again -> live; a late flush finds no channel and replays nothing.
-        Assert.False(queue.TryHandleBroadcast(peer, new FakePacket()));
+        // A late send cannot revive or replay the disconnected peer's held world stream.
+        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
         queue.Flush(peer);
         Assert.True(NothingSentTo(peer));
     }
@@ -262,7 +267,11 @@ public class ConnectionMessageQueueTests
         var loading = Connect();
         queue.BeginQueueing(loading);
 
-        var joined = PeerWithEndpoint("127.0.0.2"); // distinct endpoint, never tracked -> live
+        var joined = PeerWithEndpoint("127.0.0.2");
+        messageBroker.Publish(this, new PlayerConnected(joined));
+        queue.BeginQueueing(joined);
+        queue.OpenWithTail(joined, new NetworkJoinSync(JoinSyncSignal.WorldReady));
+        queue.CompleteCatchUp(joined);
 
         Assert.True(queue.TryHandleBroadcast(loading, new FakePacket()));  // held
         Assert.False(queue.TryHandleBroadcast(joined, new FakePacket()));  // live

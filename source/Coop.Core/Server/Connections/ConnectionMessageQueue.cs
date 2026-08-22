@@ -20,15 +20,20 @@ namespace Coop.Core.Server.Connections;
 /// runs through here per peer; single-peer handshake and save sends bypass it.
 /// </summary>
 /// <remarks>
-/// Each peer's channel moves through three phases:
+/// Each peer's channel moves through four phases:
 /// <list type="bullet">
 /// <item><b>Dropping</b> (on <see cref="PlayerConnected"/>): pre-save broadcasts are discarded — they
 /// are already in the save the peer is about to load.</item>
 /// <item><b>Queueing</b> (on <see cref="BeginQueueing"/>, just after the save snapshot): broadcasts are
 /// held FIFO — they are not in the save.</item>
 /// <item><b>Open</b> (after the join barrier): held packets are replayed FIFO, a reliable tail marker
-/// is appended, and the peer goes live (a peer with no channel is live).</item>
+/// is appended, and later broadcasts pass through while the client applies the tail.</item>
+/// <item><b>Live</b> (after <see cref="CompleteCatchUp"/>): the retained channel keeps passing broadcasts
+/// through until disconnect.</item>
 /// </list>
+/// A peer with no channel is treated as newly accepted and its world broadcasts are dropped. LiteNetLib
+/// exposes an accepted peer to fan-out before raising <see cref="PlayerConnected"/>, so treating an
+/// unknown peer as live can deliver campaign objects before its save loads.
 /// The drop/queue cut is clean: the save runs in a blocking <c>GameThread.Run</c> on the network
 /// thread, so the poller is parked and nothing races the snapshot. Replay-before-live is held by the
 /// per-peer gate lock (across the whole flush, Open flipped last), not by thread identity or the
@@ -72,6 +77,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         Dropping,
         Queueing,
         Open,
+        Live,
     }
 
     private sealed class PeerChannel
@@ -110,8 +116,9 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     {
         if (ShouldBypassLoadingQueue(packet)) return false;
 
-        // No channel means a fully-joined (or unknown) peer: send live.
-        if (channels.TryGetValue(peer, out var channel) == false) return false;
+        // LiteNetLib exposes an accepted peer to SendAll before OnPeerConnected installs its channel.
+        // Fail closed during that gap so world objects cannot reach a client before its transfer save.
+        if (channels.TryGetValue(peer, out var channel) == false) return true;
 
         lock (channel.Gate)
         {
@@ -125,9 +132,8 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
                     // Already in the save the peer is about to load; discard.
                     return true;
                 default:
-                    // Open: this peer has already caught up and is a normal live player now, so just
-                    // send the packet. (We only land here for a split second, right after the catch-up
-                    // finishes and before its channel is tidied away.)
+                    // Open and Live peers receive normal world traffic. Retaining the Live channel
+                    // lets an absent channel unambiguously mean a newly accepted peer.
                     return false;
             }
         }
@@ -185,7 +191,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         packetsRemaining = 0;
         if (channels.TryGetValue(peer, out var channel) == false) return false;
 
-        if (channel.Phase == Phase.Dropping) return false;
+        if (channel.Phase == Phase.Dropping || channel.Phase == Phase.Live) return false;
 
         packetsRemaining = Volatile.Read(ref channel.PendingCount) +
                            peer.GetPacketsCountInReliableQueue(0, true) +
@@ -197,11 +203,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     {
         if (tailMarker == null) throw new ArgumentNullException(nameof(tailMarker));
 
-        if (channels.TryGetValue(peer, out var channel) == false)
-        {
-            network.Value.SendImmediate(peer, tailMarker);
-            return;
-        }
+        var channel = channels.GetOrAdd(peer, _ => new PeerChannel());
 
         int replayed;
         lock (channel.Gate)
@@ -225,7 +227,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         lock (channel.Gate)
         {
             if (channel.Phase != Phase.Open) return;
-            channels.TryRemove(peer, out _);
+            channel.Phase = Phase.Live;
         }
     }
 
