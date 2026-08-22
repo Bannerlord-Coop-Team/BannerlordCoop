@@ -88,10 +88,52 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
             var ownedParty = Assert.Single(attackerSide.Parties);
             Assert.Equal(attackerHeroId, ownedParty.Entries[0].CharacterId);
             Assert.Equal(0, ownedParty.PlayerOwnedRank);
+            Assert.True(ownedParty.HasPlayerOwnedPartiesBefore);
+            Assert.Equal(0, ownedParty.PlayerOwnedPartiesBefore);
             Assert.Equal(6, attackerSide.TotalTroops);
             Assert.Equal(6, defenderKnowledge.TotalTroops);
             Assert.Equal(1, attackerSide.PlayerOwnedPartyCount);
             Assert.Equal(1, defenderKnowledge.PlayerOwnedPartyCount);
+        });
+    }
+
+    [Fact]
+    public void GetOwnedReserves_PlayerGuaranteeMetadataTracksEarlierPlayers()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("first", "defender", "joining");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var firstParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var joiningParty));
+            var troop = Server.CreateRegisteredObject<CharacterObject>("player_guarantee_metadata_troop");
+
+            firstParty.MemberRoster.Clear();
+            firstParty.MemberRoster.AddToCounts(troop, 22);
+            joiningParty.MemberRoster.Clear();
+            joiningParty.MemberRoster.AddToCounts(troop, 19);
+            foreach (var party in mapEvent.AttackerSide.Parties)
+                party.Update();
+
+            var builder = Server.Resolve<IBattleTroopReserveBuilder>();
+            var firstSide = builder.GetOwnedReserves(mapEvent, "first", isHost: false)
+                .Single(reserve => reserve.Side == BattleSideEnum.Attacker);
+            var joiningSide = builder.GetOwnedReserves(mapEvent, "joining", isHost: false)
+                .Single(reserve => reserve.Side == BattleSideEnum.Attacker);
+
+            var firstReserve = Assert.Single(firstSide.Parties);
+            var joiningReserve = Assert.Single(joiningSide.Parties);
+            Assert.Equal(0, firstReserve.SideOffset);
+            Assert.Equal(0, firstReserve.PlayerOwnedPartiesBefore);
+            Assert.Equal(0, firstReserve.PlayerOwnedRank);
+            Assert.Equal(22, joiningReserve.SideOffset);
+            Assert.Equal(1, joiningReserve.PlayerOwnedPartiesBefore);
+            Assert.Equal(1, joiningReserve.PlayerOwnedRank);
+            Assert.Equal(41, firstSide.TotalTroops);
+            Assert.Equal(41, joiningSide.TotalTroops);
+            Assert.Equal(2, firstSide.PlayerOwnedPartyCount);
+            Assert.Equal(2, joiningSide.PlayerOwnedPartyCount);
         });
     }
 
@@ -144,6 +186,9 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
             Assert.Equal(beforeDefenders.TotalTroops + 20, afterDefenders.TotalTroops);
             Assert.Equal(beforeDefenders.Parties.Length + 1, afterDefenders.Parties.Length);
             Assert.Equal(20, afterDefenders.Parties.Sum(party => party.Entries.Length));
+            var lateReserve = Assert.Single(afterDefenders.Parties);
+            Assert.True(lateReserve.HasPlayerOwnedPartiesBefore);
+            Assert.Equal(1, lateReserve.PlayerOwnedPartiesBefore);
         });
     }
 

@@ -141,6 +141,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
             // Only a present player's own party reserves a player slot. Offline or absent registrations fall
             // to the host and must not reduce the allocation available to the players who entered this battle.
+            int playerOwnedPartiesBefore = partySide == BattleSideEnum.Attacker
+                ? attackerPlayerParties
+                : defenderPlayerParties;
             var playerOwnedRank = -1;
             if (entries.Count > 0
                 && ResolveOwningController(partyOwnerController, null, absentControllers) != null)
@@ -162,7 +165,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 entriesArray,
                 isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId),
                 sideOffset: partyOffset,
-                playerOwnedRank: playerOwnedRank);
+                playerOwnedRank: playerOwnedRank,
+                playerOwnedPartiesBefore: playerOwnedPartiesBefore);
             if (partySide == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else

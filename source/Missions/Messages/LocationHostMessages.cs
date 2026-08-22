@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 
 namespace Missions.Messages;
 
@@ -41,19 +41,27 @@ public record LocationHostAuthorityAcquired : IEvent
 }
 
 /// <summary>
-/// [Client, local] This client was PROMOTED to NPC host of a location instance whose previous host
-/// departed (SR-014). The authority migrator adopts the previous host's NPC puppets on it.
+/// [Client, local] A location instance moved to a new NPC host. Every peer updates registry authority;
+/// the promoted host also adopts the previous host's NPC puppets.
 /// </summary>
 public record LocationHostMigrated : IEvent
 {
     public string InstanceId { get; }
 
-    /// <summary>The controller whose agents the promoted client must adopt.</summary>
+    /// <summary>The controller whose agents move to the new host.</summary>
     public string PreviousHostControllerId { get; }
+    public string NewHostControllerId { get; }
+    public long AuthorityRevision { get; }
 
-    public LocationHostMigrated(string instanceId, string previousHostControllerId)
+    public LocationHostMigrated(
+        string instanceId,
+        string previousHostControllerId,
+        string newHostControllerId,
+        long authorityRevision)
     {
         InstanceId = instanceId;
         PreviousHostControllerId = previousHostControllerId;
+        NewHostControllerId = newHostControllerId;
+        AuthorityRevision = authorityRevision;
     }
 }

@@ -110,6 +110,7 @@ public class TournamentManifestAuthorityTests
         manifest = TournamentManifestAuthority.Normalize(manifest, Snapshot("host-b", contestants));
         manifest = TournamentManifestAuthority.Normalize(manifest, Snapshot("host-c", contestants));
         Assert.All(manifest.Agents, data => Assert.Equal("host-c", data.ControllerId));
+        Assert.All(manifest.Agents, data => Assert.Equal(2, data.AuthorityRevision));
     }
 
     [Fact]
