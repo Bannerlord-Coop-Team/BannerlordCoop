@@ -198,5 +198,4 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         controllerId = controlInfo.ObjectControllerId;
         return !string.IsNullOrEmpty(controllerId);
     }
-
 }
