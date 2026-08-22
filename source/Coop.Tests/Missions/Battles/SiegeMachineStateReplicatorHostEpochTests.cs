@@ -259,6 +259,68 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal("owner-b", pending.SenderControllerId);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EqualAuthorityHostAndClaimantSnapshots_MergeBeforeMachineRegistration(bool hostFirst)
+    {
+        const int machineId = 18;
+        const int authorityRevision = 4;
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            machineId, "claimant", hostEpoch: LocalEpoch, authorityRevision: authorityRevision,
+            senderControllerId: "host"));
+        DrainGameThread();
+
+        var hostState = new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: 42.5f,
+            destructionState: 2,
+            gateState: -1,
+            ladderState: -1,
+            moveDistance: -1f,
+            hasArrived: false,
+            weaponState: -1,
+            aimDirection: -1000f,
+            aimReleaseAngle: -1000f,
+            hostEpoch: LocalEpoch,
+            senderControllerId: "host",
+            authorityRevision: authorityRevision);
+        var claimantState = new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: -1f,
+            destructionState: -1,
+            gateState: 1,
+            ladderState: 3,
+            moveDistance: 18f,
+            hasArrived: true,
+            weaponState: 4,
+            aimDirection: 0.75f,
+            aimReleaseAngle: 0.25f,
+            hostEpoch: LocalEpoch,
+            stoneAmmo: 7,
+            senderControllerId: "claimant",
+            authorityRevision: authorityRevision);
+
+        broker.Publish(this, hostFirst ? hostState : claimantState);
+        broker.Publish(this, hostFirst ? claimantState : hostState);
+        DrainGameThread();
+
+        var pending = Assert.Single(PendingStates()).Value;
+        Assert.Equal(42.5f, pending.HitPoints);
+        Assert.Equal(2, pending.DestructionState);
+        Assert.Equal(1, pending.GateState);
+        Assert.Equal(3, pending.LadderState);
+        Assert.Equal(18f, pending.MoveDistance);
+        Assert.True(pending.HasArrived);
+        Assert.Equal(4, pending.WeaponState);
+        Assert.Equal(0.75f, pending.AimDirection);
+        Assert.Equal(0.25f, pending.AimReleaseAngle);
+        Assert.True(pending.HasStoneAmmo);
+        Assert.Equal(7, pending.StoneAmmo);
+        Assert.Equal(LocalEpoch, pending.HostEpoch);
+        Assert.Equal(authorityRevision, pending.AuthorityRevision);
+    }
+
     [Fact]
     public void NewerEpochPendingLadderAnimation_ReplacesHigherRevisionFromPreviousEpoch()
     {

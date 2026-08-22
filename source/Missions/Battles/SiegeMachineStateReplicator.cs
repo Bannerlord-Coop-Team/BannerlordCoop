@@ -1403,17 +1403,48 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private void BufferMachineState(NetworkSiegeMachineState state)
     {
-        if (pendingByMachineId.TryGetValue(state.MachineId, out var existing)
-            && CompareAuthorityOrder(
+        if (pendingByMachineId.TryGetValue(state.MachineId, out var existing))
+        {
+            int authorityOrder = CompareAuthorityOrder(
                 existing.HostEpoch,
                 existing.AuthorityRevision,
                 state.HostEpoch,
-                state.AuthorityRevision) > 0)
-        {
-            return;
+                state.AuthorityRevision);
+            if (authorityOrder > 0) return;
+            if (authorityOrder == 0)
+            {
+                // A claimed machine's host and simulator send complementary fields at the same tuple.
+                pendingByMachineId[state.MachineId] = MergeMachineStates(existing, state);
+                return;
+            }
         }
 
         pendingByMachineId[state.MachineId] = state;
+    }
+
+    private static NetworkSiegeMachineState MergeMachineStates(
+        NetworkSiegeMachineState existing,
+        NetworkSiegeMachineState incoming)
+    {
+        bool incomingHasAim = incoming.AimDirection > AimSentinel + 1f;
+        bool incomingHasMovement = incoming.MoveDistance >= 0f;
+        return new NetworkSiegeMachineState(
+            incoming.MachineId,
+            incoming.HitPoints >= 0f ? incoming.HitPoints : existing.HitPoints,
+            incoming.DestructionState >= 0 ? incoming.DestructionState : existing.DestructionState,
+            incoming.GateState >= 0 ? incoming.GateState : existing.GateState,
+            incoming.LadderState >= 0 ? incoming.LadderState : existing.LadderState,
+            incomingHasMovement ? incoming.MoveDistance : existing.MoveDistance,
+            incomingHasMovement ? incoming.HasArrived : existing.HasArrived,
+            incoming.WeaponState >= 0 ? incoming.WeaponState : existing.WeaponState,
+            incomingHasAim ? incoming.AimDirection : existing.AimDirection,
+            incomingHasAim ? incoming.AimReleaseAngle : existing.AimReleaseAngle,
+            incoming.HostEpoch,
+            incoming.HasStoneAmmo
+                ? incoming.StoneAmmo
+                : (existing.HasStoneAmmo ? existing.StoneAmmo : -1),
+            incoming.SenderControllerId,
+            incoming.AuthorityRevision);
     }
 
     private void BufferLadderAnimationState(NetworkSiegeLadderAnimationState state)
