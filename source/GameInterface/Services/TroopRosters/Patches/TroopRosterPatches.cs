@@ -47,31 +47,39 @@ internal class TroopRosterPatches
 
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
     [HarmonyPrefix]
-    private static void PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
+    private static bool PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
         int woundedCountChange, int xpChange, bool removeDepleted)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        // Resolve the element by identity now: the index is valid here (pre-mutation), but a subtract-to-zero
+        // with removeDepleted removes it before a postfix could read it back.
+        var character = __instance.GetElementCopyAtIndex(index).Character;
+        if (character.IsHero && __instance.GetTroopCount(character) + countChange > 1)
+        {
+            Logger.Error("Attempted to add a hero to a TroopRoster where they were already present.");
+            return false;
+        }
+
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient)
         {
             if (ShouldReportClientMutation(ModInformation.IsClient, IsRegistered(__instance)))
                 Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddToCountsAtIndex), typeof(TroopRoster));
-            return;
+            return true;
         }
 
         // Skip rosters with no network identity (battle tally dummies, etc.) before allocating/publishing.
-        if (!IsRegistered(__instance)) return;
+        if (!IsRegistered(__instance)) return true;
 
         // Match the bounds guard the SetElement* prefixes use: an index in the slot-padding window
         // (Count <= index < data.Length) would read a cleared element with a null Character.
-        if (index < 0 || index >= __instance.Count) return;
+        if (index < 0 || index >= __instance.Count) return true;
 
-        // Resolve the element by identity now: the index is valid here (pre-mutation), but a subtract-to-zero
-        // with removeDepleted removes it before a postfix could read it back.
-        var character = __instance.GetElementCopyAtIndex(index).Character;
         MessageBroker.Instance.Publish(__instance,
             new CountsAtIndexAdded(__instance, character, countChange, woundedCountChange, xpChange, removeDepleted));
 
         _inAddToCountsAtIndex = true;
+
+        return true;
     }
 
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
