@@ -399,6 +399,34 @@ public class CoopTroopSupplierTests
         Assert.Equal(133, first.OwnedShareOf(133) + tail.OwnedShareOf(133));
     }
 
+    [Theory]
+    [InlineData(22, 19)]
+    [InlineData(19, 22)]
+    public void FullSideAllocation_WithReportedLateJoinReserves_IsExactInEitherOrder(
+        int firstTroops,
+        int joiningTroops)
+    {
+        int total = firstTroops + joiningTroops;
+
+        var first = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        first.SetReserve(new[] { Party("FIRST", firstTroops, isReceiverPlayerParty: true,
+            playerOwnedRank: 0) }, sideTotal: total, playerOwnedParties: 2,
+            authoritativeBattleSize: 1000);
+
+        var joining = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        joining.SetReserve(new[] { Party("JOINING", joiningTroops, seedBase: 4000,
+            isReceiverPlayerParty: true, sideOffset: firstTroops, playerOwnedRank: 1,
+            playerOwnedPartiesBefore: 1) }, sideTotal: total, playerOwnedParties: 2,
+            authoritativeBattleSize: 1000);
+
+        int firstShare = first.OwnedShareOf(total);
+        int joiningShare = joining.OwnedShareOf(total);
+
+        Assert.Equal(firstTroops, firstShare);
+        Assert.Equal(joiningTroops, joiningShare);
+        Assert.Equal(total, firstShare + joiningShare);
+    }
+
     [Fact]
     public void LegacyReservePayload_UsesTheLegacyIntervalCalculation()
     {

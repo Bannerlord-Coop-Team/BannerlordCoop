@@ -98,6 +98,46 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void GetOwnedReserves_PlayerGuaranteeMetadataTracksEarlierPlayers()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("first", "defender", "joining");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var firstParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var joiningParty));
+            var troop = Server.CreateRegisteredObject<CharacterObject>("player_guarantee_metadata_troop");
+
+            firstParty.MemberRoster.Clear();
+            firstParty.MemberRoster.AddToCounts(troop, 22);
+            joiningParty.MemberRoster.Clear();
+            joiningParty.MemberRoster.AddToCounts(troop, 19);
+            foreach (var party in mapEvent.AttackerSide.Parties)
+                party.Update();
+
+            var builder = Server.Resolve<IBattleTroopReserveBuilder>();
+            var firstSide = builder.GetOwnedReserves(mapEvent, "first", isHost: false)
+                .Single(reserve => reserve.Side == BattleSideEnum.Attacker);
+            var joiningSide = builder.GetOwnedReserves(mapEvent, "joining", isHost: false)
+                .Single(reserve => reserve.Side == BattleSideEnum.Attacker);
+
+            var firstReserve = Assert.Single(firstSide.Parties);
+            var joiningReserve = Assert.Single(joiningSide.Parties);
+            Assert.Equal(0, firstReserve.SideOffset);
+            Assert.Equal(0, firstReserve.PlayerOwnedPartiesBefore);
+            Assert.Equal(0, firstReserve.PlayerOwnedRank);
+            Assert.Equal(22, joiningReserve.SideOffset);
+            Assert.Equal(1, joiningReserve.PlayerOwnedPartiesBefore);
+            Assert.Equal(1, joiningReserve.PlayerOwnedRank);
+            Assert.Equal(41, firstSide.TotalTroops);
+            Assert.Equal(41, joiningSide.TotalTroops);
+            Assert.Equal(2, firstSide.PlayerOwnedPartyCount);
+            Assert.Equal(2, joiningSide.PlayerOwnedPartyCount);
+        });
+    }
+
+    [Fact]
     public void GetOwnedReserves_OfflinePlayerPartyDoesNotReserveAPlayerSlot()
     {
         var (mapEventId, _) = SetupCoopBattle("attacker", "offline-defender");
