@@ -27,6 +27,13 @@ public static class ManagedServerConfig
     /// <summary>Optional connection password supplied on the server command line.</summary>
     public static string Password { get; set; } = string.Empty;
 
+    /// <summary>UDP port the dedicated server binds for coop clients. Default 4200.</summary>
+    public const int DefaultPort = 4200;
+
+    public static int Port { get; set; } = DefaultPort;
+
+    public static bool IsValidPort(int port) => port >= 1 && port <= 65535;
+
     /// <summary>Who can discover this server through Steam.</summary>
     public static ServerVisibility Visibility { get; set; } = ServerVisibility.Public;
 }
