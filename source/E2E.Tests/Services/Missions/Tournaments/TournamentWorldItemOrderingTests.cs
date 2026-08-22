@@ -3623,6 +3623,87 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ResolvedPendingIdentity_RecordsPickupLocallyBeforeBroadcast()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject itemObject = RegisterItem(objectManager, out _);
+            try
+            {
+                Agent picker = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon resultingSlotWeapon = CreateWeapon(itemObject);
+                resultingSlotWeapon.Amount = 3;
+                AgentEquipmentShim.Track(picker, CreateEquipment(resultingSlotWeapon));
+                Guid pickerId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                Assert.True(agentRegistry.TryRegisterAgent("observer", pickerId, picker));
+
+                MissionWeapon worldWeapon = CreateWeapon(itemObject);
+                worldWeapon.Amount = 7;
+                SpawnedItemEntity worldItem =
+                    new RecordingWorldItemSpawner().AddPresent(worldWeapon);
+                worldItem.Id = new MissionObjectId(91, true);
+                Guid worldItemId = Guid.NewGuid();
+
+                var network = Assert.IsType<MockBattleNetwork>(
+                    observer.Resolve<IBattleNetwork>());
+                network.RouteMessages = false;
+                network.NetworkSentMessages.Clear();
+                using var messageBroker = new MessageBroker();
+                WeaponPickupApplied? appliedPickup = null;
+                messageBroker.Subscribe<WeaponPickupApplied>(
+                    payload => appliedPickup = payload.What);
+                using var pickupHandler = new WeaponPickupHandler(
+                    agentRegistry,
+                    new NetworkWorldItemRegistry(),
+                    network,
+                    messageBroker,
+                    objectManager);
+
+                messageBroker.Publish(this, new WorldItemIdentityPending(worldItem));
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickedup(
+                        picker,
+                        worldItem,
+                        EquipmentIndex.Weapon0,
+                        itemObject,
+                        null,
+                        null,
+                        new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                        0,
+                        10,
+                        3,
+                        7,
+                        false,
+                        resultingSlotWeapon));
+
+                Assert.Null(appliedPickup);
+                Assert.Empty(network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+
+                messageBroker.Publish(
+                    this,
+                    new WorldItemIdentityResolved(worldItem, worldItemId));
+
+                NetworkWeaponPickedup sentPickup = Assert.Single(
+                    network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+                Assert.True(appliedPickup.HasValue);
+                WeaponPickupApplied applied = appliedPickup.Value;
+                Assert.NotEqual(Guid.Empty, applied.PickupId);
+                Assert.Equal(sentPickup.PickupId, applied.PickupId);
+                Assert.Equal(worldItemId, applied.WorldItemId);
+                Assert.Equal((short)7, applied.ResultingWorldItemAmount);
+                Assert.False(applied.WorldItemConsumed);
+            }
+            finally
+            {
+                objectManager.Remove(itemObject);
+            }
+        });
+    }
+
+    [Fact]
     public void AbandonedSuccessivePickups_RollBackInReverseOrder()
     {
         RunWithAgentShims(observer =>

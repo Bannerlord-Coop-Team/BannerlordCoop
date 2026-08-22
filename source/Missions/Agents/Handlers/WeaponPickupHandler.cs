@@ -394,7 +394,8 @@ namespace Missions.Agents.Handlers
             WeaponPickedup payload,
             Guid agentId,
             Guid worldItemId,
-            bool isIdentityCorrection = false)
+            bool isIdentityCorrection = false,
+            bool recordLocalPickup = false)
         {
             if (!objectManager.TryGetIdWithLogging(payload.WeaponObject, out string itemObjectId))
                 return;
@@ -449,6 +450,18 @@ namespace Missions.Agents.Handlers
                 worldItemModifierId: worldItemModifierId,
                 pickupId: pickupId);
 
+            if (recordLocalPickup)
+            {
+                messageBroker.Publish(
+                    this,
+                    new WeaponPickupApplied(
+                        agentId,
+                        payload.EquipmentIndex,
+                        worldItemId,
+                        payload.ResultingWorldItemAmount,
+                        payload.WorldItemConsumed,
+                        pickupId: pickupId));
+            }
             network.SendAll(message);
         }
 
@@ -471,7 +484,8 @@ namespace Missions.Agents.Handlers
                         SendWeaponPickup(
                             pendingPickup.Pickup,
                             pendingPickup.AgentId,
-                            resolved.WorldItemId);
+                            resolved.WorldItemId,
+                            recordLocalPickup: true);
                     }
                 }
             }
