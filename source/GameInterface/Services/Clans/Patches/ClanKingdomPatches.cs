@@ -22,6 +22,6 @@ internal class ClanKingdomPatches
     [HarmonyPrefix]
     private static bool Prefix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification = true)
     {
-        return ModInformation.IsClient;
+        return false;
     }
 }
