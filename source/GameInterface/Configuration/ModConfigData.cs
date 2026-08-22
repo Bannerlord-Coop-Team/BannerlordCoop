@@ -110,6 +110,8 @@ public sealed class ModOptionsData
 
     public float? SmithingStaminaRecoveryMultiplier { get; set; }
 
+    public float? SmithingCraftedItemsValueMultiplier { get; set; }
+
     public float? MaximumLootersMultiplier { get; set; }
 
     public float? LooterPartySizeMultiplier { get; set; }
