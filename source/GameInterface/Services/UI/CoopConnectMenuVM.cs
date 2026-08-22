@@ -331,7 +331,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     [DataSourceProperty]
     public string LastDirectConnectionText => hasLastDirectConnection
-        ? $"Reconnect to {connectIP}:{connectPort}"
+        ? "Reconnect to last direct connection"
         : string.Empty;
 
     [DataSourceProperty]
@@ -339,7 +339,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     [DataSourceProperty]
     public string LastSteamLobbyText => lastSteamLobbyId != 0
-        ? $"Reconnect to {lastSteamLobbyHostName}"
+        ? "Reconnect to last Steam lobby"
         : string.Empty;
 
     public void ActionCycleSteamLobbyPasswordFilter()
