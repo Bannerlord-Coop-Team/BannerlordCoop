@@ -122,7 +122,8 @@ namespace Coop
 
             SetupLogging();
             InitializeCrashReporting();
-            
+            Updateables.Add(new FpsLogger());
+
 #if DEBUG
             isDeferredClientJoin = args.Any(a =>
                                        a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase)) &&
