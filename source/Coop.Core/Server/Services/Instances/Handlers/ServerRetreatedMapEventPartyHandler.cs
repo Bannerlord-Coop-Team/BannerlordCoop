@@ -1,3 +1,4 @@
+using Common;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Participation;
@@ -41,7 +42,7 @@ internal sealed class ServerRetreatedMapEventPartyHandler : IHandler
 
     private void Handle_NetworkBattleRetreated(MessagePayload<NetworkBattleRetreated> payload)
     {
-        if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player))
+        if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player) || !playerManager.TryGetPeer(player.ControllerId, out var currentPeer) || !ReferenceEquals(currentPeer, peer))
         {
             return;
         }
@@ -51,8 +52,10 @@ internal sealed class ServerRetreatedMapEventPartyHandler : IHandler
 
     private void Handle_BattlePartyRetreated(MessagePayload<BattlePartyRetreated> payload)
     {
-        if (TryResolve(payload.What.ControllerId, payload.What.InstanceId, out var mapEvent, out var party))
-            tracker.MarkRetreated(mapEvent, party);
+        GameThread.RunSafe(() =>
+        {
+            if (TryResolve(payload.What.ControllerId, payload.What.InstanceId, out var mapEvent, out var party)) tracker.MarkRetreated(mapEvent, party);
+        }, context: nameof(Handle_BattlePartyRetreated));
     }
 
     private void Handle_MissionMemberEntered(MessagePayload<MissionMemberEntered> payload)
