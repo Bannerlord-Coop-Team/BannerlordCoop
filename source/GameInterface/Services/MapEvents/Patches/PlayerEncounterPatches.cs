@@ -459,14 +459,17 @@ internal class PlayerEncounterPatches
         if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var initializationBarrier))
             initializationBarrier.CompleteDeferredEncounterCleanup();
 
-        if (PlayerEncounter.Current == null) return false;
-        if (MapEvent.PlayerMapEvent != null) return true;
+        var playerEncounter = PlayerEncounter.Current;
+        if (playerEncounter == null) return false;
+        if (MapEvent.PlayerMapEvent != null &&
+            !MapEventInitializationBarrier.IsBattleResultEncounter(playerEncounter))
+            return true;
         if (PlayerCaptivity.IsCaptive) return false;
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return true;
 
         var playerEncounterInterface = container.Resolve<IPlayerEncounterInterface>();
-        playerEncounterInterface.UpdateInternalAfterBattle(PlayerEncounter.Current);
+        playerEncounterInterface.UpdateInternalAfterBattle(playerEncounter);
 
         return false;
     }

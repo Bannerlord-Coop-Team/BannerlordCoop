@@ -549,7 +549,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         GetPlayerEncounterBattle() == mapEvent ||
         GetPlayerEncounterEncounteredBattle() == mapEvent;
 
-    private static bool IsBattleResultEncounter(PlayerEncounter encounter)
+    internal static bool IsBattleResultEncounter(PlayerEncounter encounter)
     {
         switch (encounter.EncounterState)
         {
