@@ -82,6 +82,9 @@ public class MissionModule : Module
             .AsSelf()
             .As<ILocationMissionBehavior>()
             .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateControllerResolver>()
+            .As<IPlayerNameplateControllerResolver>()
+            .InstancePerDependency();
         builder.RegisterType<PlayerNameplateEligibility>()
             .As<IPlayerNameplateEligibility>()
             .InstancePerDependency();

@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab.Sections;
 using System;
 
@@ -13,7 +14,7 @@ public class MapTimeOptionsTabProvider : ICoopOptionsTabProvider
     public const string TabName = "Map Time";
     
     public string Id => TabId;
-    public bool IsAvailable => true;
+    public bool IsAvailable(ModOptions modOptions) => true;
 
     public CoopOptionsTabVM CreateTab(CoopOptionsData options, IMessageBroker messageBroker,
         Action<CoopOptionsTabVM> onSelect)

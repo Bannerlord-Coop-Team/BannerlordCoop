@@ -88,7 +88,7 @@ public class PlayerKillFeedColorTests
     public void CoopOptionsVM_ClampsKillFeedColorAndUpdatesPreview()
     {
         var filePath = CreateTempFilePath();
-        var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), new MessageBroker());
+        var viewModel = CoopOptionsVMTestFactory.Create(new CoopOptionsStore(filePath), new MessageBroker());
         var section = GetKillFeedSection(viewModel);
 
         section.KillFeedColorRed = 999;
@@ -105,7 +105,7 @@ public class PlayerKillFeedColorTests
     public void CoopOptionsVM_DefaultTabs_SelectsKillFeedColor()
     {
         var filePath = CreateTempFilePath();
-        var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), new MessageBroker());
+        var viewModel = CoopOptionsVMTestFactory.Create(new CoopOptionsStore(filePath), new MessageBroker());
 
         var tab = viewModel.Tabs[0];
         Assert.Equal(KillFeedOptionsTabProvider.TabName, tab.Name);
@@ -121,7 +121,7 @@ public class PlayerKillFeedColorTests
     public void CoopOptionsVM_ActionCancel_UsesHostCloseAction()
     {
         var closeCalled = false;
-        var viewModel = new CoopOptionsVM(
+        var viewModel = CoopOptionsVMTestFactory.Create(
             new CoopOptionsStore(CreateTempFilePath()),
             new MessageBroker(),
             () => closeCalled = true);

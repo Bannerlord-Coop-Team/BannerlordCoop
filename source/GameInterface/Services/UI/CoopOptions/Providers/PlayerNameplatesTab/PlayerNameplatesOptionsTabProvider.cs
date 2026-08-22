@@ -12,7 +12,7 @@ public class PlayerNameplatesOptionsTabProvider : ICoopOptionsTabProvider
     public const string TabName = "Nameplates";
 
     public string Id => TabId;
-    public bool IsAvailable => ModConfigProvider.ModOptions.ShowPlayerNameplates;
+    public bool IsAvailable(ModOptions modOptions) => modOptions.ShowPlayerNameplates;
 
     public CoopOptionsTabVM CreateTab(
         CoopOptionsData options,

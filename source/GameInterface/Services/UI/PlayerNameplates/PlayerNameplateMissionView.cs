@@ -4,14 +4,12 @@ using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
-using GameInterface.Services.Players;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.MissionViews;
@@ -27,7 +25,7 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
     private readonly IMessageBroker messageBroker;
     private readonly ICoopOptionsStore optionsStore;
     private readonly IPlayerKillFeedColorService colorService;
-    private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IPlayerNameplateControllerResolver controllerResolver;
     private readonly IPlayerNameplateEligibility eligibility;
 
     private PlayerNameplatesVM dataSource;
@@ -45,13 +43,13 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         IMessageBroker messageBroker,
         ICoopOptionsStore optionsStore,
         IPlayerKillFeedColorService colorService,
-        IControllerIdProvider controllerIdProvider,
+        IPlayerNameplateControllerResolver controllerResolver,
         IPlayerNameplateEligibility eligibility)
     {
         this.messageBroker = messageBroker;
         this.optionsStore = optionsStore;
         this.colorService = colorService;
-        this.controllerIdProvider = controllerIdProvider;
+        this.controllerResolver = controllerResolver;
         this.eligibility = eligibility;
     }
 
@@ -120,6 +118,7 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         }
 
         dataSource?.OnFinalize();
+        controllerResolver.Dispose();
         movie = null;
         gauntletLayer = null;
         dataSource = null;
@@ -187,15 +186,15 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
 
         if (agent == null || agent == Agent.Main || !agent.IsActive() || !agent.IsHuman) return false;
         var playerTeam = Mission?.PlayerTeam;
-        if (agent.Team == null || !agent.Team.IsValid || playerTeam == null || !playerTeam.IsValid)
-            return false;
-        if (!eligibility.IsAlliedTeam(agent.Team == playerTeam, agent.Team.IsEnemyOf(playerTeam)))
-            return false;
-        if (agent.Character is not CharacterObject character || character.HeroObject == null) return false;
-        if (!PlayerManager.TryGetControlledObjectInfo(character.HeroObject, out var controlInfo)) return false;
-        if (controlInfo.ObjectControllerId == controllerIdProvider.ControllerId) return false;
+        if (agent.Team == null || playerTeam == null) return false;
 
-        controllerId = controlInfo.ObjectControllerId;
+        bool bothTeamsInvalid = !agent.Team.IsValid && !playerTeam.IsValid;
+        if (!bothTeamsInvalid && (!agent.Team.IsValid || !playerTeam.IsValid)) return false;
+        bool isEnemyOfPlayerTeam = !bothTeamsInvalid && agent.Team.IsEnemyOf(playerTeam);
+        if (!eligibility.IsAlliedTeam(agent.Team == playerTeam, isEnemyOfPlayerTeam, bothTeamsInvalid))
+            return false;
+        if (!controllerResolver.TryGetControllerId(agent, out controllerId)) return false;
+
         return !string.IsNullOrEmpty(controllerId);
     }
 }

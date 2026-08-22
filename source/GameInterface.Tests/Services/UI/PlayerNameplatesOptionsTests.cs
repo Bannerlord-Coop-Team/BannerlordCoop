@@ -1,6 +1,9 @@
 ﻿using Common.Messaging;
 using GameInterface.Configuration;
+using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers;
+using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab.Sections;
 using GameInterface.Services.UI.Messages;
@@ -64,21 +67,45 @@ public class PlayerNameplatesOptionsTests
     [Fact]
     public void ServerDisabled_HidesPlayerNameplatesTab()
     {
-        var original = ModConfigProvider.ModOptions;
         string filePath = CreateTempFilePath();
 
         try
         {
-            ModConfigProvider.LoadModConfig(new ModOptionsData { ShowPlayerNameplates = false });
             using var messageBroker = new MessageBroker();
-            var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), messageBroker);
+            var viewModel = CreateViewModel(filePath, messageBroker, false);
 
             Assert.Null(viewModel.PlayerNameplatesTab);
             Assert.DoesNotContain(viewModel.Tabs, tab => tab.Id == PlayerNameplatesOptionsTabProvider.TabId);
+            viewModel.OnFinalize();
         }
         finally
         {
-            ModConfigProvider.ModOptions = original;
+            if (File.Exists(filePath)) File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public void ServerDisabledAfterMenuOpened_RemovesPlayerNameplatesTab()
+    {
+        string filePath = CreateTempFilePath();
+
+        try
+        {
+            using var messageBroker = new MessageBroker();
+            var viewModel = CreateViewModel(filePath, messageBroker, true);
+            Assert.NotNull(viewModel.PlayerNameplatesTab);
+
+            messageBroker.Publish(
+                this,
+                new ModConfigApplied(new ModOptions(new ModOptionsData { ShowPlayerNameplates = false })));
+
+            Assert.Null(viewModel.PlayerNameplatesTab);
+            Assert.DoesNotContain(viewModel.Tabs, tab => tab.Id == PlayerNameplatesOptionsTabProvider.TabId);
+            Assert.Equal(KillFeedOptionsTabProvider.TabId, viewModel.SelectedTab.Id);
+            viewModel.OnFinalize();
+        }
+        finally
+        {
             if (File.Exists(filePath)) File.Delete(filePath);
         }
     }
@@ -94,7 +121,13 @@ public class PlayerNameplatesOptionsTests
     {
         Assert.Equal(
             expected,
-            new PlayerNameplateEligibility().IsAlliedTeam(isPlayerTeam, isEnemyOfPlayerTeam));
+            new PlayerNameplateEligibility().IsAlliedTeam(isPlayerTeam, isEnemyOfPlayerTeam, false));
+    }
+
+    [Fact]
+    public void InvalidTournamentSpectatorTeams_AreAllied()
+    {
+        Assert.True(new PlayerNameplateEligibility().IsAlliedTeam(false, false, true));
     }
 
     [Fact]
@@ -115,5 +148,27 @@ public class PlayerNameplatesOptionsTests
     private static string CreateTempFilePath()
     {
         return Path.Combine(Path.GetTempPath(), $"bannerlord-coop-nameplate-options-{Guid.NewGuid():N}.json");
+    }
+
+    private static CoopOptionsVM CreateViewModel(
+        string filePath,
+        IMessageBroker messageBroker,
+        bool serverAllowsNameplates)
+    {
+        ICoopOptionsTabProvider[] providers =
+        {
+            new KillFeedOptionsTabProvider(),
+            new PlayerNameplatesOptionsTabProvider()
+        };
+        var modOptions = new ModOptions(new ModOptionsData
+        {
+            ShowPlayerNameplates = serverAllowsNameplates
+        });
+        return new CoopOptionsVM(
+            new CoopOptionsStore(filePath),
+            messageBroker,
+            providers,
+            modOptions,
+            () => { });
     }
 }

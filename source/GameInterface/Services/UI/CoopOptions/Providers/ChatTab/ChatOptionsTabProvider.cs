@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab.Sections;
 using System;
 
@@ -10,7 +11,7 @@ public class ChatOptionsTabProvider : ICoopOptionsTabProvider
     public const string TabName = "Chat";
 
     public string Id => TabId;
-    public bool IsAvailable => true;
+    public bool IsAvailable(ModOptions modOptions) => true;
 
     public CoopOptionsTabVM CreateTab(
         CoopOptionsData options,
