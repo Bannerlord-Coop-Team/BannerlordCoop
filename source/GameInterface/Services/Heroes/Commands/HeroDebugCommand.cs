@@ -4,6 +4,7 @@ using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Utils.Commands;
+using Newtonsoft.Json;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -63,6 +64,65 @@ public class HeroDebugCommand
     {
         return string.IsNullOrEmpty(prefix) ||
                heroName?.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    [CommandLineArgumentFunction("home_settlement_snapshot", "coop.debug.hero")]
+    public static string HomeSettlementSnapshot(List<string> args)
+    {
+        if (args.Count != 1 || !bool.TryParse(args[0], out bool resolveMissing))
+            return "Usage: coop.debug.hero.home_settlement_snapshot <true|false>";
+
+        if (Campaign.Current == null)
+            return "Campaign is not loaded.";
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return $"Unable to get {nameof(IObjectManager)}";
+
+        var homeSettlements = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        int cacheMissesBeforeRead = 0;
+        int nullCount = 0;
+        int unregisteredSettlementCount = 0;
+
+        foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes())
+        {
+            if (!objectManager.TryGetId(hero, out string heroId)) continue;
+
+            if (hero._homeSettlement == null) cacheMissesBeforeRead++;
+            var homeSettlement = resolveMissing ? hero.HomeSettlement : hero._homeSettlement;
+            if (homeSettlement == null)
+            {
+                homeSettlements.Add(heroId, null);
+                nullCount++;
+                continue;
+            }
+
+            if (objectManager.TryGetId(homeSettlement, out string settlementId))
+            {
+                homeSettlements.Add(heroId, settlementId);
+            }
+            else
+            {
+                homeSettlements.Add(heroId, $"unregistered:{homeSettlement.StringId}");
+                unregisteredSettlementCount++;
+            }
+        }
+
+        string role = ModInformation.IsServer ? "server" : "client";
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            role,
+            resolveMissing,
+            heroCount = homeSettlements.Count,
+            cacheMissesBeforeRead,
+            nullCount,
+            unregisteredSettlementCount,
+            homeSettlements,
+        });
+
+        return $"role={role} resolveMissing={resolveMissing} heroCount={homeSettlements.Count} " +
+               $"cacheMissesBeforeRead={cacheMissesBeforeRead} nullCount={nullCount} " +
+               $"unregisteredSettlementCount={unregisteredSettlementCount}" + Environment.NewLine +
+               $"LIVE_TEST_JSON={structuredState}";
     }
 
     [CommandLineArgumentFunction("id", "coop.debug.hero")]
