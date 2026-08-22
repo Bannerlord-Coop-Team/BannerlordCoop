@@ -147,6 +147,18 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         quest.CompleteQuestWithSuccess();
     }
 
+    private static void ApplyQuestFailConsequence(Quest quest)
+    {
+        if (quest.QuestDueTime.IsPast)
+        {
+            quest.AddLog(quest.QuestFailedWithTimeOutLogText, false);
+            quest.QuestGiver.AddPower(-10f);
+            quest.RelationshipChangeWithQuestGiver = -5;
+            quest.QuestGiver.CurrentSettlement.Village.Hearth += -40f;
+        }
+        quest.CompleteQuestWithFail();
+    }
+
     static VillageNeedsCraftingMaterialsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("VillageNeedsCraftingMaterials")
@@ -157,6 +169,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
             .WithQuestCancelValidation(issue => true)
             .WithQuestFailValidation(issue => true)
+            .WithQuestFailConsequence(ApplyQuestFailConsequence)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);

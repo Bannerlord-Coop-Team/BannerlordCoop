@@ -955,9 +955,14 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             });
         }
 
+        float powerBefore = 0f;
+        float relationBefore = 0f;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            powerBefore = owner.Power;
+            relationBefore = owner.GetRelationWithPlayer();
+
             Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
                 new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestFail, generation));
@@ -966,6 +971,104 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
         Assert.Equal(fixture.HeroId, removed.OwnerId);
         Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.Equal(powerBefore, owner.Power);
+            Assert.Equal(relationBefore, owner.GetRelationWithPlayer());
+        });
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Null(owner.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+            });
+        }
+    }
+
+    [Fact]
+    public void RequestVillageIssueRemoved_QuestFail_ClaimingTheDeliveryDeadlinePassed_AppliesTheVanillaTimeoutPenalties()
+    {
+        var fixture = SetupIssueOwner();
+
+        var villageId = TestEnvironment.CreateRegisteredObject<Village>();
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
+                using (new AllowedThread())
+                {
+                    settlement.SetSettlementComponent(village);
+                    village.Bound = settlement;
+                    village.Hearth = 650f;
+                }
+            });
+        }
+
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", "", partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+
+        VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest serverQuest = null;
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                using (new QuestSolutionStartAuthorityGuard())
+                {
+                    Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+                }
+                var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+                using (new AllowedThread())
+                {
+                    quest.ChangeQuestDueTime(CampaignTime.DaysFromNow(-1f));
+                }
+                if (instance == Server)
+                {
+                    Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
+                    serverQuest = quest;
+                }
+            });
+        }
+
+        float powerBefore = 0f;
+        float hearthBefore = 0f;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            powerBefore = owner.Power;
+            hearthBefore = owner.CurrentSettlement.Village.Hearth;
+
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestFail, generation));
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.Equal(powerBefore - 10f, owner.Power);
+            Assert.Equal(-5, serverQuest.RelationshipChangeWithQuestGiver);
+            Assert.Equal(hearthBefore - 40f, owner.CurrentSettlement.Village.Hearth);
+        });
 
         foreach (var instance in AllInstances)
         {

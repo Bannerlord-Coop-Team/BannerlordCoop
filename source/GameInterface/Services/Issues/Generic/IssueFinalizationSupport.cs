@@ -55,7 +55,15 @@ internal static class IssueFinalizationSupport
                         }
                         return;
                     case IssueFinalizeReason.QuestFail:
-                        quest.CompleteQuestWithFail();
+                        var applyFailConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence;
+                        if (applyFailConsequence != null)
+                        {
+                            applyFailConsequence(quest);
+                        }
+                        else
+                        {
+                            quest.CompleteQuestWithFail();
+                        }
                         return;
                     case IssueFinalizeReason.QuestTimeout:
                         quest.CompleteQuestWithTimeOut();

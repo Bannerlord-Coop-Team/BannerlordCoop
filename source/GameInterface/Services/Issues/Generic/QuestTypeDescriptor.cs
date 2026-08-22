@@ -46,6 +46,8 @@ public abstract class QuestTypeDescriptor
 
     public Action<QuestBase> ApplyQuestCancelConsequence { get; }
 
+    public Action<QuestBase> ApplyQuestFailConsequence { get; }
+
     public Func<Hero, Func<Hero, bool>, (bool Accepted, byte[] FieldsBytes)> TryArbitrateQuestSolutionAcceptBytes { get; }
 
     public Action<Hero, byte[]> MirrorQuestSolutionAcceptBytes { get; }
@@ -74,6 +76,7 @@ public abstract class QuestTypeDescriptor
         Func<IssueBase, bool> validateQuestFail,
         Action<QuestBase> applyQuestSuccessConsequence,
         Action<QuestBase> applyQuestCancelConsequence,
+        Action<QuestBase> applyQuestFailConsequence,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -96,6 +99,7 @@ public abstract class QuestTypeDescriptor
         ValidateQuestFail = validateQuestFail;
         ApplyQuestSuccessConsequence = applyQuestSuccessConsequence;
         ApplyQuestCancelConsequence = applyQuestCancelConsequence;
+        ApplyQuestFailConsequence = applyQuestFailConsequence;
         TryArbitrateQuestSolutionAcceptBytes = tryArbitrateQuestSolutionAcceptBytes;
         MirrorQuestSolutionAcceptBytes = mirrorQuestSolutionAcceptBytes;
         RejectQuestSolutionAccept = rejectQuestSolutionAccept;
@@ -128,6 +132,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         Func<TIssue, bool> validateQuestFail,
         Action<TQuest> applyQuestSuccessConsequence,
         Action<TQuest> applyQuestCancelConsequence,
+        Action<TQuest> applyQuestFailConsequence,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -150,6 +155,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             NarrowPredicate(validateQuestFail),
             NarrowQuestAction(applyQuestSuccessConsequence),
             NarrowQuestAction(applyQuestCancelConsequence),
+            NarrowQuestAction(applyQuestFailConsequence),
             tryArbitrateQuestSolutionAcceptBytes,
             mirrorQuestSolutionAcceptBytes,
             rejectQuestSolutionAccept,
@@ -209,6 +215,7 @@ public static class QuestDescriptorBuilder
         private Func<TIssue, bool> _validateQuestFail;
         private Action<TQuest> _applyQuestSuccessConsequence;
         private Action<TQuest> _applyQuestCancelConsequence;
+        private Action<TQuest> _applyQuestFailConsequence;
         private Func<Hero, Func<Hero, bool>, (bool, byte[])> _tryArbitrateQuestSolutionAcceptBytes;
         private Action<Hero, byte[]> _mirrorQuestSolutionAcceptBytes;
         private Action<Hero> _rejectQuestSolutionAccept;
@@ -329,13 +336,19 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
+        public Builder<TIssue, TQuest> WithQuestFailConsequence(Action<TQuest> applyQuestFailConsequence)
+        {
+            _applyQuestFailConsequence = applyQuestFailConsequence;
+            return this;
+        }
+
         public QuestTypeDescriptor<TIssue, TQuest> Build()
             => new(_displayName, _questSolutionAccept, _alternativeAccept,
                 _supportsQuestSolutionAccept, _supportsAlternativeAccept,
                 _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept, _validateQuestSuccess,
                 _captureQuestSuccessProof,
                 _validateQuestCancel, _validateQuestBetrayal, _validateQuestFail,
-                _applyQuestSuccessConsequence, _applyQuestCancelConsequence,
+                _applyQuestSuccessConsequence, _applyQuestCancelConsequence, _applyQuestFailConsequence,
                 _tryArbitrateQuestSolutionAcceptBytes, _mirrorQuestSolutionAcceptBytes, _rejectQuestSolutionAccept,
                 _tryArbitrateAlternativeAcceptBytes, _mirrorAlternativeAcceptBytes, _rejectAlternativeAccept);
     }
