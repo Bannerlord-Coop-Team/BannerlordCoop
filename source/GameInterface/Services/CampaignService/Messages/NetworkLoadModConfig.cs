@@ -20,3 +20,13 @@ internal readonly struct NetworkLoadModConfig : IEvent
         ModOptions = modOptions;
     }
 }
+
+internal readonly struct ModConfigApplied : IEvent
+{
+    public readonly ModOptions ModOptions;
+
+    public ModConfigApplied(ModOptions modOptions)
+    {
+        ModOptions = modOptions;
+    }
+}
