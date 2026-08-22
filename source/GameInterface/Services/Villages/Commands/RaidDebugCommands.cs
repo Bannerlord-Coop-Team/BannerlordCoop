@@ -17,13 +17,17 @@ using Newtonsoft.Json;
 using SandBox.GauntletUI;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -89,7 +93,9 @@ public class RaidDebugCommands
         const string usage = "Usage: coop.debug.mapevent.raid_loot_warning_capture <controllerId> <settlementId>";
         if (ModInformation.IsClient) return "Run this command on the server.";
         if (args.Count != 2) return usage;
-        if (raidLootWarningFixture != null) return "A raid loot-warning fixture is already pending restoration.";
+        if (raidLootWarningFixture?.Campaign == Campaign.Current)
+            return "A raid loot-warning fixture is already pending restoration.";
+        raidLootWarningFixture = null;
 
         if (!TryResolveRaidFixtureServices(
                 out var objectManager,
@@ -109,6 +115,9 @@ public class RaidDebugCommands
 
         if (settlement?.Village == null)
             return $"Village settlement '{args[1]}' was not found.";
+        if (playerParty.MapFaction == null || settlement.MapFaction == null ||
+            playerParty.MapFaction == settlement.MapFaction)
+            return "The player and village must belong to different factions.";
         if (playerParty.MapEvent != null || settlement.Party?.MapEvent != null)
             return "The player party and village must be outside a map event.";
         if (playerParty.PartyMoveMode != MoveModeType.Hold)
@@ -125,9 +134,78 @@ public class RaidDebugCommands
             playerParty.Position,
             settlement.Village.VillageState,
             settlement.SettlementHitPoints,
-            AreFactionsAtWar(playerParty.MapFaction, settlement.MapFaction));
+            CaptureParty(playerParty.Party),
+            CaptureParty(settlement.Party),
+            CaptureHeroes(playerParty.Party, settlement.Party),
+            CaptureClans(playerParty, settlement),
+            CaptureFactionState(playerParty.MapFaction, settlement.MapFaction));
 
         return LiveTestJson(token);
+    }
+
+    [CommandLineArgumentFunction("raid_loot_warning_position", "coop.debug.mapevent")]
+    public static string PositionRaidLootWarningFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.mapevent.raid_loot_warning_position <snapshotToken>";
+        if (ModInformation.IsClient) return "Run this command on the server.";
+        if (args.Count != 1) return usage;
+        if (!TryGetRaidLootWarningFixture(args[0], out var fixture, out var error)) return error;
+        if (fixture.Positioned) return "The raid loot-warning fixture is already positioned.";
+
+        if (!TryResolveRaidFixtureServices(
+                out _,
+                out _,
+                out var settlementInterface,
+                out _,
+                out _))
+            return "Unable to resolve raid loot-warning fixture services.";
+
+        try
+        {
+            if (fixture.PlayerParty.CurrentSettlement != fixture.Settlement)
+            {
+                settlementInterface.PartyLeaveSettlement(fixture.PlayerParty);
+                fixture.PlayerParty.Position = fixture.Settlement.GatePosition;
+                HoldAndPublishPosition(fixture.PlayerParty);
+                settlementInterface.PartyEnterSettlement(fixture.PlayerParty, fixture.Settlement);
+            }
+
+            fixture.Settlement.Village.VillageState = Village.VillageStates.Normal;
+            fixture.Settlement.SettlementHitPoints = 1f;
+
+            if (!AreFactionsAtWar(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction))
+                DeclareWarAction.ApplyByDefault(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction);
+            if (!AreFactionsAtWar(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction))
+                return "The raid fixture could not establish the required war state.";
+
+            fixture.Positioned = true;
+            return LiveTestJson(fixture.Token);
+        }
+        catch (Exception e)
+        {
+            return $"Failed to position the raid loot-warning fixture: {e.Message}. Run the restore command.";
+        }
+    }
+
+    [CommandLineArgumentFunction("raid_loot_warning_enter", "coop.debug.mapevent")]
+    public static string EnterRaidLootWarningEncounter(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.mapevent.raid_loot_warning_enter <settlementId>";
+        if (ModInformation.IsServer) return "Run this command on the client.";
+        if (args.Count != 1) return usage;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve the object manager.";
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(args[0], out var settlement))
+            return $"Village settlement '{args[0]}' was not found.";
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty?.CurrentSettlement != settlement)
+            return "The local player party has not reached the fixture village.";
+        if (PlayerEncounter.Current != null)
+            return "The local player already has an encounter.";
+
+        EncounterManager.StartSettlementEncounter(mainParty, settlement);
+        return LiveTestJson(new { success = true, requestedSettlementId = settlement.StringId });
     }
 
     [CommandLineArgumentFunction("raid_loot_warning_prepare", "coop.debug.mapevent")]
@@ -138,11 +216,12 @@ public class RaidDebugCommands
         if (args.Count != 1) return usage;
         if (!TryGetRaidLootWarningFixture(args[0], out var fixture, out var error)) return error;
         if (fixture.Prepared) return "The raid loot-warning fixture is already prepared.";
+        if (!fixture.Positioned) return "Position the raid loot-warning fixture before preparing it.";
 
         if (!TryResolveRaidFixtureServices(
                 out var objectManager,
                 out _,
-                out var settlementInterface,
+                out _,
                 out var hostileActionInterface,
                 out var network))
             return "Unable to resolve raid loot-warning fixture services.";
@@ -151,20 +230,13 @@ public class RaidDebugCommands
         var settlement = fixture.Settlement;
         if (playerParty.MapEvent != null || settlement.Party?.MapEvent != null)
             return "The player party and village entered a map event after capture.";
+        if (playerParty.CurrentSettlement != settlement)
+            return "The player party left the fixture village before preparation.";
+        if (!AreFactionsAtWar(playerParty.MapFaction, settlement.MapFaction))
+            return "The fixture factions are not at war.";
 
         try
         {
-            if (playerParty.CurrentSettlement != settlement)
-            {
-                settlementInterface.PartyLeaveSettlement(playerParty);
-                playerParty.Position = settlement.GatePosition;
-                HoldAndPublishPosition(playerParty);
-                settlementInterface.PartyEnterSettlement(playerParty, settlement);
-            }
-
-            settlement.Village.VillageState = Village.VillageStates.Normal;
-            settlement.SettlementHitPoints = 1f;
-
             if (!hostileActionInterface.CanStartHostileAction(
                     playerParty,
                     settlement,
@@ -216,6 +288,7 @@ public class RaidDebugCommands
             otherItemCount,
             warningActive = InformationManager.IsAnyInquiryActive(),
             encounterState = PlayerEncounter.Current?.EncounterState.ToString() ?? "none",
+            encounterSettlementId = PlayerEncounter.EncounterSettlement?.StringId ?? string.Empty,
             mapEventId = mapEventId ?? string.Empty,
             menuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? string.Empty,
             settlementId = Settlement.CurrentSettlement?.StringId ?? string.Empty
@@ -309,6 +382,15 @@ public class RaidDebugCommands
                 fixture.PlayerParty.CurrentSettlement != fixture.OriginalSettlement)
                 settlementInterface.PartyLeaveSettlement(fixture.PlayerParty);
 
+            RestoreParty(fixture.PlayerPartySnapshot);
+            RestoreParty(fixture.SettlementPartySnapshot);
+            foreach (var hero in fixture.Heroes)
+                RestoreHeroProgression(hero);
+            foreach (var hero in fixture.Heroes)
+                RestoreHeroMembership(hero);
+            foreach (var clan in fixture.Clans)
+                RestoreClan(clan);
+
             fixture.Settlement.Village.VillageState = fixture.OriginalVillageState;
             fixture.Settlement.SettlementHitPoints = fixture.OriginalSettlementHitPoints;
 
@@ -327,10 +409,7 @@ public class RaidDebugCommands
                 HoldAndPublishPosition(fixture.PlayerParty);
             }
 
-            if (!fixture.WasAtWar && AreFactionsAtWar(
-                    fixture.PlayerParty.MapFaction,
-                    fixture.Settlement.MapFaction))
-                MakePeaceAction.Apply(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction);
+            RestoreFactionState(fixture.FactionState);
 
             fixture.Restored = true;
             return LiveTestJson(fixture.Token);
@@ -354,7 +433,11 @@ public class RaidDebugCommands
             fixture.PlayerParty.CurrentSettlement == fixture.OriginalSettlement &&
             fixture.Settlement.Village.VillageState == fixture.OriginalVillageState &&
             Math.Abs(fixture.Settlement.SettlementHitPoints - fixture.OriginalSettlementHitPoints) < 0.001f &&
-            AreFactionsAtWar(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction) == fixture.WasAtWar &&
+            PartyMatches(fixture.PlayerPartySnapshot) &&
+            PartyMatches(fixture.SettlementPartySnapshot) &&
+            fixture.Heroes.All(HeroMatches) &&
+            fixture.Clans.All(ClanMatches) &&
+            FactionStateMatches(fixture.FactionState) &&
             (fixture.OriginalSettlement != null || fixture.PlayerParty.Position == fixture.OriginalPosition);
 
         if (restored)
@@ -431,6 +514,293 @@ public class RaidDebugCommands
         }
     }
 
+    private static PartySnapshot CaptureParty(PartyBase party) =>
+        new PartySnapshot(
+            party,
+            party.MemberRoster.GetTroopRoster().ToArray(),
+            party.PrisonRoster.GetTroopRoster().ToArray(),
+            party.ItemRoster.ToArray(),
+            party.MobileParty?.RecentEventsMorale ?? 0f,
+            party.MobileParty?.PartyTradeGold ?? 0,
+            party.MobileParty?.LeaderHero);
+
+    private static HeroSnapshot[] CaptureHeroes(params PartyBase[] parties) =>
+        parties
+            .Where(party => party != null)
+            .SelectMany(party => party.MemberRoster.GetTroopRoster()
+                .Select(element => element.Character?.HeroObject)
+                .Concat(new[] { party.LeaderHero }))
+            .Where(hero => hero != null)
+            .Distinct()
+            .Select(CaptureHero)
+            .ToArray();
+
+    private static HeroSnapshot CaptureHero(Hero hero) =>
+        new HeroSnapshot(
+            hero,
+            hero.HeroState,
+            hero.PartyBelongedTo,
+            hero.PartyBelongedToAsPrisoner,
+            hero.HitPoints,
+            hero.Gold,
+            hero.DeathMark,
+            hero.DeathMarkKillerHero,
+            Skills.All.ToDictionary(skill => skill, hero.GetSkillValue),
+            hero.HeroDeveloper == null
+                ? null
+                : Skills.All.ToDictionary(skill => skill, hero.HeroDeveloper.GetSkillXp),
+            hero.HeroDeveloper?._totalXp ?? 0,
+            hero.HeroDeveloper?.UnspentFocusPoints ?? 0,
+            hero.HeroDeveloper?.UnspentAttributePoints ?? 0);
+
+    private static ClanSnapshot[] CaptureClans(MobileParty playerParty, Settlement settlement) =>
+        new[] { playerParty.ActualClan, playerParty.LeaderHero?.Clan, settlement.OwnerClan }
+            .Where(clan => clan != null)
+            .Distinct()
+            .Select(clan => new ClanSnapshot(clan, clan._influence, clan.Renown, clan._tier))
+            .ToArray();
+
+    private static FactionStateSnapshot CaptureFactionState(IFaction first, IFaction second)
+    {
+        var stance = first.GetStanceWith(second);
+        return new FactionStateSnapshot(
+            first,
+            second,
+            AreFactionsAtWar(first, second),
+            stance,
+            stance.StanceType,
+            stance.BehaviorPriority,
+            stance._warStartDate,
+            stance._peaceDeclarationDate,
+            stance.TroopCasualties1,
+            stance.TroopCasualties2,
+            stance.ShipCasualties1,
+            stance.ShipCasualties2,
+            stance.SuccessfulSieges1,
+            stance.SuccessfulSieges2,
+            stance.SuccessfulRaids1,
+            stance.SuccessfulRaids2,
+            stance.SuccessfulTownSieges1,
+            stance.SuccessfulTownSieges2,
+            stance.TotalTributePaidFrom1To2,
+            stance._dailyTributeFrom1To2,
+            stance.DailyTributeInstallments,
+            (first as Kingdom)?.PoliticalStagnation,
+            (second as Kingdom)?.PoliticalStagnation);
+    }
+
+    private static void RestoreParty(PartySnapshot snapshot)
+    {
+        RestoreRoster(snapshot.Party.MemberRoster, snapshot.MemberRoster);
+        RestoreRoster(snapshot.Party.PrisonRoster, snapshot.PrisonRoster);
+        snapshot.Party.ItemRoster.Clear();
+        foreach (var element in snapshot.Items)
+            snapshot.Party.ItemRoster.Add(element);
+
+        if (snapshot.Party.MobileParty == null) return;
+
+        snapshot.Party.MobileParty.RecentEventsMorale = snapshot.RecentEventsMorale;
+        snapshot.Party.MobileParty.PartyTradeGold = snapshot.PartyTradeGold;
+        snapshot.Party.MobileParty.ChangePartyLeader(snapshot.LeaderHero);
+    }
+
+    private static void RestoreRoster(TroopRoster roster, TroopRosterElement[] baseline)
+    {
+        for (int index = roster.Count - 1; index >= 0; index--)
+        {
+            var element = roster.GetElementCopyAtIndex(index);
+            roster.AddToCountsAtIndex(
+                index,
+                -element.Number,
+                -element.WoundedNumber,
+                0,
+                false);
+        }
+        roster.RemoveZeroCounts();
+
+        foreach (var element in baseline)
+        {
+            roster.AddToCounts(
+                element.Character,
+                element.Number,
+                false,
+                element.WoundedNumber,
+                element.Xp,
+                true);
+        }
+    }
+
+    private static void RestoreHeroProgression(HeroSnapshot snapshot)
+    {
+        if (snapshot.Hero.IsPrisoner)
+            EndCaptivityAction.ApplyByPeace(snapshot.Hero);
+
+        snapshot.Hero.DeathMark = snapshot.DeathMark;
+        snapshot.Hero.DeathMarkKillerHero = snapshot.DeathMarkKillerHero;
+        snapshot.Hero.HitPoints = snapshot.HitPoints;
+        snapshot.Hero.Gold = snapshot.Gold;
+        snapshot.Hero.ChangeState(snapshot.State);
+
+        foreach (var skill in snapshot.SkillLevels)
+            snapshot.Hero.SetSkillValue(skill.Key, skill.Value);
+
+        if (snapshot.Hero.HeroDeveloper == null || snapshot.SkillXps == null)
+            return;
+
+        foreach (var skillXp in snapshot.SkillXps)
+            snapshot.Hero.HeroDeveloper.SetSkillXp(skillXp.Key, skillXp.Value);
+        snapshot.Hero.HeroDeveloper._totalXp = snapshot.TotalXp;
+        snapshot.Hero.HeroDeveloper.UnspentFocusPoints = snapshot.UnspentFocusPoints;
+        snapshot.Hero.HeroDeveloper.UnspentAttributePoints = snapshot.UnspentAttributePoints;
+    }
+
+    private static void RestoreHeroMembership(HeroSnapshot snapshot)
+    {
+        if (snapshot.Hero.PartyBelongedToAsPrisoner != snapshot.PrisonerParty)
+        {
+            if (snapshot.Hero.PartyBelongedToAsPrisoner != null)
+                snapshot.Hero.OnRemovedFromPartyAsPrisoner(snapshot.Hero.PartyBelongedToAsPrisoner);
+            if (snapshot.PrisonerParty != null)
+                snapshot.Hero.OnAddedToPartyAsPrisoner(snapshot.PrisonerParty);
+        }
+
+        if (snapshot.Hero.PartyBelongedTo != snapshot.Party)
+        {
+            if (snapshot.Hero.PartyBelongedTo != null)
+                snapshot.Hero.OnRemovedFromParty(snapshot.Hero.PartyBelongedTo);
+            if (snapshot.Party != null)
+                snapshot.Hero.OnAddedToParty(snapshot.Party);
+        }
+    }
+
+    private static void RestoreClan(ClanSnapshot snapshot)
+    {
+        snapshot.Clan._influence = snapshot.Influence;
+        snapshot.Clan.Renown = snapshot.Renown;
+        snapshot.Clan._tier = snapshot.Tier;
+    }
+
+    private static void RestoreFactionState(FactionStateSnapshot snapshot)
+    {
+        bool atWar = AreFactionsAtWar(snapshot.First, snapshot.Second);
+        if (snapshot.WasAtWar && !atWar)
+            DeclareWarAction.ApplyByDefault(snapshot.First, snapshot.Second);
+        else if (!snapshot.WasAtWar && atWar)
+            MakePeaceAction.Apply(snapshot.First, snapshot.Second);
+
+        var stance = snapshot.Stance;
+        stance.StanceType = snapshot.StanceType;
+        stance.BehaviorPriority = snapshot.BehaviorPriority;
+        stance._warStartDate = snapshot.WarStartDate;
+        stance._peaceDeclarationDate = snapshot.PeaceDeclarationDate;
+        stance.TroopCasualties1 = snapshot.TroopCasualties1;
+        stance.TroopCasualties2 = snapshot.TroopCasualties2;
+        stance.ShipCasualties1 = snapshot.ShipCasualties1;
+        stance.ShipCasualties2 = snapshot.ShipCasualties2;
+        stance.SuccessfulSieges1 = snapshot.SuccessfulSieges1;
+        stance.SuccessfulSieges2 = snapshot.SuccessfulSieges2;
+        stance.SuccessfulRaids1 = snapshot.SuccessfulRaids1;
+        stance.SuccessfulRaids2 = snapshot.SuccessfulRaids2;
+        stance.SuccessfulTownSieges1 = snapshot.SuccessfulTownSieges1;
+        stance.SuccessfulTownSieges2 = snapshot.SuccessfulTownSieges2;
+        stance.TotalTributePaidFrom1To2 = snapshot.TotalTributePaidFrom1To2;
+        stance._dailyTributeFrom1To2 = snapshot.DailyTributeFrom1To2;
+        stance.DailyTributeInstallments = snapshot.DailyTributeInstallments;
+        if (snapshot.First is Kingdom firstKingdom && snapshot.FirstPoliticalStagnation.HasValue)
+            firstKingdom.PoliticalStagnation = snapshot.FirstPoliticalStagnation.Value;
+        if (snapshot.Second is Kingdom secondKingdom && snapshot.SecondPoliticalStagnation.HasValue)
+            secondKingdom.PoliticalStagnation = snapshot.SecondPoliticalStagnation.Value;
+        snapshot.First.UpdateFactionsAtWarWith();
+        snapshot.Second.UpdateFactionsAtWarWith();
+    }
+
+    private static bool PartyMatches(PartySnapshot snapshot)
+    {
+        if (!RosterMatches(snapshot.Party.MemberRoster, snapshot.MemberRoster) ||
+            !RosterMatches(snapshot.Party.PrisonRoster, snapshot.PrisonRoster) ||
+            !snapshot.Party.ItemRoster.SequenceEqual(snapshot.Items))
+            return false;
+
+        var mobileParty = snapshot.Party.MobileParty;
+        return mobileParty == null ||
+            (Math.Abs(mobileParty.RecentEventsMorale - snapshot.RecentEventsMorale) < 0.001f &&
+             mobileParty.PartyTradeGold == snapshot.PartyTradeGold &&
+             mobileParty.LeaderHero == snapshot.LeaderHero);
+    }
+
+    private static bool RosterMatches(TroopRoster roster, TroopRosterElement[] baseline)
+    {
+        var current = roster.GetTroopRoster();
+        if (current.Count != baseline.Length) return false;
+
+        for (int index = 0; index < baseline.Length; index++)
+        {
+            var first = current[index];
+            var second = baseline[index];
+            if (first.Character != second.Character ||
+                first.Number != second.Number ||
+                first.WoundedNumber != second.WoundedNumber ||
+                first.Xp != second.Xp)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool HeroMatches(HeroSnapshot snapshot)
+    {
+        if (snapshot.Hero.HeroState != snapshot.State ||
+            snapshot.Hero.PartyBelongedTo != snapshot.Party ||
+            snapshot.Hero.PartyBelongedToAsPrisoner != snapshot.PrisonerParty ||
+            snapshot.Hero.HitPoints != snapshot.HitPoints ||
+            snapshot.Hero.Gold != snapshot.Gold ||
+            snapshot.Hero.DeathMark != snapshot.DeathMark ||
+            snapshot.Hero.DeathMarkKillerHero != snapshot.DeathMarkKillerHero ||
+            snapshot.SkillLevels.Any(skill => snapshot.Hero.GetSkillValue(skill.Key) != skill.Value))
+            return false;
+
+        if (snapshot.Hero.HeroDeveloper == null || snapshot.SkillXps == null)
+            return true;
+
+        return snapshot.SkillXps.All(skill =>
+                   Math.Abs(snapshot.Hero.HeroDeveloper.GetSkillXp(skill.Key) - skill.Value) < 0.001f) &&
+               Math.Abs(snapshot.Hero.HeroDeveloper._totalXp - snapshot.TotalXp) < 0.001f &&
+               snapshot.Hero.HeroDeveloper.UnspentFocusPoints == snapshot.UnspentFocusPoints &&
+               snapshot.Hero.HeroDeveloper.UnspentAttributePoints == snapshot.UnspentAttributePoints;
+    }
+
+    private static bool ClanMatches(ClanSnapshot snapshot) =>
+        Math.Abs(snapshot.Clan._influence - snapshot.Influence) < 0.001f &&
+        Math.Abs(snapshot.Clan.Renown - snapshot.Renown) < 0.001f &&
+        snapshot.Clan._tier == snapshot.Tier;
+
+    private static bool FactionStateMatches(FactionStateSnapshot snapshot)
+    {
+        var stance = snapshot.Stance;
+        return AreFactionsAtWar(snapshot.First, snapshot.Second) == snapshot.WasAtWar &&
+            stance.StanceType == snapshot.StanceType &&
+            stance.BehaviorPriority == snapshot.BehaviorPriority &&
+            stance._warStartDate == snapshot.WarStartDate &&
+            stance._peaceDeclarationDate == snapshot.PeaceDeclarationDate &&
+            stance.TroopCasualties1 == snapshot.TroopCasualties1 &&
+            stance.TroopCasualties2 == snapshot.TroopCasualties2 &&
+            stance.ShipCasualties1 == snapshot.ShipCasualties1 &&
+            stance.ShipCasualties2 == snapshot.ShipCasualties2 &&
+            stance.SuccessfulSieges1 == snapshot.SuccessfulSieges1 &&
+            stance.SuccessfulSieges2 == snapshot.SuccessfulSieges2 &&
+            stance.SuccessfulRaids1 == snapshot.SuccessfulRaids1 &&
+            stance.SuccessfulRaids2 == snapshot.SuccessfulRaids2 &&
+            stance.SuccessfulTownSieges1 == snapshot.SuccessfulTownSieges1 &&
+            stance.SuccessfulTownSieges2 == snapshot.SuccessfulTownSieges2 &&
+            stance.TotalTributePaidFrom1To2 == snapshot.TotalTributePaidFrom1To2 &&
+            stance._dailyTributeFrom1To2 == snapshot.DailyTributeFrom1To2 &&
+            stance.DailyTributeInstallments == snapshot.DailyTributeInstallments &&
+            (!(snapshot.First is Kingdom firstKingdom) ||
+             firstKingdom.PoliticalStagnation == snapshot.FirstPoliticalStagnation) &&
+            (!(snapshot.Second is Kingdom secondKingdom) ||
+             secondKingdom.PoliticalStagnation == snapshot.SecondPoliticalStagnation);
+    }
+
     private static string LiveTestJson(object value) =>
         "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
 
@@ -445,7 +815,12 @@ public class RaidDebugCommands
         public CampaignVec2 OriginalPosition { get; }
         public Village.VillageStates OriginalVillageState { get; }
         public float OriginalSettlementHitPoints { get; }
-        public bool WasAtWar { get; }
+        public PartySnapshot PlayerPartySnapshot { get; }
+        public PartySnapshot SettlementPartySnapshot { get; }
+        public HeroSnapshot[] Heroes { get; }
+        public ClanSnapshot[] Clans { get; }
+        public FactionStateSnapshot FactionState { get; }
+        public bool Positioned { get; set; }
         public bool Prepared { get; set; }
         public bool Restored { get; set; }
 
@@ -459,7 +834,11 @@ public class RaidDebugCommands
             CampaignVec2 originalPosition,
             Village.VillageStates originalVillageState,
             float originalSettlementHitPoints,
-            bool wasAtWar)
+            PartySnapshot playerPartySnapshot,
+            PartySnapshot settlementPartySnapshot,
+            HeroSnapshot[] heroes,
+            ClanSnapshot[] clans,
+            FactionStateSnapshot factionState)
         {
             Token = token;
             Campaign = campaign;
@@ -470,7 +849,180 @@ public class RaidDebugCommands
             OriginalPosition = originalPosition;
             OriginalVillageState = originalVillageState;
             OriginalSettlementHitPoints = originalSettlementHitPoints;
+            PlayerPartySnapshot = playerPartySnapshot;
+            SettlementPartySnapshot = settlementPartySnapshot;
+            Heroes = heroes;
+            Clans = clans;
+            FactionState = factionState;
+        }
+    }
+
+    private sealed class PartySnapshot
+    {
+        public PartyBase Party { get; }
+        public TroopRosterElement[] MemberRoster { get; }
+        public TroopRosterElement[] PrisonRoster { get; }
+        public ItemRosterElement[] Items { get; }
+        public float RecentEventsMorale { get; }
+        public int PartyTradeGold { get; }
+        public Hero LeaderHero { get; }
+
+        public PartySnapshot(
+            PartyBase party,
+            TroopRosterElement[] memberRoster,
+            TroopRosterElement[] prisonRoster,
+            ItemRosterElement[] items,
+            float recentEventsMorale,
+            int partyTradeGold,
+            Hero leaderHero)
+        {
+            Party = party;
+            MemberRoster = memberRoster;
+            PrisonRoster = prisonRoster;
+            Items = items;
+            RecentEventsMorale = recentEventsMorale;
+            PartyTradeGold = partyTradeGold;
+            LeaderHero = leaderHero;
+        }
+    }
+
+    private sealed class HeroSnapshot
+    {
+        public Hero Hero { get; }
+        public Hero.CharacterStates State { get; }
+        public MobileParty Party { get; }
+        public PartyBase PrisonerParty { get; }
+        public int HitPoints { get; }
+        public int Gold { get; }
+        public KillCharacterAction.KillCharacterActionDetail DeathMark { get; }
+        public Hero DeathMarkKillerHero { get; }
+        public Dictionary<SkillObject, int> SkillLevels { get; }
+        public Dictionary<SkillObject, float> SkillXps { get; }
+        public int TotalXp { get; }
+        public int UnspentFocusPoints { get; }
+        public int UnspentAttributePoints { get; }
+
+        public HeroSnapshot(
+            Hero hero,
+            Hero.CharacterStates state,
+            MobileParty party,
+            PartyBase prisonerParty,
+            int hitPoints,
+            int gold,
+            KillCharacterAction.KillCharacterActionDetail deathMark,
+            Hero deathMarkKillerHero,
+            Dictionary<SkillObject, int> skillLevels,
+            Dictionary<SkillObject, float> skillXps,
+            int totalXp,
+            int unspentFocusPoints,
+            int unspentAttributePoints)
+        {
+            Hero = hero;
+            State = state;
+            Party = party;
+            PrisonerParty = prisonerParty;
+            HitPoints = hitPoints;
+            Gold = gold;
+            DeathMark = deathMark;
+            DeathMarkKillerHero = deathMarkKillerHero;
+            SkillLevels = skillLevels;
+            SkillXps = skillXps;
+            TotalXp = totalXp;
+            UnspentFocusPoints = unspentFocusPoints;
+            UnspentAttributePoints = unspentAttributePoints;
+        }
+    }
+
+    private sealed class ClanSnapshot
+    {
+        public Clan Clan { get; }
+        public float Influence { get; }
+        public float Renown { get; }
+        public int Tier { get; }
+
+        public ClanSnapshot(Clan clan, float influence, float renown, int tier)
+        {
+            Clan = clan;
+            Influence = influence;
+            Renown = renown;
+            Tier = tier;
+        }
+    }
+
+    private sealed class FactionStateSnapshot
+    {
+        public IFaction First { get; }
+        public IFaction Second { get; }
+        public bool WasAtWar { get; }
+        public StanceLink Stance { get; }
+        public StanceType StanceType { get; }
+        public int BehaviorPriority { get; }
+        public CampaignTime WarStartDate { get; }
+        public CampaignTime PeaceDeclarationDate { get; }
+        public int TroopCasualties1 { get; }
+        public int TroopCasualties2 { get; }
+        public int ShipCasualties1 { get; }
+        public int ShipCasualties2 { get; }
+        public int SuccessfulSieges1 { get; }
+        public int SuccessfulSieges2 { get; }
+        public int SuccessfulRaids1 { get; }
+        public int SuccessfulRaids2 { get; }
+        public int SuccessfulTownSieges1 { get; }
+        public int SuccessfulTownSieges2 { get; }
+        public int TotalTributePaidFrom1To2 { get; }
+        public int DailyTributeFrom1To2 { get; }
+        public int DailyTributeInstallments { get; }
+        public int? FirstPoliticalStagnation { get; }
+        public int? SecondPoliticalStagnation { get; }
+
+        public FactionStateSnapshot(
+            IFaction first,
+            IFaction second,
+            bool wasAtWar,
+            StanceLink stance,
+            StanceType stanceType,
+            int behaviorPriority,
+            CampaignTime warStartDate,
+            CampaignTime peaceDeclarationDate,
+            int troopCasualties1,
+            int troopCasualties2,
+            int shipCasualties1,
+            int shipCasualties2,
+            int successfulSieges1,
+            int successfulSieges2,
+            int successfulRaids1,
+            int successfulRaids2,
+            int successfulTownSieges1,
+            int successfulTownSieges2,
+            int totalTributePaidFrom1To2,
+            int dailyTributeFrom1To2,
+            int dailyTributeInstallments,
+            int? firstPoliticalStagnation,
+            int? secondPoliticalStagnation)
+        {
+            First = first;
+            Second = second;
             WasAtWar = wasAtWar;
+            Stance = stance;
+            StanceType = stanceType;
+            BehaviorPriority = behaviorPriority;
+            WarStartDate = warStartDate;
+            PeaceDeclarationDate = peaceDeclarationDate;
+            TroopCasualties1 = troopCasualties1;
+            TroopCasualties2 = troopCasualties2;
+            ShipCasualties1 = shipCasualties1;
+            ShipCasualties2 = shipCasualties2;
+            SuccessfulSieges1 = successfulSieges1;
+            SuccessfulSieges2 = successfulSieges2;
+            SuccessfulRaids1 = successfulRaids1;
+            SuccessfulRaids2 = successfulRaids2;
+            SuccessfulTownSieges1 = successfulTownSieges1;
+            SuccessfulTownSieges2 = successfulTownSieges2;
+            TotalTributePaidFrom1To2 = totalTributePaidFrom1To2;
+            DailyTributeFrom1To2 = dailyTributeFrom1To2;
+            DailyTributeInstallments = dailyTributeInstallments;
+            FirstPoliticalStagnation = firstPoliticalStagnation;
+            SecondPoliticalStagnation = secondPoliticalStagnation;
         }
     }
 }
