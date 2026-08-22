@@ -542,8 +542,7 @@ public class CoopBattleController : CoopMissionController
         // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
         ResultCommitter.ReportResolvedResult(missionResult);
 
-        bool wasRetreat = missionResult?.BattleResolved != true && !ResultCommitter.TryGetResolvedState(out _);
-
-        lifecycle.Leave(wasRetreat);
+        // Retreats are reported separately by OnRetreatMission
+        lifecycle.Leave(wasRetreat: false);
     }
 }

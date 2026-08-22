@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network;
 using Missions.Messages;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -14,19 +15,22 @@ public class BattleResultReadyLogic : MissionLogic
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
+    private readonly INetwork relayNetwork;
 
     public BattleResultReadyLogic(
         IBattleResultCommitter resultCommitter,
         ISiegeEngineStateReporter siegeEngineStateReporter,
         IMessageBroker messageBroker,
         IBattleSession session,
-        IBattleDeploymentCoordinator deployment)
+        IBattleDeploymentCoordinator deployment,
+        INetwork relayNetwork)
     {
         this.resultCommitter = resultCommitter;
         this.siegeEngineStateReporter = siegeEngineStateReporter;
         this.messageBroker = messageBroker;
         this.session = session;
         this.deployment = deployment;
+        this.relayNetwork = relayNetwork;
 
         messageBroker.Subscribe<BattleHostAuthorityAcquired>(Handle_BattleHostAuthorityAcquired);
     }
@@ -62,5 +66,12 @@ public class BattleResultReadyLogic : MissionLogic
             siegeEngineStateReporter.ReportConcludedIfHost();
             resultCommitter.ReportAcceptedResult();
         }, context: nameof(Handle_BattleHostAuthorityAcquired));
+    }
+
+    // Only report retreats triggered by the retreat action
+    public override void OnRetreatMission()
+    {
+        if (session.HasInstance)
+            relayNetwork.SendAll(new NetworkBattleRetreated(session.InstanceId));
     }
 }
