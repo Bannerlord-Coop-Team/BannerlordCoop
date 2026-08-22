@@ -1,6 +1,6 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MapEvents.Handlers;
-using TaleWorlds.Library;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -8,7 +8,7 @@ namespace GameInterface.Tests.Services.MapEvents;
 public class BattleMissionStartHandlerTests
 {
     [Fact]
-    public void GetOrCreateAtmosphereSnapshot_ReusesFirstBattleAtmosphere()
+    public void GetOrCreateMissionInitializerSnapshot_ReusesFirstBattleInitializer()
     {
         using var messageBroker = new MessageBroker();
         using var handler = new BattleMissionStartHandler(
@@ -19,21 +19,22 @@ public class BattleMissionStartHandlerTests
             null!,
             null!);
 
-        var initial = new AtmosphereInfo
+        var initial = new MissionInitializerRecord("battle_terrain_026")
         {
-            TimeInfo = new TimeInformation { TimeOfDay = 6f },
+            RandomTerrainSeed = 1234,
         };
-        var later = new AtmosphereInfo
+        var later = new MissionInitializerRecord("battle_terrain_030")
         {
-            TimeInfo = new TimeInformation { TimeOfDay = 18f },
+            RandomTerrainSeed = 5678,
         };
 
-        var first = handler.GetOrCreateAtmosphereSnapshot("map-event-1", () => initial);
-        var repeated = handler.GetOrCreateAtmosphereSnapshot("map-event-1", () => later);
-        var otherBattle = handler.GetOrCreateAtmosphereSnapshot("map-event-2", () => later);
+        var first = handler.GetOrCreateMissionInitializerSnapshot("map-event-1", () => initial);
+        var repeated = handler.GetOrCreateMissionInitializerSnapshot("map-event-1", () => later);
+        var otherBattle = handler.GetOrCreateMissionInitializerSnapshot("map-event-2", () => later);
 
-        Assert.Equal(6f, first.TimeInfo.TimeOfDay);
-        Assert.Equal(first.TimeInfo.TimeOfDay, repeated.TimeInfo.TimeOfDay);
-        Assert.Equal(18f, otherBattle.TimeInfo.TimeOfDay);
+        Assert.Equal("battle_terrain_026", first.SceneName);
+        Assert.Equal(first.SceneName, repeated.SceneName);
+        Assert.Equal(1234, repeated.RandomTerrainSeed);
+        Assert.Equal("battle_terrain_030", otherBattle.SceneName);
     }
 }

@@ -21,15 +21,21 @@ namespace Missions.Agents.Patches
             public EquipmentIndex EquipmentIndex { get; }
             public short SlotAmount { get; }
             public short WorldItemAmount { get; }
+            public MissionWeapon SlotWeapon { get; }
+            public AgentEquipmentData Equipment { get; }
 
             public PickupState(
                 EquipmentIndex equipmentIndex,
                 short slotAmount,
-                short worldItemAmount)
+                short worldItemAmount,
+                MissionWeapon slotWeapon,
+                AgentEquipmentData equipment)
             {
                 EquipmentIndex = equipmentIndex;
                 SlotAmount = slotAmount;
                 WorldItemAmount = worldItemAmount;
+                SlotWeapon = slotWeapon;
+                Equipment = equipment;
             }
         }
 
@@ -57,12 +63,15 @@ namespace Missions.Agents.Patches
             __state = new PickupState(
                 equipmentIndex,
                 GetSlotAmount(__instance, equipmentIndex),
-                spawnedItemEntity.WeaponCopy.Amount);
+                spawnedItemEntity.WeaponCopy.Amount,
+                GetSlotWeapon(__instance, equipmentIndex),
+                new AgentEquipmentData(__instance));
         }
 
         static void Postfix(
             SpawnedItemEntity spawnedItemEntity,
             Agent __instance,
+            bool removeWeapon,
             PickupState __state)
         {
             if (AllowedThread.IsThisThreadAllowed()) return;
@@ -71,6 +80,7 @@ namespace Missions.Agents.Patches
             if (controller?.IsSpectatorAgent(__instance) == true) return;
 
             MissionWeapon weapon = spawnedItemEntity.WeaponCopy;
+            MissionWeapon resultingSlotWeapon = GetSlotWeapon(__instance, __state.EquipmentIndex);
             WeaponPickedup message = new WeaponPickedup(
                 __instance,
                 spawnedItemEntity,
@@ -82,7 +92,12 @@ namespace Missions.Agents.Patches
                 __state.SlotAmount,
                 __state.WorldItemAmount,
                 GetSlotAmount(__instance, __state.EquipmentIndex),
-                weapon.Amount);
+                weapon.Amount,
+                removeWeapon,
+                resultingSlotWeapon,
+                __state.SlotWeapon,
+                __state.Equipment,
+                System.Guid.NewGuid());
             MessageBroker.Instance.Publish(__instance, message);
         }
 
@@ -94,6 +109,15 @@ namespace Missions.Agents.Patches
 
             MissionWeapon weapon = agent.Equipment[equipmentIndex];
             return weapon.IsEmpty ? (short)0 : weapon.Amount;
+        }
+
+        private static MissionWeapon GetSlotWeapon(Agent agent, EquipmentIndex equipmentIndex)
+        {
+            if (equipmentIndex < EquipmentIndex.WeaponItemBeginSlot ||
+                equipmentIndex >= EquipmentIndex.NumAllWeaponSlots)
+                return default;
+
+            return agent.Equipment[equipmentIndex];
         }
     }
 }

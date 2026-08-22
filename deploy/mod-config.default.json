@@ -80,6 +80,10 @@
     "movementIncomingMiBPerSecond": 1.0,
   },
   "modOptions": {
+    // Total human troops initially allocated across both sides of a battle.
+    // Valid range: 200-1000. Default is 1000.
+    "battleSize": 1000,
+
     // Toggle fast forward (2x speed) being enabled
     // (Default) true: Fast forward is allowed.
     // false: Fast forward is completely disabled.
@@ -180,6 +184,11 @@
     // Toggle players being able to execute each others' clan members.
     // This includes player companions and family members.
     // Default is false and won't have any effect if enableHeroExecutions is false.
-    "enablePlayerClanMemberExecutions": false
+    "enablePlayerClanMemberExecutions": false,
+
+    // Toggle player nameplates in co-op missions.
+    // (Default) true: Clients may show nameplates above allied remote players.
+    // false: Player nameplates are disabled and the client option is hidden.
+    "showPlayerNameplates": true
   }
 }

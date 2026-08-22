@@ -1,23 +1,31 @@
 ﻿using System;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.MountAndBlade;
+using GameInterface.Configuration;
 
 namespace Missions.Battles;
 
 public interface IBattleSizeProvider
 {
-    int GetBattleSize(MapEvent mapEvent);
+    int GetBattleSize();
 }
 
 public class BattleSizeProvider : IBattleSizeProvider
 {
-    public int GetBattleSize(MapEvent mapEvent)
-    {
-        if (mapEvent == null) throw new ArgumentNullException(nameof(mapEvent));
+    internal const int DefaultBattleSize = 1000;
+    internal const int MinimumBattleSize = 200;
+    internal const int MaximumBattleSize = 1000;
 
-        int configuredBattleSize = mapEvent.IsSiegeAssault
-            ? BannerlordConfig.GetRealBattleSizeForSiege()
-            : BannerlordConfig.GetRealBattleSize();
-        return Math.Min(configuredBattleSize, DefaultBattleMissionAgentSpawnLogic.MaxNumberOfTroopsForMission);
+    private readonly IModConfig modConfig;
+
+    public BattleSizeProvider(IModConfig modConfig)
+    {
+        if (modConfig == null) throw new ArgumentNullException(nameof(modConfig));
+
+        this.modConfig = modConfig;
+    }
+
+    public int GetBattleSize()
+    {
+        int configuredBattleSize = modConfig.Data?.ModOptions?.BattleSize ?? DefaultBattleSize;
+        return Math.Max(MinimumBattleSize, Math.Min(MaximumBattleSize, configuredBattleSize));
     }
 }

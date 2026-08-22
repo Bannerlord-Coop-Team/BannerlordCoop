@@ -1,4 +1,5 @@
-using TaleWorlds.Engine.GauntletUI;
+﻿using TaleWorlds.Engine.GauntletUI;
+using System;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.CoopOptions;
@@ -22,7 +23,9 @@ internal sealed class CoopOptionsOverlay
 
     private void Show()
     {
-        dataSource = new CoopOptionsVM(Close);
+        if (!ContainerProvider.TryResolve<ICoopOptionsVMFactory>(out var factory))
+            throw new InvalidOperationException("Coop options view-model factory is unavailable.");
+        dataSource = factory.Create(Close);
         gauntletLayer = new GauntletLayer("CoopOptionsUI", 100)
         {
             IsFocusLayer = true
@@ -38,6 +41,7 @@ internal sealed class CoopOptionsOverlay
         gauntletLayer.IsFocusLayer = false;
         ScreenManager.TryLoseFocus(gauntletLayer);
         owner.RemoveLayer(gauntletLayer);
+        dataSource?.OnFinalize();
         dataSource = null;
         gauntletLayer = null;
     }

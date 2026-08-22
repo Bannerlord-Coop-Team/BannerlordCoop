@@ -207,7 +207,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                     mountInfo?.OriginalOwner ?? info.OriginalOwner,
                 mountMovementScopeId:
                     mountInfo?.MovementScopeId ?? info.MovementScopeId,
-                isRunningAway: agent.IsRunningAway));
+                isRunningAway: agent.IsRunningAway,
+                authorityRevision: info.AuthorityRevision,
+                mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0));
         }
         return records;
     }

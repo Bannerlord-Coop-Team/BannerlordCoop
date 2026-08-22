@@ -1046,6 +1046,66 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void KingdomDecisionResolution_DoesNotReopenBeforeRemovalApplies()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var otherPlayer = CreateSyncedPlayerContext("PolicyTimeoutOtherClan", _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(otherPlayer.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+            PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
+            }
+
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+
+            Assert.NotNull(decisionsVm.CurrentDecision);
+            GetVoteManager(client).ApplyResolved(kingdomId, 0, 0, true);
+
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.True(GetVoteManager(client).ShouldSuppressLocalDecision(decision));
+
+            InquiryData reopenedInquiry = null;
+            Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => reopenedInquiry = data;
+            EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+                "OnShowInquiry",
+                BindingFlags.Public | BindingFlags.Static);
+            showInquiryEvent.AddEventHandler(null, onShowInquiry);
+            try
+            {
+                decisionsVm.OnFrameTick();
+
+                Assert.Null(reopenedInquiry);
+                Assert.Null(decisionsVm.CurrentDecision);
+                Assert.Contains(decision, decisionsVm._examinedDecisionsSinceInit);
+            }
+            finally
+            {
+                showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+            }
+
+            client.SimulateMessage(this, new NetworkRemoveDecision(kingdomId, 0));
+
+            Assert.Empty(kingdom.UnresolvedDecisions);
+            Assert.False(GetVoteManager(client).ShouldSuppressLocalDecision(decision));
+        });
+    }
+
+    [Fact]
     public void KingdomDecisionRoundStatus_DisablesPanelWhenLocalClanAlreadySubmitted()
     {
         var client1 = Clients.First();

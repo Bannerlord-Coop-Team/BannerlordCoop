@@ -1,4 +1,4 @@
-using GameInterface.Services.Tournaments.Data;
+﻿using GameInterface.Services.Tournaments.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -484,6 +484,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             if (!session.IsActive)
                 return TournamentMutationStatus.InvalidPhase;
 
+            string previousHostControllerId = session.HostControllerId;
             bool changed = false;
             if (session.TryGetActiveContestant(controllerId, out var slot))
             {
@@ -517,9 +518,66 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
 
             noViewers = !session.Contestants.Any(contestant => contestant.IsHuman) && session.Spectators.Count == 0;
             session.Revision++;
+            if (session.HostControllerId != previousHostControllerId)
+                RebindSpawnManifestAuthority(session);
             snapshot = session.CreateSnapshot();
             return TournamentMutationStatus.Applied;
         }
+    }
+
+    private static void RebindSpawnManifestAuthority(TournamentSessionState session)
+    {
+        TournamentSpawnManifestData manifest = session.SpawnManifest;
+        if (manifest?.Agents == null || string.IsNullOrEmpty(session.HostControllerId)) return;
+
+        var contestants = session.Contestants.ToDictionary(contestant => contestant.SlotId);
+        TournamentAgentSpawnData[] agents = manifest.Agents
+            .Select(data => RebindManifestAgent(data, contestants, session.HostControllerId))
+            .ToArray();
+        session.SpawnManifest = new TournamentSpawnManifestData(
+            manifest.SessionId,
+            manifest.MatchId,
+            session.Revision,
+            session.BracketRevision,
+            manifest.Sequence,
+            agents);
+    }
+
+    private static TournamentAgentSpawnData RebindManifestAgent(
+        TournamentAgentSpawnData data,
+        IReadOnlyDictionary<string, TournamentContestantSlot> contestants,
+        string hostControllerId)
+    {
+        if (data == null || !contestants.TryGetValue(data.SlotId, out var contestant)) return data;
+
+        string owner = contestant.IsHuman && !contestant.IsReplaced
+            ? contestant.ControllerId
+            : hostControllerId;
+        if (owner == data.ControllerId) return data;
+
+        return new TournamentAgentSpawnData(
+            data.AgentId,
+            data.SlotId,
+            data.CharacterId,
+            data.DescriptorSeed,
+            data.TeamId,
+            data.TeamColor,
+            data.TeamColor2,
+            data.TeamBannerCode,
+            owner,
+            data.Equipment,
+            data.Position,
+            data.Direction,
+            data.Health,
+            data.MountAgentId,
+            data.MountCharacterId,
+            data.MountDescriptorSeed,
+            data.MountEquipment,
+            data.MountHealth,
+            data.AuthorityRevision + 1,
+            data.MountAgentId == Guid.Empty
+                ? data.MountAuthorityRevision
+                : data.MountAuthorityRevision + 1);
     }
 
     public TournamentMutationStatus TryStoreSpawnManifest(
