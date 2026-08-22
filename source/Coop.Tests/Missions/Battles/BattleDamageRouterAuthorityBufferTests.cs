@@ -12,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -148,7 +149,12 @@ public class BattleDamageRouterAuthorityBufferTests
         if (missile)
         {
             blow = new Blow(17);
-            blow.WeaponRecord._isMissile = true;
+            object weaponRecord = blow.WeaponRecord;
+            FieldInfo isMissileField = typeof(BlowWeaponRecord).GetField(
+                "_isMissile", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(isMissileField);
+            isMissileField.SetValue(weaponRecord, true);
+            blow.WeaponRecord = (BlowWeaponRecord)weaponRecord;
             blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = 42;
         }
 
