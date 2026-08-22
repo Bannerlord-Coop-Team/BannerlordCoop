@@ -69,11 +69,6 @@ public class MapEventDebugCommands
         public string OpponentMobilePartyId { get; set; }
         public PartyBehaviorUpdateData OpponentBehavior { get; set; }
         public bool JoiningPartyJoined { get; set; }
-#if DEBUG
-        public TroopRosterElement[] FirstPlayerMemberRoster { get; set; }
-        public TroopRosterElement[] JoiningPlayerMemberRoster { get; set; }
-        public TroopRosterElement[] OpponentMemberRoster { get; set; }
-#endif
     }
 
     private static WoundedAlliedFixture woundedAlliedFixture;
@@ -2012,19 +2007,6 @@ public class MapEventDebugCommands
             return "Both players must be on the campaign map, outside settlements.";
         }
 
-#if DEBUG
-        if (firstParty.LeaderHero == null || joiningParty.LeaderHero == null)
-        {
-            return "Both players must lead their active party.";
-        }
-        if (firstParty.LeaderHero.IsWounded || joiningParty.LeaderHero.IsWounded ||
-            firstParty.MemberRoster.GetTroopCount(firstParty.LeaderHero.CharacterObject) <= 0 ||
-            joiningParty.MemberRoster.GetTroopCount(joiningParty.LeaderHero.CharacterObject) <= 0)
-        {
-            return "Both players need healthy leaders in their active party rosters.";
-        }
-#endif
-
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
             !playerManager.TryGetPeer(args[0], out var firstPeer) ||
             !playerManager.TryGetPeer(args[1], out _))
@@ -2074,35 +2056,11 @@ public class MapEventDebugCommands
             return "Unable to resolve fixture party ids.";
         }
 
-#if DEBUG
-        var firstPlayerMemberRoster = firstParty.MemberRoster.GetTroopRoster().ToArray();
-        var joiningPlayerMemberRoster = joiningParty.MemberRoster.GetTroopRoster().ToArray();
-        var opponentMemberRoster = opponentParty.MemberRoster.GetTroopRoster().ToArray();
-        LimitLateJoinModeFixtureRoster(firstParty.MemberRoster);
-        LimitLateJoinModeFixtureRoster(joiningParty.MemberRoster);
-        LimitLateJoinModeFixtureRoster(
-            opponentParty.MemberRoster,
-            LateJoinModeFixtureMaximumOpponentRegularTroops);
-        if (opponentParty.MemberRoster.TotalHealthyCount <= 0)
-        {
-            RestoreLateJoinModeFixtureMemberRoster(firstParty.MemberRoster, firstPlayerMemberRoster);
-            RestoreLateJoinModeFixtureMemberRoster(joiningParty.MemberRoster, joiningPlayerMemberRoster);
-            RestoreLateJoinModeFixtureMemberRoster(opponentParty.MemberRoster, opponentMemberRoster);
-            return "The fixture opponent has no healthy troops after sizing.";
-        }
-#endif
-
         var mapEvent = MapEventBattleFactory.CreateMapEvent(firstParty.Party, opponentParty.Party, default);
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out string mapEventId))
         {
             if (mapEvent != null && !mapEvent.IsFinalized)
                 mapEvent.FinalizeEvent();
-
-#if DEBUG
-            RestoreLateJoinModeFixtureMemberRoster(firstParty.MemberRoster, firstPlayerMemberRoster);
-            RestoreLateJoinModeFixtureMemberRoster(joiningParty.MemberRoster, joiningPlayerMemberRoster);
-            RestoreLateJoinModeFixtureMemberRoster(opponentParty.MemberRoster, opponentMemberRoster);
-#endif
 
             RestorePartyBehavior(firstParty, firstPlayerBehavior, behaviorSnapshot);
             RestorePartyBehavior(joiningParty, joiningPlayerBehavior, behaviorSnapshot);
@@ -2123,11 +2081,6 @@ public class MapEventDebugCommands
             JoiningPlayerBehavior = joiningPlayerBehavior,
             OpponentMobilePartyId = opponentMobilePartyId,
             OpponentBehavior = opponentBehavior,
-#if DEBUG
-            FirstPlayerMemberRoster = firstPlayerMemberRoster,
-            JoiningPlayerMemberRoster = joiningPlayerMemberRoster,
-            OpponentMemberRoster = opponentMemberRoster,
-#endif
         };
 
         var hasFieldBattleOpponent = mapEvent.EventType == MapEvent.BattleTypes.FieldBattle &&
@@ -2459,123 +2412,9 @@ public class MapEventDebugCommands
             behaviorSnapshot,
             objectManager) && restored;
 
-#if DEBUG
-        restored = RestoreLateJoinModeFixtureRoster(
-            fixture.FirstPlayerMobilePartyId,
-            fixture.FirstPlayerMemberRoster,
-            objectManager) && restored;
-        restored = RestoreLateJoinModeFixtureRoster(
-            fixture.JoiningPlayerMobilePartyId,
-            fixture.JoiningPlayerMemberRoster,
-            objectManager) && restored;
-        restored = RestoreLateJoinModeFixtureRoster(
-            fixture.OpponentMobilePartyId,
-            fixture.OpponentMemberRoster,
-            objectManager) && restored;
-#endif
-
         lateJoinModeFixture = null;
         return restored;
     }
-
-#if DEBUG
-    private const int LateJoinModeFixtureMaximumRegularTroops = 0;
-    private const int LateJoinModeFixtureMaximumOpponentRegularTroops = 1;
-
-    internal static void LimitLateJoinModeFixtureRoster(TroopRoster roster)
-    {
-        LimitLateJoinModeFixtureRoster(roster, LateJoinModeFixtureMaximumRegularTroops);
-    }
-
-    internal static void LimitLateJoinModeFixtureRoster(TroopRoster roster, int maximumRegularTroops)
-    {
-        // Keep the DEBUG evidence fixture below the mission deployment agent limit.
-        var remainingRegularTroops = maximumRegularTroops;
-        for (var index = roster.Count - 1; index >= 0; index--)
-        {
-            var element = roster.GetElementCopyAtIndex(index);
-            if (element.Character.IsHero)
-                continue;
-
-            var kept = Math.Min(element.Number - element.WoundedNumber, remainingRegularTroops);
-            remainingRegularTroops -= kept;
-
-            var countChange = kept - element.Number;
-            var woundedCountChange = -element.WoundedNumber;
-            if (countChange == 0 && woundedCountChange == 0)
-                continue;
-
-            roster.AddToCountsAtIndex(
-                index,
-                countChange,
-                woundedCountChange,
-                removeDepleted: false);
-        }
-
-        roster.RemoveZeroCounts();
-    }
-
-    internal static void LimitLateJoinModeFixtureRosters(
-        IEnumerable<TroopRoster> rosters,
-        int maximumRegularTroops)
-    {
-        var remainingRegularTroops = maximumRegularTroops;
-        foreach (var roster in rosters)
-        {
-            LimitLateJoinModeFixtureRoster(roster, Math.Max(remainingRegularTroops, 0));
-            remainingRegularTroops -= GetHealthyRegularTroopCount(roster);
-        }
-    }
-
-    private static int GetHealthyRegularTroopCount(TroopRoster roster)
-    {
-        var healthyRegularTroops = 0;
-        for (var index = 0; index < roster.Count; index++)
-        {
-            var element = roster.GetElementCopyAtIndex(index);
-            if (!element.Character.IsHero)
-                healthyRegularTroops += element.Number - element.WoundedNumber;
-        }
-
-        return healthyRegularTroops;
-    }
-
-    private static bool RestoreLateJoinModeFixtureRoster(
-        string mobilePartyId,
-        TroopRosterElement[] memberRoster,
-        IObjectManager objectManager)
-    {
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(mobilePartyId, out var party))
-            return false;
-
-        RestoreLateJoinModeFixtureMemberRoster(party.MemberRoster, memberRoster);
-        return true;
-    }
-
-    internal static void RestoreLateJoinModeFixtureMemberRoster(
-        TroopRoster roster,
-        TroopRosterElement[] elements)
-    {
-        for (var index = roster.Count - 1; index >= 0; index--)
-        {
-            var element = roster.GetElementCopyAtIndex(index);
-            roster.AddToCountsAtIndex(index, -element.Number, -element.WoundedNumber, -element.Xp, false);
-        }
-
-        for (var index = 0; index < elements.Length; index++)
-        {
-            var element = elements[index];
-            roster.AddToCounts(
-                element.Character,
-                element.Number,
-                false,
-                element.WoundedNumber,
-                element.Xp,
-                true,
-                index);
-        }
-    }
-#endif
 
     private static bool RestorePartyBehavior(
         string mobilePartyId,

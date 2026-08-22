@@ -9,29 +9,10 @@ public class CoopOptionsUI : ScreenBase
     private GauntletLayer _gauntletLayer;
     private GauntletMovieIdentifier _gauntletMovie;
 
-#if DEBUG
-    private bool _selectPlayerNameplatesTabForDebug;
-
-    internal bool IsPlayerNameplatesTabSelectedForDebug =>
-        _dataSource?.PlayerNameplatesTab != null &&
-        _dataSource.SelectedTab == _dataSource.PlayerNameplatesTab;
-
-    internal void SelectPlayerNameplatesTabForDebug()
-    {
-        _selectPlayerNameplatesTabForDebug = true;
-    }
-#endif
-
     protected override void OnInitialize()
     {
         base.OnInitialize();
         _dataSource = new CoopOptionsVM();
-#if DEBUG
-        if (_selectPlayerNameplatesTabForDebug)
-        {
-            _dataSource.PlayerNameplatesTab?.ExecuteSelection();
-        }
-#endif
         _gauntletLayer = new GauntletLayer("CoopOptionsUI", 100)
         {
             IsFocusLayer = true
