@@ -10,6 +10,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Coop.Core.Server.Connections;
@@ -88,6 +89,15 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         public int PendingCount;
     }
 
+    /// <summary>Keys connection generations by peer instance rather than reusable endpoint.</summary>
+    private sealed class NetPeerReferenceComparer : IEqualityComparer<NetPeer>
+    {
+        public static readonly NetPeerReferenceComparer Instance = new NetPeerReferenceComparer();
+
+        public bool Equals(NetPeer x, NetPeer y) => ReferenceEquals(x, y);
+        public int GetHashCode(NetPeer peer) => RuntimeHelpers.GetHashCode(peer);
+    }
+
     private static readonly ILogger Logger = LogManager.GetLogger<ConnectionMessageQueue>();
 
     // Lazy breaks the construction cycle: CoopServer (the INetwork) depends on this queue, and the
@@ -95,7 +105,8 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     private readonly Lazy<INetwork> network;
     private readonly IMessageBroker messageBroker;
 
-    private readonly ConcurrentDictionary<NetPeer, PeerChannel> channels = new ConcurrentDictionary<NetPeer, PeerChannel>();
+    private readonly ConcurrentDictionary<NetPeer, PeerChannel> channels =
+        new ConcurrentDictionary<NetPeer, PeerChannel>(NetPeerReferenceComparer.Instance);
 
     public ConnectionMessageQueue(Lazy<INetwork> network, IMessageBroker messageBroker)
     {
@@ -203,7 +214,8 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     {
         if (tailMarker == null) throw new ArgumentNullException(nameof(tailMarker));
 
-        var channel = channels.GetOrAdd(peer, _ => new PeerChannel());
+        // Disconnect can remove the channel after the loading state checks that it is still current.
+        if (channels.TryGetValue(peer, out var channel) == false) return;
 
         int replayed;
         lock (channel.Gate)

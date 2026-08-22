@@ -10,7 +10,6 @@ using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
 using LiteNetLib;
 using System;
-using System.Runtime.Serialization;
 using Xunit;
 
 namespace Coop.Tests.Server.Connections;
@@ -48,16 +47,6 @@ public class ConnectionMessageQueueTests
     }
 
     private bool NothingSentTo(NetPeer peer) => network.SentPayloads.ContainsKey(peer.Id) == false;
-
-    // NetPeer equality is endpoint-based and TestNetwork.CreatePeer reuses one endpoint, so a second
-    // distinct peer must be given its own endpoint to be a distinct dictionary key.
-    private static int distinctPeerId = 1000;
-    private static NetPeer PeerWithEndpoint(string ip)
-    {
-        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-        peer.Setup(distinctPeerId++, ip);
-        return peer;
-    }
 
     [Fact]
     public void PeerVisibleBeforePlayerConnected_DropsWorldBroadcasts()
@@ -237,6 +226,23 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
+    public void LateOpenWithTail_DoesNotOpenSameEndpointReconnect()
+    {
+        var disconnected = Connect();
+        queue.BeginQueueing(disconnected);
+        messageBroker.Publish(this, new PlayerDisconnected(disconnected, default));
+
+        queue.OpenWithTail(disconnected, new NetworkJoinSync(JoinSyncSignal.WorldReady));
+
+        var reconnected = Connect();
+        queue.OpenWithTail(disconnected, new NetworkJoinSync(JoinSyncSignal.WorldReady));
+
+        Assert.True(queue.TryHandleBroadcast(reconnected, new FakePacket()));
+        Assert.True(NothingSentTo(disconnected));
+        Assert.True(NothingSentTo(reconnected));
+    }
+
+    [Fact]
     public void RemovalIsIdempotent()
     {
         var peer = network.CreatePeer();
@@ -267,8 +273,7 @@ public class ConnectionMessageQueueTests
         var loading = Connect();
         queue.BeginQueueing(loading);
 
-        var joined = PeerWithEndpoint("127.0.0.2");
-        messageBroker.Publish(this, new PlayerConnected(joined));
+        var joined = Connect();
         queue.BeginQueueing(joined);
         queue.OpenWithTail(joined, new NetworkJoinSync(JoinSyncSignal.WorldReady));
         queue.CompleteCatchUp(joined);
