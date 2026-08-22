@@ -68,13 +68,32 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     private void Handle_LocalFire(MessagePayload<SiegeWeaponFired> payload)
     {
         var fire = payload.What;
+        if (!machineState.TryGetMachineAuthority(
+                fire.Weapon.Id.Id,
+                out var controllerId,
+                out var hostEpoch,
+                out var authorityRevision)
+            || controllerId != session.OwnControllerId)
+        {
+            return;
+        }
 
         Guid shooterId = Guid.Empty;
         if (fire.Shooter != null && registry.TryGetAgentInfo(fire.Shooter, out var info))
             shooterId = info.AgentId;
 
         network.SendAll(new NetworkSiegeWeaponFired(
-            fire.Weapon.Id.Id, shooterId, fire.Position, fire.Direction, fire.Orientation, fire.BaseSpeed, fire.Speed, fire.MissileItem?.StringId));
+            fire.Weapon.Id.Id,
+            shooterId,
+            fire.Position,
+            fire.Direction,
+            fire.Orientation,
+            fire.BaseSpeed,
+            fire.Speed,
+            fire.MissileItem?.StringId,
+            controllerId,
+            hostEpoch,
+            authorityRevision));
     }
 
     // Another client's simulated siege machine fired — swing the arm and throw a cosmetic stone.
@@ -85,6 +104,22 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
+            if (!machineState.TryGetMachineAuthority(
+                    msg.MachineId,
+                    out var controllerId,
+                    out var hostEpoch,
+                    out var authorityRevision)
+                || !IsCurrentMachineAuthority(
+                    msg.SenderControllerId,
+                    msg.HostEpoch,
+                    msg.AuthorityRevision,
+                    controllerId,
+                    hostEpoch,
+                    authorityRevision))
+            {
+                return;
+            }
+
             // The machine's simulator fired natively; everyone else replays it.
             if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.MachineId)) return;
 
@@ -277,8 +312,25 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         int currentHostEpoch,
         int currentAuthorityRevision)
     {
-        return message.SenderControllerId == currentControllerId
-            && message.HostEpoch == currentHostEpoch
-            && message.AuthorityRevision == currentAuthorityRevision;
+        return IsCurrentMachineAuthority(
+            message.SenderControllerId,
+            message.HostEpoch,
+            message.AuthorityRevision,
+            currentControllerId,
+            currentHostEpoch,
+            currentAuthorityRevision);
+    }
+
+    internal static bool IsCurrentMachineAuthority(
+        string messageControllerId,
+        int messageHostEpoch,
+        int messageAuthorityRevision,
+        string currentControllerId,
+        int currentHostEpoch,
+        int currentAuthorityRevision)
+    {
+        return messageControllerId == currentControllerId
+            && messageHostEpoch == currentHostEpoch
+            && messageAuthorityRevision == currentAuthorityRevision;
     }
 }

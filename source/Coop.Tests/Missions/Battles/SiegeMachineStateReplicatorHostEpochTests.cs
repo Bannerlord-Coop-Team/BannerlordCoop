@@ -350,6 +350,47 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Fact]
+    public void PromotedHost_NormalizesAnInheritedClaimBeforeAuthorityLookup()
+    {
+        const int machineId = 31;
+        InvokeSetMachineAuthority(machineId, "remote-a");
+        sentToAll.Clear();
+
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+        session.SetupGet(s => s.HostEpoch).Returns(LocalEpoch + 1);
+
+        Assert.True(sut.TryGetMachineAuthority(
+            machineId,
+            out var controllerId,
+            out var hostEpoch,
+            out var authorityRevision));
+
+        Assert.Equal("remote-a", controllerId);
+        Assert.Equal(LocalEpoch + 1, hostEpoch);
+        Assert.Equal(0, authorityRevision);
+
+        var authority = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(sentToAll));
+        Assert.Equal(machineId, authority.MachineId);
+        Assert.Equal("remote-a", authority.ControllerId);
+        Assert.Equal(LocalEpoch + 1, authority.HostEpoch);
+        Assert.Equal(0, authority.AuthorityRevision);
+        Assert.Equal("us", authority.SenderControllerId);
+
+        var oldEpochHit = new NetworkGateHit(
+            gateId: 32,
+            ramId: machineId,
+            damage: 100,
+            senderControllerId: "remote-a",
+            hostEpoch: LocalEpoch,
+            authorityRevision: 1);
+        Assert.False(SiegeWeaponFireReplicator.IsCurrentGateHitProducer(
+            oldEpochHit,
+            controllerId,
+            hostEpoch,
+            authorityRevision));
+    }
+
+    [Fact]
     public void PromotedHostSnapshot_BuffersUntilItsAuthorityDecisionArrives()
     {
         broker.Publish(this, MachineState(

@@ -37,6 +37,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
+    private readonly ISiegeMachineStateReplicator machineState;
     private readonly IGuardedHitWindow guardedHitWindow;
     private readonly IAgentNativeMountState agentNativeMountState;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
@@ -47,6 +48,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly Queue<DeferredDamage> deferredDamage = new();
     private readonly Dictionary<(Guid AgentId, long ShotSequence), ReconstructionInfo> reconstructions = new();
     private readonly Queue<(Guid AgentId, long ShotSequence)> reconstructionHistory = new();
+    private readonly Dictionary<int, SiegeAuthorityStamp> siegeShotAuthorities = new();
     private readonly Dictionary<Guid, NoHealthReductionWarningState> noHealthReductionWarnings = new();
     private long presentationEpoch;
     private float presentationTime;
@@ -112,6 +114,8 @@ public class BattleDamageRouter : IBattleDamageRouter
         public WeaponComponentData AttackerWeapon { get; }
         public long ReadyEpoch { get; }
         public long GuardCandidateId { get; }
+        public bool HasSiegeAuthority { get; }
+        public SiegeAuthorityStamp SiegeAuthority { get; }
 
         public PendingLocalDamage(
             BattlePuppetHit hit,
@@ -119,7 +123,9 @@ public class BattleDamageRouter : IBattleDamageRouter
             long shotSequence,
             WeaponComponentData attackerWeapon,
             long readyEpoch,
-            long guardCandidateId)
+            long guardCandidateId,
+            bool hasSiegeAuthority,
+            SiegeAuthorityStamp siegeAuthority)
         {
             Hit = hit;
             AttackerId = attackerId;
@@ -127,11 +133,37 @@ public class BattleDamageRouter : IBattleDamageRouter
             AttackerWeapon = attackerWeapon;
             ReadyEpoch = readyEpoch;
             GuardCandidateId = guardCandidateId;
+            HasSiegeAuthority = hasSiegeAuthority;
+            SiegeAuthority = siegeAuthority;
+        }
+    }
+
+    private readonly struct SiegeAuthorityStamp
+    {
+        public int MachineId { get; }
+        public string ControllerId { get; }
+        public int HostEpoch { get; }
+        public int AuthorityRevision { get; }
+        public bool Accepted { get; }
+
+        public SiegeAuthorityStamp(
+            int machineId,
+            string controllerId,
+            int hostEpoch,
+            int authorityRevision,
+            bool accepted)
+        {
+            MachineId = machineId;
+            ControllerId = controllerId;
+            HostEpoch = hostEpoch;
+            AuthorityRevision = authorityRevision;
+            Accepted = accepted;
         }
     }
 
     public BattleDamageRouter(IBattleNetwork network, IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent, IBattleSession session,
+        ISiegeMachineStateReplicator machineState,
         IGuardedHitWindow guardedHitWindow,
         IAgentNativeMountState agentNativeMountState,
         IPuppetMountStateRepairer puppetMountStateRepairer)
@@ -140,11 +172,13 @@ public class BattleDamageRouter : IBattleDamageRouter
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
+        this.machineState = machineState;
         this.guardedHitWindow = guardedHitWindow;
         this.agentNativeMountState = agentNativeMountState;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
 
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
+        messageBroker.Subscribe<SiegeWeaponFired>(Handle_SiegeWeaponFired);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
         messageBroker.Subscribe<MissileReconstructed>(Handle_MissileReconstructed);
         mountAuthorityProbe = ProbeMountAuthority;
@@ -162,12 +196,14 @@ public class BattleDamageRouter : IBattleDamageRouter
         }
 
         messageBroker.Unsubscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
+        messageBroker.Unsubscribe<SiegeWeaponFired>(Handle_SiegeWeaponFired);
         messageBroker.Unsubscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
         messageBroker.Unsubscribe<MissileReconstructed>(Handle_MissileReconstructed);
         deferredDamage.Clear();
         pendingLocalDamage.Clear();
         reconstructions.Clear();
         reconstructionHistory.Clear();
+        siegeShotAuthorities.Clear();
         noHealthReductionWarnings.Clear();
         while (inboundDamage.TryDequeue(out _)) { }
 
@@ -195,6 +231,27 @@ public class BattleDamageRouter : IBattleDamageRouter
         reconstructionHistory.Enqueue(key);
         while (reconstructionHistory.Count > MaxReconstructionHistory)
             reconstructions.Remove(reconstructionHistory.Dequeue());
+    }
+
+    private void Handle_SiegeWeaponFired(MessagePayload<SiegeWeaponFired> payload)
+    {
+        SiegeWeaponFired fire = payload.What;
+        if (fire.MissileIndex < 0)
+            return;
+
+        bool accepted = machineState.TryGetMachineAuthority(
+                fire.Weapon.Id.Id,
+                out string controllerId,
+                out int hostEpoch,
+                out int authorityRevision)
+            && controllerId == session.OwnControllerId;
+
+        siegeShotAuthorities[fire.MissileIndex] = new SiegeAuthorityStamp(
+            fire.Weapon.Id.Id,
+            controllerId,
+            hostEpoch,
+            authorityRevision,
+            accepted);
     }
 
     public void Tick(float dt)
@@ -257,6 +314,8 @@ public class BattleDamageRouter : IBattleDamageRouter
 
         long shotSequence = 0;
         WeaponComponentData attackerWeapon = null;
+        bool hasSiegeAuthority = false;
+        SiegeAuthorityStamp siegeAuthority = default;
         if (payload.What.Blow.IsMissile)
         {
             int missileIndex = payload.What.Blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
@@ -264,6 +323,28 @@ public class BattleDamageRouter : IBattleDamageRouter
                 attackerWeapon = missile.Weapon.CurrentUsageItem;
             else
                 Logger.Error("Failed to resolve routed missile weapon at source index {MissileIndex}", missileIndex);
+
+            bool hasSiegeShot = siegeShotAuthorities.TryGetValue(missileIndex, out siegeAuthority);
+            if (hasSiegeShot)
+            {
+                siegeShotAuthorities.Remove(missileIndex);
+                if (!siegeAuthority.Accepted
+                    || !machineState.TryGetMachineAuthority(
+                        siegeAuthority.MachineId,
+                        out string currentControllerId,
+                        out int currentHostEpoch,
+                        out int currentAuthorityRevision)
+                    || !SiegeWeaponFireReplicator.IsCurrentMachineAuthority(
+                        siegeAuthority.ControllerId,
+                        siegeAuthority.HostEpoch,
+                        siegeAuthority.AuthorityRevision,
+                        currentControllerId,
+                        currentHostEpoch,
+                        currentAuthorityRevision))
+                {
+                    return;
+                }
+            }
 
             if (coopMissionComponent.MissileHandler.TryTakeLocalShot(missileIndex,
                 out Guid shotAgentId, out shotSequence))
@@ -273,10 +354,15 @@ public class BattleDamageRouter : IBattleDamageRouter
                 else
                     attackerId = shotAgentId;
             }
-            else
+            else if (!hasSiegeShot)
             {
                 Logger.Warning("Could not correlate local missile hit at source index {MissileIndex}",
                     missileIndex);
+            }
+
+            if (hasSiegeShot)
+            {
+                hasSiegeAuthority = true;
             }
         }
 
@@ -296,7 +382,9 @@ public class BattleDamageRouter : IBattleDamageRouter
             shotSequence,
             attackerWeapon,
             guardedHitWindow.Epoch + 1,
-            guardCandidateId);
+            guardCandidateId,
+            hasSiegeAuthority,
+            siegeAuthority);
 
         if (payload.What.IsMount)
         {
@@ -359,7 +447,11 @@ public class BattleDamageRouter : IBattleDamageRouter
                 hit.Blow,
                 hit.CollisionData,
                 missileShotSequence: pending.ShotSequence,
-                attackerWeapon: pending.AttackerWeapon));
+                attackerWeapon: pending.AttackerWeapon,
+                machineId: pending.HasSiegeAuthority ? pending.SiegeAuthority.MachineId : 0,
+                senderControllerId: pending.HasSiegeAuthority ? pending.SiegeAuthority.ControllerId : null,
+                hostEpoch: pending.HasSiegeAuthority ? pending.SiegeAuthority.HostEpoch : 0,
+                authorityRevision: pending.HasSiegeAuthority ? pending.SiegeAuthority.AuthorityRevision : 0));
             return;
         }
 
@@ -392,7 +484,11 @@ public class BattleDamageRouter : IBattleDamageRouter
                 hit.CollisionData,
                 isMount: true,
                 missileShotSequence: pending.ShotSequence,
-                attackerWeapon: pending.AttackerWeapon));
+                attackerWeapon: pending.AttackerWeapon,
+                machineId: pending.HasSiegeAuthority ? pending.SiegeAuthority.MachineId : 0,
+                senderControllerId: pending.HasSiegeAuthority ? pending.SiegeAuthority.ControllerId : null,
+                hostEpoch: pending.HasSiegeAuthority ? pending.SiegeAuthority.HostEpoch : 0,
+                authorityRevision: pending.HasSiegeAuthority ? pending.SiegeAuthority.AuthorityRevision : 0));
             return;
         }
 
@@ -523,6 +619,18 @@ public class BattleDamageRouter : IBattleDamageRouter
 
     private bool IsLocallyAuthoritativeFor(NetworkApplyBattleDamage damage)
     {
+        if (!IsCurrentSiegeMachineAuthority(damage))
+        {
+            Logger.Warning(
+                "[BattleDamage] Dropping routed siege blow: machineId={MachineId} sender={SenderController} " +
+                "hostEpoch={MessageHostEpoch} authorityRevision={MessageAuthorityRevision}",
+                damage.MachineId,
+                damage.SenderControllerId,
+                damage.HostEpoch,
+                damage.AuthorityRevision);
+            return false;
+        }
+
         if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(damage.VictimAgentId, out var info))
         {
             Logger.Warning(
@@ -573,6 +681,9 @@ public class BattleDamageRouter : IBattleDamageRouter
         NetworkApplyBattleDamage damage,
         bool authorityWasVerified)
     {
+        if (!IsCurrentSiegeMachineAuthority(damage))
+            return;
+
         var registry = coopMissionComponent.AgentRegistry;
         if (!registry.TryGetAgentInfo(damage.VictimAgentId, out var info))
         {
@@ -758,6 +869,25 @@ public class BattleDamageRouter : IBattleDamageRouter
         {
             hero.HitPoints = Math.Max(1, (int)healthAfter);
         }
+    }
+
+    private bool IsCurrentSiegeMachineAuthority(NetworkApplyBattleDamage damage)
+    {
+        if (!damage.HasMachineAuthority)
+            return true;
+
+        return machineState.TryGetMachineAuthority(
+                   damage.MachineId,
+                   out string controllerId,
+                   out int hostEpoch,
+                   out int authorityRevision)
+            && SiegeWeaponFireReplicator.IsCurrentMachineAuthority(
+                damage.SenderControllerId,
+                damage.HostEpoch,
+                damage.AuthorityRevision,
+                controllerId,
+                hostEpoch,
+                authorityRevision);
     }
 
     internal static bool RemoveIncompatibleDismountFlag(

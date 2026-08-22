@@ -50,8 +50,30 @@ public class NetworkApplyBattleDamage : IEvent
     /// <summary>The original missile weapon used by vanilla to select the combat skill reward.</summary>
     [ProtoMember(8)]
     public WeaponComponentData AttackerWeapon { get; }
+    /// <summary>Siege machine that launched this damage-causing projectile. See <see cref="HasMachineAuthority"/>.</summary>
+    [ProtoMember(9)]
+    public int MachineId { get; }
+    /// <summary>Controller that owned the siege machine when this projectile was launched.</summary>
+    [ProtoMember(10)]
+    public string SenderControllerId { get; }
+    /// <summary>Host epoch for the siege machine authority that launched this projectile.</summary>
+    [ProtoMember(11)]
+    public int HostEpoch { get; }
+    /// <summary>Per-machine authority revision that launched this projectile.</summary>
+    [ProtoMember(12)]
+    public int AuthorityRevision { get; }
+    /// <summary>Whether this envelope carries a siege-machine authority stamp.</summary>
+    [ProtoMember(13)]
+    public bool HasMachineAuthority { get; }
+
     public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData,
-        bool isMount = false, long missileShotSequence = 0, WeaponComponentData attackerWeapon = null)
+        bool isMount = false,
+        long missileShotSequence = 0,
+        WeaponComponentData attackerWeapon = null,
+        int machineId = 0,
+        string senderControllerId = null,
+        int hostEpoch = 0,
+        int authorityRevision = 0)
     {
         VictimAgentId = victimAgentId;
         AttackerAgentId = attackerAgentId;
@@ -61,5 +83,10 @@ public class NetworkApplyBattleDamage : IEvent
         MissileShotSequence = missileShotSequence;
         IsMissile = blow.IsMissile;
         AttackerWeapon = attackerWeapon;
+        MachineId = machineId;
+        SenderControllerId = senderControllerId;
+        HostEpoch = hostEpoch;
+        AuthorityRevision = authorityRevision;
+        HasMachineAuthority = machineId >= 0 && !string.IsNullOrEmpty(senderControllerId);
     }
 }

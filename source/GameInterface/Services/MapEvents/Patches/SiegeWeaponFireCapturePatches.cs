@@ -47,7 +47,15 @@ internal static class RangedSiegeWeaponShootPatch
 [HarmonyPatch(typeof(Mission), nameof(Mission.AddCustomMissile))]
 internal static class SiegeWeaponFireCapturePatch
 {
-    private static void Postfix(Agent shooterAgent, MissionWeapon missileWeapon, Vec3 position, Vec3 direction, Mat3 orientation, float baseSpeed, float speed)
+    private static void Postfix(
+        Mission.Missile __result,
+        Agent shooterAgent,
+        MissionWeapon missileWeapon,
+        Vec3 position,
+        Vec3 direction,
+        Mat3 orientation,
+        float baseSpeed,
+        float speed)
     {
         var weapon = SiegeWeaponFireContext.Capturing;
         if (weapon == null) return;
@@ -55,6 +63,15 @@ internal static class SiegeWeaponFireCapturePatch
         // One projectile per shot; clear before publishing so any nested aux-missile patches stop matching.
         SiegeWeaponFireContext.Capturing = null;
 
-        MessageBroker.Instance.Publish(weapon, new SiegeWeaponFired(weapon, shooterAgent, position, direction, orientation, baseSpeed, speed, missileWeapon.Item));
+        MessageBroker.Instance.Publish(weapon, new SiegeWeaponFired(
+            weapon,
+            shooterAgent,
+            position,
+            direction,
+            orientation,
+            baseSpeed,
+            speed,
+            missileWeapon.Item,
+            __result?.Index ?? -1));
     }
 }

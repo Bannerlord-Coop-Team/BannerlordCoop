@@ -21,8 +21,19 @@ public record SiegeWeaponFired : IEvent
     public float BaseSpeed { get; }
     public float Speed { get; }
     public ItemObject MissileItem { get; }
+    /// <summary>The native missile index assigned to this launch, used to carry its authority to routed hits.</summary>
+    public int MissileIndex { get; }
 
-    public SiegeWeaponFired(RangedSiegeWeapon weapon, Agent shooter, Vec3 position, Vec3 direction, Mat3 orientation, float baseSpeed, float speed, ItemObject missileItem)
+    public SiegeWeaponFired(
+        RangedSiegeWeapon weapon,
+        Agent shooter,
+        Vec3 position,
+        Vec3 direction,
+        Mat3 orientation,
+        float baseSpeed,
+        float speed,
+        ItemObject missileItem,
+        int missileIndex = -1)
     {
         Weapon = weapon;
         Shooter = shooter;
@@ -32,5 +43,6 @@ public record SiegeWeaponFired : IEvent
         BaseSpeed = baseSpeed;
         Speed = speed;
         MissileItem = missileItem;
+        MissileIndex = missileIndex;
     }
 }

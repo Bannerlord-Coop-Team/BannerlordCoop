@@ -25,4 +25,15 @@ public class SiegeWeaponFireReplicatorTests
 
         Assert.Equal(expected, result);
     }
+
+    [Fact]
+    public void SiegeMachineEvents_AcceptOnlyTheCurrentAuthorityTuple()
+    {
+        Assert.True(SiegeWeaponFireReplicator.IsCurrentMachineAuthority(
+            "owner-b", 7, 3, "owner-b", 7, 3));
+        Assert.False(SiegeWeaponFireReplicator.IsCurrentMachineAuthority(
+            "owner-a", 7, 2, "owner-b", 7, 3));
+        Assert.False(SiegeWeaponFireReplicator.IsCurrentMachineAuthority(
+            "owner-b", 6, 3, "owner-b", 7, 3));
+    }
 }

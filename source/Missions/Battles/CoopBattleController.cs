@@ -134,11 +134,15 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent,
             casualties,
             puppetMountStateRepairer);
+        // Construct machine authority before damage routing so siege projectile hits can carry the
+        // same authority tuple as the fire that produced them.
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
         damageRouter = new BattleDamageRouter(
             network,
             messageBroker,
             coopMissionComponent,
             session,
+            siegeMachineState,
             guardedHitWindow,
             agentNativeMountState,
             puppetMountStateRepairer);
@@ -149,7 +153,6 @@ public class CoopBattleController : CoopMissionController
         // — a superseded hosting generation is dropped consistently across both. The policy is a
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
         siegeWeaponFire = new SiegeWeaponFireReplicator(
             network,
             messageBroker,

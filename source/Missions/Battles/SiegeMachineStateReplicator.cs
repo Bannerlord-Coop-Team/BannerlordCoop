@@ -387,6 +387,14 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         out int hostEpoch,
         out int authorityRevision)
     {
+        // A promoted host can receive an old claimant event before the first poll has re-announced
+        // inherited claims. Normalize the tuple before returning it so old-epoch events cannot pass
+        // an authority check during that window.
+        if (session.IsLocalHost && GetAuthorityEpoch(machineId) < session.HostEpoch)
+        {
+            NormalizeAuthorityForCurrentHost(machineId, initializeIfMissing: true);
+        }
+
         if (claimedMachines.TryGetValue(machineId, out controllerId))
         {
             hostEpoch = GetSnapshotAuthorityEpoch(machineId);
