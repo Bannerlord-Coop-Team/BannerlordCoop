@@ -1,4 +1,4 @@
-using ProtoBuf;
+﻿using ProtoBuf;
 using System;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -44,6 +44,10 @@ public sealed class TournamentAgentSpawnData
     public readonly float MountHealth;
     [ProtoMember(18)]
     public readonly uint TeamColor2;
+    [ProtoMember(19)]
+    public readonly long AuthorityRevision;
+    [ProtoMember(20)]
+    public readonly long MountAuthorityRevision;
 
     public TournamentAgentSpawnData(
         Guid agentId,
@@ -62,7 +66,9 @@ public sealed class TournamentAgentSpawnData
         string mountCharacterId,
         int mountDescriptorSeed,
         EquipmentElement[] mountEquipment,
-        float mountHealth)
+        float mountHealth,
+        long authorityRevision = 0,
+        long mountAuthorityRevision = 0)
         : this(
             agentId,
             slotId,
@@ -81,7 +87,9 @@ public sealed class TournamentAgentSpawnData
             mountCharacterId,
             mountDescriptorSeed,
             mountEquipment,
-            mountHealth)
+            mountHealth,
+            authorityRevision,
+            mountAuthorityRevision)
     {
     }
 
@@ -103,7 +111,9 @@ public sealed class TournamentAgentSpawnData
         string mountCharacterId,
         int mountDescriptorSeed,
         EquipmentElement[] mountEquipment,
-        float mountHealth)
+        float mountHealth,
+        long authorityRevision = 0,
+        long mountAuthorityRevision = 0)
     {
         AgentId = agentId;
         SlotId = slotId;
@@ -123,5 +133,7 @@ public sealed class TournamentAgentSpawnData
         MountDescriptorSeed = mountDescriptorSeed;
         MountEquipment = mountEquipment ?? Array.Empty<EquipmentElement>();
         MountHealth = mountHealth;
+        AuthorityRevision = authorityRevision;
+        MountAuthorityRevision = mountAuthorityRevision;
     }
 }

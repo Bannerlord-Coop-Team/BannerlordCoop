@@ -1,4 +1,5 @@
-using GameInterface.Services.Tournaments.Data;
+﻿using GameInterface.Services.Tournaments.Data;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -72,5 +73,9 @@ public static class TournamentManifestAuthority
             data.MountCharacterId,
             data.MountDescriptorSeed,
             data.MountEquipment,
-            data.MountHealth);
+            data.MountHealth,
+            data.AuthorityRevision + 1,
+            data.MountAgentId == Guid.Empty
+                ? data.MountAuthorityRevision
+                : data.MountAuthorityRevision + 1);
 }

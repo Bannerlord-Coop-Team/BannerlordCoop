@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments.Data;
@@ -150,7 +150,14 @@ public class TournamentAgentSpawner
             Agent.WeaponWieldActionType.InstantAfterPickUp,
             Equipment.InitialWeaponEquipPreference.Any);
         agent.FadeIn();
-        coopMissionComponent.AgentRegistry.TryRegisterAgent(data.ControllerId, data.AgentId, agent);
+        coopMissionComponent.AgentRegistry.TryRegisterAgent(
+            data.ControllerId,
+            data.ControllerId,
+            data.ControllerId,
+            data.AgentId,
+            0,
+            agent,
+            data.AuthorityRevision);
 
         if (role == TournamentAgentControlRole.HumanPlayer)
         {
@@ -171,7 +178,9 @@ public class TournamentAgentSpawner
             coopMissionComponent.AgentRegistry.TryRegisterAgent(
                 data.ControllerId,
                 data.MountAgentId,
-                agent.MountAgent);
+                0,
+                agent.MountAgent,
+                data.MountAuthorityRevision);
         }
     }
 
