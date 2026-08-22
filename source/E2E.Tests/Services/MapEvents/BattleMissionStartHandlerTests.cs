@@ -134,81 +134,6 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
     }
 
     [Fact]
-    public void AttackMissionStart_MissingInitializerUsesLegacyPayloadFields()
-    {
-        var mapEvent = CreateServerMapEvent();
-        var localPartyId = JoinNewServerPartyToSide(mapEvent.MapEventId, BattleSideEnum.Attacker);
-        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-        SeedPartyTroopOnAll(localPartyId, troopId, 3);
-        var client = Clients.Last();
-        var resolvedInitializer = new MissionInitializerRecord("battle_terrain_030")
-        {
-            RandomTerrainSeed = 4242,
-        };
-        var missionInitializerResolver = new RecordingMissionInitializerResolver(resolvedInitializer);
-        var battleLauncher = new Mock<ICoopFieldBattleLauncher>();
-        MissionInitializerRecord openedInitializer = default;
-        battleLauncher.Setup(l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()))
-            .Callback<MissionInitializerRecord>(initializer => openedInitializer = initializer)
-            .Returns((Mission)null!);
-
-        using var launcherScope = client.Container.BeginLifetimeScope(builder =>
-            builder.RegisterInstance(battleLauncher.Object).As<ICoopFieldBattleLauncher>());
-
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var clientBattle));
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(localPartyId, out var localParty));
-            var previousMainParty = Campaign.Current.MainParty;
-            Campaign.Current.MainParty = localParty;
-            Campaign.Current.PlayerEncounter = null;
-
-            try
-            {
-                ContainerProvider.SetContainer(launcherScope);
-                var legacyInitializer = new MissionInitializerRecord(null)
-                {
-                    RandomTerrainSeed = 4242,
-                    AtmosphereOnCampaign = new AtmosphereInfo
-                    {
-                        TimeInfo = new TimeInformation { TimeOfDay = 14f },
-                    },
-                };
-
-                using var messageBroker = new MessageBroker();
-                using var handler = new BattleMissionStartHandler(
-                    messageBroker,
-                    client.ObjectManager,
-                    client.Resolve<IPlayerManager>(),
-                    client.Resolve<INetwork>(),
-                    client.Resolve<IMapEventLogger>(),
-                    missionInitializerResolver);
-
-                messageBroker.Publish(this, new NetworkStartAttackMission(
-                    mapEvent.MapEventId,
-                    legacyInitializer,
-                    mapEvent.AttackerPartyId));
-                GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
-
-                Assert.Equal(1, missionInitializerResolver.CallCount);
-                Assert.Same(clientBattle, missionInitializerResolver.MapEvent);
-                Assert.Equal(4242, missionInitializerResolver.RandomTerrainSeed);
-                Assert.Equal(14f, missionInitializerResolver.AtmosphereOnCampaign.TimeInfo.TimeOfDay);
-                Assert.Equal("battle_terrain_030", openedInitializer.SceneName);
-                battleLauncher.Verify(
-                    l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()), Times.Once);
-            }
-            finally
-            {
-                BattleSpawnGate.EndBattle();
-                Campaign.Current.MainParty = previousMainParty;
-                Campaign.Current.PlayerEncounter = null;
-                ContainerProvider.SetContainer(client.Container);
-            }
-        });
-    }
-
-    [Fact]
     public void InitializePlayerEncounter_CurrentBattleIsPreserved()
     {
         var mapEvent = CreateServerMapEvent();
@@ -286,26 +211,13 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
 
     private sealed class RecordingMissionInitializerResolver : IBattleMissionInitializerResolver
     {
-        private readonly MissionInitializerRecord result;
-
         public int CallCount { get; private set; }
-        public MapEvent MapEvent { get; private set; }
-        public int RandomTerrainSeed { get; private set; }
-        public AtmosphereInfo AtmosphereOnCampaign { get; private set; }
-
-        public RecordingMissionInitializerResolver(MissionInitializerRecord result = default)
-        {
-            this.result = result;
-        }
 
         public MissionInitializerRecord Create(MapEvent mapEvent, int randomTerrainSeed,
             AtmosphereInfo atmosphereOnCampaign)
         {
             CallCount++;
-            MapEvent = mapEvent;
-            RandomTerrainSeed = randomTerrainSeed;
-            AtmosphereOnCampaign = atmosphereOnCampaign;
-            return result;
+            return default;
         }
     }
 }

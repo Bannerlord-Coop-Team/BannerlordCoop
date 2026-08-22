@@ -443,19 +443,10 @@ internal class BattleMissionStartHandler : IHandler
 
     private void ShowLoadingScreenAndQueueAttackMission(NetworkStartAttackMission message, long sequence)
     {
-        if (!TryGetValidBattle(nameof(NetworkStartAttackMission), message.MapEventId, out var battle))
+        if (!TryGetValidBattle(nameof(NetworkStartAttackMission), message.MapEventId, out _))
         {
             LogAttackMissionLifecycle("rejected before queue", sequence, message.MapEventId);
             return;
-        }
-
-        var missionInitializer = message.MissionInitializer;
-        if (string.IsNullOrEmpty(missionInitializer.SceneName))
-        {
-            missionInitializer = missionInitializerResolver.Create(
-                battle,
-                message.RandomTerrainSeed,
-                message.AtmosphereOnCampaign);
         }
 
         LoadingWindow.EnableGlobalLoadingWindow();
@@ -466,7 +457,7 @@ internal class BattleMissionStartHandler : IHandler
         GameThread.EnqueueSafe(() =>
         {
             LogAttackMissionLifecycle("executing queued open", sequence, message.MapEventId);
-            OpenAttackMission(message.MapEventId, missionInitializer,
+            OpenAttackMission(message.MapEventId, message.MissionInitializer,
                 message.InitiatingPartyId, sequence);
 
             if (MissionState.Current == null)
