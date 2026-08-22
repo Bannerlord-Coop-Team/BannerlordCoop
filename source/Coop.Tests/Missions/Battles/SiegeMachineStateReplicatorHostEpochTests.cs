@@ -358,6 +358,8 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
         session.SetupGet(s => s.IsLocalHost).Returns(true);
         session.SetupGet(s => s.HostEpoch).Returns(LocalEpoch + 1);
+        int changedMachineId = -1;
+        sut.AuthorityChanged += machineId => changedMachineId = machineId;
 
         Assert.True(sut.TryGetMachineAuthority(
             machineId,
@@ -375,6 +377,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(LocalEpoch + 1, authority.HostEpoch);
         Assert.Equal(0, authority.AuthorityRevision);
         Assert.Equal("us", authority.SenderControllerId);
+        Assert.Equal(machineId, changedMachineId);
 
         var oldEpochHit = new NetworkGateHit(
             gateId: 32,

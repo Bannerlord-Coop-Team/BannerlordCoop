@@ -49,6 +49,8 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly Dictionary<(Guid AgentId, long ShotSequence), ReconstructionInfo> reconstructions = new();
     private readonly Queue<(Guid AgentId, long ShotSequence)> reconstructionHistory = new();
     private readonly Dictionary<int, SiegeAuthorityStamp> siegeShotAuthorities = new();
+    private readonly Dictionary<int, List<NetworkApplyBattleDamage>> pendingAuthorityDamage = new();
+    private readonly Queue<NetworkApplyBattleDamage> pendingApplyDamage = new();
     private readonly Dictionary<Guid, NoHealthReductionWarningState> noHealthReductionWarnings = new();
     private long presentationEpoch;
     private float presentationTime;
@@ -177,6 +179,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         this.agentNativeMountState = agentNativeMountState;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
 
+        machineState.AuthorityChanged += Handle_AuthorityChanged;
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<SiegeWeaponFired>(Handle_SiegeWeaponFired);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
@@ -195,6 +198,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             closing = true;
         }
 
+        machineState.AuthorityChanged -= Handle_AuthorityChanged;
         messageBroker.Unsubscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Unsubscribe<SiegeWeaponFired>(Handle_SiegeWeaponFired);
         messageBroker.Unsubscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
@@ -204,6 +208,8 @@ public class BattleDamageRouter : IBattleDamageRouter
         reconstructions.Clear();
         reconstructionHistory.Clear();
         siegeShotAuthorities.Clear();
+        pendingAuthorityDamage.Clear();
+        pendingApplyDamage.Clear();
         noHealthReductionWarnings.Clear();
         while (inboundDamage.TryDequeue(out _)) { }
 
@@ -266,6 +272,8 @@ public class BattleDamageRouter : IBattleDamageRouter
             presentationTime += Math.Min(dt, MaximumTickSeconds);
 
         DrainInboundDamage();
+        DrainPendingAuthorityDamage();
+        DrainPendingApplyDamage();
         int count = deferredDamage.Count;
         var blockedVictims = new HashSet<Guid>();
         for (int i = 0; i < count; i++)
@@ -279,7 +287,11 @@ public class BattleDamageRouter : IBattleDamageRouter
             }
             else
             {
-                ApplyDeferredDamage(deferred.Damage);
+                if (!ApplyDeferredDamage(deferred))
+                {
+                    deferredDamage.Enqueue(deferred);
+                    blockedVictims.Add(victimId);
+                }
             }
         }
     }
@@ -295,7 +307,7 @@ public class BattleDamageRouter : IBattleDamageRouter
 
         DrainPendingLocalDamage(force: true);
         while (deferredDamage.Count > 0)
-            ApplyDeferredDamage(deferredDamage.Dequeue().Damage);
+            ApplyDeferredDamage(deferredDamage.Dequeue());
         while (inboundDamage.TryDequeue(out NetworkApplyBattleDamage damage))
             TryApplyNetworkDamage(damage, authorityWasVerified: false);
     }
@@ -507,16 +519,6 @@ public class BattleDamageRouter : IBattleDamageRouter
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
     {
         NetworkApplyBattleDamage damage = payload.What;
-        if (IsMissileDamage(damage) && damage.MissileShotSequence != 0)
-        {
-            Vec3 impactVelocity = damage.Blow.WeaponRecord.Velocity;
-            if (!MissileReplayPlanner.IsFinite(impactVelocity) || impactVelocity.LengthSquared <= 0.0001f)
-                impactVelocity = damage.CollisionData.MissileVelocity;
-
-            coopMissionComponent.MissileHandler.RecordImpactHint(damage.AttackerAgentId,
-                damage.MissileShotSequence, damage.VictimAgentId, damage.IsMount, impactVelocity);
-        }
-
         bool enqueued = false;
         lock (inboundDamageGate)
         {
@@ -535,20 +537,172 @@ public class BattleDamageRouter : IBattleDamageRouter
     {
         while (inboundDamage.TryDequeue(out NetworkApplyBattleDamage damage))
         {
+            ProcessInboundDamage(damage);
+        }
+    }
+
+    private void ProcessInboundDamage(NetworkApplyBattleDamage damage)
+    {
+        if (!TryAcceptOrBufferFutureAuthority(damage))
+            return;
+
+        RecordImpactHint(damage);
+
+        if (!IsLocallyAuthoritativeFor(damage))
+            return;
+
+        bool missile = IsMissileDamage(damage);
+        if (missile || HasDeferredDamageFor(damage.VictimAgentId))
+        {
+            deferredDamage.Enqueue(new DeferredDamage(damage, missile,
+                presentationEpoch + (missile ? MinimumPresentationEpochs : 0),
+                presentationTime + (missile ? UnknownShotGraceSeconds : 0f)));
+        }
+        else
+        {
+            if (!TryApplyNetworkDamage(damage, authorityWasVerified: true))
+            {
+                if (damage.HasMachineAuthority)
+                    BufferFutureAuthorityDamage(damage);
+                else
+                    pendingApplyDamage.Enqueue(damage);
+            }
+        }
+    }
+
+    private void RecordImpactHint(NetworkApplyBattleDamage damage)
+    {
+        if (!IsMissileDamage(damage) || damage.MissileShotSequence == 0)
+            return;
+
+        Vec3 impactVelocity = damage.Blow.WeaponRecord.Velocity;
+        if (!MissileReplayPlanner.IsFinite(impactVelocity) || impactVelocity.LengthSquared <= 0.0001f)
+            impactVelocity = damage.CollisionData.MissileVelocity;
+
+        coopMissionComponent.MissileHandler.RecordImpactHint(damage.AttackerAgentId,
+            damage.MissileShotSequence, damage.VictimAgentId, damage.IsMount, impactVelocity);
+    }
+
+    private bool TryAcceptOrBufferFutureAuthority(NetworkApplyBattleDamage damage)
+    {
+        if (!damage.HasMachineAuthority)
+            return true;
+
+        if (!machineState.TryGetMachineAuthority(
+                damage.MachineId,
+                out string controllerId,
+                out int hostEpoch,
+                out int authorityRevision))
+        {
+            BufferFutureAuthorityDamage(damage);
+            return false;
+        }
+
+        int authorityOrder = SiegeWeaponFireReplicator.CompareMachineAuthority(
+            damage.SenderControllerId,
+            damage.HostEpoch,
+            damage.AuthorityRevision,
+            controllerId,
+            hostEpoch,
+            authorityRevision);
+        if (authorityOrder == 1)
+        {
+            BufferFutureAuthorityDamage(damage);
+            return false;
+        }
+
+        return authorityOrder == 0;
+    }
+
+    private void BufferFutureAuthorityDamage(NetworkApplyBattleDamage damage)
+    {
+        if (!pendingAuthorityDamage.TryGetValue(damage.MachineId, out var pending))
+        {
+            pending = new List<NetworkApplyBattleDamage>();
+            pendingAuthorityDamage[damage.MachineId] = pending;
+        }
+
+        pending.Add(damage);
+    }
+
+    private void Handle_AuthorityChanged(int machineId)
+    {
+        if (!pendingAuthorityDamage.TryGetValue(machineId, out var pending))
+            return;
+
+        pendingAuthorityDamage.Remove(machineId);
+        foreach (var damage in pending)
+        {
+            NetworkApplyBattleDamage pendingDamage = damage;
+            GameThread.RunSafe(() => ReplayPendingAuthorityDamage(pendingDamage));
+        }
+    }
+
+    private void DrainPendingAuthorityDamage()
+    {
+        if (pendingAuthorityDamage.Count == 0)
+            return;
+
+        var machineIds = new List<int>(pendingAuthorityDamage.Keys);
+        foreach (int machineId in machineIds)
+        {
+            if (!machineState.TryGetMachineAuthority(
+                    machineId,
+                    out string controllerId,
+                    out int hostEpoch,
+                    out int authorityRevision)
+                || !pendingAuthorityDamage.TryGetValue(machineId, out var pending))
+            {
+                continue;
+            }
+
+            pendingAuthorityDamage.Remove(machineId);
+            foreach (var damage in pending)
+            {
+                int authorityOrder = SiegeWeaponFireReplicator.CompareMachineAuthority(
+                    damage.SenderControllerId,
+                    damage.HostEpoch,
+                    damage.AuthorityRevision,
+                    controllerId,
+                    hostEpoch,
+                    authorityRevision);
+                if (authorityOrder == 1)
+                {
+                    BufferFutureAuthorityDamage(damage);
+                    continue;
+                }
+
+                if (authorityOrder == 0)
+                    ReplayPendingAuthorityDamage(damage);
+            }
+        }
+    }
+
+    private void DrainPendingApplyDamage()
+    {
+        int count = pendingApplyDamage.Count;
+        for (int i = 0; i < count; i++)
+        {
+            NetworkApplyBattleDamage damage = pendingApplyDamage.Dequeue();
             if (!IsLocallyAuthoritativeFor(damage))
                 continue;
 
-            bool missile = IsMissileDamage(damage);
-            if (missile || HasDeferredDamageFor(damage.VictimAgentId))
-            {
-                deferredDamage.Enqueue(new DeferredDamage(damage, missile,
-                    presentationEpoch + (missile ? MinimumPresentationEpochs : 0),
-                    presentationTime + (missile ? UnknownShotGraceSeconds : 0f)));
-            }
-            else
-            {
-                TryApplyNetworkDamage(damage, authorityWasVerified: true);
-            }
+            if (!TryApplyNetworkDamage(damage, authorityWasVerified: true))
+                pendingApplyDamage.Enqueue(damage);
+        }
+    }
+
+    private void ReplayPendingAuthorityDamage(NetworkApplyBattleDamage damage)
+    {
+        try
+        {
+            ProcessInboundDamage(damage);
+        }
+        catch (Exception ex)
+        {
+            BufferFutureAuthorityDamage(damage);
+            Logger.Error(ex, "Failed to replay buffered siege damage for machine {MachineId}",
+                damage.MachineId);
         }
     }
 
@@ -650,24 +804,31 @@ public class BattleDamageRouter : IBattleDamageRouter
         return info.CurrentAuthority == session.OwnControllerId;
     }
 
-    private void ApplyDeferredDamage(NetworkApplyBattleDamage damage)
+    private bool ApplyDeferredDamage(DeferredDamage deferred)
     {
-        TryApplyNetworkDamage(damage, authorityWasVerified: true);
+        if (!TryApplyNetworkDamage(deferred.Damage, authorityWasVerified: true))
+            return false;
+
+        NetworkApplyBattleDamage damage = deferred.Damage;
         if (damage.AttackerAgentId != Guid.Empty && damage.MissileShotSequence != 0)
             reconstructions.Remove((damage.AttackerAgentId, damage.MissileShotSequence));
+
+        return true;
     }
 
-    private void TryApplyNetworkDamage(
+    private bool TryApplyNetworkDamage(
         NetworkApplyBattleDamage damage,
         bool authorityWasVerified)
     {
         try
         {
             ApplyNetworkDamage(damage, authorityWasVerified);
+            return true;
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to apply routed battle damage");
+            return false;
         }
     }
 

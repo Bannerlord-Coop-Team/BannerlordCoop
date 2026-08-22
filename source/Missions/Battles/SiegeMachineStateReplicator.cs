@@ -33,6 +33,8 @@ public interface ISiegeMachineStateReplicator : IDisposable
         out string controllerId,
         out int hostEpoch,
         out int authorityRevision);
+
+    event Action<int> AuthorityChanged;
 }
 
 /// <inheritdoc cref="ISiegeMachineStateReplicator"/>
@@ -61,6 +63,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private const float LadderFrameEpsilon = 0.001f;
 
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeMachineStateReplicator>();
+
+    public event Action<int> AuthorityChanged;
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -251,6 +255,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             hostEpoch,
             authorityRevision: 0,
             senderControllerId: session.OwnControllerId));
+        AuthorityChanged?.Invoke(machineId);
     }
 
     // A successor promoted to host had deactivated its machines as a peer; the simulating
@@ -1035,7 +1040,6 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         // remote claimant replacing another remote claimant while the damage fields stay unchanged.
         lastSent.Remove(machineId);
         lastSentLadderAnimations.Remove(machineId);
-        RefreshMachineGates();
         // BR-102: the arbitration decision is THE host-authority act here — stamp our hosting generation.
         network.SendAll(new NetworkSiegeMachineAuthority(
             machineId,
@@ -1043,6 +1047,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             hostEpoch,
             authorityRevision,
             session.OwnControllerId));
+        AuthorityChanged?.Invoke(machineId);
+        RefreshMachineGates();
     }
 
     private void Handle_NetworkMachineAuthority(MessagePayload<NetworkSiegeMachineAuthority> payload)
@@ -1107,6 +1113,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             {
                 ResetSendCacheWhenSimulationMovesHere(obj.MachineId, wasSimulatedLocally);
             }
+            AuthorityChanged?.Invoke(obj.MachineId);
             RefreshMachineGates();
             DrainPendingMachineStates();
         });

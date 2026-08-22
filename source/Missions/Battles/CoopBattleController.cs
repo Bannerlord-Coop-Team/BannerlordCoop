@@ -280,6 +280,7 @@ public class CoopBattleController : CoopMissionController
 
         siegeEngineDeployment.DrainPending(dt);
         siegeMachineState.Tick(dt);
+        siegeWeaponFire.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
 
