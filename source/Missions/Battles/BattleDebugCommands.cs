@@ -3,6 +3,7 @@ using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Commands;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.ObjectManager;
 using Missions.Agents.Packets;
 using Newtonsoft.Json;
 #if DEBUG
@@ -495,6 +496,93 @@ internal static class BattleDebugCommands
         return $"WIELD_TEST_RESTORED agent={restoredAgentId:D}";
     }
 
+#endif
+
+#if DEBUG
+    [CommandLineArgumentFunction("item_modifier_state", "coop.debug.battle")]
+    public static string ItemModifierState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.item_modifier_state";
+
+        Mission mission = Mission.Current;
+        CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
+        if (mission == null || controller == null)
+            return "No active coop battle mission";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Object manager is unavailable";
+
+        int activeAgents = 0;
+        int weaponCount = 0;
+        int modifiedWeapons = 0;
+        int unmodifiedWeapons = 0;
+        int canonicalModifiers = 0;
+        int unregisteredModifiers = 0;
+        int nonCanonicalModifiers = 0;
+        var modifierIds = new HashSet<string>();
+
+        foreach (Agent agent in mission.Agents)
+        {
+            if (!agent.IsActive() || !agent.IsHuman) continue;
+
+            activeAgents++;
+            MissionEquipment equipment = agent.Equipment;
+            if (equipment == null) continue;
+
+            for (EquipmentIndex index = EquipmentIndex.WeaponItemBeginSlot;
+                 index < EquipmentIndex.NumAllWeaponSlots;
+                 index++)
+            {
+                MissionWeapon weapon = equipment[index];
+                if (weapon.Item == null) continue;
+
+                weaponCount++;
+                ItemModifier modifier = weapon.ItemModifier;
+                if (modifier == null)
+                {
+                    unmodifiedWeapons++;
+                    continue;
+                }
+
+                modifiedWeapons++;
+                if (!objectManager.TryGetId(modifier, out string modifierId))
+                {
+                    unregisteredModifiers++;
+                    continue;
+                }
+
+                modifierIds.Add(modifierId);
+                if (!objectManager.TryGetObject(modifierId, out ItemModifier canonicalModifier) ||
+                    !ReferenceEquals(modifier, canonicalModifier))
+                {
+                    nonCanonicalModifiers++;
+                    continue;
+                }
+
+                canonicalModifiers++;
+            }
+        }
+
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            controllerId = controller.Session.OwnControllerId,
+            activeAgents,
+            weaponCount,
+            modifiedWeapons,
+            unmodifiedWeapons,
+            canonicalModifiers,
+            unregisteredModifiers,
+            nonCanonicalModifiers,
+            distinctModifierIds = modifierIds.OrderBy(id => id).ToArray(),
+        });
+
+        return
+            $"ITEM_MODIFIER_STATE activeAgents={activeAgents}|weapons={weaponCount}|" +
+            $"modified={modifiedWeapons}|unmodified={unmodifiedWeapons}|" +
+            $"canonical={canonicalModifiers}|unregistered={unregisteredModifiers}|" +
+            $"nonCanonical={nonCanonicalModifiers}\n" +
+            $"LIVE_TEST_JSON={structuredState}";
+    }
 #endif
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
