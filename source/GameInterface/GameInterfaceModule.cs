@@ -83,6 +83,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
+        builder.RegisterType<NearbyPartyReinforcer>().As<INearbyPartyReinforcer>().InstancePerDependency();
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();
         builder.RegisterType<AiSiegeTerminalPolicy>().As<IAiSiegeTerminalPolicy>().InstancePerLifetimeScope();
