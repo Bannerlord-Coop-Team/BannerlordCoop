@@ -17,8 +17,8 @@ namespace Missions.Battles;
 /// see <see cref="SiegeMachineStateReplicator"/>); everyone else's copy is unmanned, so its arm never swings,
 /// no stone spawns, and its ram never strikes. The capture patches report each simulator shot / ram hit; here
 /// we broadcast it and every other client plays the machine animation, plus (for a shot) spawns a cosmetic
-/// projectile with the resolved launch. Damage stays simulator-authoritative — the replayed stone is fired by
-/// a non-locally-controlled puppet, so <c>BattleBlowInterceptPatch</c> drops its blows.
+/// projectile with the resolved launch. The replayed stone is fired by a non-locally-controlled puppet, so
+/// <c>BattleBlowInterceptPatch</c> drops its blows; the mission host applies ram damage to gates.
 /// </summary>
 public interface ISiegeWeaponFireReplicator : IDisposable
 {
@@ -30,12 +30,18 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry registry;
+    private readonly IBattleSession session;
 
-    public SiegeWeaponFireReplicator(IBattleNetwork network, IMessageBroker messageBroker, INetworkAgentRegistry registry)
+    public SiegeWeaponFireReplicator(
+        IBattleNetwork network,
+        IMessageBroker messageBroker,
+        INetworkAgentRegistry registry,
+        IBattleSession session)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.registry = registry;
+        this.session = session;
 
         messageBroker.Subscribe<SiegeWeaponFired>(Handle_LocalFire);
         messageBroker.Subscribe<NetworkSiegeWeaponFired>(Handle_NetworkFire);
@@ -194,10 +200,9 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         network.SendAll(new NetworkGateHit(payload.What.Gate.Id.Id, payload.What.Ram.Id.Id, payload.What.Damage));
     }
 
-    // A granted ram strikes only on its simulator, so the host (gate authority — gates are never claimed)
-    // applies the carried damage through vanilla TriggerOnHit: its own OnHitTaken plays the reaction and
-    // the synced hit points/destruction carry the damage to everyone. Other peers replay the cosmetic
-    // reaction, mirroring CastleGate.OnHitTaken's condition.
+    // A granted ram strikes only on its simulator. The host applies the carried damage through vanilla
+    // TriggerOnHit even when a peer simulates the gate; the host snapshot carries hit points and destruction.
+    // Non-hosts replay only CastleGate.OnHitTaken's cosmetic reaction.
     private void Handle_NetworkGateHit(MessagePayload<NetworkGateHit> payload)
     {
         var msg = payload.What;
@@ -205,12 +210,13 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.RamId)) return;
+            bool ramSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.RamId);
+            if (ramSimulatedLocally) return;
 
             var gate = FindMissionObject<CastleGate>(msg.GateId);
             if (gate == null) return;
 
-            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.GateId))
+            if (ShouldApplyHostGateDamage(session.IsLocalHost, ramSimulatedLocally))
             {
                 var ram = FindMissionObject<BatteringRam>(msg.RamId);
                 if (ram == null || gate.DestructionComponent == null) return;
@@ -228,5 +234,10 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             Mission.Current.MakeSound(SoundEvent.GetEventIdFromString("event:/mission/siege/door/hit"),
                 gate.GameEntity.GlobalPosition, soundCanBePredicted: false, isReliable: true, -1, -1);
         });
+    }
+
+    internal static bool ShouldApplyHostGateDamage(bool isLocalHost, bool ramSimulatedLocally)
+    {
+        return isLocalHost && !ramSimulatedLocally;
     }
 }

@@ -4,9 +4,9 @@ using ProtoBuf;
 namespace Missions.Messages;
 
 /// <summary>
-/// Ram simulator to everyone: its battering ram struck a gate. The host applies the damage to the
-/// authoritative gate (vanilla TriggerOnHit, which also plays its reaction); other peers replay the
-/// door/plank flinch, heavy-hit particles and impact sound — their own gate never runs OnHit.
+/// Ram simulator to everyone: its battering ram struck a gate. The host applies the damage with vanilla
+/// TriggerOnHit even when another peer simulates the gate; non-hosts replay the door/plank flinch, heavy-hit
+/// particles and impact sound.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NetworkGateHit : IEvent

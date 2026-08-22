@@ -223,20 +223,6 @@ public class GameThread : IUpdateable
     public static void Run(Action action, bool blocking = false, string label = null,
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
-        => Run(action, blocking, BlockingTimeout, label, callerFile, callerMember);
-
-    public static void Run(Action action, TimeSpan blockingTimeout, string label = null,
-        [CallerFilePath] string callerFile = null,
-        [CallerMemberName] string callerMember = null)
-    {
-        if (blockingTimeout <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(blockingTimeout));
-
-        Run(action, true, blockingTimeout, label, callerFile, callerMember);
-    }
-
-    private static void Run(Action action, bool blocking, TimeSpan blockingTimeout, string label,
-        string callerFile, string callerMember)
     {
         CancellationToken cancellation = m_AmbientCancellation.Value;
         if (cancellation.IsCancellationRequested)
@@ -272,15 +258,15 @@ public class GameThread : IUpdateable
             if (ewh == null) return;
 
             int waitResult = !cancellation.CanBeCanceled
-                ? (ewh.WaitOne(blockingTimeout) ? 0 : WaitHandle.WaitTimeout)
+                ? (ewh.WaitOne(BlockingTimeout) ? 0 : WaitHandle.WaitTimeout)
                 : WaitHandle.WaitAny(
                     new[] { ewh, cancellation.WaitHandle },
-                    blockingTimeout);
+                    BlockingTimeout);
             if (waitResult == WaitHandle.WaitTimeout)
             {
                 throw new TimeoutException(
                     $"A blocking {nameof(Run)} action was not processed by the game loop " +
-                    $"within {blockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
+                    $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
                     $"{nameof(GameThread)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
             }
             if (waitResult == 1)
