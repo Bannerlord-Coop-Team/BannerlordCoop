@@ -1,0 +1,37 @@
+<Prefab>
+  <Window>
+    <NameMarkerScreenWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                            IsMarkersEnabled="@IsEnabled" TargetAlphaValue="1"
+                            MarkersContainer="MarkersContainer">
+      <Children>
+        <Widget Id="MarkersContainer" DataSource="{Targets}"
+                WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
+          <ItemTemplate>
+            <NameMarkerListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="40"
+                                 Position="@ScreenPosition" Distance="@Distance" IsMarkerEnabled="@IsEnabled"
+                                 NameTextWidget="NameContainer\NameText"
+                                 TypeVisualWidget="NameContainer\TypeVisual"
+                                 FarAlphaTarget="1" FarDistanceCutoff="250" CloseDistanceCutoff="25">
+              <Children>
+                <ListPanel Id="NameContainer"
+                           WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
+                           LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                  <Children>
+                    <BrushWidget Id="TypeVisual" IsVisible="false"
+                                 WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                 SuggestedWidth="1" SuggestedHeight="1" Brush="NameMarker.VisualBrush"
+                                 Brush.AlphaFactor="0"/>
+                    <TextWidget Id="NameText" WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
+                                Brush="NameMarker.TextBrush" Brush.FontColor="@NameColor"
+                                Brush.TextVerticalAlignment="Center" OverrideDefaultStateSwitchingEnabled="true"
+                                Text="@Name"/>
+                  </Children>
+                </ListPanel>
+              </Children>
+            </NameMarkerListPanel>
+          </ItemTemplate>
+        </Widget>
+      </Children>
+    </NameMarkerScreenWidget>
+  </Window>
+</Prefab>

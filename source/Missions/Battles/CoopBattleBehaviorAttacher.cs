@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using Serilog;
 using System;
 using TaleWorlds.MountAndBlade;
@@ -18,14 +19,17 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
     private readonly Func<CoopBattleController> controllerFactory;
     private readonly IMessageBroker messageBroker;
     private readonly Func<MissionMapTimeView> mapTimeViewFactory;
+    private readonly Func<PlayerNameplateMissionView> playerNameplateViewFactory;
 
     public CoopBattleBehaviorAttacher(
         Func<CoopBattleController> controllerFactory,
         Func<MissionMapTimeView> mapTimeViewFactory,
+        Func<PlayerNameplateMissionView> playerNameplateViewFactory,
         IMessageBroker messageBroker)
     {
         this.controllerFactory = controllerFactory;
         this.mapTimeViewFactory = mapTimeViewFactory;
+        this.playerNameplateViewFactory = playerNameplateViewFactory;
         this.messageBroker = messageBroker;
     }
 
@@ -34,6 +38,7 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
         var controller = controllerFactory();
         mission.AddMissionBehavior(controller);
         mission.AddMissionBehavior(mapTimeViewFactory());
+        mission.AddMissionBehavior(playerNameplateViewFactory());
         mission.AddMissionBehavior(new BattleResultReadyLogic(
             controller.ResultCommitter,
             controller.SiegeEngineStateReporter,
