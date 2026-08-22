@@ -150,7 +150,7 @@ public class ArmyPatches
             {
                 LongTermBehaviorTextFailures.GetValue(__instance, army =>
                 {
-                    Logger.Debug("Unable to render long-term behavior text for army {ArmyName}", army.Name);
+                    Logger.Error("Unable to render long-term behavior text for army {ArmyName}", army.Name);
                     return new object();
                 });
                 __result = TextObject.GetEmpty();

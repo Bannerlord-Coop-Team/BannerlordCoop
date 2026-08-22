@@ -37,9 +37,6 @@ namespace GameInterface.Services.Kingdoms.Commands;
 public class KingdomDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomDebugCommand>();
-#if DEBUG
-    private static Action<InquiryData, bool, bool> pendingDecisionConfirmation;
-#endif
     private enum CollectionTarget
     {
         Armies,
@@ -155,58 +152,15 @@ public class KingdomDebugCommand
         if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
 
         KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(decision);
-#if DEBUG
-        ClearPendingDecisionConfirmation();
-        Action<InquiryData, bool, bool> confirmInquiry = null;
-        confirmInquiry = (inquiry, _, _) =>
-        {
-            if (Game.Current?.GameStateManager?.ActiveState != kingdomState ||
-                inquiry?.AffirmativeAction == null ||
-                !string.Equals(inquiry.TitleText, GameTexts.FindText("str_decision").ToString(), StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            Action affirmativeAction = inquiry.AffirmativeAction;
-            ClearPendingDecisionConfirmation();
-            InformationManager.HideInquiry();
-            affirmativeAction();
-        };
-        pendingDecisionConfirmation = confirmInquiry;
-        InformationManager.OnShowInquiry += confirmInquiry;
-        try
-        {
-            Game.Current.GameStateManager.PushState(kingdomState, 0);
-        }
-        catch
-        {
-            ClearPendingDecisionConfirmation();
-            throw;
-        }
-#else
         Game.Current.GameStateManager.PushState(kingdomState, 0);
-#endif
         return "KINGDOM_DECISION_SCREEN_OPENED";
     }
-
-#if DEBUG
-    private static void ClearPendingDecisionConfirmation()
-    {
-        if (pendingDecisionConfirmation == null) return;
-
-        InformationManager.OnShowInquiry -= pendingDecisionConfirmation;
-        pendingDecisionConfirmation = null;
-    }
-#endif
 
     [CommandLineArgumentFunction("close", "coop.debug.kingdom")]
     public static string CloseKingdomScreen(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 0) return "Usage: coop.debug.kingdom.close";
-#if DEBUG
-        ClearPendingDecisionConfirmation();
-#endif
         if (!(Game.Current?.GameStateManager?.ActiveState is KingdomState))
             return "No active Kingdom screen.";
 
