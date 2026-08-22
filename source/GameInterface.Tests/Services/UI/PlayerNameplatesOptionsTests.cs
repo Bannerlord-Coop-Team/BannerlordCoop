@@ -121,13 +121,28 @@ public class PlayerNameplatesOptionsTests
     {
         Assert.Equal(
             expected,
-            new PlayerNameplateEligibility().IsAlliedTeam(isPlayerTeam, isEnemyOfPlayerTeam, false));
+            new PlayerNameplateEligibility().IsAlliedTeam(
+                isPlayerTeam,
+                isEnemyOfPlayerTeam,
+                false,
+                false,
+                false));
     }
 
     [Fact]
     public void InvalidTournamentSpectatorTeams_AreAllied()
     {
-        Assert.True(new PlayerNameplateEligibility().IsAlliedTeam(false, false, true));
+        Assert.True(new PlayerNameplateEligibility().IsAlliedTeam(false, false, true, false, true));
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void MixedTeamValidity_IsAlliedOnlyInTournaments(bool isTournament, bool expected)
+    {
+        Assert.Equal(
+            expected,
+            new PlayerNameplateEligibility().IsAlliedTeam(false, false, false, true, isTournament));
     }
 
     [Fact]

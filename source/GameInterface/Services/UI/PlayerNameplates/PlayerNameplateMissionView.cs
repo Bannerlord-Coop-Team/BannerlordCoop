@@ -12,6 +12,7 @@ using GameInterface.Services.UI.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using SandBox.Tournaments.MissionLogics;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.MountAndBlade;
@@ -211,9 +212,15 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         if (agent.Team == null || playerTeam == null) return false;
 
         bool bothTeamsInvalid = !agent.Team.IsValid && !playerTeam.IsValid;
-        if (!bothTeamsInvalid && (!agent.Team.IsValid || !playerTeam.IsValid)) return false;
-        bool isEnemyOfPlayerTeam = !bothTeamsInvalid && agent.Team.IsEnemyOf(playerTeam);
-        if (!eligibility.IsAlliedTeam(agent.Team == playerTeam, isEnemyOfPlayerTeam, bothTeamsInvalid))
+        bool hasMixedTeamValidity = agent.Team.IsValid != playerTeam.IsValid;
+        bool isEnemyOfPlayerTeam = agent.Team.IsValid && playerTeam.IsValid && agent.Team.IsEnemyOf(playerTeam);
+        bool isTournament = Mission.GetMissionBehavior<TournamentBehavior>() != null;
+        if (!eligibility.IsAlliedTeam(
+            agent.Team == playerTeam,
+            isEnemyOfPlayerTeam,
+            bothTeamsInvalid,
+            hasMixedTeamValidity,
+            isTournament))
             return false;
         if (!controllerResolver.TryGetControllerId(agent, out controllerId)) return false;
 
