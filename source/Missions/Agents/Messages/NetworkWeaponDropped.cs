@@ -224,13 +224,21 @@ namespace Missions.Agents.Messages
         [ProtoMember(6)]
         public Guid[] IncludedPickupIds { get; } = Array.Empty<Guid>();
 
+        [ProtoMember(7)]
+        public bool HasRemainingAmount { get; }
+
+        [ProtoMember(8)]
+        public short RemainingAmount { get; }
+
         public NetworkWeaponDropStateResponse(
             Guid requestId,
             Guid worldItemId,
             long stateRevision,
             bool worldItemConsumed,
             NetworkWeaponDropped drop,
-            Guid[] includedPickupIds)
+            Guid[] includedPickupIds,
+            bool hasRemainingAmount = false,
+            short remainingAmount = 0)
         {
             RequestId = requestId;
             WorldItemId = worldItemId;
@@ -238,6 +246,8 @@ namespace Missions.Agents.Messages
             WorldItemConsumed = worldItemConsumed;
             Drop = drop;
             IncludedPickupIds = includedPickupIds ?? Array.Empty<Guid>();
+            HasRemainingAmount = hasRemainingAmount;
+            RemainingAmount = remainingAmount;
         }
     }
 }

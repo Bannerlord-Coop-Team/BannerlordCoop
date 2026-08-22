@@ -12,6 +12,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Data;
+using Missions.Agents.Packets;
 using Missions.Locations;
 using Missions.Services.Network;
 using SandBox.Missions.MissionLogics;
@@ -443,7 +444,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 agent.Position,
                 agent.Health,
                 isPlayer: ReferenceEquals(agent, mainAgent),
-                hasMount: agent.HasMount));
+                hasMount: agent.HasMount,
+                missionEquipmentData: PackMissionEquipmentData(agent.Equipment),
+                currentEquipment: new AgentEquipmentData(agent)));
         }
 
         return new NetworkMissionJoinInfo(
@@ -473,6 +476,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         // Catch the joiner up on the settlement NPCs we own (SR-025) — only the host owns any, so
         // this is a no-op everywhere else.
         npcReplicator.ReplicateCurrentAgentsTo(controllerId);
+        if (session.IsLocalHost)
+            coopMissionComponent.WeaponDropHandler.CatchUpJoiner(controllerId);
     }
 
     protected override void OnLeaving()
@@ -539,7 +544,13 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             agentData.IsPlayer == true ? "Player" : "Agent",
             characterObject?.Name?.ToString() ?? "<unresolved>", agentData.AgentId, controllerId);
 
-        Agent newAgent = SpawnAgent(agentData.Position, characterObject, agentData.HasMount, agentData.Health);
+        Agent newAgent = SpawnAgent(
+            agentData.Position,
+            characterObject,
+            agentData.HasMount,
+            agentData.Health,
+            agentData.MissionEquipmentData,
+            agentData.HasCurrentEquipment ? agentData.CurrentEquipment : (AgentEquipmentData?)null);
 
         if (newAgent == null)
         {
@@ -553,7 +564,13 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             agentData.AgentId, newAgent.Position, Mission.Current?.SceneName);
     }
 
-    public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool hasMount = false, float health = -1f)
+    public Agent SpawnAgent(
+        Vec3 startingPos,
+        CharacterObject character,
+        bool hasMount = false,
+        float health = -1f,
+        MissionEquipmentData missionEquipmentData = null,
+        AgentEquipmentData? currentEquipment = null)
     {
         // A remote player's hero CharacterObject often does not resolve to a fully-initialized
         // object on this client (live campaign: each player has a distinct, not-yet-synced hero),
@@ -590,6 +607,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 agentBuildData.InitialDirection(Vec2.Forward);
                 agentBuildData.NoHorses(ShouldDisableHorses(hasMount));
                 agentBuildData.Equipment(isVillage ? character.FirstBattleEquipment : character.FirstCivilianEquipment);
+                MissionEquipment missionEquipment = ResolveMissionEquipment(missionEquipmentData);
+                if (missionEquipment != null)
+                    agentBuildData.MissionEquipment(missionEquipment);
                 agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
                 agentBuildData.Controller(AgentControllerType.None);
                 agentBuildData.ClothingColor1(character.HeroObject.MapFaction.Color);
@@ -610,6 +630,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 {
                     agent.Health = health;
                 }
+                if (currentEquipment.HasValue)
+                    currentEquipment.Value.Apply(agent);
                 agent.FadeIn();
             }
             catch (Exception ex)
@@ -620,6 +642,55 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         }, blocking: true);
 
         return agent;
+    }
+
+    private MissionEquipmentData PackMissionEquipmentData(MissionEquipment equipment)
+    {
+        if (equipment == null) return null;
+
+        var weaponSlots = new List<MissionWeaponData>();
+        for (EquipmentIndex index = EquipmentIndex.WeaponItemBeginSlot;
+             index < EquipmentIndex.NumAllWeaponSlots;
+             index++)
+        {
+            MissionWeapon weapon = equipment[index];
+            objectManager.TryGetId(weapon.Item, out string itemId);
+            weaponSlots.Add(new MissionWeaponData(
+                itemId,
+                weapon.ItemModifier,
+                weapon.Banner,
+                weapon.RawDataForNetwork,
+                weapon.ReloadPhase,
+                null));
+        }
+        return new MissionEquipmentData(weaponSlots);
+    }
+
+    private MissionEquipment ResolveMissionEquipment(MissionEquipmentData data)
+    {
+        if (data?.WeaponSlots == null ||
+            data.WeaponSlots.Count != (int)EquipmentIndex.NumAllWeaponSlots)
+        {
+            return null;
+        }
+
+        var equipment = new MissionEquipment();
+        for (EquipmentIndex index = EquipmentIndex.WeaponItemBeginSlot;
+             index < EquipmentIndex.NumAllWeaponSlots;
+             index++)
+        {
+            MissionWeaponData weapon = data.WeaponSlots[(int)index];
+            if (weapon == null) continue;
+            objectManager.TryGetObject(weapon.ItemObjectId, out ItemObject item);
+            equipment._weaponSlots[(int)index] = new MissionWeapon(
+                item,
+                weapon.ItemModifier,
+                weapon.Banner,
+                weapon.DataValue,
+                weapon.ReloadPhase,
+                null);
+        }
+        return equipment;
     }
 
     internal static bool ShouldDisableHorses(bool hasMount) => !hasMount;

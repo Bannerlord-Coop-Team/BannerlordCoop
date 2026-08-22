@@ -112,6 +112,42 @@ namespace Missions.Agents.Handlers
                 CompletionElapsedSeconds = 0f;
             }
 
+            public bool MergeWorldResponse(NetworkWeaponDropStateResponse response)
+            {
+                if (response == null) return false;
+                if (PendingWorldResponse == null ||
+                    response.StateRevision > PendingWorldResponse.StateRevision)
+                {
+                    PendingWorldResponse = response;
+                    return true;
+                }
+                if (response.StateRevision < PendingWorldResponse.StateRevision)
+                    return false;
+
+                var pickupIds = new HashSet<Guid>(
+                    PendingWorldResponse.IncludedPickupIds ?? Array.Empty<Guid>());
+                int previousCount = pickupIds.Count;
+                pickupIds.UnionWith(response.IncludedPickupIds ?? Array.Empty<Guid>());
+                bool changed = pickupIds.Count != previousCount;
+                NetworkWeaponDropped drop = PendingWorldResponse.Drop ?? response.Drop;
+                changed |= !ReferenceEquals(drop, PendingWorldResponse.Drop);
+                if (!changed) return false;
+
+                var mergedPickupIds = new Guid[pickupIds.Count];
+                pickupIds.CopyTo(mergedPickupIds);
+
+                PendingWorldResponse = new NetworkWeaponDropStateResponse(
+                    response.RequestId,
+                    response.WorldItemId,
+                    response.StateRevision,
+                    response.WorldItemConsumed,
+                    drop,
+                    mergedPickupIds,
+                    response.HasRemainingAmount,
+                    response.RemainingAmount);
+                return true;
+            }
+
             public List<NetworkWeaponDropResyncRequest> CreateRequests(bool includeAnsweredTargets)
             {
                 var targets = new List<(Guid AgentId, EquipmentIndex Slot)>(
@@ -918,15 +954,12 @@ namespace Missions.Agents.Handlers
             RemovePendingPickups(message.WorldItemId, includedPickupIds);
             request.RequiredPickupIds.ExceptWith(includedPickupIds);
             appliedWorldStateRevisions[message.WorldItemId] = message.StateRevision;
-            if (request.PendingWorldResponse == null ||
-                message.StateRevision >= request.PendingWorldResponse.StateRevision)
-            {
-                request.PendingWorldResponse = message;
-            }
+            bool worldResponseChanged = request.MergeWorldResponse(message);
             request.WorldStateAccepted = request.RequiredPickupIds.Count == 0 &&
                 request.PendingWorldResponse != null;
             if (request.WorldStateAccepted &&
-                request.PendingWorldResponse.StateRevision > request.PublishedWorldStateRevision)
+                (request.PendingWorldResponse.StateRevision > request.PublishedWorldStateRevision ||
+                 worldResponseChanged))
             {
                 request.PublishedWorldStateRevision = request.PendingWorldResponse.StateRevision;
                 messageBroker.Publish(

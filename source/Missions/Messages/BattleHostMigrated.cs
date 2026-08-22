@@ -11,22 +11,19 @@ public readonly struct BattleHostMigrated : IEvent
     public readonly string MapEventId;
     public readonly string PreviousHostControllerId;
     public readonly string NewHostControllerId;
-    public readonly long AuthorityRevision;
 
     public BattleHostMigrated(
         string mapEventId,
         string previousHostControllerId,
-        string newHostControllerId,
-        long authorityRevision)
+        string newHostControllerId)
     {
         MapEventId = mapEventId;
         PreviousHostControllerId = previousHostControllerId;
         NewHostControllerId = newHostControllerId;
-        AuthorityRevision = authorityRevision;
     }
 
     public BattleHostMigrated(string mapEventId, string previousHostControllerId)
-        : this(mapEventId, previousHostControllerId, null, -1)
+        : this(mapEventId, previousHostControllerId, null)
     {
     }
 }

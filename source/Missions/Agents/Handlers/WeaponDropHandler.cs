@@ -9,6 +9,7 @@ using Missions.Agents.Packets;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.Core;
@@ -22,6 +23,7 @@ public interface IWeaponDropHandler : IHandler
 {
     void CatchUpJoiner(string controllerId);
     void ConfigureLocalHostProvider(Func<bool> provider);
+    bool IsWorldItemIdentityPending(SpawnedItemEntity item);
     void Tick(float dt);
 }
 
@@ -183,6 +185,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         messageBroker.Subscribe<WeaponDropped>(HandleWeaponDropped);
         messageBroker.Subscribe<NetworkWeaponDropped>(HandleNetworkWeaponDropped);
         messageBroker.Subscribe<NetworkWeaponDropResyncRequest>(HandleNetworkWeaponDropResyncRequest);
+        messageBroker.Subscribe<NetworkWeaponDropStateResponse>(HandleNetworkWeaponDropCatchUpState);
         messageBroker.Subscribe<AcceptedWeaponDropStateResponse>(HandleAcceptedWeaponDropStateResponse);
         messageBroker.Subscribe<WeaponPickedup>(HandleWeaponPickedup);
         messageBroker.Subscribe<WeaponPickupApplied>(HandleWeaponPickupApplied);
@@ -202,6 +205,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         messageBroker.Unsubscribe<WeaponDropped>(HandleWeaponDropped);
         messageBroker.Unsubscribe<NetworkWeaponDropped>(HandleNetworkWeaponDropped);
         messageBroker.Unsubscribe<NetworkWeaponDropResyncRequest>(HandleNetworkWeaponDropResyncRequest);
+        messageBroker.Unsubscribe<NetworkWeaponDropStateResponse>(HandleNetworkWeaponDropCatchUpState);
         messageBroker.Unsubscribe<AcceptedWeaponDropStateResponse>(HandleAcceptedWeaponDropStateResponse);
         messageBroker.Unsubscribe<WeaponPickedup>(HandleWeaponPickedup);
         messageBroker.Unsubscribe<WeaponPickupApplied>(HandleWeaponPickupApplied);
@@ -239,6 +243,14 @@ public class WeaponDropHandler : IWeaponDropHandler
         if (provider == null) throw new ArgumentNullException(nameof(provider));
 
         isLocalHost = provider;
+    }
+
+    public bool IsWorldItemIdentityPending(SpawnedItemEntity item)
+    {
+        if (item == null) return false;
+
+        return pendingDrops.Values.Any(queue =>
+            queue.Any(observed => ReferenceEquals(observed.Item, item)));
     }
 
     public void Tick(float dt)
@@ -304,6 +316,17 @@ public class WeaponDropHandler : IWeaponDropHandler
         GameThread.RunSafe(
             () => SendRequestedWorldItemState(request),
             context: nameof(HandleNetworkWeaponDropResyncRequest));
+    }
+
+    private void HandleNetworkWeaponDropCatchUpState(
+        MessagePayload<NetworkWeaponDropStateResponse> payload)
+    {
+        NetworkWeaponDropStateResponse response = payload.What;
+        if (response == null || response.RequestId != Guid.Empty) return;
+
+        GameThread.RunSafe(
+            () => ApplyAcceptedWorldItemState(response),
+            context: nameof(HandleNetworkWeaponDropCatchUpState));
     }
 
     private void SendRequestedWorldItemState(NetworkWeaponDropResyncRequest request)
@@ -711,6 +734,7 @@ public class WeaponDropHandler : IWeaponDropHandler
                 transitionState.SlotTransitions.Contains(
                     (message.AgentId, message.EquipmentIndex))))
         {
+            ForwardAcceptedDrop(message);
             return;
         }
 
@@ -743,6 +767,7 @@ public class WeaponDropHandler : IWeaponDropHandler
                 "[WeaponDrop] Applied retired drop transition={DropId} worldItem={WorldItemId}",
                 message.DropId,
                 message.WorldItemId);
+            ForwardAcceptedDrop(message);
             return;
         }
 
@@ -764,6 +789,7 @@ public class WeaponDropHandler : IWeaponDropHandler
                     MarkLiveDropApplied(message.WorldItemId);
                     RetireWorldItem(message.WorldItemId);
                     ResolveObservedWorldItemIdentity(observedDrop, message.WorldItemId);
+                    ForwardAcceptedDrop(message);
                     return;
                 }
 
@@ -783,6 +809,7 @@ public class WeaponDropHandler : IWeaponDropHandler
                 message.AgentId,
                 message.EquipmentIndex,
                 message.WorldItemId);
+            ForwardAcceptedDrop(message);
             return;
         }
 
@@ -802,6 +829,7 @@ public class WeaponDropHandler : IWeaponDropHandler
             }
 
             RecordApplied(message, registeredItem);
+            ForwardAcceptedDrop(message);
             return;
         }
 
@@ -822,6 +850,18 @@ public class WeaponDropHandler : IWeaponDropHandler
             message.AgentId,
             message.EquipmentIndex,
             message.ItemObjectId,
+            message.WorldItemId);
+        ForwardAcceptedDrop(message);
+    }
+
+    private void ForwardAcceptedDrop(NetworkWeaponDropped message)
+    {
+        if (!isLocalHost()) return;
+
+        network.SendAll(message);
+        Logger.Debug(
+            "[WeaponDrop] Host forwarded canonical drop={DropId} worldItem={WorldItemId}",
+            message.DropId,
             message.WorldItemId);
     }
 
@@ -1489,7 +1529,9 @@ public class WeaponDropHandler : IWeaponDropHandler
                 state.Revision,
                 consumed,
                 drop,
-                requiredPickupIds));
+                requiredPickupIds,
+                state.HasRemainingAmount,
+                state.RemainingAmount));
         return true;
     }
 
@@ -1570,8 +1612,24 @@ public class WeaponDropHandler : IWeaponDropHandler
         NetworkWeaponDropStateResponse response = payload.What.Response;
         if (response == null || response.WorldItemId == Guid.Empty) return;
 
+        ApplyAcceptedWorldItemState(response);
+    }
+
+    private void ApplyAcceptedWorldItemState(NetworkWeaponDropStateResponse response)
+    {
+        if (response == null || response.WorldItemId == Guid.Empty) return;
+        if (worldItemTransitionStates.TryGetValue(
+                response.WorldItemId,
+                out WorldItemTransitionState currentState) &&
+            response.StateRevision < currentState.Revision)
+        {
+            return;
+        }
+
         WorldItemTransitionState state = GetOrCreateWorldItemTransitionState(response.WorldItemId);
         state.Revision = Math.Max(state.Revision, response.StateRevision);
+        state.HasRemainingAmount = response.HasRemainingAmount;
+        state.RemainingAmount = response.RemainingAmount;
         foreach (Guid pickupId in response.IncludedPickupIds ?? Array.Empty<Guid>())
         {
             state.TrackPickupId(pickupId);
@@ -1581,6 +1639,13 @@ public class WeaponDropHandler : IWeaponDropHandler
             RetireWorldItem(response.WorldItemId);
         else if (response.Drop != null)
             ApplyNetworkDrop(response.Drop);
+        else if (activeDrops.TryGetValue(
+                     response.WorldItemId,
+                     out NetworkWeaponDropped activeDrop))
+        {
+            TrackAppliedDropId(activeDrop.DropId);
+            MarkLiveDropApplied(response.WorldItemId);
+        }
     }
 
     private void TrimPreDropStates()
@@ -1954,9 +2019,47 @@ public class WeaponDropHandler : IWeaponDropHandler
             sent++;
         }
 
+        int stateMessagesSent = 0;
+        var stateSnapshot = new List<KeyValuePair<Guid, WorldItemTransitionState>>(
+            worldItemTransitionStates);
+        foreach (KeyValuePair<Guid, WorldItemTransitionState> pair in stateSnapshot)
+        {
+            WorldItemTransitionState state = pair.Value;
+            Guid[] pickupIds = state.PickupIds.ToArray();
+            int chunkCount = Math.Max(
+                1,
+                (pickupIds.Length + MaxResyncPickupIdsPerRequest - 1) /
+                MaxResyncPickupIdsPerRequest);
+            for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
+            {
+                int offset = chunkIndex * MaxResyncPickupIdsPerRequest;
+                int count = Math.Min(
+                    MaxResyncPickupIdsPerRequest,
+                    Math.Max(0, pickupIds.Length - offset));
+                var includedPickupIds = new Guid[count];
+                if (count > 0)
+                    Array.Copy(pickupIds, offset, includedPickupIds, 0, count);
+
+                network.Send(
+                    controllerId,
+                    new NetworkWeaponDropStateResponse(
+                        Guid.Empty,
+                        pair.Key,
+                        state.Revision,
+                        retiredWorldItemIds.Contains(pair.Key) ||
+                            consumedWorldItemIds.Contains(pair.Key),
+                        drop: null,
+                        includedPickupIds: includedPickupIds,
+                        hasRemainingAmount: state.HasRemainingAmount,
+                        remainingAmount: state.RemainingAmount));
+                stateMessagesSent++;
+            }
+        }
+
         Logger.Debug(
-            "[WeaponDrop] Sent {Count} active drop state(s) to joining controller={ControllerId}",
+            "[WeaponDrop] Sent {Count} active drop(s) and {StateCount} transition state message(s) to joining controller={ControllerId}",
             sent,
+            stateMessagesSent,
             controllerId);
     }
 

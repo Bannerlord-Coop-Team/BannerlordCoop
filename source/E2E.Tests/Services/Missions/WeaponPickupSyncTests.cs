@@ -245,7 +245,9 @@ public class WeaponPickupSyncTests
             stateRevision: 8,
             worldItemConsumed: true,
             drop: null,
-            includedPickupIds: pickupIds);
+            includedPickupIds: pickupIds,
+            hasRemainingAmount: true,
+            remainingAmount: 4);
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
 
         MessagePacket packet = MessagePacket.Create(message, serializer);
@@ -258,6 +260,64 @@ public class WeaponPickupSyncTests
         Assert.True(received.WorldItemConsumed);
         Assert.Null(received.Drop);
         Assert.Equal(pickupIds, received.IncludedPickupIds);
+        Assert.True(received.HasRemainingAmount);
+        Assert.Equal(4, received.RemainingAmount);
+    }
+
+    [Fact]
+    public void EqualRevisionWorldResponses_MergeAllPickupReceiptChunks()
+    {
+        Type stateType = typeof(WeaponPickupHandler).GetNestedType(
+            "ResyncRequestState",
+            BindingFlags.NonPublic);
+        Assert.NotNull(stateType);
+        Guid worldItemId = Guid.NewGuid();
+        object state = Activator.CreateInstance(
+            stateType,
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+            binder: null,
+            args: new object[] { worldItemId, "observer" },
+            culture: null);
+        Assert.NotNull(state);
+        Guid requestId = Assert.IsType<Guid>(
+            stateType.GetProperty("RequestId").GetValue(state));
+        Guid[] firstChunk = Enumerable.Range(0, 512).Select(_ => Guid.NewGuid()).ToArray();
+        Guid[] secondChunk = { Guid.NewGuid() };
+        MethodInfo merge = stateType.GetMethod(
+            "MergeWorldResponse",
+            BindingFlags.Instance | BindingFlags.Public);
+        Assert.NotNull(merge);
+
+        Assert.True((bool)merge.Invoke(
+            state,
+            new object[]
+            {
+                new NetworkWeaponDropStateResponse(
+                    requestId,
+                    worldItemId,
+                    stateRevision: 7,
+                    worldItemConsumed: true,
+                    drop: null,
+                    includedPickupIds: firstChunk),
+            }));
+        Assert.True((bool)merge.Invoke(
+            state,
+            new object[]
+            {
+                new NetworkWeaponDropStateResponse(
+                    requestId,
+                    worldItemId,
+                    stateRevision: 7,
+                    worldItemConsumed: true,
+                    drop: null,
+                    includedPickupIds: secondChunk),
+            }));
+
+        var merged = Assert.IsType<NetworkWeaponDropStateResponse>(
+            stateType.GetProperty("PendingWorldResponse").GetValue(state));
+        Assert.Equal(513, merged.IncludedPickupIds.Length);
+        Assert.True(
+            firstChunk.Concat(secondChunk).ToHashSet().SetEquals(merged.IncludedPickupIds));
     }
 
     [Fact]

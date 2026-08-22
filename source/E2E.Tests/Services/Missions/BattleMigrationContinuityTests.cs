@@ -60,6 +60,45 @@ public class BattleMigrationContinuityTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void HostMigration_AdvancesEachAgentFromItsCurrentAuthorityRevision()
+    {
+        using var fixture = new MissionEngineFixture();
+        var successor = Clients.First();
+        SetControllerId(successor, "C");
+        Guid npcId = Guid.NewGuid();
+
+        successor.Call(() =>
+        {
+            var mock = fixture.CreateMission(successor);
+            var controller = successor.Resolve<CoopBattleController>();
+            var registry = successor.Resolve<INetworkAgentRegistry>();
+            var hosts = successor.Resolve<IBattleHostRegistry>();
+
+            controller.Session.TryBegin("mapEvent1");
+            hosts.Set("mapEvent1", new BattleHostAssignment("B", new[] { "C" }, epoch: 1));
+
+            var npc = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("A", npcId, 0, npc));
+            Assert.True(registry.TryTransferAuthority("B", npcId));
+            Assert.True(registry.TryTransferAuthority("A", npcId));
+            Assert.True(registry.TryGetAgentInfo(npcId, out CoopAgentInfo preMigration));
+            Assert.Equal(2, preMigration.AuthorityRevision);
+
+            successor.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkBattleHostAssigned("mapEvent1", "C", Array.Empty<string>(), epoch: 2));
+
+            Assert.True(registry.TryGetAgentInfo(npcId, out CoopAgentInfo migrated));
+            Assert.Equal("C", migrated.CurrentAuthority);
+            Assert.Equal(3, migrated.AuthorityRevision);
+            Assert.Equal(AgentControllerType.AI, npc.Controller);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
     [Trait("Requirement", "BR-016")]
     public void HostMigration_AdoptsAgentsInPlace_WithoutRespawnOrReset_AndSupplierResumesFromPointer()
     {

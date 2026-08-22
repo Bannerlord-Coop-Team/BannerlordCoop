@@ -881,14 +881,14 @@ internal class BattleHostHandler : IHandler
             message.Epoch,
             string.Join(", ", assignment.SuccessorControllerIds));
 
-        // Every peer applies the same authority generation. Only the promoted peer revives the adopted AI.
+        // Every peer advances each affected agent from its own canonical authority revision. Only the
+        // promoted peer revives the adopted AI.
         if (previousHost != null && previousHost != message.HostControllerId)
         {
             messageBroker.Publish(this, new BattleHostMigrated(
                 message.MapEventId,
                 previousHost,
-                message.HostControllerId,
-                message.Epoch - 1L));
+                message.HostControllerId));
 
             if (isLocalHost)
                 Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
