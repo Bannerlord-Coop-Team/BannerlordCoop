@@ -167,6 +167,80 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Fact]
+    public void RemoteToRemoteAuthorityTransfer_RestampsUnchangedHostDamageForLoadingJoiner()
+    {
+        const int machineId = 18;
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+
+        var joinerBroker = new TestMessageBroker();
+        var joinerSession = new Mock<IBattleSession>();
+        joinerSession.SetupGet(s => s.InstanceId).Returns("mapEvent1");
+        joinerSession.SetupGet(s => s.OwnControllerId).Returns("joiner");
+        joinerSession.SetupGet(s => s.IsLocalHost).Returns(false);
+        joinerSession.SetupGet(s => s.HostEpoch).Returns(LocalEpoch);
+        joinerSession.Setup(s => s.IsHostController(It.IsAny<string>()))
+            .Returns((string controllerId) => controllerId == "us");
+        using var joiner = new SiegeMachineStateReplicator(
+            new Mock<IBattleNetwork>().Object,
+            joinerBroker,
+            joinerSession.Object,
+            new Mock<INetworkAgentRegistry>().Object,
+            new HostEpochPolicy());
+
+        InvokeSetMachineAuthority(machineId, "remote-a");
+        var authorityA = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(sentToAll));
+        Assert.Equal(1, authorityA.AuthorityRevision);
+        joinerBroker.Publish(this, authorityA);
+        DrainGameThread();
+        sentToAll.Clear();
+
+        var unchangedDamage = new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: 42.5f,
+            destructionState: 2,
+            gateState: -1,
+            ladderState: -1,
+            moveDistance: -1f,
+            hasArrived: false,
+            weaponState: -1,
+            aimDirection: -1000f,
+            aimReleaseAngle: -1000f);
+        InvokeBroadcastMachineStateIfChanged(unchangedDamage);
+
+        var revisionOneDamage = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(sentToAll));
+        Assert.Equal(1, revisionOneDamage.AuthorityRevision);
+        joinerBroker.Publish(this, revisionOneDamage);
+        DrainGameThread();
+        Assert.Equal(1, Assert.Single(PendingStates(joiner)).Value.AuthorityRevision);
+        sentToAll.Clear();
+
+        InvokeSetMachineAuthority(machineId, "remote-b");
+        var authorityB = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(sentToAll));
+        Assert.Equal("remote-b", authorityB.ControllerId);
+        Assert.Equal(2, authorityB.AuthorityRevision);
+        joinerBroker.Publish(this, authorityB);
+        DrainGameThread();
+        Assert.Empty(PendingStates(joiner));
+        sentToAll.Clear();
+
+        InvokeBroadcastMachineStateIfChanged(unchangedDamage);
+
+        var revisionTwoDamage = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(sentToAll));
+        Assert.Equal(42.5f, revisionTwoDamage.HitPoints);
+        Assert.Equal(2, revisionTwoDamage.DestructionState);
+        Assert.Equal(LocalEpoch, revisionTwoDamage.HostEpoch);
+        Assert.Equal(2, revisionTwoDamage.AuthorityRevision);
+        Assert.Equal("us", revisionTwoDamage.SenderControllerId);
+        joinerBroker.Publish(this, revisionTwoDamage);
+        DrainGameThread();
+
+        var buffered = Assert.Single(PendingStates(joiner)).Value;
+        Assert.Equal(42.5f, buffered.HitPoints);
+        Assert.Equal(2, buffered.DestructionState);
+        Assert.Equal(2, buffered.AuthorityRevision);
+    }
+
+    [Fact]
     public void SupersededOwnerState_IsDropped_AndCannotReplaceAFutureRevision()
     {
         broker.Publish(this, new NetworkSiegeMachineAuthority(
@@ -729,7 +803,11 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     private Dictionary<int, NetworkSiegeMachineState> PendingStates()
-        => GetField<Dictionary<int, NetworkSiegeMachineState>>("pendingByMachineId");
+        => PendingStates(sut);
+
+    private static Dictionary<int, NetworkSiegeMachineState> PendingStates(
+        SiegeMachineStateReplicator replicator)
+        => GetField<Dictionary<int, NetworkSiegeMachineState>>(replicator, "pendingByMachineId");
 
     private NetworkSiegeMachineState ReconcilePendingStateForLiveApply(NetworkSiegeMachineState state)
     {
@@ -756,12 +834,31 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         method!.Invoke(sut, Array.Empty<object>());
     }
 
+    private void InvokeSetMachineAuthority(int machineId, string controllerId)
+    {
+        var method = typeof(SiegeMachineStateReplicator).GetMethod(
+            "SetMachineAuthority", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(sut, new object[] { machineId, controllerId });
+    }
+
+    private void InvokeBroadcastMachineStateIfChanged(NetworkSiegeMachineState state)
+    {
+        var method = typeof(SiegeMachineStateReplicator).GetMethod(
+            "BroadcastMachineStateIfChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(sut, new object[] { state });
+    }
+
     private T GetField<T>(string fieldName)
+        => GetField<T>(sut, fieldName);
+
+    private static T GetField<T>(SiegeMachineStateReplicator replicator, string fieldName)
     {
         var field = typeof(SiegeMachineStateReplicator).GetField(
             fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
-        return Assert.IsType<T>(field!.GetValue(sut));
+        return Assert.IsType<T>(field!.GetValue(replicator));
     }
 
     /// <summary>Handlers queue their bodies via <c>GameThread.RunSafe</c>; a blocking no-op queued

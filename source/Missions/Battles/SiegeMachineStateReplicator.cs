@@ -275,11 +275,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!isHost && !simulatedLocally) continue;
 
             var state = CaptureState(machine, isHost, simulatedLocally);
-            if (!MachineStatesEqual(machineId, state))
-            {
-                lastSent[machineId] = state;
-                network.SendAll(Stamp(state));
-            }
+            BroadcastMachineStateIfChanged(state);
 
             if (simulatedLocally && machine is SiegeLadder ladder)
             {
@@ -291,6 +287,14 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 }
             }
         }
+    }
+
+    private void BroadcastMachineStateIfChanged(NetworkSiegeMachineState state)
+    {
+        if (MachineStatesEqual(state.MachineId, state)) return;
+
+        lastSent[state.MachineId] = state;
+        network.SendAll(Stamp(state));
     }
 
     private bool MachineStatesEqual(int machineId, NetworkSiegeMachineState state)
@@ -965,7 +969,6 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private void SetMachineAuthority(int machineId, string controllerId)
     {
         NormalizeAuthorityForCurrentHost(machineId, initializeIfMissing: false);
-        bool wasSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
         int hostEpoch = session.HostEpoch;
         if (GetAuthorityEpoch(machineId) > hostEpoch) return;
         int authorityRevision = GetAuthorityEpoch(machineId) == hostEpoch
@@ -984,7 +987,10 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
 
         PushClaimsToGate();
-        ResetSendCacheWhenSimulationMovesHere(machineId, wasSimulatedLocally);
+        // Every authority revision needs a freshly stamped host-owned snapshot, including a
+        // remote claimant replacing another remote claimant while the damage fields stay unchanged.
+        lastSent.Remove(machineId);
+        lastSentLadderAnimations.Remove(machineId);
         RefreshMachineGates();
         // BR-102: the arbitration decision is THE host-authority act here — stamp our hosting generation.
         network.SendAll(new NetworkSiegeMachineAuthority(
