@@ -8,10 +8,7 @@ public class FpsLogger : IUpdateable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<FpsLogger>();
 
-    private static readonly TimeSpan DefaultReportInterval = TimeSpan.FromSeconds(1);
-
-    /// <summary>Toggled by coop.debug.fps.log; off by default so logs stay clean.</summary>
-    public static bool Enabled = false;
+    private static readonly TimeSpan DefaultReportInterval = TimeSpan.FromSeconds(30);
 
     private readonly TimeSpan reportInterval;
     private readonly Action<FpsWindowStats> reportSink;
@@ -36,7 +33,6 @@ public class FpsLogger : IUpdateable
 
     public void Update(TimeSpan frameTime)
     {
-        if (!Enabled) return;
         if (frameTime <= TimeSpan.Zero) return;
 
         windowFrames++;

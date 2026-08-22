@@ -5,32 +5,11 @@ using Xunit;
 
 namespace Common.Tests;
 
-public class FpsLoggerTests : IDisposable
+public class FpsLoggerTests
 {
-    public void Dispose()
-    {
-        FpsLogger.Enabled = false;
-    }
-
     [Fact]
-    public void Update_WhenDisabled_DoesNotReport()
+    public void Update_BeforeWindowElapsed_DoesNotReport()
     {
-        FpsLogger.Enabled = false;
-        var reports = new List<FpsWindowStats>();
-        var logger = new FpsLogger(TimeSpan.FromMilliseconds(100), reports.Add);
-
-        for (int i = 0; i < 20; i++)
-        {
-            logger.Update(TimeSpan.FromMilliseconds(16));
-        }
-
-        Assert.Empty(reports);
-    }
-
-    [Fact]
-    public void Update_WhenEnabledButWindowNotElapsed_DoesNotReport()
-    {
-        FpsLogger.Enabled = true;
         var reports = new List<FpsWindowStats>();
         var logger = new FpsLogger(TimeSpan.FromMilliseconds(100), reports.Add);
 
@@ -43,7 +22,6 @@ public class FpsLoggerTests : IDisposable
     [Fact]
     public void Update_WhenWindowElapsed_ReportsAverageMinimumAndMaximumFps()
     {
-        FpsLogger.Enabled = true;
         var reports = new List<FpsWindowStats>();
         var logger = new FpsLogger(TimeSpan.FromMilliseconds(100), reports.Add);
 
@@ -63,7 +41,6 @@ public class FpsLoggerTests : IDisposable
     [Fact]
     public void Update_WithZeroFrameTime_ExcludesFrameFromStats()
     {
-        FpsLogger.Enabled = true;
         var reports = new List<FpsWindowStats>();
         var logger = new FpsLogger(TimeSpan.FromMilliseconds(50), reports.Add);
 
@@ -80,7 +57,6 @@ public class FpsLoggerTests : IDisposable
     [Fact]
     public void Update_AfterReporting_StartsNewWindow()
     {
-        FpsLogger.Enabled = true;
         var reports = new List<FpsWindowStats>();
         var logger = new FpsLogger(TimeSpan.FromMilliseconds(50), reports.Add);
 
