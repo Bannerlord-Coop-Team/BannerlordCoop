@@ -1329,11 +1329,11 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 }
             }
 
-            pendingByMachineId.Remove(obj.MachineId);
+            var stateToApply = ReconcilePendingMachineStateForLiveApply(obj);
             SiegeMissionAuthorityGate.SuppressCapture = true;
             try
             {
-                Apply(machine, obj);
+                Apply(machine, stateToApply);
             }
             finally
             {
@@ -1344,12 +1344,15 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // must not drive its arm animation or aim.
             if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId))
             {
-                if (obj.AimDirection > AimSentinel + 1f)
+                if (stateToApply.AimDirection > AimSentinel + 1f)
                 {
-                    SiegeMissionAuthorityGate.SetRemoteAim(obj.MachineId, obj.AimDirection, obj.AimReleaseAngle);
+                    SiegeMissionAuthorityGate.SetRemoteAim(
+                        obj.MachineId,
+                        stateToApply.AimDirection,
+                        stateToApply.AimReleaseAngle);
                 }
 
-                ApplyWeaponAnimation(machine, obj.WeaponState);
+                ApplyWeaponAnimation(machine, stateToApply.WeaponState);
             }
         });
     }
@@ -1420,6 +1423,22 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
 
         pendingByMachineId[state.MachineId] = state;
+    }
+
+    private NetworkSiegeMachineState ReconcilePendingMachineStateForLiveApply(
+        NetworkSiegeMachineState incoming)
+    {
+        if (!pendingByMachineId.TryGetValue(incoming.MachineId, out var pending)) return incoming;
+
+        int authorityOrder = CompareAuthorityOrder(
+            pending.HostEpoch,
+            pending.AuthorityRevision,
+            incoming.HostEpoch,
+            incoming.AuthorityRevision);
+        if (authorityOrder > 0) return incoming;
+
+        pendingByMachineId.Remove(incoming.MachineId);
+        return authorityOrder == 0 ? MergeMachineStates(pending, incoming) : incoming;
     }
 
     private static NetworkSiegeMachineState MergeMachineStates(

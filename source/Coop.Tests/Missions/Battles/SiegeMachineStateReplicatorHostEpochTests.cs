@@ -321,6 +321,100 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(authorityRevision, pending.AuthorityRevision);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EqualAuthorityHostAndClaimantSnapshots_MergeWhenMachineRegistersBetweenArrivals(bool hostFirst)
+    {
+        const int machineId = 19;
+        const int authorityRevision = 4;
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            machineId, "claimant", hostEpoch: LocalEpoch, authorityRevision: authorityRevision,
+            senderControllerId: "host"));
+        DrainGameThread();
+
+        var hostState = new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: 42.5f,
+            destructionState: 2,
+            gateState: -1,
+            ladderState: -1,
+            moveDistance: -1f,
+            hasArrived: false,
+            weaponState: -1,
+            aimDirection: -1000f,
+            aimReleaseAngle: -1000f,
+            hostEpoch: LocalEpoch,
+            senderControllerId: "host",
+            authorityRevision: authorityRevision);
+        var claimantState = new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: -1f,
+            destructionState: -1,
+            gateState: 1,
+            ladderState: 3,
+            moveDistance: 18f,
+            hasArrived: true,
+            weaponState: 4,
+            aimDirection: 0.75f,
+            aimReleaseAngle: 0.25f,
+            hostEpoch: LocalEpoch,
+            stoneAmmo: 7,
+            senderControllerId: "claimant",
+            authorityRevision: authorityRevision);
+
+        broker.Publish(this, hostFirst ? hostState : claimantState);
+        DrainGameThread();
+
+        // The native machine registers before the second arrival. This is the exact pending-to-live
+        // reconciliation seam used by the handler after its refreshed machine lookup succeeds.
+        var stateToApply = ReconcilePendingStateForLiveApply(hostFirst ? claimantState : hostState);
+
+        Assert.Empty(PendingStates());
+        Assert.Equal(42.5f, stateToApply.HitPoints);
+        Assert.Equal(2, stateToApply.DestructionState);
+        Assert.Equal(1, stateToApply.GateState);
+        Assert.Equal(3, stateToApply.LadderState);
+        Assert.Equal(18f, stateToApply.MoveDistance);
+        Assert.True(stateToApply.HasArrived);
+        Assert.Equal(4, stateToApply.WeaponState);
+        Assert.Equal(0.75f, stateToApply.AimDirection);
+        Assert.Equal(0.25f, stateToApply.AimReleaseAngle);
+        Assert.True(stateToApply.HasStoneAmmo);
+        Assert.Equal(7, stateToApply.StoneAmmo);
+        Assert.Equal(LocalEpoch, stateToApply.HostEpoch);
+        Assert.Equal(authorityRevision, stateToApply.AuthorityRevision);
+    }
+
+    [Fact]
+    public void OlderPendingMachineState_IsDiscardedWhenLiveArrivalHasNewerAuthority()
+    {
+        PendingStates()[20] = MachineState(
+            20, LocalEpoch, senderControllerId: "old-owner", authorityRevision: 7);
+        var incoming = MachineState(
+            20, LocalEpoch + 1, senderControllerId: "new-owner", authorityRevision: 0);
+
+        var stateToApply = ReconcilePendingStateForLiveApply(incoming);
+
+        Assert.Same(incoming, stateToApply);
+        Assert.Empty(PendingStates());
+    }
+
+    [Fact]
+    public void NewerPendingMachineState_IsPreservedWhenLiveArrivalHasOlderAuthority()
+    {
+        var pending = MachineState(
+            21, LocalEpoch + 1, senderControllerId: "new-owner", authorityRevision: 0);
+        PendingStates()[21] = pending;
+        var incoming = MachineState(
+            21, LocalEpoch, senderControllerId: "old-owner", authorityRevision: 7);
+
+        var stateToApply = ReconcilePendingStateForLiveApply(incoming);
+
+        Assert.Same(incoming, stateToApply);
+        Assert.Same(pending, Assert.Single(PendingStates()).Value);
+    }
+
     [Fact]
     public void NewerEpochPendingLadderAnimation_ReplacesHigherRevisionFromPreviousEpoch()
     {
@@ -636,6 +730,14 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
     private Dictionary<int, NetworkSiegeMachineState> PendingStates()
         => GetField<Dictionary<int, NetworkSiegeMachineState>>("pendingByMachineId");
+
+    private NetworkSiegeMachineState ReconcilePendingStateForLiveApply(NetworkSiegeMachineState state)
+    {
+        var method = typeof(SiegeMachineStateReplicator).GetMethod(
+            "ReconcilePendingMachineStateForLiveApply", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return Assert.IsType<NetworkSiegeMachineState>(method!.Invoke(sut, new object[] { state }));
+    }
 
     private Dictionary<int, NetworkSiegeLadderAnimationState> PendingLadderAnimations()
         => GetField<Dictionary<int, NetworkSiegeLadderAnimationState>>("pendingLadderAnimationsById");
