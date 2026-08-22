@@ -57,6 +57,35 @@ namespace GameInterface.Tests.Services.MapEvents
         }
 
         [Fact]
+        public void ExcludedParties_AreRemovedAndRestoredAtOriginalPositions()
+        {
+            MapEventParty firstDefender = CreateResolvedParty();
+            MapEventParty excludedDefender = CreateResolvedParty();
+            MapEventParty lastDefender = CreateResolvedParty();
+            MapEventParty excludedAttacker = CreateResolvedParty();
+            MapEventParty includedAttacker = CreateResolvedParty();
+            MapEvent mapEvent = CreateMapEvent(
+                CreateSide(firstDefender, excludedDefender, lastDefender),
+                CreateSide(excludedAttacker, includedAttacker));
+
+            var removedParties = MapEventPatches.RemoveParties(
+                mapEvent,
+                party => party == excludedDefender || party == excludedAttacker);
+
+            Assert.Equal(new[] { firstDefender, lastDefender }, mapEvent.DefenderSide.Parties);
+            Assert.Equal(new[] { includedAttacker }, mapEvent.AttackerSide.Parties);
+
+            MapEventPatches.RestoreParties(removedParties);
+
+            Assert.Equal(
+                new[] { firstDefender, excludedDefender, lastDefender },
+                mapEvent.DefenderSide.Parties);
+            Assert.Equal(
+                new[] { excludedAttacker, includedAttacker },
+                mapEvent.AttackerSide.Parties);
+        }
+
+        [Fact]
         public void PartyInvalidatedDuringXp_RemovesBeforeRenown()
         {
             MapEventParty defender = CreateResolvedParty();

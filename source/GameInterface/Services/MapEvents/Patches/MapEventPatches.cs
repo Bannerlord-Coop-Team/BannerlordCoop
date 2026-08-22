@@ -9,6 +9,7 @@ using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -19,17 +20,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
 [HarmonyPatch(typeof(MapEvent))]
 internal class MapEventPatches
 {
+    // Stores a removed party so it can be restored later
+    internal readonly record struct RemovedMapEventParty(MapEventSide Side, MapEventParty Party, int Index);
+
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
     private static readonly Action<MapEventParty>[] CommitResultPhases =
     {
@@ -268,6 +270,89 @@ internal class MapEventPatches
         }
 
         return removedPartyCount;
+    }
+
+    // Exclude retreated parties from reward calculations
+    [HarmonyPatch("CalculateMapEventResults")]
+    [HarmonyPrefix]
+    private static void Prefix_CalculateMapEventResults(MapEvent __instance, out List<RemovedMapEventParty> __state)
+    {
+        __state = null;
+        if (!ModInformation.IsServer || !ContainerProvider.TryResolve<IRetreatedMapEventPartyTracker>(out var tracker))
+        {
+            return;
+        }
+
+        __state = RemoveParties(__instance, party => tracker.IsRetreated(__instance, party.Party));
+    }
+
+    // Restore the parties after calculating the results
+    [HarmonyPatch("CalculateMapEventResults")]
+    [HarmonyFinalizer]
+    private static void Finalizer_CalculateMapEventResults(List<RemovedMapEventParty> __state)
+    {
+        RestoreParties(__state);
+    }
+
+    // Exclude retreated parties from defeat penalties
+    [HarmonyPatch("ApplyMoraleAndBehaviorUpdatesOfDefeatedParties")]
+    [HarmonyPrefix]
+    private static void Prefix_ApplyMoraleAndBehaviorUpdatesOfDefeatedParties(MapEvent __instance, out List<RemovedMapEventParty> __state)
+    {
+        __state = null;
+        if (!ModInformation.IsServer || !ContainerProvider.TryResolve<IRetreatedMapEventPartyTracker>(out var tracker))
+        {
+            return;
+        }
+
+        __state = RemoveParties(__instance, party => tracker.IsRetreated(__instance, party.Party));
+    }
+
+    // Restore the parties after applying defeat penaltiees
+    [HarmonyPatch("ApplyMoraleAndBehaviorUpdatesOfDefeatedParties")]
+    [HarmonyFinalizer]
+    private static void Finalizer_ApplyMoraleAndBehaviorUpdatesOfDefeatedParties(
+        List<RemovedMapEventParty> __state)
+    {
+        RestoreParties(__state);
+    }
+
+    /// <summary>
+    /// Removes matching parties and stores their original position
+    /// </summary>
+    internal static List<RemovedMapEventParty> RemoveParties(
+        MapEvent mapEvent,
+        Func<MapEventParty, bool> shouldRemove)
+    {
+        var removedParties = new List<RemovedMapEventParty>();
+
+        foreach (MapEventSide side in mapEvent._sides)
+        {
+            if (side == null) continue;
+
+            for (int i = side._battleParties.Count - 1; i >= 0; i--)
+            {
+                MapEventParty party = side._battleParties[i];
+                if (party?.Party == null || !shouldRemove(party)) continue;
+
+                removedParties.Add(new RemovedMapEventParty(side, party, i));
+                side._battleParties.RemoveAt(i);
+            }
+        }
+
+        return removedParties;
+    }
+
+    // Restores remove parties to their original position
+    internal static void RestoreParties(List<RemovedMapEventParty> removedParties)
+    {
+        if (removedParties == null) return;
+
+        for (int i = removedParties.Count - 1; i >= 0; i--)
+        {
+            RemovedMapEventParty removedParty = removedParties[i];
+            removedParty.Side._battleParties.Insert(removedParty.Index, removedParty.Party);
+        }
     }
 
     [HarmonyPatch("CommitCalculatedMapEventResults")]
