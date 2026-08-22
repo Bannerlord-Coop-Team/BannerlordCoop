@@ -118,6 +118,8 @@ public class RaidDebugCommands
         if (playerParty.MapFaction == null || settlement.MapFaction == null ||
             playerParty.MapFaction == settlement.MapFaction)
             return "The player and village must belong to different factions.";
+        if (!AreFactionsAtWar(playerParty.MapFaction, settlement.MapFaction))
+            return "The player faction must already be at war with the village faction.";
         if (playerParty.MapEvent != null || settlement.Party?.MapEvent != null)
             return "The player party and village must be outside a map event.";
         if (playerParty.PartyMoveMode != MoveModeType.Hold)
@@ -174,9 +176,7 @@ public class RaidDebugCommands
             fixture.Settlement.SettlementHitPoints = 1f;
 
             if (!AreFactionsAtWar(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction))
-                DeclareWarAction.ApplyByDefault(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction);
-            if (!AreFactionsAtWar(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction))
-                return "The raid fixture could not establish the required war state.";
+                return "The fixture factions are no longer at war.";
 
             fixture.Positioned = true;
             return LiveTestJson(fixture.Token);
@@ -676,23 +676,18 @@ public class RaidDebugCommands
     private static void RestoreClan(ClanSnapshot snapshot)
     {
         snapshot.Clan._influence = snapshot.Influence;
-        snapshot.Clan.Renown = snapshot.Renown;
+        float renownDelta = snapshot.Renown - snapshot.Clan.Renown;
+        if (Math.Abs(renownDelta) >= 0.001f)
+            snapshot.Clan.AddRenown(renownDelta);
         snapshot.Clan._tier = snapshot.Tier;
     }
 
     private static void RestoreFactionState(FactionStateSnapshot snapshot)
     {
-        bool atWar = AreFactionsAtWar(snapshot.First, snapshot.Second);
-        if (snapshot.WasAtWar && !atWar)
-            DeclareWarAction.ApplyByDefault(snapshot.First, snapshot.Second);
-        else if (!snapshot.WasAtWar && atWar)
-            MakePeaceAction.Apply(snapshot.First, snapshot.Second);
+        if (AreFactionsAtWar(snapshot.First, snapshot.Second) != snapshot.WasAtWar)
+            throw new InvalidOperationException("The raid fixture changed the faction war state unexpectedly.");
 
         var stance = snapshot.Stance;
-        stance.StanceType = snapshot.StanceType;
-        stance.BehaviorPriority = snapshot.BehaviorPriority;
-        stance._warStartDate = snapshot.WarStartDate;
-        stance._peaceDeclarationDate = snapshot.PeaceDeclarationDate;
         stance.TroopCasualties1 = snapshot.TroopCasualties1;
         stance.TroopCasualties2 = snapshot.TroopCasualties2;
         stance.ShipCasualties1 = snapshot.ShipCasualties1;
@@ -706,12 +701,6 @@ public class RaidDebugCommands
         stance.TotalTributePaidFrom1To2 = snapshot.TotalTributePaidFrom1To2;
         stance._dailyTributeFrom1To2 = snapshot.DailyTributeFrom1To2;
         stance.DailyTributeInstallments = snapshot.DailyTributeInstallments;
-        if (snapshot.First is Kingdom firstKingdom && snapshot.FirstPoliticalStagnation.HasValue)
-            firstKingdom.PoliticalStagnation = snapshot.FirstPoliticalStagnation.Value;
-        if (snapshot.Second is Kingdom secondKingdom && snapshot.SecondPoliticalStagnation.HasValue)
-            secondKingdom.PoliticalStagnation = snapshot.SecondPoliticalStagnation.Value;
-        snapshot.First.UpdateFactionsAtWarWith();
-        snapshot.Second.UpdateFactionsAtWarWith();
     }
 
     private static bool PartyMatches(PartySnapshot snapshot)
