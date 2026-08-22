@@ -4,12 +4,15 @@ using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.MissionViews;
@@ -27,6 +30,8 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
     private readonly IPlayerKillFeedColorService colorService;
     private readonly IPlayerNameplateControllerResolver controllerResolver;
     private readonly IPlayerNameplateEligibility eligibility;
+    private readonly IPlayerManager playerManager;
+    private readonly IObjectManager objectManager;
 
     private PlayerNameplatesVM dataSource;
     private GauntletLayer gauntletLayer;
@@ -44,13 +49,17 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         ICoopOptionsStore optionsStore,
         IPlayerKillFeedColorService colorService,
         IPlayerNameplateControllerResolver controllerResolver,
-        IPlayerNameplateEligibility eligibility)
+        IPlayerNameplateEligibility eligibility,
+        IPlayerManager playerManager,
+        IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.optionsStore = optionsStore;
         this.colorService = colorService;
         this.controllerResolver = controllerResolver;
         this.eligibility = eligibility;
+        this.playerManager = playerManager;
+        this.objectManager = objectManager;
     }
 
     public override void OnMissionScreenInitialize()
@@ -89,7 +98,11 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         {
             target.UpdatePosition(camera);
             if (TryGetControllerId(target.Agent, out var controllerId))
+            {
                 target.SetNameColor(colorService.GetColorString(controllerId));
+                if (TryGetPlayerHeroName(controllerId, out var playerHeroName))
+                    target.SetPlayerHeroName(playerHeroName);
+            }
         }
     }
 
@@ -130,29 +143,38 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
     {
         if (dataSource == null || Mission == null) return;
 
-        var eligibleAgents = new HashSet<Agent>();
+        var eligibleAgents = new Dictionary<Agent, PlayerNameplateTargetData>();
         foreach (var agent in Mission.Agents)
         {
-            if (TryGetControllerId(agent, out _)) eligibleAgents.Add(agent);
+            if (!TryGetControllerId(agent, out var controllerId) ||
+                !TryGetPlayerHeroName(controllerId, out var playerHeroName))
+                continue;
+
+            eligibleAgents[agent] = new PlayerNameplateTargetData(controllerId, playerHeroName);
         }
 
         for (int i = dataSource.Targets.Count - 1; i >= 0; i--)
         {
             var target = dataSource.Targets[i];
-            if (eligibleAgents.Remove(target.Agent)) continue;
+            if (eligibleAgents.TryGetValue(target.Agent, out var targetData) &&
+                target.ControllerId == targetData.ControllerId)
+            {
+                target.SetPlayerHeroName(targetData.PlayerHeroName);
+                eligibleAgents.Remove(target.Agent);
+                continue;
+            }
 
             dataSource.Targets.RemoveAt(i);
             target.OnFinalize();
         }
 
-        foreach (var agent in eligibleAgents)
+        foreach (var eligibleAgent in eligibleAgents)
         {
-            if (!TryGetControllerId(agent, out var controllerId)) continue;
-
             dataSource.Targets.Add(new PlayerNameplateTargetVM(
-                agent,
-                controllerId,
-                colorService.GetColorString(controllerId)));
+                eligibleAgent.Key,
+                eligibleAgent.Value.ControllerId,
+                eligibleAgent.Value.PlayerHeroName,
+                colorService.GetColorString(eligibleAgent.Value.ControllerId)));
         }
     }
 
@@ -196,5 +218,28 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         if (!controllerResolver.TryGetControllerId(agent, out controllerId)) return false;
 
         return !string.IsNullOrEmpty(controllerId);
+    }
+
+    private bool TryGetPlayerHeroName(string controllerId, out string playerHeroName)
+    {
+        playerHeroName = null;
+        if (!playerManager.TryGetPlayer(controllerId, out var player) ||
+            !objectManager.TryGetObject(player.HeroId, out Hero playerHero))
+            return false;
+
+        playerHeroName = playerHero.Name?.ToString();
+        return !string.IsNullOrEmpty(playerHeroName);
+    }
+
+    private readonly struct PlayerNameplateTargetData
+    {
+        public readonly string ControllerId;
+        public readonly string PlayerHeroName;
+
+        public PlayerNameplateTargetData(string controllerId, string playerHeroName)
+        {
+            ControllerId = controllerId;
+            PlayerHeroName = playerHeroName;
+        }
     }
 }

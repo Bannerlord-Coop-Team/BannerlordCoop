@@ -47,10 +47,15 @@ public sealed class PlayerNameplateTargetVM : MissionAgentMarkerTargetVM
 {
     private string nameColor;
 
-    public PlayerNameplateTargetVM(Agent agent, string controllerId, string nameColor) : base(agent)
+    public PlayerNameplateTargetVM(
+        Agent agent,
+        string controllerId,
+        string playerHeroName,
+        string nameColor) : base(agent)
     {
         Agent = agent;
         ControllerId = controllerId;
+        Name = playerHeroName;
         this.nameColor = nameColor;
         IconType = string.Empty;
         IsEnabled = true;
@@ -75,5 +80,12 @@ public sealed class PlayerNameplateTargetVM : MissionAgentMarkerTargetVM
     public void SetNameColor(string value)
     {
         NameColor = value;
+    }
+
+    public void SetPlayerHeroName(string value)
+    {
+        if (Name == value) return;
+
+        Name = value;
     }
 }
