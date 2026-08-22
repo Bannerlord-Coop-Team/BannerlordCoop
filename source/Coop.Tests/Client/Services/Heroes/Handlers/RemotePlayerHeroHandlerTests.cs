@@ -1,6 +1,7 @@
 ﻿using Common.Tests.Utils;
 using Coop.Core.Client.Services.Heroes.Handlers;
 using Coop.Core.Client.Services.Heroes.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -14,6 +15,7 @@ public class RemotePlayerHeroHandlerTests
     private readonly TestMessageBroker messageBroker = new();
     private readonly Mock<IHeroInterface> heroInterface = new();
     private readonly Mock<IPlayerManager> playerManager = new();
+    private readonly Mock<IControllerIdMigration> controllerIdMigration = new();
     private readonly Mock<IPlayerCreationRollback> playerCreationRollback = new();
     private readonly RemotePlayerHeroHandler handler;
 
@@ -23,6 +25,7 @@ public class RemotePlayerHeroHandlerTests
             messageBroker,
             heroInterface.Object,
             playerManager.Object,
+            controllerIdMigration.Object,
             playerCreationRollback.Object);
     }
 
@@ -109,5 +112,36 @@ public class RemotePlayerHeroHandlerTests
         messageBroker.Publish(this, new NetworkPlayerRegistrationUpdated(replacement));
 
         playerManager.Verify(manager => manager.ReplacePlayer(registered, replacement), Times.Once);
+    }
+
+    [Fact]
+    public void PlayerRegistrationUpdated_ChangedControllerId_MigratesExistingMapping()
+    {
+        const string legacyControllerId = "123456789";
+        var replacement = new Player(
+            "gog:123456789",
+            "hero1",
+            "party1",
+            "clan1",
+            "char1");
+        var migratedPlayer = replacement;
+        controllerIdMigration
+            .Setup(migration => migration.TryMigrate(
+                legacyControllerId,
+                replacement.ControllerId,
+                out migratedPlayer))
+            .Returns(true);
+
+        messageBroker.Publish(
+            this,
+            new NetworkPlayerRegistrationUpdated(replacement, legacyControllerId));
+
+        controllerIdMigration.Verify(migration => migration.TryMigrate(
+            legacyControllerId,
+            replacement.ControllerId,
+            out migratedPlayer), Times.Once);
+        playerManager.Verify(
+            manager => manager.ReplacePlayer(It.IsAny<Player>(), It.IsAny<Player>()),
+            Times.Never);
     }
 }

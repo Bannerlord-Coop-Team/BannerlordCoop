@@ -12,11 +12,10 @@ using Coop.Core.Client.States;
 using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Session;
-using Coop.Steam;
 using GameInterface.Policies;
 using LiteNetLib;
 using Missions;
-using System.Runtime.CompilerServices;
+using System;
 
 namespace Coop.Core.Client;
 
@@ -33,7 +32,13 @@ public class ClientModule : CommonModule
 
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
-        builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<CoopClient>()
+            .As<ICoopClient>()
+            .As<INetwork>()
+            .As<IRelayNetwork>()
+            .As<INetEventListener>()
+            .As<ILocalPeerEndpointSource>()
+            .InstancePerLifetimeScope();
         builder.RegisterType<PlayerPartyTroopXpBaselineApplier>()
             .As<IPlayerPartyTroopXpBaselineApplier>()
             .InstancePerDependency();
@@ -47,16 +52,7 @@ public class ClientModule : CommonModule
         // Policies
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
-        // Steam registrations only when the boot probe found Steam, so tests and non-Steam installs never load Steamworks types.
-        if (SessionDiscovery.SteamAvailable)
-        {
-            RegisterSteamSessionServices(builder);
-        }
-        else
-        {
-            builder.RegisterType<NoopSessionAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
-            builder.RegisterType<NoopSessionTunnelHost>().As<ISessionTunnelHost>().InstancePerLifetimeScope();
-        }
+        RegisterSessionProviderRuntime(builder, isServer: false);
 
         builder.RegisterType<ConfiguredSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
         builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
@@ -70,23 +66,109 @@ public class ClientModule : CommonModule
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);
     }
 
-    // The tunnel transport's layout embeds Steamworks value types, so mentioning it in Load
-    // would pull in Steamworks.NET while JIT-compiling Load even when the Steam branch is
-    // never taken; this non-inlined helper is only compiled once Steam is known to be present.
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void RegisterSteamSessionServices(ContainerBuilder builder)
+    internal static void RegisterSessionProviderRuntime(ContainerBuilder builder, bool isServer)
     {
-        builder.RegisterInstance(SteamBoot.JoinListener)
-            .As<ISteamLobbyMembership>()
-            .ExternallyOwned();
-        builder.RegisterType<SteamLobbyApi>()
-            .As<ISteamLobbyApi>()
-            .As<ISteamPublicLobbyApi>()
+        builder.Register(context =>
+            {
+                var provider = isServer
+                    ? SessionDiscovery.ServerProvider
+                    : SessionDiscovery.ClientProvider;
+                var networkConfig = context.Resolve<INetworkConfig>();
+                var options = new SessionProviderRuntimeOptions
+                {
+                    PeerIdentityBridgeName = networkConfig.PeerIdentityBridgeName,
+                };
+
+                ISessionProviderRuntime runtime;
+                if (provider == null)
+                {
+                    var advertiser = new NoopSessionAdvertiser();
+                    var tunnelHost = new NoopSessionTunnelHost();
+                    var unavailable = UnavailableSessionServices.Instance;
+                    runtime = new SessionProviderRuntime(
+                        advertiser,
+                        tunnelHost,
+                        unavailable,
+                        unavailable,
+                        unavailable,
+                        unavailable,
+                        new NoopMissionPeerTransport(),
+                        tunnelHost,
+                        NoopPeerIdentityPublisher.Instance,
+                        Array.Empty<IDisposable>());
+                }
+                else if (isServer)
+                {
+                    options.Visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
+#if DEBUG
+                    options.Visibility = ServerVisibility.None;
+#endif
+                    runtime = provider.CreateServerRuntime(options);
+                }
+                else
+                {
+                    options.Visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
+                    runtime = provider.CreateClientRuntime(options);
+                }
+
+                return isServer
+                    ? AddPeerIdentityBridge(runtime, options.PeerIdentityBridgeName)
+                    : runtime;
+            })
+            .As<ISessionProviderRuntime>()
             .InstancePerLifetimeScope();
-        builder.RegisterType<SteamLobbyAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
-        builder.RegisterType<SessionLobbyMembershipHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
-        builder.RegisterType<SteamNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
-        builder.RegisterType<SteamTunnelHost>().As<ISessionTunnelHost>().InstancePerLifetimeScope();
-        builder.RegisterType<SteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
+
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().Advertiser)
+            .As<ISessionAdvertiser>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().TunnelHost)
+            .As<ISessionTunnelHost>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().PeerIdentityResolver)
+            .As<IAuthenticatedPeerIdentityResolver>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().Membership)
+            .As<ISessionMembership>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().AdvertisementOwner)
+            .As<ISessionAdvertisementOwner>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().ServerReadiness)
+            .As<ISessionServerReadiness>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().TransportTargetSource)
+            .As<ISessionTransportTargetSource>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().MissionTransport)
+            .As<IMissionPeerTransport>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+        builder.Register(context => context.Resolve<ISessionProviderRuntime>().PeerIdentityPublisher)
+            .As<IPeerIdentityPublisher>()
+            .InstancePerLifetimeScope()
+            .ExternallyOwned();
+    }
+
+    internal static ISessionProviderRuntime AddPeerIdentityBridge(
+        ISessionProviderRuntime runtime,
+        string bridgeName)
+    {
+        if (!PeerIdentityBridgeName.IsValid(bridgeName)) return runtime;
+
+        var bridgeResolver = new NamedPipePeerIdentityResolver(bridgeName);
+        var peerIdentityResolver = new FallbackAuthenticatedPeerIdentityResolver(
+            runtime.PeerIdentityResolver,
+            bridgeResolver);
+        return new PeerIdentityResolvingSessionProviderRuntime(
+            runtime,
+            peerIdentityResolver,
+            bridgeResolver);
     }
 }

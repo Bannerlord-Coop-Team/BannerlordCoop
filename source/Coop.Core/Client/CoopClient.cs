@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
@@ -27,10 +28,13 @@ public interface ICoopClient : IRelayNetwork, IUpdateable, INetEventListener, ID
 }
 
 /// <inheritdoc cref="ICoopClient"/>
-public class CoopClient : CoopNetworkBase, ICoopClient
+public class CoopClient : CoopNetworkBase, ICoopClient, ILocalPeerEndpointSource
 {
     public override int Priority => 0;
     public IPEndPoint ServerEndpoint { get; private set; }
+    public IPEndPoint LocalPeerEndpoint => netManager.LocalPort <= 0
+        ? null
+        : new IPEndPoint(IPAddress.Loopback, netManager.LocalPort);
 
     private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
 

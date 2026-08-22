@@ -10,14 +10,10 @@ namespace Coop.Core.Server.Connections.Messages;
 public readonly struct NetworkTransferNewHero : IEvent
 {
     [ProtoMember(1)]
-    public readonly string PlayerId;
-
-    [ProtoMember(2)]
     public readonly byte[] PlayerHero;
 
-    public NetworkTransferNewHero(string playerId, byte[] playerHero)
+    public NetworkTransferNewHero(byte[] playerHero)
     {
-        PlayerId = playerId;
         PlayerHero = playerHero;
     }
 }

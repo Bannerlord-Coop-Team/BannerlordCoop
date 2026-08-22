@@ -18,8 +18,10 @@ public record NetworkClientValidate : ICommand
 
     [ProtoMember(1)]
     public string PlayerId { get; }
+    [ProtoMember(2)]
+    public string LegacyPlayerId { get; }
 
-    public NetworkClientValidate(string playerId)
+    public NetworkClientValidate(string playerId, string legacyPlayerId = null)
     {
         if (string.IsNullOrEmpty(playerId))
         {
@@ -27,6 +29,7 @@ public record NetworkClientValidate : ICommand
         }
 
         PlayerId = playerId;
+        LegacyPlayerId = legacyPlayerId;
     }
 }
 

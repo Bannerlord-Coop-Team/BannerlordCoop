@@ -16,7 +16,7 @@ public static class ModInformation
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
         ?.InformationalVersion ?? "0.0.0";
 
-    /// <summary>The semantic portion of <see cref="BuildVersion"/>, used by Steam server metadata.</summary>
+    /// <summary>The semantic portion of <see cref="BuildVersion"/>, used by server metadata.</summary>
     public static Version Version { get; } = ParseVersion(BuildVersion);
 
     /// <summary>Whether an advertised lobby was built with this exact mod build.</summary>

@@ -45,6 +45,7 @@ namespace Coop.Tests.Server.Connections.States
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
             connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
+            Assert.True(connectionLogic.TrySetControllerId("MyId"));
         }
 
         [Fact]
@@ -79,7 +80,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+                playerPeer, new NetworkTransferNewHero(Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert — the joining peer is sent the server-assigned ids, then we send the save and wait
@@ -88,6 +89,25 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.TestNetwork.GetPeerMessagesFromType<NetworkHeroRecieved>(playerPeer));
             Assert.IsType<NetworkHeroRecieved>(message);
             Assert.IsType<LoadingState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkTransferNewHero_UsesControllerIdBoundDuringValidation()
+        {
+            SetupUnpackedHero();
+            Player? addedPlayer = null;
+            serverComponent.Container.Resolve<Mock<IPlayerManager>>()
+                .Setup(p => p.AddPlayer(It.IsAny<Player>()))
+                .Callback<Player>(player => addedPlayer = player)
+                .Returns(true);
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            currentState.Handle_NetworkTransferNewHero(new MessagePayload<NetworkTransferNewHero>(
+                playerPeer,
+                new NetworkTransferNewHero(Array.Empty<byte>())));
+
+            Assert.NotNull(addedPlayer);
+            Assert.Equal("MyId", addedPlayer.ControllerId);
         }
 
         [Fact]
@@ -100,7 +120,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", heroData));
+                playerPeer, new NetworkTransferNewHero(heroData));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert — every other connected peer is told a new player hero was created, and the broadcast Player
@@ -137,7 +157,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+                playerPeer, new NetworkTransferNewHero(Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert
@@ -172,7 +192,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+                playerPeer, new NetworkTransferNewHero(Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert
@@ -213,7 +233,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+                playerPeer, new NetworkTransferNewHero(Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert — only the pre-existing client is replayed to the joiner (as a hero-blob-less
@@ -238,7 +258,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+                playerPeer, new NetworkTransferNewHero(Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert — malformed join data ejects only that peer. The standalone server campaign remains
@@ -264,7 +284,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+                playerPeer, new NetworkTransferNewHero(Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert — everything after AddPlayer assumes this peer owns the player it just

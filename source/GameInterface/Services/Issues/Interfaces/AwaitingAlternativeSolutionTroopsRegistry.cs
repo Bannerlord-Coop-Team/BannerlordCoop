@@ -13,6 +13,7 @@ public interface IAwaitingAlternativeSolutionTroopsRegistry
     void Clear(string ownerControllerId);
     void ClearAll();
     void Restore(string ownerControllerId, TroopRoster troops);
+    void MigrateControllerId(string legacyControllerId, string controllerId);
     IReadOnlyCollection<(string OwnerControllerId, TroopRoster Troops)> Snapshot();
 }
 
@@ -82,6 +83,18 @@ internal sealed class AwaitingAlternativeSolutionTroopsRegistry : IAwaitingAlter
     {
         if (string.IsNullOrEmpty(ownerControllerId) || troops == null || troops.Count == 0) return;
         troopsByOwnerControllerId[ownerControllerId] = troops;
+    }
+
+    public void MigrateControllerId(string legacyControllerId, string controllerId)
+    {
+        if (string.IsNullOrEmpty(legacyControllerId) ||
+            string.IsNullOrEmpty(controllerId) ||
+            legacyControllerId == controllerId ||
+            !troopsByOwnerControllerId.TryGetValue(legacyControllerId, out var legacyTroops))
+            return;
+
+        troopsByOwnerControllerId.Remove(legacyControllerId);
+        Deposit(controllerId, legacyTroops);
     }
 
     public IReadOnlyCollection<(string OwnerControllerId, TroopRoster Troops)> Snapshot()

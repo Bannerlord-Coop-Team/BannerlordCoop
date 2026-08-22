@@ -61,13 +61,13 @@ namespace Coop.UI.LoadGameUI
                     "Friends Only",
                     null,
                     true,
-                    "Listed in Server Discovery for your Steam friends only."),
+                    "Listed in your storefront's server browser for friends only."),
                 new InquiryElement(
                     ServerVisibility.None,
                     "None",
                     null,
                     true,
-                    "Hidden from Server Discovery; Steam joins, direct connections, and owner loopback still work."),
+                    "Hidden from storefront discovery; invites, direct connections, and owner loopback still work."),
             };
 
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
@@ -116,7 +116,7 @@ namespace Coop.UI.LoadGameUI
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
             }
 
-            // The handler decides spawn-managed (Steam) vs in-process hosting.
+            // The handler selects managed or in-process hosting for the active storefront.
             MessageBroker.Instance.Publish(this,
                 new AttemptHost(Save.Name, password ?? string.Empty, visibility));
         }

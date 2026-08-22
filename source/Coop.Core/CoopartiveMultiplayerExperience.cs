@@ -29,14 +29,14 @@ using TaleWorlds.Library;
 
 namespace Coop.Core
 {
-    public class CoopartiveMultiplayerExperience : IDisposable
+    public class CoopartiveMultiplayerExperience : IDisposable, ISessionJoinRequestGate
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopartiveMultiplayerExperience>();
 
         private IMessageBroker messageBroker;
         private INetworkConfig configuration;
         private IContainer container;
-        private readonly SteamOrDirectJoinEndpointPreparer joinEndpointPreparer = new SteamOrDirectJoinEndpointPreparer();
+        private readonly ProviderOrDirectJoinEndpointPreparer joinEndpointPreparer = new ProviderOrDirectJoinEndpointPreparer();
         private readonly ServerProcessManager serverProcessManager;
         private readonly Action<string> setCrashPhase;
         private readonly object containerGate = new object();
@@ -103,12 +103,7 @@ namespace Coop.Core
                 Token = connectMessage.Password ?? string.Empty,
             };
 
-            var advertisementConfig = new SessionAdvertisementConfig
-            {
-                EnableSteamInvites = connectMessage.EnableSteamInvites,
-            };
-
-            if (!StartAsClient(configuration, advertisementConfig, JoinIntent.PlayerDirect))
+            if (!StartAsClient(configuration, intent: JoinIntent.PlayerDirect))
             {
                 InformationManager.DisplayMessage(new InformationMessage(StartRefusedNotice));
             }
@@ -145,10 +140,8 @@ namespace Coop.Core
 
             AbandonAnyStartingSession();
 
-            // Already launched this process with /server and its anonymous
-            // Steam game-server session owns the fixed Steam ports. Host here so the existing
-            // server container advertises the lobby instead of spawning a second server that
-            // competes for those ports.
+            // A process already launched with /server owns the provider's server session and
+            // ports. Host in its existing container instead of spawning a competing server.
             if (standaloneServerProcess)
             {
                 Logger.Information("Standalone server process hosting save '{SaveName}' in-process",
@@ -157,11 +150,19 @@ namespace Coop.Core
                 return;
             }
 
-            // Off Steam, keep the in-process dedicated-server behavior: this instance becomes
+            // Without a storefront provider, keep the in-process dedicated-server behavior: this instance becomes
             // the server, and the player launches a second instance to join it.
-            if (!SessionDiscovery.SteamAvailable)
+            if (!SessionDiscovery.ProviderConfigured)
             {
                 StartAsServer(obj.What.SaveName, password, visibility);
+                return;
+            }
+
+            if (!SessionDiscovery.ProviderAvailable)
+            {
+                string providerName = SessionDiscovery.ClientProvider.DisplayName;
+                InformationManager.DisplayMessage(new InformationMessage(
+                    $"{providerName} authentication is not ready; launch Bannerlord through {providerName} and try hosting again"));
                 return;
             }
 
@@ -176,10 +177,22 @@ namespace Coop.Core
             // is recognised by Handle(HostedServerExited) instead of dropped on !hostedSession.
             hostedSession = true;
             clientConnectedOnce = false;
+            bool playerOwnsProviderTunnel =
+                SessionDiscovery.ClientProvider?.SupportsDedicatedServer == false;
+            // The launching player reconnects over loopback, so every spawned provider server needs this handoff.
+            string peerIdentityBridgeName = PeerIdentityBridgeName.Create();
+            string serverSessionProvider = playerOwnsProviderTunnel
+                ? "direct"
+                : SessionDiscovery.ClientProvider.Provider;
 
             try
             {
-                serverProcessManager.Start(obj.What.SaveName, password, visibility);
+                serverProcessManager.Start(
+                    obj.What.SaveName,
+                    password,
+                    visibility,
+                    peerIdentityBridgeName,
+                    serverSessionProvider);
             }
             catch (Exception ex)
             {
@@ -194,13 +207,14 @@ namespace Coop.Core
             {
                 Address = "127.0.0.1",
                 Token = password,
+                PeerIdentityBridgeName = peerIdentityBridgeName,
             };
 
             var advertisementConfig = new SessionAdvertisementConfig
             {
-                // The spawned server owns the Steam listener and public lobby. This loopback
-                // client must not create a second lobby and user-flavor tunnel.
-                EnableSteamInvites = false,
+                // Steam and configured Galaxy game servers advertise themselves. A normal GOG
+                // host owns the Galaxy lobby and tunnels traffic to this spawned direct server.
+                EnablePlatformInvites = playerOwnsProviderTunnel,
                 Visibility = visibility,
             };
 
@@ -213,7 +227,7 @@ namespace Coop.Core
                     return;
                 }
 
-                container.Resolve<SteamJoinWatchdog>().Arm(configuration.Address, configuration.Port,
+                container.Resolve<SessionJoinWatchdog>().Arm(configuration.Address, configuration.Port,
                     timeout: HostedServerStartTimeout,
                     timeoutText: "The co-op server did not finish starting. Check that the save loads in singleplayer. The standalone server remains open until you close it.");
 
@@ -270,7 +284,11 @@ namespace Coop.Core
         private void Handle(MessagePayload<SessionJoinInfoResolved> obj)
         {
             var joinInfo = obj.What.JoinInfo;
-            if (!CanStartResolvedJoin()) return;
+            if (!CanStartResolvedJoin())
+            {
+                AbandonResolvedJoin();
+                return;
+            }
 
             if (joinInfo.PasswordRequired)
             {
@@ -302,7 +320,7 @@ namespace Coop.Core
                 () =>
                 {
                     passwordInquiryPending = false;
-                    // The join keeps its Steam lobby membership alive while this prompt is
+                    // The join keeps its provider listing membership alive while this prompt is
                     // open; abandoning tells the join listener to leave, so a later Join
                     // click starts a fresh attempt instead of no-oping on the stale membership.
                     messageBroker.Publish(this, new SessionJoinAbandoned());
@@ -319,7 +337,11 @@ namespace Coop.Core
 
         private void StartResolvedJoin(SessionJoinInfo joinInfo)
         {
-            if (!CanStartResolvedJoin()) return;
+            if (!CanStartResolvedJoin())
+            {
+                AbandonResolvedJoin();
+                return;
+            }
 
             var prepared = joinEndpointPreparer.PrepareAsync(joinInfo).GetAwaiter().GetResult();
 
@@ -328,7 +350,8 @@ namespace Coop.Core
             if (!prepared.HasAddress)
             {
                 InformationManager.DisplayMessage(new InformationMessage(
-                    "Could not set up the Steam connection to the host, and the host has not shared a public address to fall back to"));
+                    "Could not set up the platform connection to the host, and the host has not shared a public address to fall back to"));
+                AbandonResolvedJoin();
                 return;
             }
 
@@ -343,29 +366,35 @@ namespace Coop.Core
             try
             {
                 // A refusal leaves the process-wide tunnel and lobby to the start still in flight.
-                if (!StartAsClient(configuration, intent: JoinIntent.PlayerSteam))
+                if (!StartAsClient(configuration, intent: JoinIntent.PlayerProvider))
                 {
                     InformationManager.DisplayMessage(new InformationMessage(StartRefusedNotice));
                     return;
                 }
 
-                container.Resolve<SteamJoinWatchdog>().Arm(prepared.Address, prepared.Port, prepared.Tunneled);
+                container.Resolve<SessionJoinWatchdog>().Arm(prepared.Address, prepared.Port, prepared.Tunneled);
             }
             catch (Exception ex)
             {
-                // Tear down the half-built container, otherwise it blocks every later Steam join.
-                Logger.Error(ex, "Steam-initiated join to {Address}:{Port} failed to start", prepared.Address, prepared.Port);
+                // Tear down the half-built container, otherwise it blocks every later provider join.
+                Logger.Error(ex, "Provider-initiated join to {Address}:{Port} failed to start", prepared.Address, prepared.Port);
                 DestroyContainer();
                 // This failure exit publishes no session message, so the tunnel is closed here.
                 joinEndpointPreparer.TearDownActiveTunnel();
                 InformationManager.DisplayMessage(new InformationMessage(
                     $"Could not connect to the advertised address '{prepared.Address}:{prepared.Port}'"));
+                AbandonResolvedJoin();
             }
         }
 
+        bool ISessionJoinRequestGate.CanStartJoin() => CanStartResolvedJoin();
+
+        private void AbandonResolvedJoin() =>
+            messageBroker.Publish(this, new SessionJoinAbandoned());
+
         private bool CanStartResolvedJoin()
         {
-            // Steam callbacks can fire at any moment, so every prompt and callback rechecks state.
+            // Provider callbacks can fire at any moment, so every prompt and callback rechecks state.
             if (container != null)
             {
                 InformationManager.DisplayMessage(new InformationMessage(
@@ -447,7 +476,11 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
-            builder.RegisterInstance(new NetworkConfig { Token = password ?? string.Empty })
+            builder.RegisterInstance(new NetworkConfig
+                {
+                    Token = password ?? string.Empty,
+                    PeerIdentityBridgeName = ManagedServerConfig.PeerIdentityBridgeName,
+                })
                 .As<INetworkConfig>()
                 .SingleInstance();
             builder.RegisterInstance(new SessionAdvertisementConfig { Visibility = visibility })

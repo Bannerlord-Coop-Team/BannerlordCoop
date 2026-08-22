@@ -6,6 +6,8 @@ using Coop.Core.Common.Configuration;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using GameInterface;
+using Moq;
+using System.Net;
 using Xunit;
 
 namespace Coop.Tests.Autofac
@@ -44,6 +46,47 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+        }
+
+        [Fact]
+        public void ServerRuntime_ProviderResolverPrecedesIdentityBridge()
+        {
+            string bridgeName = PeerIdentityBridgeName.Create();
+            var hostEndpoint = new IPEndPoint(IPAddress.Loopback, 43143);
+            var providerEndpoint = new IPEndPoint(IPAddress.Loopback, 43144);
+            var hostIdentity = new PlatformIdentity("steam", "42");
+            var staleBridgeIdentity = new PlatformIdentity("steam", "43");
+            var providerIdentity = new PlatformIdentity("gog", "84");
+            var providerResolver = new Mock<IAuthenticatedPeerIdentityResolver>();
+            providerResolver
+                .Setup(resolver => resolver.TryGetIdentity(providerEndpoint, out providerIdentity))
+                .Returns(true);
+            var providerRuntime = new Mock<ISessionProviderRuntime>();
+            providerRuntime.SetupGet(runtime => runtime.PeerIdentityResolver)
+                .Returns(providerResolver.Object);
+            var runtime = ClientModule.AddPeerIdentityBridge(providerRuntime.Object, bridgeName);
+
+            using (var publisher = new NamedPipePeerIdentityPublisher(bridgeName))
+            {
+                Assert.True(publisher.TryRegister(hostEndpoint, hostIdentity));
+                Assert.True(publisher.TryRegister(providerEndpoint, staleBridgeIdentity));
+                Assert.True(runtime.PeerIdentityResolver.TryGetIdentity(hostEndpoint, out var resolvedHost));
+                Assert.Equal(hostIdentity, resolvedHost);
+                providerResolver.Verify(
+                    resolver => resolver.TryGetIdentity(
+                        hostEndpoint,
+                        out It.Ref<PlatformIdentity>.IsAny),
+                    Times.Once);
+
+                Assert.True(runtime.PeerIdentityResolver.TryGetIdentity(
+                    providerEndpoint,
+                    out var resolvedProvider));
+                Assert.Equal(providerIdentity, resolvedProvider);
+            }
+
+            runtime.Dispose();
+            runtime.Dispose();
+            providerRuntime.Verify(inner => inner.Dispose(), Times.Once);
         }
 
         [Theory]

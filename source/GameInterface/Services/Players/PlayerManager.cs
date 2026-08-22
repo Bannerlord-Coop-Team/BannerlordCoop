@@ -29,6 +29,10 @@ public interface IPlayerManager
     /// <returns>if the player was added to the registry</returns>
     bool AddPlayer(Player player);
     bool ReplacePlayer(Player registeredPlayer, Player replacementPlayer);
+    bool TryMigrateControllerId(
+        string legacyControllerId,
+        string controllerId,
+        out Player migratedPlayer);
     bool TryGetPlayer(string controllerId, out Player player);
 
     /// <summary>
@@ -194,6 +198,111 @@ public class PlayerManager : IPlayerManager
         ReplacePlayerObject<Hero>(registeredPlayer.ControllerId, registeredPlayer.HeroId, replacementPlayer.HeroId);
         ReplacePlayerObject<Clan>(registeredPlayer.ControllerId, registeredPlayer.ClanId, replacementPlayer.ClanId);
         return true;
+    }
+
+    public bool TryMigrateControllerId(
+        string legacyControllerId,
+        string controllerId,
+        out Player migratedPlayer)
+    {
+        migratedPlayer = null;
+        if (string.IsNullOrEmpty(legacyControllerId) ||
+            string.IsNullOrEmpty(controllerId) ||
+            legacyControllerId == controllerId)
+            return false;
+
+        Player registeredPlayer;
+        Player replacedPlayer = null;
+        lock (registrySync)
+        {
+            if (!_players.TryGetValue(legacyControllerId, out registeredPlayer))
+                return false;
+
+            if (_players.TryGetValue(controllerId, out replacedPlayer) &&
+                peerToPlayer.Any(kvp =>
+                    ReferenceEquals(kvp.Value, replacedPlayer) &&
+                    kvp.Key.ConnectionState == ConnectionState.Connected))
+                return false;
+
+            migratedPlayer = new Player(
+                controllerId,
+                registeredPlayer.HeroId,
+                registeredPlayer.MobilePartyId,
+                registeredPlayer.ClanId,
+                registeredPlayer.CharacterObjectId);
+
+            if (replacedPlayer != null)
+            {
+                _players.Remove(controllerId);
+                controllerToPeer.Remove(controllerId);
+                foreach (var replacedPeer in peerToPlayer
+                    .Where(kvp => ReferenceEquals(kvp.Value, replacedPlayer))
+                    .Select(kvp => kvp.Key).ToArray())
+                {
+                    peerToPlayer.TryRemove(replacedPeer, out _);
+                }
+            }
+
+            _players.Remove(legacyControllerId);
+            _players.Add(controllerId, migratedPlayer);
+
+            if (controllerToPeer.TryGetValue(legacyControllerId, out var peer))
+            {
+                controllerToPeer.Remove(legacyControllerId);
+                controllerToPeer[controllerId] = peer;
+            }
+
+            foreach (var connectedPeer in peerToPlayer
+                .Where(kvp => ReferenceEquals(kvp.Value, registeredPlayer))
+                .Select(kvp => kvp.Key).ToArray())
+            {
+                peerToPlayer[connectedPeer] = migratedPlayer;
+            }
+        }
+
+        if (replacedPlayer != null)
+        {
+            RemovePlayerObjectForController<MobileParty>(controllerId, replacedPlayer.MobilePartyId);
+            RemovePlayerObjectForController<Hero>(controllerId, replacedPlayer.HeroId);
+            RemovePlayerObjectForController<Clan>(controllerId, replacedPlayer.ClanId);
+        }
+
+        MigratePlayerObject<MobileParty>(legacyControllerId, controllerId, registeredPlayer.MobilePartyId);
+        MigratePlayerObject<Hero>(legacyControllerId, controllerId, registeredPlayer.HeroId);
+        MigratePlayerObject<Clan>(legacyControllerId, controllerId, registeredPlayer.ClanId);
+        return true;
+    }
+
+    private void RemovePlayerObjectForController<T>(string controllerId, string networkId)
+    {
+        if (string.IsNullOrEmpty(networkId) ||
+            !objectManager.TryGetObject<T>(networkId, out var obj) ||
+            !PlayerObjects.TryGetValue(obj, out var info) ||
+            info.ObjectControllerId != controllerId)
+            return;
+
+        PlayerObjects.Remove(obj);
+
+        if (obj is MobileParty mobileParty)
+            InvalidatePlayerPartySpeedCache(mobileParty);
+    }
+
+    private void MigratePlayerObject<T>(
+        string legacyControllerId,
+        string controllerId,
+        string networkId)
+    {
+        if (string.IsNullOrEmpty(networkId) ||
+            !objectManager.TryGetObject<T>(networkId, out var obj) ||
+            !PlayerObjects.TryGetValue(obj, out var info) ||
+            info.ObjectControllerId != legacyControllerId)
+            return;
+
+        PlayerObjects.Remove(obj);
+        PlayerObjects.Add(obj, new ControlledObjectInfo(controllerId, controllerIdProvider));
+
+        if (obj is MobileParty mobileParty)
+            InvalidatePlayerPartySpeedCache(mobileParty);
     }
 
     private void ReplacePlayerObject<T>(string controllerId, string oldId, string newId)

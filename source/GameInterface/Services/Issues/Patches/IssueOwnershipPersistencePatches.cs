@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
 using Serilog;
@@ -35,7 +35,7 @@ internal class IssueOwnershipPersistencePatches
         }
     }
 
-    private static void SyncDataInternal(IDataStore dataStore, IIssueOwnershipRegistry ownershipRegistry, IIssueGenerationRegistry generationRegistry)
+    internal static void SyncDataInternal(IDataStore dataStore, IIssueOwnershipRegistry ownershipRegistry, IIssueGenerationRegistry generationRegistry)
     {
         List<IssueOwnershipSaveData> saveData = null;
         if (dataStore.IsSaving)
@@ -56,7 +56,9 @@ internal class IssueOwnershipPersistencePatches
             {
                 ownershipRegistry.RestoreAll(saveData
                     .Where(entry => entry?.IssueGiverHero != null && !string.IsNullOrEmpty(entry.OwnerControllerId))
-                    .Select(entry => new KeyValuePair<Hero, string>(entry.IssueGiverHero, entry.OwnerControllerId)));
+                    .Select(entry => new KeyValuePair<Hero, string>(
+                        entry.IssueGiverHero,
+                        entry.OwnerControllerId)));
             }
         }
 
@@ -75,4 +77,5 @@ internal class IssueOwnershipPersistencePatches
             .Where(entry => entry?.IssueGiverHero != null)
             .Select(entry => new KeyValuePair<Hero, int>(entry.IssueGiverHero, entry.Generation)));
     }
+
 }

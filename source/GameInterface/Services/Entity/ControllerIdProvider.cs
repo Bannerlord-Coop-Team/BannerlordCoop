@@ -1,5 +1,5 @@
 ﻿using Common.Logging;
-using Serilog;
+using Common.Network.Session;
 using System;
 using System.Linq;
 using TaleWorlds.Engine;
@@ -10,16 +10,30 @@ namespace GameInterface.Services.Entity;
 public interface IControllerIdProvider
 {
     string ControllerId { get; }
+    string LegacyControllerId { get; }
     void SetControllerId(string controllerId);
-    void SetControllerAsPlatformId();
+    void SetControllerAsPlatformIdentity(PlatformIdentity identity);
+    void SetControllerAsLocalId();
     void SetControllerFromProgramArgs();
 }
 
 public class ControllerIdProvider : IControllerIdProvider
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ControllerIdProvider>();
+    private readonly IControllerIdStore controllerIdStore;
 
     public string ControllerId { get; private set; }
+    public string LegacyControllerId { get; private set; }
+
+    public ControllerIdProvider() : this(new ControllerIdStore())
+    {
+    }
+
+    public ControllerIdProvider(IControllerIdStore controllerIdStore)
+    {
+        if (controllerIdStore == null) throw new ArgumentNullException(nameof(controllerIdStore));
+
+        this.controllerIdStore = controllerIdStore;
+    }
 
     public void SetControllerFromProgramArgs()
     {
@@ -30,32 +44,41 @@ public class ControllerIdProvider : IControllerIdProvider
             var platformArgIndex = args.FindIndex(x => x.ToLower() == "/platformid");
 
             ControllerId = args[platformArgIndex + 1];
+            LegacyControllerId = string.Empty;
         }
         catch(Exception)
         {
-            SetAsDefault();
+            SetControllerAsLocalId();
         }        
     }
 
-    public void SetControllerAsPlatformId()
+    public void SetControllerAsPlatformIdentity(PlatformIdentity identity)
     {
-        string controllerId = PlatformServices.UserId;
+        if (!identity.IsValid || !identity.IsStorefrontIdentity)
+            throw new ArgumentException("A valid storefront transport identity is required", nameof(identity));
 
-        if (string.IsNullOrEmpty(controllerId))
+        ControllerId = identity.ControllerId;
+        LegacyControllerId = identity.UserId;
+    }
+
+    public void SetControllerAsLocalId()
+    {
+        ControllerId = "local:" + controllerIdStore.GetOrCreateId();
+        LegacyControllerId = string.Empty;
+        try
         {
-            Logger.Error("{userId} was null", nameof(PlatformServices.UserId));
+            string platformUserId = PlatformServices.UserId;
+            if (ulong.TryParse(platformUserId, out _))
+                LegacyControllerId = platformUserId;
         }
-
-        ControllerId = PlatformServices.UserId;
+        catch
+        {
+        }
     }
 
     public void SetControllerId(string controllerId)
     {
         ControllerId = controllerId;
-    }
-
-    public void SetAsDefault()
-    {
-        ControllerId = "DefaultId";
+        LegacyControllerId = string.Empty;
     }
 }

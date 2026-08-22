@@ -9,8 +9,8 @@ public enum JoinIntent
     /// <summary>The player entered an address on the co-op join screen.</summary>
     PlayerDirect,
 
-    /// <summary>The player picked a Steam lobby, or accepted an invite.</summary>
-    PlayerSteam,
+    /// <summary>The player picked a storefront session, or accepted an invite.</summary>
+    PlayerProvider,
 
     /// <summary>This instance hosted, and is connecting to its own standalone server process.</summary>
     HostLoopback,

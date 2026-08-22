@@ -4,12 +4,11 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Network.Session;
-using Coop.Core.Common.Session;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
-using System.Globalization;
+using System;
 using System.Net;
 
 namespace Coop.Core.Server.Services.Instances.Handlers;
@@ -26,7 +25,7 @@ public class ServerMissionMembershipHandler : IHandler
     private readonly IMissionManager missionManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
-    private readonly ISessionTunnelIdentityResolver tunnelIdentityResolver;
+    private readonly IAuthenticatedPeerIdentityResolver peerIdentityResolver;
 
     public ServerMissionMembershipHandler(
         IMessageBroker messageBroker,
@@ -42,13 +41,13 @@ public class ServerMissionMembershipHandler : IHandler
         IMissionManager missionManager,
         INetwork network,
         IPlayerManager playerManager,
-        ISessionTunnelIdentityResolver tunnelIdentityResolver)
+        IAuthenticatedPeerIdentityResolver peerIdentityResolver)
     {
         this.messageBroker = messageBroker;
         this.missionManager = missionManager;
         this.network = network;
         this.playerManager = playerManager;
-        this.tunnelIdentityResolver = tunnelIdentityResolver;
+        this.peerIdentityResolver = peerIdentityResolver;
 
         messageBroker.Subscribe<NetworkMissionEntered>(Handle_MissionEntered);
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_MissionLeft);
@@ -91,37 +90,27 @@ public class ServerMissionMembershipHandler : IHandler
                 new MissionMemberEntered(result.ControllerId, result.InstanceId, result.IsFirstMember));
 
             // Introduce the newcomer and each existing member to each other so BOTH sides send their join info.
-            var newcomerSteamId = ResolveSteamId(peer, result.ControllerId);
+            var newcomerIdentity = ResolveIdentity(peer, result.ControllerId);
             foreach (var (otherControllerId, otherPeer) in result.ExistingMembers)
             {
-                var existingSteamId = ResolveSteamId(otherPeer, otherControllerId);
+                var existingIdentity = ResolveIdentity(otherPeer, otherControllerId);
 
                 network.Send(otherPeer, new NetworkMissionPeerEntered(
-                    result.ControllerId, result.InstanceId, newcomerSteamId));
+                    result.ControllerId, result.InstanceId, newcomerIdentity));
                 network.Send(peer, new NetworkMissionPeerEntered(
-                    otherControllerId, result.InstanceId, existingSteamId));
+                    otherControllerId, result.InstanceId, existingIdentity));
             }
         }, context: nameof(Handle_MissionEntered));
     }
 
-    private ulong ResolveSteamId(NetPeer peer, string controllerId)
+    private PlatformIdentity ResolveIdentity(NetPeer peer, string expectedControllerId)
     {
         var endpoint = new IPEndPoint(peer.Address, peer.Port);
-        if (tunnelIdentityResolver != null
-            && tunnelIdentityResolver.TryGetRemoteSteamId(endpoint, out var steamId))
-            return steamId;
-
-        // The hosting client reaches its spawned server directly over loopback, so it has no tunnel
-        // endpoint to map. In Release its controller id is its Steam id; constrain that fallback to a
-        // managed server's local peer so arbitrary direct-IP controller ids are never treated as Steam.
-        if (ManagedServerConfig.IsManagedServer
-            && IPAddress.IsLoopback(peer.Address)
-            && ulong.TryParse(controllerId, NumberStyles.None, CultureInfo.InvariantCulture, out steamId))
-        {
-            return steamId;
-        }
-
-        return 0;
+        return peerIdentityResolver != null &&
+            peerIdentityResolver.TryGetIdentity(endpoint, out var identity) &&
+            string.Equals(identity.ControllerId, expectedControllerId, StringComparison.Ordinal)
+            ? identity
+            : default;
     }
 
     private void Handle_MissionLeft(MessagePayload<NetworkMissionLeft> payload)

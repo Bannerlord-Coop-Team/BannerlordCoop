@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Network.Session;
 using Common.Tests.Utils;
-using Coop.Core.Common.Session;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Tests.Mocks;
@@ -28,79 +27,90 @@ public class ServerMissionMembershipHandlerTests
         modifiers: null)!;
 
     [Fact]
-    public void MissionEntered_FansOutTheOppositePeersTunnelSteamId()
+    public void MissionEntered_FansOutProviderAuthenticatedPeerIdentitiesWithoutCrossPlatformCollision()
     {
-        RunWithManagedServer(ownerProcessId: 42, () =>
-        {
-            var newcomerEndpoint = new IPEndPoint(IPAddress.Loopback, 51001);
-            var existingEndpoint = new IPEndPoint(IPAddress.Loopback, 51002);
-            var newcomer = CreatePeer(newcomerEndpoint, 1);
-            var existing = CreatePeer(existingEndpoint, 2);
+        var newcomerEndpoint = new IPEndPoint(IPAddress.Loopback, 51001);
+        var existingEndpoint = new IPEndPoint(IPAddress.Loopback, 51002);
+        var newcomer = CreatePeer(newcomerEndpoint, 1);
+        var existing = CreatePeer(existingEndpoint, 2);
+        var newcomerIdentity = new PlatformIdentity("gog", "9001");
+        var existingIdentity = new PlatformIdentity("steam", "9001");
 
-            var tunnelHost = new Mock<ISessionTunnelIdentityResolver>();
-            MapSteamId(tunnelHost, newcomerEndpoint, 9001);
-            MapSteamId(tunnelHost, existingEndpoint, 9002);
+        var identityResolver = new Mock<IAuthenticatedPeerIdentityResolver>();
+        MapIdentity(identityResolver, newcomerEndpoint, newcomerIdentity);
+        MapIdentity(identityResolver, existingEndpoint, existingIdentity);
 
-            var network = PublishEntry(
-                newcomer, "1111", existing, "2222", tunnelHost.Object);
+        var network = PublishEntry(
+            newcomer, "gog:9001", existing, "steam:9001", identityResolver.Object);
 
-            var sentToExisting = Assert.Single(
-                network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(existing));
-            Assert.Equal("1111", sentToExisting.ControllerId);
-            Assert.Equal(9001UL, sentToExisting.SteamId);
+        var sentToExisting = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(existing));
+        Assert.Equal("gog:9001", sentToExisting.ControllerId);
+        Assert.Equal(newcomerIdentity, sentToExisting.PeerIdentity);
 
-            var sentToNewcomer = Assert.Single(
-                network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(newcomer));
-            Assert.Equal("2222", sentToNewcomer.ControllerId);
-            Assert.Equal(9002UL, sentToNewcomer.SteamId);
-        });
+        var sentToNewcomer = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(newcomer));
+        Assert.Equal("steam:9001", sentToNewcomer.ControllerId);
+        Assert.Equal(existingIdentity, sentToNewcomer.PeerIdentity);
     }
 
     [Fact]
-    public void MissionEntered_ManagedDirectLoopbackHostFallsBackToNumericControllerId()
+    public void MissionEntered_EndpointIdentityMustMatchConnectionBoundController()
     {
-        RunWithManagedServer(ownerProcessId: 42, () =>
-        {
-            const string hostControllerId = "76561198000000042";
-            var hostEndpoint = new IPEndPoint(IPAddress.Loopback, 51003);
-            var tunneledEndpoint = new IPEndPoint(IPAddress.Loopback, 51004);
-            var host = CreatePeer(hostEndpoint, 3);
-            var tunneledPeer = CreatePeer(tunneledEndpoint, 4);
+        var newcomerEndpoint = new IPEndPoint(IPAddress.Loopback, 51015);
+        var existingEndpoint = new IPEndPoint(IPAddress.Loopback, 51016);
+        var newcomer = CreatePeer(newcomerEndpoint, 15);
+        var existing = CreatePeer(existingEndpoint, 16);
+        var identityResolver = new Mock<IAuthenticatedPeerIdentityResolver>();
+        MapIdentity(identityResolver, newcomerEndpoint, new PlatformIdentity("gog", "reused-port"));
+        MapIdentity(identityResolver, existingEndpoint, new PlatformIdentity("steam", "9001"));
 
-            var tunnelHost = new Mock<ISessionTunnelIdentityResolver>();
-            MapSteamId(tunnelHost, tunneledEndpoint, 9004);
+        var network = PublishEntry(
+            newcomer, "gog:9001", existing, "steam:9001", identityResolver.Object);
 
-            var network = PublishEntry(
-                host, hostControllerId, tunneledPeer, "remote", tunnelHost.Object);
+        var sentToExisting = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(existing));
+        Assert.False(sentToExisting.PeerIdentity.IsValid);
+    }
 
-            var sentToRemote = Assert.Single(
-                network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(tunneledPeer));
-            Assert.Equal(76561198000000042UL, sentToRemote.SteamId);
+    [Fact]
+    public void MissionEntered_DirectPeerDoesNotClaimStorefrontMissionIdentity()
+    {
+        var directEndpoint = new IPEndPoint(IPAddress.Loopback, 51003);
+        var tunneledEndpoint = new IPEndPoint(IPAddress.Loopback, 51004);
+        var directPeer = CreatePeer(directEndpoint, 3);
+        var tunneledPeer = CreatePeer(tunneledEndpoint, 4);
+        var tunneledIdentity = new PlatformIdentity("gog", "9004");
+        var identityResolver = new Mock<IAuthenticatedPeerIdentityResolver>();
+        MapIdentity(identityResolver, tunneledEndpoint, tunneledIdentity);
 
-            var sentToHost = Assert.Single(
-                network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(host));
-            Assert.Equal(9004UL, sentToHost.SteamId);
-        });
+        var network = PublishEntry(
+            directPeer, "local:123", tunneledPeer, "gog:9004", identityResolver.Object);
+
+        var sentToTunneled = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(tunneledPeer));
+        Assert.False(sentToTunneled.PeerIdentity.IsValid);
+
+        var sentToDirect = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(directPeer));
+        Assert.Equal(tunneledIdentity, sentToDirect.PeerIdentity);
     }
 
     [Theory]
-    [InlineData(0, "127.0.0.1")]
-    [InlineData(42, "203.0.113.10")]
-    public void MissionEntered_UnmappedNonHostPeerKeepsRelayFallback(int ownerProcessId, string address)
+    [InlineData("127.0.0.1", "local:42")]
+    [InlineData("203.0.113.10", "local:42")]
+    public void MissionEntered_UnmappedDirectPeerKeepsRelayFallback(string address, string controllerId)
     {
-        RunWithManagedServer(ownerProcessId, () =>
-        {
-            var newcomer = CreatePeer(new IPEndPoint(IPAddress.Parse(address), 51005), 5);
-            var existing = CreatePeer(new IPEndPoint(IPAddress.Parse("203.0.113.11"), 51006), 6);
-            var tunnelHost = new Mock<ISessionTunnelIdentityResolver>();
+        var newcomer = CreatePeer(new IPEndPoint(IPAddress.Parse(address), 51005), 5);
+        var existing = CreatePeer(new IPEndPoint(IPAddress.Parse("203.0.113.11"), 51006), 6);
+        var identityResolver = new Mock<IAuthenticatedPeerIdentityResolver>();
 
-            var network = PublishEntry(
-                newcomer, "76561198000000042", existing, "existing", tunnelHost.Object);
+        var network = PublishEntry(
+            newcomer, controllerId, existing, "local:existing", identityResolver.Object);
 
-            var sentToExisting = Assert.Single(
-                network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(existing));
-            Assert.Equal(0UL, sentToExisting.SteamId);
-        });
+        var sentToExisting = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(existing));
+        Assert.False(sentToExisting.PeerIdentity.IsValid);
     }
 
     [Fact]
@@ -287,7 +297,7 @@ public class ServerMissionMembershipHandlerTests
         string newcomerControllerId,
         NetPeer existing,
         string existingControllerId,
-        ISessionTunnelIdentityResolver tunnelHost)
+        IAuthenticatedPeerIdentityResolver identityResolver)
     {
         var messageBroker = new TestMessageBroker();
         var missionManager = new Mock<IMissionManager>();
@@ -314,7 +324,7 @@ public class ServerMissionMembershipHandlerTests
 
         var network = new TestNetwork();
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, network, playerManager.Object, tunnelHost);
+            messageBroker, missionManager.Object, network, playerManager.Object, identityResolver);
 
         messageBroker.Publish(newcomer, new NetworkMissionEntered(newcomerControllerId, InstanceId));
         DrainGameThread();
@@ -337,30 +347,16 @@ public class ServerMissionMembershipHandlerTests
     private static NetPeer CreatePeer(IPEndPoint endpoint, int id)
         => (NetPeer)PeerConstructor.Invoke(new object[] { new NetManager(null), endpoint, id });
 
-    private static void MapSteamId(
-        Mock<ISessionTunnelIdentityResolver> tunnelHost,
+    private static void MapIdentity(
+        Mock<IAuthenticatedPeerIdentityResolver> identityResolver,
         IPEndPoint endpoint,
-        ulong steamId)
+        PlatformIdentity identity)
     {
-        var mappedSteamId = steamId;
-        tunnelHost
-            .Setup(host => host.TryGetRemoteSteamId(
+        var mappedIdentity = identity;
+        identityResolver
+            .Setup(resolver => resolver.TryGetIdentity(
                 It.Is<IPEndPoint>(actual => actual.Equals(endpoint)),
-                out mappedSteamId))
+                out mappedIdentity))
             .Returns(true);
-    }
-
-    private static void RunWithManagedServer(int ownerProcessId, Action test)
-    {
-        var previousOwnerProcessId = ManagedServerConfig.OwnerProcessId;
-        try
-        {
-            ManagedServerConfig.OwnerProcessId = ownerProcessId;
-            test();
-        }
-        finally
-        {
-            ManagedServerConfig.OwnerProcessId = previousOwnerProcessId;
-        }
     }
 }

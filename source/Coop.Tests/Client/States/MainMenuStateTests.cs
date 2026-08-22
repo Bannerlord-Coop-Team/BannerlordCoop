@@ -118,19 +118,19 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void CancelJoinAttempt_OnASteamJoin_AbandonsTheLobby()
+        public void CancelJoinAttempt_OnAProviderJoin_AbandonsTheLobby()
         {
-            var steamComponent = new ClientTestComponent(output, JoinIntent.PlayerSteam);
-            var steamLogic = steamComponent.Container.Resolve<IClientLogic>()!;
-            var state = steamLogic.SetState<MainMenuState>();
-            steamLogic.Connect();
+            var providerComponent = new ClientTestComponent(output, JoinIntent.PlayerProvider);
+            var providerLogic = providerComponent.Container.Resolve<IClientLogic>()!;
+            var state = providerLogic.SetState<MainMenuState>();
+            providerLogic.Connect();
             DrainGameThread();
-            steamComponent.TestMessageBroker.Messages.Clear();
+            providerComponent.TestMessageBroker.Messages.Clear();
 
             state.Handle_CancelJoinAttempt(Payload(new CancelJoinAttempt()));
             DrainGameThread();
 
-            Assert.Single(steamComponent.TestMessageBroker.GetMessagesFromType<SessionJoinAbandoned>());
+            Assert.Single(providerComponent.TestMessageBroker.GetMessagesFromType<SessionJoinAbandoned>());
         }
 
         [Fact]

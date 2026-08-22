@@ -2,16 +2,19 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
+using System.Net;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
@@ -29,30 +32,36 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
     private readonly IPlayerManager playerManager;
+    private readonly IControllerIdMigration controllerIdMigration;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly IExistingPlayerSender existingPlayerSender;
+    private readonly IAuthenticatedPeerIdentityResolver peerIdentityResolver;
 
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
         INetwork network,
         IModuleValidator moduleValidator,
         IPlayerManager playerManager,
+        IControllerIdMigration controllerIdMigration,
         IPlayerPartyRestorer playerPartyRestorer,
         IObjectManager objectManager,
         IModuleInfoProvider moduleInfoProvider,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        IAuthenticatedPeerIdentityResolver peerIdentityResolver = null)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.moduleValidator = moduleValidator;
         this.playerManager = playerManager;
+        this.controllerIdMigration = controllerIdMigration;
         this.playerPartyRestorer = playerPartyRestorer;
         this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
         this.existingPlayerSender = existingPlayerSender;
+        this.peerIdentityResolver = peerIdentityResolver;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -129,7 +138,7 @@ public class ResolveCharacterState : ConnectionStateBase
 
         try
         {
-            ResolveCharacter(peer, obj.What.PlayerId);
+            ResolveCharacter(peer, obj.What.PlayerId, obj.What.LegacyPlayerId);
         }
         catch (Exception e)
         {
@@ -152,8 +161,36 @@ public class ResolveCharacterState : ConnectionStateBase
         }
     }
 
-    private void ResolveCharacter(NetPeer peer, string controllerId)
+    private void ResolveCharacter(NetPeer peer, string controllerId, string legacyControllerId)
     {
+        if (!IdentityClaimMatchesTransport(peer, controllerId, legacyControllerId))
+        {
+            Logger.Error(
+                "Connection supplied controller id {ControllerId} that does not match its authenticated transport identity; disconnecting peer {Peer}",
+                controllerId,
+                peer.Id);
+            peer.Disconnect();
+            return;
+        }
+
+        if (!ConnectionLogic.TrySetControllerId(controllerId))
+        {
+            Logger.Error("Connection supplied an invalid or changed controller id; disconnecting peer {Peer}", peer.Id);
+            peer.Disconnect();
+            return;
+        }
+
+        if (TryMigrateLegacyControllerId(legacyControllerId, controllerId, out var migratedPlayer))
+        {
+            Logger.Information(
+                "Migrated legacy controller id {LegacyControllerId} to {ControllerId}",
+                legacyControllerId,
+                controllerId);
+            network.SendAllBut(
+                peer,
+                new NetworkPlayerRegistrationUpdated(migratedPlayer, legacyControllerId));
+        }
+
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
             var heroExists = false;
@@ -214,6 +251,74 @@ public class ResolveCharacterState : ConnectionStateBase
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));
         ConnectionLogic.CreateCharacter();
+    }
+
+    private bool TryMigrateLegacyControllerId(
+        string legacyControllerId,
+        string controllerId,
+        out Player player)
+    {
+        player = null;
+        if (!PlatformIdentity.TryParseControllerId(controllerId, out var identity) ||
+            !PlatformIdentity.TryMigrateLegacyControllerId(
+                legacyControllerId,
+                identity,
+                out var migratedControllerId) ||
+            !string.Equals(controllerId, migratedControllerId, StringComparison.Ordinal))
+            return false;
+
+        bool migrated = false;
+        Player migratedPlayer = null;
+        GameThread.Run(() =>
+        {
+            if (!playerManager.TryGetPlayer(legacyControllerId, out var legacyPlayer) ||
+                !objectManager.TryGetObject<Hero>(legacyPlayer.HeroId, out _))
+                return;
+
+            migrated = controllerIdMigration.TryMigrate(
+                legacyControllerId,
+                controllerId,
+                out migratedPlayer);
+        }, blocking: true);
+
+        player = migratedPlayer;
+        return migrated;
+    }
+
+    private bool IdentityClaimMatchesTransport(
+        NetPeer peer,
+        string controllerId,
+        string legacyControllerId)
+    {
+        var endpoint = new IPEndPoint(peer.Address, peer.Port);
+        if (peerIdentityResolver != null &&
+            peerIdentityResolver.TryGetIdentity(endpoint, out var authenticatedIdentity))
+        {
+            return authenticatedIdentity.IsValid &&
+                string.Equals(
+                    controllerId,
+                    authenticatedIdentity.ControllerId,
+                    StringComparison.Ordinal) &&
+                (string.IsNullOrEmpty(legacyControllerId) ||
+                    string.Equals(
+                        legacyControllerId,
+                        authenticatedIdentity.UserId,
+                        StringComparison.Ordinal));
+        }
+
+        if (PlatformIdentity.TryParseControllerId(controllerId, out var claimedIdentity))
+        {
+            if (claimedIdentity.IsStorefrontIdentity) return false;
+
+            return string.IsNullOrEmpty(legacyControllerId) ||
+                (string.Equals(claimedIdentity.Provider, "local", StringComparison.Ordinal) &&
+                    PlatformIdentity.TryMigrateLegacyControllerId(
+                        legacyControllerId,
+                        claimedIdentity,
+                        out _));
+        }
+
+        return string.IsNullOrEmpty(legacyControllerId);
     }
 
     public override void CreateCharacter()

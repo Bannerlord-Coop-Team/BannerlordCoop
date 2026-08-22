@@ -106,6 +106,7 @@ jobs:
             -p:SourceRevisionId="$(git rev-parse HEAD)" \
             -p:IncludeSourceRevisionInInformationalVersion=true \
             -p:ModName= \
+            -p:RequireGalaxySdk=true \
             -p:NuGetAudit=false \
             --consoleLoggerParameters:ErrorsOnly
 
@@ -125,7 +126,7 @@ jobs:
             cp "$file" "$binary/"
           done
           cp source/Coop/bin/Release/Coop.CrashReporter.exe "$binary/"
-          for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll Coop.CrashReporter.exe; do
+          for required in Coop.dll Common.dll Coop.Core.dll Coop.GOG.dll Coop.Steam.dll GameInterface.dll Missions.dll Coop.CrashReporter.exe; do
             test -s "$binary/$required"
           done
           cp 'deploy/Server Instructions.md' deploy/mod-config.default.json "$module/"

@@ -7,8 +7,8 @@ namespace Coop.Core.Common.Configuration;
 /// </summary>
 public class SessionAdvertisementConfig
 {
-    public bool EnableSteamInvites { get; set; }
+    public bool EnablePlatformInvites { get; set; }
 
-    /// <summary>Who can discover a standalone server through Steam.</summary>
+    /// <summary>Who can discover a standalone server through its active storefront.</summary>
     public ServerVisibility Visibility { get; set; } = ServerVisibility.Public;
 }

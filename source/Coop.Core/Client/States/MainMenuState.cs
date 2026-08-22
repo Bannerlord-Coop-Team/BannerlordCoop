@@ -119,7 +119,7 @@ public class MainMenuState : ClientStateBase
             Logger.Information("Player cancelled a {Intent} join attempt", joinAttempt.Intent);
 
             // Held lobby membership would keep a host slot and make a retried join no-op.
-            if (joinAttempt.Intent == JoinIntent.PlayerSteam)
+            if (joinAttempt.Intent == JoinIntent.PlayerProvider)
             {
                 messageBroker.Publish(this, new SessionJoinAbandoned());
             }

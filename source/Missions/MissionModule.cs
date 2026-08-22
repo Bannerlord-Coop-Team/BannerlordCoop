@@ -73,7 +73,7 @@ public class MissionModule : Module
             .AsSelf()
             .InstancePerLifetimeScope()
             .AutoActivate();
-        builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
+        builder.RegisterType<NoopMissionPeerTransport>().As<IMissionPeerTransport>().InstancePerLifetimeScope();
         builder.RegisterType<MissionMapTimeView>()
             .AsSelf()
             .As<ILocationMissionBehavior>()

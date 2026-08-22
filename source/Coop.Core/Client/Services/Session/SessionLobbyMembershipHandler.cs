@@ -3,28 +3,27 @@ using Common.Messaging;
 using Common.Network.Session;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Session.Messages;
-using Coop.Steam;
 using System;
 
 namespace Coop.Core.Client.Services.Session;
 
 /// <summary>
-/// Keeps the local player in the server-owned Steam lobby for the network session.
+/// Keeps the local player in the server-owned provider listing for the network session.
 /// </summary>
-public class SessionLobbyMembershipHandler : IDisposable
+public class SessionLobbyMembershipHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly ISessionAdvertiser sessionAdvertiser;
-    private readonly ISteamLobbyMembership lobbyMembership;
+    private readonly ISessionMembership sessionMembership;
 
     public SessionLobbyMembershipHandler(
         IMessageBroker messageBroker,
         ISessionAdvertiser sessionAdvertiser,
-        ISteamLobbyMembership lobbyMembership)
+        ISessionMembership sessionMembership)
     {
         this.messageBroker = messageBroker;
         this.sessionAdvertiser = sessionAdvertiser;
-        this.lobbyMembership = lobbyMembership;
+        this.sessionMembership = sessionMembership;
 
         messageBroker.Subscribe<NetworkSessionLobbyChanged>(Handle_LobbyChanged);
         messageBroker.Subscribe<NetworkDisconnected>(Handle_NetworkDisconnected);
@@ -32,26 +31,28 @@ public class SessionLobbyMembershipHandler : IDisposable
 
     private void Handle_LobbyChanged(MessagePayload<NetworkSessionLobbyChanged> payload)
     {
-        ulong lobbyId = payload.What.LobbyId;
+        SessionListingId listingId = payload.What.ToListingId();
+        if (!listingId.IsValid) return;
+
         GameThread.RunSafe(() =>
         {
-            // A Steam-capable server owns the canonical lobby; withdraw a temporary client lobby.
+            // The server owns the canonical listing; withdraw any temporary client advertisement.
             sessionAdvertiser.StopAdvertising();
-            lobbyMembership.JoinSessionLobby(lobbyId);
+            sessionMembership.JoinSession(listingId);
         },
-            context: "JoinSessionSteamLobby");
+            context: "JoinProviderSession");
     }
 
     private void Handle_NetworkDisconnected(MessagePayload<NetworkDisconnected> _)
     {
-        GameThread.RunSafe(lobbyMembership.LeaveSessionLobby,
-            context: "LeaveSessionSteamLobby");
+        GameThread.RunSafe(sessionMembership.LeaveSession,
+            context: "LeaveProviderSession");
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSessionLobbyChanged>(Handle_LobbyChanged);
         messageBroker.Unsubscribe<NetworkDisconnected>(Handle_NetworkDisconnected);
-        lobbyMembership.LeaveSessionLobby();
+        sessionMembership.LeaveSession();
     }
 }

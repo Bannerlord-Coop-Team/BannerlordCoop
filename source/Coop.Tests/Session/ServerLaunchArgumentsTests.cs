@@ -1,6 +1,7 @@
 ﻿using Common.Network;
 using Common.Network.Session;
 using Coop.Core.Common.Session;
+using System;
 using Xunit;
 
 namespace Coop.Tests.Session;
@@ -94,6 +95,108 @@ public class ServerLaunchArgumentsTests
         Assert.True(ServerLaunchArguments.TryParse(
             args, out _, out _, out _, out var visibility));
         Assert.Equal(ServerVisibility.Public, visibility);
+    }
+
+    [Fact]
+    public void TryParse_FindsPeerIdentityBridgeName()
+    {
+        string bridgeName = PeerIdentityBridgeName.Create();
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.PeerIdentityBridgeArgument,
+            bridgeName,
+        };
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out var parsedBridgeName, out _));
+        Assert.Equal(bridgeName, parsedBridgeName);
+    }
+
+    [Fact]
+    public void TryParse_FindsSessionProvider()
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.SessionProviderArgument,
+            "gog",
+        };
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out _, out var sessionProvider));
+        Assert.Equal("gog", sessionProvider);
+    }
+
+    [Fact]
+    public void TryParse_RejectsSessionProviderWithoutValue()
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.SessionProviderArgument,
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out _, out var sessionProvider));
+        Assert.Equal(string.Empty, sessionProvider);
+    }
+
+    [Theory]
+    [InlineData("steam")]
+    [InlineData("gog")]
+    [InlineData("direct")]
+    public void BuildAndParse_PreservesSupportedSessionProvider(string sessionProvider)
+    {
+        string built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" },
+            "Campaign",
+            42,
+            string.Empty,
+            ServerVisibility.Public,
+            null,
+            sessionProvider);
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            built.Split(' '), out _, out _, out _, out _, out _, out var parsedProvider));
+        Assert.Equal(sessionProvider, parsedProvider);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("bannerlordcoop-peer-identity-not-a-guid")]
+    [InlineData("unrelated-pipe")]
+    public void TryParse_RejectsInvalidPeerIdentityBridgeName(string bridgeName)
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.PeerIdentityBridgeArgument,
+            bridgeName,
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out var parsedBridgeName, out _));
+        Assert.Equal(string.Empty, parsedBridgeName);
+    }
+
+    [Fact]
+    public void TryParse_RejectsPeerIdentityBridgeWithoutValue()
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.PeerIdentityBridgeArgument,
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out _, out var parsedBridgeName, out _));
+        Assert.Equal(string.Empty, parsedBridgeName);
     }
 
     [Theory]
@@ -233,5 +336,54 @@ public class ServerLaunchArgumentsTests
             new[] { "Native", "Coop" }, "My Save", 42, string.Empty);
 
         Assert.DoesNotContain(ServerLaunchArguments.PasswordArgument, built);
+    }
+
+    [Fact]
+    public void BuildManagedServerArguments_AppendsPeerIdentityBridgeName()
+    {
+        string bridgeName = PeerIdentityBridgeName.Create();
+
+        var built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" },
+            "My Save",
+            42,
+            string.Empty,
+            ServerVisibility.Public,
+            bridgeName,
+            null);
+
+        Assert.EndsWith(
+            $"{ServerLaunchArguments.PeerIdentityBridgeArgument} {bridgeName}",
+            built);
+    }
+
+    [Fact]
+    public void BuildManagedServerArguments_AppendsSessionProvider()
+    {
+        var built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" },
+            "My Save",
+            42,
+            string.Empty,
+            ServerVisibility.Public,
+            null,
+            "steam");
+
+        Assert.EndsWith(
+            $"{ServerLaunchArguments.SessionProviderArgument} steam",
+            built);
+    }
+
+    [Fact]
+    public void BuildManagedServerArguments_RejectsInvalidPeerIdentityBridgeName()
+    {
+        Assert.Throws<ArgumentException>(() => ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" },
+            "My Save",
+            42,
+            string.Empty,
+            ServerVisibility.Public,
+            "unrelated-pipe",
+            null));
     }
 }

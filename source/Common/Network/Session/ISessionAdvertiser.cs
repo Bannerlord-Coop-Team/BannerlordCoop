@@ -8,18 +8,18 @@ namespace Common.Network.Session;
 public static class SessionInviteText
 {
     public const string OverlayUnavailableHint =
-        "Steam overlay unavailable; friends can right-click you in the Steam friends list and choose Join Game";
+        "Platform invite overlay unavailable; friends can use their storefront friends list to join your game";
 }
 
 /// <summary>
-/// Publishes a joinable session to a discovery mechanism (a Steam lobby;
+/// Publishes a joinable session to a discovery mechanism (a storefront lobby;
 /// no-op for plain direct-IP hosting) so friends can join without typing an address.
 /// </summary>
 public interface ISessionAdvertiser : IDisposable
 {
     bool IsAdvertising { get; }
 
-    /// <summary>Whether this client can invite friends to its current Steam lobby.</summary>
+    /// <summary>Whether this client can invite friends to its current provider lobby.</summary>
     bool CanInviteFriends { get; }
 
     /// <summary>

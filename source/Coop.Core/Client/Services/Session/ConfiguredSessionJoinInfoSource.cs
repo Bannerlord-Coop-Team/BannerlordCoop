@@ -5,15 +5,19 @@ using Common.Network.Session;
 namespace Coop.Core.Client.Services.Session;
 
 /// <summary>
-/// Builds the advertised join info for a client hosting a Steam tunnel to its local server.
+/// Builds join metadata for a client hosting the active provider tunnel to its local server.
 /// </summary>
 public class ConfiguredSessionJoinInfoSource : ISessionJoinInfoSource
 {
     private readonly INetworkConfig networkConfig;
+    private readonly ISessionTransportTargetSource transportTargetSource;
 
-    public ConfiguredSessionJoinInfoSource(INetworkConfig networkConfig)
+    public ConfiguredSessionJoinInfoSource(
+        INetworkConfig networkConfig,
+        ISessionTransportTargetSource transportTargetSource)
     {
         this.networkConfig = networkConfig;
+        this.transportTargetSource = transportTargetSource;
     }
 
     public SessionJoinInfo Get()
@@ -21,6 +25,7 @@ public class ConfiguredSessionJoinInfoSource : ISessionJoinInfoSource
         return new SessionJoinInfo
         {
             Port = networkConfig.Port,
+            TunnelTarget = transportTargetSource.TunnelTarget,
             ModVersion = ModInformation.BuildVersion,
             PasswordRequired = !string.IsNullOrEmpty(networkConfig.Token),
         };

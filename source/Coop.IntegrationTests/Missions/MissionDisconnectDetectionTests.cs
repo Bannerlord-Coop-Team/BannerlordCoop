@@ -153,7 +153,7 @@ public class MissionDisconnectDetectionTests
         var messageBroker = new Mock<IMessageBroker>();
         var packetManager = new Mock<IPacketManager>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
-        var steamBridge = new Mock<ISteamMissionBridge>();
+        var missionTransport = new Mock<IMissionPeerTransport>();
         var movementPacketCompressor = new Mock<IMovementPacketCompressor>();
 
         var client = new LiteNetP2PClient(
@@ -164,7 +164,7 @@ public class MissionDisconnectDetectionTests
             messageBroker.Object,
             packetManager.Object,
             controllerIdProvider.Object,
-            steamBridge.Object,
+            missionTransport.Object,
             movementPacketCompressor.Object);
 
         var droppedPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 55001), 1);

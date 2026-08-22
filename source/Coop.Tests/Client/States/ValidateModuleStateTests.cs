@@ -1,11 +1,18 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
+using Common.Network.Session;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Common;
+using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Modules;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
@@ -192,6 +199,236 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
+        public void ControllerIdentityPersistenceFailure_FinalizesWithVisibleReason()
+        {
+            var logic = new Mock<IClientLogic>();
+            var controllerIdProvider = new Mock<IControllerIdProvider>();
+            controllerIdProvider
+                .Setup(provider => provider.SetControllerAsLocalId())
+                .Throws(new InvalidOperationException("identity file is not writable"));
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            ValidateModuleState validateState = null!;
+            logic.SetupGet(client => client.State).Returns(() => validateState);
+
+            validateState = new ValidateModuleState(
+                logic.Object,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                controllerIdProvider.Object,
+                coopFinalizer.Object,
+                new Mock<IGameStateInterface>().Object,
+                new Mock<IModuleInfoProvider>().Object);
+
+            try
+            {
+                DrainGameThread();
+
+                coopFinalizer.Verify(
+                    finalizer => finalizer.Finalize(It.Is<string>(reason =>
+                        reason.Contains("persistent player identity"))),
+                    Times.Once);
+                Assert.Empty(clientComponent.TestNetwork.SentNetworkMessages);
+            }
+            finally
+            {
+                validateState.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData("steam", "76561198000000001")]
+        [InlineData("gog", "123456789")]
+        public void TunneledConnection_UsesAuthenticatedTransportIdentity(
+            string providerName,
+            string platformUserId)
+        {
+            var logic = new Mock<IClientLogic>();
+            var controllerIdProvider = new Mock<IControllerIdProvider>();
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var moduleInfoProvider = new Mock<IModuleInfoProvider>();
+            moduleInfoProvider.Setup(provider => provider.GetModuleInfos()).Returns(Array.Empty<ModuleInfo>());
+            var transportTargetSource = new Mock<ISessionTransportTargetSource>();
+            var identity = new PlatformIdentity(providerName, platformUserId);
+            transportTargetSource.SetupGet(source => source.TunnelTarget).Returns(identity);
+            ValidateModuleState validateState = null!;
+            logic.SetupGet(client => client.State).Returns(() => validateState);
+
+            validateState = new ValidateModuleState(
+                logic.Object,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                controllerIdProvider.Object,
+                coopFinalizer.Object,
+                new Mock<IGameStateInterface>().Object,
+                moduleInfoProvider.Object,
+                new NetworkConfig { IsTunneled = true },
+                transportTargetSource.Object);
+
+            try
+            {
+                controllerIdProvider.Verify(
+                    provider => provider.SetControllerAsPlatformIdentity(identity),
+                    Times.Once);
+                controllerIdProvider.Verify(provider => provider.SetControllerAsLocalId(), Times.Never);
+                controllerIdProvider.Verify(provider => provider.SetControllerFromProgramArgs(), Times.Never);
+            }
+            finally
+            {
+                validateState.Dispose();
+            }
+        }
+
+        [Fact]
+        public void DirectConnection_UsesPersistentLocalIdentity()
+        {
+            var logic = new Mock<IClientLogic>();
+            var controllerIdProvider = new Mock<IControllerIdProvider>();
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var moduleInfoProvider = new Mock<IModuleInfoProvider>();
+            moduleInfoProvider.Setup(provider => provider.GetModuleInfos()).Returns(Array.Empty<ModuleInfo>());
+            ValidateModuleState validateState = null!;
+            logic.SetupGet(client => client.State).Returns(() => validateState);
+
+            validateState = new ValidateModuleState(
+                logic.Object,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                controllerIdProvider.Object,
+                coopFinalizer.Object,
+                new Mock<IGameStateInterface>().Object,
+                moduleInfoProvider.Object,
+                new NetworkConfig { IsTunneled = false },
+                new Mock<ISessionTransportTargetSource>().Object);
+
+            try
+            {
+#if DEBUG
+                controllerIdProvider.Verify(provider => provider.SetControllerFromProgramArgs(), Times.Once);
+#else
+                controllerIdProvider.Verify(provider => provider.SetControllerAsLocalId(), Times.Once);
+#endif
+                controllerIdProvider.Verify(
+                    provider => provider.SetControllerAsPlatformIdentity(It.IsAny<PlatformIdentity>()),
+                    Times.Never);
+            }
+            finally
+            {
+                validateState.Dispose();
+            }
+        }
+
+        [Fact]
+        public void PlayerOwnedProviderTunnel_RegistersLocalEndpointBeforeClaimingIdentity()
+        {
+            var logic = new Mock<IClientLogic>();
+            var controllerIdProvider = new Mock<IControllerIdProvider>();
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var moduleInfoProvider = new Mock<IModuleInfoProvider>();
+            moduleInfoProvider.Setup(provider => provider.GetModuleInfos()).Returns(Array.Empty<ModuleInfo>());
+            var transportTargetSource = new Mock<ISessionTransportTargetSource>();
+            var identity = new PlatformIdentity("gog", "123456789");
+            transportTargetSource.SetupGet(source => source.TunnelTarget).Returns(identity);
+            var identityPublisher = new Mock<IPeerIdentityPublisher>();
+            identityPublisher.SetupGet(publisher => publisher.IsAvailable).Returns(true);
+            var localEndpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 43131);
+            identityPublisher
+                .Setup(publisher => publisher.TryRegister(localEndpoint, identity))
+                .Returns(true);
+            var localEndpointSource = new Mock<ILocalPeerEndpointSource>();
+            localEndpointSource.SetupGet(source => source.LocalPeerEndpoint).Returns(localEndpoint);
+            ValidateModuleState validateState = null!;
+            logic.SetupGet(client => client.State).Returns(() => validateState);
+
+            validateState = new ValidateModuleState(
+                logic.Object,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                controllerIdProvider.Object,
+                coopFinalizer.Object,
+                new Mock<IGameStateInterface>().Object,
+                moduleInfoProvider.Object,
+                new NetworkConfig
+                {
+                    IsTunneled = false,
+                    PeerIdentityBridgeName = PeerIdentityBridgeName.Create(),
+                },
+                transportTargetSource.Object,
+                identityPublisher.Object,
+                localEndpointSource.Object);
+
+            try
+            {
+                identityPublisher.Verify(
+                    publisher => publisher.TryRegister(localEndpoint, identity),
+                    Times.Once);
+                controllerIdProvider.Verify(
+                    provider => provider.SetControllerAsPlatformIdentity(identity),
+                    Times.Once);
+                controllerIdProvider.Verify(provider => provider.SetControllerAsLocalId(), Times.Never);
+            }
+            finally
+            {
+                validateState.Dispose();
+            }
+        }
+
+        [Fact]
+        public void PlayerOwnedProviderTunnel_IdentityBridgeFailureStopsValidation()
+        {
+            var logic = new Mock<IClientLogic>();
+            var controllerIdProvider = new Mock<IControllerIdProvider>();
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var transportTargetSource = new Mock<ISessionTransportTargetSource>();
+            transportTargetSource.SetupGet(source => source.TunnelTarget)
+                .Returns(new PlatformIdentity("gog", "123456789"));
+            var identityPublisher = new Mock<IPeerIdentityPublisher>();
+            identityPublisher.SetupGet(publisher => publisher.IsAvailable).Returns(true);
+            identityPublisher
+                .Setup(publisher => publisher.TryRegister(
+                    It.IsAny<System.Net.IPEndPoint>(),
+                    It.IsAny<PlatformIdentity>()))
+                .Returns(false);
+            var localEndpointSource = new Mock<ILocalPeerEndpointSource>();
+            localEndpointSource.SetupGet(source => source.LocalPeerEndpoint)
+                .Returns(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 43132));
+            ValidateModuleState validateState = null!;
+            logic.SetupGet(client => client.State).Returns(() => validateState);
+
+            validateState = new ValidateModuleState(
+                logic.Object,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                controllerIdProvider.Object,
+                coopFinalizer.Object,
+                new Mock<IGameStateInterface>().Object,
+                new Mock<IModuleInfoProvider>().Object,
+                new NetworkConfig
+                {
+                    PeerIdentityBridgeName = PeerIdentityBridgeName.Create(),
+                },
+                transportTargetSource.Object,
+                identityPublisher.Object,
+                localEndpointSource.Object);
+
+            try
+            {
+                DrainGameThread();
+
+                coopFinalizer.Verify(
+                    finalizer => finalizer.Finalize(It.Is<string>(reason =>
+                        reason.Contains("persistent player identity"))),
+                    Times.Once);
+                controllerIdProvider.Verify(
+                    provider => provider.SetControllerAsPlatformIdentity(It.IsAny<PlatformIdentity>()),
+                    Times.Never);
+            }
+            finally
+            {
+                validateState.Dispose();
+            }
+        }
+
+        [Fact]
         public void ValidationTimeout_AfterStateLeft_DoesNothing()
         {
             // Arrange
@@ -359,5 +596,7 @@ namespace Coop.Tests.Client.States
             clientLogic.ValidateModules();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
+
+        private static void DrainGameThread() => GameThread.Run(() => { }, blocking: true);
     }
 }

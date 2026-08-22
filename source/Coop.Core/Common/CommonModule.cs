@@ -38,6 +38,7 @@ public abstract class CommonModule : Module
         builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance().ExternallyOwned();
         #endregion
 
+        builder.RegisterType<ControllerIdStore>().As<IControllerIdStore>().InstancePerDependency();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.Register(_ => new CancellationTokenSource()).InstancePerLifetimeScope();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();

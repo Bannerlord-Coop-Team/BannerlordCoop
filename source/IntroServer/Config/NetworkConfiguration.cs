@@ -66,6 +66,7 @@ namespace IntroServer.Config
         ///     P2P Identifier.
         /// </summary>
         public string P2PToken { get; } = "P2PToken";
+        public string PeerIdentityBridgeName { get; } = string.Empty;
         /// <summary>
         ///     P2P NAT Type
         /// </summary>

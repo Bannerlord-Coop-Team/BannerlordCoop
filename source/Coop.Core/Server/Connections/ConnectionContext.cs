@@ -1,10 +1,12 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Network.Session;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -26,6 +28,7 @@ public class ConnectionContext
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
         IPlayerManager playerManager,
+        IControllerIdMigration controllerIdMigration,
         IPlayerPartyRestorer playerPartyRestorer,
         IPlayerCreationRollback playerCreationRollback,
         IObjectManager objectManager,
@@ -38,13 +41,15 @@ public class ConnectionContext
         IExistingPlayerSender existingPlayerSender,
         IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
-        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender)
+        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
+        IAuthenticatedPeerIdentityResolver peerIdentityResolver)
     {
         MessageBroker = messageBroker;
         Network = network;
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
         PlayerManager = playerManager;
+        ControllerIdMigration = controllerIdMigration;
         PlayerPartyRestorer = playerPartyRestorer;
         PlayerCreationRollback = playerCreationRollback;
         ObjectManager = objectManager;
@@ -58,6 +63,7 @@ public class ConnectionContext
         ServerOptionsProvider = serverOptionsProvider;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
+        PeerIdentityResolver = peerIdentityResolver;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -65,6 +71,7 @@ public class ConnectionContext
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
     public IPlayerManager PlayerManager { get; }
+    public IControllerIdMigration ControllerIdMigration { get; }
     public IPlayerPartyRestorer PlayerPartyRestorer { get; }
     public IPlayerCreationRollback PlayerCreationRollback { get; }
     public IObjectManager ObjectManager { get; }
@@ -78,4 +85,5 @@ public class ConnectionContext
     public IServerOptionsProvider ServerOptionsProvider { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
+    public IAuthenticatedPeerIdentityResolver PeerIdentityResolver { get; }
 }

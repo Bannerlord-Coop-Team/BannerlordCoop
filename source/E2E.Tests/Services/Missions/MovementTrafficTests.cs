@@ -1124,7 +1124,7 @@ public class MovementTrafficTests : MissionTestEnvironment
         var messageBroker = new Mock<IMessageBroker>();
         var packetManager = new Mock<IPacketManager>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
-        var steamBridge = new Mock<ISteamMissionBridge>();
+        var missionTransport = new Mock<IMissionPeerTransport>();
 
         using var client = new LiteNetP2PClient(
             config.Object,
@@ -1134,7 +1134,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             messageBroker.Object,
             packetManager.Object,
             controllerIdProvider.Object,
-            steamBridge.Object,
+            missionTransport.Object,
             compressor);
         client.ConnectToInstance(instanceId);
 
@@ -1204,7 +1204,7 @@ public class MovementTrafficTests : MissionTestEnvironment
         var messageBroker = new Mock<IMessageBroker>();
         var packetManager = new Mock<IPacketManager>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
-        var steamBridge = new Mock<ISteamMissionBridge>();
+        var missionTransport = new Mock<IMissionPeerTransport>();
 
         using var client = new LiteNetP2PClient(
             config.Object,
@@ -1214,7 +1214,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             messageBroker.Object,
             packetManager.Object,
             controllerIdProvider.Object,
-            steamBridge.Object,
+            missionTransport.Object,
             compressor);
         client.ConnectToInstance(instanceId);
 

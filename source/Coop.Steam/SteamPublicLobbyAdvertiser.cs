@@ -91,15 +91,15 @@ public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
     {
         bool applied = lobbyApi.SetLobbyData(
             targetLobbyId,
-            LobbyDataCodec.VisibilityKey,
-            LobbyDataCodec.EncodeVisibility(visibility));
+            SessionListingDataCodec.VisibilityKey,
+            SessionListingDataCodec.EncodeVisibility(visibility));
         bool hasExpiry = TryGetAdvertisementExpiry(out uint expiresAt);
         if (!hasExpiry && leasePublished) return applied;
 
         bool leaseApplied = lobbyApi.SetLobbyData(
             targetLobbyId,
-            LobbyDataCodec.AdvertisementExpiresAtKey,
-            LobbyDataCodec.EncodeAdvertisementExpiry(hasExpiry ? expiresAt : uint.MaxValue));
+            SessionListingDataCodec.AdvertisementExpiresAtKey,
+            SessionListingDataCodec.EncodeAdvertisementExpiry(hasExpiry ? expiresAt : uint.MaxValue));
         if (leaseApplied)
         {
             leasePublished = true;
@@ -153,8 +153,8 @@ public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
         {
             renewed = lobbyApi.SetLobbyData(
                 LobbyId,
-                LobbyDataCodec.AdvertisementExpiresAtKey,
-                LobbyDataCodec.EncodeAdvertisementExpiry(expiresAt));
+                SessionListingDataCodec.AdvertisementExpiresAtKey,
+                SessionListingDataCodec.EncodeAdvertisementExpiry(expiresAt));
         }
         catch (Exception ex)
         {

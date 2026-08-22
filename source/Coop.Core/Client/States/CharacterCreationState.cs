@@ -7,11 +7,9 @@ using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Registry;
 using GameInterface.Services.CharacterCreation.Messages;
-using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Players;
 using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
@@ -25,9 +23,7 @@ public class CharacterCreationState : ClientStateBase
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
     private readonly IRegistryManager registryManager;
-    private readonly IControllerIdProvider controllerIdProvider;
     private readonly ILoadingInterface loadingInterface;
-    private readonly IPlayerManager playerManager;
     private readonly IGameStateInterface gameStateInterface;
     private readonly ICoopFinalizer coopFinalizer;
 
@@ -37,9 +33,7 @@ public class CharacterCreationState : ClientStateBase
         INetwork network,
         IHeroInterface heroInterface,
         IRegistryManager registryManager,
-        IControllerIdProvider controllerIdProvider,
         ILoadingInterface loadingInterface,
-        IPlayerManager playerManager,
         IGameStateInterface gameStateInterface,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
@@ -47,9 +41,7 @@ public class CharacterCreationState : ClientStateBase
         this.network = network;
         this.heroInterface = heroInterface;
         this.registryManager = registryManager;
-        this.controllerIdProvider = controllerIdProvider;
         this.loadingInterface = loadingInterface;
-        this.playerManager = playerManager;
         this.gameStateInterface = gameStateInterface;
         this.coopFinalizer = coopFinalizer;
 
@@ -77,13 +69,12 @@ public class CharacterCreationState : ClientStateBase
 
         registryManager.RegisterAllGameObjects();
 
-        var playerId = controllerIdProvider.ControllerId;
         var data = heroInterface.PackageMainHero();
 
         // Clear all registries so next time the game is loaded, it re-registers loaded save objects
         registryManager.ClearAllRegistries();
 
-        network.SendAll(new NetworkTransferNewHero(playerId, data));
+        network.SendAll(new NetworkTransferNewHero(data));
     }
 
     internal void Handle_NetworkHeroRecieved(MessagePayload<NetworkHeroRecieved> obj)

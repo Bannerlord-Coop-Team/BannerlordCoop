@@ -168,7 +168,9 @@ internal class SaveGameHandler : IHandler
     {
         // AllGameObjectsRegistered means the campaign's objects are resolvable, so these lookups
         // are authoritative about which registration still has a complete player graph.
-        foreach (var group in players.Where(player => player != null).GroupBy(player => player.ControllerId))
+        foreach (var group in players
+            .Where(player => player != null)
+            .GroupBy(player => player.ControllerId))
         {
             var registrations = group.ToArray();
             if (registrations.Length == 1)
@@ -177,7 +179,8 @@ internal class SaveGameHandler : IHandler
                 continue;
             }
 
-            var live = registrations.FirstOrDefault(PlayerGraphExists) ??
+            var live = registrations
+                .FirstOrDefault(PlayerGraphExists) ??
                 registrations.FirstOrDefault(PlayerHeroExists) ??
                 registrations[0];
 

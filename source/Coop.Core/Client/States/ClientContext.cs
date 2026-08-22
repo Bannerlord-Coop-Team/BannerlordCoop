@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Coop.Core.Common;
 using Coop.Core.Common.Session;
 using GameInterface;
@@ -35,6 +36,10 @@ public class ClientContext
         IRegistryManager registryManager,
         IPlayerManager playerManager,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
+        INetworkConfig networkConfig,
+        ISessionTransportTargetSource transportTargetSource,
+        IPeerIdentityPublisher peerIdentityPublisher,
+        ILocalPeerEndpointSource localPeerEndpointSource,
         IJoinAttemptOverlay joinAttemptOverlay,
         JoinAttemptPresentation joinAttempt)
     {
@@ -50,6 +55,10 @@ public class ClientContext
         RegistryManager = registryManager;
         PlayerManager = playerManager;
         MapTimeTrackerInterface = mapTimeTrackerInterface;
+        NetworkConfig = networkConfig;
+        TransportTargetSource = transportTargetSource;
+        PeerIdentityPublisher = peerIdentityPublisher;
+        LocalPeerEndpointSource = localPeerEndpointSource;
         JoinAttemptOverlay = joinAttemptOverlay;
         JoinAttempt = joinAttempt;
     }
@@ -66,6 +75,10 @@ public class ClientContext
     public IRegistryManager RegistryManager { get; }
     public IPlayerManager PlayerManager { get; }
     public IMapTimeTrackerInterface MapTimeTrackerInterface { get; }
+    public INetworkConfig NetworkConfig { get; }
+    public ISessionTransportTargetSource TransportTargetSource { get; }
+    public IPeerIdentityPublisher PeerIdentityPublisher { get; }
+    public ILocalPeerEndpointSource LocalPeerEndpointSource { get; }
     public IJoinAttemptOverlay JoinAttemptOverlay { get; }
     public JoinAttemptPresentation JoinAttempt { get; }
 }

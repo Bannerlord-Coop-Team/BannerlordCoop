@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using Coop.Core.Client.Services.Heroes.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
 using Serilog;
@@ -29,17 +30,20 @@ internal class RemotePlayerHeroHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerRegistry;
+    private readonly IControllerIdMigration controllerIdMigration;
     private readonly IPlayerCreationRollback playerCreationRollback;
 
     public RemotePlayerHeroHandler(
         IMessageBroker messageBroker,
         IHeroInterface heroInterface,
         IPlayerManager playerRegistry,
+        IControllerIdMigration controllerIdMigration,
         IPlayerCreationRollback playerCreationRollback)
     {
         this.messageBroker = messageBroker;
         this.heroInterface = heroInterface;
         this.playerRegistry = playerRegistry;
+        this.controllerIdMigration = controllerIdMigration;
         this.playerCreationRollback = playerCreationRollback;
 
         messageBroker.Subscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
@@ -102,6 +106,22 @@ internal class RemotePlayerHeroHandler : IHandler
         // game-thread queue, so the replacement resolves after its party has been registered.
         GameThread.RunSafe(() =>
         {
+            if (!string.IsNullOrEmpty(payload.What.PreviousControllerId))
+            {
+                if (!controllerIdMigration.TryMigrate(
+                    payload.What.PreviousControllerId,
+                    replacement.ControllerId,
+                    out _))
+                {
+                    Logger.Error(
+                        "Could not migrate player registration from controller {PreviousControllerId} to {ControllerId}",
+                        payload.What.PreviousControllerId,
+                        replacement.ControllerId);
+                }
+
+                return;
+            }
+
             if (!playerRegistry.TryGetPlayer(replacement.ControllerId, out var registered) ||
                 !playerRegistry.ReplacePlayer(registered, replacement))
             {

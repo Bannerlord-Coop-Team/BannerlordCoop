@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Interfaces;
@@ -78,7 +78,7 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
         }
     }
 
-    private static void SyncDataInternal(IDataStore dataStore, IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
+    internal static void SyncDataInternal(IDataStore dataStore, IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
     {
         List<AwaitingAlternativeSolutionTroopsSaveData> saveData = null;
         if (dataStore.IsSaving)
@@ -131,4 +131,5 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
 
         LegacyAwaitingTroopsField.SetValue(Campaign.Current.IssueManager, TroopRoster.CreateDummyTroopRoster());
     }
+
 }
