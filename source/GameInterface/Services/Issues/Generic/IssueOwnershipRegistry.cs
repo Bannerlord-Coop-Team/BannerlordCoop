@@ -1,5 +1,6 @@
 using GameInterface.Services.Entity;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Generic;
@@ -13,6 +14,7 @@ public interface IIssueOwnershipRegistry
     bool IsLocalPeerOwner(Hero issueGiver);
     IReadOnlyCollection<KeyValuePair<Hero, string>> Snapshot();
     void RestoreAll(IEnumerable<KeyValuePair<Hero, string>> entries);
+    void MigrateControllerId(string legacyControllerId, string controllerId);
 }
 
 internal sealed class IssueOwnershipRegistry : IIssueOwnershipRegistry
@@ -57,5 +59,18 @@ internal sealed class IssueOwnershipRegistry : IIssueOwnershipRegistry
     public void RestoreAll(IEnumerable<KeyValuePair<Hero, string>> entries)
     {
         registry.RestoreAll(entries);
+    }
+
+    public void MigrateControllerId(string legacyControllerId, string controllerId)
+    {
+        if (string.IsNullOrEmpty(legacyControllerId) ||
+            string.IsNullOrEmpty(controllerId) ||
+            legacyControllerId == controllerId)
+            return;
+
+        registry.RestoreAll(registry.Snapshot().Select(entry =>
+            new KeyValuePair<Hero, string>(
+                entry.Key,
+                entry.Value == legacyControllerId ? controllerId : entry.Value)));
     }
 }

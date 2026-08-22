@@ -6,6 +6,7 @@ using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -27,6 +28,7 @@ public class ConnectionContext
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
         IPlayerManager playerManager,
+        IControllerIdMigration controllerIdMigration,
         IPlayerPartyRestorer playerPartyRestorer,
         IPlayerCreationRollback playerCreationRollback,
         IObjectManager objectManager,
@@ -47,6 +49,7 @@ public class ConnectionContext
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
         PlayerManager = playerManager;
+        ControllerIdMigration = controllerIdMigration;
         PlayerPartyRestorer = playerPartyRestorer;
         PlayerCreationRollback = playerCreationRollback;
         ObjectManager = objectManager;
@@ -68,6 +71,7 @@ public class ConnectionContext
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
     public IPlayerManager PlayerManager { get; }
+    public IControllerIdMigration ControllerIdMigration { get; }
     public IPlayerPartyRestorer PlayerPartyRestorer { get; }
     public IPlayerCreationRollback PlayerCreationRollback { get; }
     public IObjectManager ObjectManager { get; }

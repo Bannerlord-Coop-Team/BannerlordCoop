@@ -12,9 +12,12 @@ public readonly struct NetworkPlayerRegistrationUpdated : IEvent
 {
     [ProtoMember(1)]
     public readonly Player Player;
+    [ProtoMember(2)]
+    public readonly string PreviousControllerId;
 
-    public NetworkPlayerRegistrationUpdated(Player player)
+    public NetworkPlayerRegistrationUpdated(Player player, string previousControllerId = null)
     {
         Player = player;
+        PreviousControllerId = previousControllerId;
     }
 }

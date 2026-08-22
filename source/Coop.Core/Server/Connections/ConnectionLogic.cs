@@ -100,7 +100,7 @@ public class ConnectionLogic : IConnectionLogic
     private IReadOnlyDictionary<Type, Func<IConnectionState>> CreateStateFactories() =>
         new Dictionary<Type, Func<IConnectionState>>
         {
-            [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.PlayerPartyRestorer, context.ObjectManager, context.ModuleInfoProvider, context.ExistingPlayerSender, context.PeerIdentityResolver),
+            [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.ControllerIdMigration, context.PlayerPartyRestorer, context.ObjectManager, context.ModuleInfoProvider, context.ExistingPlayerSender, context.PeerIdentityResolver),
             [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.PlayerCreationRollback, context.ExistingPlayerSender),
             [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.Network, context.JoinCampaignBaselineSender, context.JoinCampaignKingdomBaseLineSender, context.ConnectionMessageQueue, context.Coalescer),

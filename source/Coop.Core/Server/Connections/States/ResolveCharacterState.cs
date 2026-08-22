@@ -8,6 +8,7 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
@@ -31,6 +32,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
     private readonly IPlayerManager playerManager;
+    private readonly IControllerIdMigration controllerIdMigration;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
@@ -42,6 +44,7 @@ public class ResolveCharacterState : ConnectionStateBase
         INetwork network,
         IModuleValidator moduleValidator,
         IPlayerManager playerManager,
+        IControllerIdMigration controllerIdMigration,
         IPlayerPartyRestorer playerPartyRestorer,
         IObjectManager objectManager,
         IModuleInfoProvider moduleInfoProvider,
@@ -53,6 +56,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.network = network;
         this.moduleValidator = moduleValidator;
         this.playerManager = playerManager;
+        this.controllerIdMigration = controllerIdMigration;
         this.playerPartyRestorer = playerPartyRestorer;
         this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
@@ -182,7 +186,9 @@ public class ResolveCharacterState : ConnectionStateBase
                 "Migrated legacy controller id {LegacyControllerId} to {ControllerId}",
                 legacyControllerId,
                 controllerId);
-            network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(migratedPlayer));
+            network.SendAllBut(
+                peer,
+                new NetworkPlayerRegistrationUpdated(migratedPlayer, legacyControllerId));
         }
 
         if (playerManager.TryGetPlayer(controllerId, out var player))
@@ -269,7 +275,7 @@ public class ResolveCharacterState : ConnectionStateBase
                 !objectManager.TryGetObject<Hero>(legacyPlayer.HeroId, out _))
                 return;
 
-            migrated = playerManager.TryMigrateControllerId(
+            migrated = controllerIdMigration.TryMigrate(
                 legacyControllerId,
                 controllerId,
                 out migratedPlayer);

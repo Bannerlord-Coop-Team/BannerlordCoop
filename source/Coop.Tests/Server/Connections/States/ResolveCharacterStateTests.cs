@@ -8,6 +8,7 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -567,6 +568,23 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(controllerId, connectionLogic.ControllerId);
         }
 
+        [Fact]
+        public void NetworkPlayerRegistrationUpdated_ChangedControllerId_RoundTripsPreviousId()
+        {
+            var player = new Player(
+                "gog:123456789",
+                "Hero",
+                "Party",
+                "Clan",
+                "Character");
+
+            var roundTripped = ProtobufRoundTrip(
+                new NetworkPlayerRegistrationUpdated(player, "123456789"));
+
+            Assert.Equal(player.ControllerId, roundTripped.Player.ControllerId);
+            Assert.Equal("123456789", roundTripped.PreviousControllerId);
+        }
+
         [Theory]
         [InlineData("steam", "76561198000000001", "76561198000000002")]
         [InlineData("gog", "123456789", "987654321")]
@@ -669,6 +687,7 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.Container.Resolve<INetwork>(),
                 serverComponent.Container.Resolve<IModuleValidator>(),
                 serverComponent.Container.Resolve<IPlayerManager>(),
+                serverComponent.Container.Resolve<IControllerIdMigration>(),
                 serverComponent.Container.Resolve<IPlayerPartyRestorer>(),
                 serverComponent.Container.Resolve<IObjectManager>(),
                 serverComponent.Container.Resolve<IModuleInfoProvider>(),
