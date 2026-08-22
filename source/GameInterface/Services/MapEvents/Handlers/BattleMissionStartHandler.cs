@@ -53,9 +53,9 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
     private static long attackMissionStartSequence;
 
-    // Server-side: scene inputs chosen once per map event and reused for late entrants.
-    private readonly ConcurrentDictionary<string, int> mapEventTerrainSeeds = new ConcurrentDictionary<string, int>();
-    private readonly ConcurrentDictionary<string, AtmosphereInfo> mapEventAtmospheres = new ConcurrentDictionary<string, AtmosphereInfo>();
+    // Server-side: the complete mission initializer chosen once per map event and reused for late entrants.
+    private readonly ConcurrentDictionary<string, MissionInitializerRecord> mapEventMissionInitializers =
+        new ConcurrentDictionary<string, MissionInitializerRecord>();
     private readonly Random terrainSeedRandom = new Random();
 
     // Server-side: the siege mission inputs (wall level, wall HPs, engine lists) snapshotted once per map event,
@@ -97,8 +97,7 @@ internal class BattleMissionStartHandler : IHandler
     {
         if (objectManager.TryGetId(payload.What.MapEvent, out var mapEventId))
         {
-            mapEventTerrainSeeds.TryRemove(mapEventId, out _);
-            mapEventAtmospheres.TryRemove(mapEventId, out _);
+            mapEventMissionInitializers.TryRemove(mapEventId, out _);
             siegeMissionSnapshots.TryRemove(mapEventId, out _);
         }
     }
@@ -228,18 +227,17 @@ internal class BattleMissionStartHandler : IHandler
                 }
                 else
                 {
-                    // Roll the terrain seed once for this map event and reuse it for every entrant.
-                    var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(
+                    operation = "build attack mission snapshot";
+                    MissionInitializerRecord missionInitializer = GetOrCreateMissionInitializerSnapshot(
                         payload.What.MapEventId,
-                        _ => RollTerrainSeed());
-                    operation = "read campaign atmosphere";
-                    AtmosphereInfo atmosphereOnCampaign = GetOrCreateAtmosphereSnapshot(
-                        payload.What.MapEventId,
-                        () => GetAtmosphereOnCampaign(mapEvent));
+                        () => missionInitializerResolver.Create(
+                            mapEvent,
+                            RollTerrainSeed(),
+                            GetAtmosphereOnCampaign(mapEvent)));
 
                     operation = "send attack mission start";
                     var startMessage = new NetworkStartAttackMission(
-                        payload.What.MapEventId, randomTerrainSeed, atmosphereOnCampaign,
+                        payload.What.MapEventId, missionInitializer,
                         payload.What.AttackerPartyId);
                     SendMissionStart(participants, startMessage);
                 }
@@ -330,9 +328,11 @@ internal class BattleMissionStartHandler : IHandler
         }
     }
 
-    internal AtmosphereInfo GetOrCreateAtmosphereSnapshot(string mapEventId, Func<AtmosphereInfo> create)
+    internal MissionInitializerRecord GetOrCreateMissionInitializerSnapshot(
+        string mapEventId,
+        Func<MissionInitializerRecord> create)
     {
-        return mapEventAtmospheres.GetOrAdd(mapEventId, _ => create());
+        return mapEventMissionInitializers.GetOrAdd(mapEventId, _ => create());
     }
 
     private static AtmosphereInfo GetAtmosphereOnCampaign(MapEvent mapEvent)
@@ -448,7 +448,7 @@ internal class BattleMissionStartHandler : IHandler
         GameThread.EnqueueSafe(() =>
         {
             LogAttackMissionLifecycle("executing queued open", sequence, message.MapEventId);
-            OpenAttackMission(message.MapEventId, message.RandomTerrainSeed, message.AtmosphereOnCampaign,
+            OpenAttackMission(message.MapEventId, message.MissionInitializer,
                 message.InitiatingPartyId, sequence);
 
             if (MissionState.Current == null)
@@ -601,7 +601,7 @@ internal class BattleMissionStartHandler : IHandler
             && string.Equals(actualMapEventId, expectedMapEventId, StringComparison.Ordinal);
     }
 
-    private void OpenAttackMission(string mapEventId, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign,
+    private void OpenAttackMission(string mapEventId, MissionInitializerRecord missionInitializer,
         string initiatingPartyId, long sequence)
     {
         bool spawnGateEngaged = false;
@@ -623,7 +623,6 @@ internal class BattleMissionStartHandler : IHandler
 
             LogAttackMissionLifecycle("opening", sequence, mapEventId);
             InitializePlayerEncounter(battle);
-            MissionInitializerRecord rec2 = missionInitializerResolver.Create(battle, randomTerrainSeed, atmosphereOnCampaign);
 
             // Engage the spawn gate BEFORE OpenBattleMission builds the mission — the deployment controller
             // spawns the initial wave during mission setup (inside OpenBattleMission), earlier than the
@@ -642,7 +641,7 @@ internal class BattleMissionStartHandler : IHandler
             // lifecycle that owns EndBattle, while the already-engaged spawn patches could corrupt native setup.
             if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
             {
-                var mission = battleLauncher.OpenCoopFieldBattle(rec2);
+                var mission = battleLauncher.OpenCoopFieldBattle(missionInitializer);
                 if (mission != null)
                 {
                     spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here

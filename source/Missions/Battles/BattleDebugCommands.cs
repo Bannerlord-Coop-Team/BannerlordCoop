@@ -325,6 +325,47 @@ internal static class BattleDebugCommands
         columnReinforcementFixtureKilled = 0;
     }
 
+    [CommandLineArgumentFunction("scene_state", "coop.debug.battle")]
+    public static string SceneState(List<string> args)
+    {
+        if (args.Count != 0)
+            return LiveTestJson(new { success = false, error = "Usage: coop.debug.battle.scene_state" });
+        if (ModInformation.IsServer)
+            return LiveTestJson(new { success = false, error = "Run this command on a client." });
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        if (mission == null || controller == null)
+            return LiveTestJson(new { success = false, state = "no_active_coop_battle" });
+
+        string[] missionControllers = Array.Empty<string>();
+        if (ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+        {
+            missionControllers = registry.GetControllerIds()
+                .OrderBy(controllerId => controllerId)
+                .ToArray();
+        }
+
+        var mainAgent = Agent.Main;
+        return LiveTestJson(new
+        {
+            success = true,
+            state = "active",
+            mapEventId = controller.Session.InstanceId,
+            sceneName = mission.SceneName,
+            missionMode = mission.Mode.ToString(),
+            ownControllerId = controller.Session.OwnControllerId,
+            hostController = controller.Session.IsLocalHost,
+            playerSide = mission.PlayerTeam?.Side.ToString(),
+            mainAgentActive = mainAgent?.IsActive() == true,
+            mainAgentPosition = mainAgent == null
+                ? null
+                : $"{mainAgent.Position.X:R}|{mainAgent.Position.Y:R}|{mainAgent.Position.Z:R}",
+            activeAgents = mission.Agents.Count(agent => agent.IsActive()),
+            missionControllers,
+        });
+    }
+
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)
     {
@@ -494,6 +535,9 @@ internal static class BattleDebugCommands
         wieldTestActive = false;
         return $"WIELD_TEST_RESTORED agent={restoredAgentId:D}";
     }
+
+    private static string LiveTestJson(object value) =>
+        "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
 
 #endif
 

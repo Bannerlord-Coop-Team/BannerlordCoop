@@ -22,6 +22,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Utils.Commands;
 using Helpers;
+using Newtonsoft.Json;
 using ProtoBuf;
 using Serilog;
 using System;
@@ -54,6 +55,41 @@ public class MapEventDebugCommands
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
     private static LateJoinModeFixture lateJoinModeFixture;
+
+#if DEBUG
+    private static BattleSceneSyncFixture battleSceneSyncFixture;
+    private static BattleSceneSyncVerification battleSceneSyncVerification;
+
+    private sealed class BattleSceneSyncFixture
+    {
+        public string FirstControllerId { get; set; }
+        public MobileParty FirstParty { get; set; }
+        public string FirstPartyId { get; set; }
+        public string FirstMobilePartyId { get; set; }
+        public PartyBehaviorUpdateData FirstBehavior { get; set; }
+        public string SecondControllerId { get; set; }
+        public MobileParty SecondParty { get; set; }
+        public string SecondPartyId { get; set; }
+        public string SecondMobilePartyId { get; set; }
+        public PartyBehaviorUpdateData SecondBehavior { get; set; }
+        public Settlement Settlement { get; set; }
+        public MobileParty LooterParty { get; set; }
+        public MapEvent MapEvent { get; set; }
+        public string MapEventId { get; set; }
+    }
+
+    private sealed class BattleSceneSyncVerification
+    {
+        public string MapEventId { get; set; }
+        public MobileParty FirstParty { get; set; }
+        public CampaignVec2 FirstPosition { get; set; }
+        public MobileParty SecondParty { get; set; }
+        public CampaignVec2 SecondPosition { get; set; }
+        public MobileParty LooterParty { get; set; }
+        public string FirstControllerId { get; set; }
+        public string SecondControllerId { get; set; }
+    }
+#endif
 
     private sealed class LateJoinModeFixture
     {
@@ -1963,6 +1999,391 @@ public class MapEventDebugCommands
         var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
         return $"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("battle_scene_sync_fixture_capture", "coop.debug.mapevent")]
+    public static string CaptureBattleSceneSyncFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return LiveTestJson(new { success = false, error = "Run this command on the server." });
+        if (args.Count != 3)
+        {
+            return LiveTestJson(new
+            {
+                success = false,
+                error = "Usage: coop.debug.mapevent.battle_scene_sync_fixture_capture " +
+                        "<firstControllerId> <secondControllerId> <settlementId>",
+            });
+        }
+        if (battleSceneSyncFixture != null)
+            return LiveTestJson(new { success = false, error = "The battle scene sync fixture is already captured." });
+        if (args[0] == args[1])
+            return LiveTestJson(new { success = false, error = "The fixture requires two different players." });
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var firstParty, out var error))
+            return LiveTestJson(new { success = false, error });
+        if (!TryGetPlayerParty(args[1], requireReady: true, out _, out var secondParty, out error))
+            return LiveTestJson(new { success = false, error });
+        if (firstParty.MapEvent != null || secondParty.MapEvent != null)
+            return LiveTestJson(new { success = false, error = "Both players must be outside a map event." });
+        if (firstParty.CurrentSettlement != null || secondParty.CurrentSettlement != null)
+            return LiveTestJson(new { success = false, error = "Both players must be on the campaign map." });
+        if (VillageHostileFactionStanceHelper.HasWarStance(firstParty.MapFaction, secondParty.MapFaction))
+            return LiveTestJson(new { success = false, error = "The two player parties must be allied." });
+
+        var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == args[2]);
+        if (settlement == null)
+            return LiveTestJson(new { success = false, error = $"Settlement {args[2]} was not found." });
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPeer(args[0], out _) ||
+            !playerManager.TryGetPeer(args[1], out _) ||
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+        {
+            return LiveTestJson(new { success = false, error = "Unable to resolve connected players or fixture services." });
+        }
+        if (!behaviorSnapshot.TryCreate(firstParty, out var firstBehavior) ||
+            !behaviorSnapshot.TryCreate(secondParty, out var secondBehavior))
+        {
+            return LiveTestJson(new { success = false, error = "Unable to capture both player party behaviors." });
+        }
+        if (!objectManager.TryGetId(firstParty.Party, out string firstPartyId) ||
+            !objectManager.TryGetId(firstParty, out string firstMobilePartyId) ||
+            !objectManager.TryGetId(secondParty.Party, out string secondPartyId) ||
+            !objectManager.TryGetId(secondParty, out string secondMobilePartyId))
+        {
+            return LiveTestJson(new { success = false, error = "Unable to resolve player party ids." });
+        }
+
+        battleSceneSyncVerification = null;
+        battleSceneSyncFixture = new BattleSceneSyncFixture
+        {
+            FirstControllerId = args[0],
+            FirstParty = firstParty,
+            FirstPartyId = firstPartyId,
+            FirstMobilePartyId = firstMobilePartyId,
+            FirstBehavior = firstBehavior,
+            SecondControllerId = args[1],
+            SecondParty = secondParty,
+            SecondPartyId = secondPartyId,
+            SecondMobilePartyId = secondMobilePartyId,
+            SecondBehavior = secondBehavior,
+            Settlement = settlement,
+        };
+
+        return LiveTestJson(new
+        {
+            success = true,
+            state = "captured",
+            firstControllerId = args[0],
+            secondControllerId = args[1],
+            settlementId = settlement.StringId,
+            firstPosition = FormatPosition(firstBehavior.PartyPosition),
+            secondPosition = FormatPosition(secondBehavior.PartyPosition),
+        });
+    }
+
+    [CommandLineArgumentFunction("battle_scene_sync_fixture_start", "coop.debug.mapevent")]
+    public static string StartBattleSceneSyncFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return LiveTestJson(new { success = false, error = "Run this command on the server." });
+        if (args.Count != 0)
+            return LiveTestJson(new { success = false, error = "Usage: coop.debug.mapevent.battle_scene_sync_fixture_start" });
+
+        var fixture = battleSceneSyncFixture;
+        if (fixture == null)
+            return LiveTestJson(new { success = false, error = "Capture the battle scene sync fixture first." });
+        if (fixture.MapEvent != null)
+            return LiveTestJson(new { success = false, error = "The battle scene sync fixture has already started." });
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+            !playerManager.TryGetPeer(fixture.FirstControllerId, out var firstPeer) ||
+            !playerManager.TryGetPeer(fixture.SecondControllerId, out var secondPeer))
+        {
+            return LiveTestJson(new { success = false, error = "Unable to resolve battle scene sync fixture services." });
+        }
+
+        try
+        {
+            var looterClan = Clan.BanditFactions.FirstOrDefault(candidate => candidate.StringId == "looters");
+            if (looterClan == null)
+                throw new InvalidOperationException("The looter clan was not found.");
+            var looterTroop = looterClan.Culture?.BasicTroop;
+            if (looterTroop == null)
+                throw new InvalidOperationException("The looter clan has no basic troop.");
+
+            var gate = fixture.Settlement.GatePosition;
+            var firstPosition = new CampaignVec2(new Vec2(gate.X - 1.5f, gate.Y), isOnLand: true);
+            var secondPosition = new CampaignVec2(new Vec2(gate.X - 1.7f, gate.Y), isOnLand: true);
+            var looterPosition = new CampaignVec2(new Vec2(gate.X - 1.9f, gate.Y), isOnLand: true);
+            MoveBattleSceneSyncParty(fixture.FirstParty, firstPosition);
+            MoveBattleSceneSyncParty(fixture.SecondParty, secondPosition);
+
+            fixture.LooterParty = BanditPartyComponent.CreateLooterParty(
+                $"debug_3203_scene_sync_looters_{Guid.NewGuid():N}",
+                looterClan,
+                fixture.Settlement,
+                isBossParty: false,
+                pt: null,
+                looterPosition);
+            fixture.LooterParty.MemberRoster.AddToCounts(looterTroop, 30);
+            fixture.LooterParty.SetMoveModeHold();
+            if (fixture.LooterParty.MemberRoster.TotalHealthyCount <= 0)
+                throw new InvalidOperationException("The fixture looter party has no healthy troops.");
+
+            fixture.MapEvent = MapEventBattleFactory.CreateMapEvent(
+                fixture.FirstParty.Party,
+                fixture.LooterParty.Party,
+                default);
+            if (fixture.MapEvent == null ||
+                !objectManager.TryGetId(fixture.MapEvent, out string mapEventId))
+            {
+                throw new InvalidOperationException("Unable to create or resolve the fixture map event.");
+            }
+            fixture.MapEventId = mapEventId;
+
+            messageBroker.Publish(secondPeer, new NetworkRequestJoinBattle(
+                $"debug-3203-join-{Guid.NewGuid():N}",
+                mapEventId,
+                fixture.SecondPartyId,
+                BattleSideEnum.Attacker));
+            if (fixture.MapEvent.AttackerSide.Parties.All(
+                    mapEventParty => mapEventParty.Party != fixture.SecondParty.Party))
+                throw new InvalidOperationException("The second player party did not join the attacker side.");
+
+            messageBroker.Publish(firstPeer, new NetworkBattleStartRequest(
+                $"debug-3203-start-{Guid.NewGuid():N}",
+                (int)BattleStartMode.Mission,
+                mapEventId,
+                fixture.FirstMobilePartyId));
+
+            return LiveTestJson(new
+            {
+                success = true,
+                state = "mission_requested",
+                mapEventId,
+                eventType = fixture.MapEvent.EventType.ToString(),
+                settlementId = fixture.Settlement.StringId,
+                looterPartyId = fixture.LooterParty.StringId,
+                looterTroops = fixture.LooterParty.MemberRoster.TotalManCount,
+                attackerControllers = new[] { fixture.FirstControllerId, fixture.SecondControllerId },
+                missionStartRequests = 1,
+            });
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to start battle scene sync fixture");
+            CleanupBattleSceneSyncFixture(behaviorSnapshot);
+            return LiveTestJson(new { success = false, error = e.Message });
+        }
+    }
+
+    [CommandLineArgumentFunction("battle_scene_sync_fixture_state", "coop.debug.mapevent")]
+    public static string GetBattleSceneSyncFixtureState(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return LiveTestJson(new { success = false, error = "Run this command on the server." });
+        if (args.Count != 0)
+            return LiveTestJson(new { success = false, error = "Usage: coop.debug.mapevent.battle_scene_sync_fixture_state" });
+
+        var fixture = battleSceneSyncFixture;
+        if (fixture == null)
+            return LiveTestJson(new { success = false, state = "not_captured" });
+
+        var mapEvent = fixture.MapEvent;
+        var firstJoined = mapEvent?.AttackerSide.Parties.Any(
+            mapEventParty => mapEventParty.Party == fixture.FirstParty.Party) == true;
+        var secondJoined = mapEvent?.AttackerSide.Parties.Any(
+            mapEventParty => mapEventParty.Party == fixture.SecondParty.Party) == true;
+        var missionControllers = new List<string>();
+        if (ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership))
+        {
+            foreach (var controllerId in new[] { fixture.FirstControllerId, fixture.SecondControllerId })
+            {
+                if (missionMembership.IsControllerInMission(controllerId))
+                    missionControllers.Add(controllerId);
+            }
+        }
+
+        return LiveTestJson(new
+        {
+            success = mapEvent != null && firstJoined && secondJoined,
+            state = mapEvent == null ? "captured" : "started",
+            mapEventId = fixture.MapEventId,
+            eventType = mapEvent?.EventType.ToString(),
+            finalized = mapEvent?.IsFinalized,
+            battleState = mapEvent?.BattleState.ToString(),
+            firstSide = fixture.FirstParty.Party.Side.ToString(),
+            secondSide = fixture.SecondParty.Party.Side.ToString(),
+            attackerControllers = new[] { fixture.FirstControllerId, fixture.SecondControllerId },
+            joinedControllers = new[]
+            {
+                firstJoined ? fixture.FirstControllerId : null,
+                secondJoined ? fixture.SecondControllerId : null,
+            }.Where(controllerId => controllerId != null).ToArray(),
+            missionControllers = missionControllers.ToArray(),
+            looterPartyId = fixture.LooterParty?.StringId,
+            looterTroops = fixture.LooterParty?.MemberRoster.TotalManCount,
+        });
+    }
+
+    [CommandLineArgumentFunction("battle_scene_sync_fixture_restore", "coop.debug.mapevent")]
+    public static string RestoreBattleSceneSyncFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return LiveTestJson(new { success = false, error = "Run this command on the server." });
+        if (args.Count != 0)
+            return LiveTestJson(new { success = false, error = "Usage: coop.debug.mapevent.battle_scene_sync_fixture_restore" });
+
+        var fixture = battleSceneSyncFixture;
+        if (fixture == null)
+            return LiveTestJson(new { success = false, error = "No battle scene sync fixture is captured." });
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            return LiveTestJson(new { success = false, error = "Unable to resolve the party behavior snapshot service." });
+
+        if (fixture.MapEventId != null &&
+            ContainerProvider.TryResolve<INetwork>(out var network) &&
+            ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) &&
+            ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership))
+        {
+            foreach (var controllerId in new[] { fixture.FirstControllerId, fixture.SecondControllerId })
+            {
+                if (missionMembership.IsControllerInMission(controllerId) &&
+                    playerManager.TryGetPeer(controllerId, out var peer))
+                {
+                    network.Send(peer, new NetworkEndLateJoinModeFixtureMission(fixture.MapEventId));
+                }
+            }
+        }
+
+        var mapEventId = fixture.MapEventId;
+        try
+        {
+            CleanupBattleSceneSyncFixture(behaviorSnapshot);
+            return LiveTestJson(new { success = true, state = "restored", mapEventId });
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to restore battle scene sync fixture");
+            return LiveTestJson(new { success = false, error = e.Message, mapEventId });
+        }
+    }
+
+    [CommandLineArgumentFunction("battle_scene_sync_fixture_verify", "coop.debug.mapevent")]
+    public static string VerifyBattleSceneSyncFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return LiveTestJson(new { success = false, error = "Run this command on the server." });
+        if (args.Count != 0)
+            return LiveTestJson(new { success = false, error = "Usage: coop.debug.mapevent.battle_scene_sync_fixture_verify" });
+        if (battleSceneSyncFixture != null)
+            return LiveTestJson(new { success = false, state = "fixture_still_captured" });
+
+        var verification = battleSceneSyncVerification;
+        if (verification == null)
+            return LiveTestJson(new { success = false, state = "no_restore_record" });
+
+        bool firstPositionRestored = PositionsMatch(verification.FirstParty.Position, verification.FirstPosition);
+        bool secondPositionRestored = PositionsMatch(verification.SecondParty.Position, verification.SecondPosition);
+        bool playersDetached = verification.FirstParty.MapEvent == null && verification.SecondParty.MapEvent == null;
+        bool looterRemoved = verification.LooterParty == null || !verification.LooterParty.IsActive;
+        bool modeReleased = verification.MapEventId == null ||
+                            !ServerBattleModeArbiter.TryGetMode(verification.MapEventId, out _);
+        bool missionsExited = true;
+        if (ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership))
+        {
+            missionsExited = !missionMembership.IsControllerInMission(verification.FirstControllerId) &&
+                             !missionMembership.IsControllerInMission(verification.SecondControllerId);
+        }
+
+        return LiveTestJson(new
+        {
+            success = firstPositionRestored && secondPositionRestored && playersDetached &&
+                      looterRemoved && modeReleased && missionsExited,
+            state = "verified",
+            mapEventId = verification.MapEventId,
+            firstPositionRestored,
+            secondPositionRestored,
+            playersDetached,
+            looterRemoved,
+            modeReleased,
+            missionsExited,
+        });
+    }
+
+    private static void MoveBattleSceneSyncParty(MobileParty party, CampaignVec2 position)
+    {
+        party.Position = position;
+        party.SetMoveModeHold();
+        party.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(MapEventDebugCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: false,
+                resetMovementToHold: true));
+    }
+
+    private static void CleanupBattleSceneSyncFixture(IMobilePartyBehaviorSnapshot behaviorSnapshot)
+    {
+        var fixture = battleSceneSyncFixture;
+        if (fixture == null)
+            return;
+
+        battleSceneSyncVerification = new BattleSceneSyncVerification
+        {
+            MapEventId = fixture.MapEventId,
+            FirstParty = fixture.FirstParty,
+            FirstPosition = fixture.FirstBehavior.PartyPosition,
+            SecondParty = fixture.SecondParty,
+            SecondPosition = fixture.SecondBehavior.PartyPosition,
+            LooterParty = fixture.LooterParty,
+            FirstControllerId = fixture.FirstControllerId,
+            SecondControllerId = fixture.SecondControllerId,
+        };
+
+        if (fixture.MapEvent?.IsFinalized == false)
+            fixture.MapEvent.FinalizeEvent();
+        if (fixture.MapEventId != null)
+            ServerBattleModeArbiter.Release(fixture.MapEventId);
+        if (fixture.LooterParty?.IsActive == true && fixture.LooterParty.MapEvent == null)
+            DestroyPartyAction.Apply(null, fixture.LooterParty);
+
+        RestoreBattleSceneSyncParty(fixture.FirstParty, fixture.FirstBehavior, behaviorSnapshot);
+        RestoreBattleSceneSyncParty(fixture.SecondParty, fixture.SecondBehavior, behaviorSnapshot);
+        battleSceneSyncFixture = null;
+    }
+
+    private static void RestoreBattleSceneSyncParty(
+        MobileParty party,
+        PartyBehaviorUpdateData behavior,
+        IMobilePartyBehaviorSnapshot behaviorSnapshot)
+    {
+        if (!RestorePartyBehavior(party, behavior, behaviorSnapshot))
+            throw new InvalidOperationException($"Unable to restore party behavior for {party.StringId}.");
+
+        MessageBroker.Instance.Publish(
+            typeof(MapEventDebugCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea,
+                resetMovementToHold: false));
+    }
+
+    private static bool PositionsMatch(CampaignVec2 actual, CampaignVec2 expected) =>
+        actual.ToVec2().DistanceSquared(expected.ToVec2()) < 0.0001f;
+
+    private static string FormatPosition(CampaignVec2 position) =>
+        $"{position.X:R}|{position.Y:R}";
+
+    private static string LiveTestJson(object value) =>
+        "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
+#endif
 
     // coop.debug.mapevent.late_join_mode_fixture PlayerOne PlayerTwo
     /// <summary>
