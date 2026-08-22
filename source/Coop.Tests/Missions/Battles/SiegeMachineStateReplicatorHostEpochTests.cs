@@ -241,6 +241,64 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Fact]
+    public void MountClaimAfterProximityGrant_RejectsRevokedOwnerGateHit()
+    {
+        const int machineId = 19;
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+        InvokePrivate("RefreshMachineCache");
+
+        InvokeSetMachineAuthority(machineId, "remote-a");
+        var authorityA = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(sentToAll));
+        var hitFromA = new NetworkGateHit(
+            gateId: 20,
+            ramId: machineId,
+            damage: 100,
+            senderControllerId: authorityA.ControllerId,
+            hostEpoch: authorityA.HostEpoch,
+            authorityRevision: authorityA.AuthorityRevision);
+        sentToAll.Clear();
+
+        ProximityGrants().Add(machineId);
+        broker.Publish(this, new NetworkSiegeMachineClaim(machineId, "remote-b", isRelease: false));
+        DrainGameThread();
+
+        var authorityB = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(sentToAll));
+        Assert.Equal("remote-b", authorityB.ControllerId);
+        Assert.Equal(authorityA.AuthorityRevision + 1, authorityB.AuthorityRevision);
+        var hitFromB = new NetworkGateHit(
+            gateId: 20,
+            ramId: machineId,
+            damage: 100,
+            senderControllerId: authorityB.ControllerId,
+            hostEpoch: authorityB.HostEpoch,
+            authorityRevision: authorityB.AuthorityRevision);
+
+        Assert.True(sut.TryGetMachineAuthority(
+            machineId,
+            out var currentControllerId,
+            out var currentHostEpoch,
+            out var currentAuthorityRevision));
+
+        int appliedDamage = 0;
+        foreach (var hit in new[] { hitFromA, hitFromB })
+        {
+            if (SiegeWeaponFireReplicator.IsCurrentGateHitProducer(
+                    hit,
+                    currentControllerId,
+                    currentHostEpoch,
+                    currentAuthorityRevision)
+                && SiegeWeaponFireReplicator.ShouldApplyHostGateDamage(
+                    isLocalHost: true,
+                    ramSimulatedLocally: false))
+            {
+                appliedDamage += hit.Damage;
+            }
+        }
+
+        Assert.Equal(hitFromB.Damage, appliedDamage);
+    }
+
+    [Fact]
     public void SupersededOwnerState_IsDropped_AndCannotReplaceAFutureRevision()
     {
         broker.Publish(this, new NetworkSiegeMachineAuthority(
@@ -794,6 +852,9 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
     private Dictionary<int, string> AuthorityHostControllers()
         => GetField<Dictionary<int, string>>("authorityHostControllers");
+
+    private HashSet<int> ProximityGrants()
+        => GetField<HashSet<int>>("proximityGrants");
 
     private void AssertSingleClaim(int machineId, string controllerId)
     {

@@ -154,7 +154,8 @@ public class CoopBattleController : CoopMissionController
             network,
             messageBroker,
             coopMissionComponent.AgentRegistry,
-            session);
+            session,
+            siegeMachineState);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;

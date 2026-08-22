@@ -31,17 +31,20 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry registry;
     private readonly IBattleSession session;
+    private readonly ISiegeMachineStateReplicator machineState;
 
     public SiegeWeaponFireReplicator(
         IBattleNetwork network,
         IMessageBroker messageBroker,
         INetworkAgentRegistry registry,
-        IBattleSession session)
+        IBattleSession session,
+        ISiegeMachineStateReplicator machineState)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.registry = registry;
         this.session = session;
+        this.machineState = machineState;
 
         messageBroker.Subscribe<SiegeWeaponFired>(Handle_LocalFire);
         messageBroker.Subscribe<NetworkSiegeWeaponFired>(Handle_NetworkFire);
@@ -197,7 +200,24 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     // authoritative gate and everyone replays the reaction.
     private void Handle_LocalGateHit(MessagePayload<GateHitByRam> payload)
     {
-        network.SendAll(new NetworkGateHit(payload.What.Gate.Id.Id, payload.What.Ram.Id.Id, payload.What.Damage));
+        int ramId = payload.What.Ram.Id.Id;
+        if (!machineState.TryGetMachineAuthority(
+                ramId,
+                out var controllerId,
+                out var hostEpoch,
+                out var authorityRevision)
+            || controllerId != session.OwnControllerId)
+        {
+            return;
+        }
+
+        network.SendAll(new NetworkGateHit(
+            payload.What.Gate.Id.Id,
+            ramId,
+            payload.What.Damage,
+            controllerId,
+            hostEpoch,
+            authorityRevision));
     }
 
     // A granted ram strikes only on its simulator. The host applies the carried damage through vanilla
@@ -210,6 +230,16 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
+            if (!machineState.TryGetMachineAuthority(
+                    msg.RamId,
+                    out var controllerId,
+                    out var hostEpoch,
+                    out var authorityRevision)
+                || !IsCurrentGateHitProducer(msg, controllerId, hostEpoch, authorityRevision))
+            {
+                return;
+            }
+
             bool ramSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.RamId);
             if (ramSimulatedLocally) return;
 
@@ -239,5 +269,16 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     internal static bool ShouldApplyHostGateDamage(bool isLocalHost, bool ramSimulatedLocally)
     {
         return isLocalHost && !ramSimulatedLocally;
+    }
+
+    internal static bool IsCurrentGateHitProducer(
+        NetworkGateHit message,
+        string currentControllerId,
+        int currentHostEpoch,
+        int currentAuthorityRevision)
+    {
+        return message.SenderControllerId == currentControllerId
+            && message.HostEpoch == currentHostEpoch
+            && message.AuthorityRevision == currentAuthorityRevision;
     }
 }

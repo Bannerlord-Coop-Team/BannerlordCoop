@@ -26,6 +26,13 @@ public interface ISiegeMachineStateReplicator : IDisposable
 
     /// <summary>[Host] Replay every machine's current state and claim to a joining controller.</summary>
     void CatchUpJoiner(string controllerId);
+
+    /// <summary>[Game thread] Resolve the current simulator and authority order for an event stamp.</summary>
+    bool TryGetMachineAuthority(
+        int machineId,
+        out string controllerId,
+        out int hostEpoch,
+        out int authorityRevision);
 }
 
 /// <inheritdoc cref="ISiegeMachineStateReplicator"/>
@@ -373,6 +380,35 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         => authorityHostControllers.TryGetValue(machineId, out var controllerId)
             ? controllerId
             : string.Empty;
+
+    public bool TryGetMachineAuthority(
+        int machineId,
+        out string controllerId,
+        out int hostEpoch,
+        out int authorityRevision)
+    {
+        if (claimedMachines.TryGetValue(machineId, out controllerId))
+        {
+            hostEpoch = GetSnapshotAuthorityEpoch(machineId);
+            authorityRevision = GetAuthorityRevision(machineId);
+            return true;
+        }
+
+        if (session.IsLocalHost)
+        {
+            controllerId = session.OwnControllerId;
+            hostEpoch = session.HostEpoch;
+            authorityRevision = GetAuthorityEpoch(machineId) == hostEpoch
+                ? GetAuthorityRevision(machineId)
+                : 0;
+            return !string.IsNullOrEmpty(controllerId);
+        }
+
+        controllerId = GetAuthorityHostController(machineId);
+        hostEpoch = GetSnapshotAuthorityEpoch(machineId);
+        authorityRevision = GetAuthorityRevision(machineId);
+        return !string.IsNullOrEmpty(controllerId);
+    }
 
     // BR-102: drop a host-authority message stamped by an earlier hosting generation (a deposed host
     // in flight across a migration). Unstamped (0) senders, an unassigned (0) receiver, and epochs at
