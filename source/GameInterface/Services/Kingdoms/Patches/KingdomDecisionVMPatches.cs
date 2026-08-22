@@ -89,6 +89,21 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
             return true;
         }
+        // Singleclan kingdoms resolve decisions instantly (IsSingleClanDecision),
+        // so the vanilla "will resolve in 48h" popup is always false for them.
+        // Skip straight to RefreshWith instead of showing it.
+        [HarmonyPatch(nameof(KingdomDecisionsVM.HandleDecision))]
+        [HarmonyPriority(Priority.High)]
+        [HarmonyPrefix]
+        private static bool HandleDecisionSingleClanSkipPrefix(KingdomDecisionsVM __instance, KingdomDecision curDecision)
+        {
+            if (curDecision == null || !curDecision.IsPlayerParticipant || !curDecision.IsSingleClanDecision()) return true;
+            if (curDecision.ShouldBeCancelled()) return true;
+
+            __instance._examinedDecisionsSinceInit.Add(curDecision);
+            __instance.RefreshWith(curDecision);
+            return false;
+        }
     }
 
     [HarmonyPatch(typeof(DecisionItemBaseVM))]
