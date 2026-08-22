@@ -147,6 +147,26 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Fact]
+    public void NewAuthorityTupleForSameLocalOwner_InvalidatesPreviousEpochSendCache()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            17, "us", hostEpoch: LocalEpoch, authorityRevision: 1,
+            senderControllerId: "host"));
+        DrainGameThread();
+
+        LastSentStates()[17] = MachineState(machineId: 17, hostEpoch: LocalEpoch);
+        LastSentLadderAnimations()[17] = LadderAnimationState(ladderId: 17, hostEpoch: LocalEpoch);
+
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            17, "us", hostEpoch: LocalEpoch + 1, authorityRevision: 0,
+            senderControllerId: "promoted-host"));
+        DrainGameThread();
+
+        Assert.DoesNotContain(17, LastSentStates());
+        Assert.DoesNotContain(17, LastSentLadderAnimations());
+    }
+
+    [Fact]
     public void SupersededOwnerState_IsDropped_AndCannotReplaceAFutureRevision()
     {
         broker.Publish(this, new NetworkSiegeMachineAuthority(
@@ -404,6 +424,26 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(LocalEpoch + 1, authority.HostEpoch);
         Assert.Equal(0, authority.AuthorityRevision);
         Assert.Equal("us", authority.SenderControllerId);
+    }
+
+    [Fact]
+    public void StaleLocalHostAssignment_DoesNotCatchUpAJoinerFromAnAheadAuthorityTuple()
+    {
+        missionScope.AsSiegeBattle();
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            4, "peer", hostEpoch: LocalEpoch + 1, authorityRevision: 0,
+            senderControllerId: "promoted-host"));
+        DrainGameThread();
+
+        var sentToJoiner = new List<IMessage>();
+        network.Setup(n => n.Send("joiner", It.IsAny<IMessage>()))
+            .Callback<string, IMessage>((_, message) => sentToJoiner.Add(message));
+
+        sut.CatchUpJoiner("joiner");
+        DrainGameThread();
+
+        Assert.Empty(sentToJoiner);
     }
 
     [Fact]

@@ -1048,7 +1048,15 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
             pendingClaimSeconds.Remove(obj.MachineId);
             PushClaimsToGate();
-            ResetSendCacheWhenSimulationMovesHere(obj.MachineId, wasSimulatedLocally);
+            if (authorityOrder > 0 && SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId))
+            {
+                lastSent.Remove(obj.MachineId);
+                lastSentLadderAnimations.Remove(obj.MachineId);
+            }
+            else
+            {
+                ResetSendCacheWhenSimulationMovesHere(obj.MachineId, wasSimulatedLocally);
+            }
             RefreshMachineGates();
             DrainPendingMachineStates();
         });
@@ -1706,6 +1714,11 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             bool isHost = session.IsLocalHost;
             if (isHost)
             {
+                foreach (var authorityEpoch in authorityEpochs.Values)
+                {
+                    if (authorityEpoch > session.HostEpoch) return;
+                }
+
                 ReannounceAuthorityAfterPromotion();
                 // BR-102: the replay asserts arbitration authority NOW, so it carries the CURRENT epoch
                 // (not the epoch each claim was granted under) — a joiner already holds the newest

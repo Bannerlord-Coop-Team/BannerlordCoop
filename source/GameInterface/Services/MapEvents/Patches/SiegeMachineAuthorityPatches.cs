@@ -18,6 +18,9 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch]
 internal class SiegeMachineAuthorityPatches
 {
+    [ThreadStatic]
+    private static bool initializingGate;
+
     // ForcedUse: the per-tick scan that sends the local side's troops to man undermanned machines.
     [HarmonyPatch(typeof(SiegeWeapon), nameof(SiegeWeapon.TickAux))]
     [HarmonyPrefix]
@@ -117,13 +120,25 @@ internal class SiegeMachineAuthorityPatches
     [HarmonyPrefix]
     private static bool SetAutoOpenStatePrefix(CastleGate __instance) => AllowGateToggle(__instance);
 
+    [HarmonyPatch(typeof(CastleGate), nameof(CastleGate.AfterMissionStart))]
+    [HarmonyPrefix]
+    private static void AfterMissionStartPrefix() => initializingGate = true;
+
+    [HarmonyPatch(typeof(CastleGate), nameof(CastleGate.AfterMissionStart))]
+    [HarmonyFinalizer]
+    private static Exception AfterMissionStartFinalizer(Exception __exception)
+    {
+        initializingGate = false;
+        return __exception;
+    }
+
     // The gate's auto-open logic reacts to nearby agents, including interpolated puppets, so a
     // non-authority client's local toggles must not run; the replicated state applies under suppress.
     private static bool AllowGateToggle(CastleGate gate)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
-        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return true;
         if (SiegeMissionAuthorityGate.SuppressCapture) return true;
+        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return initializingGate;
 
         return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(gate.Id.Id);
     }
