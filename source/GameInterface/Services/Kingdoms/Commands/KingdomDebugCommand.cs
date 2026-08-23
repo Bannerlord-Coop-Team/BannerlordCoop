@@ -481,7 +481,8 @@ public class KingdomDebugCommand
             false);
         pendingAllianceTimeoutFixture = fixture;
 
-        var decision = new StartAllianceDecision(fixture.ProposerClan, fixture.TargetKingdom);
+        // A redirected inbound offer is authored by the player kingdom's ruling clan.
+        var decision = new StartAllianceDecision(fixture.Kingdom.RulingClan, fixture.TargetKingdom);
         CoopKingdomElection._opponentProposedAllianceDecisions.Add(decision);
         fixture.Kingdom.AddDecision(decision, true);
         decision.TriggerTime = CampaignTime.Zero;

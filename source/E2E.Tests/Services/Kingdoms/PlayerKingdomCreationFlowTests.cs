@@ -1690,6 +1690,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             var playerDecision = Assert.IsType<StartAllianceDecision>(
                 Assert.Single(playerKingdom.UnresolvedDecisions));
+            Assert.Same(playerKingdom.RulingClan, playerDecision.ProposerClan);
             playerDecision.TriggerTime = CampaignTime.Zero;
             CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
 
