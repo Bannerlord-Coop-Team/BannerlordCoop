@@ -675,14 +675,15 @@ public class RaidDebugCommands
 
     private static void RestoreClan(ClanSnapshot snapshot)
     {
-        snapshot.Clan._influence = snapshot.Influence;
+        float influenceDelta = snapshot.Influence - snapshot.Clan.Influence;
+        if (Math.Abs(influenceDelta) >= 0.001f)
+            ChangeClanInfluenceAction.Apply(snapshot.Clan, influenceDelta);
         if (Math.Abs(snapshot.Clan.Renown - snapshot.Renown) >= 0.001f)
         {
             snapshot.Clan.ResetClanRenown();
             if (snapshot.Renown > 0f)
                 snapshot.Clan.AddRenown(snapshot.Renown, shouldNotify: false);
         }
-        snapshot.Clan._tier = snapshot.Tier;
     }
 
     private static void RestoreFactionState(FactionStateSnapshot snapshot)
