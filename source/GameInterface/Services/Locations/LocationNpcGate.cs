@@ -91,9 +91,12 @@ public static class LocationNpcGate
         if (agent == null) return false;
         if (ReferenceEquals(agent, mainAgent)) return true;
 
-        var mainParty = PartyBase.MainParty;
-        if (mainParty != null && agent.Origin is PartyAgentOrigin origin && origin.Party == mainParty)
-            return true;
+        if (agent.Origin is PartyAgentOrigin origin)
+        {
+            var mainParty = PartyBase.MainParty;
+            if (mainParty != null && origin.Party == mainParty)
+                return true;
+        }
 
         Func<Agent, bool> resolver;
         lock (Gate) resolver = _partyAgentResolver;

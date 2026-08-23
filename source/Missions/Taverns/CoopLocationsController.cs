@@ -91,7 +91,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         npcReplicator = new LocationOwnedAgentReplicator(
             network, messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, spawnBatchCodec);
         authorityMigrator = new LocationAuthorityMigrator(
-            messageBroker, coopMissionComponent, session, bindingMap, partyAgentMap, missionContext, npcHoldRegistry);
+            messageBroker, coopMissionComponent, session, bindingMap, partyAgentMap, missionContext,
+            npcHoldRegistry, conversationAgentGuard);
         npcPuppetSpawner = new LocationPuppetSpawner(
             messageBroker, objectManager, coopMissionComponent, session, conversationAgentGuard,
             bindingMap, partyAgentMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState);
