@@ -1236,8 +1236,9 @@ public class MapEventDebugCommands
                         throw new InvalidOperationException("The initiator clan was not added to the fixture kingdom.");
                 }
 
-                kingdom.CreateArmy(initiator.Hero, danustica, Army.ArmyTypes.Raider);
-                fixture.Army = initiator.Party.Army;
+                fixture.Army = new Army(kingdom, initiator.Party, Army.ArmyTypes.Raider);
+                fixture.Army.Gather(danustica);
+                CampaignEventDispatcher.Instance.OnArmyCreated(fixture.Army);
                 if (fixture.Army == null || fixture.Army.LeaderParty != initiator.Party)
                     throw new InvalidOperationException("The fixture army was not created with the initiator as its leader.");
 
