@@ -137,12 +137,23 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
 
         dataSource.RefreshPendingBracket();
         UpdateBetInput();
+        UpdateTabInput();
+        UpdateUiVisibility();
+        UpdateCombatUi();
+    }
+
+    private void UpdateTabInput()
+    {
+        if (isPhotoMode || dataSource.IsBetWindowEnabled) return;
 
         bool advancePressed = Mission.InputManager?.IsGameKeyPressed((int)GameKeyDefinition.Leave) == true ||
             gauntletLayer.Input.IsGameKeyPressed((int)GameKeyDefinition.Leave);
-        if (advancePressed && !isPhotoMode && !dataSource.IsBetWindowEnabled)
+        if (advancePressed)
             HandleTabPressed();
+    }
 
+    private void UpdateUiVisibility()
+    {
         bool uiShouldShow = dataSource.ShouldShowUI || forceShowUi;
         if (uiShouldShow && !viewEnabled)
         {
@@ -158,7 +169,6 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
             forceShowUi = false;
             dataSource.IsLeaveMenuOpen = false;
         }
-        UpdateCombatUi();
     }
 
     public override bool IsOpeningEscapeMenuOnFocusChangeAllowed()

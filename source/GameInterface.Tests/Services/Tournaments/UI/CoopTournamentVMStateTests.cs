@@ -294,6 +294,42 @@ public class CoopTournamentVMStateTests
     }
 
     [Fact]
+    public void ShouldOpenLeaveMenu_LiveMatchRestingContestant_ReturnsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateRestingContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_LiveMatchEliminatedContestant_ReturnsTrue()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateEliminatedContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.True(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
     public void ShouldOpenLeaveMenu_AwaitingChoices_ReturnsFalse()
     {
         var snapshot = CreateSnapshot(
@@ -319,7 +355,7 @@ public class CoopTournamentVMStateTests
     }
 
     [Fact]
-    public void IsLocalInCurrentMatch_ContestantInCurrentMatch_IsTrue()
+    public void LocalRole_ContestantInCurrentMatch_IsFighter()
     {
         var snapshot = CreateSnapshot(
             new[] { CreateHumanContestant() },
@@ -333,11 +369,11 @@ public class CoopTournamentVMStateTests
 
         var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
 
-        Assert.True(state.IsInCurrentMatch);
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.Fighter, state.Role);
     }
 
     [Fact]
-    public void IsLocalInCurrentMatch_RestingContestant_IsFalse()
+    public void LocalRole_RestingContestant_IsResting()
     {
         var snapshot = CreateSnapshot(
             new[] { CreateRestingContestant() },
@@ -351,11 +387,29 @@ public class CoopTournamentVMStateTests
 
         var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
 
-        Assert.False(state.IsInCurrentMatch);
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.Resting, state.Role);
     }
 
     [Fact]
-    public void IsLocalInCurrentMatch_PureSpectator_IsFalse()
+    public void LocalRole_EliminatedContestant_IsEliminated()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateEliminatedContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.Eliminated, state.Role);
+    }
+
+    [Fact]
+    public void LocalRole_PureSpectator_IsSpectator()
     {
         var snapshot = CreateSnapshot(
             Array.Empty<TournamentContestantData>(),
@@ -369,11 +423,11 @@ public class CoopTournamentVMStateTests
 
         var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
 
-        Assert.False(state.IsInCurrentMatch);
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.Spectator, state.Role);
     }
 
     [Fact]
-    public void IsLocalInCurrentMatch_NoLocalPlayer_IsFalse()
+    public void LocalRole_NoLocalPlayer_IsNone()
     {
         var snapshot = CreateSnapshot(
             new[] { CreateContestant("slot-a", "player-b") },
@@ -387,7 +441,7 @@ public class CoopTournamentVMStateTests
 
         var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
 
-        Assert.False(state.IsInCurrentMatch);
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.None, state.Role);
     }
 
     private static NetworkTournamentBetResult CreateBetResult(
@@ -423,6 +477,9 @@ public class CoopTournamentVMStateTests
     private static TournamentContestantData CreateRestingContestant()
         => CreateContestant("slot-b", "player-a");
 
+    private static TournamentContestantData CreateEliminatedContestant()
+        => CreateContestant("slot-c", "player-a");
+
     private static TournamentContestantData CreateContestant(string slotId, string controllerId)
         => new(
             slotId,
@@ -446,7 +503,7 @@ public class CoopTournamentVMStateTests
         long revision = 1,
         TournamentSessionPhase phase = TournamentSessionPhase.AwaitingChoices)
     {
-        var match = new TournamentMatchData(
+        var currentMatch = new TournamentMatchData(
             "match-a",
             "round-a",
             0,
@@ -463,6 +520,23 @@ public class CoopTournamentVMStateTests
                     null)
             },
             Array.Empty<string>());
+        var pendingMatch = new TournamentMatchData(
+            "match-b",
+            "round-a",
+            0,
+            1,
+            1,
+            new[]
+            {
+                new TournamentTeamData(
+                    "team-b",
+                    new[] { "slot-b" },
+                    0,
+                    false,
+                    0,
+                    null)
+            },
+            Array.Empty<string>());
 
         return new TournamentSessionSnapshot(
             "session-a",
@@ -473,13 +547,13 @@ public class CoopTournamentVMStateTests
             phase,
             revision,
             1,
-            match.MatchId,
+            currentMatch.MatchId,
             "host-a",
             Array.Empty<string>(),
             contestants,
             spectators,
             choices,
-            new[] { new TournamentRoundData("round-a", 0, 0, new[] { match }) },
+            new[] { new TournamentRoundData("round-a", 0, 0, new[] { currentMatch, pendingMatch }) },
             readyCount,
             skipCount,
             voterCount,
