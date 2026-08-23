@@ -6,6 +6,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -187,6 +188,7 @@ public class MapEventDebugCommands
         public bool ReinforcementAdded;
         public bool PartialRoutIssued;
         public bool EnemiesRouted;
+        public bool InitiatorKingdomChanged;
     }
 
     private sealed class BattleRewardPlayerSnapshot
@@ -201,6 +203,8 @@ public class MapEventDebugCommands
         public int HitPoints;
         public float RecentEventsMorale;
         public float ClanInfluence;
+        public Kingdom ClanKingdom;
+        public CampaignTime ClanLastFactionChangeTime;
     }
 
     private sealed class PlayerFieldBattleFixture
@@ -1208,9 +1212,29 @@ public class MapEventDebugCommands
 
             if (createArmy)
             {
-                var kingdom = initiator.Hero.Clan?.Kingdom;
+                var clan = initiator.Hero.Clan;
+                if (clan == null)
+                    throw new InvalidOperationException($"Player {initiator.ControllerId} must belong to a clan for army mode.");
+
+                var kingdom = clan.Kingdom;
                 if (kingdom == null)
-                    throw new InvalidOperationException($"Player {initiator.ControllerId} must belong to a kingdom for army mode.");
+                {
+                    kingdom = danustica.MapFaction as Kingdom ?? danustica.OwnerClan?.Kingdom;
+                    if (kingdom == null)
+                        throw new InvalidOperationException("Danustica does not belong to a kingdom for army mode.");
+                    if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+                        throw new InvalidOperationException("Unable to resolve the kingdom membership state service.");
+
+                    fixture.InitiatorKingdomChanged = true;
+                    kingdomMembershipState.MoveClanToKingdom(
+                        null,
+                        kingdom,
+                        clan,
+                        publishCollectionChanges: true,
+                        republishExistingCollections: true);
+                    if (clan.Kingdom != kingdom)
+                        throw new InvalidOperationException("The initiator clan was not added to the fixture kingdom.");
+                }
 
                 kingdom.CreateArmy(initiator.Hero, danustica, Army.ArmyTypes.Raider);
                 fixture.Army = initiator.Party.Army;
@@ -1572,6 +1596,8 @@ public class MapEventDebugCommands
             HitPoints = hero.HitPoints,
             RecentEventsMorale = party.RecentEventsMorale,
             ClanInfluence = hero.Clan?.Influence ?? 0f,
+            ClanKingdom = hero.Clan?.Kingdom,
+            ClanLastFactionChangeTime = hero.Clan?.LastFactionChangeTime ?? CampaignTime.Zero,
         };
         return true;
     }
@@ -1633,6 +1659,9 @@ public class MapEventDebugCommands
             if (fixture.ReinforcementParty?.IsActive == true && fixture.ReinforcementParty.MapEvent == null)
                 DestroyPartyAction.Apply(null, fixture.ReinforcementParty);
 
+            if (fixture.InitiatorKingdomChanged)
+                RestoreBattleRewardClanKingdom(fixture.Initiator);
+
             if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
                 throw new InvalidOperationException("Unable to resolve the mobile-party behavior snapshot service.");
 
@@ -1647,6 +1676,23 @@ public class MapEventDebugCommands
             error = e.Message;
             return false;
         }
+    }
+
+    private static void RestoreBattleRewardClanKingdom(BattleRewardPlayerSnapshot snapshot)
+    {
+        var clan = snapshot.Hero.Clan;
+        if (clan == null)
+            throw new InvalidOperationException($"Unable to restore the clan kingdom for {snapshot.ControllerId}.");
+        if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+            throw new InvalidOperationException("Unable to resolve the kingdom membership state service.");
+
+        kingdomMembershipState.MoveClanToKingdom(
+            clan.Kingdom,
+            snapshot.ClanKingdom,
+            clan,
+            publishCollectionChanges: true,
+            republishExistingCollections: true);
+        clan.LastFactionChangeTime = snapshot.ClanLastFactionChangeTime;
     }
 
     private static void RestoreBattleRewardPlayer(
