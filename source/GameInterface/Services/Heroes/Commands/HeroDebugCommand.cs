@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
@@ -207,6 +208,7 @@ public class HeroDebugCommand
 
         return hero.Name.Value;
     }
+
     [CommandLineArgumentFunction("SetGold", "coop.debug.hero")]
     public static string SetGold(List<string> args)
     {
@@ -280,6 +282,11 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("set_hitpoints", "coop.debug.hero")]
     public static string SetHeroHitPoints(List<string> args)
     {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_hitpoints"))
+        {
+            return error;
+        }
+
         if (args.Count != 2)
         {
             return "Usage: coop.debug.hero.set_hitpoints <heroId> <hitPoints>";
@@ -313,6 +320,11 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("set_banneritem", "coop.debug.hero")]
     public static string SetHeroBannerItem(List<string> args)
     {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_banneritem"))
+        {
+            return error;
+        }
+
         if (args.Count != 2)
         {
             return "Usage: coop.debug.hero.set_banneritem <heroId> <bannerItem>";
@@ -415,6 +427,11 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("set_issue", "coop.debug.hero")]
     public static string SetHeroIssue(List<string> args)
     {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_issue"))
+        {
+            return error;
+        } 
+
         if (args.Count != 2)
         {
             return "Usage: coop.debug.hero.set_issue <heroId> <issueId>";
