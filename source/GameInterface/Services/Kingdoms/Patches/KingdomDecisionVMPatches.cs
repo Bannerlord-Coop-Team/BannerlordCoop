@@ -1,6 +1,6 @@
-﻿using GameInterface.Services.Kingdoms.Extentions;
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Clans.Handlers;
+using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -8,13 +8,14 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Policies;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
@@ -97,11 +98,15 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         private static bool HandleDecisionSingleClanSkipPrefix(KingdomDecisionsVM __instance, KingdomDecision curDecision)
         {
-            if (curDecision == null || !curDecision.IsPlayerParticipant || !curDecision.IsSingleClanDecision()) return true;
+            if (!CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _) || curDecision == null || !curDecision.IsPlayerParticipant || !curDecision.IsSingleClanDecision()) return true;
             if (curDecision.ShouldBeCancelled()) return true;
 
+            if (!TryGetVoteManager(out var voteManager)) return true;
+            if (voteManager.ShouldSuppressLocalDecision(curDecision)) return true;
             __instance._examinedDecisionsSinceInit.Add(curDecision);
+            __instance._shouldCheckForDecision = false;
             __instance.RefreshWith(curDecision);
+
             return false;
         }
     }
