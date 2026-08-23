@@ -65,6 +65,22 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    [Fact]
+    public void MapEvent_WithMissingLeaderAndRemainingParty_ServerUpdateRepairsLeader()
+    {
+        var context = CreateServerMapEvent();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            var expectedLeader = mapEvent.AttackerSide.Parties[0].Party;
+            mapEvent.AttackerSide.LeaderParty = null;
+
+            Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
+            Assert.Same(expectedLeader, mapEvent.AttackerSide.LeaderParty);
+        }, MapEventDisabledMethods);
+    }
+
     private static void AddSyntheticMapEventParty(MapEventSide side, PartyBase party)
     {
         party._mapEventSide = side;

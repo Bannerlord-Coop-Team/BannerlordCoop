@@ -333,6 +333,9 @@ internal class MapEventPatches
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
 
+        if (!RepairLeaderParties(__instance))
+            return false;
+
         if (__instance.IsRaidHostileAction())
         {
             RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
@@ -350,6 +353,41 @@ internal class MapEventPatches
         // Prevents server from instantly finishing the battle and waits for client finish request
         if (__instance.InvolvedParties.Any(x => x.IsMobile && !x.MobileParty.IsControlledByThisInstance()))
             return false;
+
+        return true;
+    }
+
+    private static bool RepairLeaderParties(MapEvent mapEvent)
+    {
+        if (mapEvent._sides == null || mapEvent._sides.Length < 2 ||
+            mapEvent._sides[0] == null || mapEvent._sides[1] == null)
+            return false;
+
+        foreach (var side in mapEvent._sides)
+        {
+            if (side._battleParties == null)
+                return false;
+
+            var leaderParty = side.LeaderParty;
+            if (leaderParty != null &&
+                side._battleParties.Any(entry => ReferenceEquals(entry?.Party, leaderParty)))
+                continue;
+
+            var replacement = side._battleParties
+                .Select(entry => entry?.Party)
+                .FirstOrDefault(party => party != null);
+            if (replacement == null)
+                continue;
+
+            side.LeaderParty = replacement;
+            side._mapFaction = replacement.MapFaction;
+            side.CacheLeaderSimulationModifier();
+            Logger.Warning(
+                "Repaired missing or stale leader party on {Side} side of map event {MapEventId} using {PartyId}",
+                side.MissionSide,
+                mapEvent.StringId,
+                replacement.Id);
+        }
 
         return true;
     }

@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -70,16 +71,15 @@ internal static class RaidAiInterventionSuppression
         if (defenderSide == null)
             return;
 
-        for (int i = defenderSide._battleParties.Count - 1; i >= 0; i--)
+        var joinedDefenders = defenderSide.Parties.ToArray();
+        foreach (var mapEventParty in joinedDefenders)
         {
-            var mapEventParty = defenderSide._battleParties[i];
             var party = mapEventParty?.Party;
-            if (!ShouldSuppressParty(defenderSide, party))
+            if (!defenderSide._battleParties.Contains(mapEventParty) ||
+                !ShouldSuppressParty(defenderSide, party))
                 continue;
 
-            defenderSide._battleParties.RemoveAt(i);
-            defenderSide._mapEvent.RemoveInvolvedPartyInternal(mapEventParty);
-
+            defenderSide.RemovePartyInternal(party);
             if (party._mapEventSide == defenderSide)
                 party._mapEventSide = null;
 

@@ -94,4 +94,19 @@ public class LocationCompanionAuthorityPatchTests
                 isOwnedCompanion,
                 suppressNativeSpawns));
     }
+
+    [Theory]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    public void DelayedPopulationSimulation_SkipsOnlyOwnedPartyAgents(
+        bool isReplayingNativePopulation,
+        bool isOwnedPartyAgent,
+        bool expected)
+    {
+        Assert.Equal(expected,
+            LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
+                isReplayingNativePopulation,
+                isOwnedPartyAgent));
+    }
 }

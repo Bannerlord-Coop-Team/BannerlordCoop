@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Serilog;
 using System;
 
@@ -31,6 +31,9 @@ public static class LocationNpcGate
     // set and read on the same thread within a single spawn call.
     [ThreadStatic]
     private static bool _suppressCapture;
+
+    [ThreadStatic]
+    private static bool _isReplayingNativePopulation;
 
     /// <summary>True while a coop settlement location mission is active on this client.</summary>
     public static bool IsCoopLocationMissionActive
@@ -66,6 +69,13 @@ public static class LocationNpcGate
     {
         get => _suppressCapture;
         set => _suppressCapture = value;
+    }
+
+    /// <summary>True while the elected host replays the native population pass after party agents spawned.</summary>
+    public static bool IsReplayingNativePopulation
+    {
+        get => _isReplayingNativePopulation;
+        set => _isReplayingNativePopulation = value;
     }
 
     /// <summary>A coop location mission began on this client. Resets host confirmation.</summary>

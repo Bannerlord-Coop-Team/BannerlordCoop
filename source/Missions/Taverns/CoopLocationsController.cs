@@ -352,6 +352,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     {
         if (agent == null || !_ownedCompanionIds.TryGetValue(agent, out Guid agentId)) return false;
 
+        EndConversationWithAgent(agent);
         _ownedCompanionIds.Remove(agent);
         coopMissionComponent.AgentRegistry.RemoveAgent(agentId);
         network.SendAll(new NetworkDespawnLocationAgents(
@@ -360,6 +361,21 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             new[] { string.Empty }));
         Logger.Information("[LocationSync] Despawned local companion {AgentId} ({Reason})", agentId, reason);
         return true;
+    }
+
+    private static void EndConversationWithAgent(Agent agent)
+    {
+        var conversationManager = Campaign.Current?.ConversationManager;
+        if (conversationManager?.IsConversationInProgress != true || conversationManager.ConversationAgents == null)
+            return;
+
+        foreach (var conversationAgent in conversationManager.ConversationAgents)
+        {
+            if (!ReferenceEquals(conversationAgent, agent)) continue;
+
+            conversationManager.EndConversation();
+            return;
+        }
     }
 
     internal static bool IsOwnPartyAgent(Agent agent)
