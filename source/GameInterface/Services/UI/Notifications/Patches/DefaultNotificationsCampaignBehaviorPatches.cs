@@ -258,6 +258,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnArmyCreatedPrefix(ref DefaultNotificationsCampaignBehavior __instance, Army army)
     {
+        if (!ContainerProvider.TryResolve<IGameInterface>(out _)) return true;
         if (ModInformation.IsClient) return false;
         var message = new NotifyArmyCreated(army, army.AiBehaviorObject);
         MessageBroker.Instance.Publish(__instance, message);
