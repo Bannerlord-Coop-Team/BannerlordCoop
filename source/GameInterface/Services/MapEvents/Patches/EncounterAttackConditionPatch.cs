@@ -8,6 +8,9 @@ using TaleWorlds.CampaignSystem.GameMenus;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
+/// <summary>
+/// Enables the Attack button for players who are wounded if the config is enabled to allow wounded battle entry.
+/// </summary>
 [HarmonyPatch(typeof(MenuHelper))]
 public class EncounterAttackConditionPatch
 {
