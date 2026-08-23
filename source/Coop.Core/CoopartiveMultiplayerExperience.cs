@@ -438,6 +438,9 @@ namespace Coop.Core
                     $"The server password cannot exceed {ConnectionPassword.MaxLength} characters");
             if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
                 throw new ArgumentOutOfRangeException(nameof(visibility));
+            if (!ManagedServerConfig.IsValidPort(ManagedServerConfig.Port))
+                throw new ArgumentOutOfRangeException(nameof(ManagedServerConfig.Port),
+                    "The server port must be between 1 and 65535");
 
             DestroyContainer();
             setCrashPhase("starting-server");
@@ -447,7 +450,11 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
-            builder.RegisterInstance(new NetworkConfig { Token = password ?? string.Empty })
+            builder.RegisterInstance(new NetworkConfig
+            {
+                Token = password ?? string.Empty,
+                Port = ManagedServerConfig.Port,
+            })
                 .As<INetworkConfig>()
                 .SingleInstance();
             builder.RegisterInstance(new SessionAdvertisementConfig { Visibility = visibility })

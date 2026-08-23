@@ -34,9 +34,6 @@ internal class MapEventPartyHandler : IHandler
         messageBroker.Subscribe<OnTroopWoundedAttempted>(Handle_OnTroopWoundedAttempted);
         messageBroker.Subscribe<NetworkTroopWounded>(Handle_NetworkTroopWounded);
 
-        messageBroker.Subscribe<OnTroopRoutedAttempted>(Handle_OnTroopRoutedAttempted);
-        messageBroker.Subscribe<NetworkTroopRouted>(Handle_NetworkTroopRouted);
-
         messageBroker.Subscribe<OnTroopScoreHitAttempted>(Handle_OnTroopScoreHitAttempted);
         messageBroker.Subscribe<NetworkTroopScoreHit>(Handle_NetworkTroopScoreHit);
 
@@ -58,9 +55,6 @@ internal class MapEventPartyHandler : IHandler
 
         messageBroker.Unsubscribe<OnTroopWoundedAttempted>(Handle_OnTroopWoundedAttempted);
         messageBroker.Unsubscribe<NetworkTroopWounded>(Handle_NetworkTroopWounded);
-
-        messageBroker.Unsubscribe<OnTroopRoutedAttempted>(Handle_OnTroopRoutedAttempted);
-        messageBroker.Unsubscribe<NetworkTroopRouted>(Handle_NetworkTroopRouted);
 
         messageBroker.Unsubscribe<OnTroopScoreHitAttempted>(Handle_OnTroopScoreHitAttempted);
         messageBroker.Unsubscribe<NetworkTroopScoreHit>(Handle_NetworkTroopScoreHit);
@@ -325,51 +319,5 @@ internal class MapEventPartyHandler : IHandler
             "Score hit for {AttackingTroop} dropped: no matching troop in party {Party}'s current roster",
             attackingTroop.StringId,
             mapEventParty.Party?.Id);
-    }
-
-    private void Handle_OnTroopRoutedAttempted(MessagePayload<OnTroopRoutedAttempted> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
-            return;
-
-        var message = new NetworkTroopRouted(mapEventPartyId, obj.TroopSeed);
-
-        network.SendAll(message);
-    }
-
-    private void Handle_NetworkTroopRouted(MessagePayload<NetworkTroopRouted> payload)
-    {
-        var obj = payload.What;
-
-        GameThread.Run(() =>
-        {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
-                    return;
-
-                var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
-
-                if (ModInformation.IsServer)
-                {
-                    mapEventParty.OnTroopRouted(troopDescriptor);
-                }
-                // Only the scoreboard tally (non-hero routs only, matching vanilla);
-                // Party.MemberRoster arrives separately.
-                else if (!mapEventParty.Troops[troopDescriptor].Troop.IsHero)
-                {
-                    using (new AllowedThread())
-                    {
-                        mapEventParty.Troops.OnTroopRouted(troopDescriptor);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error handling NetworkTroopRouted message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
-            }
-        });
     }
 }
