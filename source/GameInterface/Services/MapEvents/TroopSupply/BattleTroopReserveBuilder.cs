@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameInterface.Configuration;
+using GameInterface.Services.Heroes.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -279,7 +280,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             if (character == null)
                 continue;
             
-            var isPlayer = character.HeroObject?.IsHumanPlayerCharacter == true;
+            var isPlayer = character.HeroObject?.IsPlayerHero() == true;
             
             // Skip if the troop is not a player, or if the config option is disabled and they are a player + wounded.
             if (element.IsWounded && !(isPlayer && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry))

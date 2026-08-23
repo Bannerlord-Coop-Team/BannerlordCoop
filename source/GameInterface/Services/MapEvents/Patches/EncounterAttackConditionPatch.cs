@@ -28,11 +28,6 @@ public class EncounterAttackConditionPatch
         {
             return;
         }
-        
-        if (!Hero.MainHero.IsHumanPlayerCharacter)
-        {
-            return;
-        }
 
         if (!Hero.MainHero.IsWounded)
         {
