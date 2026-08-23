@@ -398,6 +398,60 @@ public class KingdomDebugCommand
         });
     }
 
+    [CommandLineArgumentFunction("alliance_timeout_target", "coop.debug.kingdom")]
+    public static string GetAllianceTimeoutTarget(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.alliance_timeout_target";
+        if (pendingAllianceTimeoutFixture != null) return "An alliance-timeout fixture lifecycle is already active.";
+        if (!TryGetObjectManager(out var objectManager) || !TryGetPlayerManager(out var playerManager))
+            return "Unable to resolve alliance-timeout fixture services.";
+        if (!playerManager.TryGetPlayer("testclient", out var player))
+            return "No registered player has controller id 'testclient'.";
+        if (!objectManager.TryGetObject(player.ClanId, out Clan playerClan))
+            return "Unable to resolve the testclient clan.";
+        if (playerClan.Kingdom != null)
+            return "The testclient clan must be kingdomless before selecting an alliance-timeout target.";
+
+        Kingdom sturgia = Kingdom.All.SingleOrDefault(candidate =>
+            string.Equals(candidate.StringId, "sturgia", StringComparison.Ordinal));
+        if (sturgia == null) return "The Sturgia kingdom is unavailable.";
+
+        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
+        if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
+
+        Kingdom kingdom = Kingdom.All
+            .Where(candidate =>
+                candidate != sturgia &&
+                candidate.RulingClan != null &&
+                candidate.UnresolvedDecisions.Count == 0 &&
+                !FactionManager.IsAtWarAgainstFaction(candidate, sturgia) &&
+                !allianceBehavior.IsAllyWithKingdom(candidate, sturgia) &&
+                Campaign.Current.Models.AllianceModel.CanMakeAlliance(
+                    candidate,
+                    sturgia,
+                    candidate.RulingClan,
+                    out _,
+                    includeReason: false))
+            .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (kingdom == null)
+            return "No NPC-ruled kingdom can currently receive a valid alliance offer from Sturgia.";
+        if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
+            !objectManager.TryGetIdWithLogging(sturgia, out string sturgiaId))
+            return "Unable to resolve alliance-timeout target ids.";
+
+        return LiveTestJsonResult(new
+        {
+            success = true,
+            kingdomId,
+            kingdomStringId = kingdom.StringId,
+            kingdomName = kingdom.Name.ToString(),
+            targetKingdomId = sturgiaId,
+            targetKingdomName = sturgia.Name.ToString()
+        });
+    }
+
     [CommandLineArgumentFunction("alliance_timeout_capture", "coop.debug.kingdom")]
     public static string CaptureAllianceTimeoutFixture(List<string> args)
     {
@@ -428,6 +482,15 @@ public class KingdomDebugCommand
         if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
         if (allianceBehavior.IsAllyWithKingdom(kingdom, targetKingdom))
             return $"Kingdom {kingdom.StringId} is already allied with Sturgia.";
+        if (!Campaign.Current.Models.AllianceModel.CanMakeAlliance(
+                kingdom,
+                targetKingdom,
+                kingdom.RulingClan,
+                out var reason,
+                includeReason: true))
+        {
+            return $"Kingdom {kingdom.StringId} cannot currently receive a valid alliance offer from Sturgia: {reason}";
+        }
         if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
             !objectManager.TryGetIdWithLogging(proposerClan, out string proposerClanId) ||
             !objectManager.TryGetIdWithLogging(targetKingdom, out string targetKingdomId))
