@@ -11,7 +11,7 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
         [Fact]
         public void SerializeStartAllianceDecision()
         {
-            StartAllianceDecisionData startAllianceDecisionData = new StartAllianceDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "TargetKingdom");
+            StartAllianceDecisionData startAllianceDecisionData = new StartAllianceDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "TargetKingdom", true);
             KingdomDecisionData kingdomDecisionDerivedData = startAllianceDecisionData;
             MemoryStream memoryStream = new MemoryStream();
             Serializer.Serialize(memoryStream, kingdomDecisionDerivedData);
@@ -26,6 +26,7 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(startAllianceDecisionData.NotifyPlayer, deserializedObj.NotifyPlayer);
             Assert.Equal(startAllianceDecisionData.IsEnforced, deserializedObj.IsEnforced);
             Assert.Equal(startAllianceDecisionData.KingdomToStartAllianceWithId, deserializedObj.KingdomToStartAllianceWithId);
+            Assert.True(deserializedObj.IsProposedByOpponent);
         }
 
         [Fact]

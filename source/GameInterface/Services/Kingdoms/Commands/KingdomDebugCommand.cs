@@ -6,9 +6,11 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Handlers;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Newtonsoft.Json;
@@ -21,6 +23,7 @@ using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -41,6 +44,7 @@ public class KingdomDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomDebugCommand>();
     private static PolicyTimeoutFixture pendingPolicyTimeoutFixture;
+    private static AllianceTimeoutFixture pendingAllianceTimeoutFixture;
     private enum CollectionTarget
     {
         Armies,
@@ -394,6 +398,299 @@ public class KingdomDebugCommand
         });
     }
 
+    [CommandLineArgumentFunction("alliance_timeout_capture", "coop.debug.kingdom")]
+    public static string CaptureAllianceTimeoutFixture(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.alliance_timeout_capture";
+        if (pendingAllianceTimeoutFixture != null) return "An alliance-timeout fixture lifecycle is already active.";
+        if (!TryGetObjectManager(out var objectManager) || !TryGetPlayerManager(out var playerManager))
+            return "Unable to resolve alliance-timeout fixture services.";
+        if (!playerManager.TryGetPlayer("testclient", out var player))
+            return "No registered player has controller id 'testclient'.";
+        if (!objectManager.TryGetObject(player.ClanId, out Clan proposerClan) || proposerClan.Kingdom == null)
+            return "The testclient clan is not in a kingdom.";
+
+        Kingdom kingdom = proposerClan.Kingdom;
+        if (kingdom.RulingClan == null) return $"Kingdom {kingdom.StringId} has no ruling clan.";
+        if (kingdom.RulingClan == proposerClan)
+            return "The testclient clan must be a voting supporter under an NPC ruler.";
+        Kingdom targetKingdom = Kingdom.All.SingleOrDefault(candidate =>
+            string.Equals(candidate.StringId, "sturgia", StringComparison.Ordinal));
+        if (targetKingdom == null) return "The Sturgia kingdom is unavailable.";
+        if (targetKingdom == kingdom) return "The testclient clan is already in Sturgia.";
+        if (kingdom.UnresolvedDecisions.Count > 0)
+            return $"Kingdom {kingdom.StringId} already has an unresolved decision.";
+        if (FactionManager.IsAtWarAgainstFaction(kingdom, targetKingdom))
+            return $"Kingdom {kingdom.StringId} is at war with Sturgia.";
+
+        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
+        if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
+        if (allianceBehavior.IsAllyWithKingdom(kingdom, targetKingdom))
+            return $"Kingdom {kingdom.StringId} is already allied with Sturgia.";
+        if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
+            !objectManager.TryGetIdWithLogging(proposerClan, out string proposerClanId) ||
+            !objectManager.TryGetIdWithLogging(targetKingdom, out string targetKingdomId))
+            return "Unable to resolve alliance-timeout fixture ids.";
+
+        return LiveTestJsonResult(new
+        {
+            success = true,
+            controllerId = player.ControllerId,
+            kingdomId,
+            kingdomName = kingdom.Name.ToString(),
+            proposerClanId,
+            targetKingdomId,
+            targetKingdomName = targetKingdom.Name.ToString(),
+            allianceWasActive = false,
+            unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
+        });
+    }
+
+    [CommandLineArgumentFunction("alliance_timeout_stage", "coop.debug.kingdom")]
+    public static string StageAllianceTimeoutFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.alliance_timeout_stage <kingdomId> <proposerClanId> <targetKingdomId>";
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 3) return usage;
+        if (pendingAllianceTimeoutFixture != null) return "An alliance-timeout fixture lifecycle is already active.";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
+        if (!objectManager.TryGetObject(args[1], out Clan proposerClan)) return $"Clan with ID: '{args[1]}' not found";
+        if (!objectManager.TryGetObject(args[2], out Kingdom targetKingdom)) return $"Kingdom with ID: '{args[2]}' not found";
+        if (proposerClan.Kingdom != kingdom) return $"Clan {args[1]} is not in kingdom {args[0]}.";
+        if (kingdom.RulingClan == null || kingdom.RulingClan == proposerClan)
+            return "The testclient clan is no longer a voting supporter under an NPC ruler.";
+        if (kingdom.UnresolvedDecisions.Count > 0)
+            return $"Kingdom {args[0]} no longer has a clean decision fixture.";
+
+        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
+        if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
+        if (allianceBehavior.IsAllyWithKingdom(kingdom, targetKingdom) ||
+            FactionManager.IsAtWarAgainstFaction(kingdom, targetKingdom))
+        {
+            return "The alliance-timeout fixture relationship changed after capture.";
+        }
+
+        var fixture = new AllianceTimeoutFixture(
+            kingdom,
+            proposerClan,
+            targetKingdom,
+            args[0],
+            args[2],
+            false);
+        pendingAllianceTimeoutFixture = fixture;
+
+        var decision = new StartAllianceDecision(fixture.ProposerClan, fixture.TargetKingdom);
+        CoopKingdomElection._opponentProposedAllianceDecisions.Add(decision);
+        fixture.Kingdom.AddDecision(decision, true);
+        decision.TriggerTime = CampaignTime.Zero;
+        CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+
+        int decisionIndex = fixture.Kingdom._unresolvedDecisions.IndexOf(decision) + 1;
+        if (decisionIndex <= 0) return "The alliance-timeout decision was not retained for co-op voting.";
+
+        return LiveTestJsonResult(new
+        {
+            success = true,
+            fixture.KingdomId,
+            fixture.TargetKingdomId,
+            decisionIndex,
+            triggerPast = decision.TriggerTime.IsPast,
+            votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
+        });
+    }
+
+    [CommandLineArgumentFunction("alliance_timeout_state", "coop.debug.kingdom")]
+    public static string GetAllianceTimeoutState(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.alliance_timeout_state <expectedActive>";
+        if (ModInformation.IsServer) return "Command can only be run on a client.";
+        if (args.Count != 1 || !bool.TryParse(args[0], out bool expectedActive)) return usage;
+
+        var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
+        DecisionItemBaseVM decisionItem = kingdomScreen?.DataSource?.Decision?.CurrentDecision;
+        var allianceItem = decisionItem as StartAllianceDecisionItemVM;
+        bool decisionActive = allianceItem?.IsActive ?? false;
+        var allianceDecision = allianceItem?.KingdomDecisionMaker?._decision as StartAllianceDecision;
+        string targetKingdomName = allianceDecision?.KingdomToStartAllianceWith?.Name?.ToString() ?? string.Empty;
+        string decisionTitle = allianceItem?.TitleText ?? string.Empty;
+        bool namesSturgia = string.Equals(targetKingdomName, "Sturgia", StringComparison.OrdinalIgnoreCase) ||
+            decisionTitle.IndexOf("Sturgia", StringComparison.OrdinalIgnoreCase) >= 0;
+        bool hasVotingCountdown = decisionTitle.IndexOf("Voting ends in", StringComparison.OrdinalIgnoreCase) >= 0;
+        bool observedExpectedState = expectedActive
+            ? decisionActive && namesSturgia && hasVotingCountdown
+            : decisionItem == null;
+        if (!observedExpectedState) return LiveTestJsonResult(null);
+
+        return LiveTestJsonResult(new
+        {
+            success = true,
+            expectedActive,
+            kingdomScreenActive = Game.Current?.GameStateManager?.ActiveState is KingdomState,
+            topScreenIsKingdom = kingdomScreen != null,
+            decisionPresent = decisionItem != null,
+            allianceDecisionActive = decisionActive,
+            decisionTitle,
+            targetKingdomName,
+            namesSturgia,
+            hasVotingCountdown,
+            inquiryActive = InformationManager.IsAnyInquiryActive()
+        });
+    }
+
+    [CommandLineArgumentFunction("alliance_timeout_submit_no", "coop.debug.kingdom")]
+    public static string SubmitAllianceTimeoutNoVote(List<string> args)
+    {
+        if (ModInformation.IsServer) return "Command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.kingdom.alliance_timeout_submit_no";
+
+        var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
+        var decisionItem = kingdomScreen?.DataSource?.Decision?.CurrentDecision as StartAllianceDecisionItemVM;
+        if (decisionItem == null || !decisionItem.IsActive) return "No active alliance decision is displayed.";
+
+        DecisionOptionVM noOption = decisionItem.DecisionOptionsList.SingleOrDefault(candidate =>
+            candidate.Option is StartAllianceDecision.StartAllianceDecisionOutcome outcome &&
+            !outcome.ShouldAllianceBeStarted);
+        if (noOption == null) return "The alliance decision has no No option.";
+
+        noOption.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
+        decisionItem._currentSelectedOption = noOption;
+        decisionItem.ExecuteFinalSelection();
+
+        return LiveTestJsonResult(new
+        {
+            success = true,
+            selectedOutcome = "No",
+            finalVoteSubmitted = true
+        });
+    }
+
+    [CommandLineArgumentFunction("alliance_timeout_server_state", "coop.debug.kingdom")]
+    public static string GetAllianceTimeoutServerState(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.alliance_timeout_server_state <kingdomId> <targetKingdomId>";
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 2) return usage;
+        if (!TryMatchPendingAllianceTimeoutFixture(args[0], args[1], false, out var fixture, out string error))
+            return error;
+
+        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
+        if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
+        bool decisionPresent = HasMatchingAllianceDecision(fixture);
+        bool allianceIsActive = allianceBehavior.IsAllyWithKingdom(fixture.Kingdom, fixture.TargetKingdom);
+        return LiveTestJsonResult(new
+        {
+            success = !decisionPresent && !allianceIsActive,
+            fixture.KingdomId,
+            fixture.TargetKingdomId,
+            decisionPresent,
+            allianceIsActive,
+            unresolvedDecisionCount = fixture.Kingdom.UnresolvedDecisions.Count
+        });
+    }
+
+    [CommandLineArgumentFunction("alliance_timeout_restore", "coop.debug.kingdom")]
+    public static string RestoreAllianceTimeoutFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.alliance_timeout_restore <kingdomId> <targetKingdomId> <allianceWasActive>";
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 3 || !bool.TryParse(args[2], out bool allianceWasActive)) return usage;
+        if (!TryMatchPendingAllianceTimeoutFixture(args[0], args[1], allianceWasActive, out var fixture, out string error))
+            return error;
+
+        foreach (StartAllianceDecision decision in fixture.Kingdom.UnresolvedDecisions
+            .OfType<StartAllianceDecision>()
+            .Where(candidate => candidate.KingdomToStartAllianceWith == fixture.TargetKingdom)
+            .ToList())
+        {
+            fixture.Kingdom.RemoveDecision(decision);
+            CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(decision);
+        }
+
+        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
+        if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
+        bool allianceIsActive = allianceBehavior.IsAllyWithKingdom(fixture.Kingdom, fixture.TargetKingdom);
+        if (fixture.AllianceWasActive && !allianceIsActive)
+        {
+            allianceBehavior.StartAlliance(fixture.Kingdom, fixture.TargetKingdom);
+        }
+        else if (!fixture.AllianceWasActive && allianceIsActive)
+        {
+            allianceBehavior.EndAlliance(fixture.Kingdom, fixture.TargetKingdom);
+        }
+
+        pendingAllianceTimeoutFixture = null;
+        return LiveTestJsonResult(new
+        {
+            success = true,
+            fixture.KingdomId,
+            fixture.TargetKingdomId,
+            restoredAllianceActive = allianceBehavior.IsAllyWithKingdom(fixture.Kingdom, fixture.TargetKingdom),
+            unresolvedDecisionCount = fixture.Kingdom.UnresolvedDecisions.Count
+        });
+    }
+
+    [CommandLineArgumentFunction("alliance_timeout_verify", "coop.debug.kingdom")]
+    public static string VerifyAllianceTimeoutFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.kingdom.alliance_timeout_verify <kingdomId> <targetKingdomId> <allianceWasActive>";
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (args.Count != 3 || !bool.TryParse(args[2], out bool allianceWasActive)) return usage;
+        if (pendingAllianceTimeoutFixture != null) return "The alliance-timeout fixture lifecycle is still active.";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
+        if (!objectManager.TryGetObject(args[1], out Kingdom targetKingdom)) return $"Kingdom with ID: '{args[1]}' not found";
+
+        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
+        if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
+        bool allianceIsActive = allianceBehavior.IsAllyWithKingdom(kingdom, targetKingdom);
+        bool decisionPresent = kingdom.UnresolvedDecisions
+            .OfType<StartAllianceDecision>()
+            .Any(decision => decision.KingdomToStartAllianceWith == targetKingdom);
+        bool success = allianceIsActive == allianceWasActive && !decisionPresent &&
+            kingdom.UnresolvedDecisions.Count == 0;
+        return LiveTestJsonResult(new
+        {
+            success,
+            kingdomId = args[0],
+            targetKingdomId = args[1],
+            expectedAllianceActive = allianceWasActive,
+            allianceIsActive,
+            decisionPresent,
+            unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
+        });
+    }
+
+    private static bool TryMatchPendingAllianceTimeoutFixture(
+        string kingdomId,
+        string targetKingdomId,
+        bool allianceWasActive,
+        out AllianceTimeoutFixture fixture,
+        out string error)
+    {
+        fixture = pendingAllianceTimeoutFixture;
+        error = string.Empty;
+        if (fixture == null)
+        {
+            error = "No alliance-timeout fixture has been captured.";
+            return false;
+        }
+        if (fixture.KingdomId != kingdomId || fixture.TargetKingdomId != targetKingdomId ||
+            fixture.AllianceWasActive != allianceWasActive)
+        {
+            error = "The alliance-timeout fixture arguments do not match the captured state.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool HasMatchingAllianceDecision(AllianceTimeoutFixture fixture) =>
+        fixture.Kingdom.UnresolvedDecisions
+            .OfType<StartAllianceDecision>()
+            .Any(decision => decision.KingdomToStartAllianceWith == fixture.TargetKingdom);
+
     private static bool TryMatchPendingPolicyTimeoutFixture(
         string kingdomId,
         string proposerClanId,
@@ -419,8 +716,36 @@ public class KingdomDebugCommand
         return true;
     }
 
-    private static string PolicyTimeoutJsonResult(object value) =>
+    private static string LiveTestJsonResult(object value) =>
         "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
+
+    private static string PolicyTimeoutJsonResult(object value) => LiveTestJsonResult(value);
+
+    private sealed class AllianceTimeoutFixture
+    {
+        public Kingdom Kingdom { get; }
+        public Clan ProposerClan { get; }
+        public Kingdom TargetKingdom { get; }
+        public string KingdomId { get; }
+        public string TargetKingdomId { get; }
+        public bool AllianceWasActive { get; }
+
+        public AllianceTimeoutFixture(
+            Kingdom kingdom,
+            Clan proposerClan,
+            Kingdom targetKingdom,
+            string kingdomId,
+            string targetKingdomId,
+            bool allianceWasActive)
+        {
+            Kingdom = kingdom;
+            ProposerClan = proposerClan;
+            TargetKingdom = targetKingdom;
+            KingdomId = kingdomId;
+            TargetKingdomId = targetKingdomId;
+            AllianceWasActive = allianceWasActive;
+        }
+    }
 
     private sealed class PolicyTimeoutFixture
     {

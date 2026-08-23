@@ -8,6 +8,7 @@ using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Alliances.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
@@ -26,12 +27,15 @@ using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
+using Moq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -1046,6 +1050,38 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void KingdomDecisionUi_DecisionRemovedBeforeRegistration_ClosesLateModal()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+            PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
+            var decision = new KingdomPolicyDecision(proposerClan, policy, false);
+
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(decision);
+                kingdom._unresolvedDecisions.Remove(decision);
+            }
+
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.Empty(GetVoteManager(client).GetDecisionDebugInfo(kingdom));
+        });
+    }
+
+    [Fact]
     public void KingdomDecisionResolution_DoesNotReopenBeforeRemovalApplies()
     {
         var client = Clients.First();
@@ -1419,7 +1455,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void NpcPeaceOffer_TargetingPlayerKingdom_ExpiresAsDeclined()
+    public void NpcPeaceOffer_TargetingPlayerKingdom_WaitsForVotingDeadlineThenDeclines()
     {
         var player = CreateSyncedPlayerContext(ControllerId, Clients.First());
         var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
@@ -1450,11 +1486,268 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
 
+            Assert.Same(playerDecision, Assert.Single(playerKingdom.UnresolvedDecisions));
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
+
+            GetConcreteVoteManager(Server).ProcessVotingRounds(
+                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
+
             Assert.Empty(playerKingdom.UnresolvedDecisions);
             Assert.True(FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+    }
+
+    [Fact]
+    public void NpcAllianceOffer_TargetingPlayerKingdom_WaitsForVotingDeadlineThenDeclines()
+    {
+        var player = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        ConfigureClanInKingdom(proposingClanId, proposingKingdomId);
+        EnsureKingdomRegisteredEverywhere(playerKingdomId);
+        EnsureKingdomRegisteredEverywhere(proposingKingdomId);
+        ConfigureKingdomCultureEverywhere(playerKingdomId, player.CultureId);
+        ConfigureAllianceModelEverywhere();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(proposingKingdomId, out var proposingKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(proposingClanId, out var proposingClan));
+
+            var npcDecision = new StartAllianceDecision(proposingClan, playerKingdom);
+            var allianceOutcome = npcDecision.DetermineInitialCandidates()
+                .OfType<StartAllianceDecision.StartAllianceDecisionOutcome>()
+                .Single(outcome => outcome.ShouldAllianceBeStarted);
+            Assert.True(CoopKingdomElection.TryRedirectPlayerAllianceOffer(npcDecision, allianceOutcome));
+
+            var playerDecision = Assert.IsType<StartAllianceDecision>(
+                Assert.Single(playerKingdom.UnresolvedDecisions));
+            playerDecision.TriggerTime = CampaignTime.Zero;
+
+            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+
+            Assert.Same(playerDecision, Assert.Single(playerKingdom.UnresolvedDecisions));
+            Assert.Contains(playerDecision, CoopKingdomElection._opponentProposedAllianceDecisions);
+
+            GetConcreteVoteManager(Server).ProcessVotingRounds(
+                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
+
+            Assert.Empty(playerKingdom.UnresolvedDecisions);
+            Assert.DoesNotContain(playerDecision, CoopKingdomElection._opponentProposedAllianceDecisions);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+    }
+
+    [Fact]
+    public void NpcAllianceOffer_ReloadedBeforeVotingDeadline_StillDeclines()
+    {
+        var player = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        ConfigureClanInKingdom(proposingClanId, proposingKingdomId);
+        EnsureKingdomRegisteredEverywhere(playerKingdomId);
+        EnsureKingdomRegisteredEverywhere(proposingKingdomId);
+        ConfigureKingdomCultureEverywhere(playerKingdomId, player.CultureId);
+        ConfigureAllianceModelEverywhere();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(proposingKingdomId, out var proposingKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(proposingClanId, out var proposingClan));
+
+            var outgoingDecision = new StartAllianceDecision(playerKingdom.RulingClan, proposingKingdom);
+            Assert.True(CoopKingdomElection.IsPlayerAllianceDecision(outgoingDecision));
+            Assert.False(CoopKingdomElection.IsPendingPlayerAllianceOffer(outgoingDecision));
+
+            var npcDecision = new StartAllianceDecision(proposingClan, playerKingdom);
+            var allianceOutcome = npcDecision.DetermineInitialCandidates()
+                .OfType<StartAllianceDecision.StartAllianceDecisionOutcome>()
+                .Single(outcome => outcome.ShouldAllianceBeStarted);
+            Assert.True(CoopKingdomElection.TryRedirectPlayerAllianceOffer(npcDecision, allianceOutcome));
+
+            var playerDecision = Assert.IsType<StartAllianceDecision>(
+                Assert.Single(playerKingdom.UnresolvedDecisions));
+            playerDecision.TriggerTime = CampaignTime.Zero;
+
+            var saveRecords = new Dictionary<string, object>();
+            CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
+                new TestDataStore(isSaving: true, saveRecords));
+            CoopKingdomElection._opponentProposedAllianceDecisions.Clear();
+            CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
+                new TestDataStore(isSaving: false, saveRecords));
+
+            Assert.Contains(playerDecision, CoopKingdomElection._opponentProposedAllianceDecisions);
+            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+            GetConcreteVoteManager(Server).ProcessVotingRounds(
+                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
+
+            Assert.Empty(playerKingdom.UnresolvedDecisions);
+            Assert.DoesNotContain(playerDecision, CoopKingdomElection._opponentProposedAllianceDecisions);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+    }
+
+    [Fact]
+    public void NpcAllianceOffer_LegacyReloadWithoutProvenance_StillDeclines()
+    {
+        var player = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        ConfigureClanInKingdom(proposingClanId, proposingKingdomId);
+        EnsureKingdomRegisteredEverywhere(playerKingdomId);
+        EnsureKingdomRegisteredEverywhere(proposingKingdomId);
+        ConfigureKingdomCultureEverywhere(playerKingdomId, player.CultureId);
+        ConfigureAllianceModelEverywhere();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(proposingClanId, out var proposingClan));
+
+            var npcDecision = new StartAllianceDecision(proposingClan, playerKingdom);
+            var allianceOutcome = npcDecision.DetermineInitialCandidates()
+                .OfType<StartAllianceDecision.StartAllianceDecisionOutcome>()
+                .Single(outcome => outcome.ShouldAllianceBeStarted);
+            Assert.True(CoopKingdomElection.TryRedirectPlayerAllianceOffer(npcDecision, allianceOutcome));
+
+            var playerDecision = Assert.IsType<StartAllianceDecision>(
+                Assert.Single(playerKingdom.UnresolvedDecisions));
+            playerDecision.TriggerTime = CampaignTime.Zero;
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(ControllerId, out var registeredPlayer));
+            Assert.True(playerManager.RemovePlayer(registeredPlayer));
+
+            CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
+                new TestDataStore(isSaving: false, new Dictionary<string, object>()));
+
+            Assert.DoesNotContain(playerDecision, CoopKingdomElection._opponentProposedAllianceDecisions);
+            Assert.False(CoopKingdomElection.IsPendingPlayerAllianceOffer(playerDecision));
+            var resavedRecords = new Dictionary<string, object>();
+            CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
+                new TestDataStore(isSaving: true, resavedRecords));
+            Assert.Empty(resavedRecords);
+            CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
+                new TestDataStore(isSaving: false, resavedRecords));
+            Assert.True(playerManager.AddPlayer(registeredPlayer));
+            Assert.True(CoopKingdomElection.IsPendingPlayerAllianceOffer(playerDecision));
+            Assert.True(playerDecision.OnShowDecision());
+            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+            GetConcreteVoteManager(Server).ProcessVotingRounds(
+                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
+
+            Assert.Empty(playerKingdom.UnresolvedDecisions);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+    }
+
+    [Fact]
+    public void NpcAllianceOffer_TargetingPlayerKingdom_NoVoteClosesDecisionWithoutAlliance()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var playerKingdomNpcClanId = CreateSyncedNpcClan();
+        var proposingClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(playerKingdomNpcClanId, playerKingdomId);
+        ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        ConfigureClanInKingdom(proposingClanId, proposingKingdomId);
+        EnsureKingdomRegisteredEverywhere(playerKingdomId);
+        EnsureKingdomRegisteredEverywhere(proposingKingdomId);
+        ConfigureKingdomCultureEverywhere(playerKingdomId, player.CultureId);
+        ConfigureAllianceModelEverywhere();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(proposingClanId, out var proposingClan));
+
+            var npcDecision = new StartAllianceDecision(proposingClan, playerKingdom);
+            Assert.False(npcDecision.OnShowDecision());
+            var allianceOutcome = npcDecision.DetermineInitialCandidates()
+                .OfType<StartAllianceDecision.StartAllianceDecisionOutcome>()
+                .Single(outcome => outcome.ShouldAllianceBeStarted);
+            Assert.True(CoopKingdomElection.TryRedirectPlayerAllianceOffer(npcDecision, allianceOutcome));
+
+            var playerDecision = Assert.IsType<StartAllianceDecision>(
+                Assert.Single(playerKingdom.UnresolvedDecisions));
+            playerDecision.TriggerTime = CampaignTime.Zero;
+            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+
+            Assert.Same(playerDecision, Assert.Single(playerKingdom.UnresolvedDecisions));
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+
+        StartAllianceDecision clientAllianceDecision = null;
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var playerParty));
+            using (new AllowedThread())
+            {
+                playerParty._partyComponent = new LordPartyComponent(playerHero, playerHero, null);
+            }
+            var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(playerKingdom.UnresolvedDecisions));
+            clientAllianceDecision = decision;
+            Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
+            Assert.NotSame(Clan.PlayerClan, decision.DetermineChooser());
+            Assert.True(new KingdomElection(decision).IsPlayerSupporter);
+            Assert.False(decision.IsSingleClanDecision());
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartAlliance>());
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+
+            DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
+            DecisionOptionVM noOption = decisionItem.DecisionOptionsList.Single(candidate =>
+                candidate.Option is StartAllianceDecision.StartAllianceDecisionOutcome outcome &&
+                !outcome.ShouldAllianceBeStarted);
+            noOption.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
+            decisionItem._currentSelectedOption = noOption;
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartAlliance>());
+
+            decisionItem.ExecuteFinalSelection();
+
+            NetworkRequestKingdomDecisionVote finalVote = Assert.Single(
+                client.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>(),
+                message => message.VoteData.IsFinal);
+            Assert.EndsWith("=False", finalVote.VoteData.OutcomeKey);
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartAlliance>());
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.False(decisionItem.IsActive);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.Empty(playerKingdom.UnresolvedDecisions);
+        });
+        NetworkKingdomDecisionResolved resolved = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+        Assert.EndsWith("=False", resolved.OutcomeKey);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+        Assert.False(CoopKingdomElection.IsTrackedPlayerAllianceOffer(clientAllianceDecision));
     }
 
     [Fact]
@@ -3478,6 +3771,63 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
+    private void ConfigureAllianceModelEverywhere()
+    {
+        ConfigureAllianceModel(Server);
+        foreach (var client in Clients)
+        {
+            ConfigureAllianceModel(client);
+        }
+    }
+
+    private static void ConfigureAllianceModel(EnvironmentInstance instance)
+    {
+        instance.Call(() =>
+        {
+            var allianceModel = new Mock<AllianceModel>();
+            allianceModel
+                .Setup(model => model.GetSupportScoreOfStartingAllianceForClan(
+                    It.IsAny<Kingdom>(),
+                    It.IsAny<Kingdom>(),
+                    It.IsAny<Clan>(),
+                    out It.Ref<TextObject>.IsAny,
+                    It.IsAny<bool>()))
+                .Returns(0f);
+            allianceModel
+                .Setup(model => model.CanMakeAlliance(
+                    It.IsAny<Kingdom>(),
+                    It.IsAny<Kingdom>(),
+                    It.IsAny<IFaction>(),
+                    out It.Ref<TextObject>.IsAny,
+                    It.IsAny<bool>()))
+                .Returns(true);
+            allianceModel
+                .Setup(model => model.GetInfluenceCostOfProposingStartingAlliance(It.IsAny<Clan>()))
+                .Returns(0);
+
+            Campaign.Current.Models.AllianceModel = allianceModel.Object;
+        });
+    }
+
+    private void ConfigureKingdomCultureEverywhere(string kingdomId, string cultureId)
+    {
+        ConfigureKingdomCulture(Server, kingdomId, cultureId);
+        foreach (var client in Clients)
+        {
+            ConfigureKingdomCulture(client, kingdomId, cultureId);
+        }
+    }
+
+    private static void ConfigureKingdomCulture(EnvironmentInstance instance, string kingdomId, string cultureId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(cultureId, out var culture));
+            kingdom.Culture = culture;
+        });
+    }
+
     /// <summary>
     /// The debug create command inherits the new kingdom's culture from the ruling clan, which the shared
     /// player context leaves unset.
@@ -3582,6 +3932,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 hero.Clan = clan;
                 clan.SetLeader(hero);
                 character.HeroObject = hero;
+                hero._characterObject = character;
                 if (setAsMainHero)
                 {
                     Game.Current.PlayerTroop = character;
@@ -3716,4 +4067,31 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string PartyId,
         string CharacterId,
         string CultureId);
+
+    private sealed class TestDataStore : IDataStore
+    {
+        private readonly Dictionary<string, object> records;
+
+        public bool IsSaving { get; }
+        public bool IsLoading => !IsSaving;
+
+        public TestDataStore(bool isSaving, Dictionary<string, object> records)
+        {
+            IsSaving = isSaving;
+            this.records = records;
+        }
+
+        public bool SyncData<T>(string key, ref T data)
+        {
+            if (IsSaving)
+            {
+                records[key] = data;
+                return true;
+            }
+
+            if (!records.TryGetValue(key, out object value)) return false;
+            data = (T)value;
+            return true;
+        }
+    }
 }
