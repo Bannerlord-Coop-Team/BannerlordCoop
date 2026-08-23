@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Actions.Messages;
+using GameInterface.Services.SiegeEvents;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -22,15 +23,50 @@ internal class DisbandArmyActionPatches
 {
     [HarmonyPatch(typeof(DisbandArmyAction), nameof(DisbandArmyAction.ApplyInternal))]
     [HarmonyPrefix]
-    private static bool ApplyInternalPrefix(Army army, Army.ArmyDispersionReason reason)
+    private static bool ApplyInternalPrefix(
+        Army army,
+        Army.ArmyDispersionReason reason,
+        out AiSiegeTerminalTransitionState __state)
     {
-        if (ModInformation.IsServer) return true;
+        __state = default;
+        if (ModInformation.IsServer)
+        {
+            if (reason == Army.ArmyDispersionReason.FoodProblem)
+            {
+                var leader = army?.LeaderParty;
+                var siegeEvent = leader?.SiegeEvent;
+                if (leader != null && siegeEvent != null)
+                {
+                    __state = new AiSiegeTerminalTransitionState(leader, siegeEvent);
+                }
+            }
+
+            return true;
+        }
+
         if (reason == Army.ArmyDispersionReason.DismissalRequestedWithInfluence)
         {
             var message = new DisbandArmyApplyInternal(army, MobileParty.MainParty);
             MessageBroker.Instance.Publish(army, message);
         }
         return false;
+    }
+
+    [HarmonyPatch(typeof(DisbandArmyAction), nameof(DisbandArmyAction.ApplyInternal))]
+    [HarmonyPostfix]
+    private static void ApplyInternalPostfix(
+        Army.ArmyDispersionReason reason,
+        AiSiegeTerminalTransitionState __state)
+    {
+        if (ModInformation.IsClient
+            || reason != Army.ArmyDispersionReason.FoodProblem
+            || !__state.IsValid
+            || !ContainerProvider.TryResolve<IAiSiegeTerminalPolicy>(out var terminalPolicy))
+        {
+            return;
+        }
+
+        terminalPolicy.ResolveFoodProblem(__state);
     }
     
     public static void DisbandArmyApplyInternal(Army army, MobileParty clientParty)

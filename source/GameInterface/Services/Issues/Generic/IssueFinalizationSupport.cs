@@ -30,51 +30,8 @@ internal static class IssueFinalizationSupport
             var quest = owner.Issue.IssueQuest;
             if (quest != null && quest.IsOngoing)
             {
-                switch (reason)
-                {
-                    case IssueFinalizeReason.QuestSuccess:
-                        var applyConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestSuccessConsequence;
-                        if (applyConsequence != null)
-                        {
-                            applyConsequence(quest);
-                        }
-                        else
-                        {
-                            quest.CompleteQuestWithSuccess();
-                        }
-                        return;
-                    case IssueFinalizeReason.QuestCancel:
-                        var applyCancelConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestCancelConsequence;
-                        if (applyCancelConsequence != null)
-                        {
-                            applyCancelConsequence(quest);
-                        }
-                        else
-                        {
-                            quest.CompleteQuestWithCancel();
-                        }
-                        return;
-                    case IssueFinalizeReason.QuestFail:
-                        var applyFailConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence;
-                        if (applyFailConsequence != null)
-                        {
-                            applyFailConsequence(quest);
-                        }
-                        else
-                        {
-                            quest.CompleteQuestWithFail();
-                        }
-                        return;
-                    case IssueFinalizeReason.QuestTimeout:
-                        quest.CompleteQuestWithTimeOut();
-                        return;
-                    case IssueFinalizeReason.QuestBetrayal:
-                        quest.CompleteQuestWithBetrayal();
-                        return;
-                    default:
-                        quest.CompleteQuestWithCancel();
-                        return;
-                }
+                ApplyOngoingQuestFinalize(owner, quest, reason, skipConsequenceReapplication);
+                return;
             }
 
             if (reason == IssueFinalizeReason.RejectedAccept)
@@ -84,6 +41,47 @@ internal static class IssueFinalizationSupport
             }
 
             owner.Issue.IssueFinalized();
+        }
+    }
+
+    private static void ApplyOngoingQuestFinalize(Hero owner, QuestBase quest, IssueFinalizeReason reason, bool skipConsequenceReapplication)
+    {
+        switch (reason)
+        {
+            case IssueFinalizeReason.QuestSuccess:
+                var applyConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestSuccessConsequence;
+                RunConsequenceOrFallback(applyConsequence, quest, quest.CompleteQuestWithSuccess);
+                return;
+            case IssueFinalizeReason.QuestCancel:
+                var applyCancelConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestCancelConsequence;
+                RunConsequenceOrFallback(applyCancelConsequence, quest, () => quest.CompleteQuestWithCancel());
+                return;
+            case IssueFinalizeReason.QuestFail:
+                var applyFailConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence;
+                RunConsequenceOrFallback(applyFailConsequence, quest, () => quest.CompleteQuestWithFail());
+                return;
+            case IssueFinalizeReason.QuestTimeout:
+                quest.CompleteQuestWithTimeOut();
+                return;
+            case IssueFinalizeReason.QuestBetrayal:
+                var applyBetrayalConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestBetrayalConsequence;
+                RunConsequenceOrFallback(applyBetrayalConsequence, quest, () => quest.CompleteQuestWithBetrayal());
+                return;
+            default:
+                quest.CompleteQuestWithCancel();
+                return;
+        }
+    }
+
+    private static void RunConsequenceOrFallback(Action<QuestBase> consequence, QuestBase quest, Action fallback)
+    {
+        if (consequence != null)
+        {
+            consequence(quest);
+        }
+        else
+        {
+            fallback();
         }
     }
 }

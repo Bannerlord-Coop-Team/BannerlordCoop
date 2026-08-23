@@ -42,12 +42,89 @@ public class NetworkAgentRegistryTests
         Assert.True(registry.TryGetAgentInfo(id, out var before));
         Assert.Equal("host", before.CurrentAuthority);
         Assert.Equal("host", before.OriginalOwner);
+        Assert.Equal(0, before.AuthorityRevision);
 
         Assert.True(registry.TryTransferAuthority("me", id));
 
         Assert.True(registry.TryGetAgentInfo(id, out var after));
         Assert.Equal("me", after.CurrentAuthority);   // authority moved to the successor
         Assert.Equal("host", after.OriginalOwner);     // original owner is preserved
+        Assert.Equal(1, after.AuthorityRevision);
+    }
+
+    [Fact]
+    public void CatchUpRegistration_PreservesAuthorityRevisionAcrossNextTransfer()
+    {
+        var registry = NewRegistry(localControllerId: "successor");
+        var agent = ObjectHelper.SkipConstructor<Agent>();
+        Guid agentId = Guid.NewGuid();
+
+        Assert.True(registry.TryRegisterAgent(
+            "current", "origin", "origin:epoch-1", agentId, 42, agent,
+            authorityRevision: 4));
+
+        Assert.True(registry.TryGetAgentInfo(agentId, out var caughtUp));
+        Assert.Equal(4, caughtUp.AuthorityRevision);
+
+        Assert.True(registry.TryTransferAuthority("successor", agentId));
+
+        Assert.True(registry.TryGetAgentInfo(agentId, out var transferred));
+        Assert.Equal("successor", transferred.CurrentAuthority);
+        Assert.Equal(5, transferred.AuthorityRevision);
+    }
+
+    [Fact]
+    public void AuthoritativeMigrationRevision_ConvergesExistingAndRejoinedRegistries()
+    {
+        var existing = NewRegistry(localControllerId: "observer");
+        var rejoined = NewRegistry(localControllerId: "rejoined");
+        Guid agentId = Guid.NewGuid();
+
+        Assert.True(existing.TryRegisterAgent(
+            "host-a", "host-a", "host-a:epoch-1", agentId, 7,
+            ObjectHelper.SkipConstructor<Agent>()));
+        Assert.True(existing.TryTransferAuthority("host-b", agentId, authorityRevision: 1));
+
+        Assert.True(rejoined.TryRegisterAgent(
+            "host-b", "host-a", "host-a:epoch-1", agentId, 7,
+            ObjectHelper.SkipConstructor<Agent>(), authorityRevision: 1));
+
+        Assert.True(existing.TryTransferAuthority("host-c", agentId, authorityRevision: 2));
+        Assert.True(rejoined.TryTransferAuthority("host-c", agentId, authorityRevision: 2));
+
+        Assert.True(existing.TryGetAgentInfo(agentId, out var existingInfo));
+        Assert.True(rejoined.TryGetAgentInfo(agentId, out var rejoinedInfo));
+        Assert.Equal("host-c", existingInfo.CurrentAuthority);
+        Assert.Equal("host-c", rejoinedInfo.CurrentAuthority);
+        Assert.Equal(2, existingInfo.AuthorityRevision);
+        Assert.Equal(2, rejoinedInfo.AuthorityRevision);
+    }
+
+    [Fact]
+    public void DelayedOldHostRecord_AfterTwoMigrations_ConvergesPromotedAndObserverRegistries()
+    {
+        var promoted = NewRegistry(localControllerId: "host-c");
+        var observer = NewRegistry(localControllerId: "observer");
+        Guid agentId = Guid.NewGuid();
+
+        Assert.True(promoted.TryRegisterAgent(
+            "host-b", "host-a", "host-a:epoch-1", agentId, 7,
+            ObjectHelper.SkipConstructor<Agent>(), authorityRevision: 0));
+        Assert.True(observer.TryRegisterAgent(
+            "host-b", "host-a", "host-a:epoch-1", agentId, 7,
+            ObjectHelper.SkipConstructor<Agent>(), authorityRevision: 0));
+
+        Assert.True(promoted.TryTransferAuthority("host-c", agentId, authorityRevision: 2));
+        Assert.True(observer.TryTransferAuthority("host-c", agentId, authorityRevision: 2));
+
+        Assert.True(promoted.TryGetAgentInfo(agentId, out var promotedInfo));
+        Assert.True(observer.TryGetAgentInfo(agentId, out var observerInfo));
+        Assert.Equal("host-c", promotedInfo.CurrentAuthority);
+        Assert.Equal("host-c", observerInfo.CurrentAuthority);
+        Assert.Equal(2, promotedInfo.AuthorityRevision);
+        Assert.Equal(2, observerInfo.AuthorityRevision);
+        Assert.True(promoted.IsLocallyControlled(agentId));
+        Assert.False(observer.IsLocallyControlled(agentId));
     }
 
     [Fact]

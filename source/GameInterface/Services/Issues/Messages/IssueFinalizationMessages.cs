@@ -50,14 +50,14 @@ public readonly struct RequestIssueRemoved : ICommand
     [ProtoMember(3)]
     public readonly int Generation;
     [ProtoMember(4)]
-    public readonly byte SuccessProof;
+    public readonly byte Proof;
 
-    public RequestIssueRemoved(string ownerId, IssueFinalizeReason reason, int generation, byte successProof = 0)
+    public RequestIssueRemoved(string ownerId, IssueFinalizeReason reason, int generation, byte proof = 0)
     {
         OwnerId = ownerId;
         Reason = reason;
         Generation = generation;
-        SuccessProof = successProof;
+        Proof = proof;
     }
 }
 
@@ -68,10 +68,13 @@ public readonly struct NetworkIssueRemoved : IServerToClientCommand
     public readonly string OwnerId;
     [ProtoMember(2)]
     public readonly IssueFinalizeReason Reason;
+    [ProtoMember(3)]
+    public readonly byte Proof;
 
-    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason)
+    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0)
     {
         OwnerId = ownerId;
         Reason = reason;
+        Proof = proof;
     }
 }

@@ -248,6 +248,29 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         _appliedAllocationRevision = MatchingAllocationRevision(defenderSnapshot.Revision, attackerSnapshot.Revision);
     }
 
+    internal BattleSizeState CaptureBattleSizeState()
+    {
+        SideSizing sizing = ReadSizing();
+        var settings = CreateSandBoxBattleWaveSpawnSettings();
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            sizing.DefenderOwned,
+            sizing.AttackerOwned,
+            sizing.BattleSize,
+            settings.MaximumBattleSideRatio,
+            settings.DefenderAdvantageFactor);
+        var defenderSnapshot = _defenderSupplier.CaptureAllocationSnapshot();
+        var attackerSnapshot = _attackerSupplier.CaptureAllocationSnapshot();
+
+        return new BattleSizeState(
+            _sized,
+            sizing.DefenderOwned,
+            sizing.AttackerOwned,
+            sizing.BattleSize,
+            targets.Defenders,
+            targets.Attackers,
+            MatchingAllocationRevision(defenderSnapshot.Revision, attackerSnapshot.Revision));
+    }
+
     // Reserve refreshes are sent as a reliable-ordered pair. Wait until both suppliers advanced, then resize
     // only the unspent lifetime quota; InitialSpawnNumber/InitialSpawnedNumber keep deployment one-shot.
     private void ReconcileRefreshedAllocation()
@@ -457,5 +480,34 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         /// <summary>Whether a timeout can safely degrade to a one-sided sizing instead of empty/empty.</summary>
         public bool HasAnyOwnedTroops => DefenderOwned + AttackerOwned > 0;
+    }
+
+    internal readonly struct BattleSizeState
+    {
+        public readonly bool IsSized;
+        public readonly int DefenderTotal;
+        public readonly int AttackerTotal;
+        public readonly int BattleSize;
+        public readonly int DefenderTarget;
+        public readonly int AttackerTarget;
+        public readonly long AllocationRevision;
+
+        public BattleSizeState(
+            bool isSized,
+            int defenderTotal,
+            int attackerTotal,
+            int battleSize,
+            int defenderTarget,
+            int attackerTarget,
+            long allocationRevision)
+        {
+            IsSized = isSized;
+            DefenderTotal = defenderTotal;
+            AttackerTotal = attackerTotal;
+            BattleSize = battleSize;
+            DefenderTarget = defenderTarget;
+            AttackerTarget = attackerTarget;
+            AllocationRevision = allocationRevision;
+        }
     }
 }

@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
@@ -77,6 +77,43 @@ public class LocationHostElectionTests : LocationHostTestEnvironment
 
         AssertIsLocalLocationHost(clients[1], instanceId, true);
         Assert.Equal(2, GetLocationEpoch(Server, instanceId));
+    }
+
+    [Fact]
+    public void TwoHostMigrations_WithRejoin_BroadcastMonotonicAuthorityRevision()
+    {
+        var (instanceId, _) = SetupSettlementLocation("A", "B", "C");
+        var clients = Clients.ToArray();
+        LocationHostMigrated transitionOnA = null;
+        LocationHostMigrated transitionOnC = null;
+
+        clients[0].Call(() => clients[0].Resolve<IMessageBroker>()
+            .Subscribe<LocationHostMigrated>(payload => transitionOnA = payload.What));
+        clients[2].Call(() => clients[2].Resolve<IMessageBroker>()
+            .Subscribe<LocationHostMigrated>(payload => transitionOnC = payload.What));
+
+        foreach (var client in clients)
+            MakeLocationMissionReady(client, instanceId);
+
+        DepartBattle("A", instanceId, wasRetreat: true);
+
+        Assert.NotNull(transitionOnC);
+        Assert.Equal("A", transitionOnC.PreviousHostControllerId);
+        Assert.Equal("B", transitionOnC.NewHostControllerId);
+        Assert.Equal(1, transitionOnC.AuthorityRevision);
+
+        MakeLocationMissionReady(clients[0], instanceId);
+        transitionOnA = null;
+        transitionOnC = null;
+
+        DepartBattle("B", instanceId, wasRetreat: true);
+
+        Assert.NotNull(transitionOnA);
+        Assert.NotNull(transitionOnC);
+        Assert.Equal("C", transitionOnA.NewHostControllerId);
+        Assert.Equal(2, transitionOnA.AuthorityRevision);
+        Assert.Equal("C", transitionOnC.NewHostControllerId);
+        Assert.Equal(2, transitionOnC.AuthorityRevision);
     }
 
     [Fact]

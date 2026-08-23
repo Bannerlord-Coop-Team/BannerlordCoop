@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
 using SandBox;
@@ -67,7 +68,16 @@ internal class GameStateInterface : IGameStateInterface
         }
 
         ISaveDriver driver = new CoopInMemSaveDriver(saveData);
-        LoadResult loadResult = SaveManager.Load("", driver, loadAsLateInitialize: true);
+        LoadResult loadResult;
+
+        // SaveManager fills objects on NativeParallelDriver workers. A normal AllowedThread scope only
+        // affects this game thread, leaving AutoSync patches active on those workers. Keep every
+        // CallOriginalPolicy-gated patch on its original path until the synchronous load joins its workers.
+        using (CallOriginalPolicy.AllowOriginalsOnAllThreads())
+        {
+            loadResult = SaveManager.Load("", driver, loadAsLateInitialize: true);
+        }
+
         var loadedGame = (Game)loadResult.Root;
         var loadedCampaign = (Campaign)loadedGame.GameType;
         ClearTransferredMapNotices(loadedCampaign.CampaignInformationManager);

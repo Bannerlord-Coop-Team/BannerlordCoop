@@ -60,18 +60,11 @@ public class HeroHitPointsHandler : IHandler
 
         // Setting Hero.HitPoints runs the server-side property-sync intercept; defer it to the
         // game-loop thread so the value change (and its replication) fire on the main thread.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
 
-                hero.HitPoints = data.HitPoints;
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply NetworkHeroHitPointsChangeRequest");
-            }
+            hero.HitPoints = data.HitPoints;
         });
     }
 }

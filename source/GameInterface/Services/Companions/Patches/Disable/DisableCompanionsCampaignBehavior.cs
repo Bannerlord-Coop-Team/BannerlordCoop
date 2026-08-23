@@ -145,19 +145,23 @@ internal class CompanionsCampaignBehaviorPatches
     }
 
     /// <summary>
-    /// Add a check to allow stuck companions to become fugitive if they didn't properly get released.
+    /// Add a check to allow stuck heroes to become fugitive if they didn't properly get released.
     /// This is primarily for older saves where some players would have companions stuck as prisoners.
     /// </summary>
     [HarmonyPatch(nameof(CompanionsCampaignBehavior.DailyTick))]
     [HarmonyPostfix]
     public static void DailyTickPostfix()
     {
-        foreach (Hero hero in Hero.AllAliveHeroes)
+        RepairStuckHeroes(Hero.AllAliveHeroes, hero => MakeHeroFugitiveAction.Apply(hero, true));
+    }
+
+    internal static void RepairStuckHeroes(IEnumerable<Hero> heroes, Action<Hero> makeHeroFugitive)
+    {
+        foreach (Hero hero in heroes)
         {
-            if (hero.IsWanderer && hero.CompanionOf != null && hero.IsPrisoner && hero.PartyBelongedToAsPrisoner == null)
+            if (hero.IsPrisoner && hero.PartyBelongedToAsPrisoner == null)
             {
-                MakeHeroFugitiveAction.Apply(hero, true);
-                break;
+                makeHeroFugitive(hero);
             }
         }
     }

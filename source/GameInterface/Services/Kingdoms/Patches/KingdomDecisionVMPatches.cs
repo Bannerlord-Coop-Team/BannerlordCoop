@@ -1,5 +1,5 @@
-using GameInterface.Services.Kingdoms.Extentions;
-﻿using Common.Logging;
+﻿using GameInterface.Services.Kingdoms.Extentions;
+using Common.Logging;
 using GameInterface.Services.Clans.Handlers;
 using HarmonyLib;
 using Serilog;
@@ -40,6 +40,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!TryGetVoteManager(out var voteManager)) return;
 
             voteManager.RegisterDecisionItem(__instance.CurrentDecision);
+            KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
         }
 
         [HarmonyPatch(nameof(KingdomDecisionsVM.RefreshWith))]
@@ -49,6 +50,22 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!TryGetVoteManager(out var voteManager)) return;
 
             voteManager.RegisterDecisionItem(__instance.CurrentDecision);
+            KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
+        }
+
+        [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
+        [HarmonyPostfix]
+        private static void OnFrameTickPostfix(KingdomDecisionsVM __instance)
+        {
+            if (!TryGetVoteManager(out var voteManager)) return;
+            DecisionItemBaseVM currentDecision = __instance.CurrentDecision;
+            if (currentDecision == null) return;
+
+            voteManager.RefreshDecisionTitle(currentDecision);
+            string feedback = voteManager.RefreshDecisionWaitingStatus(currentDecision);
+            IReadOnlyList<string> columns = voteManager.GetDecisionWaitingColumns(currentDecision);
+            KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
+            KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, feedback, columns);
         }
 
         internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
@@ -577,7 +594,6 @@ namespace GameInterface.Services.Kingdoms.Patches
             refresher.Refresh(__instance.Faction2);
         }
     }
-
     [HarmonyPatch(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost))]
     internal class GetCallToWarCostPatches
     {
