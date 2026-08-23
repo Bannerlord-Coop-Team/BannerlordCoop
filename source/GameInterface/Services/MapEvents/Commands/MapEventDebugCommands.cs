@@ -1020,8 +1020,6 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.join_existing <mapEventId> <Attacker|Defender>";
         }
 
-        if (PlayerEncounter.Current != null)
-            return "A player encounter is already active.";
         if (!TryGetObjectManager(out var objectManager))
             return "Unable to resolve ObjectManager";
         if (!objectManager.TryGetObjectWithLogging<MapEvent>(args[0], out var mapEvent))
@@ -1029,16 +1027,32 @@ public class MapEventDebugCommands
         if (mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None)
             return $"Map event {args[0]} is already concluded.";
 
+        var encounter = PlayerEncounter.Current;
+        if (encounter != null && PlayerEncounter.Battle != mapEvent)
+            return "A player encounter for another map event is already active.";
+
+        if (encounter?.IsJoinedBattle == true)
+        {
+            if (encounter.PlayerSide != side)
+                return $"The active encounter already joined the {encounter.PlayerSide} side.";
+
+            return $"Started the {side} join encounter for map event {args[0]}.";
+        }
+
         var opposingParty = mapEvent.GetLeaderParty(
             side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
         if (opposingParty == null)
             return $"Map event {args[0]} has no opposing leader party.";
 
-        PlayerEncounter.Start();
-        if (side == BattleSideEnum.Attacker)
-            PlayerEncounter.Current.SetupFields(MobileParty.MainParty.Party, opposingParty);
-        else
-            PlayerEncounter.Current.SetupFields(opposingParty, MobileParty.MainParty.Party);
+        if (encounter == null)
+        {
+            PlayerEncounter.Start();
+            if (side == BattleSideEnum.Attacker)
+                PlayerEncounter.Current.SetupFields(MobileParty.MainParty.Party, opposingParty);
+            else
+                PlayerEncounter.Current.SetupFields(opposingParty, MobileParty.MainParty.Party);
+        }
+
         PlayerEncounter.JoinBattle(side);
 
         return $"Started the {side} join encounter for map event {args[0]}.";
