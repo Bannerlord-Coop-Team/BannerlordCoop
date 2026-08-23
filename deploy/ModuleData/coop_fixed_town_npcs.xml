@@ -462,4 +462,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_7011447e"
+    name="{=!}Keeper"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B4"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="What’s up my homie"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_battania" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.headscarf_d" />
+        <equipment slot="Cape" id="Item.a_aserai_scale_b_shoulder_d" />
+        <equipment slot="Body" id="Item.battanian_scale_armor_b" />
+        <equipment slot="Gloves" id="Item.battania_noble_bracers" />
+        <equipment slot="Leg" id="Item.battania_leather_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
