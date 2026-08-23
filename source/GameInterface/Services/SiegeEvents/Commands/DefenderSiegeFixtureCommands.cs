@@ -788,7 +788,7 @@ internal static class DefenderSiegeFixtureContract
     }
 
     internal static bool IsCleanForCapture(DefenderFixturePartyState state) =>
-        state.IsActive && !state.IsAtSea && state.IsHolding &&
+        state.IsActive && !state.IsAtSea &&
         !state.HasMapEvent && !state.HasBesiegerCamp &&
         !state.IsTransitionInProgress && !state.HasArmy &&
         !state.HasAttachedTo && !state.HasAttachedParties;

@@ -20,13 +20,13 @@ public class DefenderSiegeFixtureContractTests
     }
 
     [Fact]
-    public void IsCleanForCapture_RejectsAnyAmbiguousPartyState()
+    public void IsCleanForCapture_AllowsRestorableOriginalMovementAndRejectsAmbiguousPartyState()
     {
         Assert.True(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState()));
         Assert.False(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState(hasMapEvent: true)));
         Assert.False(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState(hasBesiegerCamp: true)));
         Assert.False(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState(isAtSea: true)));
-        Assert.False(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState(isHolding: false)));
+        Assert.True(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState(isHolding: false)));
         Assert.False(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState(isTransitionInProgress: true)));
         Assert.False(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState(hasArmy: true)));
         Assert.False(DefenderSiegeFixtureContract.IsCleanForCapture(CreateState(hasAttachedTo: true)));
