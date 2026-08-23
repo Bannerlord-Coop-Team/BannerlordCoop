@@ -24,6 +24,7 @@ internal class PlayerLeaveSettlementPatch
         typeof(EncounterGameMenuBehavior).GetMethod("game_menu_castle_outside_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(EncounterGameMenuBehavior).GetMethod("army_encounter_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(HideoutCampaignBehavior).GetMethod("game_menu_hideout_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
+        typeof(VillageHostileActionCampaignBehavior).GetMethod("game_menu_village_hostile_action_warn_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Static),
         typeof(VillageHostileActionCampaignBehavior).GetMethod("village_looted_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Static),
     };
 
