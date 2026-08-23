@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Missions;
@@ -71,6 +72,7 @@ public class LocationControllerWithdrawalStateTests
             Mock.Of<IObjectManager>(),
             Mock.Of<ICoopMissionComponent>(),
             session.Object,
+            Mock.Of<ILocationConversationAgentGuard>(),
             Mock.Of<ILocationAgentBindingMap>(),
             Mock.Of<ILocationPartyAgentMap>(),
             Mock.Of<ILocationPuppetRosterBinder>(),

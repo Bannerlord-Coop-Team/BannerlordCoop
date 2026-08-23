@@ -43,6 +43,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private readonly ILocationPopulationDirector populationDirector;
     private readonly ILocationAuthorityMigrator authorityMigrator;
     private readonly ILocationPartyAgentMap partyAgentMap;
+    private readonly ILocationConversationAgentGuard conversationAgentGuard;
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -54,6 +55,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         ILocationHostRegistry hostRegistry,
         ILocationPuppetRosterBinder rosterBinder,
         ILocationNpcHoldRegistry npcHoldRegistry,
+        ILocationConversationAgentGuard conversationAgentGuard,
         IBattleAgentBudget agentBudget,
         ILocationAgentSpawnBatchCodec spawnBatchCodec,
         ILocationControllerWithdrawalState withdrawalState,
@@ -71,6 +73,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;
         this.hostRegistry = hostRegistry;
+        this.conversationAgentGuard = conversationAgentGuard;
         //this.boardGameManager = boardGameManager;
 
         // Composition-root style (mirrors CoopBattleController): the per-mission session and NPC
@@ -87,8 +90,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         authorityMigrator = new LocationAuthorityMigrator(
             messageBroker, coopMissionComponent, session, bindingMap, partyAgentMap, missionContext, npcHoldRegistry);
         npcPuppetSpawner = new LocationPuppetSpawner(
-            messageBroker, objectManager, coopMissionComponent, session, bindingMap, partyAgentMap,
-            rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState);
+            messageBroker, objectManager, coopMissionComponent, session, conversationAgentGuard,
+            bindingMap, partyAgentMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState);
         populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
@@ -352,7 +355,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     {
         if (agent == null || !_ownedCompanionIds.TryGetValue(agent, out Guid agentId)) return false;
 
-        EndConversationWithAgent(agent);
+        conversationAgentGuard.EndConversationWithAgent(agent);
         _ownedCompanionIds.Remove(agent);
         coopMissionComponent.AgentRegistry.RemoveAgent(agentId);
         network.SendAll(new NetworkDespawnLocationAgents(
@@ -363,19 +366,12 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         return true;
     }
 
-    private static void EndConversationWithAgent(Agent agent)
+    private bool IsKnownPartyAgent(Agent agent)
     {
-        var conversationManager = Campaign.Current?.ConversationManager;
-        if (conversationManager?.IsConversationInProgress != true || conversationManager.ConversationAgents == null)
-            return;
+        if (IsOwnPartyAgent(agent)) return true;
 
-        foreach (var conversationAgent in conversationManager.ConversationAgents)
-        {
-            if (!ReferenceEquals(conversationAgent, agent)) continue;
-
-            conversationManager.EndConversation();
-            return;
-        }
+        return coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info) &&
+               partyAgentMap.Contains(info.AgentId);
     }
 
     internal static bool IsOwnPartyAgent(Agent agent)
@@ -430,7 +426,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         // Engage the NPC gate: native population spawning is suppressed on every client until the
         // server's host assignment confirms who runs it (SR-013).
-        LocationNpcGate.BeginMission(instanceId);
+        LocationNpcGate.BeginMission(instanceId, IsKnownPartyAgent);
 
         network.ConnectToInstance(instanceId);
         coopMissionComponent.AgentRegistry.Clear();

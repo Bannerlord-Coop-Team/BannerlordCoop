@@ -1,5 +1,10 @@
-﻿using GameInterface.Services.Locations.Patches;
+﻿using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Patches;
+using System;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.MountAndBlade;
 using Xunit;
+using FormatterServices = System.Runtime.Serialization.FormatterServices;
 
 namespace GameInterface.Tests.Services.Locations;
 
@@ -95,18 +100,45 @@ public class LocationCompanionAuthorityPatchTests
                 suppressNativeSpawns));
     }
 
-    [Theory]
-    [InlineData(true, true, false)]
-    [InlineData(true, false, true)]
-    [InlineData(false, true, true)]
-    public void DelayedPopulationSimulation_SkipsOnlyOwnedPartyAgents(
-        bool isReplayingNativePopulation,
-        bool isOwnedPartyAgent,
-        bool expected)
+    [Fact]
+    public void DelayedPopulationSimulation_SkipsMainAgentRegardlessOfOrigin()
     {
-        Assert.Equal(expected,
-            LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
-                isReplayingNativePopulation,
-                isOwnedPartyAgent));
+        var mainAgent = CreateAgentWithSimpleOrigin();
+
+        Assert.True(LocationNpcGate.IsPlayerPartyAgent(mainAgent, mainAgent));
+    }
+
+    [Fact]
+    public void DelayedPopulationSimulation_SkipsRegisteredRemotePartyPuppet()
+    {
+        var remotePartyPuppet = CreateAgentWithSimpleOrigin();
+        var ambientNpc = CreateAgentWithSimpleOrigin();
+        LocationNpcGate.BeginMission(
+            "settlement|tavern",
+            agent => ReferenceEquals(agent, remotePartyPuppet));
+
+        try
+        {
+            Assert.False(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
+                isReplayingNativePopulation: true,
+                remotePartyPuppet));
+            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
+                isReplayingNativePopulation: true,
+                ambientNpc));
+            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
+                isReplayingNativePopulation: false,
+                remotePartyPuppet));
+        }
+        finally
+        {
+            LocationNpcGate.EndMission();
+        }
+    }
+
+    private static Agent CreateAgentWithSimpleOrigin()
+    {
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        agent.Origin = (SimpleAgentOrigin)FormatterServices.GetUninitializedObject(typeof(SimpleAgentOrigin));
+        return agent;
     }
 }

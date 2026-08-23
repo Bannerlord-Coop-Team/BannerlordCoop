@@ -379,6 +379,7 @@ internal class MapEventPatches
             if (replacement == null)
                 continue;
 
+            side.InvalidateSimulationSetup();
             side.LeaderParty = replacement;
             side._mapFaction = replacement.MapFaction;
             side.CacheLeaderSimulationModifier();

@@ -1,8 +1,6 @@
 ﻿using HarmonyLib;
 using SandBox;
 using SandBox.Missions.MissionLogics;
-using TaleWorlds.CampaignSystem.AgentOrigins;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.MountAndBlade;
 
@@ -58,13 +56,11 @@ internal class LocationNativeSpawnSuppressionPatches
     [HarmonyPatch(nameof(MissionAgentHandler.SimulateAgent))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    private static bool SkipOwnedPartySimulation(Agent agent)
-        => ShouldSimulateAgent(
-            LocationNpcGate.IsReplayingNativePopulation,
-            agent?.Origin is PartyAgentOrigin origin && origin.Party == PartyBase.MainParty);
+    private static bool SkipPlayerPartySimulation(Agent agent)
+        => ShouldSimulateAgent(LocationNpcGate.IsReplayingNativePopulation, agent);
 
-    internal static bool ShouldSimulateAgent(bool isReplayingNativePopulation, bool isOwnedPartyAgent)
-        => !isReplayingNativePopulation || !isOwnedPartyAgent;
+    internal static bool ShouldSimulateAgent(bool isReplayingNativePopulation, Agent agent)
+        => !isReplayingNativePopulation || !LocationNpcGate.IsPlayerPartyAgent(agent);
 
     [HarmonyPatch(nameof(MissionAgentHandler.SpawnWanderingAgentWithDelay))]
     [HarmonyPrefix]
