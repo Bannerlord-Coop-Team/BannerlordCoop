@@ -55,6 +55,16 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     private ulong lastSteamLobbyId;
     private string lastSteamLobbyHostName = string.Empty;
     private bool hasLastDirectConnection;
+    private string lastDirectIp;
+    private string lastDirectPort;
+    private string lastDirectPassword;
+    private string lastSteamLobbyPassword;
+    private string pendingDirectIp;
+    private string pendingDirectPort;
+    private string pendingDirectPassword;
+    private ulong pendingSteamLobbyId;
+    private string pendingSteamHostName;
+    private string pendingSteamPassword;
 
     public string JoinButtonText => "Join";
     public string RefreshButtonText => "Refresh";
@@ -131,6 +141,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             new CoopConnectionTabVM(LastConnectionTabId, "Last Connection", SelectTab),
         };
         SteamLobbies = new MBBindingList<SteamLobbyListItemVM>();
+
+        messageBroker.Subscribe<ClientNetworkConnected>(HandleNetworkConnected);
 
         LoadLastConnection();
         SelectTab(Tabs[0]);
@@ -326,6 +338,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             hasLastDirectConnection = value;
             OnPropertyChanged(nameof(HasLastDirectConnection));
             OnPropertyChanged(nameof(LastDirectConnectionText));
+            OnPropertyChanged(nameof(HasNoLastConnection));
         }
     }
 
@@ -443,7 +456,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             }
 
             messageBroker.Publish(this, new AttemptJoin(ip, port, connectPassword, steamInvites));
-            SaveDirectConnection();
+            pendingDirectIp = connectIP;
+            pendingDirectPort = connectPort;
+            pendingDirectPassword = connectPassword;
         }
         catch (Exception ex)
         {
@@ -452,11 +467,39 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
+    public void ActionReconnectDirect()
+    {
+        if (disposed || string.IsNullOrEmpty(lastDirectIp)) return;
+
+        if (!int.TryParse(lastDirectPort, out var port) || port < IPEndPoint.MinPort || port > IPEndPoint.MaxPort)
+            return;
+
+        try
+        {
+            bool steamInvites = SessionDiscovery.SteamAvailable && IsLoopbackAddress(lastDirectIp);
+
+            IPAddress ip;
+            if (IPAddress.TryParse(lastDirectIp, out var parsedIp))
+            {
+                ip = parsedIp;
+            }
+            else
+            {
+                var addresses = Dns.GetHostAddresses(lastDirectIp);
+                ip = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+                if (ip == null) return;
+            }
+
+            messageBroker.Publish(this, new AttemptJoin(ip, port, lastDirectPassword ?? string.Empty, steamInvites));
+        }
+        catch { }
+    }
+
     public void ActionReconnectSteamLobby()
     {
         if (disposed || lastSteamLobbyId == 0) return;
 
-        messageBroker.Publish(this, new JoinSteamLobby(lastSteamLobbyId));
+        messageBroker.Publish(this, new JoinSteamLobby(lastSteamLobbyId, lastSteamLobbyPassword));
     }
 
     public void ActionCancel()
@@ -479,6 +522,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         if (disposed) return;
 
         disposed = true;
+        messageBroker.Unsubscribe<ClientNetworkConnected>(HandleNetworkConnected);
         lobbyRequestGeneration++;
         IsRefreshingSteamLobbies = false;
         discoveredSteamLobbies.Clear();
@@ -620,8 +664,26 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     {
         if (disposed || lobbyId == 0) return;
 
-        SaveSteamLobby(lobbyId);
-        messageBroker.Publish(this, new JoinSteamLobby(lobbyId));
+        pendingSteamLobbyId = lobbyId;
+        pendingSteamHostName = discoveredSteamLobbies.FirstOrDefault(l => l.LobbyId == lobbyId)?.HostText
+            ?? string.Empty;
+        pendingSteamPassword = connectPassword;
+        messageBroker.Publish(this, new JoinSteamLobby(lobbyId, connectPassword));
+    }
+
+    private void HandleNetworkConnected(MessagePayload<ClientNetworkConnected> payload)
+    {
+        if (!string.IsNullOrEmpty(pendingDirectIp))
+        {
+            PersistDirectConnection(pendingDirectIp, pendingDirectPort, pendingDirectPassword);
+            pendingDirectIp = pendingDirectPort = pendingDirectPassword = null;
+        }
+        else if (pendingSteamLobbyId != 0)
+        {
+            PersistSteamLobby(pendingSteamLobbyId, pendingSteamHostName, pendingSteamPassword);
+            pendingSteamLobbyId = 0;
+            pendingSteamHostName = pendingSteamPassword = null;
+        }
     }
 
     private void LoadLastConnection()
@@ -637,9 +699,12 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
             if (!string.IsNullOrEmpty(data.DirectIp))
             {
-                connectIP = data.DirectIp;
-                connectPort = data.DirectPort ?? connectPort;
-                connectPassword = data.DirectPassword ?? string.Empty;
+                lastDirectIp = data.DirectIp;
+                lastDirectPort = data.DirectPort ?? connectPort;
+                lastDirectPassword = LastConnectionData.UnprotectPassword(data.DirectPasswordProtected);
+                connectIP = lastDirectIp;
+                connectPort = lastDirectPort;
+                connectPassword = lastDirectPassword;
                 hasLastDirectConnection = true;
             }
 
@@ -647,6 +712,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             {
                 lastSteamLobbyId = data.SteamLobbyId;
                 lastSteamLobbyHostName = data.SteamLobbyHostName ?? string.Empty;
+                lastSteamLobbyPassword = LastConnectionData.UnprotectPassword(data.SteamLobbyPasswordProtected);
             }
         }
         catch
@@ -655,7 +721,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
-    private void SaveDirectConnection()
+    private void PersistDirectConnection(string ip, string port, string password)
     {
         try
         {
@@ -663,9 +729,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             if (options.TryGetSection<LastConnectionData>(
                 LastConnectionData.TabId, LastConnectionData.SectionId, out var existing))
             {
-                existing.DirectIp = connectIP;
-                existing.DirectPort = connectPort;
-                existing.DirectPassword = connectPassword;
+                existing.DirectIp = ip;
+                existing.DirectPort = port;
+                existing.DirectPasswordProtected = LastConnectionData.ProtectPassword(password);
                 options.SetSection(LastConnectionData.TabId, LastConnectionData.SectionId, existing);
             }
             else
@@ -673,12 +739,15 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                 options.SetSection(LastConnectionData.TabId, LastConnectionData.SectionId,
                     new LastConnectionData
                     {
-                        DirectIp = connectIP,
-                        DirectPort = connectPort,
-                        DirectPassword = connectPassword,
+                        DirectIp = ip,
+                        DirectPort = port,
+                        DirectPasswordProtected = LastConnectionData.ProtectPassword(password),
                     });
             }
             optionsStore.Save(options);
+            lastDirectIp = ip;
+            lastDirectPort = port;
+            lastDirectPassword = password;
             HasLastDirectConnection = true;
         }
         catch
@@ -687,11 +756,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
-    private void SaveSteamLobby(ulong lobbyId)
+    private void PersistSteamLobby(ulong lobbyId, string hostName, string password)
     {
-        var hostName = discoveredSteamLobbies.FirstOrDefault(l => l.LobbyId == lobbyId)?.HostText
-            ?? string.Empty;
-
         try
         {
             var options = optionsStore.LoadOrDefault();
@@ -700,6 +766,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             {
                 existing.SteamLobbyId = lobbyId;
                 existing.SteamLobbyHostName = hostName;
+                existing.SteamLobbyPasswordProtected = LastConnectionData.ProtectPassword(password);
                 options.SetSection(LastConnectionData.TabId, LastConnectionData.SectionId, existing);
             }
             else
@@ -709,6 +776,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                     {
                         SteamLobbyId = lobbyId,
                         SteamLobbyHostName = hostName,
+                        SteamLobbyPasswordProtected = LastConnectionData.ProtectPassword(password),
                     });
             }
             optionsStore.Save(options);
@@ -720,8 +788,10 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         lastSteamLobbyId = lobbyId;
         lastSteamLobbyHostName = hostName;
+        lastSteamLobbyPassword = password;
         OnPropertyChanged(nameof(HasLastSteamLobby));
         OnPropertyChanged(nameof(LastSteamLobbyText));
+        OnPropertyChanged(nameof(HasNoLastConnection));
     }
 
     private static bool IsLoopbackAddress(string address)

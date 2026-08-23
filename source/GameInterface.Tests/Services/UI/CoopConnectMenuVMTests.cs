@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network.Session;
 using GameInterface.Services.UI;
 using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -368,17 +369,18 @@ public class CoopConnectMenuVMTests
         viewModel.Port = "4200";
         viewModel.Password = "secret";
         viewModel.ActionConnect();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
 
         Assert.True(viewModel.HasLastDirectConnection);
         Assert.False(viewModel.HasNoLastConnection);
-        Assert.Contains("127.0.0.1:4200", viewModel.LastDirectConnectionText);
+        Assert.DoesNotContain("127.0.0.1", viewModel.LastDirectConnectionText);
 
         var saved = store.Options.GetSectionOrDefault<LastConnectionData>(
             LastConnectionData.TabId, LastConnectionData.SectionId, null);
         Assert.NotNull(saved);
         Assert.Equal("127.0.0.1", saved.DirectIp);
         Assert.Equal("4200", saved.DirectPort);
-        Assert.Equal("secret", saved.DirectPassword);
+        Assert.NotNull(saved.DirectPasswordProtected);
     }
 
     [Fact]
@@ -394,13 +396,14 @@ public class CoopConnectMenuVMTests
             viewModel.Port = "5000";
             viewModel.Password = "";
             viewModel.ActionConnect();
+            messageBroker.Publish(viewModel, new ClientNetworkConnected());
         }
 
         using var viewModel2 = new CoopConnectMenuVM(browser, messageBroker, store);
         Assert.True(viewModel2.HasLastDirectConnection);
         Assert.Equal("10.0.0.1", viewModel2.Ip);
         Assert.Equal("5000", viewModel2.Port);
-        Assert.Contains("10.0.0.1:5000", viewModel2.LastDirectConnectionText);
+        Assert.DoesNotContain("10.0.0.1", viewModel2.LastDirectConnectionText);
     }
 
     [Fact]
@@ -414,10 +417,11 @@ public class CoopConnectMenuVMTests
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(CreateLobby(999, "Castle Keep"));
         viewModel.SteamLobbies[0].ExecuteJoin();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
 
         Assert.True(viewModel.HasLastSteamLobby);
         Assert.False(viewModel.HasNoLastConnection);
-        Assert.Contains("Castle Keep", viewModel.LastSteamLobbyText);
+        Assert.DoesNotContain("Castle Keep", viewModel.LastSteamLobbyText);
 
         var saved = store.Options.GetSectionOrDefault<LastConnectionData>(
             LastConnectionData.TabId, LastConnectionData.SectionId, null);
@@ -438,11 +442,55 @@ public class CoopConnectMenuVMTests
             SelectSteamLobbiesTab(viewModel);
             browser.Complete(CreateLobby(42, "Iron Citadel"));
             viewModel.SteamLobbies[0].ExecuteJoin();
+            messageBroker.Publish(viewModel, new ClientNetworkConnected());
         }
 
         using var viewModel2 = new CoopConnectMenuVM(browser, messageBroker, store);
         Assert.True(viewModel2.HasLastSteamLobby);
-        Assert.Contains("Iron Citadel", viewModel2.LastSteamLobbyText);
+        Assert.DoesNotContain("Iron Citadel", viewModel2.LastSteamLobbyText);
+    }
+
+    [Fact]
+    public void LastConnection_HasNoLastConnection_RefreshesAfterConnect()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        Assert.True(viewModel.HasNoLastConnection);
+
+        viewModel.Ip = "127.0.0.1";
+        viewModel.Port = "4200";
+        viewModel.ActionConnect();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
+
+        Assert.False(viewModel.HasNoLastConnection);
+        Assert.True(viewModel.HasLastDirectConnection);
+    }
+
+    [Fact]
+    public void LastConnection_ActionReconnectDirect_UsesSnapshot()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        viewModel.Ip = "10.0.0.1";
+        viewModel.Port = "4200";
+        viewModel.ActionConnect();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
+
+        // Edit the live form to a different address — reconnect must ignore this
+        viewModel.Ip = "1.2.3.4";
+
+        AttemptJoin published = null;
+        messageBroker.Subscribe<AttemptJoin>(payload => published = payload.What);
+        viewModel.ActionReconnectDirect();
+
+        Assert.NotNull(published);
+        Assert.Equal("10.0.0.1", published.Address.ToString());
     }
 
     private static void SelectLastConnectionTab(CoopConnectMenuVM viewModel)

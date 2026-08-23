@@ -46,6 +46,7 @@ namespace Coop.Core
         private volatile bool hostedSession;
         private volatile bool clientConnectedOnce;
         private bool passwordInquiryPending;
+        private string pendingPreSuppliedPassword;
         private int coopStartGeneration;
         // Bumped when a new host attempt starts, so a prior attempt's deferred exit handling drops out.
         private volatile int hostSessionGeneration;
@@ -72,6 +73,7 @@ namespace Coop.Core
             this.coopLogFilePath = coopLogFilePath;
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
+            messageBroker.Subscribe<JoinSteamLobby>(Handle);
             messageBroker.Subscribe<AttemptHost>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
             messageBroker.Subscribe<EndCoopMode>(Handle);
@@ -268,6 +270,12 @@ namespace Coop.Core
         {
             clientConnectedOnce = true;
             setCrashPhase("connected");
+            messageBroker.Publish(this, new ClientNetworkConnected());
+        }
+
+        private void Handle(MessagePayload<JoinSteamLobby> payload)
+        {
+            pendingPreSuppliedPassword = payload.What.PreSuppliedPassword;
         }
 
         private void Handle(MessagePayload<SessionJoinInfoResolved> obj)
@@ -277,7 +285,16 @@ namespace Coop.Core
 
             if (joinInfo.PasswordRequired)
             {
-                PromptForSessionPassword(joinInfo);
+                if (!string.IsNullOrEmpty(pendingPreSuppliedPassword))
+                {
+                    joinInfo.Password = pendingPreSuppliedPassword;
+                    pendingPreSuppliedPassword = null;
+                    StartResolvedJoin(joinInfo);
+                }
+                else
+                {
+                    PromptForSessionPassword(joinInfo);
+                }
                 return;
             }
 

@@ -391,7 +391,7 @@
                                     Text="@LastDirectConnectionText"/>
                         <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="Fixed" SuggestedHeight="58"
                                          VerticalAlignment="Center"
-                                         Command.Click="ActionConnect" Parameter.Text="@ReconnectButtonText"/>
+                                         Command.Click="ActionReconnectDirect" Parameter.Text="@ReconnectButtonText"/>
                       </Children>
                     </ListPanel>
 

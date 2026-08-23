@@ -48,7 +48,8 @@ public class ClientModule : CommonModule
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
         // Steam registrations only when the boot probe found Steam, so tests and non-Steam installs never load Steamworks types.
-        if (SessionDiscovery.SteamAvailable)
+        // JoinListener guard handles the edge case where SteamAvailable is stale but CreateServices never completed.
+        if (SessionDiscovery.SteamAvailable && SteamBoot.JoinListener != null)
         {
             RegisterSteamSessionServices(builder);
         }

@@ -217,6 +217,7 @@
     <PackageReference Include="protobuf-net" Version="3.2.56" />
     <PackageReference Include="Scriban" Version="7.2.0" />
     <PackageReference Include="Scrutor" Version="6.0.1" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
     <ItemGroup>
 	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
