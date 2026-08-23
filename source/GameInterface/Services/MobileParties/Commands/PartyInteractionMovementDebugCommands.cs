@@ -326,10 +326,20 @@ internal static class PartyInteractionMovementDebugCommands
         });
     }
 
-    private static bool CanInteractWithParty(MobileParty targetParty, MobileParty mainParty) =>
-        targetParty?.Party is IInteractablePoint interactable &&
-        mainParty != null &&
-        interactable.CanPartyInteract(mainParty, 0f);
+    private static bool CanInteractWithParty(MobileParty targetParty, MobileParty mainParty)
+    {
+        if (!(targetParty?.Party is IInteractablePoint interactable) || mainParty == null)
+            return false;
+
+        try
+        {
+            return interactable.CanPartyInteract(mainParty, 0f);
+        }
+        catch (NullReferenceException)
+        {
+            return false;
+        }
+    }
 
     private static float Distance(MobileParty first, MobileParty second) =>
         (float)Math.Sqrt(DistanceSquared(first, second));
