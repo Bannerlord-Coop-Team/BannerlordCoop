@@ -1992,11 +1992,10 @@ public class MapEventDebugCommands
             GameMenu.SwitchToMenu("encounter");
         }
 
-        var menuContext = Campaign.Current?.CurrentMenuContext;
-        if (menuContext == null)
-            return "No active encounter menu.";
+        var startResult = StartAttackMission(args);
+        if (!startResult.StartsWith("Starting attack mission for ", StringComparison.Ordinal))
+            return startResult;
 
-        MenuHelper.EncounterAttackConsequence(new MenuCallbackArgs(menuContext, null));
         return "Requested entry into the current battle.";
     }
 
