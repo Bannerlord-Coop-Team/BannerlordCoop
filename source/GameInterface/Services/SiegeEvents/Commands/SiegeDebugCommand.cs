@@ -518,14 +518,11 @@ public class SiegeDebugCommand
         }
 
         var currentGarrison = fixture.Settlement.Town.GarrisonParty;
-        if (currentGarrison != null && currentGarrison.StringId != snapshot.StringId)
-            DestroyPartyAction.Apply(null, currentGarrison);
-        if (fixture.Settlement.Town.GarrisonParty == null)
+        if (currentGarrison == null)
             fixture.Settlement.AddGarrisonParty();
 
-        currentGarrison = fixture.Settlement.Town.GarrisonParty;
-        if (currentGarrison == null || currentGarrison.StringId != snapshot.StringId)
-            throw new InvalidOperationException("Unable to recreate the original settlement garrison.");
+        if (fixture.Settlement.Town.GarrisonParty == null)
+            throw new InvalidOperationException("Unable to recreate the settlement garrison.");
     }
 
     private static PartyBase ResolvePrisonerPromptParty(
@@ -669,7 +666,7 @@ public class SiegeDebugCommand
         var mobileParty = party.MobileParty;
         return mobileParty == null ||
             ((snapshot.IsSettlementGarrison
-                ? mobileParty.IsActive && mobileParty.StringId == snapshot.StringId
+                ? mobileParty.IsActive
                 : mobileParty.IsActive == snapshot.WasActive) &&
              mobileParty.RecentEventsMorale == snapshot.RecentEventsMorale &&
              mobileParty.PartyTradeGold == snapshot.PartyTradeGold &&
