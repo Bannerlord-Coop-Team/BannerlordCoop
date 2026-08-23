@@ -314,37 +314,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
 
-            if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
+            if (!TryValidateAcceptRequest(requester, ownerId, owner, requestedGeneration, isAlternative: true,
+                nameof(RequestQuestTypeAcceptAlternative), out var player, out var descriptor))
             {
-                Logger.Error("Rejecting {Message} from an unregistered/unknown requester for owner {Owner}",
-                    nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                if (requester != null) network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
-                return;
-            }
-
-            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
-            {
-                Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
-                    nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
-                return;
-            }
-
-            if (!conversationTracker.TryGetTrackedRequester(ownerId, player.ControllerId, out var trackedGeneration) ||
-                trackedGeneration != requestedGeneration)
-            {
-                Logger.Error("Rejecting {Message} for a requester with no tracked conversation with owner {Owner}",
-                    nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
-                return;
-            }
-
-            var descriptor = QuestTypeRegistry.Get(owner.Issue);
-            var canAccept = descriptor?.SupportsAlternativeAccept == true &&
-                owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
-            if (!canAccept)
-            {
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
                 return;
             }
 
