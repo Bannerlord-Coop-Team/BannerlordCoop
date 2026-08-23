@@ -20,8 +20,9 @@ internal class ClanKingdomPatches
     }
     [HarmonyPatch(typeof(DefaultCutscenesCampaignBehavior), nameof(DefaultCutscenesCampaignBehavior.OnClanChangedKingdom))]
     [HarmonyPrefix]
-    private static bool Prefix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification = true)
+    public static bool Prefix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification = true)
     {
+        if (!ContainerProvider.TryResolve<IGameInterface>(out _)) return true;
         return false;
     }
 }
