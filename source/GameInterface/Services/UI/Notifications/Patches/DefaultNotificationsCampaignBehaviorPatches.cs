@@ -255,13 +255,13 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     }
 
     [HarmonyPatch(nameof(DefaultNotificationsCampaignBehavior.OnArmyCreated))]
-    [HarmonyPostfix]
-    public static void OnArmyCreatedPostfix(ref DefaultNotificationsCampaignBehavior __instance, Army army)
+    [HarmonyPrefix]
+    public static bool OnArmyCreatedPrefix(ref DefaultNotificationsCampaignBehavior __instance, Army army)
     {
-        if (ModInformation.IsClient) return;
-
+        if (ModInformation.IsClient) return false;
         var message = new NotifyArmyCreated(army, army.AiBehaviorObject);
         MessageBroker.Instance.Publish(__instance, message);
+        return false;
     }
 
     [HarmonyPatch(nameof(DefaultNotificationsCampaignBehavior.OnSiegeBombardmentHit))]
