@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -13,7 +14,7 @@ internal class HeroMetPatches
     [HarmonyPrefix]
     public static void SetHasMetPrefix(out Hero __state)
     {
-        __state = ModInformation.IsServer ? null : Hero.MainHero;
+        __state = ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed() ? null : Hero.MainHero;
     }
 
     [HarmonyPatch(nameof(Hero.SetHasMet))]
