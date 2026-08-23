@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network.Session;
+using Common.Network.Session.Messages;
 using GameInterface.Services.UI;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.Messages;
@@ -493,10 +494,145 @@ public class CoopConnectMenuVMTests
         Assert.Equal("10.0.0.1", published.Address.ToString());
     }
 
+    [Fact]
+    public void LastConnection_ActionReconnectSteamLobby_UsesSnapshot()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        SelectSteamLobbiesTab(viewModel);
+        viewModel.Password = "lobbypass";
+        browser.Complete(CreateLobby(777, "Test Keep"));
+        viewModel.SteamLobbies[0].ExecuteJoin();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
+
+        JoinSteamLobby published = null;
+        messageBroker.Subscribe<JoinSteamLobby>(payload => published = payload.What);
+        viewModel.ActionReconnectSteamLobby();
+
+        Assert.NotNull(published);
+        Assert.Equal(777UL, published.LobbyId);
+        Assert.Equal("lobbypass", published.PreSuppliedPassword);
+    }
+
+    [Fact]
+    public void LastConnection_SteamLobby_PasswordRoundTrip()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+
+        using (var viewModel = new CoopConnectMenuVM(browser, messageBroker, store))
+        {
+            SelectSteamLobbiesTab(viewModel);
+            viewModel.Password = "supersecret";
+            browser.Complete(CreateLobby(42, "Fortress"));
+            viewModel.SteamLobbies[0].ExecuteJoin();
+            messageBroker.Publish(viewModel, new ClientNetworkConnected());
+        }
+
+        var saved = store.Options.GetSectionOrDefault<LastConnectionData>(
+            LastConnectionData.TabId, LastConnectionData.SectionId, null);
+        Assert.NotNull(saved.SteamLobbyPasswordProtected);
+
+        using var viewModel2 = new CoopConnectMenuVM(browser, messageBroker, store);
+        JoinSteamLobby published = null;
+        messageBroker.Subscribe<JoinSteamLobby>(payload => published = payload.What);
+        viewModel2.ActionReconnectSteamLobby();
+
+        Assert.NotNull(published);
+        Assert.Equal("supersecret", published.PreSuppliedPassword);
+    }
+
+    [Fact]
+    public void LastConnection_NoSave_IfNetworkConnectedNeverFires()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        viewModel.Ip = "10.0.0.1";
+        viewModel.Port = "4200";
+        viewModel.ActionConnect();
+        // ClientNetworkConnected deliberately NOT published — connection failed
+
+        var saved = store.Options.GetSectionOrDefault<LastConnectionData>(
+            LastConnectionData.TabId, LastConnectionData.SectionId, null);
+        Assert.Null(saved);
+        Assert.True(viewModel.HasNoLastConnection);
+    }
+
+    [Fact]
+    public void LastConnection_HasNoLastConnection_RefreshesAfterSteamLobbyJoin()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        Assert.True(viewModel.HasNoLastConnection);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(CreateLobby(1, "Arena"));
+        viewModel.SteamLobbies[0].ExecuteJoin();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
+
+        Assert.False(viewModel.HasNoLastConnection);
+        Assert.True(viewModel.HasLastSteamLobby);
+    }
+
+    [Fact]
+    public void LastConnection_DirectConnection_NotPersistedInMemory_OnSaveFailure()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new FailingCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        viewModel.Ip = "10.0.0.1";
+        viewModel.Port = "4200";
+        viewModel.ActionConnect();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
+
+        Assert.True(viewModel.HasNoLastConnection);
+        Assert.False(viewModel.HasLastDirectConnection);
+    }
+
+    [Fact]
+    public void LastConnection_SteamLobby_NotPersistedInMemory_OnSaveFailure()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new FailingCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(CreateLobby(42, "Test Keep"));
+        viewModel.SteamLobbies[0].ExecuteJoin();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
+
+        Assert.True(viewModel.HasNoLastConnection);
+        Assert.False(viewModel.HasLastSteamLobby);
+    }
+
     private static void SelectLastConnectionTab(CoopConnectMenuVM viewModel)
     {
         Assert.Equal(CoopConnectMenuVM.LastConnectionTabId, viewModel.Tabs[2].Id);
         viewModel.Tabs[2].ExecuteSelection();
+    }
+
+    private sealed class FailingCoopOptionsStore : ICoopOptionsStore
+    {
+        public string FilePath => null;
+
+        public bool TryLoad(out CoopOptionsData options) { options = new CoopOptionsData(); return true; }
+
+        public CoopOptionsData LoadOrDefault() => new CoopOptionsData();
+
+        public void Save(CoopOptionsData options) => throw new System.IO.IOException("disk full");
     }
 
     private sealed class TestCoopOptionsStore : ICoopOptionsStore

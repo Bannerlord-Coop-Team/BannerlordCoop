@@ -673,6 +673,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     private void HandleNetworkConnected(MessagePayload<ClientNetworkConnected> payload)
     {
+        if (disposed) return;
+
         if (!string.IsNullOrEmpty(pendingDirectIp))
         {
             PersistDirectConnection(pendingDirectIp, pendingDirectPort, pendingDirectPassword);
@@ -780,18 +782,17 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                     });
             }
             optionsStore.Save(options);
+            lastSteamLobbyId = lobbyId;
+            lastSteamLobbyHostName = hostName;
+            lastSteamLobbyPassword = password;
+            OnPropertyChanged(nameof(HasLastSteamLobby));
+            OnPropertyChanged(nameof(LastSteamLobbyText));
+            OnPropertyChanged(nameof(HasNoLastConnection));
         }
         catch
         {
             // IO failure — not critical
         }
-
-        lastSteamLobbyId = lobbyId;
-        lastSteamLobbyHostName = hostName;
-        lastSteamLobbyPassword = password;
-        OnPropertyChanged(nameof(HasLastSteamLobby));
-        OnPropertyChanged(nameof(LastSteamLobbyText));
-        OnPropertyChanged(nameof(HasNoLastConnection));
     }
 
     private static bool IsLoopbackAddress(string address)

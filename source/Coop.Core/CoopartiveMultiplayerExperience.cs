@@ -241,6 +241,7 @@ namespace Coop.Core
             hostSessionGeneration++;
             hostedSession = false;
             clientConnectedOnce = false;
+            pendingPreSuppliedPassword = null;
         }
 
         private void Handle(MessagePayload<HostedServerExited> obj)
