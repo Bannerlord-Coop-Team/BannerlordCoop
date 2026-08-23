@@ -312,7 +312,7 @@ public class CoopTournamentVMStateTests
     }
 
     [Fact]
-    public void ShouldOpenLeaveMenu_LiveMatchEliminatedContestant_ReturnsTrue()
+    public void ShouldOpenLeaveMenu_LiveMatchEliminatedContestant_ReturnsFalse()
     {
         var snapshot = CreateSnapshot(
             new[] { CreateEliminatedContestant() },
@@ -326,7 +326,7 @@ public class CoopTournamentVMStateTests
 
         var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
 
-        Assert.True(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
     }
 
     [Fact]

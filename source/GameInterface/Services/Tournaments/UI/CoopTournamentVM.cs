@@ -670,8 +670,7 @@ internal sealed class CoopTournamentVM : TournamentVM
     }
 
     internal static bool ShouldOpenLeaveMenu(UIState state)
-        => state.IsMatchActive && state.CanLeave &&
-            (state.Role == UIState.PlayerRole.Spectator || state.Role == UIState.PlayerRole.Eliminated);
+        => state.IsMatchActive && state.CanLeave && state.Role == UIState.PlayerRole.Spectator;
 
     internal TournamentPlayerChoice? GetAdvanceChoice() => GetAdvanceChoice(lastUIState);
 
