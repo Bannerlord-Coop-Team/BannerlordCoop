@@ -4,6 +4,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -118,6 +119,16 @@ public class BattleEligibilityTests : MissionTestEnvironment
             Server.NetworkSentMessages.Clear();
             Server.InternalMessages.Clear();
 
+            clients[1].Call(() =>
+            {
+                Assert.True(clients[1].ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                Assert.True(clients[1].ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var participant));
+                var mapEventParty = Assert.NotNull(mapEvent.FindMapEventParty(participant.Party, out var side));
+                side._battleParties.Remove(mapEventParty);
+                participant.Party._mapEventSide = side;
+                Assert.Null(mapEvent.FindMapEventParty(participant.Party));
+            });
+
             clients[0].Call(() => clients[0].Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
                 Guid.NewGuid().ToString(),
                 (int)BattleStartMode.Mission,
@@ -126,9 +137,30 @@ public class BattleEligibilityTests : MissionTestEnvironment
 
             Assert.True(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().Single().Accepted);
             Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Count());
+            var membershipAndStarts = Server.NetworkSentMessages
+                .Where(message => message is NetworkAddBattleParty or NetworkStartAttackMission)
+                .ToArray();
+            Assert.Collection(
+                membershipAndStarts,
+                message => Assert.IsType<NetworkAddBattleParty>(message),
+                message => Assert.IsType<NetworkStartAttackMission>(message),
+                message => Assert.IsType<NetworkAddBattleParty>(message),
+                message => Assert.IsType<NetworkStartAttackMission>(message));
+            Assert.Equal(
+                2,
+                Server.NetworkSentMessages.GetMessages<NetworkAddBattleParty>()
+                    .Select(message => message.MapEventPartyId)
+                    .Distinct()
+                    .Count());
             Assert.Equal(
                 new[] { 1, 1, 0 },
                 clients.Select(client => client.InternalMessages.GetMessageCount<NetworkStartAttackMission>()));
+            clients[1].Call(() =>
+            {
+                Assert.True(clients[1].ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                Assert.True(clients[1].ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var participant));
+                Assert.NotNull(mapEvent.FindMapEventParty(participant.Party));
+            });
             Assert.Equal(
                 new[] { "ctrl-A", "ctrl-B" },
                 Server.InternalMessages.GetMessages<BattleJoinAccepted>()
