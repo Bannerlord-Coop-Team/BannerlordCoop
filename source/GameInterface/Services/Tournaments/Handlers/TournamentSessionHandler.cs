@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -807,10 +807,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
         string replacementName,
         NetPeer peer)
     {
-        TournamentSpawnManifestData migrationManifest = null;
-        if (current.HostControllerId == controllerId)
-            sessionRegistry.TryGetSpawnManifest(current.SessionId, out migrationManifest);
-
         TournamentMutationStatus status = sessionRegistry.TryLeaveActive(
             current.SessionId,
             current.Revision,
@@ -820,10 +816,10 @@ internal sealed partial class TournamentSessionHandler : IHandler
             out var snapshot,
             out var outcome,
             out var noViewers);
-        PublishHostMigration(current, snapshot, status, migrationManifest);
         if (status == TournamentMutationStatus.Applied)
             SettleBetLedger(current.SessionId, controllerId, snapshot.Revision, current.CurrentMatchId, "Tournament bet forfeited", peer);
         PublishMutation(status, peer, snapshot);
+        PublishHostMigration(current, snapshot, status);
         if (status == TournamentMutationStatus.Applied && outcome == TournamentBallotOutcome.SimulateMatch)
             snapshot = SimulateCurrentMatchAndAdvance(snapshot, controllerId);
         if (status == TournamentMutationStatus.Applied && noViewers && snapshot != null)
@@ -833,12 +829,11 @@ internal sealed partial class TournamentSessionHandler : IHandler
     private void PublishHostMigration(
         TournamentSessionSnapshot previous,
         TournamentSessionSnapshot snapshot,
-        TournamentMutationStatus status,
-        TournamentSpawnManifestData migrationManifest)
+        TournamentMutationStatus status)
     {
         if (status != TournamentMutationStatus.Applied ||
-            migrationManifest == null ||
-            snapshot.HostControllerId == previous.HostControllerId)
+            snapshot.HostControllerId == previous.HostControllerId ||
+            !sessionRegistry.TryGetSpawnManifest(snapshot.SessionId, out var migrationManifest))
             return;
 
         network.SendAll(new NetworkTournamentSpawnManifest(migrationManifest));

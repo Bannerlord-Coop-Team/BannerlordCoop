@@ -5,6 +5,7 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
@@ -77,6 +78,16 @@ public class MissionModule : Module
             .AsSelf()
             .As<ILocationMissionBehavior>()
             .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateMissionView>()
+            .AsSelf()
+            .As<ILocationMissionBehavior>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateControllerResolver>()
+            .As<IPlayerNameplateControllerResolver>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateEligibility>()
+            .As<IPlayerNameplateEligibility>()
+            .InstancePerDependency();
 
         // MissionContext mirrors the server's instance membership and must live for the whole client
         // session (it subscribes to the MissionPeer* messages over the campaign connection), so it is a
@@ -114,6 +125,9 @@ public class MissionModule : Module
         builder.RegisterType<LocationAgentSpawnBatchCodec>()
             .As<ILocationAgentSpawnBatchCodec>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<LocationControllerWithdrawalState>()
+            .As<ILocationControllerWithdrawalState>()
+            .InstancePerDependency();
 
         // BR-102 host-epoch receiver policy. InstancePerDependency so each CoopBattleController (one per
         // battle) is injected a FRESH policy whose accepted-epoch watermark starts clean and never leaks
@@ -195,7 +209,6 @@ public class MissionModule : Module
             .AsSelf()
             .InstancePerLifetimeScope()
             .AutoActivate();
-
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
         builder.RegisterType<AgentFormationAssigner>().As<IAgentFormationAssigner>().InstancePerDependency();
@@ -229,6 +242,9 @@ public class MissionModule : Module
             .As<IVanillaOrderVoiceService>()
             .InstancePerDependency();
         builder.RegisterType<AgentVoiceHandler>().As<IAgentVoiceHandler>().InstancePerDependency();
+        builder.RegisterType<WeaponDropWorldItemSpawner>()
+            .As<IWeaponDropWorldItemSpawner>()
+            .InstancePerDependency();
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();
         builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerDependency();
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();

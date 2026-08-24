@@ -367,6 +367,7 @@ namespace GameInterface.Services.Kingdoms
         {
             if (decision == null || Clan.PlayerClan == null) return false;
             if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
+            if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.IsResolved) return true;
             return !IsLocalPlayerEligible(decision);
         }
 
@@ -591,9 +592,9 @@ namespace GameInterface.Services.Kingdoms
                 return;
             }
 
+            state.IsResolved = true;
             CampaignEventDispatcher.Instance.OnKingdomDecisionConcluded(decision, outcome, isPlayerDecision);
             PublishDecisionNotification(notificationText);
-            RemoveDecisionState(decision);
             CloseDecision(decision);
         }
 

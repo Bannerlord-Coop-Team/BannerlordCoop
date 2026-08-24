@@ -7,6 +7,8 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameInterface.Configuration;
+using GameInterface.Services.Heroes.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -141,6 +143,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
             // Only a present player's own party reserves a player slot. Offline or absent registrations fall
             // to the host and must not reduce the allocation available to the players who entered this battle.
+            int playerOwnedPartiesBefore = partySide == BattleSideEnum.Attacker
+                ? attackerPlayerParties
+                : defenderPlayerParties;
             var playerOwnedRank = -1;
             if (entries.Count > 0
                 && ResolveOwningController(partyOwnerController, null, absentControllers) != null)
@@ -162,7 +167,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 entriesArray,
                 isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId),
                 sideOffset: partyOffset,
-                playerOwnedRank: playerOwnedRank);
+                playerOwnedRank: playerOwnedRank,
+                playerOwnedPartiesBefore: playerOwnedPartiesBefore);
             if (partySide == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else
@@ -267,12 +273,20 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
         foreach (var element in roster)
         {
-            if (element.IsWounded || element.IsRouted || element.IsKilled)
+            if (element.IsRouted || element.IsKilled)
                 continue;
 
             var character = element.Troop;
             if (character == null)
                 continue;
+            
+            var isPlayer = character.HeroObject?.IsPlayerHero() == true;
+            
+            // Skip if the troop is not a player, or if the config option is disabled and they are a player + wounded.
+            if (element.IsWounded && !(isPlayer && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry))
+            {
+                continue;
+            }
 
             // Heroes and regular troops alike are keyed by their CharacterObject id (hero CharacterObjects are
             // registered too — CharacterObjectRegistry), so resolve it uniformly.

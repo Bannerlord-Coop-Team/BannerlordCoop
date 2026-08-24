@@ -41,7 +41,9 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         var client = Clients.Last();
         var missionInitializerResolver = new RecordingMissionInitializerResolver();
         var battleLauncher = new Mock<ICoopFieldBattleLauncher>();
+        MissionInitializerRecord openedInitializer = default;
         battleLauncher.Setup(l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()))
+            .Callback<MissionInitializerRecord>(initializer => openedInitializer = initializer)
             .Returns((Mission)null!);
 
         using var launcherScope = client.Container.BeginLifetimeScope(builder =>
@@ -79,15 +81,29 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
             try
             {
                 ContainerProvider.SetContainer(launcherScope);
+                var missionInitializer = new MissionInitializerRecord("battle_terrain_030")
+                {
+                    TerrainType = 7,
+                    RandomTerrainSeed = 1234,
+                    SceneHasMapPatch = true,
+                    PatchCoordinates = new Vec2(0.25f, 0.75f),
+                    PatchEncounterDir = new Vec2(1f, 0f),
+                };
                 messageBroker.Publish(this, new NetworkStartAttackMission(
-                    mapEvent.MapEventId, 1234, default, mapEvent.AttackerPartyId));
+                    mapEvent.MapEventId, missionInitializer, mapEvent.AttackerPartyId));
 
                 Assert.Equal(0, missionInitializerResolver.CallCount);
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
 
-                Assert.Equal(1, missionInitializerResolver.CallCount);
-                Assert.Same(clientBattle, missionInitializerResolver.Battle);
-                Assert.Equal(1234, missionInitializerResolver.RandomTerrainSeed);
+                Assert.Equal(0, missionInitializerResolver.CallCount);
+                Assert.Equal("battle_terrain_030", openedInitializer.SceneName);
+                Assert.Equal(7, openedInitializer.TerrainType);
+                Assert.Equal(1234, openedInitializer.RandomTerrainSeed);
+                Assert.True(openedInitializer.SceneHasMapPatch);
+                Assert.Equal(0.25f, openedInitializer.PatchCoordinates.X);
+                Assert.Equal(0.75f, openedInitializer.PatchCoordinates.Y);
+                Assert.Equal(1f, openedInitializer.PatchEncounterDir.X);
+                Assert.Equal(0f, openedInitializer.PatchEncounterDir.Y);
                 Assert.Same(clientBattle, PlayerEncounter.Battle);
                 Assert.Equal(localSide, PlayerEncounter.Current.PlayerSide);
                 Assert.Equal(localSide.GetOppositeSide(), PlayerEncounter.Current.OpponentSide);
@@ -176,7 +192,9 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     missionInitializerResolver);
 
                 messageBroker.Publish(this, new NetworkStartAttackMission(
-                    mapEvent.MapEventId, 1234, default, mapEvent.AttackerPartyId));
+                    mapEvent.MapEventId,
+                    new MissionInitializerRecord("battle_terrain_030") { RandomTerrainSeed = 1234 },
+                    mapEvent.AttackerPartyId));
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
 
                 Assert.Equal(0, missionInitializerResolver.CallCount);
@@ -194,15 +212,11 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
     private sealed class RecordingMissionInitializerResolver : IBattleMissionInitializerResolver
     {
         public int CallCount { get; private set; }
-        public MapEvent Battle { get; private set; } = null!;
-        public int RandomTerrainSeed { get; private set; }
 
         public MissionInitializerRecord Create(MapEvent mapEvent, int randomTerrainSeed,
             AtmosphereInfo atmosphereOnCampaign)
         {
             CallCount++;
-            Battle = mapEvent;
-            RandomTerrainSeed = randomTerrainSeed;
             return default;
         }
     }

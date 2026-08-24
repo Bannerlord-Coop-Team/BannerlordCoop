@@ -52,8 +52,10 @@ using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
@@ -1079,6 +1081,74 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             s.PartyId == responderPartyId &&
             !s.InitiatorAcceptedTrade &&
             !s.ResponderAcceptedTrade);
+    }
+
+    [Fact]
+    public void TradeOfferUpdate_TroopOffer_AppliesAsOfferedOnOtherClient()
+    {
+        var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
+        var initiatorTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(initiatorTroopId, out var initiatorTroop));
+            initiatorParty.MemberRoster.AddToCounts(initiatorTroop, 5);
+        });
+
+        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+
+        BarterVM barterVM = null;
+
+        client2.Call(() =>
+        {
+            Assert.True(client2.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(client2.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(client2.ObjectManager.TryGetObject<Hero>(responderHeroId, out var responderHero));
+            Assert.True(client2.ObjectManager.TryGetObject<Hero>(initiatorHeroId, out var initiatorHero));
+            Assert.True(client2.ObjectManager.TryGetObject<CharacterObject>(initiatorTroopId, out var initiatorTroop));
+
+            PlayerPartyTradeContext.Begin(sessionId, responderParty);
+
+            var troopRosterElement = new TroopRosterElement(initiatorTroop)
+            {
+                _number = 5
+            };
+
+            var barterData = new BarterData(responderHero, initiatorHero, responderParty, initiatorParty, null, 0, false);
+            barterData.AddBarterGroup(new FiefBarterGroup());
+            barterData.AddBarterGroup(new PrisonerBarterGroup());
+            barterData.AddBarterGroup(new ItemBarterGroup());
+            barterData.AddBarterGroup(new OtherBarterGroup());
+            barterData.AddBarterGroup(new GoldBarterGroup());
+            barterData.AddBarterable<OtherBarterGroup>(
+                new PlayerPartyTroopBarterable(initiatorHero, responderHero, initiatorParty, responderParty, troopRosterElement),
+                false);
+
+            barterVM = new BarterVM(barterData);
+        });
+
+        Server.NetworkSentMessages.Clear();
+        client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
+            sessionId,
+            initiatorPartyId,
+            Array.Empty<ItemRosterElementData>(),
+            new[] { new TroopRosterElementData(initiatorTroopId, 4, 0, 0) })));
+
+        client2.Call(() =>
+        {
+            Assert.True(client2.ObjectManager.TryGetObject<CharacterObject>(initiatorTroopId, out var registeredTroop));
+
+            Assert.NotNull(barterVM);
+
+            var troopItem = Assert.Single(
+                GetAllBarterItems(barterVM),
+                item => item.Barterable is PlayerPartyTroopBarterable troopBarterable &&
+                        ReferenceEquals(troopBarterable.TroopRosterElement.Character, registeredTroop));
+
+            Assert.True(troopItem.IsOffered);
+            Assert.Equal(4, troopItem.CurrentOfferedAmount);
+        });
     }
 
     [Fact]
@@ -4086,6 +4156,33 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
 
         return 0;
+    }
+
+    private static IEnumerable<BarterItemVM> GetAllBarterItems(BarterVM barterVM)
+    {
+        foreach (var list in new IEnumerable<BarterItemVM>[]
+        {
+            barterVM.LeftFiefList,
+            barterVM.RightFiefList,
+            barterVM.LeftPrisonerList,
+            barterVM.RightPrisonerList,
+            barterVM.LeftItemList,
+            barterVM.RightItemList,
+            barterVM.LeftOtherList,
+            barterVM.RightOtherList,
+            barterVM.LeftDiplomaticList,
+            barterVM.RightDiplomaticList,
+            barterVM.LeftGoldList,
+            barterVM.RightGoldList,
+        })
+        {
+            if (list == null) continue;
+
+            foreach (var item in list)
+            {
+                if (item != null) yield return item;
+            }
+        }
     }
 
     private static void ThrowAfterBarterAccepted()
