@@ -191,22 +191,37 @@ public class HeroDebugCommand
         return auditor.Audit();
     }
 
-    [CommandLineArgumentFunction("change", "coop.debug.hero")]
-    public static string ChangeTimeStamp(List<string> args)
+    [CommandLineArgumentFunction("add_power", "coop.debug.hero")]
+    public static string AddPower(List<string> args)
     {
-        Hero hero = Hero.MainHero;
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.add_power"))
+        {
+            return error;
+        }
 
-        hero.AddPower(66);
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.add_power <heroId> <power>";
+        }
 
-        return "Updated to " + hero._power;
-    }
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
 
-    [CommandLineArgumentFunction("getChange", "coop.debug.hero")]
-    public static string GetTimeStamp(List<string> args)
-    {
-        Hero hero = Hero.FindFirst(x => x._power == 66);
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
 
-        return hero.Name.Value;
+        if (int.TryParse(args[1], out int power) == false)
+        {
+            return $"{args[1]} is not a valid integer";
+        }
+
+        hero.AddPower(power);
+
+        return $"Hero power changed to: {hero.Power}";
     }
 
     [CommandLineArgumentFunction("SetGold", "coop.debug.hero")]
