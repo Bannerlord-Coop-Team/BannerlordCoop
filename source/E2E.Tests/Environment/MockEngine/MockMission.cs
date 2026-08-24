@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Common.Util;
+using SandBox.Missions.MissionLogics;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -29,6 +30,12 @@ public sealed class MockMission
     public bool DeploymentInProgress { get; set; }
     public DeploymentMissionController DeploymentController { get; }
         = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();
+    public bool LocationPopulationBoundaryEnabled { get; set; }
+    public MissionAgentHandler LocationAgentHandler { get; }
+        = ObjectHelper.SkipConstructor<MissionAgentHandler>();
+    public Action? NativeLocationPopulation { get; set; }
+    public int NativeLocationPopulationCalls { get; set; }
+    public int NativeLocationAnimalPopulationCalls { get; set; }
 
     /// <summary>Per-side teams, returned by the <c>Mission.AttackerTeam</c>/<c>DefenderTeam</c> shims so the
     /// reinforcement spawn (which resolves the team by side) can field troops into them headless.</summary>
