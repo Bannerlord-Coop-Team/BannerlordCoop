@@ -115,6 +115,9 @@ internal class BattleJoinLeaveHandler : IHandler
                 var trackParties = !initializationBarrier.IsPending(mapEvent);
                 using (new AllowedThread())
                 {
+                    if (trackParties)
+                        mapEvent.TroopUpgradeTracker._mapEventParties.Clear();
+
                     for (int i = 0; i < message.MapEventPartyIds.Length; i++)
                     {
                         var mapEventPartyId = message.MapEventPartyIds[i];

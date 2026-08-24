@@ -70,6 +70,7 @@ internal sealed class SiegeJoinMenuActivationGate : ISiegeJoinMenuActivationGate
 
         CancelDeferredActivation();
         GameMenu.ActivateGameMenu("join_siege_event");
+        GameMenu.SwitchToMenu("encounter");
         return true;
     }
 

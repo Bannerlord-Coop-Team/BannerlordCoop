@@ -172,6 +172,10 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             mapEventContext.MapEventId,
             involvedPartyIds,
             new CampaignVec2[involvedPartyIds.Length]));
+        client.SimulateMessage(Server.NetPeer, new NetworkAddInvolvedParties(
+            mapEventContext.MapEventId,
+            involvedPartyIds,
+            new CampaignVec2[involvedPartyIds.Length]));
 
         client.Call(() =>
         {
@@ -283,6 +287,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             .ToList();
 
         using var menuActivationRecorder = new GameMenuActivationRecorder();
+        using var menuSwitchRecorder = new GameMenuSwitchRecorder();
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
@@ -323,6 +328,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
         client.SimulateMessage(Server.NetPeer, involvedParties);
         Assert.Equal(new[] { "join_siege_event" }, menuActivationRecorder.ActivationsFor(client));
+        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.SwitchesFor(client));
         client.SimulateMessage(Server.NetPeer, Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single());
     }
 
