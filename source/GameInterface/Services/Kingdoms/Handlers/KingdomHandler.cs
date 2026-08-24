@@ -5,6 +5,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -511,7 +512,13 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        kingdomInterface.RunAddDecision(kingdom, kingdomDecision, payload.IgnoreInfluenceCost, payload.RandomNumber);
+        bool isPendingPlayerAllianceOffer = payload.Data is StartAllianceDecisionData { IsProposedByOpponent: true };
+        kingdomInterface.RunAddDecision(
+            kingdom,
+            kingdomDecision,
+            payload.IgnoreInfluenceCost,
+            payload.RandomNumber,
+            isPendingPlayerAllianceOffer);
     }
 
     private static void RunKingdomMutation(Action action)

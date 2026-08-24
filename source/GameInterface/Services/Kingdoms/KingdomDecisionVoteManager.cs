@@ -412,6 +412,12 @@ namespace GameInterface.Services.Kingdoms
             if (decisionItem == null || ActiveDecisionItems.Contains(decisionItem)) return;
 
             KingdomDecision decision = decisionItem.KingdomDecisionMaker?._decision;
+            if (decision != null && !IsDecisionUnresolved(decision))
+            {
+                CloseDecisionItem(decisionItem);
+                return;
+            }
+
             if (decision != null)
             {
                 KingdomDecisionVoteState state = GetOrCreateState(decision);
@@ -1042,10 +1048,7 @@ namespace GameInterface.Services.Kingdoms
             }
             if (state.Decision is StartAllianceDecision startAllianceDecision)
             {
-                if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(startAllianceDecision))
-                {
-                    CoopKingdomElection._opponentProposedAllianceDecisions.Remove(startAllianceDecision);
-                }
+                CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(startAllianceDecision);
                 if (startAllianceDecision.Kingdom is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom()
                     && startAllianceDecision.KingdomToStartAllianceWith is Kingdom playerkingdom2 && playerkingdom2.IsPlayerKingdom())
                 {
@@ -1693,8 +1696,27 @@ namespace GameInterface.Services.Kingdoms
                 state.FinalVotes.Count,
                 state.EligibleClanIds.Count);
             ApplyMissingAbstentions(state);
+            SelectDeclinedOutcomeForUnansweredPlayerOffer(state);
             ResolveDecision(state);
             return true;
+        }
+
+        private static void SelectDeclinedOutcomeForUnansweredPlayerOffer(KingdomDecisionVoteState state)
+        {
+            if (state.FinalVotes.Count != 0) return;
+
+            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(state.Decision))
+            {
+                state.Election._chosenOutcome = state.Election._possibleOutcomes
+                    .OfType<MakePeaceKingdomDecision.MakePeaceDecisionOutcome>()
+                    .FirstOrDefault(outcome => !outcome.ShouldPeaceBeDeclared);
+            }
+            else if (CoopKingdomElection.IsPendingPlayerAllianceOffer(state.Decision))
+            {
+                state.Election._chosenOutcome = state.Election._possibleOutcomes
+                    .OfType<StartAllianceDecision.StartAllianceDecisionOutcome>()
+                    .FirstOrDefault(outcome => !outcome.ShouldAllianceBeStarted);
+            }
         }
 
         private static bool IsDecisionUnresolved(KingdomDecision decision)

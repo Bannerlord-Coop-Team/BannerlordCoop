@@ -16,7 +16,7 @@ public interface IKingdomInterface : IGameAbstraction
     bool AddPolicyPrefix(Kingdom kingdom, PolicyObject policy);
     bool RemovePolicyPrefix(Kingdom kingdom, PolicyObject policy);
     float AddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float? randomFloat = null, bool applyInfluenceCost = true);
-    void RunAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float randomFloat);
+    void RunAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float randomFloat, bool isPendingPlayerAllianceOffer = false);
     void RemoveDecision(Kingdom kingdom, KingdomDecision kingdomDecision);
     void ChangeKingdomPolicy(Kingdom kingdom, PolicyObject policy, bool isAdd);
 }
@@ -104,20 +104,51 @@ internal class KingdomInterface : IKingdomInterface
         decisionVoteManager.RegisterDecision(kingdomDecision);
         return default;
     }
-    public void RunAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float randomFloat)
+    public void RunAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float randomFloat, bool isPendingPlayerAllianceOffer = false)
     {
         RunKingdomMutation(() =>
         {
-            AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat, ModInformation.IsServer);
+            if (isPendingPlayerAllianceOffer)
+            {
+                CoopKingdomElection._opponentProposedAllianceDecisions.Add(kingdomDecision);
+            }
+
+            try
+            {
+                AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat, ModInformation.IsServer);
+            }
+            catch
+            {
+                if (kingdom._unresolvedDecisions?.Contains(kingdomDecision) != true)
+                {
+                    CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(kingdomDecision);
+                }
+                throw;
+            }
+
+            if (kingdom._unresolvedDecisions?.Contains(kingdomDecision) != true)
+            {
+                CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(kingdomDecision);
+            }
         });
     }
     public void RemoveDecision(Kingdom kingdom, KingdomDecision kingdomDecision)
     {
         RunKingdomMutation(() =>
         {
-            using (new AllowedThread())
+            try
             {
-                kingdom.RemoveDecision(kingdomDecision);
+                using (new AllowedThread())
+                {
+                    kingdom.RemoveDecision(kingdomDecision);
+                }
+            }
+            finally
+            {
+                if (kingdom._unresolvedDecisions?.Contains(kingdomDecision) != true)
+                {
+                    CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(kingdomDecision);
+                }
             }
         });
     }

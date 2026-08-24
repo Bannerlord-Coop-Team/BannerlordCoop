@@ -19,9 +19,13 @@ namespace GameInterface.Services.Kingdoms.Data
         [ProtoMember(1)]
         public string KingdomToStartAllianceWithId { get; }
 
-        public StartAllianceDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string kingdomToStartAllianceWithId) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
+        [ProtoMember(2)]
+        public bool IsProposedByOpponent { get; }
+
+        public StartAllianceDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string kingdomToStartAllianceWithId, bool isProposedByOpponent = false) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
         {
             KingdomToStartAllianceWithId = kingdomToStartAllianceWithId;
+            IsProposedByOpponent = isProposedByOpponent;
         }
 
         /// <inheritdoc/>

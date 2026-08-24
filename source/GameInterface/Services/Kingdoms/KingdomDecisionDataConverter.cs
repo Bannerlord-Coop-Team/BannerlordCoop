@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -163,7 +164,8 @@ namespace GameInterface.Services.Kingdoms
             if (startAllianceDecision != null)
             {
                 return new StartAllianceDecisionData(GetId(startAllianceDecision.ProposerClan), GetId(startAllianceDecision.Kingdom),
-                    startAllianceDecision.TriggerTime._numTicks, startAllianceDecision.IsEnforced, startAllianceDecision.NotifyPlayer, startAllianceDecision.PlayerExamined, GetId(startAllianceDecision.KingdomToStartAllianceWith));
+                    startAllianceDecision.TriggerTime._numTicks, startAllianceDecision.IsEnforced, startAllianceDecision.NotifyPlayer, startAllianceDecision.PlayerExamined,
+                    GetId(startAllianceDecision.KingdomToStartAllianceWith), CoopKingdomElection.IsTrackedPlayerAllianceOffer(startAllianceDecision));
             }
             else
             {

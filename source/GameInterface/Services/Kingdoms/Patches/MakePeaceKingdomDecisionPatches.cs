@@ -1,3 +1,4 @@
+﻿using Common;
 using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -39,6 +40,22 @@ internal static class PendingPlayerPeaceOfferCancellationPatch
                 || __instance.Kingdom.IsAtWarWith(allianceDecision.KingdomToStartAllianceWith);
             return false;
         }
+        return true;
+    }
+}
+
+[HarmonyPatch(typeof(StartAllianceDecision), nameof(StartAllianceDecision.OnShowDecision))]
+internal static class DedicatedServerStartAllianceDecisionShowPatch
+{
+    [HarmonyPrefix]
+    private static bool OnShowDecisionPrefix(StartAllianceDecision __instance, ref bool __result)
+    {
+        if (ModInformation.IsServer)
+        {
+            __result = __instance.KingdomToStartAllianceWith?.IsPlayerKingdom() != true;
+            return false;
+        }
+
         return true;
     }
 }

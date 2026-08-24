@@ -8,6 +8,7 @@ using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -45,6 +46,40 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPatch(nameof(KingdomDecisionProposalBehavior.RegisterEvents))]
         [HarmonyPrefix]
         public static bool RegisterEventsPrefix() => ModInformation.IsServer;
+
+        [HarmonyPatch(nameof(KingdomDecisionProposalBehavior.SyncData))]
+        [HarmonyPostfix]
+        private static void SyncDataPostfix(IDataStore dataStore)
+        {
+            SyncPendingPlayerAllianceOffers(dataStore);
+        }
+
+        internal static void SyncPendingPlayerAllianceOffers(IDataStore dataStore)
+        {
+            const string saveKey = "_coop_pending_player_alliance_offers";
+            List<StartAllianceDecision> pendingOffers = null;
+            if (dataStore.IsSaving)
+            {
+                pendingOffers = CoopKingdomElection.GetTrackedPlayerAllianceOffers()
+                    .Where(decision => decision.Kingdom?._unresolvedDecisions?.Contains(decision) == true)
+                    .ToList();
+                if (CoopKingdomElection.IsLegacyPlayerAllianceOfferRestorePending) return;
+            }
+
+            bool hasSavedProvenance = dataStore.SyncData(saveKey, ref pendingOffers);
+            if (!dataStore.IsLoading) return;
+
+            if (!hasSavedProvenance)
+            {
+                CoopKingdomElection.ScheduleLegacyPlayerAllianceOfferRestore();
+                return;
+            }
+
+            CoopKingdomElection.RestoreTrackedPlayerAllianceOffers(
+                (pendingOffers ?? new List<StartAllianceDecision>())
+                    .Where(decision => decision?.Kingdom?._unresolvedDecisions?.Contains(decision) == true),
+                isLegacyFallback: false);
+        }
 
         /// <summary>
         /// Replacement for the per-clan daily proposer. Mirrors the vanilla logic but
@@ -175,16 +210,20 @@ namespace GameInterface.Services.Kingdoms.Patches
                                         (Kingdom)startalliancedecision.KingdomToStartAllianceWith,
                                         startalliancedecision.Kingdom,
                                         isPending: false));
-                                    if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(startalliancedecision))
-                                    {
-                                        CoopKingdomElection._opponentProposedAllianceDecisions.Remove(startalliancedecision);
-                                    }
+                                    CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(startalliancedecision);
                                 }
                             }
                             CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, isPlayerInvolved);
                         }
                         else if (decision.TriggerTime.IsPast)
                         {
+                            if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
+                                voteManager.HasEligiblePlayerClan(decision))
+                            {
+                                voteManager.TryResolveDecision(decision);
+                                continue;
+                            }
+
                             // An unanswered inbound player peace offer expires as a decline.
                             // It must never fall through to the forced AI resolution path.
                             if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision))
@@ -203,19 +242,9 @@ namespace GameInterface.Services.Kingdoms.Patches
                                         (Kingdom)startalliancedecision.KingdomToStartAllianceWith,
                                         startalliancedecision.Kingdom,
                                         isPending: false));
-                                    if (CoopKingdomElection._opponentProposedAllianceDecisions.Contains(startalliancedecision))
-                                    {
-                                        CoopKingdomElection._opponentProposedAllianceDecisions.Remove(startalliancedecision);
-                                    }
+                                    CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(startalliancedecision);
                                 }
                                 CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, true);
-                                continue;
-                            }
-
-                            if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
-                                voteManager.HasEligiblePlayerClan(decision))
-                            {
-                                voteManager.TryResolveDecision(decision);
                                 continue;
                             }
 

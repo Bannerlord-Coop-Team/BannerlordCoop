@@ -13,6 +13,8 @@ namespace GameInterface.Services.Kingdoms.Extentions
     {
         private float? randomFloat;
         public static readonly HashSet<KingdomDecision> _opponentProposedAllianceDecisions = new();
+        private static readonly HashSet<KingdomDecision> LegacyPlayerAllianceDecisions = new();
+        private static bool restoreLegacyPlayerAllianceOffersPending;
         public float RandomFloat
         {
             get
@@ -112,10 +114,9 @@ namespace GameInterface.Services.Kingdoms.Extentions
 
         public void ApplyChosenOutcomeCoop()
         {
-            // The synchronized kingdom decision is the player-facing prompt. Native's peace
-            // notification checks process-local player singletons and must not run again when
-            // the explicit co-op vote is resolved on the authoritative server.
-            if (IsPendingPlayerPeaceOffer(this._decision) || this._decision.OnShowDecision() || IsPendingPlayerAllianceOffer(this._decision))
+            // The synchronized kingdom decision is the player-facing prompt. Native offer
+            // notifications check player singletons and must not run on the authoritative server.
+            if (IsPendingPlayerPeaceOffer(this._decision) || IsPendingPlayerAllianceOffer(this._decision) || this._decision.OnShowDecision())
             {
                 this.ApplyChosenOutcome();
             }
@@ -188,14 +189,87 @@ namespace GameInterface.Services.Kingdoms.Extentions
         internal static bool IsPendingPlayerAllianceOffer(KingdomDecision decision)
         {
             return decision is StartAllianceDecision 
-                    && _opponentProposedAllianceDecisions.Contains(decision) 
+                    && IsTrackedPlayerAllianceOffer(decision)
                     && decision.Kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true;
+        }
+
+        internal static bool IsPlayerAllianceDecision(KingdomDecision decision)
+        {
+            return decision is StartAllianceDecision
+                   && decision.Kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true;
+        }
+
+        internal static bool IsTrackedPlayerAllianceOffer(KingdomDecision decision)
+        {
+            TryRestoreLegacyPlayerAllianceOffers();
+            return _opponentProposedAllianceDecisions.Contains(decision)
+                   || LegacyPlayerAllianceDecisions.Contains(decision);
+        }
+
+        internal static void RemoveTrackedPlayerAllianceOffer(KingdomDecision decision)
+        {
+            _opponentProposedAllianceDecisions.Remove(decision);
+            LegacyPlayerAllianceDecisions.Remove(decision);
+        }
+
+        internal static IEnumerable<StartAllianceDecision> GetTrackedPlayerAllianceOffers()
+        {
+            TryRestoreLegacyPlayerAllianceOffers();
+            return _opponentProposedAllianceDecisions
+                .Concat(LegacyPlayerAllianceDecisions)
+                .OfType<StartAllianceDecision>()
+                .Distinct();
+        }
+
+        internal static bool IsLegacyPlayerAllianceOfferRestorePending => restoreLegacyPlayerAllianceOffersPending;
+
+        internal static void ScheduleLegacyPlayerAllianceOfferRestore()
+        {
+            RestoreTrackedPlayerAllianceOffers(Enumerable.Empty<StartAllianceDecision>(), isLegacyFallback: true);
+            restoreLegacyPlayerAllianceOffersPending = true;
+        }
+
+        private static void TryRestoreLegacyPlayerAllianceOffers()
+        {
+            if (!restoreLegacyPlayerAllianceOffersPending
+                || !Kingdom.All.Any(kingdom => kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true))
+            {
+                return;
+            }
+
+            LegacyPlayerAllianceDecisions.Clear();
+            foreach (StartAllianceDecision decision in Kingdom.All
+                         .Where(kingdom => kingdom?._unresolvedDecisions != null)
+                         .SelectMany(kingdom => kingdom.UnresolvedDecisions)
+                         .OfType<StartAllianceDecision>()
+                         .Where(IsPlayerAllianceDecision))
+            {
+                LegacyPlayerAllianceDecisions.Add(decision);
+            }
+
+            restoreLegacyPlayerAllianceOffersPending = false;
+        }
+
+        internal static void RestoreTrackedPlayerAllianceOffers(
+            IEnumerable<StartAllianceDecision> pendingOffers,
+            bool isLegacyFallback)
+        {
+            _opponentProposedAllianceDecisions.Clear();
+            LegacyPlayerAllianceDecisions.Clear();
+            restoreLegacyPlayerAllianceOffersPending = false;
+            HashSet<KingdomDecision> target = isLegacyFallback
+                ? LegacyPlayerAllianceDecisions
+                : _opponentProposedAllianceDecisions;
+            foreach (StartAllianceDecision decision in pendingOffers ?? Enumerable.Empty<StartAllianceDecision>())
+            {
+                target.Add(decision);
+            }
         }
 
         internal static bool TryRedirectPlayerAllianceOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)
         {
             if (decision is not StartAllianceDecision allianceDecision
-                || _opponentProposedAllianceDecisions.Contains(allianceDecision)
+                || IsTrackedPlayerAllianceOffer(allianceDecision)
                 || allianceDecision.KingdomToStartAllianceWith is not Kingdom playerKingdom
                 || !playerKingdom.IsPlayerKingdom())
             {
@@ -212,7 +286,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             bool offerAlreadyPending = playerKingdom.UnresolvedDecisions
                 .OfType<StartAllianceDecision>()
                 .Any(existing => existing.KingdomToStartAllianceWith == proposingKingdom
-                && _opponentProposedAllianceDecisions.Contains(existing));
+                && IsTrackedPlayerAllianceOffer(existing));
 
             if (offerAlreadyPending || playerKingdom.RulingClan == null)
             {
