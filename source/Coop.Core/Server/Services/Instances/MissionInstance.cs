@@ -1,4 +1,5 @@
 ﻿using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -49,11 +50,17 @@ internal sealed class MissionMembership
     public string ControllerId { get; }
     public NetPeer Peer { get; set; }
     public MissionInstance Instance { get; }
+    public Guid PeerCredential { get; set; }
 
-    public MissionMembership(string controllerId, NetPeer peer, MissionInstance instance)
+    public MissionMembership(
+        string controllerId,
+        NetPeer peer,
+        MissionInstance instance,
+        Guid peerCredential)
     {
         ControllerId = controllerId;
         Peer = peer;
         Instance = instance;
+        PeerCredential = peerCredential;
     }
 }

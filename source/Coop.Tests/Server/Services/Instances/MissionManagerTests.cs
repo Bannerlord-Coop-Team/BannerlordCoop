@@ -2,6 +2,7 @@
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using Xunit;
@@ -26,10 +27,13 @@ public class MissionManagerTests
         Assert.True(manager.TryEnterMission(first, "first", "battle", out var firstEntry));
         Assert.True(firstEntry.IsFirstMember);
         Assert.Empty(firstEntry.ExistingMembers);
+        Assert.NotEqual(Guid.Empty, firstEntry.PeerCredential);
 
         Assert.True(manager.TryEnterMission(second, "second", "battle", out var secondEntry));
         Assert.False(secondEntry.IsFirstMember);
-        Assert.Single(secondEntry.ExistingMembers);
+        var existing = Assert.Single(secondEntry.ExistingMembers);
+        Assert.Equal(firstEntry.PeerCredential, existing.peerCredential);
+        Assert.NotEqual(firstEntry.PeerCredential, secondEntry.PeerCredential);
     }
 
     [Fact]
@@ -113,15 +117,21 @@ public class MissionManagerTests
     {
         var manager = new MissionManager();
         var peer = CreatePeer(1);
+        var observerPeer = CreatePeer(2);
 
-        Assert.True(manager.TryEnterMission(peer, "host", "battle", out _));
+        Assert.True(manager.TryEnterMission(peer, "host", "battle", out var first));
+        Assert.True(manager.TryEnterMission(observerPeer, "observer", "battle", out var observer));
         Assert.True(manager.TryEnterMission(peer, "host", "battle", out var duplicate));
 
         Assert.Equal(MissionEntryStatus.Unchanged, duplicate.Status);
-        Assert.Empty(duplicate.ExistingMembers);
+        var existing = Assert.Single(duplicate.ExistingMembers);
+        Assert.Equal("observer", existing.controllerId);
+        Assert.Same(observerPeer, existing.peer);
+        Assert.Equal(observer.PeerCredential, existing.peerCredential);
         Assert.Empty(duplicate.PreviousDepartures);
+        Assert.Equal(first.PeerCredential, duplicate.PeerCredential);
         Assert.True(manager.TryGetControllers("battle", out var controllers));
-        Assert.Equal(new[] { "host" }, controllers);
+        Assert.Equal(new[] { "host", "observer" }, controllers.OrderBy(value => value));
     }
 
     [Fact]
@@ -155,12 +165,13 @@ public class MissionManagerTests
         var replacementPeer = CreatePeer(2);
         var observerPeer = CreatePeer(3);
 
-        Assert.True(manager.TryEnterMission(oldPeer, "host", "battle", out _));
+        Assert.True(manager.TryEnterMission(oldPeer, "host", "battle", out var original));
         Assert.True(manager.TryEnterMission(observerPeer, "observer", "battle", out _));
 
         Assert.True(manager.TryEnterMission(replacementPeer, "host", "battle", out var replacement));
 
         Assert.Equal(MissionEntryStatus.Reconnected, replacement.Status);
+        Assert.NotEqual(original.PeerCredential, replacement.PeerCredential);
         Assert.Empty(replacement.PreviousDepartures);
         Assert.Equal("observer", Assert.Single(replacement.ExistingMembers).controllerId);
         Assert.False(manager.TryGetRelayTarget(oldPeer, "battle", "observer", out _));
@@ -181,7 +192,11 @@ public class MissionManagerTests
             BindingFlags.NonPublic | BindingFlags.Instance)!;
         var instances = (Dictionary<string, MissionInstance>)byInstanceIdField.GetValue(manager)!;
         var staleInstance = new MissionInstance("stale-instance");
-        staleInstance.Memberships.Add(new MissionMembership("stale", peer, staleInstance));
+        staleInstance.Memberships.Add(new MissionMembership(
+            "stale",
+            peer,
+            staleInstance,
+            Guid.NewGuid()));
         instances[staleInstance.Id] = staleInstance;
 
         var departures = manager.HandleDisconnect(peer);

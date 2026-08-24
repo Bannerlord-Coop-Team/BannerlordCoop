@@ -551,6 +551,25 @@ internal static class BattleDebugCommands
             .Select(supplier => $"{supplier.Side}:{supplier.PlayerPartyId}")
             .ToArray();
 
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            success = true,
+            controllerId = controller.Session.OwnControllerId,
+            instanceId = controller.Session.InstanceId,
+            isLocalHost = controller.Session.IsLocalHost,
+            deploymentActivated = controller.Deployment.IsActivated,
+            deploymentCommitted = controller.Deployment.IsCommitted,
+            deploymentReady,
+            mainAgentAssigned = Agent.Main != null,
+            activeAgents,
+            enemyParties,
+            enemyActive = enemies.Count,
+            enemyAi = enemies.Count(agent => agent.IsAIControlled),
+            enemyFleeing,
+            enemyMovedSinceLast = moved,
+            battleResolved = result?.BattleResolved ?? false,
+        });
+
         return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
             $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
@@ -560,7 +579,8 @@ internal static class BattleDebugCommands
             $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyFleeing={enemyFleeing} " +
             $"enemyMovedSinceLast={moved} damageReceivedEvents={ownDamageEvents} " +
             $"resultState={result?.BattleState.ToString() ?? "None"} " +
-            $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
+            $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}\n" +
+            $"LIVE_TEST_JSON={structuredState}";
     }
 
     [CommandLineArgumentFunction("size_state", "coop.debug.battle")]

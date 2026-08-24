@@ -1,4 +1,8 @@
 ﻿#if DEBUG
+using Common;
+using GameInterface;
+using Missions.Services.Network;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -9,6 +13,82 @@ namespace Missions.Agents.Handlers;
 
 internal static class MovementDebugCommands
 {
+    [CommandLineArgumentFunction("peer_state", "coop.debug.movement")]
+    public static string PeerState(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.movement.peer_state <controllerId>";
+        if (!ContainerProvider.TryResolve<IBattleNetwork>(out var network))
+            return "No active co-op mission peer network.";
+        var client = network as LiteNetP2PClient;
+        if (client == null)
+            return "No active co-op mission peer network.";
+
+        bool known = client.TryGetPeerRouteState(
+            args[0],
+            out bool credentialAnnounced,
+            out bool routeExists,
+            out bool credentialMatched,
+            out bool steamIdentityMatched,
+            out bool mapped);
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            success = known && mapped && credentialMatched && steamIdentityMatched,
+            controllerId = args[0],
+            credentialAnnounced,
+            routeExists,
+            credentialMatched,
+            steamIdentityMatched,
+            mapped,
+        });
+
+        return $"MISSION_PEER_STATE controller={args[0]}|mapped={mapped}|" +
+            $"credentialAnnounced={credentialAnnounced}|credentialMatched={credentialMatched}|" +
+            $"steamIdentityMatched={steamIdentityMatched}\nLIVE_TEST_JSON={structuredState}";
+    }
+
+    [CommandLineArgumentFunction("controller_agents", "coop.debug.movement")]
+    public static string ControllerAgents(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.movement.controller_agents <controllerId>";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "Network agent registry is unavailable.";
+
+        var agents = registry.GetAgents(args[0])
+            .OrderBy(info => info.AgentId)
+            .Select(info => new
+            {
+                agentId = info.AgentId.ToString("D"),
+                info.OriginalOwner,
+                info.CurrentAuthority,
+                active = info.Agent != null && info.Agent.IsActive(),
+                position = info.Agent == null ? null : new
+                {
+                    x = info.Agent.Position.x,
+                    y = info.Agent.Position.y,
+                    z = info.Agent.Position.z,
+                },
+                velocity = info.Agent == null ? null : new
+                {
+                    x = info.Agent.GetRealGlobalVelocity().x,
+                    y = info.Agent.GetRealGlobalVelocity().y,
+                    z = info.Agent.GetRealGlobalVelocity().z,
+                },
+            })
+            .ToArray();
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            success = agents.Length > 0,
+            controllerId = args[0],
+            agentCount = agents.Length,
+            agents,
+        });
+
+        return $"CONTROLLER_AGENTS controller={args[0]}|count={agents.Length}\n" +
+            $"LIVE_TEST_JSON={structuredState}";
+    }
+
     [CommandLineArgumentFunction("state", "coop.debug.movement")]
     public static string State(List<string> args)
     {
