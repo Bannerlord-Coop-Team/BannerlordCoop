@@ -195,6 +195,7 @@ public class MapEventDebugCommands
     {
         public string ControllerId;
         public Hero Hero;
+        public Hero LeaderHero;
         public MobileParty Party;
         public TroopRosterElement[] MemberRoster;
         public TroopRosterElement[] PrisonRoster;
@@ -1236,6 +1237,9 @@ public class MapEventDebugCommands
                         throw new InvalidOperationException("The initiator clan was not added to the fixture kingdom.");
                 }
 
+                if (initiator.Party.LeaderHero != initiator.Hero)
+                    throw new InvalidOperationException("The fixture initiator must lead its party before creating an army.");
+
                 fixture.Army = new Army(kingdom, initiator.Party, Army.ArmyTypes.Raider);
                 fixture.Army.Gather(danustica);
                 CampaignEventDispatcher.Instance.OnArmyCreated(fixture.Army);
@@ -1589,6 +1593,7 @@ public class MapEventDebugCommands
         {
             ControllerId = controllerId,
             Hero = hero,
+            LeaderHero = party.LeaderHero,
             Party = party,
             MemberRoster = party.MemberRoster.GetTroopRoster().ToArray(),
             PrisonRoster = party.PrisonRoster.GetTroopRoster().ToArray(),
@@ -1608,16 +1613,30 @@ public class MapEventDebugCommands
         int totalTroops,
         CampaignVec2 position)
     {
-        RestoreTroopRoster(snapshot.Party.MemberRoster, Array.Empty<TroopRosterElement>());
+        var heroRoster = snapshot.Party.MemberRoster.GetTroopRoster()
+            .Where(element => element.Character.IsHero)
+            .ToArray();
+        RestoreTroopRoster(snapshot.Party.MemberRoster, heroRoster);
         RestoreTroopRoster(snapshot.Party.PrisonRoster, Array.Empty<TroopRosterElement>());
         snapshot.Party.ItemRoster.Clear();
 
-        snapshot.Party.MemberRoster.AddToCounts(snapshot.Hero.CharacterObject, 1, insertAtFront: true);
+        if (snapshot.Party.MemberRoster.GetTroopCount(snapshot.Hero.CharacterObject) == 0)
+            snapshot.Party.MemberRoster.AddToCounts(snapshot.Hero.CharacterObject, 1, insertAtFront: true);
+
         var basicTroop = snapshot.Hero.Culture?.BasicTroop;
         if (basicTroop == null)
             throw new InvalidOperationException($"Player {snapshot.ControllerId} has no culture basic troop.");
 
-        snapshot.Party.MemberRoster.AddToCounts(basicTroop, totalTroops - 1);
+        var regularTroopCount = totalTroops - snapshot.Party.MemberRoster.TotalManCount;
+        if (regularTroopCount < 1)
+            throw new InvalidOperationException($"Player {snapshot.ControllerId} has too many heroes for the fixture.");
+
+        snapshot.Party.MemberRoster.AddToCounts(basicTroop, regularTroopCount);
+        if (snapshot.Party.LeaderHero != snapshot.Hero)
+            snapshot.Party.ChangePartyLeader(snapshot.Hero);
+        if (snapshot.Party.LeaderHero != snapshot.Hero)
+            throw new InvalidOperationException($"Player {snapshot.ControllerId} could not lead the fixture party.");
+
         snapshot.Hero.HitPoints = snapshot.Hero.MaxHitPoints;
         snapshot.Party.Position = position;
         snapshot.Party.SetMoveModeHold();
@@ -1705,6 +1724,9 @@ public class MapEventDebugCommands
         snapshot.Party.ItemRoster.Clear();
         foreach (var element in snapshot.ItemRoster)
             snapshot.Party.ItemRoster.Add(element);
+
+        if (snapshot.Party.LeaderHero != snapshot.LeaderHero)
+            snapshot.Party.ChangePartyLeader(snapshot.LeaderHero);
 
         snapshot.Hero.HitPoints = snapshot.HitPoints;
         snapshot.Party.RecentEventsMorale = snapshot.RecentEventsMorale;
