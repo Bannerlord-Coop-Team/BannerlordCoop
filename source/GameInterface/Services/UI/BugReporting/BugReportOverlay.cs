@@ -25,7 +25,7 @@ public interface IBugReportOverlay : IDisposable
 internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
 {
     private const string SummaryInputWidgetId = "CoopBugReportSummaryInput";
-    private const int LayerOrder = 2;
+    private const int LayerOrder = 3;
 
     private readonly IBugReportService bugReportService;
     private readonly IBugReportSubmissionConsent submissionConsent;
