@@ -1,6 +1,9 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Locations;
 
@@ -25,12 +28,16 @@ public static class LocationNpcGate
 
     private static string _activeInstanceId;
     private static bool _localHostConfirmed;
+    private static Func<Agent, bool> _partyAgentResolver;
 
     // Set around a puppet Mission.SpawnAgent/SpawnMonster call so the location capture patch does not
     // re-capture (and re-broadcast) an agent that itself came off the wire. Thread-static because it is
     // set and read on the same thread within a single spawn call.
     [ThreadStatic]
     private static bool _suppressCapture;
+
+    [ThreadStatic]
+    private static bool _isReplayingNativePopulation;
 
     /// <summary>True while a coop settlement location mission is active on this client.</summary>
     public static bool IsCoopLocationMissionActive
@@ -68,8 +75,36 @@ public static class LocationNpcGate
         set => _suppressCapture = value;
     }
 
+    /// <summary>True while the elected host replays the native population pass after party agents spawned.</summary>
+    public static bool IsReplayingNativePopulation
+    {
+        get => _isReplayingNativePopulation;
+        set => _isReplayingNativePopulation = value;
+    }
+
+    /// <summary>True when the agent belongs to a local or replicated player party.</summary>
+    public static bool IsPlayerPartyAgent(Agent agent)
+        => IsPlayerPartyAgent(agent, Agent.Main);
+
+    internal static bool IsPlayerPartyAgent(Agent agent, Agent mainAgent)
+    {
+        if (agent == null) return false;
+        if (ReferenceEquals(agent, mainAgent)) return true;
+
+        if (agent.Origin is PartyAgentOrigin origin)
+        {
+            var mainParty = PartyBase.MainParty;
+            if (mainParty != null && origin.Party == mainParty)
+                return true;
+        }
+
+        Func<Agent, bool> resolver;
+        lock (Gate) resolver = _partyAgentResolver;
+        return resolver?.Invoke(agent) == true;
+    }
+
     /// <summary>A coop location mission began on this client. Resets host confirmation.</summary>
-    public static void BeginMission(string instanceId)
+    public static void BeginMission(string instanceId, Func<Agent, bool> partyAgentResolver = null)
     {
         if (string.IsNullOrEmpty(instanceId)) throw new ArgumentException("instanceId is required", nameof(instanceId));
 
@@ -81,6 +116,7 @@ public static class LocationNpcGate
 
             _activeInstanceId = instanceId;
             _localHostConfirmed = false;
+            _partyAgentResolver = partyAgentResolver;
         }
     }
 
@@ -91,6 +127,7 @@ public static class LocationNpcGate
         {
             _activeInstanceId = null;
             _localHostConfirmed = false;
+            _partyAgentResolver = null;
         }
     }
 

@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
@@ -54,6 +55,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     private readonly IObjectManager objectManager;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ILocationSession session;
+    private readonly ILocationConversationAgentGuard conversationAgentGuard;
     private readonly ILocationAgentBindingMap bindingMap;
     private readonly ILocationPartyAgentMap partyAgentMap;
     private readonly ILocationPuppetRosterBinder rosterBinder;
@@ -83,6 +85,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
         ILocationSession session,
+        ILocationConversationAgentGuard conversationAgentGuard,
         ILocationAgentBindingMap bindingMap,
         ILocationPartyAgentMap partyAgentMap,
         ILocationPuppetRosterBinder rosterBinder,
@@ -95,6 +98,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
+        this.conversationAgentGuard = conversationAgentGuard;
         this.bindingMap = bindingMap;
         this.partyAgentMap = partyAgentMap;
         this.rosterBinder = rosterBinder;
@@ -150,6 +154,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
                 if (!registry.TryGetAgentInfo(id, out var info)) continue;
 
                 var agent = info.Agent;
+                conversationAgentGuard.EndConversationWithAgent(agent);
 
                 // SR-026: a passage exit moved the entry between location rosters on the host —
                 // mirror it here (before the binding is forgotten) or a later promoted host holds

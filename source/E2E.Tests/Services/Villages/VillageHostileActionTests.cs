@@ -1306,6 +1306,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
                 defenderParty.MemberRoster.AddToCounts(defenderTroop, 1);
                 AddSyntheticMapEventParty(mapEvent.DefenderSide, defenderParty.Party);
+                mapEvent.DefenderSide.LeaderParty = defenderParty.Party;
 
                 Assert.True(mapEvent.IsActiveSlowVillageRaid());
                 Assert.True(mapEvent.DefenderSide.TroopCount > 0);
@@ -1313,6 +1314,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
                 Assert.Null(defenderParty.Party.MapEventSide);
                 Assert.DoesNotContain(mapEvent.DefenderSide.Parties, party => party.Party == defenderParty.Party);
+                Assert.Same(settlement.Party, mapEvent.DefenderSide.LeaderParty);
                 Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
 
                 var wasFinished = false;
