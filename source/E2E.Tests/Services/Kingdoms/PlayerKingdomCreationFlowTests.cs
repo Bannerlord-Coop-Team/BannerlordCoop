@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using Coop.Core.Client.Services.Kingdoms.Handlers;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -11,6 +12,8 @@ using E2E.Tests.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Kingdoms.Data;
@@ -18,6 +21,7 @@ using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -26,18 +30,19 @@ using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
+using SandBox.ViewModelCollection.Map.Tracker;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Policies;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ViewModelCollection.Information;
@@ -3120,6 +3125,154 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
+    [Fact]
+    public void SwitchedPlayer_RefreshesPreExistingArmyTracker_AfterMainHeroWasStillWrongAtConstruction()
+    {
+        var client = TestEnvironment.Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var armyId = TestEnvironment.CreateRegisteredObject<Army>();
+        ConfigureClanInKingdom(client, player.ClanId, kingdomId);
+        EnsureKingdomRegistered(client, kingdomId);
+
+        ConfigureArmyInKingdom(client, kingdomId, armyId);
+
+        // Throwaway clan, avoids EncyclopediaManager exception.
+        var throwawayClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(throwawayClanId, out var throwawayClan));
+            using (new AllowedThread())
+            {
+                Hero.MainHero.Clan = throwawayClan;
+                Campaign.Current.PlayerDefaultFaction = throwawayClan;
+            }
+        });
+
+        MapTrackerProvider provider = null;
+        client.Call(() =>
+        {
+            // MainHero still wrong at construction; reproduces the real bug.
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.NotSame(playerHero, Hero.MainHero);
+
+            provider = new MapTrackerProvider();
+
+            Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
+            Assert.DoesNotContain(
+                provider.GetTrackers(),
+                tracker => ReferenceEquals(tracker.TrackedObject, army));
+        });
+
+        // Act: real switch, publishes SwitchedPlayer at the end.
+        client.Call(() =>
+        {
+            var heroInterface = client.Resolve<IHeroInterface>();
+            heroInterface.SwitchToPlayer(new Player(
+                ControllerId,
+                player.HeroId,
+                player.PartyId,
+                player.ClanId,
+                player.CharacterId));
+        }, new[] { AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }) });
+        GameThread.Run(() => { }, blocking: true);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
+            Assert.Contains(
+                provider.GetTrackers(),
+                tracker => ReferenceEquals(tracker.TrackedObject, army));
+        });
+    }
+
+    [Fact]
+    public void ArmyCreatedDuringSession_IsPickedUpByExistingClientMapTracker()
+    {
+        var client = TestEnvironment.Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        var settlementId = CreateSyncedSettlement();
+
+        // Gather() needs a home settlement.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                hero._homeSettlement = settlement;
+            }
+        });
+
+        var throwawayClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(throwawayClanId, out var throwawayClan));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            using (new AllowedThread())
+            {
+                throwawayClan._kingdom = kingdom;
+                Hero.MainHero.Clan = throwawayClan;
+                Campaign.Current.PlayerDefaultFaction = throwawayClan;
+            }
+        });
+
+        // Provider exists before the army,
+        // testing the live ArmyCreated listener, not ResetTrackers.
+        MapTrackerProvider provider = null;
+        client.Call(() => provider = new MapTrackerProvider());
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.DoesNotContain(
+                provider.GetTrackers(),
+                tracker => kingdom.Armies.Contains(tracker.TrackedObject as Army));
+        });
+
+        // Act: CreateArmy on the server, which syncs the events to the clients through a postfix.
+        string armyId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var armyLeader));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            kingdom.CreateArmy(armyLeader, settlement, Army.ArmyTypes.Defender);
+
+            var army = Assert.Single(kingdom.Armies);
+            Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
+        });
+        GameThread.Run(() => { }, blocking: true);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
+            Assert.Contains(
+                provider.GetTrackers(),
+                tracker => ReferenceEquals(tracker.TrackedObject, army));
+        });
+    }
+    private static void ConfigureArmyInKingdom(EnvironmentInstance instance, string kingdomId, string armyId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Army>(armyId, out var army));
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+
+            using (new AllowedThread())
+            {
+                army.Kingdom = kingdom;
+            }
+        });
+    }
     private static T GetObject<T>(EnvironmentInstance instance, string id) where T : class
     {
         Assert.True(instance.ObjectManager.TryGetObject<T>(id, out var value));
