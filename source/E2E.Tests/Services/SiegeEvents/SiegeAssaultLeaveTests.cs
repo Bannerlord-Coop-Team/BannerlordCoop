@@ -1,15 +1,18 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
+using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -19,6 +22,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -178,6 +182,83 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             AssertTrackerMatchesSides(mapEvent);
             Assert.Contains(tracker._mapEventParties, involvedParty => involvedParty.Party == party.Party);
         });
+    }
+
+    [Fact]
+    public void JoinActiveSiege_WaitsForAuthoritativePartyAttachmentBeforeOpeningEncounter()
+    {
+        var mapEventContext = CreateServerMapEvent();
+        var (heroId, partyId) = CreatePlayerHeroParty("PlayerOne");
+        var client = Clients.First();
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        SetMainParty(client, partyId);
+        var siegeEventId = SetClientOnlyCamp(client, partyId);
+
+        client.NetworkSentMessages.Clear();
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(
+                typeof(E2E.Tests.Environment.TestNetworkRouter),
+                nameof(E2E.Tests.Environment.TestNetworkRouter.SendAll),
+                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }))
+            .ToList();
+
+        using var menuSwitchRecorder = new GameMenuSwitchRecorder();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+
+            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+            var settlement = siegeEvent.BesiegedSettlement;
+            settlement.SiegeEvent = siegeEvent;
+            settlement.Party._mapEventSide = mapEvent.DefenderSide;
+            mapEvent.DefenderSide.LeaderParty = settlement.Party;
+            mapEvent.MapEventSettlement = settlement;
+            party._currentSettlement = settlement;
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._mapEvent = mapEvent;
+            encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
+            Campaign.Current.PlayerEncounter = encounter;
+
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            mapState._menuContext.GameMenu = new GameMenu("join_siege_event");
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+
+            Assert.False(InvokeJoinSiegeConsequencePrefix());
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+            Assert.Null(party.MapEvent);
+        }, disabledMethods);
+
+        Assert.Empty(menuSwitchRecorder.SwitchesFor(client));
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Assert.Equal(mapEventContext.MapEventId, request.MapEventId);
+        Assert.Equal(BattleSideEnum.Attacker, request.Side);
+
+        Server.NetworkSentMessages.Clear();
+        using (var networkDeliveryBlocker = new NetworkDeliveryBlocker())
+        {
+            Server.SimulateMessage(client.NetPeer, request);
+        }
+
+        Assert.True(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single().Accepted);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddBattleParty>());
+        var involvedParties = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddInvolvedParties>());
+
+        Assert.Empty(menuSwitchRecorder.SwitchesFor(client));
+
+        client.SimulateMessage(Server.NetPeer, involvedParties);
+        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.SwitchesFor(client));
+        client.SimulateMessage(Server.NetPeer, Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single());
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.Same(mapEvent, party.MapEvent);
+        }, MapEventDisabledMethods);
     }
 
     [Fact]
@@ -402,5 +483,84 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var involvedParties = mapEvent._sides.SelectMany(side => side.Parties).ToList();
         Assert.Equal(involvedParties.Count, mapEvent.TroopUpgradeTracker._mapEventParties.Count);
         Assert.All(involvedParties, party => Assert.Contains(party, mapEvent.TroopUpgradeTracker._mapEventParties));
+    }
+
+    private static bool InvokeJoinSiegeConsequencePrefix()
+    {
+        var patchType = AccessTools.TypeByName("GameInterface.Services.SiegeEvents.Patches.SiegeEntryFlowPatches");
+        var prefix = AccessTools.Method(patchType, "JoinSiegeConsequencePrefix");
+        Assert.NotNull(prefix);
+
+        return (bool)prefix.Invoke(null, Array.Empty<object>())!;
+    }
+
+    private sealed class GameMenuSwitchRecorder : IDisposable
+    {
+        private static readonly MethodInfo SwitchToMenuMethod =
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) });
+        private static readonly List<(object Container, string MenuId)> SwitchCalls = new();
+
+        private readonly Harmony harmony = new($"siege-join-menu-recorder-{Guid.NewGuid()}");
+
+        public GameMenuSwitchRecorder()
+        {
+            SwitchCalls.Clear();
+            harmony.Patch(
+                SwitchToMenuMethod,
+                prefix: new HarmonyMethod(typeof(GameMenuSwitchRecorder), nameof(RecordSwitchToMenu))
+                {
+                    priority = Priority.First,
+                });
+        }
+
+        public string[] SwitchesFor(EnvironmentInstance instance) =>
+            SwitchCalls
+                .Where(call => ReferenceEquals(call.Container, instance.Container))
+                .Select(call => call.MenuId)
+                .ToArray();
+
+        public void Dispose() =>
+            harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
+
+        private static bool RecordSwitchToMenu(string menuId)
+        {
+            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
+                SwitchCalls.Add((container, menuId));
+            return false;
+        }
+    }
+
+    private sealed class NetworkDeliveryBlocker : IDisposable
+    {
+        private static readonly MethodInfo[] DeliveryMethods =
+        {
+            AccessTools.Method(
+                typeof(E2E.Tests.Environment.TestNetworkRouter),
+                nameof(E2E.Tests.Environment.TestNetworkRouter.Send),
+                new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(IMessage) }),
+            AccessTools.Method(
+                typeof(E2E.Tests.Environment.TestNetworkRouter),
+                nameof(E2E.Tests.Environment.TestNetworkRouter.SendAll),
+                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }),
+        };
+
+        private readonly Harmony harmony = new($"siege-join-network-blocker-{Guid.NewGuid()}");
+
+        public NetworkDeliveryBlocker()
+        {
+            var prefix = new HarmonyMethod(typeof(NetworkDeliveryBlocker), nameof(Block));
+            foreach (var method in DeliveryMethods)
+                harmony.Patch(method, prefix: prefix);
+        }
+
+        public void Dispose()
+        {
+            foreach (var method in DeliveryMethods)
+                harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
+        }
+
+        private static bool Block(IMessage message) =>
+            message is not NetworkAddInvolvedParties &&
+            message is not NetworkJoinBattleReply;
     }
 }

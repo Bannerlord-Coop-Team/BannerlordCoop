@@ -22,6 +22,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.SiegeEvents.Patches;
 
@@ -85,9 +86,17 @@ internal class SiegeEntryFlowPatches
     {
         if (ModInformation.IsServer) return true;
 
-        // With a live assault the vanilla branch joins the MapEvent, which the existing map-event
-        // join intercepts already round-trip; only the camp join during preparation needs routing.
-        if (Settlement.CurrentSettlement?.Party?.MapEvent != null) return true;
+        var mapEvent = Settlement.CurrentSettlement?.Party?.MapEvent;
+        if (mapEvent != null)
+        {
+            PlayerEncounter.JoinBattle(!mapEvent.IsSallyOut ? BattleSideEnum.Attacker : BattleSideEnum.Defender);
+
+            // A fresh join completes asynchronously and opens after its involved-party snapshot.
+            // An already-involved party has no snapshot to wait for, so preserve vanilla's switch.
+            if (MobileParty.MainParty?.MapEvent == mapEvent)
+                GameMenu.SwitchToMenu("encounter");
+            return false;
+        }
 
         MessageBroker.Instance.Publish(null, new JoinSiegeCampAttempted(MobileParty.MainParty, Settlement.CurrentSettlement));
         return false;

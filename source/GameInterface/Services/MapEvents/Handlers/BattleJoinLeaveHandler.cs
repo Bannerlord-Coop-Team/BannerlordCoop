@@ -124,12 +124,32 @@ internal class BattleJoinLeaveHandler : IHandler
                             mobileParty.Position = positions[i];
                     }
                 }
+
+                SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
         });
+    }
+
+    private static void SwitchSiegeJoinerToEncounterIfNeeded(MapEvent mapEvent)
+    {
+        if (!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut)
+            return;
+
+        if (MobileParty.MainParty?.MapEvent != mapEvent)
+            return;
+
+        var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.EncounteredBattle ?? MapEvent.PlayerMapEvent;
+        if (encounterMapEvent != mapEvent)
+            return;
+
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "join_siege_event")
+            return;
+
+        GameMenu.SwitchToMenu("encounter");
     }
 
     /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
