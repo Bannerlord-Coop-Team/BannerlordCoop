@@ -124,6 +124,13 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LiveTestCommandDispatcher>().As<ILiveTestCommandDispatcher>().InstancePerDependency();
         builder.RegisterType<CoopModulePathResolver>().As<ICoopModulePathResolver>().InstancePerDependency();
         builder.RegisterType<FixedTownNpcService>().AsSelf().InstancePerLifetimeScope();
+        builder.RegisterType<LocationNpcGateState>().As<ILocationNpcGate>().InstancePerLifetimeScope();
+        builder.RegisterType<LocationConversationClientState>()
+            .As<ILocationConversationClientState>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<SettlementHeroSpawnPool>()
+            .As<ISettlementHeroSpawnPool>()
+            .InstancePerDependency();
         builder.RegisterType<KingdomCreationSettlementTracker>().AsSelf().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreator>().AsSelf().As<IKingdomCreator>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionOutcomeResolver>().AsSelf().As<IKingdomDecisionOutcomeResolver>().InstancePerLifetimeScope();

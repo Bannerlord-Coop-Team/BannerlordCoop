@@ -22,12 +22,12 @@ public sealed class DirectPacketSend
 
 public sealed class SerializedPacketSend
 {
-    public string ControllerId { get; }
+    public string? ControllerId { get; }
     public IPacket Packet { get; }
     public byte[] Payload { get; }
 
     public SerializedPacketSend(
-        string controllerId,
+        string? controllerId,
         IPacket packet,
         byte[] payload)
     {
@@ -38,10 +38,8 @@ public sealed class SerializedPacketSend
 }
 
 /// <summary>
-/// Mock of the mission P2P mesh (<see cref="IBattleNetwork"/>) for E2E tests. The real mesh is a direct
-/// client-to-client LiteNetLib link; this routes <see cref="IMessage"/> traffic between client instances
-/// in-process via <see cref="MeshNetworkRouter"/> — the mesh counterpart to <see cref="TestNetworkRouter"/>.
-/// Registered as <see cref="IBattleNetwork"/> on each client, overriding the real <c>LiteNetP2PClient</c>.
+/// Mock of the mission P2P mesh (<see cref="IBattleNetwork"/>) for E2E tests. Lifecycle and traffic route
+/// through <see cref="MeshNetworkRouter"/> while the collections retain sender-path assertions.
 /// </summary>
 public class MockBattleNetwork : IBattleNetwork
 {
@@ -55,15 +53,36 @@ public class MockBattleNetwork : IBattleNetwork
     public int MaxUnreliablePayloadBytes { get; set; } = 1000;
     public Dictionary<string, int> ControllerPayloadBytes { get; } = new();
     public bool RouteMessages { get; set; } = true;
+    public bool RoutePackets { get; set; } = true;
+    public bool IsStarted { get; private set; }
+    public string? ActiveInstanceId { get; private set; }
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
+        if (router == null) throw new ArgumentNullException(nameof(router));
         this.router = router;
     }
 
-    public void Start() { }
-    public void Stop() { }
-    public void ConnectToInstance(string instanceId) { }
+    public void Start()
+    {
+        if (IsStarted) return;
+
+        router.Start(this);
+        IsStarted = true;
+    }
+
+    public void Stop()
+    {
+        router.Stop(this);
+        ActiveInstanceId = null;
+        IsStarted = false;
+    }
+
+    public void ConnectToInstance(string instanceId)
+    {
+        router.ConnectToInstance(this, instanceId);
+        ActiveInstanceId = instanceId;
+    }
 
     public void SendAll(IMessage message)
     {
@@ -86,29 +105,50 @@ public class MockBattleNetwork : IBattleNetwork
             router.SendAllBut(this, controllerId, message);
     }
 
-    // Packet broadcasts are captured for sender-path assertions; packet-level mesh routing isn't exercised.
-    public void SendAll(IPacket packet) => NetworkSentPackets.Add(packet);
+    public void SendAll(IPacket packet)
+    {
+        NetworkSentPackets.Add(packet);
+        if (RoutePackets)
+            router.SendAll(this, packet);
+    }
+
     public void SendAll(IPacket packet, byte[] serializedPacket)
     {
         NetworkSentPackets.Add(packet);
         SerializedPacketSends.Add(new SerializedPacketSend(null, packet, serializedPacket));
+        if (RoutePackets)
+            router.SendAll(this, packet);
     }
+
     public void Send(string controllerId, IPacket packet)
     {
         NetworkSentPackets.Add(packet);
         DirectPacketSends.Add(new DirectPacketSend(controllerId, packet));
+        if (RoutePackets)
+            router.Send(this, controllerId, packet);
     }
+
     public void Send(string controllerId, IPacket packet, byte[] serializedPacket)
     {
         NetworkSentPackets.Add(packet);
         DirectPacketSends.Add(new DirectPacketSend(controllerId, packet));
         SerializedPacketSends.Add(
             new SerializedPacketSend(controllerId, packet, serializedPacket));
+        if (RoutePackets)
+            router.Send(this, controllerId, packet);
     }
-    public void SendAllBut(string controllerId, IPacket packet) => throw new NotImplementedException();
+
+    public void SendAllBut(string controllerId, IPacket packet)
+    {
+        NetworkSentPackets.Add(packet);
+        if (RoutePackets)
+            router.SendAllBut(this, controllerId, packet);
+    }
+
     public int GetMaxUnreliablePayloadBytes(string controllerId) =>
         ControllerPayloadBytes.TryGetValue(controllerId, out int payloadBytes)
             ? payloadBytes
             : MaxUnreliablePayloadBytes;
+
     public int GetMaxUnreliablePayloadBytes() => MaxUnreliablePayloadBytes;
 }

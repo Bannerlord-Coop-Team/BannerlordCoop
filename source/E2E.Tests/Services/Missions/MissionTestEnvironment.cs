@@ -113,14 +113,18 @@ public class MissionTestEnvironment : E2ETestEnvironment
     }
 
     /// <summary>Registers a hero/party pair as a player on every instance (controller id → party).</summary>
-    protected void RegisterAsPlayerParty(string controllerId, string heroId, string partyId)
+    protected void RegisterAsPlayerParty(
+        string controllerId,
+        string heroId,
+        string partyId,
+        string characterObjectId = "MyCharacterObjectId")
     {
         void Register(EnvironmentInstance instance)
         {
             instance.Call(() =>
             {
                 var registry = instance.Resolve<IPlayerManager>();
-                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", "MyCharacterObjectId"));
+                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", characterObjectId));
                 Assert.True(registry.TryGetPlayer(controllerId, out _));
             });
         }

@@ -38,6 +38,7 @@ public abstract class EnvironmentInstance : IDisposable
     public IObjectManager ObjectManager => Container.Resolve<IObjectManager>();
 
     public GameInstance GameInstance = new GameInstance();
+    public ICampaignMission CampaignMissionContext { get; set; }
 
     private readonly TestMessageBroker messageBroker;
     private readonly MockNetworkBase mockNetwork;
@@ -153,6 +154,7 @@ public abstract class EnvironmentInstance : IDisposable
         private readonly ILifetimeScope previousContainer;
         private readonly MBObjectManager previousObjectManager;
         private readonly Campaign previousCampaign;
+        private readonly ICampaignMission previousCampaignMission;
         private readonly Game previousGame;
         private readonly TaleWorlds.MountAndBlade.Module previousModule;
         private readonly TestMessageBroker previousMessageBroker;
@@ -186,6 +188,7 @@ public abstract class EnvironmentInstance : IDisposable
                 wasServer = ModInformation.IsServer;
                 previousObjectManager = MBObjectManager.Instance;
                 previousCampaign = Campaign.Current;
+                previousCampaignMission = CampaignMission.Current;
                 previousGame = Game.Current;
                 previousModule = TaleWorlds.MountAndBlade.Module.CurrentModule;
                 if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
@@ -199,6 +202,7 @@ public abstract class EnvironmentInstance : IDisposable
                 // Set new static values
                 restorePreviousStatics = true;
                 instance.GameInstance.SetStatics();
+                CampaignMission.Current = instance.CampaignMissionContext;
 
                 ModInformation.IsServer = instance is ServerInstance;
                 instanceMessageBroker.SetStaticInstance();
@@ -243,6 +247,7 @@ public abstract class EnvironmentInstance : IDisposable
         {
             MBObjectManager.Instance = previousObjectManager;
             Campaign.Current = previousCampaign;
+            CampaignMission.Current = previousCampaignMission;
             Game.Current = previousGame;
             TaleWorlds.MountAndBlade.Module.CurrentModule = previousModule;
             ModInformation.IsServer = wasServer;
