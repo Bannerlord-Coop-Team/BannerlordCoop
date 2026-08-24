@@ -471,12 +471,13 @@ public class SiegeDebugCommand
             {
                 PublishPrisonerPromptForcedPosition(party);
             }
-            bool combatStateRestored = IsPrisonerPromptCombatStateRestored(fixture);
-            if (!playerRestored || !leaderRestored || fixture.Settlement.SiegeEvent != null ||
-                fixture.PlayerParty.Army != null || fixture.ArmyLeader.Army != null ||
-                !combatStateRestored)
+            var restoreFailures = GetPrisonerPromptFixtureRestoreFailures(
+                fixture,
+                playerRestored,
+                leaderRestored);
+            if (restoreFailures.Count != 0)
             {
-                error = "one or more fixture invariants were not restored";
+                error = "fixture invariants not restored: " + string.Join(", ", restoreFailures);
                 return false;
             }
 
@@ -659,6 +660,34 @@ public class SiegeDebugCommand
 
     private static bool IsPrisonerPromptCombatStateRestored(PrisonerPromptFixture fixture)
     {
+        return GetPrisonerPromptCombatStateRestoreFailures(fixture).Count == 0;
+    }
+
+    private static List<string> GetPrisonerPromptFixtureRestoreFailures(
+        PrisonerPromptFixture fixture,
+        bool playerBehaviorRestored,
+        bool leaderBehaviorRestored)
+    {
+        var failures = new List<string>();
+        if (!playerBehaviorRestored)
+            failures.Add("player party behavior");
+        if (!leaderBehaviorRestored)
+            failures.Add("army leader behavior");
+        if (fixture.Settlement.SiegeEvent != null)
+            failures.Add("settlement siege");
+        if (fixture.PlayerParty.Army != null)
+            failures.Add("player party army");
+        if (fixture.ArmyLeader.Army != null)
+            failures.Add("army leader army");
+
+        failures.AddRange(GetPrisonerPromptCombatStateRestoreFailures(fixture));
+        return failures;
+    }
+
+    private static List<string> GetPrisonerPromptCombatStateRestoreFailures(
+        PrisonerPromptFixture fixture)
+    {
+        var failures = new List<string>();
         bool townRestored = fixture.Settlement.Town.Prosperity == fixture.Prosperity &&
             fixture.Settlement.Town.Loyalty == fixture.Loyalty &&
             fixture.Settlement.Town.Security == fixture.Security &&
@@ -671,13 +700,30 @@ public class SiegeDebugCommand
             (fixture.PartySnapshots.Any(snapshot => snapshot.IsSettlementMilitia)
                 ? fixture.Settlement.MilitiaPartyComponent?.MobileParty?.IsActive == true
                 : fixture.Settlement.MilitiaPartyComponent == null);
-        return townRestored &&
-            fixture.PartySnapshots.All(snapshot => IsPrisonerPromptPartyRestored(fixture, snapshot)) &&
-            fixture.HeroSnapshots.All(snapshot => IsPrisonerPromptHeroRestored(fixture, snapshot)) &&
-            fixture.ClanSnapshots.All(snapshot =>
-                snapshot.Clan._influence == snapshot.Influence &&
-                snapshot.Clan.Renown == snapshot.Renown &&
-                snapshot.Clan._tier == snapshot.Tier);
+        if (!townRestored)
+            failures.Add("settlement town state");
+
+        foreach (var snapshot in fixture.PartySnapshots
+            .Where(snapshot => !IsPrisonerPromptPartyRestored(fixture, snapshot)))
+        {
+            failures.Add("party " + (snapshot.StringId ?? fixture.Settlement.StringId));
+        }
+
+        foreach (var snapshot in fixture.HeroSnapshots
+            .Where(snapshot => !IsPrisonerPromptHeroRestored(fixture, snapshot)))
+        {
+            failures.Add("hero " + snapshot.Hero.StringId);
+        }
+
+        foreach (var snapshot in fixture.ClanSnapshots.Where(snapshot =>
+            snapshot.Clan._influence != snapshot.Influence ||
+            snapshot.Clan.Renown != snapshot.Renown ||
+            snapshot.Clan._tier != snapshot.Tier))
+        {
+            failures.Add("clan " + snapshot.Clan.StringId);
+        }
+
+        return failures;
     }
 
     private static bool IsPrisonerPromptPartyRestored(
