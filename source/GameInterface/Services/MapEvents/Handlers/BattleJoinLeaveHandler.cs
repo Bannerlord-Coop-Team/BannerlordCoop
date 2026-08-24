@@ -11,6 +11,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -45,6 +46,7 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
+    private readonly ISiegeJoinMenuActivationGate siegeJoinMenuActivationGate;
     private readonly ConcurrentDictionary<string, string> pendingJoinRequests = new ConcurrentDictionary<string, string>();
 
     public BattleJoinLeaveHandler(
@@ -55,7 +57,8 @@ internal class BattleJoinLeaveHandler : IHandler
         IMapEventLogger mapEventLogger,
         IMapEventInitializationBarrier initializationBarrier,
         ISiegeEventInterface siegeEventInterface,
-        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
+        ISiegeJoinMenuActivationGate siegeJoinMenuActivationGate)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -65,6 +68,7 @@ internal class BattleJoinLeaveHandler : IHandler
         this.initializationBarrier = initializationBarrier;
         this.siegeEventInterface = siegeEventInterface;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
+        this.siegeJoinMenuActivationGate = siegeJoinMenuActivationGate;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
@@ -125,7 +129,8 @@ internal class BattleJoinLeaveHandler : IHandler
                     }
                 }
 
-                SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
+                if (!siegeJoinMenuActivationGate.ResumeAfterSnapshot(mapEvent))
+                    SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
             }
             catch (Exception e)
             {
@@ -169,6 +174,8 @@ internal class BattleJoinLeaveHandler : IHandler
             return;
         }
 
+        siegeJoinMenuActivationGate.ArmJoinRequest(data.MapEvent, data.JoiningParty);
+
         mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
 
         // On a client, SendAll targets the server (its only connected peer).
@@ -190,6 +197,8 @@ internal class BattleJoinLeaveHandler : IHandler
 
             pendingJoinRequests.TryRemove(reply.PartyId, out _);
             if (reply.Accepted) return;
+
+            siegeJoinMenuActivationGate.CancelDeferredActivation();
 
             Logger.Warning("Server rejected battle join for party {PartyId} and map event {MapEventId}",
                 reply.PartyId, reply.MapEventId);

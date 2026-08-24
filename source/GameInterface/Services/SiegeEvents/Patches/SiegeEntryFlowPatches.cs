@@ -8,6 +8,7 @@ using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Helpers;
@@ -100,6 +101,16 @@ internal class SiegeEntryFlowPatches
 
         MessageBroker.Instance.Publish(null, new JoinSiegeCampAttempted(MobileParty.MainParty, Settlement.CurrentSettlement));
         return false;
+    }
+
+    [HarmonyPatch(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) })]
+    [HarmonyPrefix]
+    private static bool ActivateJoinSiegeMenuPrefix(string menuId)
+    {
+        if (ModInformation.IsServer || menuId != "join_siege_event") return true;
+        if (!ContainerProvider.TryResolve<ISiegeJoinMenuActivationGate>(out var activationGate)) return true;
+
+        return !activationGate.TryDeferActivation();
     }
 
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_leave_on_consequence))]
