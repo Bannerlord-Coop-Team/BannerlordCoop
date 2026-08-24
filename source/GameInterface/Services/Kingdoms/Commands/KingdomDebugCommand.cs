@@ -32,6 +32,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -416,27 +417,33 @@ public class KingdomDebugCommand
         Kingdom sturgia = Kingdom.All.SingleOrDefault(candidate =>
             string.Equals(candidate.StringId, "sturgia", StringComparison.Ordinal));
         if (sturgia == null) return "The Sturgia kingdom is unavailable.";
+        if (sturgia.Leader == null) return "Sturgia has no ruling leader.";
 
         AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
         if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
 
-        Kingdom kingdom = Kingdom.All
+        Kingdom kingdom = null;
+        foreach (Kingdom candidate in Kingdom.All
             .Where(candidate =>
                 candidate != sturgia &&
                 candidate.RulingClan != null &&
+                candidate.Leader != null &&
                 candidate.UnresolvedDecisions.Count == 0 &&
                 !FactionManager.IsAtWarAgainstFaction(candidate, sturgia) &&
-                !allianceBehavior.IsAllyWithKingdom(candidate, sturgia) &&
-                Campaign.Current.Models.AllianceModel.CanMakeAlliance(
-                    candidate,
-                    sturgia,
-                    candidate.RulingClan,
-                    out _,
-                    includeReason: false))
-            .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal)
-            .FirstOrDefault();
+                !allianceBehavior.IsAllyWithKingdom(candidate, sturgia))
+            .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal))
+        {
+            if (!TryValidateAllianceTimeoutTarget(candidate, sturgia, out string error))
+            {
+                if (!string.IsNullOrEmpty(error)) return error;
+                continue;
+            }
+
+            kingdom = candidate;
+            break;
+        }
         if (kingdom == null)
-            return "No NPC-ruled kingdom can currently receive a valid alliance offer from Sturgia.";
+            return "No NPC-ruled kingdom can receive a valid alliance offer from Sturgia after reversible fixture normalization.";
         if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
             !objectManager.TryGetIdWithLogging(sturgia, out string sturgiaId))
             return "Unable to resolve alliance-timeout target ids.";
@@ -467,11 +474,13 @@ public class KingdomDebugCommand
 
         Kingdom kingdom = proposerClan.Kingdom;
         if (kingdom.RulingClan == null) return $"Kingdom {kingdom.StringId} has no ruling clan.";
+        if (kingdom.Leader == null) return $"Kingdom {kingdom.StringId} has no ruling leader.";
         if (kingdom.RulingClan == proposerClan)
             return "The testclient clan must be a voting supporter under an NPC ruler.";
         Kingdom targetKingdom = Kingdom.All.SingleOrDefault(candidate =>
             string.Equals(candidate.StringId, "sturgia", StringComparison.Ordinal));
         if (targetKingdom == null) return "The Sturgia kingdom is unavailable.";
+        if (targetKingdom.Leader == null) return "Sturgia has no ruling leader.";
         if (targetKingdom == kingdom) return "The testclient clan is already in Sturgia.";
         if (kingdom.UnresolvedDecisions.Count > 0)
             return $"Kingdom {kingdom.StringId} already has an unresolved decision.";
@@ -482,19 +491,28 @@ public class KingdomDebugCommand
         if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
         if (allianceBehavior.IsAllyWithKingdom(kingdom, targetKingdom))
             return $"Kingdom {kingdom.StringId} is already allied with Sturgia.";
-        if (!Campaign.Current.Models.AllianceModel.CanMakeAlliance(
-                kingdom,
-                targetKingdom,
-                kingdom.RulingClan,
-                out var reason,
-                includeReason: true))
-        {
-            return $"Kingdom {kingdom.StringId} cannot currently receive a valid alliance offer from Sturgia: {reason}";
-        }
         if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
             !objectManager.TryGetIdWithLogging(proposerClan, out string proposerClanId) ||
             !objectManager.TryGetIdWithLogging(targetKingdom, out string targetKingdomId))
             return "Unable to resolve alliance-timeout fixture ids.";
+
+        if (!TryCreateAllianceTimeoutFixture(
+                kingdom,
+                proposerClan,
+                targetKingdom,
+                kingdomId,
+                targetKingdomId,
+                out var fixture,
+                out string fixtureError))
+        {
+            return fixtureError;
+        }
+        pendingAllianceTimeoutFixture = fixture;
+        if (!TryPrepareAllianceTimeoutFixture(fixture, out string error))
+        {
+            if (fixture.LeaderRelationRestored) pendingAllianceTimeoutFixture = null;
+            return error;
+        }
 
         return LiveTestJsonResult(new
         {
@@ -506,6 +524,9 @@ public class KingdomDebugCommand
             targetKingdomId,
             targetKingdomName = targetKingdom.Name.ToString(),
             allianceWasActive = false,
+            leaderRelationBefore = fixture.LeaderRelationBefore,
+            leaderRelationAfter = fixture.CurrentLeaderRelation,
+            leaderRelationChanged = fixture.LeaderRelationChanged,
             unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
         });
     }
@@ -516,53 +537,79 @@ public class KingdomDebugCommand
         const string usage = "Usage: coop.debug.kingdom.alliance_timeout_stage <kingdomId> <proposerClanId> <targetKingdomId>";
         if (ModInformation.IsClient) return "Command can only be run on the server.";
         if (args.Count != 3) return usage;
-        if (pendingAllianceTimeoutFixture != null) return "An alliance-timeout fixture lifecycle is already active.";
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
-        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
-        if (!objectManager.TryGetObject(args[1], out Clan proposerClan)) return $"Clan with ID: '{args[1]}' not found";
-        if (!objectManager.TryGetObject(args[2], out Kingdom targetKingdom)) return $"Kingdom with ID: '{args[2]}' not found";
-        if (proposerClan.Kingdom != kingdom) return $"Clan {args[1]} is not in kingdom {args[0]}.";
+        if (!TryMatchPendingAllianceTimeoutFixture(args[0], args[2], false, out var fixture, out string error))
+            return error;
+        if (!TryGetObjectManager(out var objectManager))
+            return FailAllianceTimeoutFixture(fixture, "Unable to resolve ObjectManager");
+        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom))
+            return FailAllianceTimeoutFixture(fixture, $"Kingdom with ID: '{args[0]}' not found");
+        if (!objectManager.TryGetObject(args[1], out Clan proposerClan))
+            return FailAllianceTimeoutFixture(fixture, $"Clan with ID: '{args[1]}' not found");
+        if (!objectManager.TryGetObject(args[2], out Kingdom targetKingdom))
+            return FailAllianceTimeoutFixture(fixture, $"Kingdom with ID: '{args[2]}' not found");
+        if (proposerClan.Kingdom != kingdom)
+            return FailAllianceTimeoutFixture(fixture, $"Clan {args[1]} is not in kingdom {args[0]}.");
         if (kingdom.RulingClan == null || kingdom.RulingClan == proposerClan)
-            return "The testclient clan is no longer a voting supporter under an NPC ruler.";
+            return FailAllianceTimeoutFixture(fixture, "The testclient clan is no longer a voting supporter under an NPC ruler.");
         if (kingdom.UnresolvedDecisions.Count > 0)
-            return $"Kingdom {args[0]} no longer has a clean decision fixture.";
+            return FailAllianceTimeoutFixture(fixture, $"Kingdom {args[0]} no longer has a clean decision fixture.");
 
-        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
-        if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
-        if (allianceBehavior.IsAllyWithKingdom(kingdom, targetKingdom) ||
-            FactionManager.IsAtWarAgainstFaction(kingdom, targetKingdom))
+        if (!TryVerifyUnchangedAllianceState(fixture, out string allianceStateError))
+            return FailAllianceTimeoutFixture(fixture, allianceStateError);
+        if (FactionManager.IsAtWarAgainstFaction(kingdom, targetKingdom))
         {
-            return "The alliance-timeout fixture relationship changed after capture.";
+            return FailAllianceTimeoutFixture(fixture, "The alliance-timeout fixture relationship changed after capture.");
+        }
+        if (!TryCanMakeAlliance(
+                kingdom,
+                targetKingdom,
+                kingdom.RulingClan,
+                includeReason: true,
+                out bool canMakeAlliance,
+                out TextObject reason,
+                out string gateError))
+        {
+            return FailAllianceTimeoutFixture(fixture, gateError);
+        }
+        if (!canMakeAlliance)
+        {
+            return FailAllianceTimeoutFixture(
+                fixture,
+                $"Kingdom {kingdom.StringId} cannot currently receive a valid alliance offer from Sturgia: {reason}");
         }
 
-        var fixture = new AllianceTimeoutFixture(
-            kingdom,
-            proposerClan,
-            targetKingdom,
-            args[0],
-            args[2],
-            false);
-        pendingAllianceTimeoutFixture = fixture;
-
-        // A redirected inbound offer is authored by the player kingdom's ruling clan.
-        var decision = new StartAllianceDecision(fixture.Kingdom.RulingClan, fixture.TargetKingdom);
-        CoopKingdomElection._opponentProposedAllianceDecisions.Add(decision);
-        fixture.Kingdom.AddDecision(decision, true);
-        decision.TriggerTime = CampaignTime.Zero;
-        CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
-
-        int decisionIndex = fixture.Kingdom._unresolvedDecisions.IndexOf(decision) + 1;
-        if (decisionIndex <= 0) return "The alliance-timeout decision was not retained for co-op voting.";
-
-        return LiveTestJsonResult(new
+        try
         {
-            success = true,
-            fixture.KingdomId,
-            fixture.TargetKingdomId,
-            decisionIndex,
-            triggerPast = decision.TriggerTime.IsPast,
-            votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
-        });
+            // A redirected inbound offer is authored by the player kingdom's ruling clan.
+            var decision = new StartAllianceDecision(fixture.Kingdom.RulingClan, fixture.TargetKingdom);
+            CoopKingdomElection._opponentProposedAllianceDecisions.Add(decision);
+            fixture.Kingdom.AddDecision(decision, true);
+            decision.TriggerTime = CampaignTime.Zero;
+            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+
+            if (!TryVerifyUnchangedAllianceState(fixture, out allianceStateError))
+                return FailAllianceTimeoutFixture(fixture, allianceStateError);
+
+            int decisionIndex = fixture.Kingdom._unresolvedDecisions.IndexOf(decision) + 1;
+            if (decisionIndex <= 0)
+                return FailAllianceTimeoutFixture(fixture, "The alliance-timeout decision was not retained for co-op voting.");
+
+            return LiveTestJsonResult(new
+            {
+                success = true,
+                fixture.KingdomId,
+                fixture.TargetKingdomId,
+                decisionIndex,
+                triggerPast = decision.TriggerTime.IsPast,
+                votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
+            });
+        }
+        catch (Exception exception)
+        {
+            return FailAllianceTimeoutFixture(
+                fixture,
+                $"The alliance-timeout decision could not be staged: {exception.Message}");
+        }
     }
 
     [CommandLineArgumentFunction("alliance_timeout_state", "coop.debug.kingdom")]
@@ -645,10 +692,11 @@ public class KingdomDebugCommand
         bool allianceIsActive = allianceBehavior.IsAllyWithKingdom(fixture.Kingdom, fixture.TargetKingdom);
         return LiveTestJsonResult(new
         {
-            success = !decisionPresent && !allianceIsActive,
+            success = !decisionPresent && allianceIsActive == fixture.AllianceWasActive,
             fixture.KingdomId,
             fixture.TargetKingdomId,
             decisionPresent,
+            expectedAllianceActive = fixture.AllianceWasActive,
             allianceIsActive,
             unresolvedDecisionCount = fixture.Kingdom.UnresolvedDecisions.Count
         });
@@ -663,34 +711,18 @@ public class KingdomDebugCommand
         if (!TryMatchPendingAllianceTimeoutFixture(args[0], args[1], allianceWasActive, out var fixture, out string error))
             return error;
 
-        foreach (StartAllianceDecision decision in fixture.Kingdom.UnresolvedDecisions
-            .OfType<StartAllianceDecision>()
-            .Where(candidate => candidate.KingdomToStartAllianceWith == fixture.TargetKingdom)
-            .ToList())
-        {
-            fixture.Kingdom.RemoveDecision(decision);
-            CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(decision);
-        }
-
-        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
-        if (allianceBehavior == null) return "The alliance campaign behavior is unavailable.";
-        bool allianceIsActive = allianceBehavior.IsAllyWithKingdom(fixture.Kingdom, fixture.TargetKingdom);
-        if (fixture.AllianceWasActive && !allianceIsActive)
-        {
-            allianceBehavior.StartAlliance(fixture.Kingdom, fixture.TargetKingdom);
-        }
-        else if (!fixture.AllianceWasActive && allianceIsActive)
-        {
-            allianceBehavior.EndAlliance(fixture.Kingdom, fixture.TargetKingdom);
-        }
+        if (!TryRestoreAllianceTimeoutFixture(fixture, out string restoreError)) return restoreError;
 
         pendingAllianceTimeoutFixture = null;
+        AllianceCampaignBehavior allianceBehavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
         return LiveTestJsonResult(new
         {
             success = true,
             fixture.KingdomId,
             fixture.TargetKingdomId,
             restoredAllianceActive = allianceBehavior.IsAllyWithKingdom(fixture.Kingdom, fixture.TargetKingdom),
+            leaderRelationBefore = fixture.LeaderRelationBefore,
+            leaderRelationRestored = fixture.LeaderRelationRestored,
             unresolvedDecisionCount = fixture.Kingdom.UnresolvedDecisions.Count
         });
     }
@@ -755,6 +787,260 @@ public class KingdomDebugCommand
             .OfType<StartAllianceDecision>()
             .Any(decision => decision.KingdomToStartAllianceWith == fixture.TargetKingdom);
 
+    private static bool TryCreateAllianceTimeoutFixture(
+        Kingdom kingdom,
+        Clan proposerClan,
+        Kingdom targetKingdom,
+        string kingdomId,
+        string targetKingdomId,
+        out AllianceTimeoutFixture fixture,
+        out string error)
+    {
+        fixture = null;
+        error = string.Empty;
+        if (kingdom?.Leader == null || targetKingdom?.Leader == null)
+        {
+            error = "The alliance-timeout fixture requires both kingdom leaders.";
+            return false;
+        }
+
+        var campaign = Campaign.Current;
+        if (campaign?.Models?.DiplomacyModel == null)
+        {
+            error = "The campaign diplomacy model is unavailable.";
+            return false;
+        }
+
+        try
+        {
+            campaign.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+                kingdom.Leader,
+                targetKingdom.Leader,
+                out Hero effectiveLeader,
+                out Hero effectiveTargetLeader);
+            if (effectiveLeader == null || effectiveTargetLeader == null || effectiveLeader == effectiveTargetLeader)
+            {
+                error = "The alliance-timeout fixture could not resolve distinct effective relation heroes.";
+                return false;
+            }
+
+            fixture = new AllianceTimeoutFixture(
+                kingdom,
+                proposerClan,
+                targetKingdom,
+                kingdomId,
+                targetKingdomId,
+                false,
+                effectiveLeader,
+                effectiveTargetLeader,
+                CharacterRelationManager.GetHeroRelation(effectiveLeader, effectiveTargetLeader));
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = $"The alliance-timeout fixture could not resolve the effective relation: {exception.Message}";
+            return false;
+        }
+    }
+
+    private static bool TryValidateAllianceTimeoutTarget(Kingdom kingdom, Kingdom targetKingdom, out string error)
+    {
+        if (!TryCanMakeAlliance(
+                kingdom,
+                targetKingdom,
+                kingdom.RulingClan,
+                includeReason: false,
+                out bool canMakeAlliance,
+                out _,
+                out error)) return false;
+        if (canMakeAlliance) return true;
+
+        if (!TryCreateAllianceTimeoutFixture(
+                kingdom,
+                kingdom.RulingClan,
+                targetKingdom,
+                kingdom.StringId,
+                targetKingdom.StringId,
+                out var fixture,
+                out error))
+        {
+            return false;
+        }
+        if (!fixture.TryNormalizeLeaderRelation(out error)) return false;
+
+        bool targetIsEligible = false;
+        try
+        {
+            if (!TryCanMakeAlliance(
+                kingdom,
+                targetKingdom,
+                kingdom.RulingClan,
+                includeReason: false,
+                out canMakeAlliance,
+                out _,
+                out error)) return false;
+            targetIsEligible = canMakeAlliance;
+        }
+        finally
+        {
+            if (!fixture.TryRestoreLeaderRelation(out string restoreError))
+            {
+                error = $"Unable to restore alliance-timeout target normalization: {restoreError}";
+            }
+        }
+
+        return string.IsNullOrEmpty(error) && targetIsEligible;
+    }
+
+    private static bool TryPrepareAllianceTimeoutFixture(AllianceTimeoutFixture fixture, out string error)
+    {
+        if (!TryCanMakeAlliance(
+                fixture.Kingdom,
+                fixture.TargetKingdom,
+                fixture.Kingdom.RulingClan,
+                includeReason: false,
+                out bool canMakeAlliance,
+                out _,
+                out error)) return false;
+        if (!canMakeAlliance &&
+            !fixture.TryNormalizeLeaderRelation(out error))
+        {
+            return false;
+        }
+
+        if (!TryCanMakeAlliance(
+                fixture.Kingdom,
+                fixture.TargetKingdom,
+                fixture.Kingdom.RulingClan,
+                includeReason: true,
+                out canMakeAlliance,
+                out TextObject reason,
+                out string gateError))
+        {
+            if (!fixture.TryRestoreLeaderRelation(out string preparationRestoreError))
+            {
+                error = $"Unable to restore alliance-timeout fixture normalization: {preparationRestoreError}";
+                return false;
+            }
+
+            error = gateError;
+            return false;
+        }
+        if (canMakeAlliance) return true;
+
+        if (!fixture.TryRestoreLeaderRelation(out string failedGateRestoreError))
+        {
+            error = $"Unable to restore alliance-timeout fixture normalization: {failedGateRestoreError}";
+            return false;
+        }
+
+        error = $"Kingdom {fixture.Kingdom.StringId} cannot currently receive a valid alliance offer from Sturgia: {reason}";
+        return false;
+    }
+
+    private static bool TryCanMakeAlliance(
+        Kingdom kingdom,
+        Kingdom targetKingdom,
+        IFaction evaluatingFaction,
+        bool includeReason,
+        out bool canMakeAlliance,
+        out TextObject reason,
+        out string error)
+    {
+        canMakeAlliance = false;
+        reason = null;
+        error = string.Empty;
+        try
+        {
+            canMakeAlliance = Campaign.Current.Models.AllianceModel.CanMakeAlliance(
+                kingdom,
+                targetKingdom,
+                evaluatingFaction,
+                out reason,
+                includeReason);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = $"Alliance eligibility evaluation failed: {exception.Message}";
+            return false;
+        }
+    }
+
+    private static bool TryVerifyUnchangedAllianceState(AllianceTimeoutFixture fixture, out string error)
+    {
+        error = string.Empty;
+        AllianceCampaignBehavior allianceBehavior = Campaign.Current?.GetCampaignBehavior<AllianceCampaignBehavior>();
+        if (allianceBehavior == null)
+        {
+            error = "The alliance campaign behavior is unavailable.";
+            return false;
+        }
+
+        try
+        {
+            if (allianceBehavior.IsAllyWithKingdom(fixture.Kingdom, fixture.TargetKingdom) == fixture.AllianceWasActive)
+                return true;
+
+            error = "The alliance state changed; the alliance-timeout fixture will not alter it.";
+            return false;
+        }
+        catch (Exception exception)
+        {
+            error = $"The alliance state could not be verified: {exception.Message}";
+            return false;
+        }
+    }
+
+    private static string FailAllianceTimeoutFixture(AllianceTimeoutFixture fixture, string failure)
+    {
+        if (TryRestoreAllianceTimeoutFixture(fixture, out string restoreError))
+        {
+            pendingAllianceTimeoutFixture = null;
+            return failure;
+        }
+
+        return $"{failure} Fixture restoration failed: {restoreError}";
+    }
+
+    private static bool TryRestoreAllianceTimeoutFixture(AllianceTimeoutFixture fixture, out string error)
+    {
+        var errors = new List<string>();
+        try
+        {
+            foreach (StartAllianceDecision decision in fixture.Kingdom.UnresolvedDecisions
+                .OfType<StartAllianceDecision>()
+                .Where(candidate => candidate.KingdomToStartAllianceWith == fixture.TargetKingdom)
+                .ToList())
+            {
+                fixture.Kingdom.RemoveDecision(decision);
+                CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(decision);
+            }
+        }
+        catch (Exception exception)
+        {
+            errors.Add($"The alliance decision could not be removed: {exception.Message}");
+        }
+
+        if (!TryVerifyUnchangedAllianceState(fixture, out string allianceStateError))
+        {
+            errors.Add(allianceStateError);
+        }
+
+        if (!fixture.TryRestoreLeaderRelation(out string relationError))
+        {
+            errors.Add($"The leader relation was not restored: {relationError}");
+        }
+        if (HasMatchingAllianceDecision(fixture) ||
+            fixture.Kingdom.UnresolvedDecisions.Count != fixture.UnresolvedDecisionCount)
+        {
+            errors.Add("The unresolved decision state was not restored.");
+        }
+
+        error = string.Join(" ", errors);
+        return errors.Count == 0;
+    }
+
     private static bool TryMatchPendingPolicyTimeoutFixture(
         string kingdomId,
         string proposerClanId,
@@ -793,6 +1079,13 @@ public class KingdomDebugCommand
         public string KingdomId { get; }
         public string TargetKingdomId { get; }
         public bool AllianceWasActive { get; }
+        public Hero EffectiveLeader { get; }
+        public Hero EffectiveTargetLeader { get; }
+        public int LeaderRelationBefore { get; }
+        public int UnresolvedDecisionCount { get; }
+        public bool LeaderRelationChanged { get; private set; }
+        public bool LeaderRelationRestored { get; private set; }
+        public int CurrentLeaderRelation => CharacterRelationManager.GetHeroRelation(EffectiveLeader, EffectiveTargetLeader);
 
         public AllianceTimeoutFixture(
             Kingdom kingdom,
@@ -800,7 +1093,10 @@ public class KingdomDebugCommand
             Kingdom targetKingdom,
             string kingdomId,
             string targetKingdomId,
-            bool allianceWasActive)
+            bool allianceWasActive,
+            Hero effectiveLeader,
+            Hero effectiveTargetLeader,
+            int leaderRelationBefore)
         {
             Kingdom = kingdom;
             ProposerClan = proposerClan;
@@ -808,6 +1104,88 @@ public class KingdomDebugCommand
             KingdomId = kingdomId;
             TargetKingdomId = targetKingdomId;
             AllianceWasActive = allianceWasActive;
+            EffectiveLeader = effectiveLeader;
+            EffectiveTargetLeader = effectiveTargetLeader;
+            LeaderRelationBefore = leaderRelationBefore;
+            UnresolvedDecisionCount = kingdom.UnresolvedDecisions.Count;
+            LeaderRelationRestored = true;
+        }
+
+        public bool TryNormalizeLeaderRelation(out string error)
+        {
+            error = string.Empty;
+            int maximumRelation = Campaign.Current.Models.DiplomacyModel.MaxRelationLimit;
+            int currentRelation = CurrentLeaderRelation;
+            if (currentRelation == maximumRelation) return true;
+
+            if (!TrySetLeaderRelation(maximumRelation, out string normalizationError))
+            {
+                if (!TryRestoreLeaderRelation(out string normalizationExceptionRestoreError))
+                {
+                    error = $"The normalized leader relation could not be restored: {normalizationExceptionRestoreError}";
+                    return false;
+                }
+
+                error = $"The alliance-timeout fixture could not normalize the leader relation: {normalizationError}";
+                return false;
+            }
+            if (CurrentLeaderRelation == maximumRelation)
+            {
+                LeaderRelationChanged = true;
+                LeaderRelationRestored = false;
+                return true;
+            }
+
+            if (!TryRestoreLeaderRelation(out string normalizationRestoreError))
+            {
+                error = $"The normalized leader relation could not be restored: {normalizationRestoreError}";
+                return false;
+            }
+
+            error = "The alliance-timeout fixture could not normalize the leader relation.";
+            return false;
+        }
+
+        public bool TryRestoreLeaderRelation(out string error)
+        {
+            error = string.Empty;
+            int currentRelation = CurrentLeaderRelation;
+            if (currentRelation != LeaderRelationBefore)
+            {
+                if (!TrySetLeaderRelation(LeaderRelationBefore, out string restoreError))
+                {
+                    error = restoreError;
+                }
+            }
+
+            LeaderRelationRestored = CurrentLeaderRelation == LeaderRelationBefore;
+            if (!LeaderRelationRestored)
+            {
+                error = string.IsNullOrEmpty(error)
+                    ? $"Expected {LeaderRelationBefore}, found {CurrentLeaderRelation}."
+                    : $"{error} Expected {LeaderRelationBefore}, found {CurrentLeaderRelation}.";
+            }
+
+            return LeaderRelationRestored;
+        }
+
+        private bool TrySetLeaderRelation(int relation, out string error)
+        {
+            error = string.Empty;
+            try
+            {
+                CharacterRelationManager.SetHeroRelation(EffectiveLeader, EffectiveTargetLeader, relation);
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+
+            if (CurrentLeaderRelation == relation) return true;
+
+            error = $"Expected {relation}, found {CurrentLeaderRelation}.";
+            return false;
         }
     }
 

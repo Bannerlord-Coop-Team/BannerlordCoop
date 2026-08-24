@@ -56,6 +56,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private const string ControllerId = "Player";
     private const string SecondControllerId = "Player2";
     private const string KingdomName = "Real Kingdom";
+    private delegate bool AllianceGate(
+        Kingdom kingdom,
+        Kingdom targetKingdom,
+        IFaction evaluatingFaction,
+        out TextObject reason,
+        bool includeReason);
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -1749,6 +1755,225 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.EndsWith("=False", resolved.OutcomeKey);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
         Assert.False(CoopKingdomElection.IsTrackedPlayerAllianceOffer(clientAllianceDecision));
+    }
+
+    [Fact]
+    public void AllianceTimeoutFixture_NormalizesLeaderRelationAndRestoresItAfterExplicitAndFailedStagePaths()
+    {
+        const string fixtureControllerId = "testclient";
+        const int initialRelation = -40;
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(fixtureControllerId);
+        var player = CreateSyncedPlayerContext(fixtureControllerId, client);
+        var recipientKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var sturgiaKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var recipientRulerClanId = CreateSyncedNpcClan();
+        var sturgiaRulerClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(recipientRulerClanId, recipientKingdomId);
+        ConfigureClanInKingdom(sturgiaRulerClanId, sturgiaKingdomId);
+        EnsureKingdomRegisteredEverywhere(recipientKingdomId);
+        EnsureKingdomRegisteredEverywhere(sturgiaKingdomId);
+        SetKingdomStringId(Server, sturgiaKingdomId, "sturgia");
+        EnsureAllianceCampaignBehavior(Server);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+            Assert.Equal("sturgia", sturgia.StringId);
+            Assert.Contains(sturgia, Kingdom.All);
+        });
+
+        bool allowAlliance = true;
+        int gateCallCount = 0;
+        int relationChangeEventCount = 0;
+        var relationChangeListenerOwner = new object();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+            recipientKingdom.Name = new TextObject("Recipient");
+            sturgia.Name = new TextObject("Sturgia");
+            SetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader, initialRelation);
+
+            var allianceModel = new Mock<AllianceModel>();
+            allianceModel
+                .Setup(model => model.CanMakeAlliance(
+                    It.IsAny<Kingdom>(),
+                    It.IsAny<Kingdom>(),
+                    It.IsAny<IFaction>(),
+                    out It.Ref<TextObject>.IsAny,
+                    It.IsAny<bool>()))
+                .Returns((AllianceGate)((Kingdom kingdom, Kingdom targetKingdom, IFaction evaluatingFaction, out TextObject reason, bool includeReason) =>
+                {
+                    gateCallCount++;
+                    reason = null;
+                    return allowAlliance && kingdom == recipientKingdom && targetKingdom == sturgia &&
+                        GetEffectiveRelation(kingdom.Leader, targetKingdom.Leader) ==
+                        Campaign.Current.Models.DiplomacyModel.MaxRelationLimit;
+                }));
+            allianceModel
+                .Setup(model => model.GetInfluenceCostOfProposingStartingAlliance(It.IsAny<Clan>()))
+                .Returns(0);
+            Campaign.Current.Models.AllianceModel = allianceModel.Object;
+        });
+
+        Server.Call(() =>
+        {
+            CampaignEvents.HeroRelationChanged.AddNonSerializedListener(
+                relationChangeListenerOwner,
+                (Hero effectiveHero, Hero effectiveTargetHero, int relationChange, bool showQuickNotification,
+                    ChangeRelationAction.ChangeRelationDetail detail, Hero originalHero, Hero originalTargetHero) =>
+                {
+                    relationChangeEventCount++;
+                });
+        });
+
+        try
+        {
+            string target = null;
+            Server.Call(() => target = KingdomDebugCommand.GetAllianceTimeoutTarget(new List<string>()));
+            Assert.StartsWith("LIVE_TEST_JSON=", target);
+            Assert.Contains($"\"kingdomId\":\"{recipientKingdomId}\"", target);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.Equal(initialRelation, GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+            });
+
+            ConfigureClanInKingdom(player.ClanId, recipientKingdomId);
+            string capture = null;
+            Server.Call(() => capture = KingdomDebugCommand.CaptureAllianceTimeoutFixture(new List<string>()));
+            Assert.StartsWith("LIVE_TEST_JSON=", capture);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.Equal(Campaign.Current.Models.DiplomacyModel.MaxRelationLimit,
+                    GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+            });
+
+            string stage = null;
+            Server.Call(() => stage = KingdomDebugCommand.StageAllianceTimeoutFixture(
+                new List<string> { recipientKingdomId, player.ClanId, sturgiaKingdomId }));
+            Assert.StartsWith("LIVE_TEST_JSON=", stage);
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
+                var election = new CoopKingdomElection(decision);
+                int noOutcomeIndex = election._possibleOutcomes
+                    .Select((outcome, index) => new { outcome, index })
+                    .Single(candidate => candidate.outcome is StartAllianceDecision.StartAllianceDecisionOutcome outcome &&
+                        !outcome.ShouldAllianceBeStarted)
+                    .index;
+                var finalNoVote = new KingdomDecisionVoteData(
+                    recipientKingdomId,
+                    decisionIndex: 0,
+                    outcomeIndex: noOutcomeIndex,
+                    supportWeight: (int)Supporter.SupportWeights.FullyPush,
+                    isAbstain: false,
+                    isFinal: true);
+
+                Assert.True(GetConcreteVoteManager(Server).HandleVoteRequest(fixtureControllerId, finalNoVote));
+                Assert.Empty(recipientKingdom.UnresolvedDecisions);
+            });
+            NetworkKingdomDecisionResolved finalNoResolution = Assert.Single(
+                Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+                message => message.KingdomId == recipientKingdomId && message.DecisionIndex == 0);
+            Assert.EndsWith("=False", finalNoResolution.OutcomeKey);
+            Assert.Empty(Server.InternalMessages.GetMessages<AllianceStarted>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+
+            string serverState = null;
+            Server.Call(() => serverState = KingdomDebugCommand.GetAllianceTimeoutServerState(
+                new List<string> { recipientKingdomId, sturgiaKingdomId }));
+            Assert.Contains("\"success\":true", serverState);
+
+            string restore = null;
+            Server.Call(() => restore = KingdomDebugCommand.RestoreAllianceTimeoutFixture(
+                new List<string> { recipientKingdomId, sturgiaKingdomId, bool.FalseString }));
+            Assert.StartsWith("LIVE_TEST_JSON=", restore);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.Equal(initialRelation, GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+                Assert.Empty(recipientKingdom.UnresolvedDecisions);
+            });
+
+            Server.Call(() => capture = KingdomDebugCommand.CaptureAllianceTimeoutFixture(new List<string>()));
+            Assert.StartsWith("LIVE_TEST_JSON=", capture);
+
+            Server.Call(() => stage = KingdomDebugCommand.StageAllianceTimeoutFixture(
+                new List<string> { recipientKingdomId, player.ClanId, sturgiaKingdomId }));
+            Assert.StartsWith("LIVE_TEST_JSON=", stage);
+
+            int resolutionCountBeforeTimeout = Server.NetworkSentMessages
+                .GetMessages<NetworkKingdomDecisionResolved>()
+                .Count(message => message.KingdomId == recipientKingdomId && message.DecisionIndex == 0);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
+
+                GetConcreteVoteManager(Server).ProcessVotingRounds(
+                    DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
+
+                Assert.Empty(recipientKingdom.UnresolvedDecisions);
+            });
+            Assert.Equal(
+                resolutionCountBeforeTimeout + 1,
+                Server.NetworkSentMessages
+                    .GetMessages<NetworkKingdomDecisionResolved>()
+                    .Count(message => message.KingdomId == recipientKingdomId && message.DecisionIndex == 0));
+            NetworkKingdomDecisionResolved timeoutResolution = Server.NetworkSentMessages
+                .GetMessages<NetworkKingdomDecisionResolved>()
+                .Last(message => message.KingdomId == recipientKingdomId && message.DecisionIndex == 0);
+            Assert.EndsWith("=False", timeoutResolution.OutcomeKey);
+            Assert.Empty(Server.InternalMessages.GetMessages<AllianceStarted>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+
+            Server.Call(() => serverState = KingdomDebugCommand.GetAllianceTimeoutServerState(
+                new List<string> { recipientKingdomId, sturgiaKingdomId }));
+            Assert.Contains("\"success\":true", serverState);
+
+            Server.Call(() => restore = KingdomDebugCommand.RestoreAllianceTimeoutFixture(
+                new List<string> { recipientKingdomId, sturgiaKingdomId, bool.FalseString }));
+            Assert.StartsWith("LIVE_TEST_JSON=", restore);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.Equal(initialRelation, GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+                Assert.Empty(recipientKingdom.UnresolvedDecisions);
+            });
+
+            Server.Call(() => capture = KingdomDebugCommand.CaptureAllianceTimeoutFixture(new List<string>()));
+            Assert.StartsWith("LIVE_TEST_JSON=", capture);
+            allowAlliance = false;
+
+            Server.Call(() => stage = KingdomDebugCommand.StageAllianceTimeoutFixture(
+                new List<string> { recipientKingdomId, player.ClanId, sturgiaKingdomId }));
+            Assert.Contains("cannot currently receive a valid alliance offer", stage);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.Equal(initialRelation, GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+                Assert.Empty(recipientKingdom.UnresolvedDecisions);
+            });
+            Assert.True(gateCallCount >= 6);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+        }
+        finally
+        {
+            Server.Call(() => CampaignEvents.HeroRelationChanged.ClearListeners(relationChangeListenerOwner));
+        }
+
+        Assert.Equal(0, relationChangeEventCount);
     }
 
     [Fact]
@@ -3487,7 +3712,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            kingdom.StringId = stringId;
+            using (new AllowedThread())
+            {
+                kingdom.StringId = stringId;
+            }
         });
     }
 
@@ -3769,6 +3997,43 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(faction2Id, out var faction2));
             VillageHostileFactionStanceHelper.ApplyWarStance(faction1, faction2);
             Assert.True(FactionManager.IsAtWarAgainstFaction(faction1, faction2));
+        });
+    }
+
+    private static int GetEffectiveRelation(Hero hero1, Hero hero2)
+    {
+        Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+            hero1,
+            hero2,
+            out Hero effectiveHero1,
+            out Hero effectiveHero2);
+        Assert.NotNull(effectiveHero1);
+        Assert.NotNull(effectiveHero2);
+        Assert.NotSame(effectiveHero1, effectiveHero2);
+        return CharacterRelationManager.GetHeroRelation(effectiveHero1, effectiveHero2);
+    }
+
+    private static void SetEffectiveRelation(Hero hero1, Hero hero2, int value)
+    {
+        Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+            hero1,
+            hero2,
+            out Hero effectiveHero1,
+            out Hero effectiveHero2);
+        Assert.NotNull(effectiveHero1);
+        Assert.NotNull(effectiveHero2);
+        Assert.NotSame(effectiveHero1, effectiveHero2);
+        CharacterRelationManager.SetHeroRelation(effectiveHero1, effectiveHero2, value);
+    }
+
+    private static void EnsureAllianceCampaignBehavior(EnvironmentInstance instance)
+    {
+        instance.Call(() =>
+        {
+            if (Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>() != null) return;
+
+            ((CampaignBehaviorManager)Campaign.Current.CampaignBehaviorManager)
+                .AddBehavior(new AllianceCampaignBehavior());
         });
     }
 
