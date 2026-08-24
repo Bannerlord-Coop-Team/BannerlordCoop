@@ -111,6 +111,24 @@ public sealed class BugReportArchiveContents
             FailedClients,
             TimedOutClients);
     }
+
+    public BugReportArchiveContents WithValidatedLogs(
+        IReadOnlyCollection<CollectedBugReportLog> logs,
+        int invalidCount)
+    {
+        return new BugReportArchiveContents(
+            RequestId,
+            ReportingClientNetworkId,
+            Triggers,
+            Submissions,
+            ServerLog,
+            StartedAt,
+            logs,
+            ExpectedClients,
+            DeclinedClients,
+            FailedClients + invalidCount,
+            TimedOutClients);
+    }
 }
 
 /// <summary>Creates and retains server-side diagnostic report archives.</summary>
@@ -122,8 +140,12 @@ public interface IBugReportArchiveBuilder
 /// <inheritdoc />
 public class BugReportArchiveBuilder : IBugReportArchiveBuilder
 {
+    private const int MaximumPendingArchiveCount = 20;
+    private const long MaximumPendingArchiveBytes = 256L * 1024 * 1024;
     private static readonly TimeSpan PendingArchiveRetention = TimeSpan.FromDays(7);
     private readonly string outputDirectory;
+    private readonly int maximumPendingArchiveCount;
+    private readonly long maximumPendingArchiveBytes;
 
     public BugReportArchiveBuilder() : this(Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -133,12 +155,21 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
     {
     }
 
-    internal BugReportArchiveBuilder(string outputDirectory)
+    internal BugReportArchiveBuilder(
+        string outputDirectory,
+        int maximumPendingArchiveCount = MaximumPendingArchiveCount,
+        long maximumPendingArchiveBytes = MaximumPendingArchiveBytes)
     {
         if (string.IsNullOrWhiteSpace(outputDirectory))
             throw new ArgumentException("Output directory cannot be empty.", nameof(outputDirectory));
+        if (maximumPendingArchiveCount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maximumPendingArchiveCount));
+        if (maximumPendingArchiveBytes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maximumPendingArchiveBytes));
 
         this.outputDirectory = Path.GetFullPath(outputDirectory);
+        this.maximumPendingArchiveCount = maximumPendingArchiveCount;
+        this.maximumPendingArchiveBytes = maximumPendingArchiveBytes;
     }
 
     public string Create(BugReportArchiveContents contents)
@@ -165,6 +196,7 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
                 }
             }
 
+            EnforcePendingQuota(archivePath);
             return archivePath;
         }
         catch
@@ -204,6 +236,36 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
         catch (UnauthorizedAccessException)
         {
         }
+    }
+
+    private void EnforcePendingQuota(string newArchivePath)
+    {
+        var archives = Directory
+            .EnumerateFiles(outputDirectory, "bug_report_*.zip")
+            .Select(path => new FileInfo(path))
+            .OrderBy(file => file.LastWriteTimeUtc)
+            .ThenBy(file => file.Name, StringComparer.Ordinal)
+            .ToList();
+        var newArchive = archives.First(file =>
+            string.Equals(file.FullName, newArchivePath, StringComparison.OrdinalIgnoreCase));
+        if (newArchive.Length > maximumPendingArchiveBytes)
+            throw new InvalidDataException("The diagnostic archive exceeds the pending storage quota.");
+
+        var totalBytes = archives.Sum(file => file.Length);
+        while (archives.Count > maximumPendingArchiveCount ||
+               totalBytes > maximumPendingArchiveBytes)
+        {
+            var archive = archives.FirstOrDefault(file => !ReferenceEquals(file, newArchive));
+            if (archive == null) break;
+
+            var length = archive.Length;
+            archive.Delete();
+            totalBytes -= length;
+            archives.Remove(archive);
+        }
+
+        if (archives.Count > maximumPendingArchiveCount || totalBytes > maximumPendingArchiveBytes)
+            throw new InvalidDataException("The pending diagnostic archive quota could not be enforced.");
     }
 
     private static void WriteManifest(ZipArchive archive, BugReportArchiveContents contents)

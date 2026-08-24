@@ -107,6 +107,56 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
+    public void LogValidator_KeepsValidLogAndRejectsInvalidGzip()
+    {
+        var valid = new CollectedBugReportLog(
+            1,
+            Compress("valid diagnostic\n"),
+            Encoding.UTF8.GetByteCount("valid diagnostic\n"));
+        var invalid = new CollectedBugReportLog(2, new byte[] { 1, 2, 3, 4 }, 12);
+        var validator = new BugReportLogValidator();
+
+        var result = validator.Validate(new[] { valid, invalid });
+
+        Assert.Equal(1, result.InvalidCount);
+        Assert.Same(valid, Assert.Single(result.ValidLogs));
+    }
+
+    [Fact]
+    public void Archive_DeletesOldestPendingReportWhenCountQuotaIsReached()
+    {
+        Directory.CreateDirectory(tempRoot);
+        var builder = new BugReportArchiveBuilder(
+            tempRoot,
+            maximumPendingArchiveCount: 2,
+            maximumPendingArchiveBytes: long.MaxValue);
+        var first = builder.Create(CreateEmptyArchiveContents());
+        File.SetLastWriteTimeUtc(first, DateTime.UtcNow.AddMinutes(-2));
+        var second = builder.Create(CreateEmptyArchiveContents());
+        File.SetLastWriteTimeUtc(second, DateTime.UtcNow.AddMinutes(-1));
+
+        var third = builder.Create(CreateEmptyArchiveContents());
+
+        Assert.False(File.Exists(first));
+        Assert.True(File.Exists(second));
+        Assert.True(File.Exists(third));
+        Assert.Equal(2, Directory.GetFiles(tempRoot, "bug_report_*.zip").Length);
+    }
+
+    [Fact]
+    public void Archive_RejectsReportLargerThanPendingByteQuota()
+    {
+        Directory.CreateDirectory(tempRoot);
+        var builder = new BugReportArchiveBuilder(
+            tempRoot,
+            maximumPendingArchiveCount: 2,
+            maximumPendingArchiveBytes: 1);
+
+        Assert.Throws<InvalidDataException>(() => builder.Create(CreateEmptyArchiveContents()));
+        Assert.Empty(Directory.GetFiles(tempRoot, "bug_report_*.zip"));
+    }
+
+    [Fact]
     public async Task Uploader_PostsJsonWithReporterServerLogAndClientLogs()
     {
         var handler = new RecordingHttpHandler();
@@ -181,6 +231,22 @@ public class CoopLogBugReportTests : IDisposable
         catch (UnauthorizedAccessException)
         {
         }
+    }
+
+    private static BugReportArchiveContents CreateEmptyArchiveContents()
+    {
+        return new BugReportArchiveContents(
+            Guid.NewGuid().ToString("N"),
+            "network-client-1",
+            Array.Empty<string>(),
+            Array.Empty<BugReportSubmission>(),
+            null,
+            DateTimeOffset.UtcNow,
+            Array.Empty<CollectedBugReportLog>(),
+            expectedClients: 0,
+            declinedClients: 0,
+            failedClients: 0,
+            timedOutClients: 0);
     }
 
     private static byte[] Compress(string text)

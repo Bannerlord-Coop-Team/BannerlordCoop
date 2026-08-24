@@ -144,6 +144,49 @@ public class UnstuckCommandTests : MapEventTestBase
     }
 
     [Fact]
+    public void RepeatedBugReportWhileCollectionIsActive_DoesNotRequestLogsAgain()
+    {
+        var requester = SetupRegisteredMainHeroAndParty();
+        var secondHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var secondCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var secondPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(
+                "repeated-report-requester",
+                requester.HeroId,
+                requester.PartyId,
+                null,
+                requester.CharacterId)));
+            Assert.True(playerManager.AddPlayer(new Player(
+                "repeated-report-second",
+                secondHeroId,
+                secondPartyId,
+                null,
+                secondCharacterId)));
+            playerManager.SetPeer("repeated-report-requester", Client.NetPeer);
+            playerManager.SetPeer("repeated-report-second", SecondClient.NetPeer);
+        });
+
+        Client.Call(() => ((IDisposable)Client.Resolve<IBugReportService>()).Dispose());
+        SecondClient.Call(() => ((IDisposable)SecondClient.Resolve<IBugReportService>()).Dispose());
+
+        var request = new NetworkRequestBugReport(
+            "Party is stuck",
+            "Leaving Danustica keeps reopening the town menu.");
+        Server.SimulateMessage(Client.NetPeer, request);
+        Server.SimulateMessage(Client.NetPeer, request);
+
+        Assert.Equal(
+            2,
+            Server.NetworkSentMessages.GetMessages<NetworkRequestBugReportLogs>().Count());
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBugReportResult>());
+        Assert.Contains("already in progress", result.Message);
+    }
+
+    [Fact]
     public void ServerUnstuckRequest_ClearsArmyAndSettlement_AndReportsResult()
     {
         var player = SetupRegisteredMainHeroAndParty();

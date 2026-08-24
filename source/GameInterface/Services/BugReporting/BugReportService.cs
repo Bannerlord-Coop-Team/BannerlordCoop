@@ -35,6 +35,7 @@ internal class BugReportService : IBugReportService, IDisposable
     private const int MaximumCompressedLogBytes = 32 * 1024 * 1024;
     private const int MaximumCombinedCompressedBytes = 512 * 1024 * 1024;
     private static readonly TimeSpan CollectionTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan MinimumCollectionInterval = TimeSpan.FromMinutes(5);
     private static readonly ILogger Logger = LogManager.GetLogger<BugReportService>();
 
     private readonly IMessageBroker messageBroker;
@@ -43,6 +44,7 @@ internal class BugReportService : IBugReportService, IDisposable
     private readonly IBugReportLogSharingPreference logSharingPreference;
     private readonly ICoopLogSnapshotProvider logSnapshotProvider;
     private readonly IBugReportArchiveBuilder archiveBuilder;
+    private readonly IBugReportLogValidator logValidator;
     private readonly IBugReportUploader uploader;
     private readonly CancellationToken cancellationToken;
     private readonly object collectionGate = new object();
@@ -50,6 +52,7 @@ internal class BugReportService : IBugReportService, IDisposable
     private readonly HashSet<string> clientRequests = new HashSet<string>(StringComparer.Ordinal);
 
     private ActiveCollection activeCollection;
+    private DateTimeOffset nextCollectionAllowedAt;
     private int disposed;
 
     public BugReportService(
@@ -59,6 +62,7 @@ internal class BugReportService : IBugReportService, IDisposable
         IBugReportLogSharingPreference logSharingPreference,
         ICoopLogSnapshotProvider logSnapshotProvider,
         IBugReportArchiveBuilder archiveBuilder,
+        IBugReportLogValidator logValidator,
         IBugReportUploader uploader,
         CancellationTokenSource sessionCancellation)
     {
@@ -68,6 +72,7 @@ internal class BugReportService : IBugReportService, IDisposable
         this.logSharingPreference = logSharingPreference;
         this.logSnapshotProvider = logSnapshotProvider;
         this.archiveBuilder = archiveBuilder;
+        this.logValidator = logValidator;
         this.uploader = uploader;
         cancellationToken = sessionCancellation.Token;
 
@@ -216,9 +221,18 @@ internal class BugReportService : IBugReportService, IDisposable
         {
             if (activeCollection != null)
             {
-                activeCollection.Triggers.Add(trigger);
-                if (submission != null) activeCollection.Submissions.Add(submission);
-                activeCollection.Requesters.Add(requester);
+                network.Send(requester, new NetworkBugReportResult(
+                    activeCollection.RequestId,
+                    "A diagnostic bug report is already in progress."));
+                return;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (now < nextCollectionAllowedAt)
+            {
+                network.Send(requester, new NetworkBugReportResult(
+                    string.Empty,
+                    "A diagnostic bug report was recently started. Try again later."));
                 return;
             }
 
@@ -245,6 +259,7 @@ internal class BugReportService : IBugReportService, IDisposable
                 peers,
                 requester);
             activeCollection = collection;
+            nextCollectionAllowedAt = now + MinimumCollectionInterval;
             collection.Timer = new Timer(
                 _ => CompleteOnTimeout(collection.RequestId),
                 null,
@@ -495,9 +510,9 @@ internal class BugReportService : IBugReportService, IDisposable
 
     private FinalizedCollection ClaimFinalization(ActiveCollection collection, bool timedOut)
     {
-        if (!ReferenceEquals(activeCollection, collection)) return null;
+        if (!ReferenceEquals(activeCollection, collection) || collection.Finalizing) return null;
 
-        activeCollection = null;
+        collection.Finalizing = true;
         collection.Timer?.Dispose();
 
         var logs = collection.Clients.Values
@@ -529,6 +544,22 @@ internal class BugReportService : IBugReportService, IDisposable
 
     private async Task PackageAndUploadAsync(FinalizedCollection finalized)
     {
+        try
+        {
+            await PackageAndUploadCoreAsync(finalized).ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (collectionGate)
+            {
+                if (activeCollection?.RequestId == finalized.Contents.RequestId)
+                    activeCollection = null;
+            }
+        }
+    }
+
+    private async Task PackageAndUploadCoreAsync(FinalizedCollection finalized)
+    {
         if (finalized.Contents.Logs.Count == 0 && finalized.Contents.Submissions.Count == 0)
         {
             SendResult(finalized, "No clients provided a diagnostic log for the bug report.");
@@ -540,7 +571,7 @@ internal class BugReportService : IBugReportService, IDisposable
         try
         {
             var contents = await Task.Run(
-                () => CaptureServerLog(finalized.Contents),
+                () => CaptureServerLog(ValidateClientLogs(finalized.Contents)),
                 cancellationToken).ConfigureAwait(false);
             archivePath = await Task.Run(
                 () => archiveBuilder.Create(contents),
@@ -588,6 +619,18 @@ internal class BugReportService : IBugReportService, IDisposable
         }
 
         SendResult(finalized, clientMessage);
+    }
+
+    private BugReportArchiveContents ValidateClientLogs(BugReportArchiveContents contents)
+    {
+        var validation = logValidator.Validate(contents.Logs);
+        if (validation.InvalidCount == 0) return contents;
+
+        Logger.Warning(
+            "Rejected {InvalidCount} invalid client log(s) from diagnostic bug report {RequestId}",
+            validation.InvalidCount,
+            contents.RequestId);
+        return contents.WithValidatedLogs(validation.ValidLogs, validation.InvalidCount);
     }
 
     private BugReportArchiveContents CaptureServerLog(BugReportArchiveContents contents)
@@ -683,6 +726,7 @@ internal class BugReportService : IBugReportService, IDisposable
         public Dictionary<NetPeer, ClientCollection> Clients { get; }
         public HashSet<NetPeer> Requesters { get; } = new HashSet<NetPeer>();
         public Timer Timer { get; set; }
+        public bool Finalizing { get; set; }
 
         public ActiveCollection(
             string requestId,
