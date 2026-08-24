@@ -32,6 +32,7 @@ using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -84,6 +85,7 @@ public class SiegeDebugCommand
         public int PartyTradeGold;
         public CampaignVec2 Position;
         public bool IsSettlementGarrison;
+        public bool IsSettlementMilitia;
         public string StringId;
     }
 
@@ -345,7 +347,10 @@ public class SiegeDebugCommand
                 RecentEventsMorale = party.MobileParty?.RecentEventsMorale ?? 0f,
                 PartyTradeGold = party.MobileParty?.PartyTradeGold ?? 0,
                 Position = party.MobileParty?.Position ?? default,
-                IsSettlementGarrison = party.MobileParty == settlement.Town.GarrisonParty,
+                IsSettlementGarrison = settlement.Town.GarrisonParty != null &&
+                    party.MobileParty == settlement.Town.GarrisonParty,
+                IsSettlementMilitia = settlement.MilitiaPartyComponent?.MobileParty != null &&
+                    party.MobileParty == settlement.MilitiaPartyComponent.MobileParty,
                 StringId = party.MobileParty?.StringId,
             })
             .ToArray();
@@ -431,6 +436,7 @@ public class SiegeDebugCommand
                 MakePeaceAction.Apply(fixture.AttackerFaction, fixture.DefenderFaction);
 
             RestorePrisonerPromptGarrison(fixture);
+            RestorePrisonerPromptMilitia(fixture);
 
             fixture.Settlement.Town.Prosperity = fixture.Prosperity;
             fixture.Settlement.Town.Loyalty = fixture.Loyalty;
@@ -525,13 +531,37 @@ public class SiegeDebugCommand
             throw new InvalidOperationException("Unable to recreate the settlement garrison.");
     }
 
+    private static void RestorePrisonerPromptMilitia(PrisonerPromptFixture fixture)
+    {
+        var snapshot = fixture.PartySnapshots.SingleOrDefault(party => party.IsSettlementMilitia);
+        var currentMilitia = fixture.Settlement.MilitiaPartyComponent?.MobileParty;
+        if (snapshot == null)
+        {
+            if (currentMilitia != null)
+                DestroyPartyAction.Apply(null, currentMilitia);
+            return;
+        }
+
+        if (currentMilitia == null)
+        {
+            MilitiaPartyComponent.CreateMilitiaParty(
+                "militias_of_" + fixture.Settlement.StringId + "_aaa1",
+                fixture.Settlement);
+        }
+
+        if (fixture.Settlement.MilitiaPartyComponent?.MobileParty == null)
+            throw new InvalidOperationException("Unable to recreate the settlement militia.");
+    }
+
     private static PartyBase ResolvePrisonerPromptParty(
         PrisonerPromptFixture fixture,
         PrisonerPromptPartySnapshot snapshot)
     {
-        return snapshot.IsSettlementGarrison
-            ? fixture.Settlement.Town.GarrisonParty?.Party
-            : snapshot.Party;
+        if (snapshot.IsSettlementGarrison)
+            return fixture.Settlement.Town.GarrisonParty?.Party;
+        if (snapshot.IsSettlementMilitia)
+            return fixture.Settlement.MilitiaPartyComponent?.MobileParty?.Party;
+        return snapshot.Party;
     }
 
     private static PartyBase ResolvePrisonerPromptParty(
@@ -560,7 +590,7 @@ public class SiegeDebugCommand
         if (mobileParty == null)
             return;
 
-        if (!snapshot.IsSettlementGarrison)
+        if (!snapshot.IsSettlementGarrison && !snapshot.IsSettlementMilitia)
             mobileParty.IsActive = snapshot.WasActive;
         mobileParty.RecentEventsMorale = snapshot.RecentEventsMorale;
         mobileParty.PartyTradeGold = snapshot.PartyTradeGold;
@@ -637,7 +667,10 @@ public class SiegeDebugCommand
             fixture.Settlement.Town.LastCapturedBy == fixture.LastCapturedBy &&
             (fixture.HadGarrison
                 ? fixture.Settlement.Town.GarrisonParty?.IsActive == true
-                : fixture.Settlement.Town.GarrisonParty == null);
+                : fixture.Settlement.Town.GarrisonParty == null) &&
+            (fixture.PartySnapshots.Any(snapshot => snapshot.IsSettlementMilitia)
+                ? fixture.Settlement.MilitiaPartyComponent?.MobileParty?.IsActive == true
+                : fixture.Settlement.MilitiaPartyComponent == null);
         return townRestored &&
             fixture.PartySnapshots.All(snapshot => IsPrisonerPromptPartyRestored(fixture, snapshot)) &&
             fixture.HeroSnapshots.All(snapshot => IsPrisonerPromptHeroRestored(fixture, snapshot)) &&
@@ -665,7 +698,7 @@ public class SiegeDebugCommand
 
         var mobileParty = party.MobileParty;
         return mobileParty == null ||
-            ((snapshot.IsSettlementGarrison
+            (((snapshot.IsSettlementGarrison || snapshot.IsSettlementMilitia)
                 ? mobileParty.IsActive
                 : mobileParty.IsActive == snapshot.WasActive) &&
              mobileParty.RecentEventsMorale == snapshot.RecentEventsMorale &&
