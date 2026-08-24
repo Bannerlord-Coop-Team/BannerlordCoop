@@ -163,6 +163,9 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         int activationIndex = hostBattleNetwork.NetworkSentMessages.Messages.FindIndex(
             message => message is NetworkBattleActivated);
         Assert.InRange(spawnIndex, 0, int.MaxValue);
+        var catchUp = Assert.IsType<NetworkSpawnBattleAgents>(
+            hostBattleNetwork.NetworkSentMessages.Messages[spawnIndex]);
+        Assert.Equal(SpawnBatchPurpose.CatchUp, catchUp.Purpose);
         Assert.InRange(deploymentIndex, 0, int.MaxValue);
         Assert.True(spawnIndex < activationIndex);
         Assert.True(deploymentIndex < activationIndex);

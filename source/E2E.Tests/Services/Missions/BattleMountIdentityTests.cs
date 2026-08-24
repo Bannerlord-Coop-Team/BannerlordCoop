@@ -215,7 +215,9 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             Assert.True(registry.TryGetAgentInfo(horse, out var horseInfo));
             Assert.Equal("owner", horseInfo.CurrentAuthority);
 
-            var record = peer.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Single().Agents.Single();
+            var initialBatch = peer.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Single();
+            Assert.Equal(SpawnBatchPurpose.Initial, initialBatch.Purpose);
+            var record = initialBatch.Agents.Single();
             Assert.Equal(riderInfo.AgentId, record.AgentId);
             Assert.Equal(horseInfo.AgentId, record.MountAgentId);
 
