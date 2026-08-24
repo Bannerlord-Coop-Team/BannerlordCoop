@@ -5,6 +5,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
@@ -157,30 +158,34 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
 
     public bool DailyTickDrinkThisDayInSettlement()
     {
-        bool hasUpdated = false;
-        foreach (var playerData in InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement)
+        var dictionary = InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement;
+        var keysToReset = dictionary
+            .Where(x => x.Value != null)
+            .Select(x => x.Key)
+            .ToList();
+
+        foreach (var key in keysToReset)
         {
-            if (playerData.Value != null)
-            {
-                InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerData.Key] = null;
-                hasUpdated = true;
-            }
+            dictionary[key] = null;
         }
-        return hasUpdated;
+
+        return keysToReset.Count > 0;
     }
 
     public bool WeeklyTickHasBoughtToTunToParty()
     {
-        bool hasUpdated = false;
-        foreach (var playerData in InteractionsPlayerData.PlayerHasBoughtTunToParty)
+        var dictionary = InteractionsPlayerData.PlayerHasBoughtTunToParty;
+        var keysToReset = dictionary
+            .Where(x => x.Value == true)
+            .Select(x => x.Key)
+            .ToList();
+
+        foreach (var key in keysToReset)
         {
-            if (playerData.Value == true)
-            {
-                InteractionsPlayerData.PlayerHasBoughtTunToParty[playerData.Key] = false;
-                hasUpdated = true;
-            }
+            dictionary[key] = false;
         }
-        return hasUpdated;
+
+        return keysToReset.Count > 0;
     }
 
     private void RemoveInteractedPartyForAllPlayers(string mobilePartyId, Dictionary<string, Dictionary<string, int>> interactionDictionary)

@@ -182,6 +182,12 @@ internal class TavernEmployeesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
 
+            if (mainHero.Gold - data.TunPrice < 0)
+            {
+                Logger.Error($"Rejecting player bought tun due to a lack of gold. Requested change: {data.TunPrice} Player gold: {mainHero.Gold}");
+                return;
+            }
+
             GiveGoldAction.ApplyBetweenCharacters(mainHero, null, data.TunPrice, false);
             if (mainHero.PartyBelongedTo != null) mainHero.PartyBelongedTo.RecentEventsMorale += 2f;
             sessionInteractionsPlayerDataInterface.UpdateHasBoughtTunToParty(data.MainHeroId, true);

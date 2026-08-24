@@ -64,6 +64,12 @@ internal class BribeGuardsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SettlementId, out var settlement)) return;
 
+            if (mainHero.Gold - data.Gold < 0)
+            {
+                Logger.Error($"Rejecting player bribe due to a lack of gold. Requested change: {data.Gold} Player gold: {mainHero.Gold}");
+                return;
+            }
+
             GiveGoldAction.ApplyBetweenCharacters(mainHero, null, data.Gold, false);
 
             sessionTradePlayerDataInterface.UpdateSettlementBribePaid(data.MainHeroId, data.SettlementId, data.Gold);

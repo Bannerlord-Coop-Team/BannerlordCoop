@@ -138,6 +138,12 @@ internal class TradeDataInitializationHandler : IHandler
 
     private void LoadSettlementBribePaidData(string playerHeroId)
     {
+        // Clear existing bribe paid amounts in all settlements before loading player's data from CoopSession
+        foreach (var settlement in Settlement.All)
+        {
+            settlement.BribePaid = 0;
+        }
+
         // Null and key check for players without existing bribe paid data
         if (tradePlayerData?.PlayerSettlementBribePaid?.ContainsKey(playerHeroId) != true) return;
 
