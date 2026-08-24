@@ -123,10 +123,14 @@ public class BattleEligibilityTests : MissionTestEnvironment
             {
                 Assert.True(clients[1].ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
                 Assert.True(clients[1].ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var participant));
-                var mapEventParty = Assert.NotNull(mapEvent.FindMapEventParty(participant.Party, out var side));
-                side._battleParties.Remove(mapEventParty);
-                participant.Party._mapEventSide = side;
-                Assert.Null(mapEvent.FindMapEventParty(participant.Party));
+                var mapEventParty = Assert.Single(
+                    mapEvent.DefenderSide.Parties,
+                    party => party.Party == participant.Party);
+                mapEvent.DefenderSide._battleParties.Remove(mapEventParty);
+                participant.Party._mapEventSide = mapEvent.DefenderSide;
+                Assert.DoesNotContain(
+                    mapEvent.DefenderSide.Parties,
+                    party => party.Party == participant.Party);
             });
 
             clients[0].Call(() => clients[0].Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
@@ -159,7 +163,9 @@ public class BattleEligibilityTests : MissionTestEnvironment
             {
                 Assert.True(clients[1].ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
                 Assert.True(clients[1].ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var participant));
-                Assert.NotNull(mapEvent.FindMapEventParty(participant.Party));
+                Assert.Contains(
+                    mapEvent.DefenderSide.Parties,
+                    party => party.Party == participant.Party);
             });
             Assert.Equal(
                 new[] { "ctrl-A", "ctrl-B" },
