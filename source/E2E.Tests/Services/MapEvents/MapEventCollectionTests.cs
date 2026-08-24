@@ -8,11 +8,13 @@ using E2E.Tests.Util;
 using GameInterface.Services.Players;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -84,6 +86,45 @@ public class MapEventCollectionTests : MapEventTestBase
                 Assert.True(immediateCallbackRan);
             });
         }
+    }
+
+    [Fact]
+    public void Client_InvolvedPartiesSnapshotWaitsForMapEventCommit()
+    {
+        var staged = CreateServerMapEvent(commit: false);
+        var client = Clients.First();
+        var initialPosition = new CampaignVec2(new Vec2(4f, 5f), true);
+        var authoritativePosition = new CampaignVec2(new Vec2(42f, 24f), true);
+        string mapEventPartyId = null;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            var attacker = Get<MobileParty>(Server, staged.AttackerPartyId);
+            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
+                party => ReferenceEquals(party.Party, attacker.Party));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
+        });
+
+        client.Call(() =>
+        {
+            using (new AllowedThread())
+                Get<MobileParty>(client, staged.AttackerPartyId).Position = initialPosition;
+        });
+
+        client.SimulateMessage(Server.NetPeer, new NetworkAddInvolvedParties(
+            staged.MapEventId,
+            new[] { mapEventPartyId },
+            new[] { authoritativePosition }));
+
+        client.Call(() => Assert.Equal(initialPosition,
+            Get<MobileParty>(client, staged.AttackerPartyId).Position));
+
+        Server.Call(() => Campaign.Current.MapEventManager.OnMapEventCreated(
+            Get<MapEvent>(Server, staged.MapEventId)), MapEventDisabledMethods);
+
+        client.Call(() => Assert.Equal(authoritativePosition,
+            Get<MobileParty>(client, staged.AttackerPartyId).Position));
     }
 
     [Fact]
