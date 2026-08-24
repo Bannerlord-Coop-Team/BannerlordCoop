@@ -423,9 +423,17 @@ internal class BattleJoinLeaveHandler : IHandler
             var siegeSettlement = mapEvent?.MapEventSettlement;
             bool isMainParty = party == PartyBase.MainParty;
             var mobileParty = party.MobileParty;
+            var tracker = isMainParty ? mapEvent?.TroopUpgradeTracker : null;
 
             if (party.MapEventSide != null)
                 party.MapEventSide = null;
+
+            // Vanilla discards the client's tracker when its MainParty leaves, but the server's registered tracker stays live.
+            if (tracker != null && mapEvent?.IsFinalized == false && mapEvent.TroopUpgradeTracker == null)
+            {
+                mapEvent.TroopUpgradeTracker = tracker;
+                tracker._mapEventParties.Clear();
+            }
 
             if (leaveSiege && mobileParty?.BesiegerCamp != null)
                 mobileParty.BesiegerCamp = null;

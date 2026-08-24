@@ -245,7 +245,6 @@ public class SiegeDebugCommand
         }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-            || !ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface)
             || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
         {
             return $"Unable to resolve the settlement encounter for {args[0]}";
@@ -257,21 +256,43 @@ public class SiegeDebugCommand
             return $"{settlement.Name} does not have an active siege assault";
         }
 
-        if (!mapEvent.CanPartyJoinBattle(PartyBase.MainParty, BattleSideEnum.Attacker))
+        bool alreadyInAssault = PartyBase.MainParty?.MapEvent == mapEvent;
+        if (!alreadyInAssault && !mapEvent.CanPartyJoinBattle(PartyBase.MainParty, BattleSideEnum.Attacker))
         {
             return $"The local player party cannot join the assault at {settlement.Name}";
         }
 
-        settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        if (alreadyInAssault)
+        {
+            if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+            {
+                return "Unable to resolve SiegeEventInterface";
+            }
+
+            siegeEventInterface.PromptSiegeAssault(MobileParty.MainParty, settlement);
+        }
+        else
+        {
+            if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
+            {
+                return "Unable to resolve SettlementInterface";
+            }
+
+            settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        }
+
         if (PlayerEncounter.Current == null)
         {
             return $"Unable to start the local encounter at {settlement.Name}";
         }
 
-        PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
+        if (!alreadyInAssault)
+            PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
         GameMenu.SwitchToMenu("menu_siege_strategies");
         MobileParty.MainParty.SetMoveModeHold();
-        return $"Joined the active siege assault at {settlement.Name}";
+        return alreadyInAssault
+            ? $"Opened the active siege assault at {settlement.Name} for an involved player party"
+            : $"Joined the active siege assault at {settlement.Name}";
     }
 
     [CommandLineArgumentFunction("assault_entry_state", "coop.debug.siege")]
@@ -292,21 +313,76 @@ public class SiegeDebugCommand
             return "The local player encounter is unavailable";
         }
 
-        var callbackArgs = new MenuCallbackArgs((MenuContext)null, null);
-        bool conditionShown = new EncounterGameMenuBehavior()
-            .game_menu_encounter_attack_on_condition(callbackArgs);
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        var behavior = new EncounterGameMenuBehavior();
+        var attackArgs = new MenuCallbackArgs((MenuContext)null, null);
+        bool attackShown = behavior.game_menu_encounter_attack_on_condition(attackArgs);
+        var simulationArgs = new MenuCallbackArgs((MenuContext)null, null);
+        bool simulationShown = behavior.game_menu_encounter_order_attack_on_condition(simulationArgs);
         var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
-        var renderedOption = menu?.MenuOptions
+        var renderedAttack = menu?.MenuOptions
             .FirstOrDefault(option => option.IdString == "attack");
+        var renderedSimulation = menu?.MenuOptions
+            .FirstOrDefault(option => option.IdString == "str_order_attack");
         var settlement = MobileParty.MainParty?.BesiegedSettlement;
         var leader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        var mapEvent = PartyBase.MainParty?.MapEvent;
+        var tracker = mapEvent?.TroopUpgradeTracker;
+        var mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out string resolvedMapEventId)
+            ? resolvedMapEventId
+            : "none";
+        var trackerId = tracker != null && objectManager.TryGetId(tracker, out string resolvedTrackerId)
+            ? resolvedTrackerId
+            : "none";
+        var involvedPartyCount = mapEvent?._sides?
+            .Where(side => side?.Parties != null)
+            .Sum(side => side.Parties.Count) ?? 0;
+        bool mainPartyAttached = PartyBase.MainParty?.MapEventSide?.MapEvent == mapEvent && mapEvent != null;
+        bool mainPartyTracked = tracker?._mapEventParties
+            .Any(party => party?.Party == PartyBase.MainParty) == true;
+
+        var structuredResult = JsonConvert.SerializeObject(new
+        {
+            menu = menu?.StringId ?? "none",
+            settlementId = settlement?.StringId ?? "none",
+            mapEventId,
+            trackerId,
+            trackerPresent = tracker != null,
+            trackedPartyCount = tracker?._mapEventParties.Count ?? 0,
+            involvedPartyCount,
+            mainPartyAttached,
+            mainPartyTracked,
+            attack = new
+            {
+                shown = attackShown,
+                enabled = attackArgs.IsEnabled,
+                rendered = renderedAttack != null,
+                renderedEnabled = renderedAttack?.IsEnabled ?? false,
+                tooltip = attackArgs.Tooltip?.ToString() ?? "none",
+            },
+            simulation = new
+            {
+                shown = simulationShown,
+                enabled = simulationArgs.IsEnabled,
+                rendered = renderedSimulation != null,
+                renderedEnabled = renderedSimulation?.IsEnabled ?? false,
+                tooltip = simulationArgs.Tooltip?.ToString() ?? "none",
+            },
+        });
 
         return $"menu={menu?.StringId ?? "none"} settlement={settlement?.StringId ?? "none"} " +
             $"leader={leader?.StringId ?? "none"} localLeader={leader == MobileParty.MainParty} " +
-            $"conditionShown={conditionShown} conditionEnabled={callbackArgs.IsEnabled} " +
-            $"conditionTooltip={callbackArgs.Tooltip?.ToString() ?? "none"} " +
-            $"renderedRegistered={renderedOption != null} renderedEnabled={renderedOption?.IsEnabled ?? false} " +
-            $"renderedTooltip={renderedOption?.Tooltip?.ToString() ?? "none"}";
+            $"mapEvent={mapEventId} tracker={trackerId} tracked={tracker?._mapEventParties.Count ?? 0}/{involvedPartyCount} " +
+            $"mainPartyAttached={mainPartyAttached} mainPartyTracked={mainPartyTracked} " +
+            $"attackShown={attackShown} attackEnabled={attackArgs.IsEnabled} " +
+            $"attackRendered={renderedAttack != null} attackRenderedEnabled={renderedAttack?.IsEnabled ?? false} " +
+            $"simulationShown={simulationShown} simulationEnabled={simulationArgs.IsEnabled} " +
+            $"simulationRendered={renderedSimulation != null} simulationRenderedEnabled={renderedSimulation?.IsEnabled ?? false}" +
+            Environment.NewLine + "LIVE_TEST_JSON=" + structuredResult;
     }
 
     [CommandLineArgumentFunction("leave", "coop.debug.siege")]
@@ -504,6 +580,22 @@ public class SiegeDebugCommand
         if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
         {
             return "Unable to resolve SiegeEventInterface";
+        }
+
+        var activeAssault = settlement.Party.MapEvent ?? leader.MapEvent;
+        if (activeAssault != null && !activeAssault.IsFinalized)
+            activeAssault.FinalizeEvent();
+
+        if (settlement.SiegeEvent == null)
+        {
+            var finalizedRestoreResult = PartyCommands.RestorePositionCommand(new List<string>
+            {
+                leader.StringId,
+                args[1],
+                args[2],
+                args[3],
+            });
+            return $"Finalized the assault and stopped the siege of {settlement.Name}\n" + finalizedRestoreResult;
         }
 
         var siegeParties = camp._besiegerParties.ToArray();
@@ -1033,15 +1125,36 @@ public class SiegeDebugCommand
         var siegeEvent = settlement.SiegeEvent;
         if (siegeEvent == null)
         {
-            return $"{settlement.Name} ({settlement.StringId}): siege=False graphComplete=False";
+            var cleanResult = JsonConvert.SerializeObject(new
+            {
+                success = true,
+                settlementId = settlement.StringId,
+                siege = false,
+                graphComplete = false,
+            });
+            return $"{settlement.Name} ({settlement.StringId}): siege=False graphComplete=False" +
+                Environment.NewLine + "LIVE_TEST_JSON=" + cleanResult;
         }
 
         var camp = siegeEvent.BesiegerCamp;
+        bool graphComplete = SiegeContainerLookup.IsGraphComplete(siegeEvent);
+        var structuredResult = JsonConvert.SerializeObject(new
+        {
+            success = true,
+            settlementId = settlement.StringId,
+            siege = true,
+            campPresent = camp != null,
+            leaderPresent = camp?.LeaderParty != null,
+            attackerContainerPresent = camp?.SiegeEngines != null,
+            defenderContainerPresent = settlement.SiegeEngines != null,
+            graphComplete,
+        });
         return $"{settlement.Name} ({settlement.StringId}): siege=True " +
             $"camp={camp != null} leader={camp?.LeaderParty != null} " +
             $"attackerContainer={camp?.SiegeEngines != null} " +
             $"defenderContainer={settlement.SiegeEngines != null} " +
-            $"graphComplete={SiegeContainerLookup.IsGraphComplete(siegeEvent)}";
+            $"graphComplete={graphComplete}" + Environment.NewLine +
+            "LIVE_TEST_JSON=" + structuredResult;
     }
 
     /// <summary>

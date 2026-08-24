@@ -5,10 +5,14 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using Helpers;
 using System.Reflection;
@@ -85,6 +89,127 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         {
             AssertPartyState(client, partyId, expectMapEvent: false, expectCamp: false);
         }
+    }
+
+    [Fact]
+    public void ActiveSiegeAttacker_LeaveThenRejoin_PreservesClientTracker()
+    {
+        var mapEventContext = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(mapEventContext.MapEventId, BattleSideEnum.Attacker);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        var client = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        string? partyBaseId = null;
+        string? trackerId = null;
+        string? mapEventPartyId = null;
+        string? attackerSideId = null;
+        string[]? involvedPartyIds = null;
+
+        SetMapEventType(mapEventContext.MapEventId, MapEvent.BattleTypes.Siege);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetId(party.Party, out partyBaseId));
+        });
+
+        SetMainParty(client, partyId);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var mapEventParty = mapEvent.FindMapEventParty(party.Party);
+            Assert.NotNull(mapEventParty);
+            Assert.NotNull(mapEvent.TroopUpgradeTracker);
+            Assert.True(client.ObjectManager.TryGetId(mapEvent.TroopUpgradeTracker, out trackerId));
+            Assert.True(client.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
+            Assert.True(client.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
+        });
+
+        Assert.NotNull(partyBaseId);
+        Assert.NotNull(trackerId);
+        Assert.NotNull(mapEventPartyId);
+        Assert.NotNull(attackerSideId);
+        client.Call(() => client.Resolve<INetwork>().SendAll(
+            new NetworkRequestLeaveBattle(partyBaseId, finishLocalMenus: false)), MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<TroopUpgradeTracker>(trackerId, out var tracker));
+
+            Assert.Null(party.MapEvent);
+            Assert.Same(tracker, mapEvent.TroopUpgradeTracker);
+            Assert.Empty(tracker._mapEventParties);
+        });
+
+        client.SimulateMessage(Server.NetPeer, new NetworkAddBattleParty(attackerSideId, mapEventPartyId));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.Same(mapEvent, party.MapEvent);
+
+            var partyIds = new List<string>();
+            foreach (var involvedParty in mapEvent._sides.SelectMany(side => side.Parties))
+            {
+                Assert.True(client.ObjectManager.TryGetId(involvedParty, out var involvedPartyId));
+                partyIds.Add(involvedPartyId);
+            }
+            involvedPartyIds = partyIds.ToArray();
+        });
+
+        Assert.NotNull(involvedPartyIds);
+        client.SimulateMessage(Server.NetPeer, new NetworkAddInvolvedParties(
+            mapEventContext.MapEventId,
+            involvedPartyIds,
+            new CampaignVec2[involvedPartyIds.Length]));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<TroopUpgradeTracker>(trackerId, out var tracker));
+
+            Assert.Same(mapEvent, party.MapEvent);
+            Assert.Same(tracker, mapEvent.TroopUpgradeTracker);
+            AssertTrackerMatchesSides(mapEvent);
+            Assert.Contains(tracker._mapEventParties, involvedParty => involvedParty.Party == party.Party);
+        });
+    }
+
+    [Fact]
+    public void PromptSiegeAssault_WhenEncounterAlreadyOwnsAssault_PreservesEncounterAndPartySide()
+    {
+        var mapEventContext = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(mapEventContext.MapEventId, BattleSideEnum.Attacker);
+        var client = Clients.First();
+
+        SetMapEventType(mapEventContext.MapEventId, MapEvent.BattleTypes.Siege);
+        SetMainParty(client, partyId);
+        var siegeEventId = SetClientOnlyCamp(client, partyId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+            var settlement = siegeEvent.BesiegedSettlement;
+            settlement.Party._mapEventSide = mapEvent.DefenderSide;
+            mapEvent.MapEventSettlement = settlement;
+
+            PlayerEncounter.Start();
+            PlayerEncounter.Current._mapEvent = mapEvent;
+            var encounter = PlayerEncounter.Current;
+
+            new SiegeEventInterface().PromptSiegeAssault(party, settlement);
+
+            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+            Assert.Same(mapEvent.AttackerSide, party.Party.MapEventSide);
+        });
     }
 
     [Fact]
@@ -270,5 +395,12 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.Equal(expectMapEvent, party.MapEvent != null);
             Assert.Equal(expectCamp, party.BesiegerCamp != null);
         });
+    }
+
+    private static void AssertTrackerMatchesSides(MapEvent mapEvent)
+    {
+        var involvedParties = mapEvent._sides.SelectMany(side => side.Parties).ToList();
+        Assert.Equal(involvedParties.Count, mapEvent.TroopUpgradeTracker._mapEventParties.Count);
+        Assert.All(involvedParties, party => Assert.Contains(party, mapEvent.TroopUpgradeTracker._mapEventParties));
     }
 }
