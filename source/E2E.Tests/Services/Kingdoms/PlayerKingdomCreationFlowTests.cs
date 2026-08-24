@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Network;
 using Common.Messaging;
 using Common.Util;
 using Coop.Core.Client.Services.Kingdoms.Handlers;
@@ -20,6 +21,8 @@ using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
+using GameInterface.Services.Locations.Messages.Conversation;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -291,6 +294,55 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
         Assert.False(rejected.Accepted);
+    }
+    
+    [Fact]
+    public void VassalServiceAccepted_DuringSettlementLocationConversation_JoinsKingdomAndReleasesConversationLock()
+    {
+        const string LocationId = "vassal_oath_settlement";
+
+        var client = Clients.First();
+        var joiner = CreateSyncedPlayerContext(ControllerId, client);
+        var ruler = CreateSyncedPlayerContext("SettlementVassalRuler", _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+        SetClanTierEverywhere(joiner.ClanId, 2);
+
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+
+        // The joiner walks up to the ruler's hero inside a settlement and opens a location conversation,
+        // exactly as LocationConversationPatches gates it for a synced hero met in a settlement.
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(
+            new NetworkRequestLocationConversation(LocationId, ruler.CharacterId, generation: 1)));
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowLocationConversation>());
+        var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionStarted>());
+        Assert.True(started.IsLocationInteraction);
+
+        // While that settlement conversation is still held, the joiner takes the oath to join the ruler's kingdom
+        Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+        Server.NetworkSentMessages.Clear();
+        client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<RequestVassalService>());
+        Assert.Equal(kingdomId, request.KingdomId);
+
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
+        Assert.True(accepted.Accepted);
+
+        Server.Call(() => AssertVassalMembership(Server, joiner.ClanId, kingdomId));
+        foreach (var instance in Clients)
+        {
+            instance.Call(() => AssertVassalMembership(instance, joiner.ClanId, kingdomId));
+        }
+
+        // The dialog concludes and the settlement conversation ends normally afterward
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+
+        var ended = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionEnded>());
+        Assert.True(ended.IsLocationInteraction);
     }
 
     [Fact]
