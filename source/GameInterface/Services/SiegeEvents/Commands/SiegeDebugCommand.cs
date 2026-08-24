@@ -288,7 +288,8 @@ public class SiegeDebugCommand
 
         if (!alreadyInAssault)
             PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
-        GameMenu.SwitchToMenu("encounter");
+        else
+            GameMenu.SwitchToMenu("encounter");
         MobileParty.MainParty.SetMoveModeHold();
         return alreadyInAssault
             ? $"Opened the active siege assault at {settlement.Name} for an involved player party"
