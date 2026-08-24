@@ -17,6 +17,7 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
+using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CrashReporting;
 using GameInterface.Utils;
@@ -62,6 +63,8 @@ namespace Coop
         private string activeLogFilePath;
         private string informationalVersion = "unknown";
         private CrashReportingConsentCoordinator crashReportingConsent;
+        private BugReportConsentCoordinator bugReportConsent;
+        private IBugReportOverlay bugReportOverlay;
         private UnsupportedModuleWarningHandler unsupportedModuleWarning;
         private bool startupModuleWarningReady;
         private bool automaticCrashReportsRequested;
@@ -260,9 +263,7 @@ namespace Coop
 
             Logger = LogManager.GetLogger<CoopMod>();
 
-            informationalVersion = typeof(ModInformation).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion ?? "unknown";
+            informationalVersion = ModInformation.BuildVersion;
             Logger.Information("BannerlordCoop build {Build}", informationalVersion);
             Logger.Information(
                 "[Protobuf] MonoRuntime={MonoRuntime} AutoCompile={AutoCompile} StructFactoryWorkaround={StructFactoryWorkaround} CLRVersion={ClrVersion}",
@@ -289,6 +290,9 @@ namespace Coop
                 },
                 exception => Logger.Warning(exception, "Crash reporting preference could not be saved"));
             crashReportingConsent.ApplyStoredDecision();
+            bugReportConsent = new BugReportConsentCoordinator(
+                new CoopOptionsStore(),
+                exception => Logger.Warning(exception, "Diagnostic bug-report log-sharing preference could not be saved"));
             TryStartCrashReporter(role);
         }
 
@@ -440,7 +444,10 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
-            Coop = new CoopartiveMultiplayerExperience(isServer, CrashDiagnostics.SetPhase);
+            Coop = new CoopartiveMultiplayerExperience(
+                isServer,
+                CrashDiagnostics.SetPhase,
+                activeLogFilePath);
 
             Updateables.Add(GameThread.Instance);
 
@@ -592,6 +599,8 @@ namespace Coop
             TryApplyAutomaticCrashReports();
             TryShowUnsupportedModuleWarning(isAtMainMenu);
             TryShowCrashReportingConsent(isAtMainMenu);
+            TryShowBugReportConsent(isAtMainMenu);
+            TryInitializeBugReportOverlay();
 
             // Boot Steam services once the main menu is up, so a +connect_lobby launch resolves while joining is possible.
             if (!steamBootAttempted && isAtMainMenu)
@@ -634,7 +643,40 @@ namespace Coop
                 isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
                 inquiry => InformationManager.ShowInquiry(inquiry));
         }
-        
+
+        private void TryShowBugReportConsent(bool isAtMainMenu)
+        {
+            if (bugReportConsent == null || isServer || isAutoConnect ||
+                ManagedServerConfig.IsManagedServer)
+            {
+                return;
+            }
+
+            bugReportConsent.TryShowPrompt(
+                isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
+                inquiry => InformationManager.ShowInquiry(inquiry));
+        }
+
+        private void TryInitializeBugReportOverlay()
+        {
+            if (isServer || Game.Current == null || bugReportOverlay != null ||
+                !ContainerProvider.TryResolve(out IBugReportOverlay overlay))
+            {
+                return;
+            }
+
+            try
+            {
+                overlay.Initialize();
+                bugReportOverlay = overlay;
+                Logger.Debug("Initialized the bug-report overlay");
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Could not initialize the bug-report overlay");
+            }
+        }
+
         // Show the one-time unsupported module warning when the client startup UI is available.
         private void TryShowUnsupportedModuleWarning(bool isAtMainMenu)
         {

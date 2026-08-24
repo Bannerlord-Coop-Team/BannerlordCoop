@@ -5,12 +5,14 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.BugReporting;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -42,6 +44,7 @@ internal class PlayerUnstuckHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IBugReportService bugReportService;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ISettlementInterface settlementInterface;
@@ -50,6 +53,7 @@ internal class PlayerUnstuckHandler : IHandler
     public PlayerUnstuckHandler(
         IMessageBroker messageBroker,
         INetwork network,
+        IBugReportService bugReportService,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
@@ -57,6 +61,7 @@ internal class PlayerUnstuckHandler : IHandler
     {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.bugReportService = bugReportService;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.settlementInterface = settlementInterface;
@@ -97,7 +102,37 @@ internal class PlayerUnstuckHandler : IHandler
         if (!ModInformation.IsServer) return;
 
         var data = payload.What;
-        GameThread.RunSafe(() => ApplyServerUnstuck(data.PartyId, data.HeroId), context: nameof(PlayerUnstuckHandler));
+        var requester = payload.Who as NetPeer;
+        GameThread.RunSafe(() =>
+        {
+            try
+            {
+                ApplyServerUnstuck(data.PartyId, data.HeroId);
+            }
+            finally
+            {
+                TryRequestBugReport(data.PartyId, requester);
+            }
+        }, context: nameof(PlayerUnstuckHandler));
+    }
+
+    private void TryRequestBugReport(string partyId, NetPeer requester)
+    {
+        if (requester == null ||
+            !playerManager.TryGetPlayer(requester, out var player) ||
+            player.MobilePartyId != partyId)
+        {
+            return;
+        }
+
+        try
+        {
+            bugReportService.RequestReport("unstuck", requester);
+        }
+        catch (Exception exception)
+        {
+            Logger.Warning(exception, "Could not start the unstuck diagnostic bug report");
+        }
     }
 
     private void ApplyServerUnstuck(string partyId, string heroId)

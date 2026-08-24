@@ -1,0 +1,717 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using GameInterface.Services.BugReporting.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.UI.BugReporting;
+using LiteNetLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using TaleWorlds.Library;
+
+namespace GameInterface.Services.BugReporting;
+
+/// <summary>Starts server-side diagnostic reports that collect logs from consenting clients.</summary>
+public interface IBugReportService
+{
+    void RequestReport(
+        string trigger,
+        NetPeer requester,
+        string summary = null,
+        string description = null);
+    void SubmitReport(string summary, string description);
+}
+
+/// <inheritdoc />
+internal class BugReportService : IBugReportService, IDisposable
+{
+    private const int MaximumCompressedLogBytes = 32 * 1024 * 1024;
+    private const int MaximumCombinedCompressedBytes = 512 * 1024 * 1024;
+    private static readonly TimeSpan CollectionTimeout = TimeSpan.FromMinutes(2);
+    private static readonly ILogger Logger = LogManager.GetLogger<BugReportService>();
+
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
+    private readonly IBugReportLogSharingPreference logSharingPreference;
+    private readonly ICoopLogSnapshotProvider logSnapshotProvider;
+    private readonly IBugReportArchiveBuilder archiveBuilder;
+    private readonly IBugReportUploader uploader;
+    private readonly CancellationToken cancellationToken;
+    private readonly object collectionGate = new object();
+    private readonly object clientRequestGate = new object();
+    private readonly HashSet<string> clientRequests = new HashSet<string>(StringComparer.Ordinal);
+
+    private ActiveCollection activeCollection;
+    private int disposed;
+
+    public BugReportService(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IPlayerManager playerManager,
+        IBugReportLogSharingPreference logSharingPreference,
+        ICoopLogSnapshotProvider logSnapshotProvider,
+        IBugReportArchiveBuilder archiveBuilder,
+        IBugReportUploader uploader,
+        CancellationTokenSource sessionCancellation)
+    {
+        this.messageBroker = messageBroker;
+        this.network = network;
+        this.playerManager = playerManager;
+        this.logSharingPreference = logSharingPreference;
+        this.logSnapshotProvider = logSnapshotProvider;
+        this.archiveBuilder = archiveBuilder;
+        this.uploader = uploader;
+        cancellationToken = sessionCancellation.Token;
+
+        messageBroker.Subscribe<NetworkRequestBugReport>(Handle_NetworkRequestBugReport);
+        messageBroker.Subscribe<NetworkRequestBugReportLogs>(Handle_NetworkRequestBugReportLogs);
+        messageBroker.Subscribe<NetworkBugReportLogChunk>(Handle_NetworkBugReportLogChunk);
+        messageBroker.Subscribe<NetworkBugReportLogUnavailable>(Handle_NetworkBugReportLogUnavailable);
+        messageBroker.Subscribe<NetworkBugReportResult>(Handle_NetworkBugReportResult);
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+
+        messageBroker.Unsubscribe<NetworkRequestBugReport>(Handle_NetworkRequestBugReport);
+        messageBroker.Unsubscribe<NetworkRequestBugReportLogs>(Handle_NetworkRequestBugReportLogs);
+        messageBroker.Unsubscribe<NetworkBugReportLogChunk>(Handle_NetworkBugReportLogChunk);
+        messageBroker.Unsubscribe<NetworkBugReportLogUnavailable>(Handle_NetworkBugReportLogUnavailable);
+        messageBroker.Unsubscribe<NetworkBugReportResult>(Handle_NetworkBugReportResult);
+
+        lock (collectionGate)
+        {
+            activeCollection?.Timer?.Dispose();
+            activeCollection = null;
+        }
+    }
+
+    public void RequestReport(
+        string trigger,
+        NetPeer requester,
+        string summary = null,
+        string description = null)
+    {
+        if (!ModInformation.IsServer) return;
+        if (string.IsNullOrWhiteSpace(trigger))
+            throw new ArgumentException("Trigger cannot be empty.", nameof(trigger));
+        if (requester == null) throw new ArgumentNullException(nameof(requester));
+        if (!playerManager.TryGetPlayer(requester, out var reportingPlayer))
+            throw new InvalidOperationException("The reporting peer is not registered as a player.");
+
+        var reportingClientNetworkId = reportingPlayer.ControllerId;
+        BugReportSubmission submission = null;
+        if (summary != null || description != null)
+        {
+            if (!TryNormalizeSubmission(summary, description, out summary, out description, out var error))
+                throw new ArgumentException(error, nameof(summary));
+            submission = new BugReportSubmission(
+                reportingClientNetworkId,
+                summary,
+                description);
+        }
+
+        StartCollection(
+            trigger.Trim(),
+            requester,
+            reportingClientNetworkId,
+            submission);
+    }
+
+    public void SubmitReport(string summary, string description)
+    {
+        if (!ModInformation.IsClient) return;
+        if (!TryNormalizeSubmission(summary, description, out summary, out description, out var error))
+            throw new ArgumentException(error, nameof(summary));
+
+        network.SendAll(new NetworkRequestBugReport(summary, description));
+    }
+
+    private void Handle_NetworkRequestBugReport(MessagePayload<NetworkRequestBugReport> payload)
+    {
+        if (!ModInformation.IsServer || !(payload.Who is NetPeer requester)) return;
+
+        var request = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetPlayer(requester, out _))
+            {
+                Logger.Warning("Ignoring a bug report from an unregistered peer");
+                return;
+            }
+
+            if (!TryNormalizeSubmission(
+                    request.Summary,
+                    request.Description,
+                    out var summary,
+                    out var description,
+                    out var error))
+            {
+                network.Send(requester, new NetworkBugReportResult(string.Empty, error));
+                return;
+            }
+
+            RequestReport("player-submitted", requester, summary, description);
+        }, context: nameof(BugReportService));
+    }
+
+    private static bool TryNormalizeSubmission(
+        string inputSummary,
+        string inputDescription,
+        out string summary,
+        out string description,
+        out string error)
+    {
+        summary = (inputSummary ?? string.Empty)
+            .Replace("\r", " ")
+            .Replace("\n", " ")
+            .Trim();
+        description = (inputDescription ?? string.Empty)
+            .Replace("\r\n", "\n")
+            .Replace("\r", "\n")
+            .Trim();
+
+        if (summary.Length == 0)
+        {
+            error = "Bug report summary is required.";
+            return false;
+        }
+        if (summary.Length > NetworkRequestBugReport.MaximumSummaryLength)
+        {
+            error = $"Bug report summary cannot exceed {NetworkRequestBugReport.MaximumSummaryLength} characters.";
+            return false;
+        }
+        if (description.Length == 0)
+        {
+            error = "Bug report description is required.";
+            return false;
+        }
+        if (description.Length > NetworkRequestBugReport.MaximumDescriptionLength)
+        {
+            error = $"Bug report description cannot exceed {NetworkRequestBugReport.MaximumDescriptionLength} characters.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private void StartCollection(
+        string trigger,
+        NetPeer requester,
+        string reportingClientNetworkId,
+        BugReportSubmission submission)
+    {
+        ActiveCollection collection;
+        lock (collectionGate)
+        {
+            if (activeCollection != null)
+            {
+                activeCollection.Triggers.Add(trigger);
+                if (submission != null) activeCollection.Submissions.Add(submission);
+                activeCollection.Requesters.Add(requester);
+                return;
+            }
+
+            var peers = new List<NetPeer>();
+            foreach (var player in playerManager.Players)
+            {
+                if (playerManager.TryGetPeer(player.ControllerId, out var peer) && !peers.Contains(peer))
+                    peers.Add(peer);
+            }
+
+            if (peers.Count == 0)
+            {
+                network.Send(requester, new NetworkBugReportResult(
+                    string.Empty,
+                    "No connected player logs were available for the bug report."));
+                return;
+            }
+
+            collection = new ActiveCollection(
+                Guid.NewGuid().ToString("N"),
+                trigger,
+                reportingClientNetworkId,
+                submission,
+                peers,
+                requester);
+            activeCollection = collection;
+            collection.Timer = new Timer(
+                _ => CompleteOnTimeout(collection.RequestId),
+                null,
+                CollectionTimeout,
+                Timeout.InfiniteTimeSpan);
+        }
+
+        Logger.Information(
+            "Starting diagnostic bug report {RequestId} for {ClientCount} connected clients",
+            collection.RequestId,
+            collection.Clients.Count);
+
+        var request = new NetworkRequestBugReportLogs(collection.RequestId);
+        foreach (var peer in collection.Clients.Keys)
+        {
+            try
+            {
+                network.Send(peer, request);
+            }
+            catch (Exception exception)
+            {
+                Logger.Warning(exception, "Could not request a diagnostic log from a client");
+                RecordUnavailable(peer, collection.RequestId, BugReportLogUnavailableReason.CaptureFailed);
+            }
+        }
+    }
+
+    private void Handle_NetworkRequestBugReportLogs(
+        MessagePayload<NetworkRequestBugReportLogs> payload)
+    {
+        if (!ModInformation.IsClient || string.IsNullOrEmpty(payload.What.RequestId)) return;
+
+        if (!logSharingPreference.IsEnabled())
+        {
+            network.SendAll(new NetworkBugReportLogUnavailable(
+                payload.What.RequestId,
+                BugReportLogUnavailableReason.ConsentNotGranted));
+            return;
+        }
+
+        lock (clientRequestGate)
+        {
+            if (!clientRequests.Add(payload.What.RequestId)) return;
+        }
+
+        _ = CaptureAndSendAsync(payload.What.RequestId);
+    }
+
+    private async Task CaptureAndSendAsync(string requestId)
+    {
+        CoopLogSnapshot snapshot = null;
+        var reason = BugReportLogUnavailableReason.LogUnavailable;
+        try
+        {
+            snapshot = await Task.Run(() =>
+            {
+                if (!logSnapshotProvider.TryCapture(out var captured)) return null;
+                return captured;
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            reason = BugReportLogUnavailableReason.CaptureFailed;
+            Logger.Warning(exception, "Capturing the local co-op log for a bug report failed");
+        }
+
+        if (cancellationToken.IsCancellationRequested || Volatile.Read(ref disposed) != 0) return;
+
+        GameThread.RunSafe(() =>
+        {
+            try
+            {
+                if (cancellationToken.IsCancellationRequested || Volatile.Read(ref disposed) != 0) return;
+
+                if (snapshot == null)
+                {
+                    network.SendAll(new NetworkBugReportLogUnavailable(requestId, reason));
+                    return;
+                }
+
+                SendSnapshot(requestId, snapshot);
+            }
+            finally
+            {
+                lock (clientRequestGate)
+                {
+                    clientRequests.Remove(requestId);
+                }
+            }
+        }, context: nameof(BugReportService));
+    }
+
+    private void SendSnapshot(string requestId, CoopLogSnapshot snapshot)
+    {
+        var compressed = snapshot.CompressedData;
+        if (compressed == null || compressed.Length == 0 || compressed.Length > MaximumCompressedLogBytes)
+        {
+            network.SendAll(new NetworkBugReportLogUnavailable(
+                requestId,
+                BugReportLogUnavailableReason.CaptureFailed));
+            return;
+        }
+
+        var chunkCount = (compressed.Length + NetworkBugReportLogChunk.ChunkSize - 1) /
+                         NetworkBugReportLogChunk.ChunkSize;
+        for (var chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
+        {
+            var offset = chunkIndex * NetworkBugReportLogChunk.ChunkSize;
+            var length = Math.Min(NetworkBugReportLogChunk.ChunkSize, compressed.Length - offset);
+            var data = new byte[length];
+            Buffer.BlockCopy(compressed, offset, data, 0, length);
+
+            network.SendAll(new NetworkBugReportLogChunk(
+                requestId,
+                chunkIndex,
+                chunkCount,
+                compressed.Length,
+                snapshot.UncompressedLength,
+                data));
+        }
+    }
+
+    private void Handle_NetworkBugReportLogChunk(
+        MessagePayload<NetworkBugReportLogChunk> payload)
+    {
+        if (!ModInformation.IsServer || !(payload.Who is NetPeer peer)) return;
+
+        FinalizedCollection finalized = null;
+        lock (collectionGate)
+        {
+            var collection = activeCollection;
+            if (collection == null || collection.RequestId != payload.What.RequestId ||
+                !collection.Clients.TryGetValue(peer, out var client) || client.Responded)
+            {
+                return;
+            }
+
+            if (!TryAppendChunk(collection, client, payload.What))
+            {
+                client.Responded = true;
+                client.Status = ClientCollectionStatus.Failed;
+            }
+
+            if (collection.Clients.Values.All(item => item.Responded))
+                finalized = ClaimFinalization(collection, timedOut: false);
+        }
+
+        if (finalized != null) _ = PackageAndUploadAsync(finalized);
+    }
+
+    private static bool TryAppendChunk(
+        ActiveCollection collection,
+        ClientCollection client,
+        NetworkBugReportLogChunk chunk)
+    {
+        var maximumChunks = (MaximumCompressedLogBytes + NetworkBugReportLogChunk.ChunkSize - 1) /
+                            NetworkBugReportLogChunk.ChunkSize;
+        if (chunk.ChunkCount <= 0 || chunk.ChunkCount > maximumChunks ||
+            chunk.ChunkIndex != client.NextChunkIndex ||
+            chunk.ChunkIndex >= chunk.ChunkCount ||
+            chunk.CompressedLength <= 0 || chunk.CompressedLength > MaximumCompressedLogBytes ||
+            chunk.UncompressedLength < 0 || chunk.UncompressedLength > CoopLogSnapshotProvider.MaximumLogBytes ||
+            chunk.Data == null || chunk.Data.Length == 0 ||
+            chunk.Data.Length > NetworkBugReportLogChunk.ChunkSize)
+        {
+            return false;
+        }
+
+        if (client.NextChunkIndex == 0)
+        {
+            client.ChunkCount = chunk.ChunkCount;
+            client.CompressedLength = chunk.CompressedLength;
+            client.UncompressedLength = chunk.UncompressedLength;
+        }
+        else if (client.ChunkCount != chunk.ChunkCount ||
+                 client.CompressedLength != chunk.CompressedLength ||
+                 client.UncompressedLength != chunk.UncompressedLength)
+        {
+            return false;
+        }
+
+        if (client.Data.Length + chunk.Data.Length > client.CompressedLength) return false;
+
+        client.Data.Write(chunk.Data, 0, chunk.Data.Length);
+        client.NextChunkIndex++;
+        if (client.NextChunkIndex != client.ChunkCount) return true;
+        if (client.Data.Length != client.CompressedLength) return false;
+
+        var combinedLength = collection.Clients.Values
+            .Where(item => item.Status == ClientCollectionStatus.Collected)
+            .Sum(item => (long)item.CompressedLength);
+        if (combinedLength + client.CompressedLength > MaximumCombinedCompressedBytes) return false;
+
+        client.Responded = true;
+        client.Status = ClientCollectionStatus.Collected;
+        return true;
+    }
+
+    private void Handle_NetworkBugReportLogUnavailable(
+        MessagePayload<NetworkBugReportLogUnavailable> payload)
+    {
+        if (!ModInformation.IsServer || !(payload.Who is NetPeer peer)) return;
+        RecordUnavailable(peer, payload.What.RequestId, payload.What.Reason);
+    }
+
+    private void RecordUnavailable(
+        NetPeer peer,
+        string requestId,
+        BugReportLogUnavailableReason reason)
+    {
+        FinalizedCollection finalized = null;
+        lock (collectionGate)
+        {
+            var collection = activeCollection;
+            if (collection == null || collection.RequestId != requestId ||
+                !collection.Clients.TryGetValue(peer, out var client) || client.Responded)
+            {
+                return;
+            }
+
+            client.Responded = true;
+            client.Status = reason == BugReportLogUnavailableReason.ConsentNotGranted
+                ? ClientCollectionStatus.Declined
+                : ClientCollectionStatus.Failed;
+
+            if (collection.Clients.Values.All(item => item.Responded))
+                finalized = ClaimFinalization(collection, timedOut: false);
+        }
+
+        if (finalized != null) _ = PackageAndUploadAsync(finalized);
+    }
+
+    private void CompleteOnTimeout(string requestId)
+    {
+        FinalizedCollection finalized = null;
+        lock (collectionGate)
+        {
+            if (activeCollection != null && activeCollection.RequestId == requestId)
+                finalized = ClaimFinalization(activeCollection, timedOut: true);
+        }
+
+        if (finalized != null) _ = PackageAndUploadAsync(finalized);
+    }
+
+    private FinalizedCollection ClaimFinalization(ActiveCollection collection, bool timedOut)
+    {
+        if (!ReferenceEquals(activeCollection, collection)) return null;
+
+        activeCollection = null;
+        collection.Timer?.Dispose();
+
+        var logs = collection.Clients.Values
+            .Where(client => client.Status == ClientCollectionStatus.Collected)
+            .Select(client => new CollectedBugReportLog(
+                client.ClientNumber,
+                client.Data.ToArray(),
+                client.UncompressedLength))
+            .ToArray();
+        var timedOutClients = timedOut
+            ? collection.Clients.Values.Count(client => !client.Responded)
+            : 0;
+
+        return new FinalizedCollection(
+            new BugReportArchiveContents(
+                collection.RequestId,
+                collection.ReportingClientNetworkId,
+                collection.Triggers.OrderBy(trigger => trigger).ToArray(),
+                collection.Submissions.ToArray(),
+                null,
+                collection.StartedAt,
+                logs,
+                collection.Clients.Count,
+                collection.Clients.Values.Count(client => client.Status == ClientCollectionStatus.Declined),
+                collection.Clients.Values.Count(client => client.Status == ClientCollectionStatus.Failed),
+                timedOutClients),
+            collection.Requesters.ToArray());
+    }
+
+    private async Task PackageAndUploadAsync(FinalizedCollection finalized)
+    {
+        if (finalized.Contents.Logs.Count == 0 && finalized.Contents.Submissions.Count == 0)
+        {
+            SendResult(finalized, "No clients provided a diagnostic log for the bug report.");
+            return;
+        }
+
+        string archivePath = null;
+        string clientMessage;
+        try
+        {
+            var contents = await Task.Run(
+                () => CaptureServerLog(finalized.Contents),
+                cancellationToken).ConfigureAwait(false);
+            archivePath = await Task.Run(
+                () => archiveBuilder.Create(contents),
+                cancellationToken).ConfigureAwait(false);
+
+            Logger.Information(
+                "Created diagnostic bug-report archive {RequestId} at {ArchivePath}",
+                contents.RequestId,
+                archivePath);
+
+            var upload = await uploader.UploadAsync(
+                contents,
+                cancellationToken).ConfigureAwait(false);
+
+            if (upload.Uploaded)
+            {
+                TryDelete(archivePath);
+                clientMessage = "The bug report and available diagnostic logs were submitted.";
+                Logger.Information("Uploaded diagnostic bug report {RequestId}", finalized.Contents.RequestId);
+            }
+            else if (!upload.EndpointConfigured)
+            {
+                clientMessage = "The bug report was packaged on the server; the upload endpoint is not configured yet.";
+                Logger.Information(
+                    "Diagnostic bug report {RequestId} was not uploaded because the endpoint is not configured",
+                    finalized.Contents.RequestId);
+            }
+            else
+            {
+                clientMessage = "The bug report was packaged, but its upload failed.";
+                Logger.Warning(
+                    "Uploading diagnostic bug report {RequestId} failed: {Details}",
+                    finalized.Contents.RequestId,
+                    upload.Details);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Packaging the diagnostic bug report failed");
+            clientMessage = "The server could not package the bug report.";
+        }
+
+        SendResult(finalized, clientMessage);
+    }
+
+    private BugReportArchiveContents CaptureServerLog(BugReportArchiveContents contents)
+    {
+        try
+        {
+            if (!logSnapshotProvider.TryCapture(out var snapshot)) return contents;
+
+            return contents.WithServerLog(new CollectedBugReportServerLog(
+                snapshot.CompressedData,
+                snapshot.UncompressedLength));
+        }
+        catch (Exception exception)
+        {
+            Logger.Warning(exception, "Capturing the server log for a bug report failed");
+            return contents;
+        }
+    }
+
+    private void SendResult(FinalizedCollection finalized, string message)
+    {
+        if (cancellationToken.IsCancellationRequested || Volatile.Read(ref disposed) != 0) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (cancellationToken.IsCancellationRequested || Volatile.Read(ref disposed) != 0) return;
+
+            var result = new NetworkBugReportResult(finalized.Contents.RequestId, message);
+            foreach (var requester in finalized.Requesters)
+            {
+                network.Send(requester, result);
+            }
+        }, context: nameof(BugReportService));
+    }
+
+    private void Handle_NetworkBugReportResult(
+        MessagePayload<NetworkBugReportResult> payload)
+    {
+        if (!ModInformation.IsClient || string.IsNullOrWhiteSpace(payload.What.Message)) return;
+
+        var message = payload.What.Message;
+        GameThread.RunSafe(
+            () => InformationManager.DisplayMessage(new InformationMessage("[Bug Report] " + message)),
+            context: nameof(BugReportService));
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private enum ClientCollectionStatus
+    {
+        Pending,
+        Collected,
+        Declined,
+        Failed,
+    }
+
+    private sealed class ClientCollection
+    {
+        public int ClientNumber { get; }
+        public MemoryStream Data { get; } = new MemoryStream();
+        public int NextChunkIndex { get; set; }
+        public int ChunkCount { get; set; }
+        public int CompressedLength { get; set; }
+        public int UncompressedLength { get; set; }
+        public bool Responded { get; set; }
+        public ClientCollectionStatus Status { get; set; }
+
+        public ClientCollection(int clientNumber)
+        {
+            ClientNumber = clientNumber;
+        }
+    }
+
+    private sealed class ActiveCollection
+    {
+        public string RequestId { get; }
+        public string ReportingClientNetworkId { get; }
+        public DateTimeOffset StartedAt { get; } = DateTimeOffset.UtcNow;
+        public HashSet<string> Triggers { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public List<BugReportSubmission> Submissions { get; } = new List<BugReportSubmission>();
+        public Dictionary<NetPeer, ClientCollection> Clients { get; }
+        public HashSet<NetPeer> Requesters { get; } = new HashSet<NetPeer>();
+        public Timer Timer { get; set; }
+
+        public ActiveCollection(
+            string requestId,
+            string trigger,
+            string reportingClientNetworkId,
+            BugReportSubmission submission,
+            IEnumerable<NetPeer> peers,
+            NetPeer requester)
+        {
+            RequestId = requestId;
+            ReportingClientNetworkId = reportingClientNetworkId;
+            Triggers.Add(trigger);
+            if (submission != null) Submissions.Add(submission);
+            Clients = peers
+                .Select((peer, index) => new { peer, client = new ClientCollection(index + 1) })
+                .ToDictionary(item => item.peer, item => item.client);
+            Requesters.Add(requester);
+        }
+    }
+
+    private sealed class FinalizedCollection
+    {
+        public BugReportArchiveContents Contents { get; }
+        public NetPeer[] Requesters { get; }
+
+        public FinalizedCollection(BugReportArchiveContents contents, NetPeer[] requesters)
+        {
+            Contents = contents;
+            Requesters = requesters;
+        }
+    }
+}
