@@ -128,6 +128,39 @@ public class MapEventCollectionTests : MapEventTestBase
     }
 
     [Fact]
+    public void Client_AddBattlePartyRestoresPartyReferenceBeforeAttachment()
+    {
+        var staged = CreateServerMapEvent();
+        string mapEventSideId = null;
+        string mapEventPartyId = null;
+        string partyId = null;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
+                candidate => ReferenceEquals(candidate.Party, Get<MobileParty>(Server, staged.AttackerPartyId).Party));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out mapEventSideId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty.Party, out partyId));
+        });
+
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            var mapEventParty = Get<MapEventParty>(client, mapEventPartyId);
+            using (new AllowedThread()) mapEventParty.Party = null;
+        });
+
+        client.SimulateMessage(Server.NetPeer,
+            new NetworkAddBattleParty(mapEventSideId, mapEventPartyId, partyId));
+
+        client.Call(() => Assert.Same(
+            Get<PartyBase>(client, partyId),
+            Get<MapEventParty>(client, mapEventPartyId).Party));
+    }
+
+    [Fact]
     public void Client_CommitRestoresAuthoritativeComponentLinks()
     {
         var staged = CreateServerMapEvent(commit: false);
