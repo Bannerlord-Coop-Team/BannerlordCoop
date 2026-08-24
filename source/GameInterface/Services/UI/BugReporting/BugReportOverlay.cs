@@ -25,7 +25,8 @@ public interface IBugReportOverlay : IDisposable
 internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
 {
     private const string SummaryInputWidgetId = "CoopBugReportSummaryInput";
-    private const int LayerOrder = 3;
+    // Vanilla map nameplates use 90 and the regular map UI uses 100.
+    private const int LayerOrder = 110;
 
     private readonly IBugReportService bugReportService;
     private readonly IBugReportSubmissionConsent submissionConsent;
