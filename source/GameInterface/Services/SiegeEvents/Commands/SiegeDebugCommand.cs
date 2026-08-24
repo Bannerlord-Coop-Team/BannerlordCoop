@@ -653,7 +653,9 @@ public class SiegeDebugCommand
     private static void RestorePrisonerPromptClan(PrisonerPromptClanSnapshot snapshot)
     {
         snapshot.Clan._influence = snapshot.Influence;
-        if (snapshot.Clan.Renown != snapshot.Renown)
+        if (snapshot.Clan.Renown > snapshot.Renown)
+            snapshot.Clan.ResetClanRenown();
+        if (snapshot.Clan.Renown < snapshot.Renown)
             snapshot.Clan.AddRenown(snapshot.Renown - snapshot.Clan.Renown);
         snapshot.Clan._tier = snapshot.Tier;
     }
