@@ -115,6 +115,43 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void SiegeAmbush_DefenderSupplyOrderIsContiguousAcrossOwners()
+    {
+        var battle = SetupInteraction(MapEvent.BattleTypes.None, isSiegeAmbush: true,
+            includeAiParties: true);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPlayerPartyId,
+                out var initiatingParty));
+            var builder = Server.Resolve<IBattleTroopReserveBuilder>();
+            builder.PrepareMissionReserves(mapEvent, initiatingParty);
+
+            var present = new[] { "attacker", "defender" };
+            var hostReserves = builder.GetOwnedReserves(mapEvent, "attacker", isHost: true,
+                presentControllers: present);
+            var defenderReserves = builder.GetOwnedReserves(mapEvent, "defender", isHost: false,
+                presentControllers: present);
+            var defenderOrders = hostReserves.Concat(defenderReserves)
+                .Where(reserve => reserve.Side == BattleSideEnum.Defender)
+                .SelectMany(reserve => reserve.Parties)
+                .SelectMany(party => party.Entries)
+                .Select(entry => entry.SupplyOrder)
+                .OrderBy(order => order)
+                .ToArray();
+
+            Assert.Equal(Enumerable.Range(1, DefenderPlayerTroops + DefenderAiTroops),
+                defenderOrders);
+            Assert.All(hostReserves
+                    .Where(reserve => reserve.Side == BattleSideEnum.Attacker)
+                    .SelectMany(reserve => reserve.Parties)
+                    .SelectMany(party => party.Entries),
+                entry => Assert.Equal(0, entry.SupplyOrder));
+        });
+    }
+
     [Theory]
     [InlineData(MapEvent.BattleTypes.SallyOut)]
     [InlineData(MapEvent.BattleTypes.SiegeOutside)]
@@ -167,6 +204,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 Array.Empty<SiegeEngineState>(),
                 Array.Empty<SiegeEngineState>(),
                 initiatingPartyId: null,
+                settlementId: "e2e-siege-settlement",
                 isSallyOut: true);
         });
 
@@ -188,6 +226,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         Assert.All(starts, start =>
         {
             Assert.Equal(battle.MapEventId, start.MapEventId);
+            Assert.Equal("e2e-siege-settlement", start.SettlementId);
             Assert.True(start.IsSallyOut);
         });
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
@@ -393,7 +432,10 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             var previousMainParty = Campaign.Current.MainParty;
             var previousSettlement = mapEvent.MapEventSettlement;
             Campaign.Current.MainParty = mainParty;
-            mapEvent.MapEventSettlement = CreateSettlementWithCenterScenes();
+            var missionSettlement = CreateSettlementWithCenterScenes();
+            if (!client.ObjectManager.TryGetId(missionSettlement, out var missionSettlementId))
+                Assert.True(client.ObjectManager.AddNewObject(missionSettlement, out missionSettlementId));
+            mapEvent.MapEventSettlement = null;
             var attackerEngineState = new SiegeEngineState("e2e_attacker_engine", 1, 50f, 100f);
             var defenderEngineState = new SiegeEngineState("e2e_defender_engine", 2, 75f, 125f);
             var snapshot = new NetworkStartSiegeMission(
@@ -403,6 +445,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 new[] { attackerEngineState },
                 new[] { defenderEngineState },
                 battle.AttackerPlayerPartyId,
+                settlementId: missionSettlementId,
                 isSallyOut: isSiegeAmbush);
             Assert.Same(attackerEngineState, Assert.Single(snapshot.AttackerEngines));
             Assert.Same(defenderEngineState, Assert.Single(snapshot.DefenderEngines));
@@ -415,7 +458,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<IPlayerManager>(),
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
-                client.Resolve<IBattleMissionInitializerResolver>());
+                client.Resolve<IBattleMissionInitializerResolver>(),
+                null!);
 
             try
             {
@@ -427,9 +471,11 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                     Array.Empty<SiegeEngineState>(),
                     Array.Empty<SiegeEngineState>(),
                     battle.AttackerPlayerPartyId,
+                    settlementId: missionSettlementId,
                     isSallyOut: isSiegeAmbush));
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
 
+                Assert.Same(missionSettlement, mapEvent.MapEventSettlement);
                 Assert.NotNull(capturedRecord);
                 Assert.Equal("e2e_siege_level_2", capturedRecord!.Value.SceneName);
                 Assert.Equal(new[] { 1f, 0.5f, 0.25f }, capturedWallRatios);
@@ -681,15 +727,15 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<IPlayerManager>(),
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
-                resolver);
+                resolver,
+                null!);
 
             try
             {
                 ContainerProvider.SetContainer(scope);
                 broker.Publish(this, new NetworkStartAttackMission(
                     battle.MapEventId,
-                    1234,
-                    default,
+                    new MissionInitializerRecord(expectedScene) { RandomTerrainSeed = 1234 },
                     battle.AttackerPlayerPartyId));
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));

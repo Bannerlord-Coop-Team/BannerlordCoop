@@ -9,9 +9,11 @@ using GameInterface.Utils;
 using HarmonyLib;
 using Helpers;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
@@ -30,6 +32,7 @@ namespace GameInterface.Services.Armies.Patches;
 public class ArmyPatches
 {
     private static ILogger Logger = LogManager.GetLogger<Kingdom>();
+    private static readonly ConditionalWeakTable<Army, object> LongTermBehaviorTextFailures = new();
 
     [HarmonyPatch(nameof(Army.OnAddPartyInternal))]
     [HarmonyPrefix]
@@ -131,11 +134,27 @@ public class ArmyPatches
     /// </summary>
     [HarmonyPatch(nameof(Army.GetLongTermBehaviorText))]
     [HarmonyPrefix]
-    private static bool GetLongTermBehaviorTextPrefix(Army __instance, ref TextObject __result)
+    private static bool GetLongTermBehaviorTextPrefix(Army __instance, bool setWithLink, ref TextObject __result)
     {
         if (__instance.LeaderParty.IsPlayerParty())
         {
             __result = __instance.GetLongTermBehaviorTextForPlayerParty();
+        }
+        else if (ModInformation.IsClient)
+        {
+            try
+            {
+                __result = __instance.GetLongTermBehaviorTextForAILeadedParty(setWithLink);
+            }
+            catch (NullReferenceException)
+            {
+                LongTermBehaviorTextFailures.GetValue(__instance, army =>
+                {
+                    Logger.Error("Unable to render long-term behavior text for army {ArmyName}", army.Name);
+                    return new object();
+                });
+                __result = TextObject.GetEmpty();
+            }
         }
         else
         {

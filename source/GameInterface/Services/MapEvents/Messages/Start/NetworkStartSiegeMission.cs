@@ -25,10 +25,12 @@ internal record NetworkStartSiegeMission : ICommand
     public string InitiatingPartyId { get; }
     [ProtoMember(7)]
     public bool IsSallyOut { get; }
+    [ProtoMember(8)]
+    public string SettlementId { get; }
 
     public NetworkStartSiegeMission(string mapEventId, int wallLevel, float[] wallHitPointRatios,
         SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines, string initiatingPartyId,
-        bool isSallyOut = false)
+        string settlementId, bool isSallyOut = false)
     {
         MapEventId = mapEventId;
         WallLevel = wallLevel;
@@ -36,6 +38,7 @@ internal record NetworkStartSiegeMission : ICommand
         AttackerEngines = attackerEngines;
         DefenderEngines = defenderEngines;
         InitiatingPartyId = initiatingPartyId;
+        SettlementId = settlementId;
         IsSallyOut = isSallyOut;
     }
 }

@@ -184,6 +184,15 @@
     // Toggle players being able to execute each others' clan members.
     // This includes player companions and family members.
     // Default is false and won't have any effect if enableHeroExecutions is false.
-    "enablePlayerClanMemberExecutions": false
+    "enablePlayerClanMemberExecutions": false,
+
+    // Toggle player nameplates in co-op missions.
+    // (Default) true: Clients may show nameplates above allied remote players.
+    // false: Player nameplates are disabled and the client option is hidden.
+    "showPlayerNameplates": true,
+
+    // Toggle players being allowed to join battles when wounded
+    // Default is true
+    "playerWoundedBattleEntry": true,
   }
 }

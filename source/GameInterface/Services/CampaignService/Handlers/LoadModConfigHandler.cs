@@ -73,6 +73,7 @@ internal class LoadModConfigHandler : IHandler
         GameThread.RunSafe(() =>
         {
             ModConfigProvider.ModOptions = obj.What.ModOptions;
+            messageBroker.Publish(this, new ModConfigApplied(ModConfigProvider.ModOptions));
         });
     }
 

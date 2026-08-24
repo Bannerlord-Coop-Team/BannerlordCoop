@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Locations.Messages;
 using Missions.Agents.Packets;
 using ProtoBuf;
@@ -142,6 +142,8 @@ public class LocationAgentSpawnData
     public readonly int UsedPointId;
     [ProtoMember(21)]
     public readonly bool HasUsedPoint;
+    [ProtoMember(22)]
+    public readonly long AuthorityRevision;
 
     public LocationAgentSpawnData(
         Guid agentId,
@@ -162,7 +164,8 @@ public class LocationAgentSpawnData
         AgentEquipmentData? currentEquipment,
         LocationCharacterData rosterEntry,
         string originalOwnerControllerId = null,
-        int? usedPointId = null)
+        int? usedPointId = null,
+        long authorityRevision = 0)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -185,5 +188,6 @@ public class LocationAgentSpawnData
         RosterEntry = rosterEntry;
         UsedPointId = usedPointId.GetValueOrDefault();
         HasUsedPoint = usedPointId.HasValue;
+        AuthorityRevision = authorityRevision;
     }
 }
