@@ -112,6 +112,35 @@ public class SiegeEngineStateCommitHandlerTests : IDisposable
         Assert.Contains(engine, container.DeployedSiegeEngines);
     }
 
+    [Fact]
+    public void AmbushReport_RemovesDestroyedDuplicateByMissionIndex()
+    {
+        var engineType = new SiegeEngineType();
+        var destroyedEngine = new SiegeEngineConstructionProgress(engineType, progress: 1f, maxHitPoints: 100f);
+        var survivingEngine = new SiegeEngineConstructionProgress(engineType, progress: 1f, maxHitPoints: 100f);
+        var container = new SiegeEnginesContainer(BattleSideEnum.Attacker, siegePreparations: null);
+        container.DeploySiegeEngineAtIndex(destroyedEngine, index: 0);
+        container.DeploySiegeEngineAtIndex(survivingEngine, index: 1);
+        var side = new Mock<ISiegeEventSide>();
+        side.SetupGet(value => value.SiegeEngines).Returns(container);
+        var missionWeapons = new[]
+        {
+            MissionSiegeWeapon.CreateCampaignWeapon(engineType, 0, 0f, 100f),
+            MissionSiegeWeapon.CreateCampaignWeapon(engineType, 1, 45f, 100f),
+        };
+
+        SiegeEngineStateCommitHandler.SetAmbushEngineStatesForSide(
+            ObjectHelper.SkipConstructor<SiegeEvent>(),
+            side.Object,
+            missionWeapons);
+
+        Assert.Null(container.DeployedMeleeSiegeEngines[0]);
+        Assert.Same(survivingEngine, container.DeployedMeleeSiegeEngines[1]);
+        Assert.DoesNotContain(destroyedEngine, container.DeployedSiegeEngines);
+        Assert.Contains(survivingEngine, container.DeployedSiegeEngines);
+        Assert.Equal(45f, survivingEngine.Hitpoints);
+    }
+
     private static NetworkSiegeEngineStatesReport Report(int hostEpoch)
         => new(MapEventId, Array.Empty<SiegeEngineState>(), Array.Empty<SiegeEngineState>(), hostEpoch);
 

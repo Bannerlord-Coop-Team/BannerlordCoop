@@ -86,18 +86,42 @@ internal class SiegeEngineStateCommitHandler : IHandler
         if (missionWeapons == null || missionWeapons.Count == 0)
             return;
 
-        int missionWeaponIndex = missionWeapons.Count - 1;
-        for (int engineIndex = side.SiegeEngines.DeployedSiegeEngines.Count - 1; engineIndex >= 0; engineIndex--)
+        var deployedEngines = side.SiegeEngines.DeployedSiegeEngines.ToList();
+        foreach (var missionWeapon in missionWeapons)
         {
-            var engine = side.SiegeEngines.DeployedSiegeEngines[engineIndex];
-            if (!engine.IsActive)
+            int engineIndex = missionWeapon.Index;
+            if (engineIndex < 0 || engineIndex >= deployedEngines.Count)
+            {
+                Logger.Warning("Skipped ambush siege engine state at invalid deployed index {Index}", engineIndex);
                 continue;
+            }
 
-            var missionWeapon = missionWeapons[missionWeaponIndex--];
+            var engine = deployedEngines[engineIndex];
+            if (!engine.IsActive || engine.SiegeEngine != missionWeapon.Type)
+            {
+                Logger.Warning("Skipped ambush siege engine state at index {Index}: campaign engine does not match mission type {EngineType}",
+                    engineIndex, missionWeapon.Type?.StringId);
+                continue;
+            }
+
             if (missionWeapon.Health > 0f)
+            {
                 engine.SetHitpoints(missionWeapon.Health);
-            else
-                siegeEvent.BreakSiegeEngine(side, engine.SiegeEngine);
+                continue;
+            }
+
+            int deploymentIndex = side.SiegeEngines.FindDeploymentIndexOfDeployedEngine(engine);
+            if (deploymentIndex < 0)
+            {
+                Logger.Warning("Skipped destroyed ambush siege engine at index {Index}: its deployment slot is missing", engineIndex);
+                continue;
+            }
+
+            side.SiegeEngines.RemoveDeployedSiegeEngine(
+                deploymentIndex,
+                engine.SiegeEngine.IsRanged,
+                moveToReserve: false);
+            siegeEvent.BesiegedSettlement?.Party?.SetVisualAsDirty();
         }
     }
 
