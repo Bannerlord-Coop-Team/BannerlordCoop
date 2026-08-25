@@ -1,4 +1,4 @@
-using GameInterface.Configuration;
+﻿using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
 using ProtoBuf;
 using ProtoBuf.Meta;
@@ -73,6 +73,9 @@ namespace Coop.IntegrationTests.Serialization
                 PlayerKingdomClanTierRequired = 2,
                 SmithingStaminaRecoveryMultiplier = 2.5f,
                 MaximumLootersMultiplier = 0.25f,
+                LooterPartySizeMultiplier = 0.33f,
+                ShowPlayerNameplates = true,
+                PlayerWoundedBattleEntry = false,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -86,11 +89,14 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(2, copy.PlayerKingdomClanTierRequired);
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0.25f, copy.MaximumLootersMultiplier);
+            Assert.Equal(0.33f, copy.LooterPartySizeMultiplier);
+            Assert.False(copy.PlayerWoundedBattleEntry);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
             Assert.True(copy.AutoPauseEnabled);
             Assert.True(copy.SpeedLimitWhilePlayersInBattle);
+            Assert.True(copy.ShowPlayerNameplates);
         }
 
         private static ModOptions AllOptionsOff() => new(new ModOptionsData
@@ -109,6 +115,9 @@ namespace Coop.IntegrationTests.Serialization
             SmithingStaminaRecoveryOutsideSettlements = false,
             SmithingStaminaRecoveryMultiplier = 0f,
             MaximumLootersMultiplier = 0f,
+            LooterPartySizeMultiplier = 0f,
+            ShowPlayerNameplates = false,
+            PlayerWoundedBattleEntry = false,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -127,6 +136,9 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.SmithingStaminaRecoveryOutsideSettlements);
             Assert.Equal(0f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0f, copy.MaximumLootersMultiplier);
+            Assert.Equal(0f, copy.LooterPartySizeMultiplier);
+            Assert.False(copy.ShowPlayerNameplates);
+            Assert.False(copy.PlayerWoundedBattleEntry);
         }
 
         private static T RoundTrip<T>(T original)

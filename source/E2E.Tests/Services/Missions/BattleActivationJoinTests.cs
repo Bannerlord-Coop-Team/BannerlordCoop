@@ -121,6 +121,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         });
         var hostBattleNetwork = host.Resolve<MockBattleNetwork>();
         hostBattleNetwork.NetworkSentMessages.Clear();
+        hostBattleNetwork.RouteMessages = false;
 
         host.Call(() =>
         {
@@ -132,8 +133,8 @@ public class BattleActivationJoinTests : MissionTestEnvironment
                 {
                     host.Resolve<IMessageBroker>().Publish(
                         host,
-                        // Keep this poll-thread ordering probe sender-only. Routing synchronously into the
-                        // in-process joiner would contend on the test harness's static game-instance lock.
+                        // This probe only inspects the sender's capture. Mesh routing is disabled above because
+                        // switching to the in-process joiner would contend on the static game-instance lock.
                         new NetworkMissionPeerEntered("unrouted-joiner", mapEventId));
                 }
                 catch (Exception exception)

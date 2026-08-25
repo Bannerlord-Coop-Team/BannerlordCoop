@@ -72,6 +72,12 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     [ProtoMember(20)]
     public readonly bool ApplyReleasedAndTakenPrisonerActions;
 
+    [ProtoMember(21)]
+    public readonly string DonationSettlementId;
+
+    [ProtoMember(22)]
+    public readonly FlattenedTroop[] DonatedPrisonersRoster;
+
     public NetworkCompleteDoneLogic(
         string mainHeroId,
         FlattenedTroop[] releasedPrisonersRoster,
@@ -92,7 +98,9 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         CampaignVec2 releaserPartyPosition,
         PartyScreenHelper.PartyScreenMode partyScreenMode,
         TroopRosterOrderData rightMemberOrderData,
-        bool applyReleasedAndTakenPrisonerActions = false)
+        bool applyReleasedAndTakenPrisonerActions = false,
+        string donationSettlementId = null,
+        FlattenedTroop[] donatedPrisonersRoster = null)
     {
         MainHeroId = mainHeroId;
         ReleasedPrisonersRoster = releasedPrisonersRoster;
@@ -114,5 +122,7 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         PartyScreenMode = partyScreenMode;
         RightMemberOrderData = rightMemberOrderData;
         ApplyReleasedAndTakenPrisonerActions = applyReleasedAndTakenPrisonerActions;
+        DonationSettlementId = donationSettlementId;
+        DonatedPrisonersRoster = donatedPrisonersRoster;
     }
 }

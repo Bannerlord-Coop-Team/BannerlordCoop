@@ -1,21 +1,22 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
-using Common;
 using Common.Util;
 using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using SandBox.GauntletUI;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ScreenSystem;
-using SandBox.GauntletUI;
 
 namespace Coop.Core.Client.Services.Kingdoms.Handlers;
 
@@ -53,6 +54,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
         messageBroker.Subscribe<NetworkChangeKingdomPolicy>(HandleNetworkChangeKingdomPolicy);
         messageBroker.Subscribe<NetworkChangeKingdomDecisionVote>(HandleNetworkChangeKingdomDecisionVote);
+        messageBroker.Subscribe<NetworkKingdomDecisionRoundStatus>(HandleNetworkKingdomDecisionRoundStatus);
         messageBroker.Subscribe<NetworkKingdomDecisionResolved>(HandleNetworkKingdomDecisionResolved);
         messageBroker.Subscribe<NetworkPlayerKingdomCreated>(HandleNetworkPlayerKingdomCreated);
         messageBroker.Subscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
@@ -62,6 +64,8 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<RulingClanChanged>(HandleRulingClanChanged);
         messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Subscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
+        messageBroker.Subscribe<NetworkPeaceOfferPendingStatusChanged>(Handle_NetworkPeaceOfferPendingStatusChanged);
+        messageBroker.Subscribe<NetworkAllianceOfferPendingStatusChanged>(Handle_NetworkAllianceOfferPendingStatusChanged);
     }
 
     private void HandleKingdomCreationRequested(MessagePayload<KingdomCreationRequested> obj)
@@ -362,6 +366,11 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Publish(this, message);
     }
 
+    private void HandleNetworkKingdomDecisionRoundStatus(MessagePayload<NetworkKingdomDecisionRoundStatus> obj)
+    {
+        messageBroker.Publish(this, new ApplyKingdomDecisionRoundStatus(obj.What.Status));
+    }
+
     private void HandleNetworkChangeKingdomPolicy(MessagePayload<NetworkChangeKingdomPolicy> obj)
     {
         var payload = obj.What;
@@ -411,12 +420,36 @@ public class ClientKingdomHandler : IHandler
         network.SendAll(new NetworkRulingClanChanged(kingdomId, clanId));
     }
 
+    public void Handle_NetworkPeaceOfferPendingStatusChanged(MessagePayload<NetworkPeaceOfferPendingStatusChanged> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var obj = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.RequestingKingdomId, out var requestingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.TargetKingdomId, out var targetKingdom)) return;
+            PeaceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, obj.IsPending);
+        });
+    }
+
+    private void Handle_NetworkAllianceOfferPendingStatusChanged(MessagePayload<NetworkAllianceOfferPendingStatusChanged> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var obj = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.RequestingKingdomId, out var requestingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.TargetKingdomId, out var targetKingdom)) return;
+            AllianceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, obj.IsPending);
+        });
+    }
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
         messageBroker.Unsubscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
         messageBroker.Unsubscribe<NetworkChangeKingdomPolicy>(HandleNetworkChangeKingdomPolicy);
         messageBroker.Unsubscribe<NetworkChangeKingdomDecisionVote>(HandleNetworkChangeKingdomDecisionVote);
+        messageBroker.Unsubscribe<NetworkKingdomDecisionRoundStatus>(HandleNetworkKingdomDecisionRoundStatus);
         messageBroker.Unsubscribe<NetworkKingdomDecisionResolved>(HandleNetworkKingdomDecisionResolved);
         messageBroker.Unsubscribe<NetworkPlayerKingdomCreated>(HandleNetworkPlayerKingdomCreated);
         messageBroker.Unsubscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
@@ -426,6 +459,8 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<RulingClanChanged>(HandleRulingClanChanged);
         messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Unsubscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
+        messageBroker.Unsubscribe<NetworkPeaceOfferPendingStatusChanged>(Handle_NetworkPeaceOfferPendingStatusChanged);
+        messageBroker.Unsubscribe<NetworkAllianceOfferPendingStatusChanged>(Handle_NetworkAllianceOfferPendingStatusChanged);
     }
 
     private readonly struct PendingSettlementRestore

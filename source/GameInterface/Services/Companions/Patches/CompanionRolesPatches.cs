@@ -80,6 +80,9 @@ internal class CompanionRolesPatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
+        // end_rescue_companion runs after this dialogue and must not send the legacy release too.
+        __instance._partyCreatedAfterRescueForCompanion = true;
+
         var message = new CompanionJoinedPartyByRescue(
             Hero.OneToOneConversationHero,
             MobileParty.MainParty);
@@ -108,6 +111,18 @@ internal class CompanionRolesPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.turn_companion_to_lord_on_condition))]
+    [HarmonyPrefix]
+    public static bool TurnCompanionToLordOnConditionPrefix(ref bool __result)
+    {
+        if (Hero.OneToOneConversationHero?.Clan != Hero.MainHero?.Clan)
+        {
+            __result = false;
+            return false;
+        }
+        return true;
+    }
+
     [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.end_rescue_companion))]
     [HarmonyPrefix]
     public static bool EndRescueCompanionPrefix(ref CompanionRolesCampaignBehavior __instance)
@@ -115,7 +130,7 @@ internal class CompanionRolesPatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // Skip CompanionRescued when a party was created
+        // Skip CompanionRescued after a correlated join request or party creation.
         if (__instance._partyCreatedAfterRescueForCompanion)
         {
             __instance._partyCreatedAfterRescueForCompanion = false;

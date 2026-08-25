@@ -1,9 +1,13 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
+using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Connections.States;
 using Coop.Core.Server.Services.Time.Handlers;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -121,6 +125,14 @@ public class E2ETestEnvironment : IDisposable
                 $"Player '{controllerId}' must be registered before connecting its peer.");
 
             playerManager.SetPeer(controllerId, client.NetPeer);
+
+            var connections = Server.Resolve<ConnectionCollection>();
+            if (!connections.ConnectionStates.TryGetValue(client.NetPeer, out var connection))
+            {
+                Server.Resolve<IMessageBroker>().Publish(this, new PlayerConnected(client.NetPeer));
+                Assert.True(connections.ConnectionStates.TryGetValue(client.NetPeer, out connection));
+            }
+            connection.SetState<CampaignState>();
 
             Assert.True(
                 playerManager.IsConnected(player),

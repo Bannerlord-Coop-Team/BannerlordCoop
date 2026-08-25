@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
@@ -26,6 +27,7 @@ public interface ICoopSession
     InteractionsPlayerData InteractionsPlayerData { get; }
     TradePlayerData TradePlayerData { get; }
     InventoryPlayerData InventoryPlayerData { get; }
+    HeroMeetingData HeroMeetingData { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -42,9 +44,10 @@ public class CoopSession : ICoopSession
         new WorkshopPlayerData(new()),
         new CaravansPlayerData(new(), new()),
         new AlleyPlayerData(new()),
-        new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new()),
+        new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new()),
         new TradePlayerData(new(), new(), new()),
-        new InventoryPlayerData(new(), new()));
+        new InventoryPlayerData(new(), new()),
+        new HeroMeetingData(new()));
 
     [ProtoMember(1)]
     public string UniqueGameId { get; }
@@ -64,6 +67,8 @@ public class CoopSession : ICoopSession
     public TradePlayerData TradePlayerData { get; }
     [ProtoMember(9)]
     public InventoryPlayerData InventoryPlayerData { get; }
+    [ProtoMember(10)]
+    public HeroMeetingData HeroMeetingData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -74,7 +79,8 @@ public class CoopSession : ICoopSession
         AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
-        InventoryPlayerData inventoryPlayerData)
+        InventoryPlayerData inventoryPlayerData,
+        HeroMeetingData heroMeetingData)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -85,5 +91,6 @@ public class CoopSession : ICoopSession
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
+        HeroMeetingData = heroMeetingData;
     }
 }

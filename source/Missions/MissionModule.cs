@@ -5,11 +5,13 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
 using Missions.Agents.Voice;
 using Missions.Battles;
+using Missions.Locations;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Patches;
 using Missions.Services.Network;
@@ -32,6 +34,7 @@ public class MissionModule : Module
     internal const string ShieldDamagePatchCategory = "CoopShieldDamagePatches";
     internal const string CombatHitPresentationPatchCategory = "CoopCombatHitPresentationPatches";
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
+    internal const string WeaponDropPatchCategory = "CoopWeaponDropPatches";
     internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
 
     protected override void Load(ContainerBuilder builder)
@@ -45,8 +48,17 @@ public class MissionModule : Module
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
             .InstancePerDependency();
+        builder.RegisterType<MovementNetworkSettings>()
+            .As<IMovementNetworkSettings>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementPriorityScheduler>()
+            .As<IMovementPriorityScheduler>()
+            .InstancePerDependency();
         builder.RegisterType<MovementTrafficBudget>()
             .As<IMovementTrafficBudget>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementTrafficBudgetFactory>()
+            .As<IMovementTrafficBudgetFactory>()
             .InstancePerDependency();
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
@@ -65,6 +77,16 @@ public class MissionModule : Module
         builder.RegisterType<MissionMapTimeView>()
             .AsSelf()
             .As<ILocationMissionBehavior>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateMissionView>()
+            .AsSelf()
+            .As<ILocationMissionBehavior>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateControllerResolver>()
+            .As<IPlayerNameplateControllerResolver>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerNameplateEligibility>()
+            .As<IPlayerNameplateEligibility>()
             .InstancePerDependency();
 
         // MissionContext mirrors the server's instance membership and must live for the whole client
@@ -97,6 +119,19 @@ public class MissionModule : Module
             .As<ILocationMissionBehavior>()
             .InstancePerDependency();
 
+        // Location NPC spawn-batch codec (stateless). The per-mission session/binding map/components
+        // are constructed by CoopLocationsController itself (composition-root style, mirroring
+        // CoopBattleController) so they share one session instance.
+        builder.RegisterType<LocationAgentSpawnBatchCodec>()
+            .As<ILocationAgentSpawnBatchCodec>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<LocationPartyPuppetRegistrar>()
+            .As<ILocationPartyPuppetRegistrar>()
+            .InstancePerDependency();
+        builder.RegisterType<LocationControllerWithdrawalState>()
+            .As<ILocationControllerWithdrawalState>()
+            .InstancePerDependency();
+
         // BR-102 host-epoch receiver policy. InstancePerDependency so each CoopBattleController (one per
         // battle) is injected a FRESH policy whose accepted-epoch watermark starts clean and never leaks
         // across battles — the controller's per-battle lifetime is the watermark's natural reset. The
@@ -121,6 +156,9 @@ public class MissionModule : Module
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<BattleSizeProvider>()
+            .As<IBattleSizeProvider>()
+            .InstancePerDependency();
 
         // Builds the coop field-battle mission (mirrors SandBoxMissions.OpenBattleMission with coop suppliers,
         // no deployment phase, and the coop behaviors attached). Resolved from the container by the GameInterface
@@ -156,6 +194,15 @@ public class MissionModule : Module
             .InstancePerLifetimeScope()
             .AutoActivate();
 
+        // Location NPC host election: elects on the server, stores the broadcast on clients, AutoActivated
+        // so it subscribes up front on both. The assignment store itself (ILocationHostRegistry) is
+        // registered by GameInterfaceModule. Deliberately separate from BattleHostHandler — each ignores
+        // departures for instance ids its own registry does not hold.
+        builder.RegisterType<LocationHostHandler>()
+            .AsSelf()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
+
         // [Server] Applies owner-reported battle casualties to the authoritative map-event roster.
         builder.RegisterType<BattleCasualtyHandler>()
             .AsSelf()
@@ -165,12 +212,14 @@ public class MissionModule : Module
             .AsSelf()
             .InstancePerLifetimeScope()
             .AutoActivate();
-
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
         builder.RegisterType<AgentFormationAssigner>().As<IAgentFormationAssigner>().InstancePerDependency();
         builder.RegisterType<PuppetMountStateRepairer>()
             .As<IPuppetMountStateRepairer>()
+            .InstancePerDependency();
+        builder.RegisterType<AgentNativeMountState>()
+            .As<IAgentNativeMountState>()
             .InstancePerDependency();
 
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
@@ -196,6 +245,9 @@ public class MissionModule : Module
             .As<IVanillaOrderVoiceService>()
             .InstancePerDependency();
         builder.RegisterType<AgentVoiceHandler>().As<IAgentVoiceHandler>().InstancePerDependency();
+        builder.RegisterType<WeaponDropWorldItemSpawner>()
+            .As<IWeaponDropWorldItemSpawner>()
+            .InstancePerDependency();
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();
         builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerDependency();
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();
@@ -220,6 +272,9 @@ public class MissionModule : Module
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AgentVoicePatch).Assembly,
             AgentVoicePatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(AgentDropPatch).Assembly,
+            WeaponDropPatchCategory);
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AgentPickupPatch).Assembly,
             WeaponPickupPatchCategory);

@@ -13,6 +13,7 @@ using GameInterface;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Handlers;
 using GameInterface.Services.Chat;
+using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
@@ -22,6 +23,9 @@ using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
+#if DEBUG
+using System.Collections.Generic;
+#endif
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -36,6 +40,9 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.ScreenSystem;
+#if DEBUG
+using static TaleWorlds.Library.CommandLineFunctionality;
+#endif
 using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop
@@ -62,6 +69,8 @@ namespace Coop
 
 #if DEBUG
         private LiveTestControlServer liveTestControlServer;
+        private bool isDeferredClientJoin;
+        private bool isLiveTestRun;
 #endif
 
         public CoopMod()
@@ -113,6 +122,13 @@ namespace Coop
 
             SetupLogging();
             InitializeCrashReporting();
+            
+#if DEBUG
+            isDeferredClientJoin = args.Any(a =>
+                                       a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase)) &&
+                                   LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
+            isLiveTestRun = LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs());
+#endif
 
             // Creates the handler during launch
             if (!isServer)
@@ -139,9 +155,13 @@ namespace Coop
                 EnsureSafeExitConfig();
             }
 
-            // Boot-apply the loading-window patches so the keepalive guard exists before a host or join waits on PatchAll
-            new Harmony("Coop.UILoading").PatchCategory(
+            // Reuse one boot Harmony owner for categories that must be active before normal PatchAll.
+            var bootHarmony = new Harmony("Coop.UILoading");
+            bootHarmony.PatchCategory(
                 typeof(IGameInterface).Assembly, GameInterface.GameInterface.HARMONY_UI_LOADING_CATEGORY);
+            bootHarmony.PatchCategory(
+                typeof(IGameInterface).Assembly,
+                GameInterface.GameInterface.HARMONY_CONFIGURED_MINOR_FACTION_CATEGORY);
 
             GameThread.Instance.MarkGameThread();
         }
@@ -312,6 +332,17 @@ namespace Coop
                     startInfo.EnvironmentVariables["COOP_CRASH_BUILD"] = informationalVersion;
                     startInfo.EnvironmentVariables["COOP_CRASH_READY"] = readyEventName;
 
+                    string gameBinariesDirectory = GameBinariesDirectory.Resolve();
+                    if (gameBinariesDirectory == null)
+                    {
+                        Logger.Warning(
+                            "Game binaries directory could not be resolved; crash reports will not list installed game files");
+                    }
+                    else
+                    {
+                        startInfo.EnvironmentVariables["COOP_CRASH_GAME_BINARIES"] = gameBinariesDirectory;
+                    }
+
                     using (var ready = new EventWaitHandle(
                         false,
                         EventResetMode.AutoReset,
@@ -414,9 +445,13 @@ namespace Coop
             Updateables.Add(GameThread.Instance);
 
 #if DEBUG
-            if (isAutoConnect)
+            if (isAutoConnect && LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs()))
             {
-                liveTestControlServer = new LiveTestControlServer(isServer, activeLogFilePath);
+                liveTestControlServer = new LiveTestControlServer(
+                    isServer,
+                    activeLogFilePath,
+                    isDeferredClientJoin,
+                    () => Coop.StartAsClient());
                 liveTestControlServer.Start();
             }
 #endif
@@ -443,9 +478,10 @@ namespace Coop
                         {
                             Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         }
-                        else
+                        else if (!Coop.StartAsClient())
                         {
-                            Coop.StartAsClient();
+                            InformationManager.DisplayMessage(new InformationMessage(
+                                CoopartiveMultiplayerExperience.StartRefusedNotice));
                         }
                     },
                     () => { return (false, new TextObject("")); }
@@ -494,6 +530,8 @@ namespace Coop
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
+                if (ContainerProvider.TryResolve<ICoopModulePathResolver>(out var modulePathResolver))
+                    campaignGameStarter.AddBehavior(new FixedTownNpcConversationBehavior(modulePathResolver));
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
                 campaignGameStarter.AddBehavior(new CoopTournamentCampaignBehavior());
             }
@@ -559,10 +597,19 @@ namespace Coop
             if (!steamBootAttempted && isAtMainMenu)
             {
                 steamBootAttempted = true;
-                var steamPump = SteamIntegrationBoot.TryStartWithCallbackPump(
-                    isServer, Utilities.GetFullCommandLineString());
-                // The standalone server has no game frame of its own to dispatch its game-server callbacks.
-                if (steamPump != null) Updateables.Add(steamPump);
+#if DEBUG
+                if (isLiveTestRun)
+                {
+                    Logger.Information("[LiveTest] Steam integration disabled for this scoped runtime");
+                }
+                else
+#endif
+                {
+                    var steamPump = SteamIntegrationBoot.TryStartWithCallbackPump(
+                        isServer, Utilities.GetFullCommandLineString());
+                    // The standalone server has no game frame of its own to dispatch its game-server callbacks.
+                    if (steamPump != null) Updateables.Add(steamPump);
+                }
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
@@ -627,8 +674,12 @@ namespace Coop
         {
             // The auto-load-save start path owns this process's startup.
             if (ManagedServerConfig.HasAutoLoadSave) return;
+#if DEBUG
+            if (!isServer && isDeferredClientJoin) return;
+#endif
 
-            if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
+            if (isAutoConnect && !_autoStarted &&
+                GameStateManager.Current?.ActiveState is InitialState)
             {
                 _autoStarted = true;
                 try
@@ -642,8 +693,8 @@ namespace Coop
                     else
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as client...");
-                        Coop.StartAsClient();
-                        Logger.Information("[AutoConnect] StartAsClient() completed");
+                        bool started = Coop.StartAsClient();
+                        Logger.Information("[AutoConnect] StartAsClient() returned {Started}", started);
                     }
                 }
                 catch (Exception ex)
@@ -672,4 +723,37 @@ namespace Coop
             base.OnAfterGameInitializationFinished(game, starterObject);
         }
     }
+
+#if DEBUG
+    /// <summary>
+    /// Starts a deferred live-test client through the normal connection path.
+    /// </summary>
+    internal static class JoinFixtureCommands
+    {
+        [CommandLineArgumentFunction("start", "coop.debug.connection")]
+        public static string Start(List<string> args)
+        {
+            if (args.Count != 0)
+            {
+                return "Usage: coop.debug.connection.start";
+            }
+
+            if (ModInformation.IsServer)
+            {
+                return "start must be run on a client.";
+            }
+
+            if (ContainerProvider.TryResolve<Common.LogicStates.ILogic>(out _))
+            {
+                return "Client co-op connection is already starting or running.";
+            }
+
+            if (!CoopMod.Coop.StartAsClient())
+            {
+                throw new InvalidOperationException("Client co-op connection start was refused.");
+            }
+            return "Client co-op connection started.";
+        }
+    }
+#endif
 }

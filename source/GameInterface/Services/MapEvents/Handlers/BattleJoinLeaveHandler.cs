@@ -44,6 +44,7 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
     private readonly ConcurrentDictionary<string, string> pendingJoinRequests = new ConcurrentDictionary<string, string>();
 
     public BattleJoinLeaveHandler(
@@ -53,7 +54,8 @@ internal class BattleJoinLeaveHandler : IHandler
         IPlayerManager playerManager,
         IMapEventLogger mapEventLogger,
         IMapEventInitializationBarrier initializationBarrier,
-        ISiegeEventInterface siegeEventInterface)
+        ISiegeEventInterface siegeEventInterface,
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -62,6 +64,7 @@ internal class BattleJoinLeaveHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.initializationBarrier = initializationBarrier;
         this.siegeEventInterface = siegeEventInterface;
+        this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
@@ -226,11 +229,6 @@ internal class BattleJoinLeaveHandler : IHandler
                         Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
                         return;
                     }
-                    if (mapEvent.IsActiveSlowVillageRaid() && data.Side == BattleSideEnum.Defender)
-                    {
-                        Logger.Warning("Ignoring defender join request: map event {MapEventId} is an active slow village raid", data.MapEventId);
-                        return;
-                    }
                     var side = mapEvent.GetMapEventSide(data.Side);
                     if (side == null)
                     {
@@ -248,6 +246,9 @@ internal class BattleJoinLeaveHandler : IHandler
                             data.PartyId, data.MapEventId);
                         return;
                     }
+
+                    // Removal temporarily promotes a remaining party; put the persistent besieger back when it rejoins.
+                    siegeMapEventLeaderReconciler.RestoreAfterJoin(mapEvent, party);
 
                     if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
                         MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");

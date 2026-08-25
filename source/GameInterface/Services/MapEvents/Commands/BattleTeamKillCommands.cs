@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Configuration;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Utils.Commands;
 using Serilog;
@@ -337,6 +338,9 @@ Leaves the current battle through the native mission lifecycle.";
     [CommandLineArgumentFunction("leave_battle", "coop.debug.mapevent")]
     public static string LeaveBattle(List<string> args)
     {
+        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+            return "The host has disabled cheats on clients.";
+
         var ctx = new CommandContext("leave_battle", LeaveBattleUsage, args);
         if (!ctx.RequireArgCount(0, out var error))
             return error;
@@ -358,6 +362,9 @@ Kills one live enemy-team agent in the current battle (battle-authority side).";
     [CommandLineArgumentFunction("kill_enemy", "coop.debug.mapevent")]
     public static string KillOneEnemy(List<string> args)
     {
+        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+            return "The host has disabled cheats on clients.";
+
         var ctx = new CommandContext("kill_one_enemy", KillEnemyUsage, args);
         if (!ctx.RequireArgCount(0, out var error))
             return error;
@@ -390,6 +397,9 @@ Kills every live enemy-team agent in the current battle (battle-authority side).
     [CommandLineArgumentFunction("kill_enemy_team", "coop.debug.mapevent")]
     public static string KillEnemyTeam(List<string> args)
     {
+        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+            return "The host has disabled cheats on clients.";
+
         var ctx = new CommandContext("kill_enemy_team", KillEnemyTeamUsage, args);
         if (!ctx.RequireArgCount(0, out var error))
             return error;
@@ -414,6 +424,9 @@ coop battle LOSS.";
     [CommandLineArgumentFunction("kill_own_team", "coop.debug.mapevent")]
     public static string KillOwnTeam(List<string> args)
     {
+        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+            return "The host has disabled cheats on clients.";
+
         var ctx = new CommandContext("kill_own_team", KillOwnTeamUsage, args);
         if (!ctx.RequireArgCount(0, out var error))
             return error;
@@ -470,7 +483,7 @@ coop battle LOSS.";
         return killed;
     }
 
-    private static void Kill(Agent agent)
+    internal static void Kill(Agent agent)
     {
         var blow = new Blow(agent.Index)
         {

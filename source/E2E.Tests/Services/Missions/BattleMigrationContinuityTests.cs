@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
@@ -24,6 +24,79 @@ namespace E2E.Tests.Services.Missions;
 public class BattleMigrationContinuityTests : MissionTestEnvironment
 {
     public BattleMigrationContinuityTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void HostMigration_ObserverAdvancesCatchUpAuthorityRevision()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+        var npcId = Guid.NewGuid();
+
+        observer.Call(() =>
+        {
+            var mock = fixture.CreateMission(observer);
+            var controller = observer.Resolve<CoopBattleController>();
+            var registry = observer.Resolve<INetworkAgentRegistry>();
+            var hosts = observer.Resolve<IBattleHostRegistry>();
+
+            controller.Session.TryBegin("mapEvent1");
+            hosts.Set("mapEvent1", new BattleHostAssignment("B", new[] { "C" }, epoch: 2));
+
+            var npc = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("B", npcId, 0, npc, authorityRevision: 1));
+
+            observer.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkBattleHostAssigned("mapEvent1", "C", Array.Empty<string>(), epoch: 3));
+
+            Assert.True(registry.TryGetAgentInfo(npcId, out var info));
+            Assert.Equal("C", info.CurrentAuthority);
+            Assert.Equal(2, info.AuthorityRevision);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
+    public void HostMigration_AdvancesEachAgentFromItsCurrentAuthorityRevision()
+    {
+        using var fixture = new MissionEngineFixture();
+        var successor = Clients.First();
+        SetControllerId(successor, "C");
+        Guid npcId = Guid.NewGuid();
+
+        successor.Call(() =>
+        {
+            var mock = fixture.CreateMission(successor);
+            var controller = successor.Resolve<CoopBattleController>();
+            var registry = successor.Resolve<INetworkAgentRegistry>();
+            var hosts = successor.Resolve<IBattleHostRegistry>();
+
+            controller.Session.TryBegin("mapEvent1");
+            hosts.Set("mapEvent1", new BattleHostAssignment("B", new[] { "C" }, epoch: 1));
+
+            var npc = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("A", npcId, 0, npc));
+            Assert.True(registry.TryTransferAuthority("B", npcId));
+            Assert.True(registry.TryTransferAuthority("A", npcId));
+            Assert.True(registry.TryGetAgentInfo(npcId, out CoopAgentInfo preMigration));
+            Assert.Equal(2, preMigration.AuthorityRevision);
+
+            successor.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkBattleHostAssigned("mapEvent1", "C", Array.Empty<string>(), epoch: 2));
+
+            Assert.True(registry.TryGetAgentInfo(npcId, out CoopAgentInfo migrated));
+            Assert.Equal("C", migrated.CurrentAuthority);
+            Assert.Equal(3, migrated.AuthorityRevision);
+            Assert.Equal(AgentControllerType.AI, npc.Controller);
+
+            GC.KeepAlive(controller);
+        });
+    }
 
     [Fact]
     [Trait("Requirement", "BR-016")]
@@ -77,7 +150,8 @@ public class BattleMigrationContinuityTests : MissionTestEnvironment
         // Supplier continuity: on migration a new owner is handed the reserve at the server's supplied pointer,
         // so it resumes mid-list and never re-supplies troops the departed owner already spawned.
         var supplier = new CoopTroopSupplier("mapEvent1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        supplier.SetReserve(new[] { new PartyReserve("P", 4, Entries(10)) }); // server pointer = 4
+        supplier.SetReserve(new[] { new PartyReserve("P", 4, Entries(10)) },
+            sideTotal: 10, playerOwnedParties: 0, authoritativeBattleSize: 1000); // server pointer = 4
 
         Assert.Equal(4, supplier.GetSuppliedByParty().Single().supplied); // resumes at the server's pointer
         Assert.Equal(6, supplier.NumTroopsNotSupplied);

@@ -91,6 +91,8 @@ public sealed class MockMission
     /// spawning a cavalry rider's mount implicitly (from its equipment) inside the same SpawnAgent call.</summary>
     public bool SpawnMounted { get; set; }
 
+    public bool DismountRiderOnNextBlow { get; set; }
+
     /// <summary>Headless replacement for <see cref="Mission.SpawnAgent"/>: mints a skip-ctor agent, mirrors the
     /// build data, assigns a mission-local index, and tracks it.</summary>
     public Agent SpawnAgent(AgentBuildData buildData)
@@ -137,4 +139,10 @@ public sealed class MockMission
     }
 
     public Agent FindAgentWithIndex(int index) => agentsByIndex.TryGetValue(index, out var a) ? a : null;
+
+    public void DeleteAgent(Agent agent)
+    {
+        if (AgentMirror.TryGet(agent, out var mirror))
+            agentsByIndex.Remove(mirror.Index);
+    }
 }

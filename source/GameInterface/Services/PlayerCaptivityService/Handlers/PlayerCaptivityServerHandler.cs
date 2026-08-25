@@ -170,19 +170,11 @@ internal class PlayerCaptivityServerHandler : IHandler
     /// (BR-061 "heroes" clause) through the real <see cref="TakePrisonerAction"/> — the same action that
     /// captured the leader — so each companion gets proper hero captivity state, with the member-roster
     /// removal, the captor's prison-roster add and the auto-synced <see cref="Hero.PartyBelongedToAsPrisoner"/>
-    /// each replicating to the clients. Wounded companions are still captured; a companion killed in THIS
-    /// battle is never captured, and one already a prisoner is not captured again.
+    /// each replicating to the clients. Wounded companions are still captured; death-marked companions and
+    /// existing prisoners are not captured again.
     /// MUST run after the party is parked: each capture re-publishes <see cref="PrisonerTaken"/> for this
     /// same party (the companion's <see cref="Hero.PartyBelongedTo"/> is the player party), and the IsActive
     /// guard in <see cref="Handle_PrisonerTaken"/> is what short-circuits that nested pass.
-    /// <para>
-    /// Aliveness alone is NOT a sufficient dead-check here: during an active map event native
-    /// <see cref="KillCharacterAction"/> defers the kill (it only stamps a <see cref="Hero.DeathMark"/> and
-    /// returns while the victim's party still has a <see cref="MapEvent"/>), so a hero killed in this very
-    /// battle still reports <see cref="Hero.IsAlive"/> == true. The battle DeathMark is the reliable
-    /// dead-signal, matching native <c>MapEvent.CaptureDefeatedPartyMembers</c> and the coop
-    /// <c>MapEventResultsInterface</c> reimplementation — see <see cref="HasBattleDeathMark"/>.
-    /// </para>
     /// </summary>
     private static void CaptureCompanionHeroes(TroopRoster memberRoster, PartyBase captor)
     {
@@ -199,11 +191,12 @@ internal class PlayerCaptivityServerHandler : IHandler
             if (element.Number <= 0) continue;
 
             var companion = element.Character.HeroObject;
-            // A companion killed in this battle is skipped: its death is deferred to a DeathMark while the map
-            // event is active, so IsAlive is still true here (see HasBattleDeathMark). Aliveness alone would
-            // capture a dead companion — check the DeathMark too. A wounded (not dead) companion has no battle
-            // death mark and is still captured.
-            if (companion == null || !companion.IsAlive || HasBattleDeathMark(companion) || companion.IsPrisoner) continue;
+            // A death mark can precede the final state transition, so aliveness alone is not enough.
+            if (companion == null ||
+                !companion.IsAlive ||
+                companion.DeathMark != KillCharacterAction.KillCharacterActionDetail.None ||
+                companion.IsPrisoner)
+                continue;
 
             companions.Add(companion);
         }
@@ -215,20 +208,6 @@ internal class PlayerCaptivityServerHandler : IHandler
             TakePrisonerAction.Apply(captor, companion);
         }
     }
-
-    /// <summary>
-    /// True when <paramref name="hero"/> was killed in the current battle. During an active map event native
-    /// <see cref="KillCharacterAction"/> defers the kill: <c>ApplyInternal</c> only records a
-    /// <see cref="Hero.DeathMark"/> and returns while the victim's party still has a <see cref="MapEvent"/>, so
-    /// a hero killed in THIS battle still reports <see cref="Hero.IsAlive"/> == true when the surrender is
-    /// processed. The battle death marks are therefore the reliable "is dead" signal at capture time — exactly
-    /// what native <c>MapEvent.CaptureDefeatedPartyMembers</c> and the coop <c>MapEventResultsInterface</c>
-    /// reimplementation gate on (DiedInBattle / DiedInLabor). A merely-wounded hero carries no battle death
-    /// mark, so it stays capturable.
-    /// </summary>
-    private static bool HasBattleDeathMark(Hero hero)
-        => hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInBattle
-        || hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInLabor;
 
     /// <summary>
     /// Records the surrendered party's remaining regular troops as prisoners of the captor (BR-061): each
@@ -525,8 +504,9 @@ internal class PlayerCaptivityServerHandler : IHandler
 
     /// <summary>
     /// Server-authoritative release of a player (client) hero from captivity, shared by the client-requested
-    /// and server-initiated paths. Restores the deactivated player party to the map and clears the captivity
-    /// state — which auto-syncs to the clients through <see cref="Hero.PartyBelongedToAsPrisoner"/>.
+    /// and server-initiated paths. Restores the party's captivity state and release position, then lets the
+    /// server visibility handler decide whether its synchronized owner is ready for map activation. The cleared
+    /// captivity state auto-syncs to the clients through <see cref="Hero.PartyBelongedToAsPrisoner"/>.
     /// Re-implements native <see cref="PlayerCaptivity"/>.EndCaptivityInternal for a hero that is not this
     /// instance's main hero; the menu/encounter cleanup the native version does happens on the owning client
     /// instead (<see cref="PlayerCaptivityClientHandler"/>).
@@ -633,7 +613,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (playerHero.IsAlive)
         {
             playerParty.Position = releasePosition;
-            playerParty.IsActive = true;
             playerParty.IgnoreForHours(4);
             if (captorParty?.MobileParty?.IsActive == true)
             {
@@ -659,16 +638,12 @@ internal class PlayerCaptivityServerHandler : IHandler
                 SkillLevelingManager.OnMainHeroReleasedFromCaptivity(PlayerCaptivity.CaptivityStartTime.ElapsedHoursUntilNow);
             }
 
-            if (!playerParty.IsCurrentlyAtSea)
-            {
-                playerParty.Party.UpdateVisibilityAndInspected(playerParty.Position);
-            }
             SyncReleasePosition(playerParty, releasePosition);
 
-            // Rebuild the map mesh after the roster/leader/position are restored, so the freed party's map
-            // figure reflects its (re-mounted) state rather than the stale on-foot captive mesh.
+            // The visibility handler keeps offline/loading owners parked and rebuilds the map figure only
+            // after campaign synchronization has completed.
             playerParty.Party.SetVisualAsDirty();
-            RecreateVisual(playerParty);
+            messageBroker.Publish(this, new PlayerPartyReleasedFromCaptivity(playerParty));
         }
     }
 
@@ -708,33 +683,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         }
 
         network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
-    }
-
-    private void RecreateVisual(MobileParty party)
-    {
-        RemoveVisual(party);
-
-        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return;
-
-        using (new AllowedThread())
-        {
-            party.CreateNewPartyVisual();
-        }
-
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual == null)
-        {
-            Logger.Error("CreateNewPartyVisual did not produce a visual for party {PartyId}", party.StringId);
-            return;
-        }
-
-        if (!objectManager.AddNewObject(partyVisual, out var visualId))
-        {
-            Logger.Error("Failed to register recreated visual for party {PartyId}", party.StringId);
-            return;
-        }
-
-        network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
     }
 
     /// <summary>

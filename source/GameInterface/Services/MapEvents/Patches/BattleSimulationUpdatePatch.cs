@@ -1,6 +1,10 @@
-using Common;
+﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -22,5 +26,34 @@ public class BattleSimulationUpdatePatch
 
         BattleSimulationReplay.Tick(__instance, dt);
         return false;
+    }
+
+    [HarmonyPatch(typeof(MapState), nameof(MapState.EndBattleSimulation))]
+    internal static class BattleSimulationEndPatch
+    {
+        [HarmonyPrefix]
+        private static void Prefix()
+        {
+            if (ModInformation.IsServer) return;
+
+            if (BattleSimulationReplay.TryRequestCancellation(out var mapEventId))
+            {
+                MessageBroker.Instance.Publish(typeof(BattleSimulationEndPatch), new RequestCancelBattleSimulation(mapEventId));
+            }
+        }
+    }
+}
+
+[HarmonyPatch(typeof(BattleSimulation), nameof(BattleSimulation.OnFinished))]
+internal class BattleSimulationFinishedPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix()
+    {
+        if (ModInformation.IsServer) return;
+
+        // The scoreboard has restored the encounter menu, so the retained defeat can now continue through it.
+        if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier))
+            barrier.CompleteDeferredEncounterCleanup();
     }
 }

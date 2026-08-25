@@ -56,8 +56,6 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.PartyBelongedToAsPrisoner)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StayingInSettlement)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.IsKnownToPlayer)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HasMet)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastMeetingTimeWithPlayer)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.BornSettlement)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Gold)), coalesce: true);
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.RandomValue)));

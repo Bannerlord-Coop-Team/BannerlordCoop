@@ -61,7 +61,7 @@ internal sealed class ModConfig : IModConfig
             ["persuasionSuccessChance"] = "VeryEasy",
             ["clanMemberDeathChance"] = "VeryEasy",
             ["battleDeath"] = "VeryEasy",
-            ["birthAndDeath"] = true,
+            ["birthAndDeath"] = false,
             ["autoAllocateClanMemberPerks"] = false,
         };
 
@@ -378,6 +378,7 @@ internal sealed class ModConfig : IModConfig
         if (data.UnknownKeys != null) WarnUnknownKeys(data.UnknownKeys);
         if (data.Difficulty?.UnknownKeys != null) WarnUnknownKeys(data.Difficulty.UnknownKeys, "difficulty ");
         if (data.ModOptions?.UnknownKeys != null) WarnUnknownKeys(data.ModOptions.UnknownKeys, "mod option ");
+        if (data.Network?.UnknownKeys != null) WarnUnknownKeys(data.Network.UnknownKeys, "network ");
     }
 
     private static void WarnUnknownKeys(IDictionary<string, JToken> unknownKeys, string keyType = "")

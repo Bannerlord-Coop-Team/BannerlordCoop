@@ -7,6 +7,9 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameInterface.Configuration;
+using GameInterface.Services.Heroes.Extensions;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -19,10 +22,27 @@ public readonly struct SideReserve
     public readonly BattleSideEnum Side;
     public readonly PartyReserve[] Parties;
 
-    public SideReserve(BattleSideEnum side, PartyReserve[] parties)
+    /// <summary>
+    /// Every troop on this side across ALL owners, not just <see cref="Parties"/>. The spawn logic splits a
+    /// fixed battle size in proportion to the totals each client gives it, so sizing from owned troops alone
+    /// makes a side that is divided between players measure smaller than it is.
+    /// </summary>
+    public readonly int TotalTroops;
+
+    /// <summary>
+    /// How many parties on this side belong to a player, counting every owner and not just this receiver.
+    /// One troop of the allocation is reserved for each, so that no player can be rounded down to nothing
+    /// while the total still adds up exactly. See <see cref="PartyReserve.PlayerOwnedRank"/>.
+    /// </summary>
+    public readonly int PlayerOwnedPartyCount;
+
+    public SideReserve(BattleSideEnum side, PartyReserve[] parties, int totalTroops = 0,
+        int playerOwnedPartyCount = 0)
     {
         Side = side;
         Parties = parties;
+        TotalTroops = totalTroops;
+        PlayerOwnedPartyCount = playerOwnedPartyCount;
     }
 }
 
@@ -90,6 +110,10 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
         var attacker = new List<PartyReserve>();
         var defender = new List<PartyReserve>();
+        int attackerTotal = 0;
+        int defenderTotal = 0;
+        int attackerPlayerParties = 0;
+        int defenderPlayerParties = 0;
 
         foreach (var party in EnumerateParties(mapEvent))
         {
@@ -99,13 +123,39 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // Who fields this party: its own player; or — for an AI party in a player-led army — that army
             // leader (#3 "army leader deploys the army"); or, when no player does (including a player that
             // DROPPED from this battle and hasn't returned), the host.
+            if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out var supplied))
+                continue;
+
+            // Counted before ownership is considered: the totals describe the SIDE, and every client must
+            // receive the same pair or their battle-size splits disagree.
+            //
+            // The running total before this party is added is also its OFFSET within the side. Because this
+            // loop runs over every party in a fixed order on the server, those offsets partition the side
+            // exactly once, which is what lets each owner take a slice that adds up (see PartyReserve).
+            var partySide = party.Party?.Side ?? BattleSideEnum.None;
+            var partyOffset = partySide == BattleSideEnum.Attacker ? attackerTotal : defenderTotal;
+            if (partySide == BattleSideEnum.Attacker) attackerTotal += entries.Count;
+            else defenderTotal += entries.Count;
+
             TryGetOwningPlayer(party, absentControllers, presentControllers, out var partyOwnerController);
             TryGetArmyLeaderPlayer(party, absentControllers, presentControllers, out var armyLeaderController);
             var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers);
-            if (!IsOwnedByRequester(owningController, controllerId, isHost))
-                continue;
 
-            if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out var supplied))
+            // Only a present player's own party reserves a player slot. Offline or absent registrations fall
+            // to the host and must not reduce the allocation available to the players who entered this battle.
+            int playerOwnedPartiesBefore = partySide == BattleSideEnum.Attacker
+                ? attackerPlayerParties
+                : defenderPlayerParties;
+            var playerOwnedRank = -1;
+            if (entries.Count > 0
+                && ResolveOwningController(partyOwnerController, null, absentControllers) != null)
+            {
+                playerOwnedRank = partySide == BattleSideEnum.Attacker
+                    ? attackerPlayerParties++
+                    : defenderPlayerParties++;
+            }
+
+            if (!IsOwnedByRequester(owningController, controllerId, isHost))
                 continue;
 
             var entriesArray = new TroopReserveEntry[entries.Count];
@@ -115,8 +165,11 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 partyId,
                 supplied,
                 entriesArray,
-                isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId));
-            if ((party.Party?.Side ?? BattleSideEnum.None) == BattleSideEnum.Attacker)
+                isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId),
+                sideOffset: partyOffset,
+                playerOwnedRank: playerOwnedRank,
+                playerOwnedPartiesBefore: playerOwnedPartiesBefore);
+            if (partySide == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else
                 defender.Add(reserve);
@@ -128,8 +181,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         // Return both sides (empty parties = "owns nothing here") so every supplier becomes populated.
         return new[]
         {
-            new SideReserve(BattleSideEnum.Attacker, attacker.ToArray()),
-            new SideReserve(BattleSideEnum.Defender, defender.ToArray()),
+            new SideReserve(BattleSideEnum.Attacker, attacker.ToArray(), attackerTotal, attackerPlayerParties),
+            new SideReserve(BattleSideEnum.Defender, defender.ToArray(), defenderTotal, defenderPlayerParties),
         };
     }
 
@@ -191,12 +244,14 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 if (!objectManager.TryGetId(party, out var partyId))
                     continue;
 
-                if (!builtParties.Add(partyId))
+                if (builtParties.Contains(partyId))
                     continue; // already flattened
 
                 bool hadRoster = party._roster != null;
                 var entries = FlattenParty(party);
+                PlacePlayerHeroFirstInReserve(party, entries);
                 ledger.SetReserve(mapEventId, partyId, entries);
+                builtParties.Add(partyId);
                 Logger.Information("[TroopSupply] Built reserve: party {PartyId} side {Side} -> {Count} troops (roster was {Roster})",
                     partyId, party.Party?.Side, entries.Count, hadRoster ? "present" : "null");
             }
@@ -218,12 +273,20 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
         foreach (var element in roster)
         {
-            if (element.IsWounded || element.IsRouted || element.IsKilled)
+            if (element.IsRouted || element.IsKilled)
                 continue;
 
             var character = element.Troop;
             if (character == null)
                 continue;
+            
+            var isPlayer = character.HeroObject?.IsPlayerHero() == true;
+            
+            // Skip if the troop is not a player, or if the config option is disabled and they are a player + wounded.
+            if (element.IsWounded && !(isPlayer && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry))
+            {
+                continue;
+            }
 
             // Heroes and regular troops alike are keyed by their CharacterObject id (hero CharacterObjects are
             // registered too — CharacterObjectRegistry), so resolve it uniformly.
@@ -237,6 +300,28 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 element.Descriptor.UniqueSeed, characterId, (int)character.GetFormationClass()));
         }
         return entries;
+    }
+
+    private void PlacePlayerHeroFirstInReserve(MapEventParty party, List<TroopReserveEntry> entries)
+    {
+        var mobileParty = party.Party?.MobileParty;
+        if (mobileParty == null || !objectManager.TryGetId(mobileParty, out var mobilePartyId)) return;
+
+        string characterId = null;
+        foreach (var player in playerManager.Players)
+        {
+            if (player.MobilePartyId != mobilePartyId) continue;
+            characterId = player.CharacterObjectId;
+            break;
+        }
+        if (string.IsNullOrEmpty(characterId)) return;
+
+        int heroIndex = entries.FindIndex(entry => entry.CharacterId == characterId);
+        if (heroIndex <= 0) return;
+
+        var hero = entries[heroIndex];
+        entries.RemoveAt(heroIndex);
+        entries.Insert(0, hero);
     }
 
     /// <summary>

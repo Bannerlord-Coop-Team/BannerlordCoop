@@ -51,6 +51,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleAgentBudget agentBudget;
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IPuppetRoutApplier puppetRoutApplier;
+    private readonly IBattleAuthorityMigrator authorityMigrator;
 
     // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
     // agents without that identity later break team ownership and scoreboard attribution.
@@ -59,6 +60,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly object withdrawnControllerLock = new object();
     private readonly HashSet<string> withdrawnControllers = new HashSet<string>();
     private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
+    private readonly HashSet<Guid> retainedFormerHostAgentIds = new HashSet<Guid>();
 
     public PuppetSpawner(
         IMessageBroker messageBroker,
@@ -71,7 +73,8 @@ public class PuppetSpawner : IPuppetSpawner
         IAgentFormationAssigner formationAssigner,
         IBattleAgentBudget agentBudget,
         IPuppetRoutApplier puppetRoutApplier = null,
-        IBattleAgentSpawnBatchCodec spawnBatchCodec = null)
+        IBattleAgentSpawnBatchCodec spawnBatchCodec = null,
+        IBattleAuthorityMigrator authorityMigrator = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -84,6 +87,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.agentBudget = agentBudget;
         this.spawnBatchCodec = spawnBatchCodec ?? new BattleAgentSpawnBatchCodec();
         this.puppetRoutApplier = puppetRoutApplier;
+        this.authorityMigrator = authorityMigrator;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -147,7 +151,7 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         int slotsAvailable = agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current));
-        foreach (BattleAgentSpawnData data in agents)
+        foreach (BattleAgentSpawnData data in PlayerHeroesFirst(agents))
         {
             if (data == null || data.AgentId == Guid.Empty) continue;
 
@@ -178,6 +182,7 @@ public class PuppetSpawner : IPuppetSpawner
         if (Mission.Current == null) return true;                       // no mission — drop
         if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
+        bool isRetainedFormerHostRecord = IsRetainedFormerHostRecord(data);
 
         bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
         if (LocalDeploymentBlocksSpawn(isOwnAgent)) return false;
@@ -289,13 +294,29 @@ public class PuppetSpawner : IPuppetSpawner
             agent.SetIsAIPaused(false);
         }
 
-        registry.TryRegisterAgent(
+        bool agentRegistered = registry.TryRegisterAgent(
             data.OwnerControllerId,
             data.OriginalOwnerControllerId,
             data.MovementScopeId,
             data.AgentId,
             data.MovementId,
-            agent);
+            agent,
+            data.AuthorityRevision);
+        if (!agentRegistered)
+        {
+            Logger.Error(
+                "[BattleDesync] Spawned puppet remained unregistered: kind=rider agentId={AgentId} " +
+                "owner={Owner} originalOwner={OriginalOwner} movementIdentity={Scope}/{MovementId} " +
+                "agentIndex={AgentIndex} character={CharacterId} ownAgent={OwnAgent}",
+                data.AgentId,
+                data.OwnerControllerId,
+                data.OriginalOwnerControllerId,
+                data.MovementScopeId,
+                data.MovementId,
+                agent.Index,
+                data.CharacterId,
+                isOwnAgent);
+        }
         if (data.IsRunningAway)
             puppetRoutApplier?.ApplyFleeing(agent);
         if (data.HasCurrentEquipment)
@@ -309,15 +330,44 @@ public class PuppetSpawner : IPuppetSpawner
         if (data.MountAgentId != Guid.Empty)
         {
             if (agent.MountAgent is Agent mount)
-                registry.TryRegisterAgent(
+            {
+                bool mountRegistered = registry.TryRegisterAgent(
                     data.OwnerControllerId,
                     data.MountOriginalOwnerControllerId,
                     data.MountMovementScopeId,
                     data.MountAgentId,
                     data.MountMovementId,
-                    mount);
+                    mount,
+                    data.MountAuthorityRevision);
+                if (!mountRegistered)
+                {
+                    Logger.Error(
+                        "[BattleDesync] Spawned puppet remained unregistered: kind=mount agentId={AgentId} " +
+                        "riderAgentId={RiderAgentId} owner={Owner} originalOwner={OriginalOwner} " +
+                        "movementIdentity={Scope}/{MovementId} agentIndex={AgentIndex} character={CharacterId}",
+                        data.MountAgentId,
+                        data.AgentId,
+                        data.OwnerControllerId,
+                        data.MountOriginalOwnerControllerId,
+                        data.MountMovementScopeId,
+                        data.MountMovementId,
+                        mount.Index,
+                        data.CharacterId);
+                }
+            }
             else
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
+        }
+
+        // A retained record of a departed host can drain after the migration sweep. Every peer moves
+        // the late registry entries to the current host; only that host revives the rider as battle AI.
+        if (isRetainedFormerHostRecord && agentRegistered)
+        {
+            authorityMigrator?.ApplyLateSpawnedPuppet(
+                agent,
+                data.AgentId,
+                agent.MountAgent,
+                data.MountAgentId);
         }
 
         // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
@@ -335,8 +385,9 @@ public class PuppetSpawner : IPuppetSpawner
         {
             lock (withdrawnControllerLock)
             {
+                // Re-entry clears current withdrawal, but former-host lineage stays for retained records
+                // that can still drain after the controller returns.
                 withdrawnControllers.Remove(payload.What.ControllerId);
-                withdrawnHostControllers.Remove(payload.What.ControllerId);
             }
         });
     }
@@ -366,9 +417,23 @@ public class PuppetSpawner : IPuppetSpawner
         // player's party on the game thread, while leaving NPC parties from the old host available to migrate.
         GameThread.RunSafe(() =>
         {
+            var retainedAgentIds = new List<Guid>();
             lock (pendingPuppetLock)
-                pendingPuppets.RemoveAll(data => data.OwnerControllerId == controllerId
-                    && (!wasHost || IsPlayerPartyRecord(data, controllerId)));
+            {
+                pendingPuppets.RemoveAll(data =>
+                {
+                    if (data.OwnerControllerId != controllerId) return false;
+                    bool remove = !wasHost || IsPlayerPartyRecord(data, controllerId);
+                    if (!remove) retainedAgentIds.Add(data.AgentId);
+                    return remove;
+                });
+            }
+
+            if (retainedAgentIds.Count > 0)
+            {
+                lock (withdrawnControllerLock)
+                    retainedFormerHostAgentIds.UnionWith(retainedAgentIds);
+            }
         });
     }
 
@@ -384,6 +449,23 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         return !wasHost || IsPlayerPartyRecord(data, data.OwnerControllerId);
+    }
+
+    private bool IsRetainedFormerHostRecord(BattleAgentSpawnData data)
+    {
+        bool isDepartedHost;
+        lock (withdrawnControllerLock)
+        {
+            if (retainedFormerHostAgentIds.Contains(data.AgentId)) return true;
+            isDepartedHost = withdrawnControllers.Contains(data.OwnerControllerId)
+                && withdrawnHostControllers.Contains(data.OwnerControllerId);
+        }
+
+        if (!isDepartedHost || IsPlayerPartyRecord(data, data.OwnerControllerId)) return false;
+
+        lock (withdrawnControllerLock)
+            retainedFormerHostAgentIds.Add(data.AgentId);
+        return true;
     }
 
     // [Game thread] Match a spawn record to the controller's player party. The hero check covers a record
@@ -425,8 +507,13 @@ public class PuppetSpawner : IPuppetSpawner
             if (pendingPuppets.Count == 0) return;
             int count = Math.Min(MaxBufferedSpawnsPerTick, pendingPuppets.Count);
             pending = new BattleAgentSpawnData[count];
-            pendingPuppets.CopyTo(0, pending, 0, count);
-            pendingPuppets.RemoveRange(0, count);
+            for (int i = 0; i < count; i++)
+            {
+                int heroIndex = pendingPuppets.FindIndex(IsPlayerHeroRecord);
+                int index = heroIndex >= 0 ? heroIndex : 0;
+                pending[i] = pendingPuppets[index];
+                pendingPuppets.RemoveAt(index);
+            }
         }
 
         // BR-110: count the live remaining capacity ONCE for the whole drain and decrement it as puppets spawn,
@@ -448,6 +535,21 @@ public class PuppetSpawner : IPuppetSpawner
                 Logger.Error(e, "[BattleSync] Failed to spawn buffered puppet {AgentId}; dropping it", data.AgentId);
             }
         }
+    }
+
+    private IEnumerable<BattleAgentSpawnData> PlayerHeroesFirst(IEnumerable<BattleAgentSpawnData> agents)
+    {
+        foreach (var data in agents)
+            if (IsPlayerHeroRecord(data)) yield return data;
+        foreach (var data in agents)
+            if (!IsPlayerHeroRecord(data)) yield return data;
+    }
+
+    private bool IsPlayerHeroRecord(BattleAgentSpawnData data)
+    {
+        if (data == null || string.IsNullOrEmpty(data.OwnerControllerId)) return false;
+        return playerManager.TryGetPlayer(data.OwnerControllerId, out var player)
+            && player.CharacterObjectId == data.CharacterId;
     }
 
     // The PartyBase for a battle party id (a MapEventParty object-manager id), used for a puppet's origin.

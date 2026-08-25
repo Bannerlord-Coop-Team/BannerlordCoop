@@ -2,6 +2,7 @@
 using GameInterface.Surrogates;
 using ProtoBuf.Meta;
 using System.IO;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -15,16 +16,25 @@ public class NetworkStartAttackMissionSerializationTest
     }
 
     [Fact]
-    public void RoundTrip_PreservesRandomTerrainSeed()
+    public void RoundTrip_PreservesMissionInitializer()
     {
-        var original = new NetworkStartAttackMission("map-event-1", 4242, new AtmosphereInfo
+        var initializer = new MissionInitializerRecord("battle_terrain_030")
         {
-            TimeInfo = new TimeInformation
+            TerrainType = 7,
+            RandomTerrainSeed = 4242,
+            SceneHasMapPatch = true,
+            PatchCoordinates = new Vec2(0.25f, 0.75f),
+            PatchEncounterDir = new Vec2(1f, 0f),
+            AtmosphereOnCampaign = new AtmosphereInfo
             {
-                TimeOfDay = 14.0f,
-                NightTimeFactor = 0.0f,
+                TimeInfo = new TimeInformation
+                {
+                    TimeOfDay = 14.0f,
+                    NightTimeFactor = 0.0f,
+                },
             },
-        }, "player-party-1");
+        };
+        var original = new NetworkStartAttackMission("map-event-1", initializer, "player-party-1");
 
         byte[] bytes;
         using (var ms = new MemoryStream())
@@ -48,5 +58,14 @@ public class NetworkStartAttackMissionSerializationTest
         Assert.Equal("player-party-1", result.InitiatingPartyId);
         Assert.Equal("map-event-1", result.MapEventId);
         Assert.Equal(4242, result.RandomTerrainSeed);
+        Assert.Equal("battle_terrain_030", result.MissionInitializer.SceneName);
+        Assert.Equal(7, result.MissionInitializer.TerrainType);
+        Assert.Equal(4242, result.MissionInitializer.RandomTerrainSeed);
+        Assert.True(result.MissionInitializer.SceneHasMapPatch);
+        Assert.Equal(0.25f, result.MissionInitializer.PatchCoordinates.X);
+        Assert.Equal(0.75f, result.MissionInitializer.PatchCoordinates.Y);
+        Assert.Equal(1f, result.MissionInitializer.PatchEncounterDir.X);
+        Assert.Equal(0f, result.MissionInitializer.PatchEncounterDir.Y);
+        Assert.Equal(14f, result.MissionInitializer.AtmosphereOnCampaign.TimeInfo.TimeOfDay);
     }
 }

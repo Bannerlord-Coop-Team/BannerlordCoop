@@ -196,7 +196,7 @@ public class PrisonerSaleProcessorTests
 
     private sealed class PassthroughPrisonerSaleValidator : IPrisonerSaleValidator
     {
-        public TroopRoster Validate(TroopRoster requestedRoster, TroopRoster availableRoster) =>
+        public TroopRoster Validate(TroopRoster requestedRoster, TroopRoster availableRoster, bool preserveTroopXp = false) =>
             requestedRoster;
     }
 

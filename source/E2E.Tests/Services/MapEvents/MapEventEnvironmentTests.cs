@@ -319,6 +319,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // Arrange — the player loses a battle and is taken prisoner by the captor party. Capture parks the
         // player party (emptied + deactivated) and makes the hero the captor's prisoner.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
 
@@ -356,6 +357,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // lord hero, captured via the companion capture). The player hero itself is added by
         // DefeatPlayerPartyInBattle AFTER this snapshot, hence the explicit +1 below.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var capturedTroops = GetPartyNonHeroManCount(Server, partyId);
         var capturedRidingHeroes = GetPartyLiveHeroCount(Server, partyId);
@@ -406,6 +408,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     public void EscapeFromCaptivity_ProtectsPlayerFromFormerCaptorForTwelveHours()
     {
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
 
@@ -477,6 +480,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     {
         // Arrange — the player party holds the hero plus a stack of regular troops on every instance.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var troopCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         SeedPartyTroopOnAll(partyId, troopCharacterId, 5);
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
@@ -532,6 +536,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     {
         // Arrange — a troopless player is captured.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
 
@@ -554,6 +559,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // Arrange — create both player parties and attach the captor hero to its authoritative party so
         // NetworkCompleteDoneLogic resolves the Party screen's right-hand owner and rosters.
         var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
         var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
 
         Server.Call(() =>
@@ -612,6 +618,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // Arrange — capture a player normally, then reproduce the live divergence: the server has already
         // lost the prison-roster element while the captor client still displays it and captivity is active.
         var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
         var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
 
         Server.Call(() =>

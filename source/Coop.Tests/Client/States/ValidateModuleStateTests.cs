@@ -50,7 +50,8 @@ namespace Coop.Tests.Client.States
             Assert.NotEmpty(clientComponent.TestNetwork.Peers);
 
             var message = Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer));
-            Assert.IsType<NetworkModuleVersionsValidate>(message);
+            var validateMessage = Assert.IsType<NetworkModuleVersionsValidate>(message);
+            Assert.Equal(Common.ModInformation.BuildVersion, validateMessage.CoopBuildVersion);
         }
 
         [Fact]
@@ -84,6 +85,29 @@ namespace Coop.Tests.Client.States
             // Assert
             Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer).OfType<NetworkClientValidate>());
             Assert.Empty(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("different-build")]
+        public void NetworkModuleVersionsValidated_IncompatibleBuild_ShowsReasonAndDisconnects(
+            string? serverBuildVersion)
+        {
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this,
+                new NetworkModuleVersionsValidated(true, null, serverBuildVersion));
+
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            Assert.Empty(
+                clientComponent.TestNetwork.GetPeerMessages(serverPeer).OfType<NetworkClientValidate>());
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+            var popup = Assert.Single(
+                clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Contains("Incompatible co-op mod build", popup.Text);
+            Assert.Contains("Update the co-op mod on both sides", popup.Text);
         }
 
         [Fact]

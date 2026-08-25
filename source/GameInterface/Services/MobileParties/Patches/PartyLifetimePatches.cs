@@ -98,16 +98,19 @@ internal class DestroyPartyActionPatch
 
     [HarmonyPatch(nameof(DestroyPartyAction.ApplyForDisbanding))]
     [HarmonyPrefix]
-    private static void PrefixApplyForDisbanding(MobileParty disbandedParty, Settlement relatedSettlement)
+    private static bool PrefixApplyForDisbanding(MobileParty disbandedParty, Settlement relatedSettlement)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (IsProtectedPlayerParty(disbandedParty)) return false;
+
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to apply DestroyPartyAction for disbanding party {partyName}, {StringId}", disbandedParty.Name, disbandedParty.StringId);
-            return;
+            return true;
         }
 
         MessageBroker.Instance.Publish(null, new PartyDisbanded(disbandedParty, relatedSettlement));
+        return true;
     }
 }

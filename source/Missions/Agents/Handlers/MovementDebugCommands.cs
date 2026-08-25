@@ -14,7 +14,8 @@ internal static class MovementDebugCommands
     {
         if (args.Count != 0)
             return "Usage: coop.debug.movement.state";
-        if (!TryGetHandler(out IAgentMovementHandler handler))
+        if (!TryGetHandler(out IAgentMovementHandler handler) ||
+            !TryGetDebugControl(handler, out IAgentMovementDebugControl debugControl))
             return "No active co-op mission movement handler.";
 
         MovementRateSnapshot state = handler.MovementRate;
@@ -29,6 +30,7 @@ internal static class MovementDebugCommands
             $"profile={state.Profile}",
             $"bulkHz={state.BulkHz}",
             $"priorityHz={state.PriorityHz}",
+            $"frameLimitHz={state.FrameLimitHz}",
             $"performanceCeilingHz={state.PerformanceCeilingHz}",
             $"localAdaptiveHz={state.LocalAdaptiveHz}",
             $"receiverCapHz={state.AdvertisedReceiverCapHz}",
@@ -46,10 +48,18 @@ internal static class MovementDebugCommands
             $"receiverApplyMsPerSecond={state.ReceiverApplyMillisecondsPerSecond.ToString("0.00", CultureInfo.InvariantCulture)}",
             $"receiverQueueMs={state.MaximumReceiverQueueMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}",
             $"wireBytesPerSecond={state.WireBytesPerSecond}",
+            $"configuredOutgoingBytesPerSecond={state.ConfiguredOutgoingBytesPerSecond}",
+            $"availableOutgoingBytes={handler.AvailableOutgoingMovementBytes}",
+            $"configuredIncomingBytesPerSecond={state.ConfiguredIncomingBytesPerSecond}",
+            $"incomingBytesPerSender={state.AdvertisedIncomingBytesPerSender}",
+            $"focusAgentId={state.FocusAgentId}",
             $"deferred={state.MaximumDeferredSnapshots}",
             $"deferredAge={state.MaximumDeferredAgeSeconds.ToString("0.000", CultureInfo.InvariantCulture)}",
             $"bulkPolls={state.BulkPollsPerSecond}",
             $"priorityOnlyPolls={state.PriorityOnlyPollsPerSecond}",
+            $"initialConfiguredBulkHz={debugControl.InitialConfiguredBulkHz}",
+            $"syntheticReceivePressureActive={debugControl.SyntheticReceivePressureActive.ToString().ToLowerInvariant()}",
+            $"syntheticReceivePressureRemainingSeconds={debugControl.SyntheticReceivePressureRemainingSeconds.ToString("0.00", CultureInfo.InvariantCulture)}",
             $"reason={state.Reason}",
         });
     }
@@ -96,12 +106,67 @@ internal static class MovementDebugCommands
             : "MOVEMENT_RECEIVER_CAP_AUTOMATIC";
     }
 
+    [CommandLineArgumentFunction("simulate_receive_pressure", "coop.debug.movement")]
+    public static string SimulateReceivePressure(List<string> args)
+    {
+        if (args.Count != 4 ||
+            !float.TryParse(args[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float durationSeconds) ||
+            !double.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double queueMilliseconds) ||
+            !double.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double applyMilliseconds) ||
+            !int.TryParse(args[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int snapshots))
+        {
+            return "Usage: coop.debug.movement.simulate_receive_pressure <duration-seconds> <queue-ms> <apply-ms> <snapshots>";
+        }
+        if (!TryGetHandler(out IAgentMovementHandler handler) ||
+            !TryGetDebugControl(handler, out IAgentMovementDebugControl debugControl))
+            return "No active co-op mission movement handler.";
+        if (!debugControl.TrySetSyntheticReceivePressure(
+                durationSeconds,
+                queueMilliseconds,
+                applyMilliseconds,
+                snapshots,
+                out string error))
+        {
+            return error;
+        }
+
+        return string.Join(" ", new[]
+        {
+            "MOVEMENT_RECEIVE_PRESSURE_ACTIVE",
+            $"durationSeconds={durationSeconds.ToString("0.00", CultureInfo.InvariantCulture)}",
+            $"queueMilliseconds={queueMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}",
+            $"applyMilliseconds={applyMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}",
+            $"snapshots={snapshots}",
+        });
+    }
+
+    [CommandLineArgumentFunction("clear_receive_pressure", "coop.debug.movement")]
+    public static string ClearReceivePressure(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.movement.clear_receive_pressure";
+        if (!TryGetHandler(out IAgentMovementHandler handler) ||
+            !TryGetDebugControl(handler, out IAgentMovementDebugControl debugControl))
+            return "No active co-op mission movement handler.";
+
+        debugControl.ClearSyntheticReceivePressure();
+        return "MOVEMENT_RECEIVE_PRESSURE_CLEARED";
+    }
+
     private static bool TryGetHandler(out IAgentMovementHandler handler)
     {
         handler = Mission.Current?
             .GetMissionBehavior<CoopMissionController>()?
             .AgentMovementHandler;
         return handler != null;
+    }
+
+    private static bool TryGetDebugControl(
+        IAgentMovementHandler handler,
+        out IAgentMovementDebugControl debugControl)
+    {
+        debugControl = handler as IAgentMovementDebugControl;
+        return debugControl != null;
     }
 
     private static bool TryParseRate(
