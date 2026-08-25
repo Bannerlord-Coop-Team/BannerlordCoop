@@ -391,6 +391,8 @@ internal static class PartyInteractionMovementDebugCommands
             restoring.TargetNextTargetPosition,
             restoring.TargetDefaultBehaviorNeedsUpdate);
         bool restored = playerRestoredVerified && targetRestoredVerified;
+        restoring.PlayerRestoredVerified = playerRestoredVerified;
+        restoring.TargetRestoredVerified = targetRestoredVerified;
         if (!restored)
         {
             return JsonResult(new
@@ -432,18 +434,19 @@ internal static class PartyInteractionMovementDebugCommands
             return "Unable to resolve the caravan proximity movement snapshot service.";
 
         CaravanProximityFixtureState restored = restoredCaravanProximityFixture;
-        bool playerVerified = TryVerifyRestored(
+        bool playerVerified = restored.PlayerRestoredVerified && TryVerifyRestored(
             behaviorSnapshot,
             restored.PlayerParty,
             restored.PlayerState,
             restored.PlayerNextTargetPosition,
             restored.PlayerDefaultBehaviorNeedsUpdate);
-        bool targetVerified = TryVerifyRestored(
+        bool targetCurrentMatchesCaptured = TryVerifyRestored(
             behaviorSnapshot,
             restored.TargetParty,
             restored.TargetState,
             restored.TargetNextTargetPosition,
             restored.TargetDefaultBehaviorNeedsUpdate);
+        bool targetVerified = restored.TargetRestoredVerified;
         bool verified = playerVerified && targetVerified;
         if (verified)
             restoredCaravanProximityFixture = null;
@@ -455,6 +458,7 @@ internal static class PartyInteractionMovementDebugCommands
             targetPartyId = restored.TargetPartyId,
             playerVerified,
             targetVerified,
+            targetCurrentMatchesCaptured,
             restored = verified
         });
     }
@@ -777,6 +781,8 @@ internal static class PartyInteractionMovementDebugCommands
         public bool PlayerDefaultBehaviorNeedsUpdate { get; }
         public bool TargetDefaultBehaviorNeedsUpdate { get; }
         public bool Staged { get; set; }
+        public bool PlayerRestoredVerified { get; set; }
+        public bool TargetRestoredVerified { get; set; }
 
         public CaravanProximityFixtureState(
             MobileParty playerParty,
