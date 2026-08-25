@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Serialization;
 using Coop.Core;
 using Coop.Core.Common.Session;
+using Coop.Core.Diagnostics;
 using Coop.CrashReporting;
 using Coop.Lib.NoHarmony;
 #if DEBUG
@@ -123,16 +124,17 @@ namespace Coop
             ManagedServerConfig.Password = serverPassword;
             ManagedServerConfig.Visibility = serverVisibility;
             
-            informationalVersion = typeof(ModInformation).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion ?? "unknown";
-
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
-            CoopLogHeader(moduleInfoProvider);
-            InitializeCrashReporting();
-            
-            
+            StartupDiagnosticsSequence.Run(
+                ResolveInformationalVersion,
+                version =>
+                {
+                    informationalVersion = version;
+                    CoopLogHeader(moduleInfoProvider);
+                },
+                version => InitializeCrashReporting());
+
             Logger.Verbose("Coop Mod Module Started");
             
             Updateables.Add(new FpsLogger());
@@ -273,11 +275,25 @@ namespace Coop
 #endif
             Logger = LogManager.GetLogger<CoopMod>();
         }
+        
+        private static string ResolveInformationalVersion() =>
+            typeof(ModInformation).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? "unknown";
 
         private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
         {
             var modules = moduleInfoProvider.GetModuleInfos().ToArray();
             var native = modules.FirstOrDefault(m => m.IsOfficial && m.Id.Equals("Native",  StringComparison.OrdinalIgnoreCase));
+
+            if (native.Id == null)
+            {
+                // ModuleInfo was not initialized (not found).
+                native.Id = "Unknown";
+                native.IsDlc = false;
+                native.IsOfficial = false;
+                native.Version = ApplicationVersion.Empty;
+            }
             
             Logger.Information("========================================================");
             Logger.Information("Bannerlord Coop - {client}", isServer ? "Server" : "Client");
