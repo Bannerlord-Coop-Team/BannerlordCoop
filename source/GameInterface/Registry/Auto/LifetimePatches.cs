@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using Serilog;
+using TaleWorlds.Core;
 
 namespace GameInterface.Registry.Auto;
 internal class LifetimePatches<T>
@@ -13,6 +14,10 @@ internal class LifetimePatches<T>
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+#if DEBUG
+        if (typeof(T) == typeof(Equipment) && DebugEquipmentLifetimeFixtureScope.IsActive) return;
+#endif
 
         if (ModInformation.IsClient)
         {

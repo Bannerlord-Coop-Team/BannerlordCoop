@@ -173,6 +173,25 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         GC.KeepAlive(hostController);
     }
 
+#if DEBUG
+    [Fact]
+    public void DebugReplay_RequiresAnActiveCoopBattleMission()
+    {
+        using var fixture = new MissionEngineFixture();
+        SetupCoopBattle("host", "joiner");
+        var host = Clients.First();
+
+        host.Call(() =>
+        {
+            fixture.CreateMission(host);
+            var controller = host.Resolve<CoopBattleController>();
+
+            Assert.False(controller.TryDebugReplayOwnedAgentsToConnectedPeer("joiner", out string error));
+            Assert.Equal("there is no active co-op battle mission", error);
+        });
+    }
+#endif
+
     [Fact]
     public void InitialJoinBeforeActivation_DoesNotWaitForGameThreadPump()
     {

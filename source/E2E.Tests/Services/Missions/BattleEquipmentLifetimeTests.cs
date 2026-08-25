@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using E2E.Tests.Environment;
+using GameInterface.Registry.Auto;
 using Missions.Battles;
 using Missions.Messages;
 using System;
@@ -102,6 +103,33 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
 
         Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
     }
+
+#if DEBUG
+    [Fact]
+    public void DebugFixtureScope_SuppressesOnlyItsScopedClientEquipmentDiagnostic()
+    {
+        var client = testEnvironment.Clients.First();
+
+        ClearCapturedLogs();
+        client.Call(() =>
+        {
+            using (new DebugEquipmentLifetimeFixtureScope())
+            {
+                var fixtureEquipment = new Equipment(Equipment.EquipmentType.Battle);
+                Assert.False(client.ObjectManager.TryGetId(fixtureEquipment, out _));
+            }
+        });
+        Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+
+        ClearCapturedLogs();
+        client.Call(() =>
+        {
+            var ordinaryEquipment = new Equipment(Equipment.EquipmentType.Battle);
+            Assert.False(client.ObjectManager.TryGetId(ordinaryEquipment, out _));
+        });
+        Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+    }
+#endif
 
     private void CaptureLog(string message)
     {

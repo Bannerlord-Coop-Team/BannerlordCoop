@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Commands;
 using GameInterface.Services.MapEvents.TroopSupply;
@@ -182,7 +183,8 @@ internal static class BattleDebugCommands
         if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
             return "BATTLE_REPLICATION_FIXTURE_INITIAL network agent registry is unavailable";
 
-        Agent source = registry.GetAgents(controller.Session.OwnControllerId)
+        var ownedAgents = registry.GetAgents(controller.Session.OwnControllerId).ToArray();
+        Agent source = ownedAgents
             .Select(info => info.Agent)
             .FirstOrDefault(agent =>
                 agent != null &&
@@ -200,31 +202,46 @@ internal static class BattleDebugCommands
 
         var sourceOrigin = (CoopAgentOrigin)source.Origin;
         var character = (CharacterObject)source.Character;
-        // A detached origin preserves the real party identity without mutating the source supplier on teardown.
-        var fixtureOrigin = new CoopAgentOrigin(
+        var fixtureSeeds = new HashSet<int>(ownedAgents
+            .Select(info => info.Agent?.Origin)
+            .OfType<CoopAgentOrigin>()
+            .Select(origin => origin.UniqueSeed));
+        int fixtureSeed = int.MaxValue;
+        while (fixtureSeeds.Contains(fixtureSeed))
+        {
+            if (fixtureSeed == int.MinValue)
+                return "BATTLE_REPLICATION_FIXTURE_INITIAL no unused fixture seed is available";
+            fixtureSeed--;
+        }
+
+        // The marker retains the party for native team assignment without adding a roster-attributed troop.
+        var fixtureOrigin = new DebugReplicationFixtureAgentOrigin(
             character,
             sourceOrigin.Party,
             sourceOrigin.Rank,
             sourceOrigin.Banner,
-            new UniqueTroopDescriptor(sourceOrigin.UniqueSeed),
-            sourceOrigin.MapEventPartyId);
+            new UniqueTroopDescriptor(fixtureSeed));
         if (mission.PlayerTeam == null)
             return "BATTLE_REPLICATION_FIXTURE_INITIAL the player team is unavailable";
 
         bool isPlayerSide = source.Team == mission.PlayerTeam;
-        Agent fixtureAgent = mission.SpawnTroop(
-            fixtureOrigin,
-            isPlayerSide,
-            hasFormation: true,
-            spawnWithHorse: source.MountAgent != null,
-            isReinforcement: true,
-            formationTroopCount: 1,
-            formationTroopIndex: 0,
-            isAlarmed: true,
-            wieldInitialWeapons: true,
-            initialPosition: null,
-            initialDirection: null,
-            formationIndex: source.Formation.FormationIndex);
+        Agent fixtureAgent;
+        using (new DebugEquipmentLifetimeFixtureScope())
+        {
+            fixtureAgent = mission.SpawnTroop(
+                fixtureOrigin,
+                isPlayerSide,
+                hasFormation: true,
+                spawnWithHorse: source.MountAgent != null,
+                isReinforcement: true,
+                formationTroopCount: 1,
+                formationTroopIndex: 0,
+                isAlarmed: true,
+                wieldInitialWeapons: true,
+                initialPosition: null,
+                initialDirection: null,
+                formationIndex: source.Formation.FormationIndex);
+        }
         if (fixtureAgent == null)
             return "BATTLE_REPLICATION_FIXTURE_INITIAL native spawn returned no agent";
 
@@ -1524,3 +1541,18 @@ internal static class BattleDebugCommands
         return true;
     }
 }
+
+#if DEBUG
+internal sealed class DebugReplicationFixtureAgentOrigin : CoopAgentOrigin
+{
+    public DebugReplicationFixtureAgentOrigin(
+        CharacterObject troop,
+        PartyBase party,
+        int rank,
+        Banner banner,
+        UniqueTroopDescriptor descriptor)
+        : base(troop, party, rank, banner, descriptor)
+    {
+    }
+}
+#endif
