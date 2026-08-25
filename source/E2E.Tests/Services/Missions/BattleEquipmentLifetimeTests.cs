@@ -104,7 +104,6 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
         Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
     }
 
-#if DEBUG
     [Fact]
     public void DebugFixtureScope_SuppressesOnlyItsScopedClientEquipmentDiagnostic()
     {
@@ -129,7 +128,6 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
         });
         Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
     }
-#endif
 
     private void CaptureLog(string message)
     {

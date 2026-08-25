@@ -314,9 +314,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         // on death (puppets, spawned with a SimpleAgentOrigin, get these from the spawn data).
         string mapEventPartyId = null;
         int troopSeed = 0;
-#if DEBUG
         bool isDebugReplicationFixture = agent.Origin is DebugReplicationFixtureAgentOrigin;
-#endif
         // Our coop spawns carry a CoopAgentOrigin (the custom supplier's origin), NOT the native
         // PartyGroupAgentOrigin — read the party + descriptor seed from it. Checking for the native type here
         // left attribution null, so the death report was skipped and the map-event roster never decremented.
@@ -324,23 +322,20 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         {
             troopSeed = origin.UniqueSeed;
 
-#if DEBUG
             if (!isDebugReplicationFixture)
             {
-#endif
-            // The origin carries the server's MapEventParty id directly; re-deriving it from the local
-            // map-event membership missed whole parties (a garrison whose wrapper never resolved here),
-            // and an unattributed spawn record is never spawned as a puppet on the other clients.
-            mapEventPartyId = origin.MapEventPartyId;
-            if (mapEventPartyId == null && origin.Party != null)
-            {
-                var mapEventParty = ResolveMapEventParty(origin.Party);
-                if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
-                    mapEventPartyId = mepId;
+                // The origin carries the server's MapEventParty id directly; re-deriving it from the local
+                // map-event membership missed whole parties (a garrison whose wrapper never resolved here),
+                // and an unattributed spawn record is never spawned as a puppet on the other clients.
+                mapEventPartyId = origin.MapEventPartyId;
+                if (mapEventPartyId == null && origin.Party != null)
+                {
+                    var mapEventParty = ResolveMapEventParty(origin.Party);
+                    if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
+                        mapEventPartyId = mepId;
+                }
             }
-#if DEBUG
             }
-#endif
         }
         // The casualty keys on the troop's CHARACTER — exactly `characterId`, the CharacterObject's object-manager
         // id we also carry in the spawn data.
@@ -365,9 +360,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             isRunningAway: agent.IsRunningAway);
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
-#if DEBUG
         if (!isDebugReplicationFixture)
-#endif
         messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our

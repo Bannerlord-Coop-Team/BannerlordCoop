@@ -74,9 +74,7 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeMachineStateReplicator siegeMachineState;
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
-#if DEBUG
     private readonly IMissionContext debugMissionContext;
-#endif
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
     private int lastResultSnapshotEpochReported;
 
@@ -114,9 +112,7 @@ public class CoopBattleController : CoopMissionController
             Missions.Agents.Handlers.MovementCadenceProfile.Battle)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
-#if DEBUG
         debugMissionContext = missionContext;
-#endif
         coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
             () => session.IsLocalHost);
         var casualties = new CasualtyAttributionMap();
@@ -420,7 +416,6 @@ public class CoopBattleController : CoopMissionController
         ResultCommitter.ReportAcceptedResult();
     }
 
-#if DEBUG
     // The live fixture only replays to a peer that this mission has actually mapped to a connected P2P link.
     internal bool TryDebugReplayOwnedAgentsToConnectedPeer(string controllerId, out string error)
     {
@@ -451,7 +446,6 @@ public class CoopBattleController : CoopMissionController
         replicator.ReplicateCurrentAgentsTo(controllerId);
         return true;
     }
-#endif
 
     protected override void SendJoinInfo(string controllerId)
     {

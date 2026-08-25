@@ -15,9 +15,7 @@ internal class LifetimePatches<T>
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
-#if DEBUG
         if (typeof(T) == typeof(Equipment) && DebugEquipmentLifetimeFixtureScope.IsActive) return;
-#endif
 
         if (ModInformation.IsClient)
         {

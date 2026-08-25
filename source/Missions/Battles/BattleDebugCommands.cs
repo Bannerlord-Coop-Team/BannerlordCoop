@@ -1542,7 +1542,6 @@ internal static class BattleDebugCommands
     }
 }
 
-#if DEBUG
 internal sealed class DebugReplicationFixtureAgentOrigin : CoopAgentOrigin
 {
     public DebugReplicationFixtureAgentOrigin(
@@ -1555,4 +1554,3 @@ internal sealed class DebugReplicationFixtureAgentOrigin : CoopAgentOrigin
     {
     }
 }
-#endif

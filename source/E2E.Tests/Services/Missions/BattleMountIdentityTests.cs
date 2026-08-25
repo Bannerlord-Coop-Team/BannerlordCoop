@@ -226,7 +226,6 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         });
     }
 
-#if DEBUG
     [Fact]
     public void DebugFixtureOrigin_FlushesInitialWithoutMapEventCasualtyAttribution()
     {
@@ -266,7 +265,6 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             GC.KeepAlive(controller);
         });
     }
-#endif
 
     [Fact]
     public void MountDeath_Broadcasts_KillsThePuppetHorse_AndReportsNoServerCasualty()

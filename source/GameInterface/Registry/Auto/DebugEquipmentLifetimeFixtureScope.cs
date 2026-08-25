@@ -2,7 +2,6 @@
 
 namespace GameInterface.Registry.Auto;
 
-#if DEBUG
 /// <summary>Suppresses auto-registry handling for one intentional debug fixture equipment construction.</summary>
 public sealed class DebugEquipmentLifetimeFixtureScope : IDisposable
 {
@@ -21,4 +20,3 @@ public sealed class DebugEquipmentLifetimeFixtureScope : IDisposable
         depth--;
     }
 }
-#endif

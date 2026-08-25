@@ -173,7 +173,6 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         GC.KeepAlive(hostController);
     }
 
-#if DEBUG
     [Fact]
     public void DebugReplay_RequiresAnActiveCoopBattleMission()
     {
@@ -190,7 +189,6 @@ public class BattleActivationJoinTests : MissionTestEnvironment
             Assert.Equal("there is no active co-op battle mission", error);
         });
     }
-#endif
 
     [Fact]
     public void InitialJoinBeforeActivation_DoesNotWaitForGameThreadPump()
