@@ -74,6 +74,86 @@ public class MissionManagerTests
     }
 
     [Fact]
+    public void GracefulLeaveRemovesControllerPunchEndpoint()
+    {
+        var manager = new MissionManager();
+        var departingPeer = CreatePeer(1);
+        var survivorPeer = CreatePeer(2);
+        var netManager = new NetManager(null);
+        var internalEndpoint = new IPEndPoint(IPAddress.Loopback, 53005);
+        var externalEndpoint = new IPEndPoint(IPAddress.Loopback, 53006);
+
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            internalEndpoint,
+            externalEndpoint,
+            "departing%battle");
+        Assert.True(manager.TryEnterMission(departingPeer, "departing", "battle", out _));
+        Assert.True(manager.TryEnterMission(survivorPeer, "survivor", "battle", out _));
+
+        Assert.True(manager.TryLeaveMission(departingPeer, "departing", "battle", out _));
+
+        MissionInstance instance = GetInstance(manager, "battle");
+        Assert.Empty(instance.PunchEndpoints);
+        Assert.Equal(new[] { "survivor" }, instance.Controllers);
+    }
+
+    [Fact]
+    public void RepunchReplacesEarlierEndpointForController()
+    {
+        var manager = new MissionManager();
+        var netManager = new NetManager(null);
+        var oldInternal = new IPEndPoint(IPAddress.Loopback, 53007);
+        var oldExternal = new IPEndPoint(IPAddress.Loopback, 53008);
+        var replacementInternal = new IPEndPoint(IPAddress.Loopback, 53009);
+        var replacementExternal = new IPEndPoint(IPAddress.Loopback, 53010);
+
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            oldInternal,
+            oldExternal,
+            "host%battle");
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            replacementInternal,
+            replacementExternal,
+            "host%battle");
+
+        MissionInstance.Endpoints endpoint = Assert.Single(GetInstance(manager, "battle").PunchEndpoints);
+        Assert.Equal("host", endpoint.ControllerId);
+        Assert.Equal(replacementInternal, endpoint.Internal);
+        Assert.Equal(replacementExternal, endpoint.External);
+    }
+
+    [Fact]
+    public void RepunchStillRemovesMatchingEndpointAcrossInstances()
+    {
+        var manager = new MissionManager();
+        var netManager = new NetManager(null);
+        var firstInternal = new IPEndPoint(IPAddress.Loopback, 53011);
+        var replacementInternal = new IPEndPoint(IPAddress.Loopback, 53012);
+        var sharedExternal = new IPEndPoint(IPAddress.Loopback, 53013);
+
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            firstInternal,
+            sharedExternal,
+            "first%first-battle");
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            replacementInternal,
+            sharedExternal,
+            "replacement%replacement-battle");
+
+        Assert.Empty(GetInstance(manager, "first-battle").PunchEndpoints);
+        MissionInstance.Endpoints endpoint = Assert.Single(
+            GetInstance(manager, "replacement-battle").PunchEndpoints);
+        Assert.Equal("replacement", endpoint.ControllerId);
+        Assert.Equal(replacementInternal, endpoint.Internal);
+        Assert.Equal(sharedExternal, endpoint.External);
+    }
+
+    [Fact]
     public void ActiveConclusionClaimFencesLaterEntry()
     {
         var manager = new MissionManager();
@@ -287,6 +367,15 @@ public class MissionManagerTests
 
         Assert.True(manager.TryGetRelayTarget(observerPeer, "battle", "host", out var resolved));
         Assert.Same(replacementPeer, resolved);
+    }
+
+    private static MissionInstance GetInstance(MissionManager manager, string instanceId)
+    {
+        var byInstanceIdField = typeof(MissionManager).GetField(
+            "byInstanceId",
+            BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var instances = (Dictionary<string, MissionInstance>)byInstanceIdField.GetValue(manager)!;
+        return instances[instanceId];
     }
 
     private static NetPeer CreatePeer(int id)

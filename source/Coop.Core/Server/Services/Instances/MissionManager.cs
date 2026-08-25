@@ -173,8 +173,9 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                     instanceId, remoteEndPoint);
             }
 
-            // A punch = (re)entering now. Drop any earlier slot for this endpoint first, else a re-joiner
-            // (same endpoint, since the socket persists) is mistaken for a duplicate and never reconnected.
+            // A punch = (re)entering now. Drop any earlier slot for this controller or endpoint first,
+            // so a replacement connection is not introduced to its own stale socket.
+            RemoveControllerEndpointEverywhere(connectionToken.ControllerId);
             RemoveEndpointEverywhere(remoteEndPoint);
 
             foreach (var existing in instance.PunchEndpoints)
@@ -188,7 +189,10 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                     token);
             }
 
-            instance.PunchEndpoints.Add(new MissionInstance.Endpoints(localEndPoint, remoteEndPoint));
+            instance.PunchEndpoints.Add(new MissionInstance.Endpoints(
+                connectionToken.ControllerId,
+                localEndPoint,
+                remoteEndPoint));
         }
     }
 
@@ -532,6 +536,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private MissionDeparture RemoveMembership(MissionMembership membership)
     {
         membership.Instance.Memberships.Remove(membership);
+        membership.Instance.PunchEndpoints.RemoveAll(
+            endpoints => endpoints.ControllerId == membership.ControllerId);
         if (byPeer.TryGetValue(membership.Peer, out var peerMembership) &&
             ReferenceEquals(peerMembership, membership))
         {
@@ -556,7 +562,15 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             .Select(member => (member.ControllerId, member.Peer))
             .ToList();
 
-    // A peer is in at most one instance, so any prior listing for this endpoint is stale on a new punch.
+    // A controller and peer are each in at most one instance, so prior punch slots are stale on a new punch.
+    private void RemoveControllerEndpointEverywhere(string controllerId)
+    {
+        foreach (var instance in byInstanceId.Values)
+        {
+            instance.PunchEndpoints.RemoveAll(e => e.ControllerId == controllerId);
+        }
+    }
+
     private void RemoveEndpointEverywhere(IPEndPoint external)
     {
         foreach (var instance in byInstanceId.Values)
