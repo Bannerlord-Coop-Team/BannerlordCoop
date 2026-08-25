@@ -7,6 +7,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
@@ -14,6 +15,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
@@ -22,6 +24,7 @@ using HarmonyLib;
 using Helpers;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
@@ -264,7 +267,63 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.Same(mapEvent, party.MapEvent);
+
+            Assert.Contains(
+                mapEvent.DefenderSide.Parties.SelectMany(mapEventParty => mapEventParty.Troops),
+                troop => !troop.IsWounded && !troop.IsKilled);
+            foreach (var mapEventParty in mapEvent.DefenderSide.Parties)
+                mapEventParty.Party.MemberRoster.Clear();
+
+            var nativeArgs = new MenuCallbackArgs((MenuContext)null, null);
+            Assert.False(MenuHelper.EncounterAttackCondition(nativeArgs));
+
+            var (shown, args) = InvokePatchedEncounterAttackCondition();
+            Assert.True(shown);
+            Assert.True(args.IsEnabled);
+
+            var healthyHitPoints = Hero.MainHero.HitPoints;
+            var previousOptions = ModConfigProvider.ModOptions;
+            try
+            {
+                using (new AllowedThread())
+                    Hero.MainHero.HitPoints = 1;
+
+                ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
+                {
+                    PlayerWoundedBattleEntry = false,
+                });
+                (shown, args) = InvokePatchedEncounterAttackCondition();
+                Assert.True(shown);
+                Assert.False(args.IsEnabled);
+
+                ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
+                {
+                    PlayerWoundedBattleEntry = true,
+                });
+                (shown, args) = InvokePatchedEncounterAttackCondition();
+                Assert.True(shown);
+                Assert.True(args.IsEnabled);
+            }
+            finally
+            {
+                ModConfigProvider.ModOptions = previousOptions;
+                using (new AllowedThread())
+                    Hero.MainHero.HitPoints = healthyHitPoints;
+            }
         }, MapEventDisabledMethods);
+    }
+
+    private static (bool shown, MenuCallbackArgs args) InvokePatchedEncounterAttackCondition()
+    {
+        var method = AccessTools.Method(
+            typeof(EncounterGameMenuBehavior),
+            "game_menu_encounter_attack_on_condition");
+        Assert.NotNull(method);
+
+        var args = new MenuCallbackArgs((MenuContext)null, null);
+        var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+        var shown = (bool)method.Invoke(behavior, new object[] { args });
+        return (shown, args);
     }
 
     [Fact]
