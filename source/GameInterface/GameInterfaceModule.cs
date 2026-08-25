@@ -12,6 +12,7 @@ using GameInterface.Services;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
+using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
@@ -45,12 +46,14 @@ using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
+using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.Patches;
 using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Serilog;
 using System.Linq;
+using System.Threading;
 
 namespace GameInterface;
 
@@ -64,6 +67,13 @@ public class GameInterfaceModule : Module
     protected override void Load(ContainerBuilder builder)
     {
         builder.RegisterInstance(harmony).As<Harmony>().SingleInstance();
+        builder.RegisterInstance(new CoopLogFile(null))
+            .As<ICoopLogFile>()
+            .SingleInstance()
+            .PreserveExistingDefaults();
+        builder.Register(_ => new CancellationTokenSource())
+            .InstancePerLifetimeScope()
+            .PreserveExistingDefaults();
 
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
@@ -74,6 +84,14 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
+        builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().InstancePerLifetimeScope();
+        builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();
+        builder.RegisterType<BugReportArchiveBuilder>().As<IBugReportArchiveBuilder>().InstancePerDependency();
+        builder.RegisterType<BugReportLogValidator>().As<IBugReportLogValidator>().InstancePerDependency();
+        builder.RegisterType<BugReportUploader>().As<IBugReportUploader>().InstancePerDependency();
+        builder.RegisterType<BugReportLogSharingPreference>().As<IBugReportLogSharingPreference>().InstancePerDependency();
+        builder.RegisterType<BugReportSubmissionConsent>().As<IBugReportSubmissionConsent>().InstancePerDependency();
         builder.RegisterType<KillFeedOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<MapTimeOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<ChatOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
