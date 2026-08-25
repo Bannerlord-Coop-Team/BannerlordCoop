@@ -45,10 +45,12 @@ namespace GameInterface.Tests.Serialization
         [Fact]
         public void GetBinaryPackage_ClearsPackagesWhenPackingThrows()
         {
+            var value = new ThrowingPackageValue();
+
             Assert.Throws<InvalidOperationException>(() =>
-                factory.GetBinaryPackage(new ThrowingPackageValue()));
+                factory.GetBinaryPackage(value));
             Assert.Throws<InvalidOperationException>(() =>
-                factory.GetBinaryPackage(new ThrowingPackageValue()));
+                factory.GetBinaryPackage(value));
         }
     }
 
