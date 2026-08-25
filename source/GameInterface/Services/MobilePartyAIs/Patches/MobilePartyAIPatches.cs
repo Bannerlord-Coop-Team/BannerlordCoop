@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.MobileParties.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
@@ -35,6 +36,7 @@ internal class MobilePartyAIPatches
     private static void AiBehaviorInteractablePrefix(MobilePartyAi __instance, IInteractablePoint value, out bool __state) =>
         __state = ModInformation.IsServer &&
             !CallOriginalPolicy.IsOriginalAllowed() &&
+            !MobilePartyMovementStatePatches.IsAutomaticBehaviorBroadcastSuppressed &&
             __instance?._mobileParty?.IsActive == true &&
             value != __instance.AiBehaviorInteractable;
 

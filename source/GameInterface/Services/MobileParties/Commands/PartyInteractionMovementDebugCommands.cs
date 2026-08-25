@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using Newtonsoft.Json;
@@ -13,6 +14,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Map;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -48,6 +50,10 @@ internal static class PartyInteractionMovementDebugCommands
         MobileParty mainParty = ModInformation.IsClient ? MobileParty.MainParty : null;
         bool mainPartyAvailable = mainParty?.IsActive == true && mainParty.Party != null &&
             mainParty.CurrentSettlement == null && mainParty.MapEvent == null;
+        IInteractablePoint mainPartyInteractable = mainParty?.Ai?.AiBehaviorInteractable;
+        MobileParty mainPartyInteractionTarget = GetInteractableParty(mainPartyInteractable);
+        string mainPartyInteractablePointId = GetInteractablePointId(objectManager, mainPartyInteractable);
+        CampaignVec2? mainPartyInteractionPosition = GetInteractionPosition(mainPartyInteractable, mainParty);
         MobileParty nearestCaravan = mainPartyAvailable == false
             ? null
             : MobileParty.All
@@ -97,6 +103,18 @@ internal static class PartyInteractionMovementDebugCommands
             mainPartyHasPartyBase = mainParty?.Party != null,
             mainPartySettlementId = mainParty?.CurrentSettlement?.StringId,
             mainPartyMapEventId = mainParty?.MapEvent?.StringId,
+            mainPartyPositionX = mainParty?.Position.X,
+            mainPartyPositionY = mainParty?.Position.Y,
+            mainPartyDefaultBehavior = mainParty?.DefaultBehavior.ToString(),
+            mainPartyShortTermBehavior = mainParty?.ShortTermBehavior.ToString(),
+            mainPartyMoveMode = mainParty?.PartyMoveMode.ToString(),
+            mainPartyTargetPartyId = GetPartyId(objectManager, mainParty?.TargetParty),
+            mainPartyInteractablePointId,
+            mainPartyInteractionTargetPartyId = GetPartyId(objectManager, mainPartyInteractionTarget),
+            mainPartyInteractionPositionX = mainPartyInteractionPosition?.X,
+            mainPartyInteractionPositionY = mainPartyInteractionPosition?.Y,
+            mainPartyInteractionRangeVerified = mainPartyInteractionTarget != null &&
+                CanInteractWithParty(mainPartyInteractionTarget, mainParty),
             parties,
             holdCount,
             nearestCaravanId,
@@ -208,7 +226,8 @@ internal static class PartyInteractionMovementDebugCommands
             playerState,
             playerPartyId,
             targetPartyId,
-            targetInteractablePointId);
+            targetInteractablePointId,
+            playerParty.NextTargetPosition);
 
         return JsonResult(new
         {
@@ -242,9 +261,21 @@ internal static class PartyInteractionMovementDebugCommands
         if (fixture.PlayerParty.IsCurrentlyAtSea != fixture.TargetParty.IsCurrentlyAtSea)
             return "The Cemai player party and caravan no longer use the same navigation layer.";
 
-        fixture.PlayerParty.SetMoveModeHold();
-        fixture.PlayerParty.Ai.AiBehaviorInteractable = fixture.TargetParty.Party;
-        fixture.PlayerParty.Position = fixture.TargetParty.Position;
+        if (!(fixture.TargetParty.Party is IInteractablePoint targetInteractable))
+            return "The captured caravan no longer has a vanilla interaction point.";
+
+        CampaignVec2 interactionPosition = targetInteractable.GetInteractionPosition(fixture.PlayerParty);
+        MobilePartyMovementStatePatches.RunWithoutAutomaticBehaviorBroadcast(() =>
+        {
+            fixture.PlayerParty.SetMoveModeHold();
+            fixture.PlayerParty.SetNavigationModeHold();
+            fixture.PlayerParty.Ai.AiBehaviorInteractable = targetInteractable;
+            fixture.PlayerParty.Ai.BehaviorTarget = interactionPosition;
+            fixture.PlayerParty.Position = interactionPosition;
+            fixture.PlayerParty.TargetPosition = interactionPosition;
+            fixture.PlayerParty.MoveTargetPoint = interactionPosition;
+            fixture.PlayerParty.NextTargetPosition = interactionPosition;
+        });
         PublishForcedPosition(fixture.PlayerParty);
         fixture.Staged = true;
 
@@ -269,6 +300,8 @@ internal static class PartyInteractionMovementDebugCommands
             targetPartyId = fixture.TargetPartyId,
             targetInteractablePointId = fixture.TargetInteractablePointId,
             distance = Distance(fixture.PlayerParty, fixture.TargetParty),
+            interactionPositionX = interactionPosition.X,
+            interactionPositionY = interactionPosition.Y,
             interactionTargetVerified,
             preCommandEncounterSafe,
             stagedBehaviorSnapshotVerified,
@@ -291,7 +324,11 @@ internal static class PartyInteractionMovementDebugCommands
 
         CaravanProximityFixtureState restoring = caravanProximityFixture;
         if (!behaviorSnapshot.CanApply(restoring.PlayerParty, restoring.PlayerState) ||
-            !RestoreParty(behaviorSnapshot, restoring.PlayerParty, restoring.PlayerState))
+            !RestoreParty(
+                behaviorSnapshot,
+                restoring.PlayerParty,
+                restoring.PlayerState,
+                restoring.PlayerNextTargetPosition))
         {
             return JsonResult(new
             {
@@ -304,7 +341,8 @@ internal static class PartyInteractionMovementDebugCommands
         bool restored = TryVerifyRestored(
             behaviorSnapshot,
             restoring.PlayerParty,
-            restoring.PlayerState);
+            restoring.PlayerState,
+            restoring.PlayerNextTargetPosition);
         if (!restored)
         {
             return JsonResult(new
@@ -341,7 +379,8 @@ internal static class PartyInteractionMovementDebugCommands
         bool verified = TryVerifyRestored(
             behaviorSnapshot,
             restored.PlayerParty,
-            restored.PlayerState);
+            restored.PlayerState,
+            restored.PlayerNextTargetPosition);
         if (verified)
             restoredCaravanProximityFixture = null;
 
@@ -502,6 +541,38 @@ internal static class PartyInteractionMovementDebugCommands
         return objectManager.TryGetId(party, out string id) ? id : party.StringId;
     }
 
+    private static string GetInteractablePointId(
+        IObjectManager objectManager,
+        IInteractablePoint interactable)
+    {
+        if (interactable is PartyBase partyBase)
+            return objectManager.TryGetId(partyBase, out string id) ? id : null;
+        if (interactable is AnchorPoint anchor)
+            return objectManager.TryGetId(anchor, out string id) ? id : null;
+
+        return null;
+    }
+
+    private static MobileParty GetInteractableParty(IInteractablePoint interactable)
+    {
+        if (interactable is PartyBase partyBase)
+            return partyBase.MobileParty;
+        if (interactable is AnchorPoint anchor)
+            return anchor.Owner;
+
+        return null;
+    }
+
+    private static CampaignVec2? GetInteractionPosition(
+        IInteractablePoint interactable,
+        MobileParty interactingParty)
+    {
+        if (interactable == null || interactingParty == null)
+            return null;
+
+        return interactable.GetInteractionPosition(interactingParty);
+    }
+
     private static string InteractWithCaravan(
         IObjectManager objectManager,
         MobileParty targetParty,
@@ -566,12 +637,21 @@ internal static class PartyInteractionMovementDebugCommands
     private static bool RestoreParty(
         IMobilePartyBehaviorSnapshot behaviorSnapshot,
         MobileParty party,
-        PartyBehaviorUpdateData state)
+        PartyBehaviorUpdateData state,
+        CampaignVec2 nextTargetPosition)
     {
-        if (!behaviorSnapshot.TryApply(party, state, out _))
+        bool restored = false;
+        MobilePartyMovementStatePatches.RunWithoutAutomaticBehaviorBroadcast(() =>
+        {
+            restored = behaviorSnapshot.TryApply(party, state, out _);
+            if (!restored) return;
+
+            party.Position = state.PartyPosition;
+            party.NextTargetPosition = nextTargetPosition;
+        });
+        if (!restored)
             return false;
 
-        party.Position = state.PartyPosition;
         PublishForcedPosition(party);
         return true;
     }
@@ -579,7 +659,8 @@ internal static class PartyInteractionMovementDebugCommands
     private static bool TryVerifyRestored(
         IMobilePartyBehaviorSnapshot behaviorSnapshot,
         MobileParty party,
-        PartyBehaviorUpdateData expected)
+        PartyBehaviorUpdateData expected,
+        CampaignVec2 expectedNextTargetPosition)
     {
         if (!behaviorSnapshot.TryCreate(party, out PartyBehaviorUpdateData actual))
             return false;
@@ -599,7 +680,8 @@ internal static class PartyInteractionMovementDebugCommands
             actual.PartyMoveMode == expected.PartyMoveMode &&
             actual.MoveTargetPartyId == expected.MoveTargetPartyId &&
             actual.IsInteractableAnchor == expected.IsInteractableAnchor &&
-            actual.IsCurrentlyAtSea == expected.IsCurrentlyAtSea;
+            actual.IsCurrentlyAtSea == expected.IsCurrentlyAtSea &&
+            party.NextTargetPosition == expectedNextTargetPosition;
     }
 
     private static void PublishForcedPosition(MobileParty party) =>
@@ -618,6 +700,7 @@ internal static class PartyInteractionMovementDebugCommands
         public string PlayerPartyId { get; }
         public string TargetPartyId { get; }
         public string TargetInteractablePointId { get; }
+        public CampaignVec2 PlayerNextTargetPosition { get; }
         public bool Staged { get; set; }
 
         public CaravanProximityFixtureState(
@@ -626,7 +709,8 @@ internal static class PartyInteractionMovementDebugCommands
             PartyBehaviorUpdateData playerState,
             string playerPartyId,
             string targetPartyId,
-            string targetInteractablePointId)
+            string targetInteractablePointId,
+            CampaignVec2 playerNextTargetPosition)
         {
             PlayerParty = playerParty;
             TargetParty = targetParty;
@@ -634,6 +718,7 @@ internal static class PartyInteractionMovementDebugCommands
             PlayerPartyId = playerPartyId;
             TargetPartyId = targetPartyId;
             TargetInteractablePointId = targetInteractablePointId;
+            PlayerNextTargetPosition = playerNextTargetPosition;
         }
     }
 
