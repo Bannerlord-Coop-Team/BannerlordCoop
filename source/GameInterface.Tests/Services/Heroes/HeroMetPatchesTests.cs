@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
@@ -20,7 +20,7 @@ public class HeroMetPatchesTests
     {
         var playerHero = ObjectHelper.SkipConstructor<Hero>();
         var metHero = ObjectHelper.SkipConstructor<Hero>();
-        PlayerMetHero publishedMeeting = null;
+        PlayerMetHero? publishedMeeting = null;
         var publishCount = 0;
 
         void Handle(MessagePayload<PlayerMetHero> payload)
@@ -35,6 +35,7 @@ public class HeroMetPatchesTests
             HeroMetPatches.SetHasMetPostfix(metHero, playerHero);
 
             Assert.Equal(1, publishCount);
+            Assert.NotNull(publishedMeeting);
             Assert.Same(playerHero, publishedMeeting.PlayerHero);
             Assert.Same(metHero, publishedMeeting.MetHero);
         }
