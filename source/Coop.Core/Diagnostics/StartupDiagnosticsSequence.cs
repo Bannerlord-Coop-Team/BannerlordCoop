@@ -11,10 +11,13 @@ public static class StartupDiagnosticsSequence
 {
     public static void Run(
         Action<string> emitLogHeader,
-        Action<string> initializeCrashReporting)
+        Action<string> initializeCrashReporting,
+        Func<string> resolveInformationalVersion = null)
     {
-        string version = ModInformation.BuildVersion;
+        string version = (resolveInformationalVersion ?? DefaultResolveInformationalVersion)();
         emitLogHeader(version);
         initializeCrashReporting(version);
     }
+
+    private static string DefaultResolveInformationalVersion() => ModInformation.BuildVersion;
 }

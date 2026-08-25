@@ -1,3 +1,4 @@
+using Common;
 using Coop.Core.Diagnostics;
 using System.Collections.Generic;
 using Xunit;
@@ -14,11 +15,6 @@ public class StartupDiagnosticsSequenceTests
         string crashReportingVersion = null;
 
         StartupDiagnosticsSequence.Run(
-            resolveInformationalVersion: () =>
-            {
-                callOrder.Add("resolve");
-                return "1.2.3-test";
-            },
             emitLogHeader: version =>
             {
                 callOrder.Add("header");
@@ -28,6 +24,11 @@ public class StartupDiagnosticsSequenceTests
             {
                 callOrder.Add("crash-reporting");
                 crashReportingVersion = version;
+            },
+            resolveInformationalVersion: () =>
+            {
+                callOrder.Add("resolve");
+                return "1.2.3-test";
             });
 
         Assert.Equal(new[] { "resolve", "header", "crash-reporting" }, callOrder);
@@ -39,8 +40,22 @@ public class StartupDiagnosticsSequenceTests
     public void CrashReportingNeverReceivesTheUnresolvedPlaceholder()
     {
         StartupDiagnosticsSequence.Run(
-            resolveInformationalVersion: () => "9.9.9",
             emitLogHeader: _ => { },
-            initializeCrashReporting: version => Assert.NotEqual("unknown", version));
+            initializeCrashReporting: version => Assert.NotEqual("unknown", version),
+            resolveInformationalVersion: () => "9.9.9");
+    }
+
+    [Fact]
+    public void DefaultsToTheRealBuildVersionWhenNoResolverIsSupplied()
+    {
+        string headerVersion = null;
+        string crashReportingVersion = null;
+
+        StartupDiagnosticsSequence.Run(
+            emitLogHeader: version => headerVersion = version,
+            initializeCrashReporting: version => crashReportingVersion = version);
+
+        Assert.Equal(ModInformation.BuildVersion, headerVersion);
+        Assert.Equal(ModInformation.BuildVersion, crashReportingVersion);
     }
 }
