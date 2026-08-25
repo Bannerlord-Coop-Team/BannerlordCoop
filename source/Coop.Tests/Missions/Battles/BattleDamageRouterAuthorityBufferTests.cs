@@ -7,6 +7,7 @@ using Missions.Messages;
 using Missions.Missiles.Handlers;
 using Moq;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -20,6 +21,49 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class BattleDamageRouterAuthorityBufferTests
 {
+    [Fact]
+    public void RemovedSiegeMissile_ClearsAuthorityStampWithoutAnAgentHit()
+    {
+        Assert.Null(Mission.Current);
+        var broker = new Mock<IMessageBroker>();
+        var missionComponent = new Mock<ICoopMissionComponent>();
+        missionComponent.SetupGet(component => component.AgentRegistry)
+            .Returns(Mock.Of<INetworkAgentRegistry>());
+        missionComponent.SetupGet(component => component.MissileHandler)
+            .Returns(Mock.Of<IMissileHandler>());
+
+        using var sut = new BattleDamageRouter(
+            Mock.Of<IBattleNetwork>(),
+            broker.Object,
+            missionComponent.Object,
+            Mock.Of<IBattleSession>(),
+            Mock.Of<ISiegeMachineStateReplicator>(),
+            Mock.Of<IGuardedHitWindow>(),
+            Mock.Of<IAgentNativeMountState>(),
+            Mock.Of<IPuppetMountStateRepairer>());
+
+        using var missionScope = new MissionCurrentScope();
+        sut.Initialize(missionScope.Instance);
+
+        FieldInfo authorityField = typeof(BattleDamageRouter).GetField(
+            "siegeShotAuthorities", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(authorityField);
+        var authorityMap = Assert.IsAssignableFrom<IDictionary>(authorityField!.GetValue(sut));
+        Type stampType = authorityMap.GetType().GetGenericArguments()[1];
+        object authorityStamp = Activator.CreateInstance(stampType);
+        Assert.NotNull(authorityStamp);
+        authorityMap.Add(17, authorityStamp);
+        Assert.Single(authorityMap.Keys);
+
+        FieldInfo removedEvent = typeof(Mission).GetField(
+            "OnMissileRemovedEvent", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(removedEvent);
+        var callback = Assert.IsType<Action<int>>(removedEvent!.GetValue(missionScope.Instance));
+        callback(17);
+
+        Assert.Empty(authorityMap);
+    }
+
     [Fact]
     public void FutureDamage_IsBufferedUntilAuthorityChange_AndStaleOrConflictingDamageIsDropped()
     {

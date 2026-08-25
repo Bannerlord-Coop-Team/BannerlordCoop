@@ -14,6 +14,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -24,6 +25,7 @@ namespace Missions.Battles;
 /// <summary>Routes puppet damage to the client that owns the victim.</summary>
 public interface IBattleDamageRouter : IDisposable
 {
+    void Initialize(Mission mission);
     void Tick(float dt);
     void FlushForMissionEnd();
 }
@@ -41,6 +43,8 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IGuardedHitWindow guardedHitWindow;
     private readonly IAgentNativeMountState agentNativeMountState;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
+    private Mission mission;
+    private EventInfo missileRemovedEvent;
     private readonly Func<Agent, bool?> mountAuthorityProbe;
     private readonly object inboundDamageGate = new();
     private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
@@ -188,6 +192,21 @@ public class BattleDamageRouter : IBattleDamageRouter
         BattleSpawnGate.MountAuthorityProbe = mountAuthorityProbe;
     }
 
+    public void Initialize(Mission mission)
+    {
+        if (mission == null) throw new ArgumentNullException(nameof(mission));
+        if (this.mission != null)
+        {
+            if (!ReferenceEquals(this.mission, mission))
+                throw new InvalidOperationException("Battle damage router is already attached to another mission");
+            return;
+        }
+
+        this.mission = mission;
+        missileRemovedEvent = ResolveMissileRemovedEvent();
+        missileRemovedEvent.AddEventHandler(mission, (Action<int>)Handle_MissileRemoved);
+    }
+
     public void Dispose()
     {
         lock (inboundDamageGate)
@@ -199,6 +218,8 @@ public class BattleDamageRouter : IBattleDamageRouter
         }
 
         machineState.AuthorityChanged -= Handle_AuthorityChanged;
+        if (mission != null)
+            missileRemovedEvent.RemoveEventHandler(mission, (Action<int>)Handle_MissileRemoved);
         messageBroker.Unsubscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Unsubscribe<SiegeWeaponFired>(Handle_SiegeWeaponFired);
         messageBroker.Unsubscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
@@ -258,6 +279,26 @@ public class BattleDamageRouter : IBattleDamageRouter
             hostEpoch,
             authorityRevision,
             accepted);
+    }
+
+    private void Handle_MissileRemoved(int missileIndex)
+    {
+        siegeShotAuthorities.Remove(missileIndex);
+    }
+
+    private static EventInfo ResolveMissileRemovedEvent()
+    {
+        foreach (EventInfo missionEvent in typeof(Mission).GetEvents(
+                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+        {
+            if (missionEvent.Name == "OnMissileRemovedEvent"
+                && missionEvent.EventHandlerType == typeof(Action<int>))
+            {
+                return missionEvent;
+            }
+        }
+
+        throw new MissingMemberException(typeof(Mission).FullName, "OnMissileRemovedEvent");
     }
 
     public void Tick(float dt)

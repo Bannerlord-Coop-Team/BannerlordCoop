@@ -208,6 +208,12 @@ public class CoopBattleController : CoopMissionController
         base.Dispose();
     }
 
+    public override void OnBehaviorInitialize()
+    {
+        base.OnBehaviorInitialize();
+        damageRouter.Initialize(base.Mission);
+    }
+
     // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to
     // the behaviors only once Mission.IsLoadingFinished turned true, so this is the moment this client has
     // FINISHED LOADING the battle mission. Announce it so BattleHostHandler requests the host election —
