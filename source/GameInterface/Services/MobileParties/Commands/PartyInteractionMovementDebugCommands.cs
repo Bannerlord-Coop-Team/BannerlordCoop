@@ -268,11 +268,11 @@ internal static class PartyInteractionMovementDebugCommands
         MobilePartyMovementStatePatches.RunWithoutAutomaticBehaviorBroadcast(() =>
         {
             fixture.PlayerParty.SetMoveModeHold();
-            fixture.PlayerParty.SetNavigationModeHold();
-            fixture.PlayerParty.Ai.AiBehaviorInteractable = targetInteractable;
+            fixture.PlayerParty.SetShortTermBehavior(AiBehavior.GoToPoint, targetInteractable);
             fixture.PlayerParty.Ai.BehaviorTarget = interactionPosition;
             fixture.PlayerParty.Position = interactionPosition;
             fixture.PlayerParty.TargetPosition = interactionPosition;
+            fixture.PlayerParty.SetNavigationModeHold();
             fixture.PlayerParty.MoveTargetPoint = interactionPosition;
             fixture.PlayerParty.NextTargetPosition = interactionPosition;
         });
@@ -283,7 +283,7 @@ internal static class PartyInteractionMovementDebugCommands
             ReferenceEquals(fixture.PlayerParty.Ai?.AiBehaviorInteractable, fixture.TargetParty.Party);
         bool preCommandEncounterSafe =
             fixture.PlayerParty.DefaultBehavior == AiBehavior.Hold &&
-            fixture.PlayerParty.ShortTermBehavior == AiBehavior.Hold &&
+            fixture.PlayerParty.ShortTermBehavior == AiBehavior.GoToPoint &&
             fixture.PlayerParty.PartyMoveMode == MoveModeType.Hold &&
             fixture.PlayerParty.TargetParty == null;
         bool stagedBehaviorSnapshotVerified =
