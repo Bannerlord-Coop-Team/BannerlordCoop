@@ -21,7 +21,7 @@ namespace Missions.Agents.Packets
 
         [ProtoMember(1)]
         public string IdentityScopeId { get; }
-        [ProtoMember(2)]
+        [ProtoMember(2, IsPacked = true)]
         public ushort[] MountIds { get; }
         [ProtoMember(3)]
         public AgentMountData[] Mounts { get; }

@@ -6,23 +6,10 @@ namespace GameInterface.Surrogates;
 [ProtoContract]
 internal struct Vec3Surrogate
 {
-    [ProtoMember(1)]
-    public float X { get; set; }
+    [ProtoMember(1, IsPacked = true)] public float[] V;
 
-    [ProtoMember(2)]
-    public float Y { get; set; }
-
-    [ProtoMember(3)]
-    public float Z { get; set; }
-
-    public Vec3Surrogate(Vec3 v)
-    {
-        X = v.x;
-        Y = v.y;
-        Z = v.z;
-    }
-
-    public static implicit operator Vec3Surrogate(Vec3 v) => new Vec3Surrogate(v);
-
-    public static implicit operator Vec3(Vec3Surrogate s) => new Vec3(s.X, s.Y, s.Z);
+    public static implicit operator Vec3Surrogate(Vec3 v)
+        => new Vec3Surrogate { V = new[] { v.X, v.Y, v.Z } };
+    public static implicit operator Vec3(Vec3Surrogate s)
+        => new Vec3(s.V[0], s.V[1], s.V[2]);
 }
