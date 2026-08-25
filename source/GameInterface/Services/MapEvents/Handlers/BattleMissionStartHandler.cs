@@ -8,6 +8,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -290,12 +291,18 @@ internal class BattleMissionStartHandler : IHandler
         {
             if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
                 !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
-                mapEvent.FindMapEventParty(party.Party) == null)
+                mapEvent.FindMapEventParty(party.Party, out var side) is not MapEventParty mapEventParty ||
+                !objectManager.TryGetIdWithLogging(side, out var sideId) ||
+                !objectManager.TryGetIdWithLogging(mapEventParty, out var mapEventPartyId))
             {
                 continue;
             }
 
-            participants.Add(new MissionParticipant(player.ControllerId, peer));
+            participants.Add(new MissionParticipant(
+                player.ControllerId,
+                peer,
+                sideId,
+                mapEventPartyId));
         }
 
         return participants;
@@ -322,18 +329,33 @@ internal class BattleMissionStartHandler : IHandler
         }
 
         foreach (var participant in participants)
+        {
+            // Replay the recipient's authoritative membership first. The ordered channel and
+            // idempotent client attachment make it present before the mission-start guard runs.
+            network.Send(participant.Peer, new NetworkAddBattleParty(
+                participant.MapEventSideId,
+                participant.MapEventPartyId));
             network.Send(participant.Peer, message);
+        }
     }
 
     private sealed class MissionParticipant
     {
         public string ControllerId { get; }
         public NetPeer Peer { get; }
+        public string MapEventSideId { get; }
+        public string MapEventPartyId { get; }
 
-        public MissionParticipant(string controllerId, NetPeer peer)
+        public MissionParticipant(
+            string controllerId,
+            NetPeer peer,
+            string mapEventSideId,
+            string mapEventPartyId)
         {
             ControllerId = controllerId;
             Peer = peer;
+            MapEventSideId = mapEventSideId;
+            MapEventPartyId = mapEventPartyId;
         }
     }
 
