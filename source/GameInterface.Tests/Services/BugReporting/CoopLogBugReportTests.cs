@@ -1,6 +1,12 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.BugReporting;
+using GameInterface.Services.BugReporting.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.UI.BugReporting;
+using Moq;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -56,7 +62,7 @@ public class CoopLogBugReportTests : IDisposable
         var logBytes = Compress("client diagnostic\n");
         var serverLogBytes = Compress("server diagnostic\n");
         var requestId = Guid.NewGuid().ToString("N");
-        var builder = new BugReportArchiveBuilder(tempRoot);
+        using var builder = new BugReportArchiveBuilder(tempRoot);
         var contents = new BugReportArchiveContents(
             requestId,
             "network-client-1",
@@ -123,10 +129,49 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
+    public void CollectionBuffer_ReservesAggregateLimitBeforeAllocatingClientLog()
+    {
+        Assert.True(BugReportService.CanReserveCompressedBytes(
+            BugReportService.MaximumCombinedCompressedBytes - 1,
+            1));
+        Assert.False(BugReportService.CanReserveCompressedBytes(
+            BugReportService.MaximumCombinedCompressedBytes,
+            1));
+        Assert.Equal(4 * 1024, NetworkBugReportLogChunk.ChunkSize);
+    }
+
+    [Fact]
+    public void PrepareContents_WithNoClientLogs_StillCapturesServerLog()
+    {
+        var compressed = Compress("server diagnostic\n");
+        var snapshot = new CoopLogSnapshot(
+            compressed,
+            Encoding.UTF8.GetByteCount("server diagnostic\n"));
+        var snapshotProvider = new Mock<ICoopLogSnapshotProvider>();
+        snapshotProvider.Setup(value => value.TryCapture(out snapshot)).Returns(true);
+        using var cancellation = new CancellationTokenSource();
+        using var service = new BugReportService(
+            Mock.Of<IMessageBroker>(),
+            Mock.Of<INetwork>(),
+            Mock.Of<IPlayerManager>(),
+            Mock.Of<IBugReportLogSharingPreference>(),
+            snapshotProvider.Object,
+            Mock.Of<IBugReportArchiveBuilder>(),
+            new BugReportLogValidator(),
+            Mock.Of<IBugReportUploader>(),
+            cancellation);
+
+        var contents = service.PrepareContents(CreateEmptyArchiveContents());
+
+        Assert.NotNull(contents.ServerLog);
+        Assert.Equal(compressed, contents.ServerLog.CompressedData);
+    }
+
+    [Fact]
     public void Archive_DeletesOldestPendingReportWhenCountQuotaIsReached()
     {
         Directory.CreateDirectory(tempRoot);
-        var builder = new BugReportArchiveBuilder(
+        using var builder = new BugReportArchiveBuilder(
             tempRoot,
             maximumPendingArchiveCount: 2,
             maximumPendingArchiveBytes: long.MaxValue);
@@ -147,7 +192,7 @@ public class CoopLogBugReportTests : IDisposable
     public void Archive_RejectsReportLargerThanPendingByteQuota()
     {
         Directory.CreateDirectory(tempRoot);
-        var builder = new BugReportArchiveBuilder(
+        using var builder = new BugReportArchiveBuilder(
             tempRoot,
             maximumPendingArchiveCount: 2,
             maximumPendingArchiveBytes: 1);
@@ -157,13 +202,50 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
+    public void Archive_PeriodicallyDeletesExpiredReportWithoutAnotherCreate()
+    {
+        Directory.CreateDirectory(tempRoot);
+        using var builder = new BugReportArchiveBuilder(
+            tempRoot,
+            pendingArchiveRetention: TimeSpan.FromMilliseconds(20),
+            cleanupInterval: TimeSpan.FromMilliseconds(20));
+        var path = builder.Create(CreateEmptyArchiveContents());
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(-1));
+
+        Assert.True(SpinWait.SpinUntil(() => !File.Exists(path), TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
+    public void Archive_LockedExpiredReportDoesNotBlockOtherCleanup()
+    {
+        Directory.CreateDirectory(tempRoot);
+        var lockedPath = Path.Combine(tempRoot, "bug_report_locked.zip");
+        var removablePath = Path.Combine(tempRoot, "bug_report_removable.zip");
+        File.WriteAllText(lockedPath, "locked");
+        File.WriteAllText(removablePath, "removable");
+        File.SetLastWriteTimeUtc(lockedPath, DateTime.UtcNow.AddDays(-2));
+        File.SetLastWriteTimeUtc(removablePath, DateTime.UtcNow.AddDays(-2));
+
+        using (new FileStream(lockedPath, FileMode.Open, FileAccess.Read, FileShare.None))
+        using (var builder = new BugReportArchiveBuilder(
+                   tempRoot,
+                   pendingArchiveRetention: TimeSpan.FromDays(1)))
+        {
+            Assert.True(File.Exists(lockedPath));
+            Assert.False(File.Exists(removablePath));
+        }
+    }
+
+    [Fact]
     public async Task Uploader_PostsJsonWithReporterServerLogAndClientLogs()
     {
         var handler = new RecordingHttpHandler();
         using var httpClient = new HttpClient(handler);
+        const string authorizationToken = "server-bound-token";
         using var uploader = new BugReportUploader(
             httpClient,
-            "https://bug-reports.example.test/api/v1/reports");
+            "https://bug-reports.example.test/api/v1/reports",
+            authorizationToken: authorizationToken);
         var serverLog = Compress("server diagnostic\n");
         var clientLog = Compress("client diagnostic\n");
         var report = new BugReportArchiveContents(
@@ -192,7 +274,8 @@ public class CoopLogBugReportTests : IDisposable
         Assert.True(result.Uploaded);
         Assert.Equal("application/json; charset=utf-8", handler.ContentType);
         Assert.Equal(BugReportUploader.SupabasePublishableKey, handler.ApiKey);
-        Assert.Equal("Bearer " + BugReportUploader.SupabasePublishableKey, handler.Authorization);
+        Assert.Equal("Bearer " + authorizationToken, handler.Authorization);
+        Assert.Equal(report.RequestId, handler.IdempotencyKey);
         using var json = JsonDocument.Parse(handler.Body);
         var root = json.RootElement;
         Assert.Equal("network-client-1", root.GetProperty("reportingClientNetworkId").GetString());
@@ -209,14 +292,35 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
-    public void Uploader_UsesConfiguredSupabaseEndpoint()
+    public void Uploader_RequiresServerAuthorizationForSupabaseEndpoint()
     {
-        using var uploader = new BugReportUploader();
+        using var httpClient = new HttpClient(new RecordingHttpHandler());
+        using var uploader = new BugReportUploader(httpClient);
 
-        Assert.True(uploader.IsConfigured);
+        Assert.False(uploader.IsConfigured);
         Assert.Equal(
             "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/create-github-issue-bug-report",
             BugReportUploader.Endpoint);
+    }
+
+    [Fact]
+    public void Uploader_DoesNotTreatPublishableKeyAsServerAuthorization()
+    {
+        using var httpClient = new HttpClient(new RecordingHttpHandler());
+        using var uploader = new BugReportUploader(
+            httpClient,
+            authorizationToken: BugReportUploader.SupabasePublishableKey);
+
+        Assert.False(uploader.IsConfigured);
+    }
+
+    [Fact]
+    public void Uploader_EnforcesCompressedReportLimitBeforeJsonEncoding()
+    {
+        Assert.True(BugReportUploader.IsWithinCompressedLogLimit(
+            BugReportUploader.MaximumCompressedReportBytes));
+        Assert.False(BugReportUploader.IsWithinCompressedLogLimit(
+            (long)BugReportUploader.MaximumCompressedReportBytes + 1));
     }
 
     public void Dispose()
@@ -274,6 +378,7 @@ public class CoopLogBugReportTests : IDisposable
         public string ContentType { get; private set; }
         public string ApiKey { get; private set; }
         public string Authorization { get; private set; }
+        public string IdempotencyKey { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -282,6 +387,7 @@ public class CoopLogBugReportTests : IDisposable
             ContentType = request.Content.Headers.ContentType.ToString();
             ApiKey = string.Join(string.Empty, request.Headers.GetValues("apikey"));
             Authorization = request.Headers.Authorization?.ToString();
+            IdempotencyKey = string.Join(string.Empty, request.Headers.GetValues("Idempotency-Key"));
             Body = await request.Content.ReadAsStringAsync();
             return new HttpResponseMessage(HttpStatusCode.OK)
             {

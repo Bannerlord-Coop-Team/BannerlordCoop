@@ -28,7 +28,8 @@ public class BugReportLogSharingPreference : IBugReportLogSharingPreference
                    BugReportConsentCoordinator.TabId,
                    BugReportConsentCoordinator.SectionId,
                    out BugReportConsentOptions saved) &&
-               saved.ShareBugReportLogs == true;
+               saved.ShareBugReportLogs == true &&
+               saved.DisclosureVersion == BugReportConsentCoordinator.CurrentDisclosureVersion;
     }
 
     public void SetEnabled(bool enabled)
@@ -37,7 +38,11 @@ public class BugReportLogSharingPreference : IBugReportLogSharingPreference
         options.SetSection(
             BugReportConsentCoordinator.TabId,
             BugReportConsentCoordinator.SectionId,
-            new BugReportConsentOptions { ShareBugReportLogs = enabled });
+            new BugReportConsentOptions
+            {
+                ShareBugReportLogs = enabled,
+                DisclosureVersion = BugReportConsentCoordinator.CurrentDisclosureVersion,
+            });
         optionsStore.Save(options);
     }
 }

@@ -19,6 +19,12 @@ public class BugReportConsentTests
         Assert.Contains("Saves, configuration files, and memory dumps are not included",
             BugReportConsentCoordinator.PromptText);
         Assert.Contains("cancel this bug report", BugReportSubmissionConsent.PromptText);
+        Assert.Contains("public GitHub issue", BugReportConsentCoordinator.PromptText);
+        Assert.Contains("publicly accessible links", BugReportConsentCoordinator.PromptText);
+        Assert.Contains("remote deletion or expiry is not guaranteed", BugReportConsentCoordinator.PromptText);
+        Assert.Contains("public GitHub issue", BugReportSubmissionConsent.PromptText);
+        Assert.Contains("publicly accessible links", BugReportSubmissionConsent.PromptText);
+        Assert.Contains("remote deletion or expiry is not guaranteed", BugReportSubmissionConsent.PromptText);
     }
 
     [Theory]
@@ -39,6 +45,25 @@ public class BugReportConsentTests
 
         var preference = new BugReportLogSharingPreference(store);
         Assert.Equal(enabled, preference.IsEnabled());
+    }
+
+    [Fact]
+    public void LegacyConsentWithoutPublicDisclosure_IsDisabledAndPromptedAgain()
+    {
+        var store = new TestOptionsStore();
+        var options = store.LoadOrDefault();
+        options.SetSection(
+            BugReportConsentCoordinator.TabId,
+            BugReportConsentCoordinator.SectionId,
+            new BugReportConsentOptions { ShareBugReportLogs = true });
+        store.Save(options);
+        var coordinator = new BugReportConsentCoordinator(store, _ => { });
+        InquiryData inquiry = null;
+
+        coordinator.TryShowPrompt(true, value => inquiry = value);
+
+        Assert.NotNull(inquiry);
+        Assert.False(new BugReportLogSharingPreference(store).IsEnabled());
     }
 
     [Fact]

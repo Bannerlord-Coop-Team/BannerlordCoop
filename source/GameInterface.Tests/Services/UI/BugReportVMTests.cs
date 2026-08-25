@@ -26,6 +26,16 @@ public class BugReportVMTests
     }
 
     [Fact]
+    public void Disclosure_ExplainsPublicIssueAndLogLinks()
+    {
+        var viewModel = new BugReportVM((_, _) => true);
+
+        Assert.Contains("public GitHub issue", viewModel.DisclosureText);
+        Assert.Contains("public links", viewModel.DisclosureText);
+        Assert.Contains("no guaranteed remote expiry", viewModel.DisclosureText);
+    }
+
+    [Fact]
     public void Submit_WithMissingDescription_ShowsValidationAndDoesNotSend()
     {
         var submitted = false;

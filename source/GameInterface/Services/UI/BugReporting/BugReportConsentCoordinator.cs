@@ -10,11 +10,14 @@ public class BugReportConsentCoordinator
 {
     public const string TabId = "BugReporting";
     public const string SectionId = "BugReportLogSharingConsent";
+    public const int CurrentDisclosureVersion = 2;
     public const string PromptTitle = "Share Co-op Diagnostic Logs?";
     public const string PromptText =
         "When the dedicated server creates a diagnostic bug report, allow this client's current " +
         "BannerlordCoop log to be sent to the dedicated server, packaged with logs from other consenting " +
-        "clients, and submitted to BannerlordCoop's bug-report service? Reports may be triggered " +
+        "clients, and submitted to BannerlordCoop's bug-report service? Reports create a public GitHub " +
+        "issue containing the reporting player's network ID. Included server and client logs are uploaded " +
+        "to publicly accessible links, and remote deletion or expiry is not guaranteed. Reports may be triggered " +
         "automatically by recovery actions such as the coop unstuck command. Logs may contain " +
         "player names, Steam IDs, IP addresses, file paths, and gameplay or network details. Runtime " +
         "command arguments and common credential values are redacted. Saves, configuration files, " +
@@ -67,7 +70,9 @@ public class BugReportConsentCoordinator
             SectionId,
             out BugReportConsentOptions saved))
         {
-            decision = saved.ShareBugReportLogs;
+            decision = saved.DisclosureVersion == CurrentDisclosureVersion
+                ? saved.ShareBugReportLogs
+                : null;
         }
     }
 
@@ -80,7 +85,11 @@ public class BugReportConsentCoordinator
             options.SetSection(
                 TabId,
                 SectionId,
-                new BugReportConsentOptions { ShareBugReportLogs = enabled });
+                new BugReportConsentOptions
+                {
+                    ShareBugReportLogs = enabled,
+                    DisclosureVersion = CurrentDisclosureVersion,
+                });
             optionsStore.Save(options);
         }
         catch (Exception exception)
@@ -95,4 +104,7 @@ public class BugReportConsentOptions
 {
     [JsonPropertyName("shareBugReportLogs")]
     public bool? ShareBugReportLogs { get; set; }
+
+    [JsonPropertyName("disclosureVersion")]
+    public int? DisclosureVersion { get; set; }
 }

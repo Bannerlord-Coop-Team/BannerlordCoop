@@ -6,6 +6,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace GameInterface.Services.BugReporting;
 
@@ -132,7 +133,7 @@ public sealed class BugReportArchiveContents
 }
 
 /// <summary>Creates and retains server-side diagnostic report archives.</summary>
-public interface IBugReportArchiveBuilder
+public interface IBugReportArchiveBuilder : IDisposable
 {
     string Create(BugReportArchiveContents contents);
 }
@@ -143,9 +144,14 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
     private const int MaximumPendingArchiveCount = 20;
     private const long MaximumPendingArchiveBytes = 256L * 1024 * 1024;
     private static readonly TimeSpan PendingArchiveRetention = TimeSpan.FromDays(7);
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
     private readonly string outputDirectory;
     private readonly int maximumPendingArchiveCount;
     private readonly long maximumPendingArchiveBytes;
+    private readonly TimeSpan pendingArchiveRetention;
+    private readonly object archiveGate = new object();
+    private readonly Timer cleanupTimer;
+    private int disposed;
 
     public BugReportArchiveBuilder() : this(Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -158,7 +164,9 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
     internal BugReportArchiveBuilder(
         string outputDirectory,
         int maximumPendingArchiveCount = MaximumPendingArchiveCount,
-        long maximumPendingArchiveBytes = MaximumPendingArchiveBytes)
+        long maximumPendingArchiveBytes = MaximumPendingArchiveBytes,
+        TimeSpan? pendingArchiveRetention = null,
+        TimeSpan? cleanupInterval = null)
     {
         if (string.IsNullOrWhiteSpace(outputDirectory))
             throw new ArgumentException("Output directory cannot be empty.", nameof(outputDirectory));
@@ -166,13 +174,37 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
             throw new ArgumentOutOfRangeException(nameof(maximumPendingArchiveCount));
         if (maximumPendingArchiveBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(maximumPendingArchiveBytes));
+        if (pendingArchiveRetention.HasValue && pendingArchiveRetention.Value <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(pendingArchiveRetention));
+        if (cleanupInterval.HasValue && cleanupInterval.Value <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(cleanupInterval));
 
         this.outputDirectory = Path.GetFullPath(outputDirectory);
         this.maximumPendingArchiveCount = maximumPendingArchiveCount;
         this.maximumPendingArchiveBytes = maximumPendingArchiveBytes;
+        this.pendingArchiveRetention = pendingArchiveRetention ?? PendingArchiveRetention;
+        RunCleanup();
+        var interval = cleanupInterval ?? CleanupInterval;
+        cleanupTimer = new Timer(_ => RunCleanup(), null, interval, interval);
     }
 
     public string Create(BugReportArchiveContents contents)
+    {
+        lock (archiveGate)
+        {
+            if (Volatile.Read(ref disposed) != 0)
+                throw new ObjectDisposedException(nameof(BugReportArchiveBuilder));
+            return CreateCore(contents);
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        cleanupTimer.Dispose();
+    }
+
+    private string CreateCore(BugReportArchiveContents contents)
     {
         if (contents == null) throw new ArgumentNullException(nameof(contents));
         if (!Guid.TryParseExact(contents.RequestId, "N", out _))
@@ -220,21 +252,47 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
         }
     }
 
+    private void RunCleanup()
+    {
+        if (Volatile.Read(ref disposed) != 0) return;
+
+        lock (archiveGate)
+        {
+            if (Volatile.Read(ref disposed) != 0) return;
+            PruneExpiredArchives();
+        }
+    }
+
     private void PruneExpiredArchives()
     {
+        string[] paths;
         try
         {
-            var cutoff = DateTime.UtcNow - PendingArchiveRetention;
-            foreach (var path in Directory.EnumerateFiles(outputDirectory, "bug_report_*.zip"))
-            {
-                if (File.GetLastWriteTimeUtc(path) < cutoff) File.Delete(path);
-            }
+            if (!Directory.Exists(outputDirectory)) return;
+            paths = Directory.GetFiles(outputDirectory, "bug_report_*.zip");
         }
         catch (IOException)
         {
+            return;
         }
         catch (UnauthorizedAccessException)
         {
+            return;
+        }
+
+        var cutoff = DateTime.UtcNow - pendingArchiveRetention;
+        foreach (var path in paths)
+        {
+            try
+            {
+                if (File.GetLastWriteTimeUtc(path) < cutoff) File.Delete(path);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
         }
     }
 

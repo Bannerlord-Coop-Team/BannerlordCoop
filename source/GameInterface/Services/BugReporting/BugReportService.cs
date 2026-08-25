@@ -10,7 +10,6 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -32,8 +31,8 @@ public interface IBugReportService
 /// <inheritdoc />
 internal class BugReportService : IBugReportService, IDisposable
 {
-    private const int MaximumCompressedLogBytes = 32 * 1024 * 1024;
-    private const int MaximumCombinedCompressedBytes = 512 * 1024 * 1024;
+    private const int MaximumCompressedLogBytes = CoopLogSnapshotProvider.MaximumCompressedLogBytes;
+    internal const int MaximumCombinedCompressedBytes = 8 * 1024 * 1024;
     private static readonly TimeSpan CollectionTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan MinimumCollectionInterval = TimeSpan.FromMinutes(5);
     private static readonly ILogger Logger = LogManager.GetLogger<BugReportService>();
@@ -332,36 +331,38 @@ internal class BugReportService : IBugReportService, IDisposable
 
         if (cancellationToken.IsCancellationRequested || Volatile.Read(ref disposed) != 0) return;
 
-        GameThread.RunSafe(() =>
+        try
         {
-            try
+            if (snapshot == null)
             {
-                if (cancellationToken.IsCancellationRequested || Volatile.Read(ref disposed) != 0) return;
-
-                if (snapshot == null)
-                {
-                    network.SendAll(new NetworkBugReportLogUnavailable(requestId, reason));
-                    return;
-                }
-
-                SendSnapshot(requestId, snapshot);
+                SendOnGameThread(new NetworkBugReportLogUnavailable(requestId, reason));
+                return;
             }
-            finally
+
+            SendSnapshotPaced(requestId, snapshot);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            Logger.Warning(exception, "Sending the local co-op log for a bug report failed");
+        }
+        finally
+        {
+            lock (clientRequestGate)
             {
-                lock (clientRequestGate)
-                {
-                    clientRequests.Remove(requestId);
-                }
+                clientRequests.Remove(requestId);
             }
-        }, context: nameof(BugReportService));
+        }
     }
 
-    private void SendSnapshot(string requestId, CoopLogSnapshot snapshot)
+    private void SendSnapshotPaced(string requestId, CoopLogSnapshot snapshot)
     {
         var compressed = snapshot.CompressedData;
         if (compressed == null || compressed.Length == 0 || compressed.Length > MaximumCompressedLogBytes)
         {
-            network.SendAll(new NetworkBugReportLogUnavailable(
+            SendOnGameThread(new NetworkBugReportLogUnavailable(
                 requestId,
                 BugReportLogUnavailableReason.CaptureFailed));
             return;
@@ -371,19 +372,30 @@ internal class BugReportService : IBugReportService, IDisposable
                          NetworkBugReportLogChunk.ChunkSize;
         for (var chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
         {
+            if (cancellationToken.IsCancellationRequested || Volatile.Read(ref disposed) != 0)
+                return;
+
             var offset = chunkIndex * NetworkBugReportLogChunk.ChunkSize;
             var length = Math.Min(NetworkBugReportLogChunk.ChunkSize, compressed.Length - offset);
             var data = new byte[length];
             Buffer.BlockCopy(compressed, offset, data, 0, length);
-
-            network.SendAll(new NetworkBugReportLogChunk(
+            var chunk = new NetworkBugReportLogChunk(
                 requestId,
                 chunkIndex,
                 chunkCount,
                 compressed.Length,
                 snapshot.UncompressedLength,
-                data));
+                data);
+            SendOnGameThread(chunk);
         }
+    }
+
+    private void SendOnGameThread<T>(T message) where T : IMessage
+    {
+        GameThread.Run(
+            () => network.SendAll(message),
+            blocking: true,
+            label: nameof(BugReportService));
     }
 
     private void Handle_NetworkBugReportLogChunk(
@@ -403,6 +415,7 @@ internal class BugReportService : IBugReportService, IDisposable
 
             if (!TryAppendChunk(collection, client, payload.What))
             {
+                ReleaseClientBuffer(collection, client);
                 client.Responded = true;
                 client.Status = ClientCollectionStatus.Failed;
             }
@@ -434,9 +447,19 @@ internal class BugReportService : IBugReportService, IDisposable
 
         if (client.NextChunkIndex == 0)
         {
+            var expectedChunks = (chunk.CompressedLength + NetworkBugReportLogChunk.ChunkSize - 1) /
+                                 NetworkBugReportLogChunk.ChunkSize;
+            if (chunk.ChunkCount != expectedChunks ||
+                !CanReserveCompressedBytes(collection.BufferedBytes, chunk.CompressedLength))
+            {
+                return false;
+            }
+
             client.ChunkCount = chunk.ChunkCount;
             client.CompressedLength = chunk.CompressedLength;
             client.UncompressedLength = chunk.UncompressedLength;
+            client.Data = new byte[chunk.CompressedLength];
+            collection.BufferedBytes += chunk.CompressedLength;
         }
         else if (client.ChunkCount != chunk.ChunkCount ||
                  client.CompressedLength != chunk.CompressedLength ||
@@ -445,21 +468,38 @@ internal class BugReportService : IBugReportService, IDisposable
             return false;
         }
 
-        if (client.Data.Length + chunk.Data.Length > client.CompressedLength) return false;
+        if (client.Data == null ||
+            client.BytesWritten + chunk.Data.Length > client.CompressedLength)
+        {
+            return false;
+        }
 
-        client.Data.Write(chunk.Data, 0, chunk.Data.Length);
+        Buffer.BlockCopy(chunk.Data, 0, client.Data, client.BytesWritten, chunk.Data.Length);
+        client.BytesWritten += chunk.Data.Length;
         client.NextChunkIndex++;
         if (client.NextChunkIndex != client.ChunkCount) return true;
-        if (client.Data.Length != client.CompressedLength) return false;
-
-        var combinedLength = collection.Clients.Values
-            .Where(item => item.Status == ClientCollectionStatus.Collected)
-            .Sum(item => (long)item.CompressedLength);
-        if (combinedLength + client.CompressedLength > MaximumCombinedCompressedBytes) return false;
+        if (client.BytesWritten != client.CompressedLength) return false;
 
         client.Responded = true;
         client.Status = ClientCollectionStatus.Collected;
         return true;
+    }
+
+    internal static bool CanReserveCompressedBytes(long bufferedBytes, int requestedBytes)
+    {
+        return bufferedBytes >= 0 && requestedBytes > 0 &&
+               bufferedBytes + requestedBytes <= MaximumCombinedCompressedBytes;
+    }
+
+    private static void ReleaseClientBuffer(
+        ActiveCollection collection,
+        ClientCollection client)
+    {
+        if (client.Data == null) return;
+
+        collection.BufferedBytes -= client.CompressedLength;
+        client.Data = null;
+        client.BytesWritten = 0;
     }
 
     private void Handle_NetworkBugReportLogUnavailable(
@@ -484,6 +524,7 @@ internal class BugReportService : IBugReportService, IDisposable
                 return;
             }
 
+            ReleaseClientBuffer(collection, client);
             client.Responded = true;
             client.Status = reason == BugReportLogUnavailableReason.ConsentNotGranted
                 ? ClientCollectionStatus.Declined
@@ -515,13 +556,24 @@ internal class BugReportService : IBugReportService, IDisposable
         collection.Finalizing = true;
         collection.Timer?.Dispose();
 
-        var logs = collection.Clients.Values
-            .Where(client => client.Status == ClientCollectionStatus.Collected)
-            .Select(client => new CollectedBugReportLog(
-                client.ClientNumber,
-                client.Data.ToArray(),
-                client.UncompressedLength))
-            .ToArray();
+        var logs = new List<CollectedBugReportLog>();
+        foreach (var client in collection.Clients.Values)
+        {
+            if (client.Status == ClientCollectionStatus.Collected)
+            {
+                logs.Add(new CollectedBugReportLog(
+                    client.ClientNumber,
+                    client.Data,
+                    client.UncompressedLength));
+                client.Data = null;
+            }
+            else
+            {
+                ReleaseClientBuffer(collection, client);
+            }
+        }
+        collection.BufferedBytes = 0;
+
         var timedOutClients = timedOut
             ? collection.Clients.Values.Count(client => !client.Responded)
             : 0;
@@ -560,53 +612,12 @@ internal class BugReportService : IBugReportService, IDisposable
 
     private async Task PackageAndUploadCoreAsync(FinalizedCollection finalized)
     {
-        if (finalized.Contents.Logs.Count == 0 && finalized.Contents.Submissions.Count == 0)
-        {
-            SendResult(finalized, "No clients provided a diagnostic log for the bug report.");
-            return;
-        }
-
-        string archivePath = null;
-        string clientMessage;
+        BugReportArchiveContents contents;
         try
         {
-            var contents = await Task.Run(
-                () => CaptureServerLog(ValidateClientLogs(finalized.Contents)),
+            contents = await Task.Run(
+                () => PrepareContents(finalized.Contents),
                 cancellationToken).ConfigureAwait(false);
-            archivePath = await Task.Run(
-                () => archiveBuilder.Create(contents),
-                cancellationToken).ConfigureAwait(false);
-
-            Logger.Information(
-                "Created diagnostic bug-report archive {RequestId} at {ArchivePath}",
-                contents.RequestId,
-                archivePath);
-
-            var upload = await uploader.UploadAsync(
-                contents,
-                cancellationToken).ConfigureAwait(false);
-
-            if (upload.Uploaded)
-            {
-                TryDelete(archivePath);
-                clientMessage = "The bug report and available diagnostic logs were submitted.";
-                Logger.Information("Uploaded diagnostic bug report {RequestId}", finalized.Contents.RequestId);
-            }
-            else if (!upload.EndpointConfigured)
-            {
-                clientMessage = "The bug report was packaged on the server; the upload endpoint is not configured yet.";
-                Logger.Information(
-                    "Diagnostic bug report {RequestId} was not uploaded because the endpoint is not configured",
-                    finalized.Contents.RequestId);
-            }
-            else
-            {
-                clientMessage = "The bug report was packaged, but its upload failed.";
-                Logger.Warning(
-                    "Uploading diagnostic bug report {RequestId} failed: {Details}",
-                    finalized.Contents.RequestId,
-                    upload.Details);
-            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -614,11 +625,85 @@ internal class BugReportService : IBugReportService, IDisposable
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "Packaging the diagnostic bug report failed");
-            clientMessage = "The server could not package the bug report.";
+            Logger.Error(exception, "Preparing the diagnostic bug report failed");
+            SendResult(finalized, "The server could not prepare the bug report.");
+            return;
         }
 
-        SendResult(finalized, clientMessage);
+        if (contents.ServerLog == null &&
+            contents.Logs.Count == 0 &&
+            contents.Submissions.Count == 0)
+        {
+            SendResult(finalized, "No diagnostic logs were available for the bug report.");
+            return;
+        }
+
+        BugReportUploadResult upload;
+        try
+        {
+            upload = await uploader.UploadAsync(contents, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            Logger.Warning(exception, "Uploading diagnostic bug report {RequestId} failed", contents.RequestId);
+            upload = new BugReportUploadResult(false, true, exception.Message);
+        }
+
+        if (upload.Uploaded)
+        {
+            Logger.Information("Uploaded diagnostic bug report {RequestId}", contents.RequestId);
+            SendResult(finalized, "The bug report and available diagnostic logs were submitted.");
+            return;
+        }
+
+        string archivePath;
+        try
+        {
+            archivePath = await Task.Run(
+                () => archiveBuilder.Create(contents),
+                cancellationToken).ConfigureAwait(false);
+            Logger.Information(
+                "Created diagnostic bug-report fallback archive {RequestId} at {ArchivePath}",
+                contents.RequestId,
+                archivePath);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Saving the diagnostic bug-report fallback failed");
+            SendResult(finalized, upload.EndpointConfigured
+                ? "The bug-report upload failed and its local fallback could not be saved."
+                : "Bug-report uploads are not configured and the local fallback could not be saved.");
+            return;
+        }
+
+        if (!upload.EndpointConfigured)
+        {
+            Logger.Information(
+                "Diagnostic bug report {RequestId} was not uploaded because authorization is not configured",
+                contents.RequestId);
+            SendResult(finalized, "The bug report was saved on the server; upload authorization is not configured.");
+        }
+        else
+        {
+            Logger.Warning(
+                "Uploading diagnostic bug report {RequestId} failed: {Details}",
+                contents.RequestId,
+                upload.Details);
+            SendResult(finalized, "The bug-report upload failed, so it was saved on the server.");
+        }
+    }
+
+    internal BugReportArchiveContents PrepareContents(BugReportArchiveContents contents)
+    {
+        return CaptureServerLog(ValidateClientLogs(contents));
     }
 
     private BugReportArchiveContents ValidateClientLogs(BugReportArchiveContents contents)
@@ -677,20 +762,6 @@ internal class BugReportService : IBugReportService, IDisposable
             context: nameof(BugReportService));
     }
 
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
-
     private enum ClientCollectionStatus
     {
         Pending,
@@ -702,7 +773,8 @@ internal class BugReportService : IBugReportService, IDisposable
     private sealed class ClientCollection
     {
         public int ClientNumber { get; }
-        public MemoryStream Data { get; } = new MemoryStream();
+        public byte[] Data { get; set; }
+        public int BytesWritten { get; set; }
         public int NextChunkIndex { get; set; }
         public int ChunkCount { get; set; }
         public int CompressedLength { get; set; }
@@ -727,6 +799,7 @@ internal class BugReportService : IBugReportService, IDisposable
         public HashSet<NetPeer> Requesters { get; } = new HashSet<NetPeer>();
         public Timer Timer { get; set; }
         public bool Finalizing { get; set; }
+        public long BufferedBytes { get; set; }
 
         public ActiveCollection(
             string requestId,

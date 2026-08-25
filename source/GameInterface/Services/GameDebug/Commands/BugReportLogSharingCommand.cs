@@ -42,12 +42,7 @@ public class BugReportLogSharingCommand
 
         try
         {
-            var options = store.LoadOrDefault();
-            options.SetSection(
-                BugReportConsentCoordinator.TabId,
-                BugReportConsentCoordinator.SectionId,
-                new BugReportConsentOptions { ShareBugReportLogs = enabled });
-            store.Save(options);
+            preference.SetEnabled(enabled);
             return enabled
                 ? "Diagnostic bug-report log sharing enabled."
                 : "Diagnostic bug-report log sharing disabled.";

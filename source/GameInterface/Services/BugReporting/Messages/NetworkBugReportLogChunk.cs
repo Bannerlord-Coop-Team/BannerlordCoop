@@ -9,7 +9,7 @@ namespace GameInterface.Services.BugReporting.Messages;
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkBugReportLogChunk : ICommand
 {
-    public const int ChunkSize = 64 * 1024;
+    public const int ChunkSize = 4 * 1024;
 
     [ProtoMember(1)]
     public string RequestId { get; }

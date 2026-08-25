@@ -659,8 +659,9 @@ namespace Coop
 
         private void TryInitializeBugReportOverlay()
         {
-            if (isServer || Game.Current == null || bugReportOverlay != null ||
-                !ContainerProvider.TryResolve(out IBugReportOverlay overlay))
+            if (isServer || Game.Current == null ||
+                !ContainerProvider.TryResolve(out IBugReportOverlay overlay) ||
+                ReferenceEquals(bugReportOverlay, overlay))
             {
                 return;
             }

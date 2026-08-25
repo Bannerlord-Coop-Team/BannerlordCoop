@@ -26,6 +26,8 @@ public class BugReportUploader : IBugReportUploader, IDisposable
     public const string Endpoint =
         "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/create-github-issue-bug-report";
     public const string SupabasePublishableKey = "sb_publishable_tseZMeJ-RYeSHI0KwU2p0g_PE4GVtN6";
+    public const string AuthorizationTokenEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_TOKEN";
+    internal const int MaximumCompressedReportBytes = 10 * 1024 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
@@ -35,16 +37,20 @@ public class BugReportUploader : IBugReportUploader, IDisposable
     private readonly HttpClient httpClient;
     private readonly string endpoint;
     private readonly string supabasePublishableKey;
+    private readonly string authorizationToken;
     private readonly bool ownsClient;
 
     public bool IsConfigured =>
         !new Uri(endpoint).Host.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase) &&
-        !string.IsNullOrWhiteSpace(supabasePublishableKey);
+        !string.IsNullOrWhiteSpace(supabasePublishableKey) &&
+        !string.IsNullOrWhiteSpace(authorizationToken) &&
+        !string.Equals(authorizationToken, supabasePublishableKey, StringComparison.Ordinal);
 
     public BugReportUploader() : this(
         new HttpClient { Timeout = TimeSpan.FromMinutes(2) },
         Endpoint,
         SupabasePublishableKey,
+        Environment.GetEnvironmentVariable(AuthorizationTokenEnvironmentVariable),
         true)
     {
     }
@@ -53,6 +59,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
         HttpClient httpClient,
         string endpoint = Endpoint,
         string supabasePublishableKey = SupabasePublishableKey,
+        string authorizationToken = null,
         bool ownsClient = false)
     {
         if (httpClient == null) throw new ArgumentNullException(nameof(httpClient));
@@ -61,6 +68,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
         this.httpClient = httpClient;
         this.endpoint = endpoint;
         this.supabasePublishableKey = supabasePublishableKey;
+        this.authorizationToken = authorizationToken;
         this.ownsClient = ownsClient;
     }
 
@@ -74,7 +82,15 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             return new BugReportUploadResult(
                 false,
                 false,
-                "The bug-report upload endpoint is not configured.");
+                "Bug-report upload authorization is not configured.");
+        }
+
+        if (!IsWithinCompressedLogLimit(GetCompressedLogBytes(report)))
+        {
+            return new BugReportUploadResult(
+                false,
+                true,
+                "The bug report exceeds the upload size limit.");
         }
 
         var json = JsonSerializer.Serialize(CreateRequest(report), JsonOptions);
@@ -83,7 +99,8 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             Content = new StringContent(json, Encoding.UTF8, "application/json"),
         };
         request.Headers.TryAddWithoutValidation("apikey", supabasePublishableKey);
-        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + supabasePublishableKey);
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + authorizationToken);
+        request.Headers.TryAddWithoutValidation("Idempotency-Key", report.RequestId);
         using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         var details = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
@@ -102,6 +119,19 @@ public class BugReportUploader : IBugReportUploader, IDisposable
     public void Dispose()
     {
         if (ownsClient) httpClient.Dispose();
+    }
+
+    internal static bool IsWithinCompressedLogLimit(long compressedBytes)
+    {
+        return compressedBytes >= 0 && compressedBytes <= MaximumCompressedReportBytes;
+    }
+
+    private static long GetCompressedLogBytes(BugReportArchiveContents report)
+    {
+        var bytes = report.ServerLog?.CompressedData?.LongLength ?? 0;
+        return report.Logs.Aggregate(
+            bytes,
+            (total, log) => total + (log?.CompressedData?.LongLength ?? 0));
     }
 
     private static BugReportJsonRequest CreateRequest(BugReportArchiveContents report)

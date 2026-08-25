@@ -29,7 +29,8 @@ public sealed class CoopLogSnapshot
 /// <inheritdoc />
 public class CoopLogSnapshotProvider : ICoopLogSnapshotProvider
 {
-    internal const int MaximumLogBytes = 31 * 1024 * 1024;
+    internal const int MaximumLogBytes = 8 * 1024 * 1024;
+    internal const int MaximumCompressedLogBytes = 1 * 1024 * 1024;
     private const string RuntimeArgumentsMarker = "#TW#Runtime#TW#Arguments#TW#";
     private const string CommandArgumentsMarker = "Command Args:";
 
@@ -80,6 +81,8 @@ public class CoopLogSnapshotProvider : ICoopLogSnapshotProvider
                     uncompressedLength += lineBytes;
                 }
             }
+
+            if (compressed.Length > MaximumCompressedLogBytes) return false;
 
             snapshot = new CoopLogSnapshot(compressed.ToArray(), uncompressedLength);
             return true;

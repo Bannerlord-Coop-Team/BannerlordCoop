@@ -32,8 +32,8 @@ internal sealed class BugReportVM : ViewModel
 
     [DataSourceProperty]
     public string DisclosureText =>
-        "Your network ID, summary, and description will be sent to the server. A redacted server log " +
-        "and current co-op logs from clients that enabled diagnostic sharing may also be included.";
+        "Your network ID, summary, and description will be published in a public GitHub issue. " +
+        "Included logs are available through public links, with no guaranteed remote expiry.";
 
     [DataSourceProperty]
     public string SummaryLabel => "Summary";
