@@ -1,10 +1,11 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.SiegeEvents;
 using ProtoBuf;
 
 namespace GameInterface.Services.SiegeEvents.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal record NetworkInitializeSiegeEvent : IEvent
+internal readonly struct NetworkInitializeSiegeEvent : IServerToClientCommand
 {
     [ProtoMember(1)]
     public string SiegeEventId { get; }
@@ -24,6 +25,24 @@ internal record NetworkInitializeSiegeEvent : IEvent
     [ProtoMember(6)]
     public string DefenderSiegeEnginesId { get; }
 
+    [ProtoMember(7)]
+    public long SiegeStartTimeTicks { get; }
+
+    [ProtoMember(8)]
+    public string BesiegerStrategyId { get; }
+
+    [ProtoMember(9)]
+    public int BesiegerTroopsKilled { get; }
+
+    [ProtoMember(10)]
+    public string[] BesiegerPartyIds { get; }
+
+    [ProtoMember(11)]
+    public SiegeEngineGraphSnapshot[] AttackerEngines { get; }
+
+    [ProtoMember(12)]
+    public SiegeEngineGraphSnapshot[] DefenderEngines { get; }
+
     public NetworkInitializeSiegeEvent(
         string siegeEventId,
         string settlementId,
@@ -38,5 +57,42 @@ internal record NetworkInitializeSiegeEvent : IEvent
         LeaderPartyId = leaderPartyId;
         AttackerSiegeEnginesId = attackerSiegeEnginesId;
         DefenderSiegeEnginesId = defenderSiegeEnginesId;
+        SiegeStartTimeTicks = 0;
+        BesiegerStrategyId = null;
+        BesiegerTroopsKilled = 0;
+        BesiegerPartyIds = null;
+        AttackerEngines = null;
+        DefenderEngines = null;
     }
+
+    public NetworkInitializeSiegeEvent(SiegeEventGraphSnapshot snapshot)
+        : this(
+            snapshot.SiegeEventId,
+            snapshot.SettlementId,
+            snapshot.BesiegerCampId,
+            snapshot.LeaderPartyId,
+            snapshot.AttackerSiegeEnginesId,
+            snapshot.DefenderSiegeEnginesId)
+    {
+        SiegeStartTimeTicks = snapshot.SiegeStartTimeTicks;
+        BesiegerStrategyId = snapshot.BesiegerStrategyId;
+        BesiegerTroopsKilled = snapshot.BesiegerTroopsKilled;
+        BesiegerPartyIds = snapshot.BesiegerPartyIds;
+        AttackerEngines = snapshot.AttackerEngines;
+        DefenderEngines = snapshot.DefenderEngines;
+    }
+
+    public SiegeEventGraphSnapshot ToSnapshot() => new SiegeEventGraphSnapshot(
+        SiegeEventId,
+        SettlementId,
+        BesiegerCampId,
+        LeaderPartyId,
+        AttackerSiegeEnginesId,
+        DefenderSiegeEnginesId,
+        SiegeStartTimeTicks,
+        BesiegerStrategyId,
+        BesiegerTroopsKilled,
+        BesiegerPartyIds,
+        AttackerEngines,
+        DefenderEngines);
 }

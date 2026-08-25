@@ -1,8 +1,13 @@
 ﻿using Common.Messaging;
+using Common.Network;
+using Common.Serialization;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using System.Reflection;
@@ -10,6 +15,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.SiegeEvents;
@@ -41,10 +48,18 @@ public class SiegeEventLifetimeTests : IDisposable
     public void ServerStartSiegeEvent_MissedGraphWrites_RepairedByInitializationSnapshot()
     {
         // Arrange
+        foreach (var instance in AllEnvironmentInstances)
+        {
+            instance.Call(EnsureTestPreparationsType);
+        }
+
         string? siegeEventId = null;
         string? settlementId = null;
         string? besiegerCampId = null;
         string? besiegerPartyId = null;
+        string? supportPartyId = null;
+        string? preparationsId = null;
+        long siegeStartTimeTicks = 0;
 
         // Act
         using (new SiegeGraphAutoSyncBlocker())
@@ -62,6 +77,17 @@ public class SiegeEventLifetimeTests : IDisposable
                 Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
                 Assert.True(Server.ObjectManager.TryGetId(siegeEvent.BesiegerCamp, out besiegerCampId));
                 Assert.True(Server.ObjectManager.TryGetId(besiegerParty, out besiegerPartyId));
+                Assert.True(Server.ObjectManager.TryGetId(
+                    siegeEvent.BesiegerCamp.SiegeEngines.SiegePreparations, out preparationsId));
+                siegeStartTimeTicks = siegeEvent.SiegeStartTime.NumTicks;
+
+                var supportParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+                supportParty._besiegerCamp = siegeEvent.BesiegerCamp;
+                siegeEvent.BesiegerCamp._besiegerParties.Add(supportParty);
+                Assert.True(Server.ObjectManager.TryGetId(supportParty, out supportPartyId));
+                Assert.True(Server.Resolve<ISiegeEventGraphSynchronizer>().TryCapture(
+                    siegeEvent, out var snapshot, besiegerParty));
+                Server.Resolve<INetwork>().SendAll(new NetworkInitializeSiegeEvent(snapshot));
             }, disabledMethods);
         }
 
@@ -70,13 +96,19 @@ public class SiegeEventLifetimeTests : IDisposable
         Assert.NotNull(settlementId);
         Assert.NotNull(besiegerCampId);
         Assert.NotNull(besiegerPartyId);
+        Assert.NotNull(supportPartyId);
+        Assert.NotNull(preparationsId);
         Assert.Contains(Server.NetworkSentMessages,
             message => message.GetType().Name == "SiegeEvent_BesiegedSettlement_SetNetworkMessage");
         Assert.Contains(Server.NetworkSentMessages,
             message => message.GetType().Name == "SiegeEvent_BesiegerCamp_SetNetworkMessage");
         Assert.Contains(Server.NetworkSentMessages,
             message => message.GetType().Name == "Settlement_SiegeEvent_SetNetworkMessage");
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkInitializeSiegeEvent>());
+        var initializations = Server.NetworkSentMessages.GetMessages<NetworkInitializeSiegeEvent>().ToArray();
+        Assert.Equal(2, initializations.Length);
+        var initialization = initializations[^1];
+        Assert.NotNull(initialization.BesiegerPartyIds);
+        Assert.Contains(besiegerPartyId, initialization.BesiegerPartyIds);
 
         foreach (var client in TestEnvironment.Clients)
         {
@@ -84,13 +116,48 @@ public class SiegeEventLifetimeTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var besiegerParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(supportPartyId, out var supportParty));
             Assert.Same(siegeEvent, settlement.SiegeEvent);
             Assert.Same(settlement, siegeEvent.BesiegedSettlement);
             Assert.Same(besiegerCamp, siegeEvent.BesiegerCamp);
             Assert.Same(besiegerParty, besiegerCamp.LeaderParty);
             Assert.Same(besiegerCamp, besiegerParty.BesiegerCamp);
+            Assert.Same(besiegerCamp, supportParty.BesiegerCamp);
+            Assert.Equal(1, besiegerCamp._besiegerParties.Count(party => party == besiegerParty));
+            Assert.Equal(1, besiegerCamp._besiegerParties.Count(party => party == supportParty));
             Assert.NotNull(besiegerCamp.SiegeEngines?.DeployedRangedSiegeEngines);
             Assert.NotNull(settlement.SiegeEngines?.DeployedRangedSiegeEngines);
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent.SiegeEngineConstructionProgress>(
+                preparationsId, out var preparations));
+            Assert.Same(preparations, besiegerCamp.SiegeEngines.SiegePreparations);
+            Assert.Equal(0.75f, preparations.Progress);
+            Assert.Equal(1f, preparations.RedeploymentProgress);
+            Assert.Equal(100f, preparations.Hitpoints);
+            Assert.Equal(100f, preparations.MaxHitPoints);
+            Assert.Equal(siegeStartTimeTicks, siegeEvent.SiegeStartTime.NumTicks);
+
+            client.Call(() =>
+            {
+                long retainedStartTimeTicks = siegeStartTimeTicks + 10;
+                using (new AllowedThread())
+                {
+                    siegeEvent.SiegeStartTime = new CampaignTime(retainedStartTimeTicks);
+                    besiegerCamp.NumberOfTroopsKilledOnSide = 9;
+                }
+
+                var legacySnapshot = new SiegeEventGraphSnapshot(
+                    siegeEventId,
+                    settlementId,
+                    besiegerCampId,
+                    besiegerPartyId,
+                    initialization.AttackerSiegeEnginesId,
+                    initialization.DefenderSiegeEnginesId);
+                Assert.True(client.Resolve<ISiegeEventGraphSynchronizer>().TryApply(legacySnapshot));
+                Assert.Equal(retainedStartTimeTicks, siegeEvent.SiegeStartTime.NumTicks);
+                Assert.Equal(9, besiegerCamp.NumberOfTroopsKilledOnSide);
+                Assert.Contains(besiegerParty, besiegerCamp._besiegerParties);
+                Assert.Same(preparations, besiegerCamp.SiegeEngines.SiegePreparations);
+            });
         }
     }
 
@@ -111,6 +178,69 @@ public class SiegeEventLifetimeTests : IDisposable
 
         // Assert
         Assert.Null(clientSiegeEventId);
+    }
+
+    [Fact]
+    public void SiegeGraphMessages_RoundTripAllIds()
+    {
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        var snapshot = new SiegeEventGraphSnapshot(
+            "siege-event",
+            "settlement",
+            "camp",
+            "leader",
+            "attacker-engines",
+            "defender-engines",
+            1234,
+            "strategy",
+            7,
+            new[] { "leader", "support" },
+            new[]
+            {
+                new SiegeEngineGraphSnapshot(
+                    "preparation", "preparations", 0.75f, 1f, 100f, 100f,
+                    SiegeEngineGraphLocation.Preparation),
+            },
+            Array.Empty<SiegeEngineGraphSnapshot>());
+
+        var initialization = RoundTrip(serializer, new NetworkInitializeSiegeEvent(snapshot));
+        AssertGraph(snapshot, initialization.ToSnapshot());
+
+        var mapCommit = RoundTrip(serializer, new NetworkMapEventInitialized(
+            "map-event", false, "tracker", "component", "visual", snapshot));
+        AssertGraph(snapshot, mapCommit.SiegeGraph);
+    }
+
+    private static T RoundTrip<T>(ProtoBufSerializer serializer, T message)
+    {
+        return serializer.Deserialize<T>(serializer.Serialize(message));
+    }
+
+    private static void AssertGraph(SiegeEventGraphSnapshot expected, SiegeEventGraphSnapshot actual)
+    {
+        Assert.Equal(expected.SiegeEventId, actual.SiegeEventId);
+        Assert.Equal(expected.SettlementId, actual.SettlementId);
+        Assert.Equal(expected.BesiegerCampId, actual.BesiegerCampId);
+        Assert.Equal(expected.LeaderPartyId, actual.LeaderPartyId);
+        Assert.Equal(expected.AttackerSiegeEnginesId, actual.AttackerSiegeEnginesId);
+        Assert.Equal(expected.DefenderSiegeEnginesId, actual.DefenderSiegeEnginesId);
+        Assert.Equal(expected.SiegeStartTimeTicks, actual.SiegeStartTimeTicks);
+        Assert.Equal(expected.BesiegerStrategyId, actual.BesiegerStrategyId);
+        Assert.Equal(expected.BesiegerTroopsKilled, actual.BesiegerTroopsKilled);
+        Assert.Equal(expected.BesiegerPartyIds, actual.BesiegerPartyIds);
+        Assert.Equal(expected.AttackerEngines, actual.AttackerEngines);
+        Assert.Equal(expected.DefenderEngines ?? Array.Empty<SiegeEngineGraphSnapshot>(),
+            actual.DefenderEngines ?? Array.Empty<SiegeEngineGraphSnapshot>());
+    }
+
+    private static void EnsureTestPreparationsType()
+    {
+        const string preparationsId = "issue_3253_test_preparations";
+        if (MBObjectManager.Instance.GetObject<SiegeEngineType>(preparationsId) != null) return;
+
+        var preparationsType = ObjectHelper.SkipConstructor<SiegeEngineType>();
+        using (new AllowedThread()) preparationsType.StringId = preparationsId;
+        MBObjectManager.Instance.RegisterObject(preparationsType);
     }
 
     private sealed class SiegeGraphAutoSyncBlocker : IDisposable
@@ -159,7 +289,19 @@ public class SiegeEventLifetimeTests : IDisposable
         }
 
         private static bool AllowDelivery(IMessage message) =>
-            !BlockedMessages.Contains(message.GetType().Name);
+            !BlockedMessages.Contains(message.GetType().Name) && !IsBlockedCreate(message.GetType());
+
+        private static bool IsBlockedCreate(Type messageType)
+        {
+            if (!messageType.IsGenericType ||
+                messageType.GetGenericTypeDefinition() != typeof(NetworkCreateInstance<>)) return false;
+
+            var instanceType = messageType.GetGenericArguments()[0];
+            return instanceType == typeof(SiegeEvent) ||
+                   instanceType == typeof(BesiegerCamp) ||
+                   instanceType == typeof(SiegeEvent.SiegeEnginesContainer) ||
+                   instanceType == typeof(SiegeEvent.SiegeEngineConstructionProgress);
+        }
     }
 
     private sealed class SiegeSideInitializationStub : IDisposable
@@ -187,15 +329,20 @@ public class SiegeEventLifetimeTests : IDisposable
 
         private static bool InitializeBesieger(BesiegerCamp __instance)
         {
-            __instance.SiegeEngines =
-                GameObjectCreator.CreateInitializedObject<SiegeEvent.SiegeEnginesContainer>();
+            const string preparationsId = "issue_3253_test_preparations";
+            var preparationsType = MBObjectManager.Instance.GetObject<SiegeEngineType>(preparationsId);
+
+            var preparations = new SiegeEvent.SiegeEngineConstructionProgress(
+                preparationsType, 0.75f, 100f);
+            __instance.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+                BattleSideEnum.Attacker, preparations);
             return false;
         }
 
         private static bool InitializeDefender(Settlement __instance)
         {
-            __instance.SiegeEngines =
-                GameObjectCreator.CreateInitializedObject<SiegeEvent.SiegeEnginesContainer>();
+            __instance.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+                BattleSideEnum.Defender, null);
             return false;
         }
     }
