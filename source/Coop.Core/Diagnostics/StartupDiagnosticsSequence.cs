@@ -1,4 +1,5 @@
 using System;
+using Common;
 
 namespace Coop.Core.Diagnostics;
 
@@ -9,11 +10,10 @@ namespace Coop.Core.Diagnostics;
 public static class StartupDiagnosticsSequence
 {
     public static void Run(
-        Func<string> resolveInformationalVersion,
         Action<string> emitLogHeader,
         Action<string> initializeCrashReporting)
     {
-        string version = resolveInformationalVersion();
+        string version = ModInformation.BuildVersion;
         emitLogHeader(version);
         initializeCrashReporting(version);
     }

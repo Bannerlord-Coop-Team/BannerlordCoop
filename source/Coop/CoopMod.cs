@@ -126,9 +126,7 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
-            StartupDiagnosticsSequence.Run(
-                ResolveInformationalVersion,
-                version =>
+            StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
                     CoopLogHeader(moduleInfoProvider);
@@ -275,11 +273,6 @@ namespace Coop
 #endif
             Logger = LogManager.GetLogger<CoopMod>();
         }
-        
-        private static string ResolveInformationalVersion() =>
-            typeof(ModInformation).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion ?? "unknown";
 
         private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
         {
