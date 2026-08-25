@@ -62,6 +62,7 @@ public class AgentActionHandler : IAgentActionHandler
 {
     // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
     private const int MaxAgentsPerActionPacket = 8;
+    private const float ActionSpeedDeltaThreshold = 0.001f;
 
     private readonly IBattleNetwork client;
     private readonly IPacketManager packetManager;
@@ -82,6 +83,8 @@ public class AgentActionHandler : IAgentActionHandler
         public bool HasObservation;
         public int Action0;
         public int Action1;
+        public float Action0Speed;
+        public float Action1Speed;
         public Agent.MovementControlFlag DefendFlags;
         public Agent.GuardMode GuardMode;
         public Agent.GuardMode ActionGuardMode;
@@ -217,6 +220,8 @@ public class AgentActionHandler : IAgentActionHandler
 
         int action0 = agent.GetCurrentAction(0).Index;
         int action1 = agent.GetCurrentAction(1).Index;
+        float action0Speed = AgentActionData.GetCurrentActionSpeed(agent, 0);
+        float action1Speed = AgentActionData.GetCurrentActionSpeed(agent, 1);
         _localAgentStates.TryGetValue(info.AgentId, out var state);
         bool hadState = state.HasObservation;
         bool isPlayerControlled =
@@ -314,7 +319,18 @@ public class AgentActionHandler : IAgentActionHandler
                 || AgentActionData.IsGuardMode(state.GuardMode));
         bool action0Changed = !hadState || state.Action0 != action0;
         bool action1Changed = !hadState || state.Action1 != action1;
+        bool action0SpeedChanged =
+            hadState
+            && state.Action0 == action0
+            && Math.Abs(state.Action0Speed - action0Speed)
+                > ActionSpeedDeltaThreshold;
+        bool action1SpeedChanged =
+            hadState
+            && state.Action1 == action1
+            && Math.Abs(state.Action1Speed - action1Speed)
+                > ActionSpeedDeltaThreshold;
         if (!action0Changed && !action1Changed
+            && !action0SpeedChanged && !action1SpeedChanged
             && !defendChanged && !guardChanged
             && !guardedMountStateChanged
             && !guardedControllerRoleChanged)
@@ -322,6 +338,8 @@ public class AgentActionHandler : IAgentActionHandler
             if (hadState)
             {
                 state.DefendFlags = defendFlags;
+                state.Action0Speed = action0Speed;
+                state.Action1Speed = action1Speed;
                 state.ActionGuardMode = actionGuardMode;
                 _localAgentStates[info.AgentId] = state;
             }
@@ -400,7 +418,17 @@ public class AgentActionHandler : IAgentActionHandler
                 && !action1GuardLocomotionChurn
                 && (action1Discrete
                     || locationAmbientAgent
-                    || (hadState && state.Action1WasDiscrete)));
+                    || (hadState && state.Action1WasDiscrete)))
+            || (action0SpeedChanged
+                && action0 >= 0
+                && (action0Discrete
+                    || locationAmbientAgent
+                    || state.Action0WasDiscrete))
+            || (action1SpeedChanged
+                && action1 >= 0
+                && (action1Discrete
+                    || locationAmbientAgent
+                    || state.Action1WasDiscrete));
         bool broadcast =
             defendChanged
             || guardChanged
@@ -410,6 +438,8 @@ public class AgentActionHandler : IAgentActionHandler
         state.HasObservation = true;
         state.Action0 = action0;
         state.Action1 = action1;
+        state.Action0Speed = action0Speed;
+        state.Action1Speed = action1Speed;
         state.DefendFlags = defendFlags;
         state.GuardMode = guardMode;
         state.ActionGuardMode = actionGuardMode;
