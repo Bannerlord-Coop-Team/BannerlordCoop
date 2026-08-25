@@ -16,7 +16,7 @@ internal class CraftedItemValuePatch
             var multiplier = ModConfigProvider.ModOptions.SmithingCraftedItemsValueMultiplier;
             if (multiplier < 0) multiplier = 1;
 
-            __instance.Value *= (int)multiplier;
+            __instance.Value = (int)(__instance.Value * multiplier);
         }
     }
 }

@@ -60,7 +60,7 @@ public readonly struct ModOptions
     public readonly bool EnablePlayerClanMemberExecutions { get; } = false;
     [ProtoMember(20)]
     public readonly bool ShowPlayerNameplates { get; } = true;
-    [ProtoMember(20)]
+    [ProtoMember(21)]
     public readonly bool PlayerWoundedBattleEntry { get; } = true;
 
     public ModOptions(ModOptionsData modOptionsData)
