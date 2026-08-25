@@ -1,9 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
+using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
@@ -17,26 +20,41 @@ namespace Missions.Battles;
 /// see <see cref="SiegeMachineStateReplicator"/>); everyone else's copy is unmanned, so its arm never swings,
 /// no stone spawns, and its ram never strikes. The capture patches report each simulator shot / ram hit; here
 /// we broadcast it and every other client plays the machine animation, plus (for a shot) spawns a cosmetic
-/// projectile with the resolved launch. Damage stays simulator-authoritative — the replayed stone is fired by
-/// a non-locally-controlled puppet, so <c>BattleBlowInterceptPatch</c> drops its blows.
+/// projectile with the resolved launch. The replayed stone is fired by a non-locally-controlled puppet, so
+/// <c>BattleBlowInterceptPatch</c> drops its blows; the mission host applies ram damage to gates.
 /// </summary>
 public interface ISiegeWeaponFireReplicator : IDisposable
 {
+    void Tick(float dt);
 }
 
 /// <inheritdoc cref="ISiegeWeaponFireReplicator"/>
 public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegeWeaponFireReplicator>();
+
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry registry;
+    private readonly IBattleSession session;
+    private readonly ISiegeMachineStateReplicator machineState;
+    private readonly Dictionary<int, List<NetworkSiegeWeaponFired>> pendingNetworkFires =
+        new Dictionary<int, List<NetworkSiegeWeaponFired>>();
 
-    public SiegeWeaponFireReplicator(IBattleNetwork network, IMessageBroker messageBroker, INetworkAgentRegistry registry)
+    public SiegeWeaponFireReplicator(
+        IBattleNetwork network,
+        IMessageBroker messageBroker,
+        INetworkAgentRegistry registry,
+        IBattleSession session,
+        ISiegeMachineStateReplicator machineState)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.registry = registry;
+        this.session = session;
+        this.machineState = machineState;
 
+        machineState.AuthorityChanged += Handle_AuthorityChanged;
         messageBroker.Subscribe<SiegeWeaponFired>(Handle_LocalFire);
         messageBroker.Subscribe<NetworkSiegeWeaponFired>(Handle_NetworkFire);
         messageBroker.Subscribe<RamHitStarted>(Handle_LocalRamHit);
@@ -45,27 +63,59 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         messageBroker.Subscribe<NetworkGateHit>(Handle_NetworkGateHit);
     }
 
+    public void Tick(float dt)
+    {
+        _ = dt;
+        if (pendingNetworkFires.Count == 0 || Mission.Current == null)
+            return;
+
+        var machineIds = new List<int>(pendingNetworkFires.Keys);
+        foreach (int machineId in machineIds)
+            DrainPendingNetworkFires(machineId);
+    }
+
     public void Dispose()
     {
+        machineState.AuthorityChanged -= Handle_AuthorityChanged;
         messageBroker.Unsubscribe<SiegeWeaponFired>(Handle_LocalFire);
         messageBroker.Unsubscribe<NetworkSiegeWeaponFired>(Handle_NetworkFire);
         messageBroker.Unsubscribe<RamHitStarted>(Handle_LocalRamHit);
         messageBroker.Unsubscribe<NetworkRamHit>(Handle_NetworkRamHit);
         messageBroker.Unsubscribe<GateHitByRam>(Handle_LocalGateHit);
         messageBroker.Unsubscribe<NetworkGateHit>(Handle_NetworkGateHit);
+        pendingNetworkFires.Clear();
     }
 
     // [Owner] one of our simulated siege machines fired — broadcast the resolved launch so the rest replay it.
     private void Handle_LocalFire(MessagePayload<SiegeWeaponFired> payload)
     {
         var fire = payload.What;
+        if (!machineState.TryGetMachineAuthority(
+                fire.Weapon.Id.Id,
+                out var controllerId,
+                out var hostEpoch,
+                out var authorityRevision)
+            || controllerId != session.OwnControllerId)
+        {
+            return;
+        }
 
         Guid shooterId = Guid.Empty;
         if (fire.Shooter != null && registry.TryGetAgentInfo(fire.Shooter, out var info))
             shooterId = info.AgentId;
 
         network.SendAll(new NetworkSiegeWeaponFired(
-            fire.Weapon.Id.Id, shooterId, fire.Position, fire.Direction, fire.Orientation, fire.BaseSpeed, fire.Speed, fire.MissileItem?.StringId));
+            fire.Weapon.Id.Id,
+            shooterId,
+            fire.Position,
+            fire.Direction,
+            fire.Orientation,
+            fire.BaseSpeed,
+            fire.Speed,
+            fire.MissileItem?.StringId,
+            controllerId,
+            hostEpoch,
+            authorityRevision));
     }
 
     // Another client's simulated siege machine fired — swing the arm and throw a cosmetic stone.
@@ -75,16 +125,123 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
 
         GameThread.RunSafe(() =>
         {
-            if (Mission.Current == null) return;
-            // The machine's simulator fired natively; everyone else replays it.
-            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.MachineId)) return;
-
-            var weapon = FindMissionObject<RangedSiegeWeapon>(msg.MachineId);
-            if (weapon == null) return;
-
-            PlayFireAnimation(weapon);
-            SpawnProjectile(weapon, msg);
+            Handle_NetworkFireOnGameThread(msg);
         });
+    }
+
+    private void Handle_NetworkFireOnGameThread(NetworkSiegeWeaponFired msg)
+    {
+        if (Mission.Current == null) return;
+        if (!machineState.TryGetMachineAuthority(
+                msg.MachineId,
+                out var controllerId,
+                out var hostEpoch,
+                out var authorityRevision))
+        {
+            BufferNetworkFire(msg);
+            return;
+        }
+
+        int authorityOrder = CompareMachineAuthority(
+            msg.SenderControllerId,
+            msg.HostEpoch,
+            msg.AuthorityRevision,
+            controllerId,
+            hostEpoch,
+            authorityRevision);
+        if (authorityOrder == 1)
+        {
+            BufferNetworkFire(msg);
+            return;
+        }
+
+        if (authorityOrder != 0)
+            return;
+
+        // The machine's simulator fired natively; everyone else replays it.
+        if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.MachineId)) return;
+
+        var weapon = FindMissionObject<RangedSiegeWeapon>(msg.MachineId);
+        if (weapon == null)
+        {
+            BufferNetworkFire(msg);
+            return;
+        }
+
+        if (!TrySpawnProjectile(weapon, msg))
+        {
+            BufferNetworkFire(msg);
+            return;
+        }
+
+        PlayFireAnimation(weapon);
+    }
+
+    private void BufferNetworkFire(NetworkSiegeWeaponFired msg)
+    {
+        if (!pendingNetworkFires.TryGetValue(msg.MachineId, out var pending))
+        {
+            pending = new List<NetworkSiegeWeaponFired>();
+            pendingNetworkFires[msg.MachineId] = pending;
+        }
+
+        pending.Add(msg);
+    }
+
+    private void Handle_AuthorityChanged(int machineId)
+    {
+        DrainPendingNetworkFires(machineId);
+    }
+
+    private void DrainPendingNetworkFires(int machineId)
+    {
+        if (Mission.Current == null
+            || !machineState.TryGetMachineAuthority(
+                machineId,
+                out string controllerId,
+                out int hostEpoch,
+                out int authorityRevision)
+            || !pendingNetworkFires.TryGetValue(machineId, out var pending))
+        {
+            return;
+        }
+
+        pendingNetworkFires.Remove(machineId);
+        foreach (var msg in pending)
+        {
+            int authorityOrder = CompareMachineAuthority(
+                msg.SenderControllerId,
+                msg.HostEpoch,
+                msg.AuthorityRevision,
+                controllerId,
+                hostEpoch,
+                authorityRevision);
+            if (authorityOrder == 1)
+            {
+                BufferNetworkFire(msg);
+                continue;
+            }
+
+            if (authorityOrder != 0)
+                continue;
+
+            NetworkSiegeWeaponFired pendingMessage = msg;
+            GameThread.RunSafe(() => ReplayPendingNetworkFire(pendingMessage));
+        }
+    }
+
+    private void ReplayPendingNetworkFire(NetworkSiegeWeaponFired message)
+    {
+        try
+        {
+            Handle_NetworkFireOnGameThread(message);
+        }
+        catch (Exception ex)
+        {
+            BufferNetworkFire(message);
+            Logger.Error(ex, "Failed to replay buffered siege fire for machine {MachineId}",
+                message.MachineId);
+        }
     }
 
     private static T FindMissionObject<T>(int id) where T : MissionObject
@@ -111,16 +268,16 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         }
     }
 
-    private void SpawnProjectile(RangedSiegeWeapon weapon, NetworkSiegeWeaponFired msg)
+    private bool TrySpawnProjectile(RangedSiegeWeapon weapon, NetworkSiegeWeaponFired msg)
     {
-        if (string.IsNullOrEmpty(msg.MissileItemId) || msg.ShooterAgentId == Guid.Empty) return;
+        if (string.IsNullOrEmpty(msg.MissileItemId) || msg.ShooterAgentId == Guid.Empty) return true;
 
         Agent shooter = null;
         if (registry.TryGetAgentInfo(msg.ShooterAgentId, out var info) && info.Agent != null)
         {
             // Spawn only with a non-local shooter, so the cosmetic stone's blows are dropped (attacker not
             // locally controlled) — the real damage arrives as routed blows and synced hit points.
-            if (registry.IsLocallyControlled(info.Agent)) return;
+            if (registry.IsLocallyControlled(info.Agent)) return true;
             shooter = info.Agent;
         }
         else
@@ -129,15 +286,16 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             // fly. Any inert puppet keeps the blow-drop guarantee — it keys on Controller.None, not on the
             // shooter's identity. AddCustomMissile cannot take a null shooter.
             shooter = FindStandInShooter();
-            if (shooter == null) return;
+            if (shooter == null) return false;
         }
 
         var missileItem = MBObjectManager.Instance.GetObject<ItemObject>(msg.MissileItemId);
-        if (missileItem == null) return;
+        if (missileItem == null) return true;
 
         // Ammo count 1 matches the simulator's own launch exactly (physics-inert, cosmetic parity).
         var missileWeapon = new MissionWeapon(missileItem, null, null, 1);
         Mission.Current.AddCustomMissile(shooter, missileWeapon, msg.Position, msg.Direction, msg.Orientation, msg.BaseSpeed, msg.Speed, addRigidBody: false, weapon);
+        return true;
     }
 
     private static Agent FindStandInShooter()
@@ -191,13 +349,29 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     // authoritative gate and everyone replays the reaction.
     private void Handle_LocalGateHit(MessagePayload<GateHitByRam> payload)
     {
-        network.SendAll(new NetworkGateHit(payload.What.Gate.Id.Id, payload.What.Ram.Id.Id, payload.What.Damage));
+        int ramId = payload.What.Ram.Id.Id;
+        if (!machineState.TryGetMachineAuthority(
+                ramId,
+                out var controllerId,
+                out var hostEpoch,
+                out var authorityRevision)
+            || controllerId != session.OwnControllerId)
+        {
+            return;
+        }
+
+        network.SendAll(new NetworkGateHit(
+            payload.What.Gate.Id.Id,
+            ramId,
+            payload.What.Damage,
+            controllerId,
+            hostEpoch,
+            authorityRevision));
     }
 
-    // A granted ram strikes only on its simulator, so the host (gate authority — gates are never claimed)
-    // applies the carried damage through vanilla TriggerOnHit: its own OnHitTaken plays the reaction and
-    // the synced hit points/destruction carry the damage to everyone. Other peers replay the cosmetic
-    // reaction, mirroring CastleGate.OnHitTaken's condition.
+    // A granted ram strikes only on its simulator. The host applies the carried damage through vanilla
+    // TriggerOnHit even when a peer simulates the gate; the host snapshot carries hit points and destruction.
+    // Non-hosts replay only CastleGate.OnHitTaken's cosmetic reaction.
     private void Handle_NetworkGateHit(MessagePayload<NetworkGateHit> payload)
     {
         var msg = payload.What;
@@ -205,12 +379,23 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.RamId)) return;
+            if (!machineState.TryGetMachineAuthority(
+                    msg.RamId,
+                    out var controllerId,
+                    out var hostEpoch,
+                    out var authorityRevision)
+                || !IsCurrentGateHitProducer(msg, controllerId, hostEpoch, authorityRevision))
+            {
+                return;
+            }
+
+            bool ramSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.RamId);
+            if (ramSimulatedLocally) return;
 
             var gate = FindMissionObject<CastleGate>(msg.GateId);
             if (gate == null) return;
 
-            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.GateId))
+            if (ShouldApplyHostGateDamage(session.IsLocalHost, ramSimulatedLocally))
             {
                 var ram = FindMissionObject<BatteringRam>(msg.RamId);
                 if (ram == null || gate.DestructionComponent == null) return;
@@ -228,5 +413,59 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             Mission.Current.MakeSound(SoundEvent.GetEventIdFromString("event:/mission/siege/door/hit"),
                 gate.GameEntity.GlobalPosition, soundCanBePredicted: false, isReliable: true, -1, -1);
         });
+    }
+
+    internal static bool ShouldApplyHostGateDamage(bool isLocalHost, bool ramSimulatedLocally)
+    {
+        return isLocalHost && !ramSimulatedLocally;
+    }
+
+    internal static bool IsCurrentGateHitProducer(
+        NetworkGateHit message,
+        string currentControllerId,
+        int currentHostEpoch,
+        int currentAuthorityRevision)
+    {
+        return IsCurrentMachineAuthority(
+            message.SenderControllerId,
+            message.HostEpoch,
+            message.AuthorityRevision,
+            currentControllerId,
+            currentHostEpoch,
+            currentAuthorityRevision);
+    }
+
+    internal static bool IsCurrentMachineAuthority(
+        string messageControllerId,
+        int messageHostEpoch,
+        int messageAuthorityRevision,
+        string currentControllerId,
+        int currentHostEpoch,
+        int currentAuthorityRevision)
+    {
+        return CompareMachineAuthority(
+            messageControllerId,
+            messageHostEpoch,
+            messageAuthorityRevision,
+            currentControllerId,
+            currentHostEpoch,
+            currentAuthorityRevision) == 0;
+    }
+
+    internal static int CompareMachineAuthority(
+        string messageControllerId,
+        int messageHostEpoch,
+        int messageAuthorityRevision,
+        string currentControllerId,
+        int currentHostEpoch,
+        int currentAuthorityRevision)
+    {
+        int hostEpochOrder = messageHostEpoch.CompareTo(currentHostEpoch);
+        if (hostEpochOrder != 0) return hostEpochOrder;
+
+        int revisionOrder = messageAuthorityRevision.CompareTo(currentAuthorityRevision);
+        if (revisionOrder != 0) return revisionOrder;
+
+        return messageControllerId == currentControllerId ? 0 : 2;
     }
 }

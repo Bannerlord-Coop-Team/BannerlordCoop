@@ -93,4 +93,63 @@ public class NetworkAgentShootSerializationTests
         Assert.NotNull(result.AttackerWeapon);
         Assert.Equal(WeaponClass.Arrow, result.AttackerWeapon.WeaponClass);
     }
+
+    [Fact]
+    public void NetworkSiegeWeaponFired_RoundTripsAuthorityTuple()
+    {
+        var original = new NetworkSiegeWeaponFired(
+            machineId: 12,
+            shooterAgentId: Guid.NewGuid(),
+            position: new Vec3(1f, 2f, 3f),
+            direction: new Vec3(4f, 5f, 6f),
+            orientation: Mat3.Identity,
+            baseSpeed: 55f,
+            speed: 61f,
+            missileItemId: "siege_stone",
+            senderControllerId: "peer-a",
+            hostEpoch: 7,
+            authorityRevision: 3);
+
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        MessagePacket packet = MessagePacket.Create(original, serializer);
+
+        var result = Assert.IsType<NetworkSiegeWeaponFired>(serializer.Deserialize<IMessage>(packet.Data));
+
+        Assert.Equal(original.MachineId, result.MachineId);
+        Assert.Equal(original.SenderControllerId, result.SenderControllerId);
+        Assert.Equal(original.HostEpoch, result.HostEpoch);
+        Assert.Equal(original.AuthorityRevision, result.AuthorityRevision);
+    }
+
+    [Fact]
+    public void NetworkApplyBattleDamage_RoundTripsSiegeAuthorityTuple()
+    {
+        var blow = new Blow(17)
+        {
+            InflictedDamage = 23,
+            DamageType = DamageTypes.Pierce,
+        };
+        blow.WeaponRecord._isMissile = true;
+
+        var original = new NetworkApplyBattleDamage(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            blow,
+            default,
+            machineId: 12,
+            senderControllerId: "peer-a",
+            hostEpoch: 7,
+            authorityRevision: 3);
+
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        MessagePacket packet = MessagePacket.Create(original, serializer);
+
+        var result = Assert.IsType<NetworkApplyBattleDamage>(serializer.Deserialize<IMessage>(packet.Data));
+
+        Assert.True(result.HasMachineAuthority);
+        Assert.Equal(original.MachineId, result.MachineId);
+        Assert.Equal(original.SenderControllerId, result.SenderControllerId);
+        Assert.Equal(original.HostEpoch, result.HostEpoch);
+        Assert.Equal(original.AuthorityRevision, result.AuthorityRevision);
+    }
 }

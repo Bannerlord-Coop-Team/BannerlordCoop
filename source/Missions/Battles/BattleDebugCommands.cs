@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -497,6 +498,52 @@ internal static class BattleDebugCommands
     }
 
 #endif
+
+    [CommandLineArgumentFunction("defender_mission_ack", "coop.debug.battle")]
+    public static string DefenderMissionAcknowledgement(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.battle.defender_mission_ack";
+        }
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        var playerTeam = mission?.PlayerTeam;
+        var localMainAgent = Agent.Main;
+        bool missionActive = mission != null;
+        bool activeCoopSiegeAssault = missionActive && controller != null &&
+            MobileParty.MainParty?.MapEvent?.IsSiegeAssault == true;
+        bool localMainAgentActive = localMainAgent != null && localMainAgent.IsActive() &&
+            localMainAgent.Mission == mission && localMainAgent.Team == playerTeam;
+        // The native deployment controller removes itself after FinishDeployment. The coordinator's commit
+        // latch survives that removal and is the stable proof that this local client finished deployment.
+        bool deploymentCommitted = controller?.Deployment.IsCommitted == true;
+        bool controllerReady = controller?.Session.HasInstance == true && controller.Deployment.IsActivated;
+        BattleSideEnum battleSide = playerTeam?.Side ?? BattleSideEnum.None;
+        bool success = DefenderMissionAcknowledgementContract.IsReady(
+            !ModInformation.IsServer,
+            missionActive,
+            activeCoopSiegeAssault,
+            battleSide,
+            localMainAgentActive,
+            deploymentCommitted,
+            controllerReady);
+
+        return "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            success,
+            role = ModInformation.IsServer ? "server" : "client",
+            missionActive,
+            missionKind = activeCoopSiegeAssault ? "siege-assault" : "none",
+            activeCoopSiegeAssault,
+            battleSide = battleSide.ToString(),
+            localMainAgent = localMainAgentActive,
+            deploymentCommitted,
+            controllerReady,
+            sessionId = controller?.Session.InstanceId
+        });
+    }
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
     public static string State(List<string> args)
@@ -1401,4 +1448,19 @@ internal static class BattleDebugCommands
         ladderCamera = null;
         return true;
     }
+}
+
+internal static class DefenderMissionAcknowledgementContract
+{
+    internal static bool IsReady(
+        bool isClient,
+        bool missionActive,
+        bool activeCoopSiegeAssault,
+        BattleSideEnum battleSide,
+        bool localMainAgent,
+        bool deploymentCommitted,
+        bool controllerReady) =>
+        isClient && missionActive && activeCoopSiegeAssault &&
+        battleSide == BattleSideEnum.Defender && localMainAgent &&
+        deploymentCommitted && controllerReady;
 }

@@ -135,11 +135,15 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent,
             casualties,
             puppetMountStateRepairer);
+        // Construct machine authority before damage routing so siege projectile hits can carry the
+        // same authority tuple as the fire that produced them.
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
         damageRouter = new BattleDamageRouter(
             network,
             messageBroker,
             coopMissionComponent,
             session,
+            siegeMachineState,
             guardedHitWindow,
             agentNativeMountState,
             puppetMountStateRepairer);
@@ -151,8 +155,12 @@ public class CoopBattleController : CoopMissionController
         // — a superseded hosting generation is dropped consistently across both. The policy is a
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(
+            network,
+            messageBroker,
+            coopMissionComponent.AgentRegistry,
+            session,
+            siegeMachineState);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
@@ -274,6 +282,7 @@ public class CoopBattleController : CoopMissionController
 
         siegeEngineDeployment.DrainPending(dt);
         siegeMachineState.Tick(dt);
+        siegeWeaponFire.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
 
