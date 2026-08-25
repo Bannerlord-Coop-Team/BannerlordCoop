@@ -328,7 +328,7 @@ internal class BattleHandler : IHandler
         return players.Count(player => isConnected(player) && isInBlockingMapEvent(player));
     }
 
-    private static bool IsFastForwardBlockingMapEvent(MapEvent mapEvent, MapEvent excluding = null)
+    internal static bool IsFastForwardBlockingMapEvent(MapEvent mapEvent, MapEvent excluding = null)
     {
         return mapEvent != null &&
                mapEvent != excluding &&

@@ -5,6 +5,8 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -17,6 +19,7 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
@@ -68,6 +71,7 @@ namespace GameInterface.Services.Kingdoms
     public class KingdomDecisionVoteManager : IKingdomDecisionVoteManager, IDisposable
     {
         internal static readonly TimeSpan VotingRoundDuration = TimeSpan.FromSeconds(60);
+        internal static readonly TimeSpan VotingRoundBattleHoldMaximum = TimeSpan.FromMinutes(4);
         private static readonly TimeSpan VotingRoundTickInterval = TimeSpan.FromSeconds(1);
         private static readonly ILogger Logger = LogManager.GetLogger(typeof(KingdomDecisionVoteManager));
         private readonly Dictionary<KingdomDecision, KingdomDecisionVoteState> DecisionStates = new Dictionary<KingdomDecision, KingdomDecisionVoteState>();
@@ -82,6 +86,7 @@ namespace GameInterface.Services.Kingdoms
         private readonly IKingdomDecisionOutcomeResolver outcomeResolver;
         private readonly IKingdomDecisionOutcomeOrder outcomeOrder;
         private readonly IKingdomDecisionRoundPresentation roundPresentation;
+        private readonly IKingdomVotingRoundClock votingRoundClock;
         private readonly Timer votingRoundTimer;
         private int isDisposed;
 
@@ -91,7 +96,8 @@ namespace GameInterface.Services.Kingdoms
             IMessageBroker messageBroker,
             IKingdomDecisionOutcomeResolver outcomeResolver,
             IKingdomDecisionOutcomeOrder outcomeOrder,
-            IKingdomDecisionRoundPresentation roundPresentation)
+            IKingdomDecisionRoundPresentation roundPresentation,
+            IKingdomVotingRoundClock votingRoundClock)
         {
             this.playerManager = playerManager;
             this.objectManager = objectManager;
@@ -99,6 +105,7 @@ namespace GameInterface.Services.Kingdoms
             this.outcomeResolver = outcomeResolver;
             this.outcomeOrder = outcomeOrder;
             this.roundPresentation = roundPresentation;
+            this.votingRoundClock = votingRoundClock;
 
             if (ModInformation.IsServer)
             {
@@ -451,6 +458,8 @@ namespace GameInterface.Services.Kingdoms
 
             KingdomDecisionVoteState state = GetOrCreateState(decision);
             RefreshEligibleClanIds(state, decision);
+            // A deadline held by TryResolveExpiredRound is only published on the paths below that reach
+            // PublishRoundStatus; the refused ones wait for the next 1s tick to publish it.
             if (state.IsResolved || TryResolveExpiredRound(state, DateTime.UtcNow)) return false;
             if (!state.EligibleClanIds.Contains(voterClanId)) return false;
             if (!ApplyVote(state, voterClanId, voterClan, voteData)) return false;
@@ -1386,9 +1395,10 @@ namespace GameInterface.Services.Kingdoms
             TryGetKingdomId(decision.Kingdom, out string kingdomId);
             TryGetDecisionIndex(decision, out int decisionIndex);
             HashSet<string> eligibleClanIds = GetEligibleClanIds(decision);
+            DateTime roundStartedUtc = DateTime.UtcNow;
             DateTime? deadlineUtc = ModInformation.IsServer && eligibleClanIds.Count > 0
-                ? DateTime.UtcNow + VotingRoundDuration
-                : null;
+                ? votingRoundClock.CreateDeadline(roundStartedUtc)
+                : (DateTime?)null;
             Dictionary<string, KingdomDecisionRoundClanStatusData> roundClans = ModInformation.IsServer
                 ? CreateRoundClanStatuses(decision, eligibleClanIds)
                 : new Dictionary<string, KingdomDecisionRoundClanStatusData>();
@@ -1397,6 +1407,7 @@ namespace GameInterface.Services.Kingdoms
                 decisionIndex,
                 decision,
                 eligibleClanIds,
+                roundStartedUtc,
                 deadlineUtc,
                 roundClans);
         }
@@ -1461,7 +1472,7 @@ namespace GameInterface.Services.Kingdoms
             }
 
             Player[] clanPlayers = playerManager.Players
-                .Where(player => player.ClanId == clanId || PlayerBelongsToClan(player, decision.Kingdom, clanId))
+                .Where(player => PlayerVotesForClan(player, decision.Kingdom, clanId))
                 .ToArray();
             string playerNames = string.Join(", ", clanPlayers
                 .Select(GetPlayerDisplayName)
@@ -1476,6 +1487,15 @@ namespace GameInterface.Services.Kingdoms
                 string.IsNullOrWhiteSpace(playerNames) ? clanName : playerNames,
                 hasFinalVote,
                 isConnected);
+        }
+
+        // The id a player registered with is not always the canonical clan id, so a raw mismatch still
+        // has to be resolved through the object manager before the player is ruled out.
+        private bool PlayerVotesForClan(Player player, Kingdom kingdom, string clanId)
+        {
+            if (player == null) return false;
+
+            return player.ClanId == clanId || PlayerBelongsToClan(player, kingdom, clanId);
         }
 
         private bool PlayerBelongsToClan(Player player, Kingdom kingdom, string canonicalClanId)
@@ -1686,6 +1706,22 @@ namespace GameInterface.Services.Kingdoms
         {
             if (!state.RoundDeadlineUtc.HasValue || utcNow < state.RoundDeadlineUtc.Value) return false;
 
+            DateTime? heldDeadlineUtc = votingRoundClock.TryExtendDeadline(
+                utcNow,
+                state.RoundDeadlineUtc.Value,
+                state.RoundStartedUtc,
+                () => AnyEligibleVoterInBattle(state));
+            if (heldDeadlineUtc.HasValue)
+            {
+                state.ExtendRoundDeadline(heldDeadlineUtc.Value);
+                Logger.Information(
+                    "Kingdom decision voting deadline for {KingdomId} decision {DecisionIndex} held until {HeldDeadline} because an eligible voter is in a battle",
+                    state.KingdomId,
+                    state.DecisionIndex,
+                    heldDeadlineUtc.Value);
+                return false;
+            }
+
             Logger.Information(
                 "Kingdom decision voting deadline reached for {KingdomId} decision {DecisionIndex}; resolving with {FinalVotes}/{EligibleClans} final clan votes",
                 state.KingdomId,
@@ -1695,6 +1731,46 @@ namespace GameInterface.Services.Kingdoms
             ApplyMissingAbstentions(state);
             ResolveDecision(state);
             return true;
+        }
+
+        // [Server] The mission registry is only registered in the server container, so it is resolved here
+        // instead of injected: this manager is also built in the client container where that type is missing.
+        private bool AnyEligibleVoterInBattle(KingdomDecisionVoteState state)
+        {
+            if (ModInformation.IsClient || playerManager == null || objectManager == null) return false;
+            if (!ContainerProvider.TryResolve<IMissionMembershipRegistry>(out IMissionMembershipRegistry missionRegistry)) return false;
+
+            Kingdom kingdom = state.Decision?.Kingdom;
+            return BattleHandler.CountConnectedPlayersInMapEvents(
+                playerManager.Players,
+                playerManager.IsConnected,
+                player => IsPendingVoter(state.EligibleClanIds, state.FinalVotes.Keys, kingdom, player) &&
+                          IsPlayerInBattle(player, missionRegistry)) > 0;
+        }
+
+        /// <summary>
+        /// Whether the player still owes a vote for one of the eligible clans. A clan that already cast its
+        /// final vote is skipped, otherwise its battle would hold a round it can no longer change.
+        /// </summary>
+        internal bool IsPendingVoter(
+            IEnumerable<string> eligibleClanIds,
+            ICollection<string> finalVoteClanIds,
+            Kingdom kingdom,
+            Player player)
+        {
+            return eligibleClanIds.Any(clanId =>
+                !finalVoteClanIds.Contains(clanId) && PlayerVotesForClan(player, kingdom, clanId));
+        }
+
+        // Mission membership is also true in a tavern or a tournament, so the party's map event is what makes it
+        // a battle. Sharing the fast-forward predicate keeps a slow village raid, which leaves the raider free on
+        // the map, out of both.
+        private bool IsPlayerInBattle(Player player, IMissionMembershipRegistry missionRegistry)
+        {
+            if (!missionRegistry.IsControllerInMission(player.ControllerId)) return false;
+            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty)) return false;
+
+            return BattleHandler.IsFastForwardBlockingMapEvent(playerParty.MapEvent);
         }
 
         private static bool IsDecisionUnresolved(KingdomDecision decision)
@@ -2024,6 +2100,7 @@ namespace GameInterface.Services.Kingdoms
             public Dictionary<string, KingdomDecisionRoundClanStatusData> RoundClans { get; }
             public string[] OrderedOutcomeKeys { get; private set; }
             public KingdomDecisionRoundStatusData LastPublishedRoundStatus { get; set; }
+            public DateTime RoundStartedUtc { get; }
             public DateTime? RoundDeadlineUtc { get; private set; }
             public bool IsResolved { get; set; }
             public bool HasRoundSnapshot => RoundClans.Count > 0;
@@ -2035,6 +2112,7 @@ namespace GameInterface.Services.Kingdoms
                 int decisionIndex,
                 KingdomDecision decision,
                 HashSet<string> eligibleClanIds,
+                DateTime roundStartedUtc,
                 DateTime? roundDeadlineUtc,
                 Dictionary<string, KingdomDecisionRoundClanStatusData> roundClans)
             {
@@ -2046,6 +2124,7 @@ namespace GameInterface.Services.Kingdoms
                 EligibleClanIds = eligibleClanIds;
                 Votes = new Dictionary<string, AppliedKingdomDecisionVote>();
                 FinalVotes = new Dictionary<string, AppliedKingdomDecisionVote>();
+                RoundStartedUtc = roundStartedUtc;
                 RoundDeadlineUtc = roundDeadlineUtc;
                 RoundClans = roundClans ?? new Dictionary<string, KingdomDecisionRoundClanStatusData>();
                 OrderedOutcomeKeys = Array.Empty<string>();
@@ -2055,6 +2134,11 @@ namespace GameInterface.Services.Kingdoms
             {
                 KingdomId = kingdomId;
                 DecisionIndex = decisionIndex;
+            }
+
+            public void ExtendRoundDeadline(DateTime roundDeadlineUtc)
+            {
+                RoundDeadlineUtc = roundDeadlineUtc;
             }
 
             public void RefreshEligibleClanIds(HashSet<string> eligibleClanIds)
