@@ -56,7 +56,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         CoopBattleController hostController = null;
         host.Call(() =>
         {
-            fixture.CreateMission(host);
+            CreateConnectedMission(fixture, host, mapEventId);
             hostController = host.Resolve<CoopBattleController>();
         });
 
@@ -68,7 +68,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         CoopBattleController joinerController = null;
         joiner.Call(() =>
         {
-            fixture.CreateMission(joiner);
+            CreateConnectedMission(fixture, joiner, mapEventId);
             joinerController = joiner.Resolve<CoopBattleController>();
             joinerController.Session.TryBegin(mapEventId);
         });
@@ -96,7 +96,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         Agent ownedAgent = null!;
         host.Call(() =>
         {
-            fixture.CreateMission(host);
+            CreateConnectedMission(fixture, host, mapEventId);
             hostController = host.Resolve<CoopBattleController>();
         });
         EnterBattle(host, mapEventId);
@@ -111,7 +111,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
 
         joiner.Call(() =>
         {
-            fixture.CreateMission(joiner);
+            CreateConnectedMission(fixture, joiner, mapEventId);
             joiner.Resolve<CoopBattleController>().Session.TryBegin(mapEventId);
         });
         host.Call(() =>
@@ -180,7 +180,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         CoopBattleController hostController = null!;
         host.Call(() =>
         {
-            fixture.CreateMission(host);
+            CreateConnectedMission(fixture, host, mapEventId);
             hostController = host.Resolve<CoopBattleController>();
             hostController.Session.TryBegin(mapEventId);
         });
@@ -224,7 +224,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         CoopBattleController hostController = null;
         host.Call(() =>
         {
-            fixture.CreateMission(host);
+            CreateConnectedMission(fixture, host, mapEventId);
             hostController = host.Resolve<CoopBattleController>();
         });
 
@@ -234,7 +234,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         CoopBattleController joinerController = null;
         joiner.Call(() =>
         {
-            fixture.CreateMission(joiner);
+            CreateConnectedMission(fixture, joiner, mapEventId);
             joinerController = joiner.Resolve<CoopBattleController>();
             joinerController.Session.TryBegin(mapEventId);
         });
@@ -264,7 +264,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         CoopBattleController hostController = null;
         host.Call(() =>
         {
-            fixture.CreateMission(host);
+            CreateConnectedMission(fixture, host, mapEventId);
             hostController = host.Resolve<CoopBattleController>();
         });
         EnterBattle(host, mapEventId);
@@ -280,7 +280,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         CoopBattleController joinerController = null;
         joiner.Call(() =>
         {
-            fixture.CreateMission(joiner);
+            CreateConnectedMission(fixture, joiner, mapEventId);
             joinerController = joiner.Resolve<CoopBattleController>();
             joinerController.Session.TryBegin(mapEventId);
             joiner.NetworkSentMessages.Clear();
@@ -332,12 +332,12 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         var host = Clients.First();
         var joiner = Clients.Skip(1).First();
 
-        host.Call(() => fixture.CreateMission(host));
+        host.Call(() => CreateConnectedMission(fixture, host, mapEventId));
         EnterBattle(host, mapEventId);
 
         joiner.Call(() =>
         {
-            fixture.CreateMission(joiner);
+            CreateConnectedMission(fixture, joiner, mapEventId);
             var controller = joiner.Resolve<CoopBattleController>();
             controller.Session.TryBegin(mapEventId);
             int nextEpoch = controller.Session.HostEpoch + 1;

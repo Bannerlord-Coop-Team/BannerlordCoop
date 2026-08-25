@@ -28,6 +28,7 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var victimId = Guid.NewGuid();
         var affectorId = Guid.NewGuid();
         Agent ownerVictim = null!, ownerAffector = null!, peerVictim = null!, peerAffector = null!;
@@ -35,7 +36,7 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
             peerController = peer.Resolve<CoopBattleController>();
             var registry = peer.Resolve<INetworkAgentRegistry>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
@@ -47,7 +48,7 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
             BasicCharacterObject character = Game.Current.PlayerTroop;

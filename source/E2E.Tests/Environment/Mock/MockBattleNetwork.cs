@@ -59,7 +59,7 @@ public class MockBattleNetwork : IBattleNetwork
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
-        if (router == null) throw new ArgumentNullException(nameof(router));
+        ArgumentNullException.ThrowIfNull(router);
         this.router = router;
     }
 

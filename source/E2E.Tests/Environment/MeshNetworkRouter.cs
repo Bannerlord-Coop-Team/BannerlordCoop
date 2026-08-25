@@ -20,14 +20,14 @@ public class MeshNetworkRouter
 
     public MeshNetworkRouter(IVirtualNetworkScheduler scheduler)
     {
-        if (scheduler == null) throw new ArgumentNullException(nameof(scheduler));
+        ArgumentNullException.ThrowIfNull(scheduler);
         this.scheduler = scheduler;
     }
 
     public void AddClient(ClientInstance instance, MockBattleNetwork mesh)
     {
-        if (instance == null) throw new ArgumentNullException(nameof(instance));
-        if (mesh == null) throw new ArgumentNullException(nameof(mesh));
+        ArgumentNullException.ThrowIfNull(instance);
+        ArgumentNullException.ThrowIfNull(mesh);
         clients.Add(new ClientRegistration(instance, mesh));
     }
 

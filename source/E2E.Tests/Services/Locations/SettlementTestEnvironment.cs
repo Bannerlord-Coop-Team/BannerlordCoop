@@ -87,7 +87,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
 
     public SettlementClientFixture EnterLocation(EnvironmentInstance client, string instanceId)
     {
-        if (client == null) throw new ArgumentNullException(nameof(client));
+        ArgumentNullException.ThrowIfNull(client);
         if (string.IsNullOrEmpty(instanceId)) throw new ArgumentException("instanceId is required", nameof(instanceId));
         if (activeClients.ContainsKey(client))
             throw new InvalidOperationException("A client can only have one active settlement location");
@@ -195,8 +195,8 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
         SettlementClientFixture receiver,
         TimeSpan latency)
     {
-        if (sender == null) throw new ArgumentNullException(nameof(sender));
-        if (receiver == null) throw new ArgumentNullException(nameof(receiver));
+        ArgumentNullException.ThrowIfNull(sender);
+        ArgumentNullException.ThrowIfNull(receiver);
         Server.Resolve<IVirtualNetworkScheduler>().SetLatency(sender.Mesh, receiver.Mesh, latency);
     }
 
@@ -248,7 +248,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
         string characterId,
         Vec3 position)
     {
-        if (owner == null) throw new ArgumentNullException(nameof(owner));
+        ArgumentNullException.ThrowIfNull(owner);
         Agent companion = null;
 
         owner.Instance.Call(() =>
@@ -280,7 +280,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
         Vec3 position,
         Vec2 direction)
     {
-        if (host == null) throw new ArgumentNullException(nameof(host));
+        ArgumentNullException.ThrowIfNull(host);
         Agent spawned = null;
 
         host.Instance.Call(() =>
@@ -303,7 +303,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
         string targetCharacterId,
         int generation)
     {
-        if (initiator == null) throw new ArgumentNullException(nameof(initiator));
+        ArgumentNullException.ThrowIfNull(initiator);
 
         initiator.Instance.Call(() =>
         {
@@ -316,14 +316,14 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
 
     public void EndDialogue(SettlementClientFixture participant)
     {
-        if (participant == null) throw new ArgumentNullException(nameof(participant));
+        ArgumentNullException.ThrowIfNull(participant);
         participant.Instance.Call(() =>
             participant.Instance.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
     }
 
     public void ApplyAuthoritativeOutcome(Action action)
     {
-        if (action == null) throw new ArgumentNullException(nameof(action));
+        ArgumentNullException.ThrowIfNull(action);
         Server.Call(action);
     }
 
