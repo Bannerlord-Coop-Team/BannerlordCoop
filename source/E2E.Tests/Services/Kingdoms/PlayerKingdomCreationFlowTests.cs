@@ -35,6 +35,7 @@ using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -1758,19 +1759,24 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void AllianceTimeoutFixture_NormalizesLeaderRelationAndRestoresItAfterExplicitAndFailedStagePaths()
+    public void AllianceTimeoutFixture_NormalizesEveryReversibleEligibilityInputAndRestoresThemAfterExplicitAndFailedStagePaths()
     {
         const string fixtureControllerId = "testclient";
         const int initialRelation = -40;
+        const int initialSupporterRelation = 35;
+        const int initialRecipientHonor = -1;
+        const int initialSturgiaHonor = 0;
         var client = Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(fixtureControllerId);
         var player = CreateSyncedPlayerContext(fixtureControllerId, client);
         var recipientKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var sturgiaKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var recipientRulerClanId = CreateSyncedNpcClan();
+        var recipientSupporterClanId = CreateSyncedNpcClan();
         var sturgiaRulerClanId = CreateSyncedNpcClan();
 
         ConfigureClanInKingdom(recipientRulerClanId, recipientKingdomId);
+        ConfigureClanInKingdom(recipientSupporterClanId, recipientKingdomId);
         ConfigureClanInKingdom(sturgiaRulerClanId, sturgiaKingdomId);
         EnsureKingdomRegisteredEverywhere(recipientKingdomId);
         EnsureKingdomRegisteredEverywhere(sturgiaKingdomId);
@@ -1784,17 +1790,44 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Contains(sturgia, Kingdom.All);
         });
 
-        bool allowAlliance = true;
+        bool rejectNpcElectionSupporterGate = false;
         int gateCallCount = 0;
-        int relationChangeEventCount = 0;
+        int playerSupportGateCallCount = 0;
+        int npcElectionSupporterGateCallCount = 0;
+        int unrelatedDueDecisionGateCallCount = 0;
+        bool unrelatedDueDecisionObservedNpcElectionSupporter = false;
+        int fixtureRelationChangeEventCount = 0;
         var relationChangeListenerOwner = new object();
+        Clan testclientClan = null;
+        Hero leaderRelationFirst = null;
+        Hero leaderRelationSecond = null;
+        Hero supporterRelationFirst = null;
+        Hero supporterRelationSecond = null;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out testclientClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientSupporterClanId, out var recipientSupporterClan));
+            Assert.False(recipientRulerClan.IsUnderMercenaryService);
+            Assert.False(recipientSupporterClan.IsUnderMercenaryService);
             recipientKingdom.Name = new TextObject("Recipient");
             sturgia.Name = new TextObject("Sturgia");
+            Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+                recipientKingdom.Leader,
+                sturgia.Leader,
+                out leaderRelationFirst,
+                out leaderRelationSecond);
+            Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+                recipientSupporterClan.Leader,
+                sturgia.Leader,
+                out supporterRelationFirst,
+                out supporterRelationSecond);
             SetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader, initialRelation);
+            SetEffectiveRelation(recipientSupporterClan.Leader, sturgia.Leader, initialSupporterRelation);
+            recipientKingdom.Leader.SetTraitLevel(DefaultTraits.Honor, initialRecipientHonor);
+            sturgia.Leader.SetTraitLevel(DefaultTraits.Honor, initialSturgiaHonor);
 
             var allianceModel = new Mock<AllianceModel>();
             allianceModel
@@ -1808,15 +1841,57 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 {
                     gateCallCount++;
                     reason = null;
-                    return allowAlliance && kingdom == recipientKingdom && targetKingdom == sturgia &&
-                        GetEffectiveRelation(kingdom.Leader, targetKingdom.Leader) ==
+                    if (kingdom == sturgia && targetKingdom == recipientKingdom)
+                    {
+                        unrelatedDueDecisionGateCallCount++;
+                        unrelatedDueDecisionObservedNpcElectionSupporter =
+                            recipientKingdom.RulingClan.IsUnderMercenaryService ||
+                            recipientSupporterClan.IsUnderMercenaryService;
+                        return false;
+                    }
+                    if (kingdom != recipientKingdom || targetKingdom != sturgia ||
+                        sturgia.Leader.GetTraitLevel(DefaultTraits.Honor) != 1) return false;
+
+                    if (recipientKingdom.RulingClan.IsUnderMercenaryService)
+                    {
+                        npcElectionSupporterGateCallCount++;
+                        if (rejectNpcElectionSupporterGate) return false;
+                    }
+
+                    if (testclientClan.Kingdom != recipientKingdom)
+                    {
+                        return GetEffectiveRelation(kingdom.Leader, targetKingdom.Leader) ==
+                            Campaign.Current.Models.DiplomacyModel.MaxRelationLimit &&
+                            recipientKingdom.Leader.GetTraitLevel(DefaultTraits.Honor) == 1;
+                    }
+
+                    playerSupportGateCallCount++;
+                    return GetEffectiveRelation(kingdom.Leader, targetKingdom.Leader) ==
+                        Campaign.Current.Models.DiplomacyModel.MaxRelationLimit &&
+                        recipientKingdom.Leader.GetTraitLevel(DefaultTraits.Honor) == 1 &&
+                        GetEffectiveRelation(recipientSupporterClan.Leader, sturgia.Leader) ==
                         Campaign.Current.Models.DiplomacyModel.MaxRelationLimit;
                 }));
             allianceModel
                 .Setup(model => model.GetInfluenceCostOfProposingStartingAlliance(It.IsAny<Clan>()))
                 .Returns(0);
+            allianceModel
+                .Setup(model => model.GetSupportScoreOfStartingAllianceForClan(
+                    It.IsAny<Kingdom>(),
+                    It.IsAny<Kingdom>(),
+                    It.IsAny<Clan>(),
+                    out It.Ref<TextObject>.IsAny,
+                    It.IsAny<bool>()))
+                .Returns(200f);
+            allianceModel
+                .SetupGet(model => model.MaxNumberOfAlliances)
+                .Returns(3);
             Campaign.Current.Models.AllianceModel = allianceModel.Object;
         });
+        foreach (var environment in Clients)
+        {
+            ConfigureAllianceModel(environment);
+        }
 
         Server.Call(() =>
         {
@@ -1825,43 +1900,93 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 (Hero effectiveHero, Hero effectiveTargetHero, int relationChange, bool showQuickNotification,
                     ChangeRelationAction.ChangeRelationDetail detail, Hero originalHero, Hero originalTargetHero) =>
                 {
-                    relationChangeEventCount++;
+                    if ((effectiveHero == leaderRelationFirst && effectiveTargetHero == leaderRelationSecond) ||
+                        (effectiveHero == leaderRelationSecond && effectiveTargetHero == leaderRelationFirst) ||
+                        (effectiveHero == supporterRelationFirst && effectiveTargetHero == supporterRelationSecond) ||
+                        (effectiveHero == supporterRelationSecond && effectiveTargetHero == supporterRelationFirst))
+                    {
+                        fixtureRelationChangeEventCount++;
+                    }
                 });
         });
 
         try
         {
+            Server.Call(() => Assert.NotSame(testclientClan, Clan.PlayerClan));
+
             string target = null;
             Server.Call(() => target = KingdomDebugCommand.GetAllianceTimeoutTarget(new List<string>()));
-            Assert.StartsWith("LIVE_TEST_JSON=", target);
+            Assert.True(target.StartsWith("LIVE_TEST_JSON="), target);
             Assert.Contains($"\"kingdomId\":\"{recipientKingdomId}\"", target);
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientSupporterClanId, out var recipientSupporterClan));
                 Assert.Equal(initialRelation, GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+                Assert.Equal(initialSupporterRelation,
+                    GetEffectiveRelation(recipientSupporterClan.Leader, sturgia.Leader));
+                Assert.Equal(initialRecipientHonor, recipientKingdom.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.Equal(initialSturgiaHonor, sturgia.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.False(recipientRulerClan.IsUnderMercenaryService);
+                Assert.False(recipientSupporterClan.IsUnderMercenaryService);
             });
 
             ConfigureClanInKingdom(player.ClanId, recipientKingdomId);
             string capture = null;
             Server.Call(() => capture = KingdomDebugCommand.CaptureAllianceTimeoutFixture(new List<string>()));
             Assert.StartsWith("LIVE_TEST_JSON=", capture);
+            Assert.Contains("\"eligibilityInputsChanged\":true", capture);
+            Assert.Contains("\"normalizedSupporterRelationCount\":1", capture);
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientSupporterClanId, out var recipientSupporterClan));
                 Assert.Equal(Campaign.Current.Models.DiplomacyModel.MaxRelationLimit,
                     GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+                Assert.Equal(1,
+                    recipientKingdom.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.Equal(1, sturgia.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.Equal(Campaign.Current.Models.DiplomacyModel.MaxRelationLimit,
+                    GetEffectiveRelation(recipientSupporterClan.Leader, sturgia.Leader));
+                Assert.False(recipientRulerClan.IsUnderMercenaryService);
+                Assert.False(recipientSupporterClan.IsUnderMercenaryService);
             });
+            Assert.True(playerSupportGateCallCount > 0);
 
             string stage = null;
+            StartAllianceDecision unrelatedDueDecision = null;
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                unrelatedDueDecision = new StartAllianceDecision(sturgia.RulingClan, recipientKingdom)
+                {
+                    TriggerTime = CampaignTime.Zero
+                };
+                sturgia._unresolvedDecisions ??= new MBList<KingdomDecision>();
+                sturgia._unresolvedDecisions.Add(unrelatedDueDecision);
+            });
             Server.Call(() => stage = KingdomDebugCommand.StageAllianceTimeoutFixture(
                 new List<string> { recipientKingdomId, player.ClanId, sturgiaKingdomId }));
             Assert.StartsWith("LIVE_TEST_JSON=", stage);
+            Assert.Contains("\"normalizedNpcElectionSupporterCount\":2", stage);
+            Assert.Contains("\"npcElectionSupportersRestored\":true", stage);
+            Assert.True(unrelatedDueDecisionGateCallCount > 0);
+            Assert.False(unrelatedDueDecisionObservedNpcElectionSupporter);
 
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientSupporterClanId, out var recipientSupporterClan));
+                Assert.False(recipientRulerClan.IsUnderMercenaryService);
+                Assert.False(recipientSupporterClan.IsUnderMercenaryService);
+                Assert.DoesNotContain(unrelatedDueDecision, sturgia.UnresolvedDecisions);
                 var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
                 var election = new CoopKingdomElection(decision);
                 int noOutcomeIndex = election._possibleOutcomes
@@ -1886,6 +2011,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.EndsWith("=False", finalNoResolution.OutcomeKey);
             Assert.Empty(Server.InternalMessages.GetMessages<AllianceStarted>());
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+            Assert.Empty(Server.InternalMessages.GetMessages<ClanMercenaryServiceChanged>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkClanMercenaryServiceChanged>());
 
             string serverState = null;
             Server.Call(() => serverState = KingdomDebugCommand.GetAllianceTimeoutServerState(
@@ -1900,7 +2027,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientSupporterClanId, out var recipientSupporterClan));
                 Assert.Equal(initialRelation, GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+                Assert.Equal(initialSupporterRelation,
+                    GetEffectiveRelation(recipientSupporterClan.Leader, sturgia.Leader));
+                Assert.Equal(initialRecipientHonor, recipientKingdom.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.Equal(initialSturgiaHonor, sturgia.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.False(recipientRulerClan.IsUnderMercenaryService);
+                Assert.False(recipientSupporterClan.IsUnderMercenaryService);
                 Assert.Empty(recipientKingdom.UnresolvedDecisions);
             });
 
@@ -1910,6 +2045,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Server.Call(() => stage = KingdomDebugCommand.StageAllianceTimeoutFixture(
                 new List<string> { recipientKingdomId, player.ClanId, sturgiaKingdomId }));
             Assert.StartsWith("LIVE_TEST_JSON=", stage);
+            Assert.Contains("\"normalizedNpcElectionSupporterCount\":2", stage);
+            Assert.Contains("\"npcElectionSupportersRestored\":true", stage);
 
             int resolutionCountBeforeTimeout = Server.NetworkSentMessages
                 .GetMessages<NetworkKingdomDecisionResolved>()
@@ -1917,6 +2054,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientSupporterClanId, out var recipientSupporterClan));
+                Assert.False(recipientRulerClan.IsUnderMercenaryService);
+                Assert.False(recipientSupporterClan.IsUnderMercenaryService);
                 var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
 
                 GetConcreteVoteManager(Server).ProcessVotingRounds(
@@ -1935,6 +2076,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.EndsWith("=False", timeoutResolution.OutcomeKey);
             Assert.Empty(Server.InternalMessages.GetMessages<AllianceStarted>());
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+            Assert.Empty(Server.InternalMessages.GetMessages<ClanMercenaryServiceChanged>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkClanMercenaryServiceChanged>());
 
             Server.Call(() => serverState = KingdomDebugCommand.GetAllianceTimeoutServerState(
                 new List<string> { recipientKingdomId, sturgiaKingdomId }));
@@ -1947,13 +2090,21 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientSupporterClanId, out var recipientSupporterClan));
                 Assert.Equal(initialRelation, GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+                Assert.Equal(initialSupporterRelation,
+                    GetEffectiveRelation(recipientSupporterClan.Leader, sturgia.Leader));
+                Assert.Equal(initialRecipientHonor, recipientKingdom.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.Equal(initialSturgiaHonor, sturgia.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.False(recipientRulerClan.IsUnderMercenaryService);
+                Assert.False(recipientSupporterClan.IsUnderMercenaryService);
                 Assert.Empty(recipientKingdom.UnresolvedDecisions);
             });
 
             Server.Call(() => capture = KingdomDebugCommand.CaptureAllianceTimeoutFixture(new List<string>()));
             Assert.StartsWith("LIVE_TEST_JSON=", capture);
-            allowAlliance = false;
+            rejectNpcElectionSupporterGate = true;
 
             Server.Call(() => stage = KingdomDebugCommand.StageAllianceTimeoutFixture(
                 new List<string> { recipientKingdomId, player.ClanId, sturgiaKingdomId }));
@@ -1962,18 +2113,29 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
                 Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(sturgiaKingdomId, out var sturgia));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(recipientSupporterClanId, out var recipientSupporterClan));
                 Assert.Equal(initialRelation, GetEffectiveRelation(recipientKingdom.Leader, sturgia.Leader));
+                Assert.Equal(initialSupporterRelation,
+                    GetEffectiveRelation(recipientSupporterClan.Leader, sturgia.Leader));
+                Assert.Equal(initialRecipientHonor, recipientKingdom.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.Equal(initialSturgiaHonor, sturgia.Leader.GetTraitLevel(DefaultTraits.Honor));
+                Assert.False(recipientRulerClan.IsUnderMercenaryService);
+                Assert.False(recipientSupporterClan.IsUnderMercenaryService);
                 Assert.Empty(recipientKingdom.UnresolvedDecisions);
             });
             Assert.True(gateCallCount >= 6);
+            Assert.True(npcElectionSupporterGateCallCount >= 3);
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
+            Assert.Empty(Server.InternalMessages.GetMessages<ClanMercenaryServiceChanged>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkClanMercenaryServiceChanged>());
         }
         finally
         {
             Server.Call(() => CampaignEvents.HeroRelationChanged.ClearListeners(relationChangeListenerOwner));
         }
 
-        Assert.Equal(0, relationChangeEventCount);
+        Assert.Equal(0, fixtureRelationChangeEventCount);
     }
 
     [Fact]

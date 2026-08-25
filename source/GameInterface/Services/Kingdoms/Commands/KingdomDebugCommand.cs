@@ -24,8 +24,10 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
@@ -33,6 +35,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -425,12 +428,7 @@ public class KingdomDebugCommand
         Kingdom kingdom = null;
         foreach (Kingdom candidate in Kingdom.All
             .Where(candidate =>
-                candidate != sturgia &&
-                candidate.RulingClan != null &&
-                candidate.Leader != null &&
-                candidate.UnresolvedDecisions.Count == 0 &&
-                !FactionManager.IsAtWarAgainstFaction(candidate, sturgia) &&
-                !allianceBehavior.IsAllyWithKingdom(candidate, sturgia))
+                IsEligibleAllianceTimeoutCandidate(candidate, sturgia, allianceBehavior))
             .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal))
         {
             if (!TryValidateAllianceTimeoutTarget(candidate, sturgia, out string error))
@@ -508,9 +506,9 @@ public class KingdomDebugCommand
             return fixtureError;
         }
         pendingAllianceTimeoutFixture = fixture;
-        if (!TryPrepareAllianceTimeoutFixture(fixture, out string error))
+        if (!TryPrepareAllianceTimeoutFixture(fixture, out _, out string error))
         {
-            if (fixture.LeaderRelationRestored) pendingAllianceTimeoutFixture = null;
+            if (fixture.EligibilityRestored) pendingAllianceTimeoutFixture = null;
             return error;
         }
 
@@ -527,6 +525,9 @@ public class KingdomDebugCommand
             leaderRelationBefore = fixture.LeaderRelationBefore,
             leaderRelationAfter = fixture.CurrentLeaderRelation,
             leaderRelationChanged = fixture.LeaderRelationChanged,
+            eligibilityInputsChanged = fixture.EligibilityInputsChanged,
+            normalizedThreatClanCount = fixture.NormalizedThreatClanCount,
+            normalizedSupporterRelationCount = fixture.NormalizedSupporterRelationCount,
             unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
         });
     }
@@ -578,38 +579,86 @@ public class KingdomDebugCommand
                 $"Kingdom {kingdom.StringId} cannot currently receive a valid alliance offer from Sturgia: {reason}");
         }
 
+        if (!fixture.TryNormalizeNpcElectionSupporters(out string electionSupporterError))
+            return FailAllianceTimeoutFixture(fixture, electionSupporterError);
+
+        string stageFailure = string.Empty;
+        int decisionIndex = 0;
+        StartAllianceDecision decision = null;
         try
         {
-            // A redirected inbound offer is authored by the player kingdom's ruling clan.
-            var decision = new StartAllianceDecision(fixture.Kingdom.RulingClan, fixture.TargetKingdom);
-            CoopKingdomElection._opponentProposedAllianceDecisions.Add(decision);
-            fixture.Kingdom.AddDecision(decision, true);
-            decision.TriggerTime = CampaignTime.Zero;
-            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
-
-            if (!TryVerifyUnchangedAllianceState(fixture, out allianceStateError))
-                return FailAllianceTimeoutFixture(fixture, allianceStateError);
-
-            int decisionIndex = fixture.Kingdom._unresolvedDecisions.IndexOf(decision) + 1;
-            if (decisionIndex <= 0)
-                return FailAllianceTimeoutFixture(fixture, "The alliance-timeout decision was not retained for co-op voting.");
-
-            return LiveTestJsonResult(new
+            if (!TryCanMakeAlliance(
+                    kingdom,
+                    targetKingdom,
+                    kingdom.RulingClan,
+                    includeReason: true,
+                    out canMakeAlliance,
+                    out reason,
+                    out gateError))
             {
-                success = true,
-                fixture.KingdomId,
-                fixture.TargetKingdomId,
-                decisionIndex,
-                triggerPast = decision.TriggerTime.IsPast,
-                votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
-            });
+                stageFailure = gateError;
+            }
+            else if (!canMakeAlliance)
+            {
+                stageFailure = $"Kingdom {kingdom.StringId} cannot currently receive a valid alliance offer from Sturgia: {reason}";
+            }
+            else
+            {
+                // A redirected inbound offer is authored by the player kingdom's ruling clan.
+                decision = new StartAllianceDecision(fixture.Kingdom.RulingClan, fixture.TargetKingdom);
+                CoopKingdomElection._opponentProposedAllianceDecisions.Add(decision);
+                fixture.Kingdom.AddDecision(decision, true);
+                if (!fixture.TryRestoreNpcElectionSupporters(out string restoreError))
+                {
+                    stageFailure = $"The alliance-timeout election supporters could not be restored: {restoreError}";
+                }
+                else
+                {
+                    decision.TriggerTime = CampaignTime.Zero;
+                    CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+
+                    if (!TryVerifyUnchangedAllianceState(fixture, out allianceStateError))
+                    {
+                        stageFailure = allianceStateError;
+                    }
+                    else
+                    {
+                        decisionIndex = fixture.Kingdom._unresolvedDecisions.IndexOf(decision) + 1;
+                        if (decisionIndex <= 0)
+                        {
+                            stageFailure = "The alliance-timeout decision was not retained for co-op voting.";
+                        }
+                    }
+                }
+            }
         }
         catch (Exception exception)
         {
-            return FailAllianceTimeoutFixture(
-                fixture,
-                $"The alliance-timeout decision could not be staged: {exception.Message}");
+            stageFailure = $"The alliance-timeout decision could not be staged: {exception.Message}";
         }
+        finally
+        {
+            if (!fixture.TryRestoreNpcElectionSupporters(out string restoreError))
+            {
+                stageFailure = string.IsNullOrEmpty(stageFailure)
+                    ? $"The alliance-timeout election supporters could not be restored: {restoreError}"
+                    : $"{stageFailure} Fixture election supporter restoration failed: {restoreError}";
+            }
+        }
+
+        if (!string.IsNullOrEmpty(stageFailure)) return FailAllianceTimeoutFixture(fixture, stageFailure);
+
+        return LiveTestJsonResult(new
+        {
+            success = true,
+            fixture.KingdomId,
+            fixture.TargetKingdomId,
+            decisionIndex,
+            normalizedNpcElectionSupporterCount = fixture.NormalizedNpcElectionSupporterCount,
+            npcElectionSupportersRestored = fixture.NpcElectionSupportersRestored,
+            triggerPast = decision.TriggerTime.IsPast,
+            votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
+        });
     }
 
     [CommandLineArgumentFunction("alliance_timeout_state", "coop.debug.kingdom")]
@@ -723,6 +772,7 @@ public class KingdomDebugCommand
             restoredAllianceActive = allianceBehavior.IsAllyWithKingdom(fixture.Kingdom, fixture.TargetKingdom),
             leaderRelationBefore = fixture.LeaderRelationBefore,
             leaderRelationRestored = fixture.LeaderRelationRestored,
+            eligibilityInputsRestored = fixture.EligibilityRestored,
             unresolvedDecisionCount = fixture.Kingdom.UnresolvedDecisions.Count
         });
     }
@@ -787,6 +837,59 @@ public class KingdomDebugCommand
             .OfType<StartAllianceDecision>()
             .Any(decision => decision.KingdomToStartAllianceWith == fixture.TargetKingdom);
 
+    private static bool IsEligibleAllianceTimeoutCandidate(
+        Kingdom kingdom,
+        Kingdom targetKingdom,
+        AllianceCampaignBehavior allianceBehavior)
+    {
+        if (kingdom == null || targetKingdom == null || kingdom == targetKingdom ||
+            kingdom.IsEliminated || targetKingdom.IsEliminated ||
+            kingdom.RulingClan == null || kingdom.Leader == null || targetKingdom.RulingClan == null ||
+            targetKingdom.Leader == null || kingdom.UnresolvedDecisions.Count != 0 ||
+            FactionManager.IsAtWarAgainstFaction(kingdom, targetKingdom) ||
+            allianceBehavior.IsAllyWithKingdom(kingdom, targetKingdom)) return false;
+
+        if (Campaign.Current?.Models?.AllianceModel == null) return false;
+
+        int maximumAlliances = Campaign.Current.Models.AllianceModel.MaxNumberOfAlliances;
+        if (kingdom.AlliedKingdoms.Count >= maximumAlliances ||
+            targetKingdom.AlliedKingdoms.Count >= maximumAlliances) return false;
+
+        // The vanilla gate owns the topology and directional score checks after preparation.
+        return true;
+    }
+
+    private static List<AllianceTimeoutNeighbor> GetAllianceTimeoutNeighbors(Kingdom kingdom)
+    {
+        var seenFortifications = new HashSet<Settlement>();
+        var neighborCounts = new Dictionary<Kingdom, float>();
+        float totalNeighborCount = 0f;
+        foreach (Town fief in kingdom.Fiefs)
+        {
+            foreach (Settlement fortification in fief.GetNeighborFortifications(MobileParty.NavigationType.All))
+            {
+                IFaction faction = fortification.MapFaction;
+                if (faction == kingdom || !faction.IsKingdomFaction || !seenFortifications.Add(fortification)) continue;
+
+                var neighboringKingdom = (Kingdom)faction;
+                if (neighborCounts.TryGetValue(neighboringKingdom, out float count))
+                {
+                    neighborCounts[neighboringKingdom] = count + 1f;
+                }
+                else
+                {
+                    neighborCounts.Add(neighboringKingdom, 1f);
+                }
+
+                totalNeighborCount++;
+            }
+        }
+
+        return neighborCounts
+            .Select(pair => new AllianceTimeoutNeighbor(pair.Key, pair.Value, totalNeighborCount))
+            .ToList();
+    }
+
     private static bool TryCreateAllianceTimeoutFixture(
         Kingdom kingdom,
         Clan proposerClan,
@@ -845,16 +948,6 @@ public class KingdomDebugCommand
 
     private static bool TryValidateAllianceTimeoutTarget(Kingdom kingdom, Kingdom targetKingdom, out string error)
     {
-        if (!TryCanMakeAlliance(
-                kingdom,
-                targetKingdom,
-                kingdom.RulingClan,
-                includeReason: false,
-                out bool canMakeAlliance,
-                out _,
-                out error)) return false;
-        if (canMakeAlliance) return true;
-
         if (!TryCreateAllianceTimeoutFixture(
                 kingdom,
                 kingdom.RulingClan,
@@ -866,34 +959,38 @@ public class KingdomDebugCommand
         {
             return false;
         }
-        if (!fixture.TryNormalizeLeaderRelation(out error)) return false;
 
-        bool targetIsEligible = false;
+        bool targetIsEligible;
+        bool gateRejected;
+        bool eligibilityRestored = false;
         try
         {
-            if (!TryCanMakeAlliance(
-                kingdom,
-                targetKingdom,
-                kingdom.RulingClan,
-                includeReason: false,
-                out canMakeAlliance,
-                out _,
-                out error)) return false;
-            targetIsEligible = canMakeAlliance;
+            targetIsEligible = TryPrepareAllianceTimeoutFixture(fixture, out gateRejected, out error);
         }
         finally
         {
-            if (!fixture.TryRestoreLeaderRelation(out string restoreError))
+            eligibilityRestored = fixture.TryRestoreEligibility(out string restoreError);
+            if (!eligibilityRestored)
             {
                 error = $"Unable to restore alliance-timeout target normalization: {restoreError}";
             }
         }
 
+        if (!targetIsEligible && gateRejected && eligibilityRestored)
+        {
+            error = string.Empty;
+            return false;
+        }
         return string.IsNullOrEmpty(error) && targetIsEligible;
     }
 
-    private static bool TryPrepareAllianceTimeoutFixture(AllianceTimeoutFixture fixture, out string error)
+    private static bool TryPrepareAllianceTimeoutFixture(
+        AllianceTimeoutFixture fixture,
+        out bool gateRejected,
+        out string error)
     {
+        gateRejected = false;
+        bool requiresPlayerSupportNormalization = fixture.RequiresPlayerSupportNormalization;
         if (!TryCanMakeAlliance(
                 fixture.Kingdom,
                 fixture.TargetKingdom,
@@ -902,12 +999,84 @@ public class KingdomDebugCommand
                 out bool canMakeAlliance,
                 out _,
                 out error)) return false;
-        if (!canMakeAlliance &&
-            !fixture.TryNormalizeLeaderRelation(out error))
+        if (canMakeAlliance && !requiresPlayerSupportNormalization) return true;
+
+        if (!fixture.TryNormalizeLeaderRelation(out string leaderRelationError))
         {
-            return false;
+            return TryFailAllianceTimeoutFixturePreparation(fixture, leaderRelationError, out error);
+        }
+        if (TryCanMakeAlliance(
+                fixture.Kingdom,
+                fixture.TargetKingdom,
+                fixture.Kingdom.RulingClan,
+                includeReason: false,
+                out canMakeAlliance,
+                out _,
+                out error) && canMakeAlliance && !requiresPlayerSupportNormalization) return true;
+        if (!string.IsNullOrEmpty(error))
+        {
+            string gateFailure = error;
+            return TryFailAllianceTimeoutFixturePreparation(fixture, gateFailure, out error);
         }
 
+        if (!fixture.TryNormalizeThreatStrengths(out string threatStrengthError))
+        {
+            return TryFailAllianceTimeoutFixturePreparation(fixture, threatStrengthError, out error);
+        }
+        if (TryCanMakeAlliance(
+                fixture.Kingdom,
+                fixture.TargetKingdom,
+                fixture.Kingdom.RulingClan,
+                includeReason: false,
+                out canMakeAlliance,
+                out _,
+                out error) && canMakeAlliance && !requiresPlayerSupportNormalization) return true;
+        if (!string.IsNullOrEmpty(error))
+        {
+            string gateFailure = error;
+            return TryFailAllianceTimeoutFixturePreparation(fixture, gateFailure, out error);
+        }
+
+        if (!fixture.TryNormalizeKingdomCultures(out string cultureError))
+        {
+            return TryFailAllianceTimeoutFixturePreparation(fixture, cultureError, out error);
+        }
+        if (TryCanMakeAlliance(
+                fixture.Kingdom,
+                fixture.TargetKingdom,
+                fixture.Kingdom.RulingClan,
+                includeReason: false,
+                out canMakeAlliance,
+                out _,
+                out error) && canMakeAlliance && !requiresPlayerSupportNormalization) return true;
+        if (!string.IsNullOrEmpty(error))
+        {
+            string gateFailure = error;
+            return TryFailAllianceTimeoutFixturePreparation(fixture, gateFailure, out error);
+        }
+
+        if (!fixture.TryNormalizeLeaderHonor(out string leaderHonorError))
+        {
+            return TryFailAllianceTimeoutFixturePreparation(fixture, leaderHonorError, out error);
+        }
+        if (TryCanMakeAlliance(
+                fixture.Kingdom,
+                fixture.TargetKingdom,
+                fixture.Kingdom.RulingClan,
+                includeReason: false,
+                out canMakeAlliance,
+                out _,
+                out error) && canMakeAlliance && !requiresPlayerSupportNormalization) return true;
+        if (!string.IsNullOrEmpty(error))
+        {
+            string gateFailure = error;
+            return TryFailAllianceTimeoutFixturePreparation(fixture, gateFailure, out error);
+        }
+
+        if (!fixture.TryNormalizePlayerSupport(out string playerSupportError))
+        {
+            return TryFailAllianceTimeoutFixturePreparation(fixture, playerSupportError, out error);
+        }
         if (!TryCanMakeAlliance(
                 fixture.Kingdom,
                 fixture.TargetKingdom,
@@ -917,24 +1086,29 @@ public class KingdomDebugCommand
                 out TextObject reason,
                 out string gateError))
         {
-            if (!fixture.TryRestoreLeaderRelation(out string preparationRestoreError))
-            {
-                error = $"Unable to restore alliance-timeout fixture normalization: {preparationRestoreError}";
-                return false;
-            }
-
-            error = gateError;
-            return false;
+            return TryFailAllianceTimeoutFixturePreparation(fixture, gateError, out error);
         }
         if (canMakeAlliance) return true;
 
-        if (!fixture.TryRestoreLeaderRelation(out string failedGateRestoreError))
+        gateRejected = true;
+        return TryFailAllianceTimeoutFixturePreparation(
+            fixture,
+            $"Kingdom {fixture.Kingdom.StringId} cannot currently receive a valid alliance offer from Sturgia: {reason}",
+            out error);
+    }
+
+    private static bool TryFailAllianceTimeoutFixturePreparation(
+        AllianceTimeoutFixture fixture,
+        string failure,
+        out string error)
+    {
+        if (!fixture.TryRestoreEligibility(out string restoreError))
         {
-            error = $"Unable to restore alliance-timeout fixture normalization: {failedGateRestoreError}";
+            error = $"{failure} Fixture restoration failed: {restoreError}";
             return false;
         }
 
-        error = $"Kingdom {fixture.Kingdom.StringId} cannot currently receive a valid alliance offer from Sturgia: {reason}";
+        error = failure;
         return false;
     }
 
@@ -1027,9 +1201,9 @@ public class KingdomDebugCommand
             errors.Add(allianceStateError);
         }
 
-        if (!fixture.TryRestoreLeaderRelation(out string relationError))
+        if (!fixture.TryRestoreEligibility(out string relationError))
         {
-            errors.Add($"The leader relation was not restored: {relationError}");
+            errors.Add($"The alliance eligibility inputs were not restored: {relationError}");
         }
         if (HasMatchingAllianceDecision(fixture) ||
             fixture.Kingdom.UnresolvedDecisions.Count != fixture.UnresolvedDecisionCount)
@@ -1073,6 +1247,17 @@ public class KingdomDebugCommand
 
     private sealed class AllianceTimeoutFixture
     {
+        private const float MinimumQuerierKingdomStrength = 1f;
+        private const float ThreatScoreThreshold = 430f;
+        private const float ThreatSelectionMargin = 1f;
+        private const float ThreatScoreCoefficient = 130f;
+        private const float ThreatScoreBaseline = 0.4f;
+        private const float MaximumThreatExposure = 1.7f;
+        private const float MaximumThreatPowerRatio = 3f;
+        private readonly List<AllianceTimeoutClanStrength> normalizedThreatClanStrengths = new List<AllianceTimeoutClanStrength>();
+        private readonly List<AllianceTimeoutRelation> normalizedSupporterRelations = new List<AllianceTimeoutRelation>();
+        private readonly List<AllianceTimeoutMercenaryStatus> normalizedNpcElectionSupporters = new List<AllianceTimeoutMercenaryStatus>();
+
         public Kingdom Kingdom { get; }
         public Clan ProposerClan { get; }
         public Kingdom TargetKingdom { get; }
@@ -1083,9 +1268,29 @@ public class KingdomDebugCommand
         public Hero EffectiveTargetLeader { get; }
         public int LeaderRelationBefore { get; }
         public int UnresolvedDecisionCount { get; }
+        public CultureObject KingdomCultureBefore { get; }
+        public CultureObject TargetKingdomCultureBefore { get; }
+        public int KingdomLeaderHonorBefore { get; }
+        public int TargetKingdomLeaderHonorBefore { get; }
         public bool LeaderRelationChanged { get; private set; }
         public bool LeaderRelationRestored { get; private set; }
+        public bool KingdomCultureChanged { get; private set; }
+        public bool TargetKingdomCultureChanged { get; private set; }
+        public bool KingdomLeaderHonorChanged { get; private set; }
+        public bool TargetKingdomLeaderHonorChanged { get; private set; }
+        public bool EligibilityRestored { get; private set; }
+        public bool NpcElectionSupportersRestored { get; private set; }
+        public bool EligibilityInputsChanged =>
+            LeaderRelationChanged || KingdomCultureChanged || TargetKingdomCultureChanged ||
+            KingdomLeaderHonorChanged || TargetKingdomLeaderHonorChanged ||
+            normalizedThreatClanStrengths.Count != 0 || normalizedSupporterRelations.Count != 0 ||
+            normalizedNpcElectionSupporters.Count != 0;
+        public int NormalizedThreatClanCount => normalizedThreatClanStrengths.Count;
+        public int NormalizedSupporterRelationCount => normalizedSupporterRelations.Count;
+        public int NormalizedNpcElectionSupporterCount => normalizedNpcElectionSupporters.Count;
         public int CurrentLeaderRelation => CharacterRelationManager.GetHeroRelation(EffectiveLeader, EffectiveTargetLeader);
+        public bool RequiresPlayerSupportNormalization =>
+            ProposerClan != null && ProposerClan.Kingdom == Kingdom && ProposerClan != Kingdom.RulingClan;
 
         public AllianceTimeoutFixture(
             Kingdom kingdom,
@@ -1108,7 +1313,13 @@ public class KingdomDebugCommand
             EffectiveTargetLeader = effectiveTargetLeader;
             LeaderRelationBefore = leaderRelationBefore;
             UnresolvedDecisionCount = kingdom.UnresolvedDecisions.Count;
+            KingdomCultureBefore = kingdom.Culture;
+            TargetKingdomCultureBefore = targetKingdom.Culture;
+            KingdomLeaderHonorBefore = kingdom.Leader.GetTraitLevel(DefaultTraits.Honor);
+            TargetKingdomLeaderHonorBefore = targetKingdom.Leader.GetTraitLevel(DefaultTraits.Honor);
             LeaderRelationRestored = true;
+            NpcElectionSupportersRestored = true;
+            EligibilityRestored = true;
         }
 
         public bool TryNormalizeLeaderRelation(out string error)
@@ -1133,6 +1344,7 @@ public class KingdomDebugCommand
             {
                 LeaderRelationChanged = true;
                 LeaderRelationRestored = false;
+                EligibilityRestored = false;
                 return true;
             }
 
@@ -1169,6 +1381,612 @@ public class KingdomDebugCommand
             return LeaderRelationRestored;
         }
 
+        public bool TryNormalizeThreatStrengths(out string error)
+        {
+            error = string.Empty;
+            if (!TryEnsureKingdomStrength(Kingdom, MinimumQuerierKingdomStrength, out error)) return false;
+            if (!TryEnsureKingdomStrength(TargetKingdom, MinimumQuerierKingdomStrength, out error)) return false;
+            if (!TryNormalizeThreateningNeighbor(Kingdom, TargetKingdom, out error)) return false;
+            if (!TryEnsureKingdomStrength(TargetKingdom, MinimumQuerierKingdomStrength, out error)) return false;
+            if (!TryNormalizeThreateningNeighbor(TargetKingdom, Kingdom, out error)) return false;
+            if (!TryEnsureKingdomStrength(Kingdom, MinimumQuerierKingdomStrength, out error)) return false;
+            return TryEnsureKingdomStrength(TargetKingdom, MinimumQuerierKingdomStrength, out error);
+        }
+
+        public bool TryNormalizeKingdomCultures(out string error)
+        {
+            if (!TryNormalizeKingdomCulture(Kingdom, TargetKingdom, true, out error)) return false;
+            return TryNormalizeKingdomCulture(TargetKingdom, Kingdom, false, out error);
+        }
+
+        public bool TryNormalizeLeaderHonor(out string error)
+        {
+            if (!TrySetKingdomLeaderHonor(1, out error)) return false;
+            return TrySetTargetKingdomLeaderHonor(1, out error);
+        }
+
+        public bool TryNormalizePlayerSupport(out string error)
+        {
+            error = string.Empty;
+            if (!RequiresPlayerSupportNormalization) return true;
+
+            int maximumRelation = Campaign.Current.Models.DiplomacyModel.MaxRelationLimit;
+            if (!TrySetLeaderRelation(maximumRelation, out error)) return false;
+            if (!TrySetKingdomLeaderHonor(1, out error)) return false;
+            if (!TrySetTargetKingdomLeaderHonor(1, out error)) return false;
+
+            foreach (Clan supporterClan in Kingdom.Clans
+                     .Where(candidate =>
+                         !candidate.IsUnderMercenaryService && candidate != ProposerClan &&
+                         candidate != Kingdom.RulingClan && candidate.Leader != null))
+            {
+                try
+                {
+                    Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+                        supporterClan.Leader,
+                        TargetKingdom.Leader,
+                        out Hero effectiveSupporter,
+                        out Hero effectiveTarget);
+                    if (effectiveSupporter == null || effectiveTarget == null || effectiveSupporter == effectiveTarget)
+                    {
+                        error = "The alliance-timeout fixture could not resolve a supporter relation.";
+                        return false;
+                    }
+                    if (IsLeaderRelation(effectiveSupporter, effectiveTarget) ||
+                        normalizedSupporterRelations.Any(snapshot => snapshot.IsFor(effectiveSupporter, effectiveTarget)))
+                    {
+                        continue;
+                    }
+
+                    int currentRelation = CharacterRelationManager.GetHeroRelation(effectiveSupporter, effectiveTarget);
+                    if (currentRelation == maximumRelation) continue;
+
+                    var snapshot = new AllianceTimeoutRelation(
+                        effectiveSupporter,
+                        effectiveTarget,
+                        currentRelation);
+                    normalizedSupporterRelations.Add(snapshot);
+                    CharacterRelationManager.SetHeroRelation(effectiveSupporter, effectiveTarget, maximumRelation);
+                    if (CharacterRelationManager.GetHeroRelation(effectiveSupporter, effectiveTarget) != maximumRelation)
+                    {
+                        error = $"Expected supporter relation {maximumRelation}, found " +
+                            $"{CharacterRelationManager.GetHeroRelation(effectiveSupporter, effectiveTarget)}.";
+                        return false;
+                    }
+
+                    EligibilityRestored = false;
+                }
+                catch (Exception exception)
+                {
+                    error = $"The alliance-timeout fixture could not normalize supporter relation: {exception.Message}";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public bool TryNormalizeNpcElectionSupporters(out string error)
+        {
+            error = string.Empty;
+            if (ProposerClan == null || ProposerClan.Kingdom != Kingdom)
+            {
+                error = "The alliance-timeout fixture no longer has a testclient voting clan.";
+                return false;
+            }
+            if (ProposerClan.IsUnderMercenaryService)
+            {
+                error = "The testclient voting clan cannot be under mercenary service.";
+                return false;
+            }
+            if (normalizedNpcElectionSupporters.Count != 0)
+            {
+                error = "The alliance-timeout fixture has already initialized its election supporters.";
+                return false;
+            }
+
+            foreach (Clan clan in Kingdom.Clans
+                     .Where(candidate => candidate != null && candidate != ProposerClan &&
+                         !candidate.IsUnderMercenaryService)
+                     .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal))
+            {
+                if (clan.Leader?.IsHumanPlayerCharacter == true)
+                {
+                    return TryFailNpcElectionSupporterNormalization(
+                        "The alliance-timeout fixture requires testclient to be the only non-mercenary human supporter.",
+                        out error);
+                }
+
+                var snapshot = new AllianceTimeoutMercenaryStatus(clan, clan.IsUnderMercenaryService);
+                normalizedNpcElectionSupporters.Add(snapshot);
+                try
+                {
+                    clan.IsUnderMercenaryService = true;
+                }
+                catch (Exception exception)
+                {
+                    return TryFailNpcElectionSupporterNormalization(
+                        $"The alliance-timeout fixture could not initialize election supporters: {exception.Message}",
+                        out error);
+                }
+                if (!clan.IsUnderMercenaryService)
+                {
+                    return TryFailNpcElectionSupporterNormalization(
+                        $"Expected {clan.StringId} to be under mercenary service during election setup.",
+                        out error);
+                }
+            }
+
+            if (normalizedNpcElectionSupporters.Count == 0)
+            {
+                error = "The alliance-timeout fixture could not find an NPC election supporter to initialize.";
+                return false;
+            }
+
+            NpcElectionSupportersRestored = false;
+            EligibilityRestored = false;
+            return true;
+        }
+
+        private bool TryFailNpcElectionSupporterNormalization(string failure, out string error)
+        {
+            if (TryRestoreNpcElectionSupporters(out string restoreError))
+            {
+                error = failure;
+                return false;
+            }
+
+            error = $"{failure} Fixture election supporter restoration failed: {restoreError}";
+            return false;
+        }
+
+        public bool TryRestoreNpcElectionSupporters(out string error)
+        {
+            var errors = new List<string>();
+            foreach (AllianceTimeoutMercenaryStatus snapshot in normalizedNpcElectionSupporters)
+            {
+                try
+                {
+                    if (snapshot.CurrentValue != snapshot.Value)
+                    {
+                        snapshot.Clan.IsUnderMercenaryService = snapshot.Value;
+                    }
+                    if (snapshot.CurrentValue != snapshot.Value)
+                    {
+                        errors.Add($"Expected {snapshot.Clan.StringId} mercenary status {snapshot.Value}, found {snapshot.CurrentValue}.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    errors.Add($"The election supporter {snapshot.Clan.StringId} could not be restored: {exception.Message}");
+                }
+            }
+
+            NpcElectionSupportersRestored = errors.Count == 0 &&
+                normalizedNpcElectionSupporters.All(snapshot => snapshot.CurrentValue == snapshot.Value);
+            if (!NpcElectionSupportersRestored && errors.Count == 0)
+            {
+                errors.Add("The alliance-timeout election supporters did not restore to their captured values.");
+            }
+
+            error = string.Join(" ", errors);
+            return NpcElectionSupportersRestored;
+        }
+
+        public bool TryRestoreEligibility(out string error)
+        {
+            var errors = new List<string>();
+            if (!TryRestoreNpcElectionSupporters(out string npcElectionSupporterError)) errors.Add(npcElectionSupporterError);
+            TryRestoreSupporterRelations(errors);
+            if (!TryRestoreLeaderRelation(out string leaderRelationError)) errors.Add(leaderRelationError);
+            TryRestoreKingdomLeaderHonor(errors);
+            TryRestoreTargetKingdomLeaderHonor(errors);
+            TryRestoreKingdomCultures(errors);
+            TryRestoreThreatStrengths(errors);
+
+            EligibilityRestored = errors.Count == 0 &&
+                LeaderRelationRestored &&
+                Kingdom.Culture == KingdomCultureBefore &&
+                TargetKingdom.Culture == TargetKingdomCultureBefore &&
+                Kingdom.Leader.GetTraitLevel(DefaultTraits.Honor) == KingdomLeaderHonorBefore &&
+                TargetKingdom.Leader.GetTraitLevel(DefaultTraits.Honor) == TargetKingdomLeaderHonorBefore &&
+                normalizedThreatClanStrengths.All(snapshot => snapshot.Clan.CurrentTotalStrength == snapshot.Value) &&
+                normalizedSupporterRelations.All(snapshot => snapshot.CurrentValue == snapshot.Value) &&
+                normalizedNpcElectionSupporters.All(snapshot => snapshot.CurrentValue == snapshot.Value) &&
+                NpcElectionSupportersRestored;
+            if (!EligibilityRestored && errors.Count == 0)
+            {
+                errors.Add("The alliance-timeout eligibility inputs did not restore to their captured values.");
+            }
+
+            error = string.Join(" ", errors);
+            return EligibilityRestored;
+        }
+
+        private bool TryNormalizeKingdomCulture(
+            Kingdom kingdom,
+            Kingdom otherKingdom,
+            bool isFixtureKingdom,
+            out string error)
+        {
+            error = string.Empty;
+            if (kingdom.Culture == null || !otherKingdom.Fiefs.Any(fief => fief.Culture == kingdom.Culture)) return true;
+
+            CultureObject culture = MBObjectManager.Instance.GetObjectTypeList<CultureObject>()
+                .Where(candidate => candidate != null && !otherKingdom.Fiefs.Any(fief => fief.Culture == candidate))
+                .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal)
+                .FirstOrDefault();
+            if (culture == null)
+            {
+                error = $"The alliance-timeout fixture could not find a reversible culture for {kingdom.StringId}.";
+                return false;
+            }
+
+            try
+            {
+                kingdom.Culture = culture;
+            }
+            catch (Exception exception)
+            {
+                error = $"The alliance-timeout fixture could not normalize kingdom culture: {exception.Message}";
+                return false;
+            }
+            if (kingdom.Culture != culture)
+            {
+                error = "The alliance-timeout fixture could not normalize kingdom culture.";
+                return false;
+            }
+
+            if (isFixtureKingdom) KingdomCultureChanged = true;
+            else TargetKingdomCultureChanged = true;
+            EligibilityRestored = false;
+            return true;
+        }
+
+        private bool TrySetKingdomLeaderHonor(int honor, out string error)
+        {
+            return TrySetLeaderHonor(Kingdom.Leader, honor, true, out error);
+        }
+
+        private bool TrySetTargetKingdomLeaderHonor(int honor, out string error)
+        {
+            return TrySetLeaderHonor(TargetKingdom.Leader, honor, false, out error);
+        }
+
+        private bool TrySetLeaderHonor(Hero leader, int honor, bool isFixtureKingdom, out string error)
+        {
+            error = string.Empty;
+            if (leader.GetTraitLevel(DefaultTraits.Honor) == honor) return true;
+
+            try
+            {
+                leader.SetTraitLevel(DefaultTraits.Honor, honor);
+            }
+            catch (Exception exception)
+            {
+                error = $"The alliance-timeout fixture could not normalize ruler honor: {exception.Message}";
+                return false;
+            }
+            if (leader.GetTraitLevel(DefaultTraits.Honor) != honor)
+            {
+                error = $"Expected ruler honor {honor}, found {leader.GetTraitLevel(DefaultTraits.Honor)}.";
+                return false;
+            }
+
+            if (isFixtureKingdom) KingdomLeaderHonorChanged = true;
+            else TargetKingdomLeaderHonorChanged = true;
+            EligibilityRestored = false;
+            return true;
+        }
+
+        private void TryRestoreSupporterRelations(List<string> errors)
+        {
+            foreach (AllianceTimeoutRelation snapshot in normalizedSupporterRelations)
+            {
+                try
+                {
+                    if (snapshot.CurrentValue != snapshot.Value)
+                    {
+                        CharacterRelationManager.SetHeroRelation(snapshot.First, snapshot.Second, snapshot.Value);
+                    }
+                    if (snapshot.CurrentValue != snapshot.Value)
+                    {
+                        errors.Add($"Expected supporter relation {snapshot.Value}, found {snapshot.CurrentValue}.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    errors.Add($"The supporter relation could not be restored: {exception.Message}");
+                }
+            }
+        }
+
+        private void TryRestoreKingdomLeaderHonor(List<string> errors)
+        {
+            TryRestoreLeaderHonor(Kingdom.Leader, KingdomLeaderHonorBefore, errors);
+        }
+
+        private void TryRestoreTargetKingdomLeaderHonor(List<string> errors)
+        {
+            TryRestoreLeaderHonor(TargetKingdom.Leader, TargetKingdomLeaderHonorBefore, errors);
+        }
+
+        private static void TryRestoreLeaderHonor(Hero leader, int honor, List<string> errors)
+        {
+            try
+            {
+                if (leader.GetTraitLevel(DefaultTraits.Honor) != honor)
+                {
+                    leader.SetTraitLevel(DefaultTraits.Honor, honor);
+                }
+                if (leader.GetTraitLevel(DefaultTraits.Honor) != honor)
+                {
+                    errors.Add($"Expected ruler honor {honor}, found {leader.GetTraitLevel(DefaultTraits.Honor)}.");
+                }
+            }
+            catch (Exception exception)
+            {
+                errors.Add($"The ruler honor could not be restored: {exception.Message}");
+            }
+        }
+
+        private void TryRestoreKingdomCultures(List<string> errors)
+        {
+            TryRestoreKingdomCulture(Kingdom, KingdomCultureBefore, errors);
+            TryRestoreKingdomCulture(TargetKingdom, TargetKingdomCultureBefore, errors);
+        }
+
+        private static void TryRestoreKingdomCulture(Kingdom kingdom, CultureObject culture, List<string> errors)
+        {
+            try
+            {
+                if (kingdom.Culture != culture) kingdom.Culture = culture;
+                if (kingdom.Culture != culture)
+                {
+                    errors.Add($"The culture for {kingdom.StringId} was not restored.");
+                }
+            }
+            catch (Exception exception)
+            {
+                errors.Add($"The culture for {kingdom.StringId} could not be restored: {exception.Message}");
+            }
+        }
+
+        private void TryRestoreThreatStrengths(List<string> errors)
+        {
+            foreach (AllianceTimeoutClanStrength snapshot in normalizedThreatClanStrengths)
+            {
+                try
+                {
+                    if (snapshot.Clan.CurrentTotalStrength != snapshot.Value)
+                    {
+                        snapshot.Clan.CurrentTotalStrength = snapshot.Value;
+                    }
+                    if (snapshot.Clan.CurrentTotalStrength != snapshot.Value)
+                    {
+                        errors.Add($"Expected threat strength {snapshot.Value}, found {snapshot.Clan.CurrentTotalStrength}.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    errors.Add($"Threat strength could not be restored: {exception.Message}");
+                }
+            }
+        }
+
+        private bool TryNormalizeThreateningNeighbor(
+            Kingdom querierKingdom,
+            Kingdom otherKingdom,
+            out string error)
+        {
+            error = string.Empty;
+            List<AllianceTimeoutNeighbor> neighbors = GetAllianceTimeoutNeighbors(querierKingdom);
+            float querierStrength = GetKingdomStrength(querierKingdom);
+            AllianceTimeoutNeighbor threatNeighbor = neighbors
+                .Where(candidate => candidate.Kingdom != otherKingdom && !candidate.Kingdom.IsEliminated)
+                .OrderByDescending(candidate => GetMaximumThreatScore(candidate, querierStrength))
+                .ThenBy(candidate => candidate.Kingdom.StringId, StringComparer.Ordinal)
+                .FirstOrDefault();
+            if (threatNeighbor == null ||
+                GetMaximumThreatScore(threatNeighbor, querierStrength) <= ThreatScoreThreshold) return true;
+
+            float requiredStrength = GetRequiredThreatStrength(
+                threatNeighbor,
+                querierStrength,
+                ThreatScoreThreshold + ThreatSelectionMargin);
+            if (!TryEnsureKingdomStrength(threatNeighbor.Kingdom, requiredStrength, out error)) return false;
+
+            float selectedThreatScore = GetThreatScore(threatNeighbor, querierStrength);
+            foreach (AllianceTimeoutNeighbor competingNeighbor in neighbors
+                     .Where(candidate => candidate.Kingdom != threatNeighbor.Kingdom))
+            {
+                if (GetThreatScore(competingNeighbor, querierStrength) < selectedThreatScore) continue;
+
+                float maximumStrength = GetMaximumThreatStrength(
+                    competingNeighbor,
+                    querierStrength,
+                    selectedThreatScore - ThreatSelectionMargin);
+                if (!TryLimitKingdomStrength(competingNeighbor.Kingdom, maximumStrength, out error)) return false;
+            }
+
+            AllianceTimeoutNeighbor selectedThreat = GetVanillaThreateningNeighbor(querierKingdom, out float threatScore);
+            if (selectedThreat == threatNeighbor && threatScore > ThreatScoreThreshold) return true;
+
+            error = $"The alliance-timeout fixture could not select {threatNeighbor.Kingdom.StringId} " +
+                "as the vanilla threatening neighbor.";
+            return false;
+        }
+
+        private bool TryEnsureKingdomStrength(Kingdom kingdom, float requiredStrength, out string error)
+        {
+            error = string.Empty;
+            float currentStrength = GetKingdomStrength(kingdom);
+            if (currentStrength >= requiredStrength) return true;
+
+            Clan clan = kingdom.Clans
+                .Where(candidate => !candidate.IsUnderMercenaryService)
+                .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal)
+                .FirstOrDefault();
+            if (clan == null)
+            {
+                error = $"The alliance-timeout fixture could not find a non-mercenary clan for {kingdom.StringId}.";
+                return false;
+            }
+
+            float normalizedStrength = clan.CurrentTotalStrength + requiredStrength - currentStrength;
+            if (!TrySetClanStrength(clan, normalizedStrength, out error)) return false;
+            if (GetKingdomStrength(kingdom) < requiredStrength)
+            {
+                error = $"Expected kingdom strength {requiredStrength}, found {GetKingdomStrength(kingdom)}.";
+                return false;
+            }
+
+            EligibilityRestored = false;
+            return true;
+        }
+
+        private bool TryLimitKingdomStrength(Kingdom kingdom, float maximumStrength, out string error)
+        {
+            error = string.Empty;
+            float currentStrength = GetKingdomStrength(kingdom);
+            if (currentStrength < maximumStrength) return true;
+
+            float remainingReduction = currentStrength - maximumStrength + ThreatSelectionMargin;
+            foreach (Clan clan in kingdom.Clans
+                     .Where(candidate => !candidate.IsUnderMercenaryService)
+                     .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal))
+            {
+                if (remainingReduction <= 0f) break;
+
+                float reduction = MathF.Min(clan.CurrentTotalStrength, remainingReduction);
+                if (reduction <= 0f) continue;
+                if (!TrySetClanStrength(clan, clan.CurrentTotalStrength - reduction, out error)) return false;
+                remainingReduction -= reduction;
+            }
+
+            if (GetKingdomStrength(kingdom) >= maximumStrength)
+            {
+                error = $"Expected kingdom strength below {maximumStrength}, found {GetKingdomStrength(kingdom)}.";
+                return false;
+            }
+
+            EligibilityRestored = false;
+            return true;
+        }
+
+        private bool TrySetClanStrength(Clan clan, float strength, out string error)
+        {
+            error = string.Empty;
+            if (!normalizedThreatClanStrengths.Any(snapshot => snapshot.Clan == clan))
+            {
+                normalizedThreatClanStrengths.Add(new AllianceTimeoutClanStrength(clan, clan.CurrentTotalStrength));
+            }
+
+            try
+            {
+                clan.CurrentTotalStrength = strength;
+            }
+            catch (Exception exception)
+            {
+                error = $"The alliance-timeout fixture could not normalize threat strength: {exception.Message}";
+                return false;
+            }
+
+            return true;
+        }
+
+        private AllianceTimeoutNeighbor GetVanillaThreateningNeighbor(
+            Kingdom querierKingdom,
+            out float threatScore)
+        {
+            AllianceTimeoutNeighbor selectedNeighbor = null;
+            threatScore = 0f;
+            float querierStrength = GetKingdomStrength(querierKingdom);
+            foreach (AllianceTimeoutNeighbor neighbor in GetAllianceTimeoutNeighbors(querierKingdom))
+            {
+                float candidateThreatScore = GetThreatScore(neighbor, querierStrength);
+                if (threatScore < candidateThreatScore)
+                {
+                    selectedNeighbor = neighbor;
+                    threatScore = candidateThreatScore;
+                }
+            }
+
+            return selectedNeighbor;
+        }
+
+        private static float GetMaximumThreatScore(AllianceTimeoutNeighbor neighbor, float querierStrength)
+        {
+            if (querierStrength <= 0f || neighbor.TotalNeighborScore <= 0f) return 0f;
+
+            float exposureScore = MBMath.Map(
+                neighbor.NeighborScore / neighbor.TotalNeighborScore,
+                0f,
+                1f,
+                1f,
+                2f);
+            return (MathF.Min(exposureScore, MaximumThreatExposure) + ThreatScoreBaseline +
+                MaximumThreatPowerRatio) * ThreatScoreCoefficient;
+        }
+
+        private float GetThreatScore(AllianceTimeoutNeighbor neighbor, float querierStrength)
+        {
+            if (querierStrength <= 0f || neighbor.TotalNeighborScore <= 0f) return 0f;
+
+            float exposureScore = MBMath.Map(
+                neighbor.NeighborScore / neighbor.TotalNeighborScore,
+                0f,
+                1f,
+                1f,
+                2f);
+            float powerRatio = MathF.Clamp(
+                GetKingdomStrength(neighbor.Kingdom) / querierStrength,
+                0f,
+                MaximumThreatPowerRatio);
+            return (MathF.Min(exposureScore, MaximumThreatExposure) + ThreatScoreBaseline +
+                powerRatio) * ThreatScoreCoefficient;
+        }
+
+        private static float GetRequiredThreatStrength(
+            AllianceTimeoutNeighbor neighbor,
+            float querierStrength,
+            float requiredThreatScore)
+        {
+            float exposureScore = MBMath.Map(
+                neighbor.NeighborScore / neighbor.TotalNeighborScore,
+                0f,
+                1f,
+                1f,
+                2f);
+            float requiredPowerRatio = (requiredThreatScore / ThreatScoreCoefficient) -
+                MathF.Min(exposureScore, MaximumThreatExposure) - ThreatScoreBaseline;
+            return querierStrength * MathF.Clamp(requiredPowerRatio, 0f, MaximumThreatPowerRatio);
+        }
+
+        private static float GetMaximumThreatStrength(
+            AllianceTimeoutNeighbor neighbor,
+            float querierStrength,
+            float maximumThreatScore)
+        {
+            float exposureScore = MBMath.Map(
+                neighbor.NeighborScore / neighbor.TotalNeighborScore,
+                0f,
+                1f,
+                1f,
+                2f);
+            float maximumPowerRatio = (maximumThreatScore / ThreatScoreCoefficient) -
+                MathF.Min(exposureScore, MaximumThreatExposure) - ThreatScoreBaseline;
+            return querierStrength * MathF.Clamp(maximumPowerRatio, 0f, MaximumThreatPowerRatio);
+        }
+
+        private bool IsLeaderRelation(Hero first, Hero second) =>
+            (first == EffectiveLeader && second == EffectiveTargetLeader) ||
+            (first == EffectiveTargetLeader && second == EffectiveLeader);
+
+        private static float GetKingdomStrength(Kingdom kingdom) => kingdom.Clans
+            .Where(clan => !clan.IsUnderMercenaryService)
+            .Sum(clan => clan.CurrentTotalStrength);
+
         private bool TrySetLeaderRelation(int relation, out string error)
         {
             error = string.Empty;
@@ -1186,6 +2004,63 @@ public class KingdomDebugCommand
 
             error = $"Expected {relation}, found {CurrentLeaderRelation}.";
             return false;
+        }
+    }
+
+    private sealed class AllianceTimeoutClanStrength
+    {
+        public Clan Clan { get; }
+        public float Value { get; }
+
+        public AllianceTimeoutClanStrength(Clan clan, float value)
+        {
+            Clan = clan;
+            Value = value;
+        }
+    }
+
+    private sealed class AllianceTimeoutRelation
+    {
+        public Hero First { get; }
+        public Hero Second { get; }
+        public int Value { get; }
+        public int CurrentValue => CharacterRelationManager.GetHeroRelation(First, Second);
+
+        public AllianceTimeoutRelation(Hero first, Hero second, int value)
+        {
+            First = first;
+            Second = second;
+            Value = value;
+        }
+
+        public bool IsFor(Hero first, Hero second) =>
+            (first == First && second == Second) || (first == Second && second == First);
+    }
+
+    private sealed class AllianceTimeoutMercenaryStatus
+    {
+        public Clan Clan { get; }
+        public bool Value { get; }
+        public bool CurrentValue => Clan.IsUnderMercenaryService;
+
+        public AllianceTimeoutMercenaryStatus(Clan clan, bool value)
+        {
+            Clan = clan;
+            Value = value;
+        }
+    }
+
+    private sealed class AllianceTimeoutNeighbor
+    {
+        public Kingdom Kingdom { get; }
+        public float NeighborScore { get; }
+        public float TotalNeighborScore { get; }
+
+        public AllianceTimeoutNeighbor(Kingdom kingdom, float neighborScore, float totalNeighborScore)
+        {
+            Kingdom = kingdom;
+            NeighborScore = neighborScore;
+            TotalNeighborScore = totalNeighborScore;
         }
     }
 
