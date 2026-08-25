@@ -3,7 +3,6 @@ using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Missions;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using ProtoBuf;
 using System.Collections.Generic;
@@ -71,12 +70,10 @@ internal readonly struct NetworkEndDebugBattleMission : IEvent
 internal sealed class DebugBattleMissionExitHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
-    private readonly IObjectManager objectManager;
 
-    public DebugBattleMissionExitHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public DebugBattleMissionExitHandler(IMessageBroker messageBroker)
     {
         this.messageBroker = messageBroker;
-        this.objectManager = objectManager;
         messageBroker.Subscribe<NetworkEndDebugBattleMission>(Handle);
     }
 
@@ -93,9 +90,8 @@ internal sealed class DebugBattleMissionExitHandler : IHandler
         string mapEventId = payload.What.MapEventId;
         GameThread.RunSafe(() =>
         {
-            var mapEvent = MobileParty.MainParty?.MapEvent;
-            if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var localMapEventId) ||
-                localMapEventId != mapEventId)
+            // The ordered destroy message can remove the registry entry before this queued action runs.
+            if (BattleSpawnGate.ActiveMapEventId != mapEventId)
                 return;
 
             var mission = Mission.Current ?? MissionState.Current?.CurrentMission;
