@@ -15,6 +15,7 @@ using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -231,16 +232,13 @@ internal class TradeHandler : IHandler
 
         foreach (var (item, count) in items)
         {
+            if (item.EquipmentElement.Item == null)
+                continue;
+
             if (TryResolveItemRosterId(item, out var resolvedItem))
             {
                 resolvedItems.Add((resolvedItem, count));
-if (item.EquipmentElement.Item == null)
-    continue;
-    
-if (TryResolveItemRosterId(item, out var resolvedItem))
-{
-resolvedItems.Add((resolvedItem, count));
-}
+            }
         }
 
         return resolvedItems.ToArray();
