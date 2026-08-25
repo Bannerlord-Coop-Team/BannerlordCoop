@@ -84,11 +84,24 @@ public class MeshNetworkRouter
             SchedulePacket(sender, recipient, packet);
     }
 
+    public void SendAll(MockBattleNetwork sender, IPacket packet, byte[] serializedPacket)
+    {
+        foreach (ClientRegistration recipient in RecipientsOf(sender))
+            SchedulePacket(sender, recipient, packet, serializedPacket);
+    }
+
     public void Send(MockBattleNetwork sender, string controllerId, IPacket packet)
     {
         foreach (ClientRegistration recipient in RecipientsOf(sender))
             if (ControllerIdOf(recipient.Instance) == controllerId)
                 SchedulePacket(sender, recipient, packet);
+    }
+
+    public void Send(MockBattleNetwork sender, string controllerId, IPacket packet, byte[] serializedPacket)
+    {
+        foreach (ClientRegistration recipient in RecipientsOf(sender))
+            if (ControllerIdOf(recipient.Instance) == controllerId)
+                SchedulePacket(sender, recipient, packet, serializedPacket);
     }
 
     public void SendAllBut(MockBattleNetwork sender, string excludedControllerId, IPacket packet)
@@ -130,6 +143,21 @@ public class MeshNetworkRouter
         IPacket packet)
     {
         IPacket wireCopy = SenderInstance(sender).EnsureSerializable(packet);
+        scheduler.Schedule(
+            sender,
+            recipient.Mesh,
+            $"packet:{packet.DeliveryMethod}",
+            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy)));
+        scheduler.DrainReady();
+    }
+
+    private void SchedulePacket(
+        MockBattleNetwork sender,
+        ClientRegistration recipient,
+        IPacket packet,
+        byte[] serializedPacket)
+    {
+        byte[] wireCopy = serializedPacket.ToArray();
         scheduler.Schedule(
             sender,
             recipient.Mesh,

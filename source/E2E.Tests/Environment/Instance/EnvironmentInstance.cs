@@ -83,6 +83,19 @@ public abstract class EnvironmentInstance : IDisposable
         }
     }
 
+    /// <summary>Simulates the real mesh receive path by deserializing the exact transmitted bytes.</summary>
+    public void SimulatePacket(NetPeer source, byte[] serializedPacket, bool markGameThread = true)
+    {
+        ArgumentNullException.ThrowIfNull(serializedPacket);
+
+        using (new StaticScope(this, markGameThread))
+        {
+            var serializer = Container.Resolve<ICommonSerializer>();
+            IPacket packet = serializer.Deserialize<IPacket>(serializedPacket);
+            mockNetwork.ReceiveFromNetwork(source, packet);
+        }
+    }
+
     /// <summary>
     /// Calls a given action with correctly setup static variables used by the patches
     /// </summary>

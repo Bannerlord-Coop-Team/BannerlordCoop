@@ -1,4 +1,5 @@
 ﻿using Common.PacketHandlers;
+using Common.Serialization;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
@@ -102,7 +103,7 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
         try
         {
             var packet = new MovementPacket(Array.Empty<Guid>(), Array.Empty<AgentData>());
-            byte[] serializedPacket = { 1, 2, 3 };
+            byte[] serializedPacket = clients[0].Resolve<ICommonSerializer>().Serialize(packet);
             MockBattleNetwork sender = Mesh(clients[0]);
 
             clients[0].Call(() =>
@@ -123,6 +124,46 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
             Assert.Equal(5, sender.NetworkSentPackets.Count);
             Assert.Equal(2, sender.DirectPacketSends.Count);
             Assert.Equal(2, sender.SerializedPacketSends.Count);
+        }
+        finally
+        {
+            packetManagerB.RemovePacketHandler(receiverB);
+            packetManagerC.RemovePacketHandler(receiverC);
+        }
+    }
+
+    [Fact]
+    public void Mesh_SerializedPacketOverloads_RouteProvidedPayloadThroughRestore()
+    {
+        EnvironmentInstance[] clients = Clients.ToArray();
+        Connect(clients[0], "ctrl-A", "instance-1");
+        Connect(clients[1], "ctrl-B", "instance-1");
+        Connect(clients[2], "ctrl-C", "instance-1");
+
+        var receiverB = new RecordingPacketHandler();
+        var receiverC = new RecordingPacketHandler();
+        IPacketManager packetManagerB = clients[1].Resolve<IPacketManager>();
+        IPacketManager packetManagerC = clients[2].Resolve<IPacketManager>();
+        packetManagerB.RegisterPacketHandler(receiverB);
+        packetManagerC.RegisterPacketHandler(receiverC);
+
+        try
+        {
+            var logicalPacket = new MovementPacket(Array.Empty<Guid>(), Array.Empty<AgentData>());
+            var corruptEnvelope = new CompressedMovementPacket(512, new byte[] { 1, 2, 3 });
+            byte[] serializedPacket = clients[0].Resolve<ICommonSerializer>().Serialize(corruptEnvelope);
+            MockBattleNetwork sender = Mesh(clients[0]);
+
+            clients[0].Call(() =>
+            {
+                sender.SendAll(logicalPacket, serializedPacket);
+                sender.Send("ctrl-B", logicalPacket, serializedPacket);
+            });
+
+            Assert.Empty(receiverB.Packets);
+            Assert.Empty(receiverC.Packets);
+            Assert.Equal(2, sender.SerializedPacketSends.Count);
+            Assert.All(sender.SerializedPacketSends, send => Assert.Same(serializedPacket, send.Payload));
         }
         finally
         {
