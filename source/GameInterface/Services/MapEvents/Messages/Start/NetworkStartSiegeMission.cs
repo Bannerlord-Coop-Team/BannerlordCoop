@@ -44,7 +44,8 @@ internal record NetworkStartSiegeMission : ICommand
 }
 
 /// <summary>
-/// One deployed siege engine as the mission reads it: type, deployment slot, and remaining health.
+/// One deployed siege engine as the mission reads it: type, position in the compact deployed-engine snapshot,
+/// and remaining health.
 /// Public because the mission host (Missions assembly) also reports final engine states with it.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
