@@ -141,18 +141,26 @@ public class SiegeEventLifetimeTests : IDisposable
             {
                 var leaderPosition = new CampaignVec2(new Vec2(17f, 23f), true);
                 var supportPosition = new CampaignVec2(new Vec2(31f, 47f), true);
+                var stalePosition = new CampaignVec2(new Vec2(53f, 71f), true);
+                var staleParty = ObjectHelper.SkipConstructor<MobileParty>();
                 besiegerParty._position = leaderPosition;
                 supportParty._position = supportPosition;
+                staleParty._position = stalePosition;
                 besiegerParty._besiegerCamp = null;
                 supportParty._besiegerCamp = null;
+                staleParty._besiegerCamp = besiegerCamp;
                 besiegerCamp._besiegerParties.Clear();
+                besiegerCamp._besiegerParties.Add(staleParty);
 
                 Assert.True(client.Resolve<ISiegeEventGraphSynchronizer>().TryApply(
                     initialization.ToSnapshot()));
                 Assert.Equal(leaderPosition, besiegerParty.Position);
                 Assert.Equal(supportPosition, supportParty.Position);
+                Assert.Equal(stalePosition, staleParty.Position);
                 Assert.Same(besiegerCamp, besiegerParty.BesiegerCamp);
                 Assert.Same(besiegerCamp, supportParty.BesiegerCamp);
+                Assert.Null(staleParty.BesiegerCamp);
+                Assert.DoesNotContain(staleParty, besiegerCamp._besiegerParties);
 
                 long retainedStartTimeTicks = siegeStartTimeTicks + 10;
                 using (new AllowedThread())

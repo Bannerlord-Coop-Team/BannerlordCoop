@@ -286,7 +286,16 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
                     if (strategy != null) camp.SiegeStrategy = strategy;
                 }
 
+                var previousParties = camp._besiegerParties.ToArray();
                 camp._besiegerParties.Clear();
+                foreach (var party in previousParties)
+                {
+                    if (besiegerParties.Contains(party) || party?._besiegerCamp != camp) continue;
+
+                    party._besiegerCamp = null;
+                    party.Party?.SetVisualAsDirty();
+                }
+
                 foreach (var party in besiegerParties)
                 {
                     if (party._besiegerCamp != camp)
