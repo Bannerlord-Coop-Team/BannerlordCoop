@@ -182,6 +182,7 @@ internal static class BattleDebugCommands
 #endif
 
 #if DEBUG
+    private const float OwnedAgentMovementDriveAcceleration = 4f;
     private static Agent wieldTestAgent;
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
@@ -801,6 +802,19 @@ internal static class BattleDebugCommands
             agent,
             Agent.MovementControlFlag.Forward);
         Missions.Agents.Packets.AgentData.ApplyMovementInput(agent, Vec2.Forward);
+
+        // Local player input is overwritten by the client control loop, so drive this DEBUG fixture natively.
+        Vec3 acceleration = new Vec3(agent.LookDirection.X, agent.LookDirection.Y, 0f);
+        if (acceleration.LengthSquared <= 0.0001f)
+            acceleration = new Vec3(Vec2.Forward.X, Vec2.Forward.Y, 0f);
+        else
+            acceleration.Normalize();
+
+        acceleration = new Vec3(
+            acceleration.X * OwnedAgentMovementDriveAcceleration,
+            acceleration.Y * OwnedAgentMovementDriveAcceleration,
+            0f);
+        agent.AddAcceleration(in acceleration);
     }
 
     internal static void RestoreOwnedAgentMovementDrive(

@@ -56,6 +56,8 @@ public sealed class MirrorAgent
     public int SetMovementDirectionCalls { get; set; }
     public Vec2 InputVector { get; set; }
     public int SetMovementInputCalls { get; set; }
+    public int AddAccelerationCalls { get; set; }
+    public Vec3 LastAcceleration { get; set; }
     public Agent.MovementControlFlag MovementFlags { get; set; }
     public int SetMovementFlagsCalls { get; set; }
     public int NativeStateWriteSequence { get; set; }

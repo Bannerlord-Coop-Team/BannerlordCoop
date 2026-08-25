@@ -31,6 +31,7 @@ public class BattleDebugMovementDriveTests
                 Agent.MovementControlFlag.TurnLeft |
                 Agent.MovementControlFlag.DefendBlock,
             InputVector = new Vec2(0.25f, -0.5f),
+            LookDirection = new Vec3(3f, 4f, 2f),
         };
         AgentMirror.Bind(agent, mirror);
 
@@ -46,6 +47,10 @@ public class BattleDebugMovementDriveTests
             mirror.MovementFlags);
         Assert.Equal(Vec2.Forward.X, mirror.InputVector.X);
         Assert.Equal(Vec2.Forward.Y, mirror.InputVector.Y);
+        Assert.Equal(1, mirror.AddAccelerationCalls);
+        Assert.InRange(mirror.LastAcceleration.X, 2.39f, 2.41f);
+        Assert.InRange(mirror.LastAcceleration.Y, 3.19f, 3.21f);
+        Assert.Equal(0f, mirror.LastAcceleration.Z);
 
         mirror.MovementFlags |= Agent.MovementControlFlag.DefendRight;
         BattleDebugCommands.RestoreOwnedAgentMovementDrive(

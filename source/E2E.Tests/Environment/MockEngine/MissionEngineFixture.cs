@@ -140,6 +140,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
+        Prefix(typeof(Agent), nameof(Agent.AddAcceleration), nameof(Agent_AddAcceleration));
         // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
@@ -788,6 +789,14 @@ public sealed class MissionEngineFixture : IDisposable
         m.SetMovementInputCalls++;
         if (m.ClearLocomotionFlagsOnContinuousStateWrite)
             m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
+        return false;
+    }
+
+    private static bool Agent_AddAcceleration(Agent __instance, Vec3 __0)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.AddAccelerationCalls++;
+        m.LastAcceleration = __0;
         return false;
     }
 
