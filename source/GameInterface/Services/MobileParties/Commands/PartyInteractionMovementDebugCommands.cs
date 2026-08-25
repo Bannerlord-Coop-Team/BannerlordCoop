@@ -1,4 +1,8 @@
 ﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using Newtonsoft.Json;
@@ -16,6 +20,9 @@ namespace GameInterface.Services.MobileParties.Commands;
 
 internal static class PartyInteractionMovementDebugCommands
 {
+    private static CaravanProximityFixtureState caravanProximityFixture;
+    private static CaravanProximityFixtureState restoredCaravanProximityFixture;
+
     [CommandLineArgumentFunction("movement_state", "coop.debug.mobileparty")]
     public static string MovementState(List<string> args)
     {
@@ -152,6 +159,198 @@ internal static class PartyInteractionMovementDebugCommands
             return "No active caravan is within the vanilla interaction range.";
 
         return InteractWithCaravan(objectManager, targetParty, mainParty);
+    }
+
+    [CommandLineArgumentFunction("caravan_proximity_fixture_capture", "coop.debug.mobileparty")]
+    public static string CaptureCaravanProximityFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Command can only be run on the server.";
+        if (args.Count != 1)
+            return "Usage: coop.debug.mobileparty.caravan_proximity_fixture_capture <PlayerMobilePartyId>";
+        if (caravanProximityFixture != null)
+            return "Caravan proximity fixture is already active; restore it before capturing another.";
+        if (restoredCaravanProximityFixture != null)
+            return "Caravan proximity fixture restoration must be verified before capturing another.";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+        {
+            return "Unable to resolve caravan proximity fixture services.";
+        }
+        if (!TryFindParty(objectManager, args[0], out MobileParty playerParty))
+            return $"Player party '{args[0]}' was not found.";
+        if (!playerParty.IsPlayerParty())
+            return $"Party '{args[0]}' is not registered as a player party.";
+        if (!IsAvailableOnMap(playerParty))
+            return $"Player party '{args[0]}' must be active on the campaign map and outside a map event, settlement, army, or transition.";
+        if (!behaviorSnapshot.TryCreate(playerParty, out PartyBehaviorUpdateData playerState))
+            return "Unable to capture the Cemai player-party movement state.";
+
+        MobileParty targetParty = MobileParty.All
+            .Where(party => party != playerParty &&
+                party?.IsCaravan == true &&
+                party.Party is IInteractablePoint &&
+                IsAvailableOnMap(party) &&
+                party.IsCurrentlyAtSea == playerParty.IsCurrentlyAtSea &&
+                objectManager.TryGetId(party, out _) &&
+                objectManager.TryGetId(party.Party, out _))
+            .OrderBy(party => DistanceSquared(party, playerParty))
+            .FirstOrDefault();
+        if (targetParty == null)
+            return "No registered active caravan is available for the proximity fixture.";
+
+        string playerPartyId = GetPartyId(objectManager, playerParty);
+        string targetPartyId = GetPartyId(objectManager, targetParty);
+        objectManager.TryGetId(targetParty.Party, out string targetInteractablePointId);
+        caravanProximityFixture = new CaravanProximityFixtureState(
+            playerParty,
+            targetParty,
+            playerState,
+            playerPartyId,
+            targetPartyId,
+            targetInteractablePointId);
+
+        return JsonResult(new
+        {
+            success = true,
+            playerPartyId,
+            targetPartyId,
+            targetInteractablePointId,
+            targetStringId = targetParty.StringId,
+            originalDistance = Distance(playerParty, targetParty),
+            captured = true
+        });
+    }
+
+    [CommandLineArgumentFunction("caravan_proximity_fixture_stage", "coop.debug.mobileparty")]
+    public static string StageCaravanProximityFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Command can only be run on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mobileparty.caravan_proximity_fixture_stage";
+        if (caravanProximityFixture == null)
+            return "Caravan proximity fixture is not captured.";
+        if (caravanProximityFixture.Staged)
+            return "Caravan proximity fixture is already staged.";
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            return "Unable to resolve the caravan proximity movement snapshot service.";
+
+        CaravanProximityFixtureState fixture = caravanProximityFixture;
+        if (!IsAvailableOnMap(fixture.PlayerParty) || !IsAvailableOnMap(fixture.TargetParty))
+            return "The Cemai player party and caravan must remain active on the campaign map.";
+        if (fixture.PlayerParty.IsCurrentlyAtSea != fixture.TargetParty.IsCurrentlyAtSea)
+            return "The Cemai player party and caravan no longer use the same navigation layer.";
+
+        fixture.PlayerParty.SetMoveModeHold();
+        fixture.PlayerParty.Ai.AiBehaviorInteractable = fixture.TargetParty.Party;
+        fixture.PlayerParty.Position = fixture.TargetParty.Position;
+        PublishForcedPosition(fixture.PlayerParty);
+        fixture.Staged = true;
+
+        bool interactionTargetVerified =
+            ReferenceEquals(fixture.PlayerParty.Ai?.AiBehaviorInteractable, fixture.TargetParty.Party);
+        bool preCommandEncounterSafe =
+            fixture.PlayerParty.DefaultBehavior == AiBehavior.Hold &&
+            fixture.PlayerParty.ShortTermBehavior == AiBehavior.Hold &&
+            fixture.PlayerParty.PartyMoveMode == MoveModeType.Hold &&
+            fixture.PlayerParty.TargetParty == null;
+        bool stagedBehaviorSnapshotVerified =
+            behaviorSnapshot.TryCreate(fixture.PlayerParty, out PartyBehaviorUpdateData stagedState) &&
+            behaviorSnapshot.CanApply(fixture.PlayerParty, stagedState);
+        bool interactionRangeVerified = interactionTargetVerified &&
+            preCommandEncounterSafe &&
+            stagedBehaviorSnapshotVerified &&
+            CanInteractWithParty(fixture.TargetParty, fixture.PlayerParty);
+        return JsonResult(new
+        {
+            success = interactionRangeVerified,
+            playerPartyId = fixture.PlayerPartyId,
+            targetPartyId = fixture.TargetPartyId,
+            targetInteractablePointId = fixture.TargetInteractablePointId,
+            distance = Distance(fixture.PlayerParty, fixture.TargetParty),
+            interactionTargetVerified,
+            preCommandEncounterSafe,
+            stagedBehaviorSnapshotVerified,
+            interactionRangeVerified,
+            staged = true
+        });
+    }
+
+    [CommandLineArgumentFunction("caravan_proximity_fixture_restore", "coop.debug.mobileparty")]
+    public static string RestoreCaravanProximityFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Command can only be run on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mobileparty.caravan_proximity_fixture_restore";
+        if (caravanProximityFixture == null)
+            return "Caravan proximity fixture is not active.";
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            return "Unable to resolve the caravan proximity movement snapshot service.";
+
+        CaravanProximityFixtureState restoring = caravanProximityFixture;
+        if (!behaviorSnapshot.CanApply(restoring.PlayerParty, restoring.PlayerState) ||
+            !RestoreParty(behaviorSnapshot, restoring.PlayerParty, restoring.PlayerState))
+        {
+            return JsonResult(new
+            {
+                success = false,
+                playerPartyId = restoring.PlayerPartyId,
+                restored = false
+            });
+        }
+
+        bool restored = TryVerifyRestored(
+            behaviorSnapshot,
+            restoring.PlayerParty,
+            restoring.PlayerState);
+        if (!restored)
+        {
+            return JsonResult(new
+            {
+                success = false,
+                playerPartyId = restoring.PlayerPartyId,
+                restored = false
+            });
+        }
+
+        caravanProximityFixture = null;
+        restoredCaravanProximityFixture = restoring;
+        return JsonResult(new
+        {
+            success = true,
+            playerPartyId = restoring.PlayerPartyId,
+            restored = true
+        });
+    }
+
+    [CommandLineArgumentFunction("caravan_proximity_fixture_verify", "coop.debug.mobileparty")]
+    public static string VerifyCaravanProximityFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Command can only be run on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mobileparty.caravan_proximity_fixture_verify";
+        if (restoredCaravanProximityFixture == null)
+            return JsonResult(new { success = false, restored = false });
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            return "Unable to resolve the caravan proximity movement snapshot service.";
+
+        CaravanProximityFixtureState restored = restoredCaravanProximityFixture;
+        bool verified = TryVerifyRestored(
+            behaviorSnapshot,
+            restored.PlayerParty,
+            restored.PlayerState);
+        if (verified)
+            restoredCaravanProximityFixture = null;
+
+        return JsonResult(new
+        {
+            success = verified,
+            playerPartyId = restored.PlayerPartyId,
+            restored = verified
+        });
     }
 
     [CommandLineArgumentFunction("nearby_lord_parties", "coop.debug.mobileparty")]
@@ -355,6 +554,88 @@ internal static class PartyInteractionMovementDebugCommands
         party.DefaultBehavior == AiBehavior.Hold &&
         party.ShortTermBehavior == AiBehavior.Hold &&
         party.PartyMoveMode == MoveModeType.Hold;
+
+    private static bool IsAvailableOnMap(MobileParty party) =>
+        party?.IsActive == true &&
+        party.Party != null &&
+        party.CurrentSettlement == null &&
+        party.MapEvent == null &&
+        party.Army == null &&
+        !party.IsTransitionInProgress;
+
+    private static bool RestoreParty(
+        IMobilePartyBehaviorSnapshot behaviorSnapshot,
+        MobileParty party,
+        PartyBehaviorUpdateData state)
+    {
+        if (!behaviorSnapshot.TryApply(party, state, out _))
+            return false;
+
+        party.Position = state.PartyPosition;
+        PublishForcedPosition(party);
+        return true;
+    }
+
+    private static bool TryVerifyRestored(
+        IMobilePartyBehaviorSnapshot behaviorSnapshot,
+        MobileParty party,
+        PartyBehaviorUpdateData expected)
+    {
+        if (!behaviorSnapshot.TryCreate(party, out PartyBehaviorUpdateData actual))
+            return false;
+
+        return actual.MobilePartyId == expected.MobilePartyId &&
+            actual.NewAiBehavior == expected.NewAiBehavior &&
+            actual.InteractablePointId == expected.InteractablePointId &&
+            actual.BestTargetPoint == expected.BestTargetPoint &&
+            actual.PartyPosition == expected.PartyPosition &&
+            actual.DefaultBehavior == expected.DefaultBehavior &&
+            actual.TargetPosition == expected.TargetPosition &&
+            actual.DesiredAiNavigationType == expected.DesiredAiNavigationType &&
+            actual.TargetPartyId == expected.TargetPartyId &&
+            actual.TargetSettlementId == expected.TargetSettlementId &&
+            actual.MoveTargetPoint == expected.MoveTargetPoint &&
+            actual.IsTargetingPort == expected.IsTargetingPort &&
+            actual.PartyMoveMode == expected.PartyMoveMode &&
+            actual.MoveTargetPartyId == expected.MoveTargetPartyId &&
+            actual.IsInteractableAnchor == expected.IsInteractableAnchor &&
+            actual.IsCurrentlyAtSea == expected.IsCurrentlyAtSea;
+    }
+
+    private static void PublishForcedPosition(MobileParty party) =>
+        MessageBroker.Instance.Publish(
+            typeof(PartyInteractionMovementDebugCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea));
+
+    private sealed class CaravanProximityFixtureState
+    {
+        public MobileParty PlayerParty { get; }
+        public MobileParty TargetParty { get; }
+        public PartyBehaviorUpdateData PlayerState { get; }
+        public string PlayerPartyId { get; }
+        public string TargetPartyId { get; }
+        public string TargetInteractablePointId { get; }
+        public bool Staged { get; set; }
+
+        public CaravanProximityFixtureState(
+            MobileParty playerParty,
+            MobileParty targetParty,
+            PartyBehaviorUpdateData playerState,
+            string playerPartyId,
+            string targetPartyId,
+            string targetInteractablePointId)
+        {
+            PlayerParty = playerParty;
+            TargetParty = targetParty;
+            PlayerState = playerState;
+            PlayerPartyId = playerPartyId;
+            TargetPartyId = targetPartyId;
+            TargetInteractablePointId = targetInteractablePointId;
+        }
+    }
 
     private static string JsonResult(object value) =>
         "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
