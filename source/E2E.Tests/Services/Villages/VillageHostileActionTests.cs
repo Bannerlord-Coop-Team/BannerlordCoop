@@ -2025,7 +2025,7 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void SlowRaidMapEvent_DefenderJoin_ContestsRaidBeforeMissionStart()
+    public void SlowRaidMapEvent_DefenderJoin_UsesCanonicalSideAndContestsRaidBeforeMissionStart()
     {
         var client = Clients.First();
         var (raiderHeroId, raiderMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
@@ -2081,7 +2081,12 @@ public class VillageHostileActionTests : MapEventTestBase
                 Campaign.Current.MainParty = joinerParty;
                 joinerHero.PartyBelongedTo = joinerParty;
                 Game.Current.PlayerTroop = joinerHero.CharacterObject;
+
+                // A newly replicated defender side can still hold the enum default when the player joins.
+                mapEvent.DefenderSide.MissionSide = BattleSideEnum.Attacker;
             }
+
+            Assert.Equal(BattleSideEnum.Attacker, mapEvent.DefenderSide.MissionSide);
 
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
