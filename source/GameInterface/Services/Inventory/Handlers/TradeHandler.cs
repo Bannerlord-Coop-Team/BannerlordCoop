@@ -234,7 +234,13 @@ internal class TradeHandler : IHandler
             if (TryResolveItemRosterId(item, out var resolvedItem))
             {
                 resolvedItems.Add((resolvedItem, count));
-            }
+if (item.EquipmentElement.Item == null)
+    continue;
+    
+if (TryResolveItemRosterId(item, out var resolvedItem))
+{
+resolvedItems.Add((resolvedItem, count));
+}
         }
 
         return resolvedItems.ToArray();
@@ -304,11 +310,6 @@ internal class TradeHandler : IHandler
     private bool TryResolveItemRosterId(ItemRosterElement itemRosterElement, out ItemRosterElementData result)
     {
         result = default;
-
-        if (itemRosterElement.EquipmentElement.Item == null)
-        {
-            return false;
-        }
 
         if (!objectManager.TryGetId(itemRosterElement.EquipmentElement.Item, out var itemObjectId))
         {
