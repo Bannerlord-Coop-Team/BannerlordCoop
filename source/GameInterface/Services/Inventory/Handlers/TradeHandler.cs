@@ -305,6 +305,11 @@ internal class TradeHandler : IHandler
     {
         result = default;
 
+        if (itemRosterElement.EquipmentElement.Item == null)
+        {
+            return false;
+        }
+
         if (!objectManager.TryGetId(itemRosterElement.EquipmentElement.Item, out var itemObjectId))
         {
             logger.Error("Failed to get id for {type}", nameof(itemRosterElement.EquipmentElement.Item));
