@@ -335,7 +335,6 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                         mapEventPartyId = mepId;
                 }
             }
-            }
         }
         // The casualty keys on the troop's CHARACTER — exactly `characterId`, the CharacterObject's object-manager
         // id we also carry in the spawn data.
