@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
@@ -76,7 +77,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 client.Resolve<IPlayerManager>(),
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
-                missionInitializerResolver);
+                missionInitializerResolver,
+                new Mock<IMapEventInitializationBarrier>().Object);
 
             try
             {
@@ -189,7 +191,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     client.Resolve<IPlayerManager>(),
                     client.Resolve<INetwork>(),
                     client.Resolve<IMapEventLogger>(),
-                    missionInitializerResolver);
+                    missionInitializerResolver,
+                    new Mock<IMapEventInitializationBarrier>().Object);
 
                 messageBroker.Publish(this, new NetworkStartAttackMission(
                     mapEvent.MapEventId,

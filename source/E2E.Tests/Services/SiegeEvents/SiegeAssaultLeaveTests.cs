@@ -6,6 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
@@ -141,7 +142,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 Server.Resolve<IPlayerManager>(),
                 Server.Resolve<INetwork>(),
                 Server.Resolve<IMapEventLogger>(),
-                Server.Resolve<IBattleMissionInitializerResolver>());
+                Server.Resolve<IBattleMissionInitializerResolver>(),
+                Server.Resolve<IMapEventInitializationBarrier>());
 
             Assert.True(handler.RemoveWoundedNonInitiatorParties(mapEvent, initiatingPartyId));
         }, disabledMethods);
@@ -201,7 +203,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 Server.Resolve<IPlayerManager>(),
                 Server.Resolve<INetwork>(),
                 Server.Resolve<IMapEventLogger>(),
-                Server.Resolve<IBattleMissionInitializerResolver>());
+                Server.Resolve<IBattleMissionInitializerResolver>(),
+                Server.Resolve<IMapEventInitializationBarrier>());
 
             Assert.True(handler.RemoveWoundedNonInitiatorParties(mapEvent, initiatingPartyId));
         }, disabledMethods);

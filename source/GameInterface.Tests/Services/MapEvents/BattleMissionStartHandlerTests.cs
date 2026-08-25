@@ -8,11 +8,27 @@ namespace GameInterface.Tests.Services.MapEvents;
 public class BattleMissionStartHandlerTests
 {
     [Fact]
+    public void DecideDeferredOpenAction_ResolvesByMissionAndBattleState()
+    {
+        // Keep waiting while the battle is still valid, abandon the loading window once its graph is gone
+        // (the aborted contested-raid case), and clear once a mission has opened.
+        Assert.Equal(BattleMissionStartHandler.DeferredOpenAction.Keep,
+            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen: false, battleStillValid: true));
+        Assert.Equal(BattleMissionStartHandler.DeferredOpenAction.Abandon,
+            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen: false, battleStillValid: false));
+        Assert.Equal(BattleMissionStartHandler.DeferredOpenAction.Clear,
+            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen: true, battleStillValid: false));
+        Assert.Equal(BattleMissionStartHandler.DeferredOpenAction.Clear,
+            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen: true, battleStillValid: true));
+    }
+
+    [Fact]
     public void GetOrCreateMissionInitializerSnapshot_ReusesFirstBattleInitializer()
     {
         using var messageBroker = new MessageBroker();
         using var handler = new BattleMissionStartHandler(
             messageBroker,
+            null!,
             null!,
             null!,
             null!,

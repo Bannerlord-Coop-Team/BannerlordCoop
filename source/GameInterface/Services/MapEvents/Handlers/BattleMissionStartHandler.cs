@@ -4,11 +4,13 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
@@ -51,6 +53,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
+    private readonly IMapEventInitializationBarrier initializationBarrier;
     private static long attackMissionStartSequence;
 
     // Server-side: the complete mission initializer chosen once per map event and reused for late entrants.
@@ -63,13 +66,18 @@ internal class BattleMissionStartHandler : IHandler
     // container keeps syncing. Evicted with the terrain seed when the event finalizes.
     private readonly ConcurrentDictionary<string, NetworkStartSiegeMission> siegeMissionSnapshots = new ConcurrentDictionary<string, NetworkStartSiegeMission>();
 
+    // Client-side, game-thread only: the map event whose attack-mission open is deferred until the battle
+    // graph commits. Non-null means the loading window is up waiting for that commit.
+    private string deferredAttackMissionMapEventId;
+
     public BattleMissionStartHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         INetwork network,
         IMapEventLogger mapEventLogger,
-        IBattleMissionInitializerResolver missionInitializerResolver)
+        IBattleMissionInitializerResolver missionInitializerResolver,
+        IMapEventInitializationBarrier initializationBarrier)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -77,11 +85,13 @@ internal class BattleMissionStartHandler : IHandler
         this.network = network;
         this.mapEventLogger = mapEventLogger;
         this.missionInitializerResolver = missionInitializerResolver;
+        this.initializationBarrier = initializationBarrier;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
         messageBroker.Subscribe<NetworkStartSiegeMission>(Handle_NetworkStartSiegeMission);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
@@ -90,6 +100,7 @@ internal class BattleMissionStartHandler : IHandler
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
         messageBroker.Unsubscribe<NetworkStartSiegeMission>(Handle_NetworkStartSiegeMission);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     /// <summary>The battle ended — drop its cached mission inputs (server-side; a no-op on a client's empty maps).</summary>
@@ -443,7 +454,7 @@ internal class BattleMissionStartHandler : IHandler
 
     private void ShowLoadingScreenAndQueueAttackMission(NetworkStartAttackMission message, long sequence)
     {
-        if (!TryGetValidBattle(nameof(NetworkStartAttackMission), message.MapEventId, out _))
+        if (!TryGetValidBattle(nameof(NetworkStartAttackMission), message.MapEventId, out var battle))
         {
             LogAttackMissionLifecycle("rejected before queue", sequence, message.MapEventId);
             return;
@@ -452,17 +463,55 @@ internal class BattleMissionStartHandler : IHandler
         LoadingWindow.EnableGlobalLoadingWindow();
         LogAttackMissionLifecycle("queued", sequence, message.MapEventId);
 
+        // Opening before the defender side graph commits leaves CoopTroopSupplier with no troops to deploy
+        // and the loading screen never clears, so wait for the barrier's commit while the event is pending.
+        if (initializationBarrier.IsPending(battle))
+        {
+            deferredAttackMissionMapEventId = message.MapEventId;
+            initializationBarrier.RunAfterCommit(battle, () => OpenQueuedAttackMission(message, sequence));
+            return;
+        }
+
         // MissionState enables the loading window only after building every mission behavior.
         // Defer that work one frame so the window is rendered before setup can stall the map.
-        GameThread.EnqueueSafe(() =>
-        {
-            LogAttackMissionLifecycle("executing queued open", sequence, message.MapEventId);
-            OpenAttackMission(message.MapEventId, message.MissionInitializer,
-                message.InitiatingPartyId, sequence);
+        GameThread.EnqueueSafe(() => OpenQueuedAttackMission(message, sequence),
+            context: nameof(Handle_NetworkStartAttackMission));
+    }
 
-            if (MissionState.Current == null)
+    private void OpenQueuedAttackMission(NetworkStartAttackMission message, long sequence)
+    {
+        deferredAttackMissionMapEventId = null;
+        LogAttackMissionLifecycle("executing queued open", sequence, message.MapEventId);
+        OpenAttackMission(message.MapEventId, message.MissionInitializer,
+            message.InitiatingPartyId, sequence);
+
+        if (MissionState.Current == null)
+            LoadingWindow.DisableGlobalLoadingWindow();
+    }
+
+    // A deferred open's RunAfterCommit callback is dropped when the barrier aborts and destroys the graph
+    // (a contested raid whose defense event never completes), which would strand the loading window; once
+    // the battle is gone, abandon the open so the client returns to the map instead of hanging.
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        var deferredMapEventId = deferredAttackMissionMapEventId;
+        if (deferredMapEventId == null)
+            return;
+
+        bool missionOpen = MissionState.Current != null;
+        bool battleStillValid = !missionOpen &&
+            TryGetValidBattle(nameof(CampaignTick), deferredMapEventId, out _);
+
+        switch (DecideDeferredOpenAction(missionOpen, battleStillValid))
+        {
+            case DeferredOpenAction.Abandon:
+                deferredAttackMissionMapEventId = null;
                 LoadingWindow.DisableGlobalLoadingWindow();
-        }, context: nameof(Handle_NetworkStartAttackMission));
+                break;
+            case DeferredOpenAction.Clear:
+                deferredAttackMissionMapEventId = null;
+                break;
+        }
     }
 
     /// <summary>[Server] Snapshot the mission-defining siege inputs for one map event.</summary>
@@ -736,5 +785,23 @@ internal class BattleMissionStartHandler : IHandler
     {
         return !isPlayerWounded ||
                (localPartyId != null && string.Equals(localPartyId, initiatingPartyId, StringComparison.Ordinal));
+    }
+
+    internal enum DeferredOpenAction
+    {
+        Keep,
+        Clear,
+        Abandon,
+    }
+
+    /// <summary>[Client] Fate of a deferred attack-mission open re-checked on a later tick: keep waiting while
+    /// the battle is still valid, clear once a mission has opened, or abandon (dropping the loading window)
+    /// once the battle graph is gone.</summary>
+    internal static DeferredOpenAction DecideDeferredOpenAction(bool missionOpen, bool battleStillValid)
+    {
+        if (missionOpen)
+            return DeferredOpenAction.Clear;
+
+        return battleStillValid ? DeferredOpenAction.Keep : DeferredOpenAction.Abandon;
     }
 }
