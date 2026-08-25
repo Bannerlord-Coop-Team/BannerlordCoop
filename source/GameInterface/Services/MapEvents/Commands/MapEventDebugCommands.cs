@@ -10,6 +10,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Commands;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -2305,23 +2306,14 @@ public class MapEventDebugCommands
         if (fixture == null)
             return "No late-join mode fixture is active.";
 
-        if (!ContainerProvider.TryResolve<INetwork>(out var network) ||
-            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
-            !ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership))
+        if (!ContainerProvider.TryResolve<IDebugBattleMissionExitRequester>(out var missionExitRequester))
         {
             return "Unable to resolve the late-join mission-exit services.";
         }
 
-        var requested = 0;
-        foreach (var controllerId in new[] { fixture.FirstControllerId, fixture.JoiningControllerId })
-        {
-            if (!missionMembership.IsControllerInMission(controllerId) ||
-                !playerManager.TryGetPeer(controllerId, out var peer))
-                continue;
-
-            network.Send(peer, new NetworkEndLateJoinModeFixtureMission(fixture.MapEventId));
-            requested++;
-        }
+        int requested = missionExitRequester.Request(
+            fixture.MapEventId,
+            new[] { fixture.FirstControllerId, fixture.JoiningControllerId });
 
         return $"Late-join fixture mission exit requested for {requested} player(s).";
     }
@@ -3336,55 +3328,3 @@ public class MapEventDebugCommands
         return genericTypeName + "<" + string.Join(", ", genericArguments) + ">";
     }
 }
-
-#if DEBUG
-/// <summary>[Server -&gt; Client] Ends a live-test fixture mission without resolving its campaign battle.</summary>
-[ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkEndLateJoinModeFixtureMission : IEvent
-{
-    [ProtoMember(1)]
-    public readonly string MapEventId;
-
-    public NetworkEndLateJoinModeFixtureMission(string mapEventId)
-    {
-        MapEventId = mapEventId;
-    }
-}
-
-/// <summary>Applies the server's live-test fixture mission-exit request on participating clients.</summary>
-internal sealed class LateJoinModeFixtureMissionExitHandler : IHandler
-{
-    private readonly IMessageBroker messageBroker;
-    private readonly IObjectManager objectManager;
-
-    public LateJoinModeFixtureMissionExitHandler(IMessageBroker messageBroker, IObjectManager objectManager)
-    {
-        this.messageBroker = messageBroker;
-        this.objectManager = objectManager;
-        messageBroker.Subscribe<NetworkEndLateJoinModeFixtureMission>(Handle);
-    }
-
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<NetworkEndLateJoinModeFixtureMission>(Handle);
-    }
-
-    private void Handle(MessagePayload<NetworkEndLateJoinModeFixtureMission> payload)
-    {
-        if (ModInformation.IsServer)
-            return;
-
-        var mapEventId = payload.What.MapEventId;
-        GameThread.RunSafe(() =>
-        {
-            var mapEvent = MobileParty.MainParty?.MapEvent;
-            if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var localMapEventId) ||
-                localMapEventId != mapEventId)
-                return;
-
-            var mission = Mission.Current ?? MissionState.Current?.CurrentMission;
-            mission?.EndMission();
-        }, context: nameof(NetworkEndLateJoinModeFixtureMission));
-    }
-}
-#endif

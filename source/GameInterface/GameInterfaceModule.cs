@@ -26,6 +26,7 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Commands;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MobileParties;
@@ -132,6 +133,11 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MainPartyBattleRewardsCache>().As<IMainPartyBattleRewardsCache>().InstancePerLifetimeScope();
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventInitializationBarrierBinding>().InstancePerLifetimeScope().AutoActivate();
+#if DEBUG
+        builder.RegisterType<DebugBattleMissionExitRequester>()
+            .As<IDebugBattleMissionExitRequester>()
+            .InstancePerDependency();
+#endif
 
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();

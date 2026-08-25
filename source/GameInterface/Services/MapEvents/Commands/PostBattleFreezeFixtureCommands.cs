@@ -167,6 +167,10 @@ internal class PostBattleFreezeFixtureCommands
                 default);
             if (pendingFixture.MapEvent == null)
                 throw new InvalidOperationException("The fixture could not create a field battle.");
+            if (!objectManager.TryGetIdWithLogging(pendingFixture.MapEvent, out var mapEventId))
+                throw new InvalidOperationException("The fixture could not resolve the battle's network id.");
+
+            pendingFixture.MapEventId = mapEventId;
 
             secondPlayer.Party.MapEventSide = firstPlayer.Party.MapEventSide;
 
@@ -206,20 +210,19 @@ internal class PostBattleFreezeFixtureCommands
 
         if (!objectManager.TryGetId(fixture.AiParty.Party, out string aiPartyId) ||
             !objectManager.TryGetId(fixture.FirstPlayer.Party.Party, out string firstPlayerPartyId) ||
-            !objectManager.TryGetId(fixture.SecondPlayer.Party.Party, out string secondPlayerPartyId) ||
-            !objectManager.TryGetId(fixture.MapEvent, out string mapEventId))
+            !objectManager.TryGetId(fixture.SecondPlayer.Party.Party, out string secondPlayerPartyId))
             return "The fixture could not resolve the battle's network ids.";
 
         network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
             $"debug-2218-first-{Guid.NewGuid():N}",
             aiPartyId,
             firstPlayerPartyId,
-            mapEventId));
+            fixture.MapEventId));
         network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
             $"debug-2218-second-{Guid.NewGuid():N}",
             aiPartyId,
             secondPlayerPartyId,
-            mapEventId));
+            fixture.MapEventId));
         fixture.EncountersOpened = true;
         return $"Opened the post-battle freeze fixture encounter for " +
                $"{fixture.FirstControllerId} and {fixture.SecondControllerId}.";
@@ -270,15 +273,20 @@ internal class PostBattleFreezeFixtureCommands
         if (fixture == null)
             return "The post-battle freeze fixture is not active.";
         if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
-            !ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
+            !ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl) ||
+            !ContainerProvider.TryResolve<IDebugBattleMissionExitRequester>(out var missionExitRequester))
             return "Unable to resolve fixture restore services.";
 
         try
         {
             var pendingFixture = fixture;
+            // Send before FinalizeEvent broadcasts the map-event destroy on the same ordered channel.
+            int exitRequests = missionExitRequester.Request(
+                pendingFixture.MapEventId,
+                new[] { pendingFixture.FirstControllerId, pendingFixture.SecondControllerId });
             RestoreFixture(pendingFixture, behaviorSnapshot, timeControl);
             fixture = null;
-            return "Post-battle freeze fixture restored.";
+            return $"Post-battle freeze fixture restored. Mission exit requested for {exitRequests} player(s).";
         }
         catch (Exception e)
         {
@@ -640,6 +648,7 @@ internal class PostBattleFreezeFixtureCommands
         public TimeControlEnum OriginalTimeControl { get; }
         public MobileParty AiParty { get; set; }
         public MapEvent MapEvent { get; set; }
+        public string MapEventId { get; set; }
         public bool EncountersOpened { get; set; }
         public CampaignTime ProbeStartedAt { get; set; }
 
