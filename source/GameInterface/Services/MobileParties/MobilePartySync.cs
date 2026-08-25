@@ -24,8 +24,6 @@ internal class MobilePartySync : IAutoSync
 
         // Movement is replicated atomically by NetworkUpdatePartyBehavior. These members are
         // interdependent, so independent AutoSync messages can apply a behavior before its target.
-        // EventPositionAdder is a locally computed map-event visual offset and is also carried by
-        // MobilePartyBehaviorSnapshot for join-time initialization.
 
         // Sync Properties
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Ai)));
@@ -54,5 +52,6 @@ internal class MobilePartySync : IAutoSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Navigator)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeTaxGold)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.RecentEventsMorale)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.EventPositionAdder)));
     }
 }

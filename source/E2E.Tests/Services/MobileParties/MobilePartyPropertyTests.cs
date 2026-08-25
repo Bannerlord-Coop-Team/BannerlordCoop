@@ -57,6 +57,7 @@ public class MobilePartyPropertyTests : SyncTestBase
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Quartermaster));
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Surgeon));
         TestEnvironment.AssertProperty<MobileParty, float>(nameof(MobileParty.RecentEventsMorale), 5f);
+        TestEnvironment.AssertProperty<MobileParty, Vec2>(nameof(MobileParty.EventPositionAdder), new Vec2(2,2));
     }
 
     [Fact]
