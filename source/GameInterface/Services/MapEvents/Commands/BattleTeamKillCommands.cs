@@ -37,7 +37,7 @@ internal class BattleTeamKillCommands
 @"Usage:
   coop.debug.mapevent.click_deployment_ready
 
-Finishes deployment through the active native deployment handler.";
+Activates the deployment Ready button's native UI callback.";
 
     [CommandLineArgumentFunction("click_deployment_ready", "coop.debug.mapevent")]
     public static string ClickDeploymentReady(List<string> args)
@@ -56,12 +56,12 @@ Finishes deployment through the active native deployment handler.";
         if (!deploymentController.TeamSetupOver)
             return "Failed: deployment team setup is not complete.";
 
-        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
-        if (deploymentHandler == null)
-            return "Failed: no deployment handler.";
+        var orderUi = mission.GetMissionBehavior<MissionGauntletSingleplayerOrderUIHandler>();
+        if (orderUi == null)
+            return "Failed: no deployment order UI.";
 
-        deploymentHandler.FinishDeployment();
-        return "Finished deployment through the native deployment handler.";
+        orderUi.OnBeginMission();
+        return "Clicked deployment Ready through the native UI callback.";
     }
 
     private const string FinishDeploymentUsage =
