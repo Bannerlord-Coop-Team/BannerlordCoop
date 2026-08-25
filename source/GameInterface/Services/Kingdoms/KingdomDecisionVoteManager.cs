@@ -44,7 +44,7 @@ namespace GameInterface.Services.Kingdoms
         bool ShouldSuppressLocalDecision(KingdomDecision decision);
         bool ShouldDisableResolveDecision(KingdomDecision decision);
         bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
-        bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem);
+        bool IsLocalPlayerEligible(DecisionItemBaseVM decisionItem);
         void RegisterDecisionItem(DecisionItemBaseVM decisionItem);
         void UnregisterDecisionItem(DecisionItemBaseVM decisionItem);
         bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData);
@@ -213,7 +213,9 @@ namespace GameInterface.Services.Kingdoms
 
             if (!TryCreateVoteData(decisionItem, out KingdomDecisionVoteData voteData, isFinal: true))
             {
-                Logger.Warning("Unable to publish final kingdom decision vote from the local decision UI.");
+                Logger.Warning(
+                    "Unable to route the final kingdom decision vote for {DecisionType}, so the screen closes without recording one.",
+                    decisionItem.KingdomDecisionMaker?._decision?.GetType().Name);
                 return false;
             }
 
@@ -393,18 +395,11 @@ namespace GameInterface.Services.Kingdoms
                    roundClan.HasFinalVote;
         }
 
-        public bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem)
+        public bool IsLocalPlayerEligible(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null || decisionItem.KingdomDecisionMaker == null) return false;
-            KingdomDecision decision = decisionItem.KingdomDecisionMaker._decision;
-            if (decision == null || Clan.PlayerClan == null) return false;
 
-            if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.HasRoundSnapshot)
-            {
-                return Clan.PlayerClan.Kingdom == decision.Kingdom;
-            }
-
-            return IsLocalPlayerEligible(decision);
+            return IsLocalPlayerEligible(decisionItem.KingdomDecisionMaker._decision);
         }
 
         public void RegisterDecisionItem(DecisionItemBaseVM decisionItem)
@@ -574,7 +569,12 @@ namespace GameInterface.Services.Kingdoms
         {
             if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision))
             {
+                Logger.Warning(
+                    "Resolved decision {DecisionIndex} for kingdom {KingdomId} is missing from the local unresolved decisions, so it cant be concluded here.",
+                    decisionIndex,
+                    kingdomId);
                 PublishDecisionNotification(notificationText);
+                CloseOrphanedDecisionItems(kingdomId);
                 return;
             }
             KingdomDecisionVoteState state = GetOrCreateState(decision);
@@ -588,7 +588,13 @@ namespace GameInterface.Services.Kingdoms
                 outcomeKey);
             if (!outcomeResolver.TryGetOutcome(voteData, state.Election, objectManager, out DecisionOutcome outcome))
             {
+                Logger.Warning(
+                    "Resolved outcome {OutcomeIndex} for kingdom {KingdomId} decision {DecisionIndex} has no local match, so it cant be concluded here.",
+                    outcomeIndex,
+                    kingdomId,
+                    decisionIndex);
                 PublishDecisionNotification(notificationText);
+                CloseOrphanedDecisionItems(kingdomId);
                 return;
             }
 
@@ -683,12 +689,39 @@ namespace GameInterface.Services.Kingdoms
 
         private void CloseDecision(KingdomDecision decision)
         {
-            foreach (DecisionItemBaseVM decisionItem in ActiveDecisionItems
-                         .Where(item => item?.KingdomDecisionMaker?._decision == decision)
-                         .ToList())
+            CloseDecisionItems(item => item?.KingdomDecisionMaker?._decision == decision);
+        }
+
+        private void CloseOrphanedDecisionItems(string kingdomId)
+        {
+            if (string.IsNullOrWhiteSpace(kingdomId)) return;
+
+            CloseDecisionItems(item => IsOrphanedSubmittedDecisionItem(item, kingdomId));
+        }
+
+        // A resolve that cant be matched to a local decision still has to close a screen whose final vote is
+        // already in, otherwise that screen has no exit left. The decision also has to be gone from the kingdom,
+        // otherwise a second submitted screen closes while the server is still working on it.
+        internal bool IsOrphanedSubmittedDecisionItem(DecisionItemBaseVM decisionItem, string kingdomId)
+        {
+            return decisionItem != null &&
+                   decisionItem._finalSelectionDone &&
+                   IsDecisionItemForKingdom(decisionItem, kingdomId) &&
+                   !IsDecisionUnresolved(decisionItem.KingdomDecisionMaker?._decision);
+        }
+
+        private void CloseDecisionItems(Func<DecisionItemBaseVM, bool> predicate)
+        {
+            foreach (DecisionItemBaseVM decisionItem in ActiveDecisionItems.Where(predicate).ToList())
             {
                 CloseDecisionItem(decisionItem);
             }
+        }
+
+        private bool IsDecisionItemForKingdom(DecisionItemBaseVM decisionItem, string kingdomId)
+        {
+            return TryGetKingdomId(decisionItem.KingdomDecisionMaker?._decision?.Kingdom, out string itemKingdomId) &&
+                   itemKingdomId == kingdomId;
         }
 
         private void RemoveDecisionState(KingdomDecision decision)

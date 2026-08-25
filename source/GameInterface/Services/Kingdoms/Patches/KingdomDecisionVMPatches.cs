@@ -76,7 +76,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         // Bypass vanilla's single-clan shortcut so the receiving player gets the normal peace decision UI and vote.
         [HarmonyPatch(typeof(KingdomDecisionsVM), nameof(KingdomDecisionsVM.RefreshWith))]
         [HarmonyPrefix]
-        private static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
+        internal static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
         {
             if ((CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision)) && decision.IsSingleClanDecision())
             {
@@ -87,7 +87,10 @@ namespace GameInterface.Services.Kingdoms.Patches
                 __instance.CurrentDecision.SetDoneInputKey(__instance.DoneInputKey);
                 return false;
             }
-            return true;
+
+            // KingdomManagementVM.ForceDecideDecision reaches RefreshWith without going through HandleDecision,
+            // so gate a suppressed decision here too, otherwise it opens a screen the local clan cant vote on.
+            return !TryGetVoteManager(out var voteManager) || !voteManager.ShouldSuppressLocalDecision(decision);
         }
     }
 
@@ -105,12 +108,18 @@ namespace GameInterface.Services.Kingdoms.Patches
 
         [HarmonyPatch(nameof(DecisionItemBaseVM.ExecuteFinalSelection))]
         [HarmonyPrefix]
-        private static bool ExecuteFinalSelectionPrefix(DecisionItemBaseVM __instance)
+        internal static bool ExecuteFinalSelectionPrefix(DecisionItemBaseVM __instance)
         {
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
-            if (!voteManager.ShouldBlockLocalResolution(__instance)) return true;
 
-            voteManager.TryPublishFinalVote(__instance);
+            if (voteManager.IsLocalPlayerEligible(__instance) && voteManager.TryPublishFinalVote(__instance))
+            {
+                return false;
+            }
+
+            // native resolution applies an AI outcome locally for a clan that cant vote and records an abstain
+            // nobody picked when the vote wont route, so close the screen instead of falling through to it
+            voteManager.CloseDecisionItem(__instance);
             return false;
         }
 
