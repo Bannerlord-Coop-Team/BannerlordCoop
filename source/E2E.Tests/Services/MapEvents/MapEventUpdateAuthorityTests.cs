@@ -65,6 +65,29 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    [Fact]
+    public void MapEvent_WithStaleLeaderAndLockedAllocations_ServerUpdateRepairsSimulationSetup()
+    {
+        var context = CreateServerMapEvent();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            var side = mapEvent.AttackerSide;
+            var removedLeader = side.LeaderParty;
+            var expectedLeader = GameObjectCreator.CreateInitializedObject<MobileParty>().Party;
+            AddSyntheticMapEventParty(side, expectedLeader);
+
+            side._troopAllocationsLocked = true;
+            side._battleParties.RemoveAt(0);
+            removedLeader._mapEventSide = null;
+
+            Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
+            Assert.Same(expectedLeader, side.LeaderParty);
+            Assert.False(side._troopAllocationsLocked);
+        }, MapEventDisabledMethods);
+    }
+
     private static void AddSyntheticMapEventParty(MapEventSide side, PartyBase party)
     {
         party._mapEventSide = side;
