@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -36,12 +37,14 @@ internal class BribeGuardsHandler : IHandler
 
         messageBroker.Subscribe<PlayerBribesGuard>(Handle_PlayerBribesGuard);
         messageBroker.Subscribe<NetworkPlayerBribesGuard>(Handle_NetworkPlayerBribesGuard);
+        messageBroker.Subscribe<NetworkPlayerBribesGuardClient>(Handle_NetworkPlayerBribesGuardClient);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerBribesGuard>(Handle_PlayerBribesGuard);
         messageBroker.Unsubscribe<NetworkPlayerBribesGuard>(Handle_NetworkPlayerBribesGuard);
+        messageBroker.Unsubscribe<NetworkPlayerBribesGuardClient>(Handle_NetworkPlayerBribesGuardClient);
     }
 
     private void Handle_PlayerBribesGuard(MessagePayload<PlayerBribesGuard> obj)
@@ -84,6 +87,21 @@ internal class BribeGuardsHandler : IHandler
                 float skillXp = (float)data.Gold * 0.1f;
                 DefaultSkillLevelingManager.OnPartySkillExercised(mainHero.PartyBelongedTo, DefaultSkills.Roguery, skillXp, PartyRole.PartyLeader);
             }
+
+            network.Send(obj.Who as NetPeer, new NetworkPlayerBribesGuardClient(data.SettlementId, data.Gold));
+        });
+    }
+
+    private void Handle_NetworkPlayerBribesGuardClient(MessagePayload<NetworkPlayerBribesGuardClient> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SettlementId, out var settlement)) return;
+
+            // Locally set the BribePaid on the settlement, this is unique per client
+            settlement.BribePaid += data.Gold;
         });
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -11,10 +12,14 @@ public readonly struct WeeklyTickHasBoughtTunToParty : IEvent {}
 public readonly struct PlayerAcceptsClanInfoOffer : IEvent
 {
     public readonly Hero MainHero;
+    public readonly Settlement CurrentSettlement;
 
-    public PlayerAcceptsClanInfoOffer(Hero mainHero)
+    public PlayerAcceptsClanInfoOffer(
+        Hero mainHero,
+        Settlement currentSettlement)
     {
         MainHero = mainHero;
+        CurrentSettlement = currentSettlement;
     }
 }
 

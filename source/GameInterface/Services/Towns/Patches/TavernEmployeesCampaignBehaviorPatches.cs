@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Towns.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
@@ -37,24 +38,18 @@ internal class TavernEmployeesCampaignBehaviorPatches
         var message = new WeeklyTickHasBoughtTunToParty();
         MessageBroker.Instance.Publish(__instance, message);
 
-        return true;
+        return false;
     }
 
     [HarmonyPatch(nameof(TavernEmployeesCampaignBehavior.player_accepts_clan_info_offer_on_consequence))]
     [HarmonyPrefix]
     public static bool PlayerAcceptsClanInfoOfferOnConsequencePrefix(TavernEmployeesCampaignBehavior __instance)
     {
-        // Doesn't do anything. Every hero is already known to every player at game start
-        foreach (Hero hero in Settlement.CurrentSettlement.OwnerClan.Heroes)
-        {
-            hero.IsKnownToPlayer = true;
-        }
-
         // Run gold change on server
-        var message = new PlayerAcceptsClanInfoOffer(Hero.MainHero);
+        var message = new PlayerAcceptsClanInfoOffer(Hero.MainHero, Settlement.CurrentSettlement);
         MessageBroker.Instance.Publish(__instance, message);
 
-        return true;
+        return false;
     }
 
     [HarmonyPatch(nameof(TavernEmployeesCampaignBehavior.conversation_tavernmaid_delivers_food_on_consequence))]
@@ -71,7 +66,6 @@ internal class TavernEmployeesCampaignBehaviorPatches
     public static bool CanBuyTunOnConsequencePrefix(TavernEmployeesCampaignBehavior __instance)
     {
         int tunPrice = TavernEmployeesCampaignBehavior.get_tun_price();
-        __instance._hasBoughtTunToParty = true;
 
         // Run gold & morale change on server
         var message = new PlayerBuysTun(Hero.MainHero, tunPrice);

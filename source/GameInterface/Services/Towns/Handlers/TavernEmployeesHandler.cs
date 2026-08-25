@@ -2,9 +2,11 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Messages;
+using LiteNetLib;
 using SandBox.CampaignBehaviors;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -21,6 +23,8 @@ internal class TavernEmployeesHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+
+    private readonly int ClanInfoOfferCost = 500;
 
     public TavernEmployeesHandler(
         IMessageBroker messageBroker,
@@ -41,12 +45,14 @@ internal class TavernEmployeesHandler : IHandler
 
         messageBroker.Subscribe<PlayerAcceptsClanInfoOffer>(Handle_PlayerAcceptsClanInfoOffer);
         messageBroker.Subscribe<NetworkPlayerAcceptsClanInfoOffer>(Handle_NetworkPlayerAcceptsClanInfoOffer);
+        messageBroker.Subscribe<NetworkPlayerAcceptsClanInfoOfferClient>(Handle_NetworkPlayerAcceptsClanInfoOfferClient);
 
         messageBroker.Subscribe<TavernMaidDeliversFood>(Handle_TavernMaidDeliversFood);
         messageBroker.Subscribe<NetworkTavernMaidDeliversFood>(Handle_NetworkTavernMaidDeliversFood);
 
         messageBroker.Subscribe<PlayerBuysTun>(Handle_PlayerBuysTun);
         messageBroker.Subscribe<NetworkPlayerBuysTun>(Handle_NetworkPlayerBuysTun);
+        messageBroker.Subscribe<NetworkPlayerBuysTunClient>(Handle_NetworkPlayerBuysTunClient);
 
         messageBroker.Subscribe<UpdateHasMetRansomBroker>(Handle_UpdateHasMetRansomBroker);
         messageBroker.Subscribe<NetworkUpdateHasMetRansomBroker>(Handle_NetworkUpdateHasMetRansomBroker);
@@ -65,12 +71,14 @@ internal class TavernEmployeesHandler : IHandler
 
         messageBroker.Unsubscribe<PlayerAcceptsClanInfoOffer>(Handle_PlayerAcceptsClanInfoOffer);
         messageBroker.Unsubscribe<NetworkPlayerAcceptsClanInfoOffer>(Handle_NetworkPlayerAcceptsClanInfoOffer);
+        messageBroker.Unsubscribe<NetworkPlayerAcceptsClanInfoOfferClient>(Handle_NetworkPlayerAcceptsClanInfoOfferClient);
 
         messageBroker.Unsubscribe<TavernMaidDeliversFood>(Handle_TavernMaidDeliversFood);
         messageBroker.Unsubscribe<NetworkTavernMaidDeliversFood>(Handle_NetworkTavernMaidDeliversFood);
 
         messageBroker.Unsubscribe<PlayerBuysTun>(Handle_PlayerBuysTun);
         messageBroker.Unsubscribe<NetworkPlayerBuysTun>(Handle_NetworkPlayerBuysTun);
+        messageBroker.Unsubscribe<NetworkPlayerBuysTunClient>(Handle_NetworkPlayerBuysTunClient);
 
         messageBroker.Unsubscribe<UpdateHasMetRansomBroker>(Handle_UpdateHasMetRansomBroker);
         messageBroker.Unsubscribe<NetworkUpdateHasMetRansomBroker>(Handle_NetworkUpdateHasMetRansomBroker);
@@ -126,8 +134,9 @@ internal class TavernEmployeesHandler : IHandler
     private void Handle_PlayerAcceptsClanInfoOffer(MessagePayload<PlayerAcceptsClanInfoOffer> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.CurrentSettlement, out var currentSettlementId)) return;
 
-        var message = new NetworkPlayerAcceptsClanInfoOffer(mainHeroId);
+        var message = new NetworkPlayerAcceptsClanInfoOffer(mainHeroId, currentSettlementId);
         network.SendAll(message);
     }
 
@@ -138,8 +147,36 @@ internal class TavernEmployeesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
 
-            GiveGoldAction.ApplyBetweenCharacters(mainHero, null, 500, false);
+            if (mainHero.Gold - ClanInfoOfferCost < 0)
+            {
+                Logger.Error($"Rejecting player accepts clan info offer due to a lack of gold. Requested change: {ClanInfoOfferCost} Player gold: {mainHero.Gold}");
+                return;
+            }
+
+            GiveGoldAction.ApplyBetweenCharacters(mainHero, null, ClanInfoOfferCost, false);
+
+            network.Send(obj.Who as NetPeer, new NetworkPlayerAcceptsClanInfoOfferClient(data.CurrentSettlementId));
+        });
+    }
+
+    private void Handle_NetworkPlayerAcceptsClanInfoOfferClient(MessagePayload<NetworkPlayerAcceptsClanInfoOfferClient> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
+
+            // Validate settlement before applying change
+            if (currentSettlement != Settlement.CurrentSettlement) return;
+
+            // Currently doesn't do anything as every hero is already known to every player at game start
+            foreach (Hero hero in Settlement.CurrentSettlement.OwnerClan.Heroes)
+            {
+                hero.IsKnownToPlayer = true;
+            }
         });
     }
 
@@ -191,6 +228,20 @@ internal class TavernEmployeesHandler : IHandler
             GiveGoldAction.ApplyBetweenCharacters(mainHero, null, data.TunPrice, false);
             if (mainHero.PartyBelongedTo != null) mainHero.PartyBelongedTo.RecentEventsMorale += 2f;
             sessionInteractionsPlayerDataInterface.UpdateHasBoughtTunToParty(data.MainHeroId, true);
+
+            network.Send(obj.Who as NetPeer, new NetworkPlayerBuysTunClient());
+        });
+    }
+
+    private void Handle_NetworkPlayerBuysTunClient(MessagePayload<NetworkPlayerBuysTunClient> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetTavernEmployeesBehavior(out var tavernEmployeesBehavior)) return;
+
+            tavernEmployeesBehavior._hasBoughtTunToParty = true;
         });
     }
 

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using SandBox.CampaignBehaviors;
 
 namespace GameInterface.Services.Towns.Messages;
 
@@ -15,9 +16,28 @@ internal readonly struct NetworkPlayerAcceptsClanInfoOffer : ICommand
     [ProtoMember(1)]
     public readonly string MainHeroId;
 
-    public NetworkPlayerAcceptsClanInfoOffer(string mainHeroId)
+    [ProtoMember(2)]
+    public readonly string CurrentSettlementId;
+
+    public NetworkPlayerAcceptsClanInfoOffer(
+        string mainHeroId,
+        string currentSettlementId)
     {
         MainHeroId = mainHeroId;
+        CurrentSettlementId = currentSettlementId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkPlayerAcceptsClanInfoOfferClient : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string CurrentSettlementId;
+
+    public NetworkPlayerAcceptsClanInfoOfferClient(
+        string currentSettlementId)
+    {
+        CurrentSettlementId = currentSettlementId;
     }
 }
 
@@ -56,6 +76,9 @@ internal readonly struct NetworkPlayerBuysTun : ICommand
         TunPrice = tunPrice;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkPlayerBuysTunClient : ICommand { }
 
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkUpdateHasMetRansomBroker : ICommand

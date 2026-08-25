@@ -44,3 +44,21 @@ internal readonly struct NetworkPlayerBribesGuard : ICommand
         Gold = gold;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkPlayerBribesGuardClient : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string SettlementId;
+
+    [ProtoMember(2)]
+    public readonly int Gold;
+
+    public NetworkPlayerBribesGuardClient(
+        string settlementId,
+        int gold)
+    {
+        SettlementId = settlementId;
+        Gold = gold;
+    }
+}

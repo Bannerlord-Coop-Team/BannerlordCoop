@@ -21,9 +21,6 @@ internal class BribeGuardsActionPatches
         // Don't update with no gold change like in vanilla
         if (gold <= 0) return false;
 
-        // Locally set the BribePaid on the settlement, this is unique per client
-        settlement.BribePaid += gold;
-
         var message = new PlayerBribesGuard(Hero.MainHero, settlement, gold);
         MessageBroker.Instance.Publish(null, message);
 
