@@ -198,6 +198,45 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
         }
     }
 
+    [Fact]
+    public void AlreadyRemovedHero_NegativeDelta_IsAcceptedWithoutChangingRoster()
+    {
+        Server.Call(() =>
+        {
+            var roster = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
+
+            var troopRosterInterface = Server.Resolve<ITroopRosterInterface>();
+            var applied = troopRosterInterface.TryApplyTroopRosterDeltas(new[]
+            {
+                (roster, Delta(characterId, -1)),
+            });
+
+            Assert.True(applied);
+            Assert.Equal(0, roster.GetTroopCount(hero.CharacterObject));
+            Assert.Null(hero.PartyBelongedTo);
+            Assert.Null(hero.PartyBelongedToAsPrisoner);
+        });
+    }
+
+    [Fact]
+    public void AlreadyRemovedHero_IsOmittedFromPackedDelta()
+    {
+        Server.Call(() =>
+        {
+            var current = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+            var initial = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            initial.AddToCounts(hero.CharacterObject, 1);
+
+            var troopRosterInterface = Server.Resolve<ITroopRosterInterface>();
+            var packed = troopRosterInterface.PackTroopRosterDelta(current, initial);
+
+            Assert.Empty(packed.Data);
+        });
+    }
+
     private void CreateFreedCoalescerSlots()
     {
         Server.Call(() =>

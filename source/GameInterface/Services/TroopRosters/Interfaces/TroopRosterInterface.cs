@@ -9,7 +9,6 @@ using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -175,6 +174,9 @@ internal class TroopRosterInterface : ITroopRosterInterface
             if (!objectManager.TryGetIdWithLogging(character, out var characterId))
                 continue;
 
+            if (IsAlreadyAppliedHeroRemoval(character, cur, numberDelta, woundedDelta, xpDelta))
+                continue;
+
             elements.Add(new TroopRosterElementData(characterId, numberDelta, woundedDelta, xpDelta));
         }
 
@@ -208,6 +210,10 @@ internal class TroopRosterInterface : ITroopRosterInterface
                 long finalNumber = current.number + elementData.Number;
                 long finalWounded = current.wounded + elementData.WoundedNumber;
                 long finalXp = current.xp + elementData.Xp;
+
+                if (IsAlreadyAppliedHeroRemoval(character, current, elementData.Number, elementData.WoundedNumber, elementData.Xp))
+                    continue;
+
                 if (finalNumber < 0 ||
                     finalNumber > int.MaxValue ||
                     finalWounded < 0 ||
@@ -236,6 +242,26 @@ internal class TroopRosterInterface : ITroopRosterInterface
         ApplyDeltaElements(elements, applyAdditions: false);
         ApplyDeltaElements(elements, applyAdditions: true);
         return true;
+    }
+
+    private static bool IsAlreadyAppliedHeroRemoval(
+        CharacterObject character,
+        (int number, int wounded, int xp) current,
+        int numberDelta,
+        int woundedDelta,
+        int xpDelta)
+    {
+        if (!character.IsHero ||
+            current.number != 0 ||
+            current.wounded != 0 ||
+            current.xp != 0 ||
+            numberDelta >= 0 ||
+            woundedDelta != 0 ||
+            xpDelta != 0)
+            return false;
+
+        var hero = character.HeroObject;
+        return hero.PartyBelongedTo == null && hero.PartyBelongedToAsPrisoner == null;
     }
 
     private void ApplyDeltaElements(
