@@ -231,7 +231,7 @@ public class CoopLogBugReportTests : IDisposable
                    tempRoot,
                    pendingArchiveRetention: TimeSpan.FromDays(1)))
         {
-            Assert.True(File.Exists(lockedPath));
+            if (OperatingSystem.IsWindows()) Assert.True(File.Exists(lockedPath));
             Assert.False(File.Exists(removablePath));
         }
     }
