@@ -41,7 +41,32 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
 
     public (string instanceId, string[] partyIds) CreateSettlement(params string[] controllerIds)
     {
-        return SetupSettlementLocation(controllerIds);
+        var settlement = SetupSettlementLocation(controllerIds);
+        AttachLocationComplex(settlement.instanceId);
+        return settlement;
+    }
+
+    // LocationComplex is not serialized by the headless registry, so rebuild its location link per instance.
+    private void AttachLocationComplex(string instanceId)
+    {
+        string[] ids = instanceId.Split('|');
+
+        void Attach(EnvironmentInstance instance)
+        {
+            instance.Call(() =>
+            {
+                Settlement settlement = instance.GetRegisteredObject<Settlement>(ids[0]);
+                Location location = instance.GetRegisteredObject<Location>(ids[1]);
+                var locationComplex = new LocationComplex();
+                locationComplex._locations.Add(ids[1], location);
+                location._ownerComplex = locationComplex;
+                settlement.LocationComplex = locationComplex;
+            });
+        }
+
+        Attach(Server);
+        foreach (EnvironmentInstance client in Clients)
+            Attach(client);
     }
 
     public (string heroId, string characterId) CreateHeroCharacter()
