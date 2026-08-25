@@ -18,17 +18,6 @@ namespace GameInterface.Tests.Serialization
         }
 
         [Fact]
-        public void GetBinaryPackage_ClearsPackagesAfterRootGraphCompletes()
-        {
-            var value = new MutablePackageValue { Value = 1 };
-
-            var package = factory.GetBinaryPackage<MutablePackageValueBinaryPackage>(value);
-
-            Assert.Equal(1, package.CacheCountDuringPack);
-            Assert.Equal(0, factory.CachedPackageCount);
-        }
-
-        [Fact]
         public void GetBinaryPackage_PacksCurrentStateOnEachRootCall()
         {
             var value = new MutablePackageValue { Value = 1 };
@@ -40,7 +29,6 @@ namespace GameInterface.Tests.Serialization
             Assert.NotSame(firstPackage, secondPackage);
             Assert.Equal(1, firstPackage.PackedValue);
             Assert.Equal(2, secondPackage.PackedValue);
-            Assert.Equal(0, factory.CachedPackageCount);
         }
 
         [Fact]
@@ -52,7 +40,6 @@ namespace GameInterface.Tests.Serialization
             var package = factory.GetBinaryPackage<RecursivePackageValueBinaryPackage>(value);
 
             Assert.Same(package, package.SelfPackage);
-            Assert.Equal(0, factory.CachedPackageCount);
         }
 
         [Fact]
@@ -60,8 +47,8 @@ namespace GameInterface.Tests.Serialization
         {
             Assert.Throws<InvalidOperationException>(() =>
                 factory.GetBinaryPackage(new ThrowingPackageValue()));
-
-            Assert.Equal(0, factory.CachedPackageCount);
+            Assert.Throws<InvalidOperationException>(() =>
+                factory.GetBinaryPackage(new ThrowingPackageValue()));
         }
     }
 
@@ -73,7 +60,6 @@ namespace GameInterface.Tests.Serialization
     public class MutablePackageValueBinaryPackage : BinaryPackageBase<MutablePackageValue>
     {
         public int PackedValue { get; private set; }
-        public int CacheCountDuringPack { get; private set; }
 
         public MutablePackageValueBinaryPackage(
             MutablePackageValue obj,
@@ -84,7 +70,6 @@ namespace GameInterface.Tests.Serialization
         protected override void PackInternal()
         {
             PackedValue = Object.Value;
-            CacheCountDuringPack = BinaryPackageFactory.CachedPackageCount;
         }
 
         protected override void UnpackInternal()

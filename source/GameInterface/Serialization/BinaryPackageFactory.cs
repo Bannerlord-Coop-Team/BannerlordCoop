@@ -12,8 +12,6 @@ namespace GameInterface.Serialization
     {
         IObjectManager ObjectManager { get; }
 
-        int CachedPackageCount { get; }
-
         T GetBinaryPackage<T>(object obj);
 
         IBinaryPackage GetBinaryPackage(object obj);
@@ -36,12 +34,6 @@ namespace GameInterface.Serialization
 
         private readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
         private int packageGraphDepth;
-
-        public int CachedPackageCount
-        {
-            [MethodImpl(MethodImplOptions.Synchronized)]
-            get => InstantiatedPackages.Count;
-        }
 
         private static void CollectBinaryPackageTypes()
         {
