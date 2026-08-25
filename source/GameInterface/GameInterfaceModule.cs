@@ -23,6 +23,7 @@ using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.LiveTesting;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
@@ -35,8 +36,8 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
-using GameInterface.Services.Stances;
 using GameInterface.Services.SiegeEvents;
+using GameInterface.Services.Stances;
 using GameInterface.Services.Time;
 using GameInterface.Services.TroopRosters;
 using GameInterface.Services.TroopRosters.Logging;
@@ -45,6 +46,7 @@ using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
+using GameInterface.Services.UI.Patches;
 using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
 using HarmonyLib;
@@ -92,6 +94,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
         builder.RegisterType<NearbyPartyReinforcer>().As<INearbyPartyReinforcer>().InstancePerDependency();
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
@@ -138,6 +141,7 @@ public class GameInterfaceModule : Module
             .As<IDebugBattleMissionExitRequester>()
             .InstancePerDependency();
 #endif
+        builder.RegisterType<MapTrackerProviderHolder>().As<IMapTrackerProviderHolder>().InstancePerLifetimeScope();
 
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
