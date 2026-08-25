@@ -60,6 +60,10 @@ public readonly struct ModOptions
     public readonly bool ShowPlayerNameplates { get; } = true;
     [ProtoMember(20)]
     public readonly bool PlayerWoundedBattleEntry { get; } = true;
+    [ProtoMember(21)]
+    public readonly int MinimumWarDurationDays { get; } = 0;
+    [ProtoMember(22)]
+    public readonly int PeaceDeclineCooldownDays { get; } = 0;
 
     public ModOptions(ModOptionsData modOptionsData)
     {
@@ -83,5 +87,7 @@ public readonly struct ModOptions
         EnablePlayerClanMemberExecutions = modOptionsData.EnablePlayerClanMemberExecutions ?? EnablePlayerClanMemberExecutions;
         ShowPlayerNameplates = modOptionsData.ShowPlayerNameplates ?? ShowPlayerNameplates;
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
+        MinimumWarDurationDays = modOptionsData.MinimumWarDurationDays ?? MinimumWarDurationDays;
+        PeaceDeclineCooldownDays = modOptionsData.PeaceDeclineCooldownDays ?? PeaceDeclineCooldownDays;
     }
 }

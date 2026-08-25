@@ -76,6 +76,8 @@ namespace Coop.IntegrationTests.Serialization
                 LooterPartySizeMultiplier = 0.33f,
                 ShowPlayerNameplates = true,
                 PlayerWoundedBattleEntry = false,
+                MinimumWarDurationDays = 30,
+                PeaceDeclineCooldownDays = 3,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -91,6 +93,8 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(0.25f, copy.MaximumLootersMultiplier);
             Assert.Equal(0.33f, copy.LooterPartySizeMultiplier);
             Assert.False(copy.PlayerWoundedBattleEntry);
+            Assert.Equal(30, copy.MinimumWarDurationDays);
+            Assert.Equal(3, copy.PeaceDeclineCooldownDays);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
@@ -118,6 +122,8 @@ namespace Coop.IntegrationTests.Serialization
             LooterPartySizeMultiplier = 0f,
             ShowPlayerNameplates = false,
             PlayerWoundedBattleEntry = false,
+            MinimumWarDurationDays = 0,
+            PeaceDeclineCooldownDays = 0,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -139,6 +145,8 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(0f, copy.LooterPartySizeMultiplier);
             Assert.False(copy.ShowPlayerNameplates);
             Assert.False(copy.PlayerWoundedBattleEntry);
+            Assert.Equal(0, copy.MinimumWarDurationDays);
+            Assert.Equal(0, copy.PeaceDeclineCooldownDays);
         }
 
         private static T RoundTrip<T>(T original)

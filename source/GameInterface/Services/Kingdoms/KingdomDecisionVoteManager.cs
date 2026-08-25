@@ -82,6 +82,7 @@ namespace GameInterface.Services.Kingdoms
         private readonly IKingdomDecisionOutcomeResolver outcomeResolver;
         private readonly IKingdomDecisionOutcomeOrder outcomeOrder;
         private readonly IKingdomDecisionRoundPresentation roundPresentation;
+        private readonly IAiPeaceProposalGate peaceProposalGate;
         private readonly Timer votingRoundTimer;
         private int isDisposed;
 
@@ -91,7 +92,8 @@ namespace GameInterface.Services.Kingdoms
             IMessageBroker messageBroker,
             IKingdomDecisionOutcomeResolver outcomeResolver,
             IKingdomDecisionOutcomeOrder outcomeOrder,
-            IKingdomDecisionRoundPresentation roundPresentation)
+            IKingdomDecisionRoundPresentation roundPresentation,
+            IAiPeaceProposalGate peaceProposalGate)
         {
             this.playerManager = playerManager;
             this.objectManager = objectManager;
@@ -99,6 +101,7 @@ namespace GameInterface.Services.Kingdoms
             this.outcomeResolver = outcomeResolver;
             this.outcomeOrder = outcomeOrder;
             this.roundPresentation = roundPresentation;
+            this.peaceProposalGate = peaceProposalGate;
 
             if (ModInformation.IsServer)
             {
@@ -1031,7 +1034,12 @@ namespace GameInterface.Services.Kingdoms
 
             if (state.Decision is MakePeaceKingdomDecision decision)
             {
-                if (decision.Kingdom is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom() 
+                if (chosenOutcome is not MakePeaceKingdomDecision.MakePeaceDecisionOutcome { ShouldPeaceBeDeclared: true })
+                {
+                    peaceProposalGate?.RecordDeclinedOffer(decision);
+                }
+
+                if (decision.Kingdom is Kingdom playerKingdom && playerKingdom.IsPlayerKingdom()
                     && decision.FactionToMakePeaceWith is Kingdom playerkingdom2 && playerkingdom2.IsPlayerKingdom())
                 {
                     messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(

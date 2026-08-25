@@ -72,7 +72,11 @@ public class KingdomDebugCommand
     private static readonly string AddKingdomPolicyDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> KingdomPolicyDecision <policyId> <isInvertedDecision>";
     private static readonly string AddSettlementClaimantDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> SettlementClaimantDecision <settlementId> <capturerHeroId> <clanToExcludeId>";
     private static readonly string AddSettlementClaimantPreliminaryDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> SettlementClaimantPreliminaryDecision <SettlementId>";
-    private static readonly string AddMakePeaceKingdomDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> MakePeaceKingdomDecision <factionId> <dailyTribute> <applyResults>";
+    private static readonly string AddMakePeaceKingdomDecisionUsage =
+@"Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> MakePeaceKingdomDecision <factionId> <dailyTribute> <dailyTributeDurationInDays> <applyResults>
+Example: coop.debug.kingdom.add_decision empire_s clan_empire_south_1 true MakePeaceKingdomDecision vlandia 50 30 true
+  Pethros proposes that the Southern Empire make peace with Vlandia, paying 50 tribute a day for 30 days.
+  Run coop.debug.kingdom.list for the kingdom ids and coop.debug.kingdom.info <kingdomId> for its clans.";
     private static readonly string AddAcceptCallToWarAgreementDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> AcceptCallToWarAgreementDecision <callingKingdomId> <kingdomToCallToWarAgainstId>";
     private static readonly string AddProposeCallToWarAgreementDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> ProposeCallToWarAgreementDecision <calledKingdomId> <kingdomToCallToWarAgainstId>";
     private static readonly string AddStartAllianceDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> StartAllianceDecision <kingdomToStartAllianceWithId>";
@@ -90,7 +94,7 @@ public class KingdomDebugCommand
             { nameof(ProposeCallToWarAgreementDecision), TryGetProposeCallToWarAgreementDecision },
             { nameof(StartAllianceDecision), TryGetStartAllianceDecision },
             { nameof(TradeAgreementDecision), TryGetTradeAgreementDecision },
-            //{ nameof(MakePeaceKingdomDecision), TryGetMakePeaceKingdomDecision },
+            { nameof(MakePeaceKingdomDecision), TryGetMakePeaceKingdomDecision },
         };
 
 
@@ -1558,6 +1562,7 @@ public class KingdomDebugCommand
     [CommandLineArgumentFunction("add_decision", "coop.debug.kingdom")]
     public static string AddDecision(List<string> args)
     {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
         if (args.Count < 4)
         {
             return AddBasicUsage;
@@ -1971,53 +1976,60 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
+    private static bool TryGetMakePeaceKingdomDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    {
+        if (args.Count < 8)
+        {
+            kingdomDecision = null;
+            message = AddMakePeaceKingdomDecisionUsage;
+            return false;
+        }
 
-    //private static bool TryGetMakePeaceKingdomDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
-    //{
-    //    if (args.Count < 7)
-    //    {
-    //        kingdomDecision = null;
-    //        message = AddMakePeaceKingdomDecisionUsage;
-    //        return false;
-    //    }
+        string factionId = args[4];
+        string dailyTribute = args[5];
+        string dailyTributeDuration = args[6];
+        string applyResults = args[7];
 
-    //    string factionId = args[4];
-    //    string dailyTribute = args[5];
-    //    string applyResults = args[6];
+        if (!objectManager.TryGetObject(factionId, out Kingdom kingdom) & !objectManager.TryGetObject(factionId, out Clan clanFaction))
+        {
+            kingdomDecision = null;
+            message = $"Argument5: Faction is not found by Id: {factionId}";
+            return false;
+        }
 
-    //    if (!objectManager.TryGetObject(factionId, out Kingdom kingdom) & !objectManager.TryGetObject(factionId, out Clan clan))
-    //    {
-    //        kingdomDecision = null;
-    //        message = $"Argument5: Faction is not found by Id: {factionId}";
-    //        return false;
-    //    }
+        IFaction faction;
+        if (kingdom != null)
+        {
+            faction = kingdom;
+        }
+        else
+        {
+            faction = clanFaction;
+        }
 
-    //    IFaction faction;
-    //    if (kingdom != null)
-    //    {
-    //        faction = kingdom;
-    //    }
-    //    else
-    //    {
-    //        faction = clan;
-    //    }
+        if (!int.TryParse(dailyTribute, out int dailyTributeToBePaid))
+        {
+            kingdomDecision = null;
+            message = $"Argument6: The given value is not an integer value: {dailyTribute}";
+            return false;
+        }
 
-    //    if (!int.TryParse(dailyTribute, out int dailyTributeToBePaid))
-    //    {
-    //        kingdomDecision = null;
-    //        message = $"Argument6: The given value is not an integer value: {dailyTribute}";
-    //        return false;
-    //    }
+        if (!int.TryParse(dailyTributeDuration, out int dailyTributeDurationInDays))
+        {
+            kingdomDecision = null;
+            message = $"Argument7: The given value is not an integer value: {dailyTributeDuration}";
+            return false;
+        }
 
-    //    if (!bool.TryParse(applyResults, out bool applyResult))
-    //    {
-    //        kingdomDecision = null;
-    //        message = $"Argument7: The given value is not a boolean value: {applyResults}";
-    //        return false;
-    //    }
+        if (!bool.TryParse(applyResults, out bool applyResult))
+        {
+            kingdomDecision = null;
+            message = $"Argument8: The given value is not a boolean value: {applyResults}";
+            return false;
+        }
 
-    //    kingdomDecision = new MakePeaceKingdomDecision(proposerClan, faction, dailyTributeToBePaid, applyResult);
-    //    message = string.Empty;
-    //    return true;
-    //}
+        kingdomDecision = new MakePeaceKingdomDecision(proposerClan, faction, dailyTributeToBePaid, dailyTributeDurationInDays, applyResult);
+        message = string.Empty;
+        return true;
+    }
 }

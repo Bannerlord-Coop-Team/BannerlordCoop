@@ -111,6 +111,17 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             if (kingdomDecision == null) return false;
 
+            // Held back if the war is younger than the configured minimum, if the last offer to
+            // this pair was declined, or if a mirrored offer is still unanswered.
+            if (kingdomDecision is MakePeaceKingdomDecision proposedPeace
+                && ContainerProvider.TryResolve<IAiPeaceProposalGate>(out var peaceProposalGate)
+                && peaceProposalGate.IsPeaceProposalBlocked(clan.MapFaction, proposedPeace.FactionToMakePeaceWith, out var blockingRule))
+            {
+                Logger.Debug("Held back {ProposingFaction} peace proposal to {TargetFaction}: {BlockingRule}",
+                    clan.MapFaction?.StringId, proposedPeace.FactionToMakePeaceWith?.StringId, blockingRule);
+                return false;
+            }
+
             // Cross-kingdom duplicate guard (vanilla, player-deref-free): skip if an equivalent
             // war/peace decision is already pending.
             foreach (KingdomDecision existing in __instance._kingdomDecisionsList)
@@ -192,6 +203,11 @@ namespace GameInterface.Services.Kingdoms.Patches
                                 kingdom.RemoveDecision(decision);
                                 if (decision is MakePeaceKingdomDecision d)
                                 {
+                                    if (ContainerProvider.TryResolve<IAiPeaceProposalGate>(out var peaceProposalGate))
+                                    {
+                                        peaceProposalGate.RecordDeclinedOffer(d);
+                                    }
+
                                     MessageBroker.Instance.Publish(null, new PeaceOfferPendingStatusChanged(
                                         (Kingdom)d.FactionToMakePeaceWith,
                                         d.Kingdom,

@@ -157,12 +157,12 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 return true;
             }
 
+            // Only the exact-duplicate guard belongs here. The AI proposer rules run on the
+            // DailyTickClan path; applying them again here would swallow a player authored offer
+            // after its influence was already spent and leave the pending flag stuck on.
             Kingdom proposingKingdom = peaceDecision.Kingdom;
-            bool offerAlreadyPending = playerKingdom.UnresolvedDecisions
-                .OfType<MakePeaceKingdomDecision>()
-                .Any(existing => existing._isProposedByOpponent
-                                 && existing.FactionToMakePeaceWith == proposingKingdom);
-            if (offerAlreadyPending || playerKingdom.RulingClan == null)
+            if (AiPeaceProposalGate.HasPendingMirroredOffer(playerKingdom, proposingKingdom)
+                || playerKingdom.RulingClan == null)
             {
                 return true;
             }

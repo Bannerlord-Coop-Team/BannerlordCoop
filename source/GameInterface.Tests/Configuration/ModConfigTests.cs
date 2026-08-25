@@ -306,6 +306,8 @@ public class ModConfigTests : IDisposable
         Assert.Equal(1f, options.MaximumLootersMultiplier);
         Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
         Assert.True(options.ShowPlayerNameplates);
+        Assert.Equal(0, options.MinimumWarDurationDays);
+        Assert.Equal(0, options.PeaceDeclineCooldownDays);
     }
 
     /// <summary>

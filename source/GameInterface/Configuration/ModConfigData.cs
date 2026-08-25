@@ -124,6 +124,10 @@ public sealed class ModOptionsData
 
     public bool? ShowPlayerNameplates { get; set; }
 
+    public int? MinimumWarDurationDays { get; set; }
+
+    public int? PeaceDeclineCooldownDays { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

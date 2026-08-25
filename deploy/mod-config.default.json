@@ -194,5 +194,20 @@
     // Toggle players being allowed to join battles when wounded
     // Default is true
     "playerWoundedBattleEntry": true,
+
+    // Minimum number of in-game days a war involving a player faction must last before
+    // AI clans are allowed to propose peace for it.
+    // On a dedicated server an AI peace vote resolves without meaningful player input, so
+    // without this a player war can be voted away the day after it was declared.
+    // Players can always propose peace themselves, whatever this is set to.
+    // Wars between two AI factions are never held back.
+    // (Default) 0: vanilla, AI clans may propose peace as soon as the war starts.
+    "minimumWarDurationDays": 0,
+
+    // In-game days an AI clan waits before proposing peace again to a faction pair that turned
+    // the last offer down. An offer that expires unanswered counts as a refusal.
+    // One decline holds the pair back in both directions, and only AI proposals are affected.
+    // (Default) 0: vanilla, a declined offer may be re-proposed the next day.
+    "peaceDeclineCooldownDays": 0,
   }
 }
