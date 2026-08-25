@@ -422,12 +422,16 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.start_attack_mission";
         }
 
-        var mainParty = MobileParty.MainParty;
-        var mapEvent = mainParty?.MapEvent;
-        if (mapEvent == null)
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        if (!GameThread.WaitWhilePumping(
+                () => MobileParty.MainParty?.MapEvent != null,
+                deadline))
         {
             return "The main party has no replicated map event";
         }
+
+        var mainParty = MobileParty.MainParty;
+        var mapEvent = mainParty.MapEvent;
 
         if (!TryGetObjectManager(out var objectManager)
             || !objectManager.TryGetId(mapEvent, out var mapEventId)
