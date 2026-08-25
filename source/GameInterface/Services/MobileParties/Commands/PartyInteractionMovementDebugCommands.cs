@@ -434,12 +434,13 @@ internal static class PartyInteractionMovementDebugCommands
             return "Unable to resolve the caravan proximity movement snapshot service.";
 
         CaravanProximityFixtureState restored = restoredCaravanProximityFixture;
-        bool playerVerified = restored.PlayerRestoredVerified && TryVerifyRestored(
+        bool playerCurrentMatchesCaptured = TryVerifyRestored(
             behaviorSnapshot,
             restored.PlayerParty,
             restored.PlayerState,
             restored.PlayerNextTargetPosition,
             restored.PlayerDefaultBehaviorNeedsUpdate);
+        bool playerVerified = restored.PlayerRestoredVerified;
         bool targetCurrentMatchesCaptured = TryVerifyRestored(
             behaviorSnapshot,
             restored.TargetParty,
@@ -457,6 +458,7 @@ internal static class PartyInteractionMovementDebugCommands
             playerPartyId = restored.PlayerPartyId,
             targetPartyId = restored.TargetPartyId,
             playerVerified,
+            playerCurrentMatchesCaptured,
             targetVerified,
             targetCurrentMatchesCaptured,
             restored = verified
