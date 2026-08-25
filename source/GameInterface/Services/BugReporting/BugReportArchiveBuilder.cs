@@ -149,6 +149,7 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
     private readonly int maximumPendingArchiveCount;
     private readonly long maximumPendingArchiveBytes;
     private readonly TimeSpan pendingArchiveRetention;
+    private readonly Func<string, bool> deleteArchive;
     private readonly object archiveGate = new object();
     private readonly Timer cleanupTimer;
     private int disposed;
@@ -166,7 +167,8 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
         int maximumPendingArchiveCount = MaximumPendingArchiveCount,
         long maximumPendingArchiveBytes = MaximumPendingArchiveBytes,
         TimeSpan? pendingArchiveRetention = null,
-        TimeSpan? cleanupInterval = null)
+        TimeSpan? cleanupInterval = null,
+        Func<string, bool> deleteArchive = null)
     {
         if (string.IsNullOrWhiteSpace(outputDirectory))
             throw new ArgumentException("Output directory cannot be empty.", nameof(outputDirectory));
@@ -183,6 +185,7 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
         this.maximumPendingArchiveCount = maximumPendingArchiveCount;
         this.maximumPendingArchiveBytes = maximumPendingArchiveBytes;
         this.pendingArchiveRetention = pendingArchiveRetention ?? PendingArchiveRetention;
+        this.deleteArchive = deleteArchive ?? DeleteArchive;
         RunCleanup();
         var interval = cleanupInterval ?? CleanupInterval;
         cleanupTimer = new Timer(_ => RunCleanup(), null, interval, interval);
@@ -233,23 +236,31 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
         }
         catch
         {
-            TryDelete(archivePath);
+            TryDeleteArchive(archivePath);
             throw;
         }
     }
 
-    private static void TryDelete(string path)
+    private bool TryDeleteArchive(string path)
     {
         try
         {
-            File.Delete(path);
+            return deleteArchive(path);
         }
         catch (IOException)
         {
+            return false;
         }
         catch (UnauthorizedAccessException)
         {
+            return false;
         }
+    }
+
+    private static bool DeleteArchive(string path)
+    {
+        File.Delete(path);
+        return true;
     }
 
     private void RunCleanup()
@@ -285,7 +296,7 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
         {
             try
             {
-                if (File.GetLastWriteTimeUtc(path) < cutoff) File.Delete(path);
+                if (File.GetLastWriteTimeUtc(path) < cutoff) TryDeleteArchive(path);
             }
             catch (IOException)
             {
@@ -310,14 +321,20 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
             throw new InvalidDataException("The diagnostic archive exceeds the pending storage quota.");
 
         var totalBytes = archives.Sum(file => file.Length);
-        while (archives.Count > maximumPendingArchiveCount ||
-               totalBytes > maximumPendingArchiveBytes)
+        var evictionCandidates = archives
+            .Where(file => !ReferenceEquals(file, newArchive))
+            .ToList();
+        foreach (var archive in evictionCandidates)
         {
-            var archive = archives.FirstOrDefault(file => !ReferenceEquals(file, newArchive));
-            if (archive == null) break;
+            if (archives.Count <= maximumPendingArchiveCount &&
+                totalBytes <= maximumPendingArchiveBytes)
+            {
+                break;
+            }
 
             var length = archive.Length;
-            archive.Delete();
+            if (!TryDeleteArchive(archive.FullName)) continue;
+
             totalBytes -= length;
             archives.Remove(archive);
         }

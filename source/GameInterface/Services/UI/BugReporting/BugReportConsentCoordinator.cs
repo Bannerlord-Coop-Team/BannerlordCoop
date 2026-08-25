@@ -48,6 +48,13 @@ public class BugReportConsentCoordinator
         if (decision.HasValue) return;
 
         promptShown = true;
+        ShowPrompt(showInquiry);
+    }
+
+    public void ShowPrompt(Action<InquiryData> showInquiry)
+    {
+        if (showInquiry == null) throw new ArgumentNullException(nameof(showInquiry));
+
         showInquiry(new InquiryData(
             PromptTitle,
             PromptText,

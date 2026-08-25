@@ -189,6 +189,36 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
+    public void Archive_SkipsLockedOldestReportWhenEnforcingQuota()
+    {
+        Directory.CreateDirectory(tempRoot);
+        string lockedPath = null;
+        bool DeleteUnlessLocked(string path)
+        {
+            if (string.Equals(path, lockedPath, StringComparison.OrdinalIgnoreCase)) return false;
+            File.Delete(path);
+            return true;
+        }
+
+        using var builder = new BugReportArchiveBuilder(
+            tempRoot,
+            maximumPendingArchiveCount: 2,
+            maximumPendingArchiveBytes: long.MaxValue,
+            deleteArchive: DeleteUnlessLocked);
+        lockedPath = builder.Create(CreateEmptyArchiveContents());
+        File.SetLastWriteTimeUtc(lockedPath, DateTime.UtcNow.AddMinutes(-2));
+        var removablePath = builder.Create(CreateEmptyArchiveContents());
+        File.SetLastWriteTimeUtc(removablePath, DateTime.UtcNow.AddMinutes(-1));
+
+        var newPath = builder.Create(CreateEmptyArchiveContents());
+
+        Assert.True(File.Exists(lockedPath));
+        Assert.False(File.Exists(removablePath));
+        Assert.True(File.Exists(newPath));
+        Assert.Equal(2, Directory.GetFiles(tempRoot, "bug_report_*.zip").Length);
+    }
+
+    [Fact]
     public void Archive_RejectsReportLargerThanPendingByteQuota()
     {
         Directory.CreateDirectory(tempRoot);

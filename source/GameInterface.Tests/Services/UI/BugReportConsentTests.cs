@@ -67,6 +67,23 @@ public class BugReportConsentTests
     }
 
     [Fact]
+    public void ExplicitEnablePrompt_DoesNotEnableSharingUntilDisclosureIsAccepted()
+    {
+        var store = new TestOptionsStore();
+        var preference = new BugReportLogSharingPreference(store);
+        var coordinator = new BugReportConsentCoordinator(store, _ => { });
+        InquiryData inquiry = null;
+
+        coordinator.ShowPrompt(value => inquiry = value);
+
+        Assert.NotNull(inquiry);
+        Assert.Contains("public GitHub issue", inquiry.Text);
+        Assert.False(preference.IsEnabled());
+        inquiry.AffirmativeAction();
+        Assert.True(preference.IsEnabled());
+    }
+
+    [Fact]
     public void MissingDecision_DefaultsToDisabled()
     {
         var preference = new BugReportLogSharingPreference(new TestOptionsStore());
