@@ -265,7 +265,11 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
             if (settlement.SiegeEvent != siegeEvent) settlement.SiegeEvent = siegeEvent;
             if (camp.SiegeEvent != siegeEvent) camp.SiegeEvent = siegeEvent;
             if (camp._leaderParty != leaderParty) camp._leaderParty = leaderParty;
-            if (leaderParty.BesiegerCamp != camp) leaderParty.BesiegerCamp = camp;
+            if (leaderParty._besiegerCamp != camp)
+            {
+                leaderParty._besiegerCamp = camp;
+                leaderParty.Party?.SetVisualAsDirty();
+            }
             if (camp.SiegeEngines != attackerEngines) camp.SiegeEngines = attackerEngines;
             if (settlement.SiegeEngines != defenderEngines) settlement.SiegeEngines = defenderEngines;
             SiegeEnginesContainerShellPatches.InitializeShell(attackerEngines, BattleSideEnum.Attacker);
@@ -285,7 +289,11 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
                 camp._besiegerParties.Clear();
                 foreach (var party in besiegerParties)
                 {
-                    if (party.BesiegerCamp != camp) party.BesiegerCamp = camp;
+                    if (party._besiegerCamp != camp)
+                    {
+                        party._besiegerCamp = camp;
+                        party.Party?.SetVisualAsDirty();
+                    }
                     if (!camp._besiegerParties.Contains(party)) camp._besiegerParties.Add(party);
                 }
 

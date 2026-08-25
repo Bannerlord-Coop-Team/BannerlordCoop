@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
@@ -138,6 +139,21 @@ public class SiegeEventLifetimeTests : IDisposable
 
             client.Call(() =>
             {
+                var leaderPosition = new CampaignVec2(new Vec2(17f, 23f), true);
+                var supportPosition = new CampaignVec2(new Vec2(31f, 47f), true);
+                besiegerParty._position = leaderPosition;
+                supportParty._position = supportPosition;
+                besiegerParty._besiegerCamp = null;
+                supportParty._besiegerCamp = null;
+                besiegerCamp._besiegerParties.Clear();
+
+                Assert.True(client.Resolve<ISiegeEventGraphSynchronizer>().TryApply(
+                    initialization.ToSnapshot()));
+                Assert.Equal(leaderPosition, besiegerParty.Position);
+                Assert.Equal(supportPosition, supportParty.Position);
+                Assert.Same(besiegerCamp, besiegerParty.BesiegerCamp);
+                Assert.Same(besiegerCamp, supportParty.BesiegerCamp);
+
                 long retainedStartTimeTicks = siegeStartTimeTicks + 10;
                 using (new AllowedThread())
                 {
