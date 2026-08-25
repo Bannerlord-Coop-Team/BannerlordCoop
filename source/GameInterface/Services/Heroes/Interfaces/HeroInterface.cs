@@ -13,6 +13,7 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.UI.Messages;
 using SandBox.View.Map.Managers;
 using Serilog;
 using System;
@@ -192,6 +193,7 @@ internal class HeroInterface : IHeroInterface
         // icons would stay revealed forever. Queued so it runs once the campaign state is entered
         // and the hero switched to above is the local main party.
         GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
+        MessageBroker.Instance.Publish(player, new SwitchedPlayer());
     }
 
     private void LogPlayerSwitchState(
