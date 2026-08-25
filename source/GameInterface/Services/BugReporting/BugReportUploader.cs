@@ -23,9 +23,9 @@ public interface IBugReportUploader
 /// <inheritdoc />
 public class BugReportUploader : IBugReportUploader, IDisposable
 {
-    public const string Endpoint =
-        "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/create-github-issue-bug-report";
-    public const string SupabasePublishableKey = "sb_publishable_tseZMeJ-RYeSHI0KwU2p0g_PE4GVtN6";
+    public const string Endpoint = "https://bug-reports.bannerlordcoop.invalid/api/v1/reports";
+    public const string EndpointEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_ENDPOINT";
+    public const string PublishableKeyEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_PUBLISHABLE_KEY";
     public const string AuthorizationTokenEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_TOKEN";
     internal const int MaximumCompressedReportBytes = 10 * 1024 * 1024;
 
@@ -48,8 +48,8 @@ public class BugReportUploader : IBugReportUploader, IDisposable
 
     public BugReportUploader() : this(
         new HttpClient { Timeout = TimeSpan.FromMinutes(2) },
-        Endpoint,
-        SupabasePublishableKey,
+        Environment.GetEnvironmentVariable(EndpointEnvironmentVariable) ?? Endpoint,
+        Environment.GetEnvironmentVariable(PublishableKeyEnvironmentVariable),
         Environment.GetEnvironmentVariable(AuthorizationTokenEnvironmentVariable),
         true)
     {
@@ -58,7 +58,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
     internal BugReportUploader(
         HttpClient httpClient,
         string endpoint = Endpoint,
-        string supabasePublishableKey = SupabasePublishableKey,
+        string supabasePublishableKey = null,
         string authorizationToken = null,
         bool ownsClient = false)
     {

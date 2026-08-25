@@ -241,11 +241,13 @@ public class CoopLogBugReportTests : IDisposable
     {
         var handler = new RecordingHttpHandler();
         using var httpClient = new HttpClient(handler);
+        const string publishableKey = "test-publishable-key";
         const string authorizationToken = "server-bound-token";
         using var uploader = new BugReportUploader(
             httpClient,
             "https://bug-reports.example.test/api/v1/reports",
-            authorizationToken: authorizationToken);
+            publishableKey,
+            authorizationToken);
         var serverLog = Compress("server diagnostic\n");
         var clientLog = Compress("client diagnostic\n");
         var report = new BugReportArchiveContents(
@@ -273,7 +275,7 @@ public class CoopLogBugReportTests : IDisposable
 
         Assert.True(result.Uploaded);
         Assert.Equal("application/json; charset=utf-8", handler.ContentType);
-        Assert.Equal(BugReportUploader.SupabasePublishableKey, handler.ApiKey);
+        Assert.Equal(publishableKey, handler.ApiKey);
         Assert.Equal("Bearer " + authorizationToken, handler.Authorization);
         Assert.Equal(report.RequestId, handler.IdempotencyKey);
         using var json = JsonDocument.Parse(handler.Body);
@@ -292,24 +294,25 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
-    public void Uploader_RequiresServerAuthorizationForSupabaseEndpoint()
+    public void Uploader_DefaultConfigurationIsDisabled()
     {
         using var httpClient = new HttpClient(new RecordingHttpHandler());
         using var uploader = new BugReportUploader(httpClient);
 
         Assert.False(uploader.IsConfigured);
-        Assert.Equal(
-            "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/create-github-issue-bug-report",
-            BugReportUploader.Endpoint);
+        Assert.EndsWith(".invalid/api/v1/reports", BugReportUploader.Endpoint);
     }
 
     [Fact]
     public void Uploader_DoesNotTreatPublishableKeyAsServerAuthorization()
     {
         using var httpClient = new HttpClient(new RecordingHttpHandler());
+        const string publishableKey = "test-publishable-key";
         using var uploader = new BugReportUploader(
             httpClient,
-            authorizationToken: BugReportUploader.SupabasePublishableKey);
+            "https://bug-reports.example.test/api/v1/reports",
+            publishableKey,
+            publishableKey);
 
         Assert.False(uploader.IsConfigured);
     }
