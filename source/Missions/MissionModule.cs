@@ -129,6 +129,9 @@ public class MissionModule : Module
         builder.RegisterType<LocationAgentSpawnBatchCodec>()
             .As<ILocationAgentSpawnBatchCodec>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<LocationPartyPuppetRegistrar>()
+            .As<ILocationPartyPuppetRegistrar>()
+            .InstancePerDependency();
         builder.RegisterType<LocationControllerWithdrawalState>()
             .As<ILocationControllerWithdrawalState>()
             .InstancePerDependency();

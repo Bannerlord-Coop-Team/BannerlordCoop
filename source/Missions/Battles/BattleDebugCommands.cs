@@ -155,8 +155,6 @@ internal static class BattleDebugCommands
             mission?.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();
         if (mission == null || controller == null || spawnLogic == null)
             return "COLUMN_REINFORCEMENT_FIXTURE no active coop battle";
-        if (!controller.Session.IsLocalHost)
-            return "COLUMN_REINFORCEMENT_FIXTURE run this on the battle-authority client";
         if (!controller.Deployment.IsActivated)
             return "COLUMN_REINFORCEMENT_FIXTURE finish deployment first";
         if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
@@ -208,8 +206,7 @@ internal static class BattleDebugCommands
 
         if (candidate == null)
         {
-            return "COLUMN_REINFORCEMENT_FIXTURE no reserve is assigned to a non-player formation " +
-                   "whose active human agents are all locally controlled";
+            return "COLUMN_REINFORCEMENT_FIXTURE no reserve is assigned to an eligible locally controlled formation";
         }
 
         columnReinforcementFixtureMission = mission;
@@ -247,13 +244,13 @@ internal static class BattleDebugCommands
 
             Agent[] agents = mission.Agents
                 .Where(agent => agent != null
+                    && agent != Agent.Main
                     && agent.IsActive()
                     && agent.IsHuman
-                    && agent.Formation == formation)
+                    && agent.Formation == formation
+                    && registry.IsLocallyControlled(agent))
                 .ToArray();
-            if (agents.Length == 0 || agents.Contains(Agent.Main))
-                continue;
-            if (agents.Any(agent => !registry.IsLocallyControlled(agent)))
+            if (agents.Length == 0)
                 continue;
 
             return new ColumnReinforcementCandidate
@@ -273,6 +270,8 @@ internal static class BattleDebugCommands
     {
         if (columnReinforcementFixtureMission == null)
             return "COLUMN_REINFORCEMENT_FIXTURE inactive";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "COLUMN_REINFORCEMENT_FIXTURE network agent registry is unavailable";
         if (Mission.Current != columnReinforcementFixtureMission ||
             columnReinforcementFixtureFormation == null ||
             columnReinforcementFixtureSpawnContext == null)
@@ -284,7 +283,9 @@ internal static class BattleDebugCommands
         int active = Mission.Current.Agents.Count(agent => agent != null
             && agent.IsActive()
             && agent.IsHuman
-            && agent.Formation == columnReinforcementFixtureFormation);
+            && agent != Agent.Main
+            && agent.Formation == columnReinforcementFixtureFormation
+            && registry.IsLocallyControlled(agent));
         int vanguardPositions = columnReinforcementFixtureFormation.Arrangement is ColumnFormation column
             ? column.GetUnitPositionsOnVanguardFileIndex().Count
             : -1;
