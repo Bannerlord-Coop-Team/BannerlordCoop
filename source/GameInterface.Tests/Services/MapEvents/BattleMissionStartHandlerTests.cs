@@ -7,19 +7,18 @@ namespace GameInterface.Tests.Services.MapEvents;
 
 public class BattleMissionStartHandlerTests
 {
-    [Fact]
-    public void DecideDeferredOpenAction_ResolvesByMissionAndBattleState()
+    // The two missionOpen: true rows prove Clear wins regardless of battleStillValid, guarding
+    // against a future reorder that would let a stale/invalid battle override an opened mission.
+    [Theory]
+    [InlineData(false, true, BattleMissionStartHandler.DeferredOpenAction.Keep)]
+    [InlineData(false, false, BattleMissionStartHandler.DeferredOpenAction.Abandon)]
+    [InlineData(true, false, BattleMissionStartHandler.DeferredOpenAction.Clear)]
+    [InlineData(true, true, BattleMissionStartHandler.DeferredOpenAction.Clear)]
+    public void DecideDeferredOpenAction_ResolvesByMissionAndBattleState(
+        bool missionOpen, bool battleStillValid, object expected)
     {
-        // Keep waiting while the battle is still valid, abandon the loading window once its graph is gone
-        // (the aborted contested-raid case), and clear once a mission has opened.
-        Assert.Equal(BattleMissionStartHandler.DeferredOpenAction.Keep,
-            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen: false, battleStillValid: true));
-        Assert.Equal(BattleMissionStartHandler.DeferredOpenAction.Abandon,
-            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen: false, battleStillValid: false));
-        Assert.Equal(BattleMissionStartHandler.DeferredOpenAction.Clear,
-            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen: true, battleStillValid: false));
-        Assert.Equal(BattleMissionStartHandler.DeferredOpenAction.Clear,
-            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen: true, battleStillValid: true));
+        Assert.Equal((BattleMissionStartHandler.DeferredOpenAction)expected,
+            BattleMissionStartHandler.DecideDeferredOpenAction(missionOpen, battleStillValid));
     }
 
     [Fact]
