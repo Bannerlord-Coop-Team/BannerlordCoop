@@ -92,7 +92,7 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
             });
         }
 
-        Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+        Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentDiagnostic);
 
         ClearCapturedLogs();
         client.Call(() =>
@@ -112,13 +112,13 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
         ClearCapturedLogs();
         client.Call(() =>
         {
-            using (new TransientEquipmentLifetimeScope())
+            using (new TransientEquipmentSyncScope())
             {
                 var fixtureEquipment = new Equipment(Equipment.EquipmentType.Battle);
                 Assert.False(client.ObjectManager.TryGetId(fixtureEquipment, out _));
             }
         });
-        Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+        Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentDiagnostic);
 
         ClearCapturedLogs();
         client.Call(() =>
@@ -156,4 +156,8 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
     private static bool ContainsClientEquipmentLifetimeError(string message) =>
         message.Contains("Client created managed") &&
         message.Contains("TaleWorlds.Core.Equipment");
+
+    private static bool ContainsClientEquipmentDiagnostic(string message) =>
+        ContainsClientEquipmentLifetimeError(message) ||
+        (message.Contains("Client updated managed") && message.Contains("_equipmentType"));
 }

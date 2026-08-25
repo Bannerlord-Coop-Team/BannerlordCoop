@@ -259,7 +259,7 @@ public class PuppetSpawner : IPuppetSpawner
         BattleSpawnGate.SuppressCapture = true;
         try
         {
-            using (new TransientEquipmentLifetimeScope())
+            using (new TransientEquipmentSyncScope())
             {
                 agent = Mission.Current.SpawnAgent(buildData);
             }

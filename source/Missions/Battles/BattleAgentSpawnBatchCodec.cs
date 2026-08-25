@@ -122,7 +122,7 @@ public sealed class BattleAgentSpawnBatchCodec : IBattleAgentSpawnBatchCodec
 
             using var stream = new MemoryStream(serialized, writable: false);
             SpawnBatchPayload batch;
-            using (new TransientEquipmentLifetimeScope())
+            using (new TransientEquipmentSyncScope())
             {
                 batch = Serializer.Deserialize<SpawnBatchPayload>(stream);
             }

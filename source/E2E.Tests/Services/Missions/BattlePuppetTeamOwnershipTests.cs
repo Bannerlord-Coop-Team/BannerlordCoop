@@ -44,13 +44,15 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             lock (logGate) capturedLogs.Add(message);
         }
 
-        bool ContainsEquipmentLifetimeError()
+        bool ContainsEquipmentDiagnostic()
         {
             lock (logGate)
             {
                 return capturedLogs.Any(message =>
-                    message.Contains("Client created managed") &&
-                    message.Contains("TaleWorlds.Core.Equipment"));
+                    (message.Contains("Client created managed") &&
+                     message.Contains("TaleWorlds.Core.Equipment")) ||
+                    (message.Contains("Client updated managed") &&
+                     message.Contains("_equipmentType")));
             }
         }
 
@@ -125,14 +127,14 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 Assert.NotNull(mirror.SpawnEquipment);
                 Assert.False(client.ObjectManager.TryGetId(mirror.SpawnEquipment, out _));
             });
-            Assert.False(ContainsEquipmentLifetimeError());
+            Assert.False(ContainsEquipmentDiagnostic());
 
             client.Call(() =>
             {
                 var unsupportedEquipment = new Equipment(Equipment.EquipmentType.Battle);
                 Assert.False(client.ObjectManager.TryGetId(unsupportedEquipment, out _));
             });
-            Assert.True(ContainsEquipmentLifetimeError());
+            Assert.True(ContainsEquipmentDiagnostic());
         }
         finally
         {
