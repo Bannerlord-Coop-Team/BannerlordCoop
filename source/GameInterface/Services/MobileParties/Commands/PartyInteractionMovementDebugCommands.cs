@@ -106,6 +106,7 @@ internal static class PartyInteractionMovementDebugCommands
             mainPartyPositionX = mainParty?.Position.X,
             mainPartyPositionY = mainParty?.Position.Y,
             mainPartyDefaultBehavior = mainParty?.DefaultBehavior.ToString(),
+            mainPartyDefaultBehaviorNeedsUpdate = mainParty?.Ai?.DefaultBehaviorNeedsUpdate,
             mainPartyShortTermBehavior = mainParty?.ShortTermBehavior.ToString(),
             mainPartyMoveMode = mainParty?.PartyMoveMode.ToString(),
             mainPartyTargetPartyId = GetPartyId(objectManager, mainParty?.TargetParty),
@@ -227,7 +228,8 @@ internal static class PartyInteractionMovementDebugCommands
             playerPartyId,
             targetPartyId,
             targetInteractablePointId,
-            playerParty.NextTargetPosition);
+            playerParty.NextTargetPosition,
+            playerParty.Ai.DefaultBehaviorNeedsUpdate);
 
         return JsonResult(new
         {
@@ -237,6 +239,7 @@ internal static class PartyInteractionMovementDebugCommands
             targetInteractablePointId,
             targetStringId = targetParty.StringId,
             originalDistance = Distance(playerParty, targetParty),
+            playerDefaultBehaviorNeedsUpdate = playerParty.Ai.DefaultBehaviorNeedsUpdate,
             captured = true
         });
     }
@@ -269,6 +272,8 @@ internal static class PartyInteractionMovementDebugCommands
         {
             fixture.PlayerParty.SetMoveModeHold();
             fixture.PlayerParty.SetShortTermBehavior(AiBehavior.GoToPoint, targetInteractable);
+            fixture.PlayerParty.DefaultBehavior = AiBehavior.GoToPoint;
+            fixture.PlayerParty.SetShortTermBehavior(AiBehavior.GoToPoint, targetInteractable);
             fixture.PlayerParty.Ai.BehaviorTarget = interactionPosition;
             fixture.PlayerParty.Position = interactionPosition;
             fixture.PlayerParty.TargetPosition = interactionPosition;
@@ -281,15 +286,23 @@ internal static class PartyInteractionMovementDebugCommands
 
         bool interactionTargetVerified =
             ReferenceEquals(fixture.PlayerParty.Ai?.AiBehaviorInteractable, fixture.TargetParty.Party);
+        bool controllerTickCompatible =
+            fixture.PlayerParty.DefaultBehavior == AiBehavior.GoToPoint &&
+            fixture.PlayerParty.ShortTermBehavior == AiBehavior.GoToPoint &&
+            fixture.PlayerParty.Ai?.BehaviorTarget == interactionPosition &&
+            interactionTargetVerified;
         bool preCommandEncounterSafe =
-            fixture.PlayerParty.DefaultBehavior == AiBehavior.Hold &&
+            fixture.PlayerParty.DefaultBehavior == AiBehavior.GoToPoint &&
             fixture.PlayerParty.ShortTermBehavior == AiBehavior.GoToPoint &&
             fixture.PlayerParty.PartyMoveMode == MoveModeType.Hold &&
             fixture.PlayerParty.TargetParty == null;
         bool stagedBehaviorSnapshotVerified =
             behaviorSnapshot.TryCreate(fixture.PlayerParty, out PartyBehaviorUpdateData stagedState) &&
+            stagedState.DefaultBehavior == AiBehavior.GoToPoint &&
+            stagedState.NewAiBehavior == AiBehavior.GoToPoint &&
             behaviorSnapshot.CanApply(fixture.PlayerParty, stagedState);
         bool interactionRangeVerified = interactionTargetVerified &&
+            controllerTickCompatible &&
             preCommandEncounterSafe &&
             stagedBehaviorSnapshotVerified &&
             CanInteractWithParty(fixture.TargetParty, fixture.PlayerParty);
@@ -303,6 +316,7 @@ internal static class PartyInteractionMovementDebugCommands
             interactionPositionX = interactionPosition.X,
             interactionPositionY = interactionPosition.Y,
             interactionTargetVerified,
+            controllerTickCompatible,
             preCommandEncounterSafe,
             stagedBehaviorSnapshotVerified,
             interactionRangeVerified,
@@ -328,7 +342,8 @@ internal static class PartyInteractionMovementDebugCommands
                 behaviorSnapshot,
                 restoring.PlayerParty,
                 restoring.PlayerState,
-                restoring.PlayerNextTargetPosition))
+                restoring.PlayerNextTargetPosition,
+                restoring.PlayerDefaultBehaviorNeedsUpdate))
         {
             return JsonResult(new
             {
@@ -342,7 +357,8 @@ internal static class PartyInteractionMovementDebugCommands
             behaviorSnapshot,
             restoring.PlayerParty,
             restoring.PlayerState,
-            restoring.PlayerNextTargetPosition);
+            restoring.PlayerNextTargetPosition,
+            restoring.PlayerDefaultBehaviorNeedsUpdate);
         if (!restored)
         {
             return JsonResult(new
@@ -380,7 +396,8 @@ internal static class PartyInteractionMovementDebugCommands
             behaviorSnapshot,
             restored.PlayerParty,
             restored.PlayerState,
-            restored.PlayerNextTargetPosition);
+            restored.PlayerNextTargetPosition,
+            restored.PlayerDefaultBehaviorNeedsUpdate);
         if (verified)
             restoredCaravanProximityFixture = null;
 
@@ -638,7 +655,8 @@ internal static class PartyInteractionMovementDebugCommands
         IMobilePartyBehaviorSnapshot behaviorSnapshot,
         MobileParty party,
         PartyBehaviorUpdateData state,
-        CampaignVec2 nextTargetPosition)
+        CampaignVec2 nextTargetPosition,
+        bool defaultBehaviorNeedsUpdate)
     {
         bool restored = false;
         MobilePartyMovementStatePatches.RunWithoutAutomaticBehaviorBroadcast(() =>
@@ -648,6 +666,7 @@ internal static class PartyInteractionMovementDebugCommands
 
             party.Position = state.PartyPosition;
             party.NextTargetPosition = nextTargetPosition;
+            party.Ai.DefaultBehaviorNeedsUpdate = defaultBehaviorNeedsUpdate;
         });
         if (!restored)
             return false;
@@ -660,7 +679,8 @@ internal static class PartyInteractionMovementDebugCommands
         IMobilePartyBehaviorSnapshot behaviorSnapshot,
         MobileParty party,
         PartyBehaviorUpdateData expected,
-        CampaignVec2 expectedNextTargetPosition)
+        CampaignVec2 expectedNextTargetPosition,
+        bool expectedDefaultBehaviorNeedsUpdate)
     {
         if (!behaviorSnapshot.TryCreate(party, out PartyBehaviorUpdateData actual))
             return false;
@@ -681,7 +701,8 @@ internal static class PartyInteractionMovementDebugCommands
             actual.MoveTargetPartyId == expected.MoveTargetPartyId &&
             actual.IsInteractableAnchor == expected.IsInteractableAnchor &&
             actual.IsCurrentlyAtSea == expected.IsCurrentlyAtSea &&
-            party.NextTargetPosition == expectedNextTargetPosition;
+            party.NextTargetPosition == expectedNextTargetPosition &&
+            party.Ai?.DefaultBehaviorNeedsUpdate == expectedDefaultBehaviorNeedsUpdate;
     }
 
     private static void PublishForcedPosition(MobileParty party) =>
@@ -701,6 +722,7 @@ internal static class PartyInteractionMovementDebugCommands
         public string TargetPartyId { get; }
         public string TargetInteractablePointId { get; }
         public CampaignVec2 PlayerNextTargetPosition { get; }
+        public bool PlayerDefaultBehaviorNeedsUpdate { get; }
         public bool Staged { get; set; }
 
         public CaravanProximityFixtureState(
@@ -710,7 +732,8 @@ internal static class PartyInteractionMovementDebugCommands
             string playerPartyId,
             string targetPartyId,
             string targetInteractablePointId,
-            CampaignVec2 playerNextTargetPosition)
+            CampaignVec2 playerNextTargetPosition,
+            bool playerDefaultBehaviorNeedsUpdate)
         {
             PlayerParty = playerParty;
             TargetParty = targetParty;
@@ -719,6 +742,7 @@ internal static class PartyInteractionMovementDebugCommands
             TargetPartyId = targetPartyId;
             TargetInteractablePointId = targetInteractablePointId;
             PlayerNextTargetPosition = playerNextTargetPosition;
+            PlayerDefaultBehaviorNeedsUpdate = playerDefaultBehaviorNeedsUpdate;
         }
     }
 
