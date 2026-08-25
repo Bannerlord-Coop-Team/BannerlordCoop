@@ -13,6 +13,7 @@ using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using Newtonsoft.Json;
 using SandBox.View.Map;
 using Serilog;
 using System;
@@ -453,9 +454,18 @@ public class SiegeDebugCommand
         besieger.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
 
+        string structuredResult = JsonConvert.SerializeObject(new
+        {
+            settlementId = settlement.StringId,
+            besiegerPartyId = besieger.StringId,
+            originalX = originalPosition.X,
+            originalY = originalPosition.Y,
+            originalIsOnLand = originalPosition.IsOnLand,
+        });
         return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}\n" +
             $"Restore with: coop.debug.siege.stop {settlement.StringId} " +
-            $"{originalPosition.X:R} {originalPosition.Y:R} {originalPosition.IsOnLand}";
+            $"{originalPosition.X:R} {originalPosition.Y:R} {originalPosition.IsOnLand}\n" +
+            "LIVE_TEST_JSON=" + structuredResult;
     }
 
     /// <summary>
@@ -863,7 +873,12 @@ public class SiegeDebugCommand
         }
 
         var mapEventId = objectManager.TryGetId(mapEvent, out string id) ? id : mapEvent.StringId;
-        return $"Started AI siege assault by {attacker.Name} against {settlement.Name} (MapEvent {mapEventId})";
+        return $"Started AI siege assault by {attacker.Name} against {settlement.Name} (MapEvent {mapEventId})" +
+            Environment.NewLine + "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+            {
+                settlementId = settlement.StringId,
+                mapEventId,
+            });
     }
 
     /// <summary>

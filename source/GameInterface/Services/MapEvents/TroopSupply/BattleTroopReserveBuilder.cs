@@ -7,6 +7,8 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameInterface.Configuration;
+using GameInterface.Services.Heroes.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -271,12 +273,20 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
         foreach (var element in roster)
         {
-            if (element.IsWounded || element.IsRouted || element.IsKilled)
+            if (element.IsRouted || element.IsKilled)
                 continue;
 
             var character = element.Troop;
             if (character == null)
                 continue;
+            
+            var isPlayer = character.HeroObject?.IsPlayerHero() == true;
+            
+            // Skip if the troop is not a player, or if the config option is disabled and they are a player + wounded.
+            if (element.IsWounded && !(isPlayer && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry))
+            {
+                continue;
+            }
 
             // Heroes and regular troops alike are keyed by their CharacterObject id (hero CharacterObjects are
             // registered too — CharacterObjectRegistry), so resolve it uniformly.

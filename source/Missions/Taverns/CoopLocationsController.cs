@@ -12,6 +12,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Data;
+using Missions.Agents.Packets;
 using Missions.Locations;
 using Missions.Services.Network;
 using SandBox.Missions.MissionLogics;
@@ -42,6 +43,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private readonly ILocationPopulationDirector populationDirector;
     private readonly ILocationAuthorityMigrator authorityMigrator;
     private readonly ILocationPartyAgentMap partyAgentMap;
+    private readonly ILocationConversationAgentGuard conversationAgentGuard;
+    private readonly ILocationPartyPuppetRegistrar partyPuppetRegistrar;
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -53,8 +56,11 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         ILocationHostRegistry hostRegistry,
         ILocationPuppetRosterBinder rosterBinder,
         ILocationNpcHoldRegistry npcHoldRegistry,
+        ILocationConversationAgentGuard conversationAgentGuard,
         IBattleAgentBudget agentBudget,
         ILocationAgentSpawnBatchCodec spawnBatchCodec,
+        ILocationPartyPuppetRegistrar partyPuppetRegistrar,
+        ILocationControllerWithdrawalState withdrawalState,
         IMissionContext missionContext,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
@@ -69,22 +75,27 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;
         this.hostRegistry = hostRegistry;
+        this.conversationAgentGuard = conversationAgentGuard;
+        this.partyPuppetRegistrar = partyPuppetRegistrar;
         //this.boardGameManager = boardGameManager;
 
         // Composition-root style (mirrors CoopBattleController): the per-mission session and NPC
         // binding map are SHARED state, so the components are constructed here around single
         // instances instead of DI-resolving them (transient injection would give each its own).
         session = new LocationSession(controllerIdProvider, hostRegistry);
+        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+            () => session.IsLocalHost);
         var bindingMap = new LocationAgentBindingMap();
         partyAgentMap = new LocationPartyAgentMap();
 
         npcReplicator = new LocationOwnedAgentReplicator(
             network, messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, spawnBatchCodec);
         authorityMigrator = new LocationAuthorityMigrator(
-            messageBroker, coopMissionComponent, session, bindingMap, partyAgentMap, missionContext, npcHoldRegistry);
+            messageBroker, coopMissionComponent, session, bindingMap, partyAgentMap, missionContext,
+            npcHoldRegistry, conversationAgentGuard);
         npcPuppetSpawner = new LocationPuppetSpawner(
-            messageBroker, objectManager, coopMissionComponent, session, bindingMap, partyAgentMap,
-            rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator);
+            messageBroker, objectManager, coopMissionComponent, session, conversationAgentGuard,
+            bindingMap, partyAgentMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState);
         populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
@@ -348,6 +359,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     {
         if (agent == null || !_ownedCompanionIds.TryGetValue(agent, out Guid agentId)) return false;
 
+        conversationAgentGuard.EndConversationWithAgent(agent);
         _ownedCompanionIds.Remove(agent);
         coopMissionComponent.AgentRegistry.RemoveAgent(agentId);
         network.SendAll(new NetworkDespawnLocationAgents(
@@ -356,6 +368,14 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             new[] { string.Empty }));
         Logger.Information("[LocationSync] Despawned local companion {AgentId} ({Reason})", agentId, reason);
         return true;
+    }
+
+    private bool IsKnownPartyAgent(Agent agent)
+    {
+        if (IsOwnPartyAgent(agent)) return true;
+
+        return coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info) &&
+               partyAgentMap.Contains(info.AgentId);
     }
 
     internal static bool IsOwnPartyAgent(Agent agent)
@@ -410,7 +430,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         // Engage the NPC gate: native population spawning is suppressed on every client until the
         // server's host assignment confirms who runs it (SR-013).
-        LocationNpcGate.BeginMission(instanceId);
+        LocationNpcGate.BeginMission(instanceId, IsKnownPartyAgent);
 
         network.ConnectToInstance(instanceId);
         coopMissionComponent.AgentRegistry.Clear();
@@ -440,7 +460,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 agent.Position,
                 agent.Health,
                 isPlayer: ReferenceEquals(agent, mainAgent),
-                hasMount: agent.HasMount));
+                hasMount: agent.HasMount,
+                missionEquipmentData: PackMissionEquipmentData(agent.Equipment),
+                currentEquipment: new AgentEquipmentData(agent)));
         }
 
         return new NetworkMissionJoinInfo(
@@ -470,6 +492,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         // Catch the joiner up on the settlement NPCs we own (SR-025) — only the host owns any, so
         // this is a no-op everywhere else.
         npcReplicator.ReplicateCurrentAgentsTo(controllerId);
+        if (session.IsLocalHost)
+            coopMissionComponent.WeaponDropHandler.CatchUpJoiner(controllerId);
     }
 
     protected override void OnLeaving()
@@ -512,12 +536,22 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             return;
         }
 
-        var agentRegistry = coopMissionComponent.AgentRegistry;
-
         // Record party identity before dedupe. An ambient spawn batch from the elected host can race this
         // join record; even if that batch won and attached an NPC binding, migration must still despawn this
         // player/companion instead of adopting it as settlement population.
         partyAgentMap.Record(agentData.AgentId);
+
+        // Keep spawn and registration in one queued action. A host-authority population replay can be in
+        // the same game-thread drain and must not see the spawned puppet before the registry can identify it.
+        GameThread.RunSafe(
+            () => ProcessAgentOnGameThread(controllerId, agentData),
+            blocking: true,
+            context: nameof(ProcessAgent));
+    }
+
+    private void ProcessAgentOnGameThread(string controllerId, CoopAgentSpawnData agentData)
+    {
+        var agentRegistry = coopMissionComponent.AgentRegistry;
 
         // Dedupe across all peers: NAT punch can yield more than one connection to the same remote
         // client, delivering its join info multiple times. Only spawn one agent per id.
@@ -536,21 +570,45 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             agentData.IsPlayer == true ? "Player" : "Agent",
             characterObject?.Name?.ToString() ?? "<unresolved>", agentData.AgentId, controllerId);
 
-        Agent newAgent = SpawnAgent(agentData.Position, characterObject, agentData.HasMount, agentData.Health);
+        bool registered = partyPuppetRegistrar.TrySpawnAndRegister(
+            () => SpawnAgentOnGameThread(
+                agentData.Position,
+                characterObject,
+                agentData.HasMount,
+                agentData.Health,
+                agentData.MissionEquipmentData,
+                agentData.HasCurrentEquipment ? agentData.CurrentEquipment : (AgentEquipmentData?)null),
+            agentRegistry,
+            controllerId,
+            agentData.AgentId,
+            out Agent newAgent);
 
-        if (newAgent == null)
+        if (!registered)
         {
-            Logger.Error("[LocationSync] Failed to spawn remote agent {AgentID} — removing agent.", agentData.AgentId);
-            agentRegistry.RemoveAgent(agentData.AgentId);
+            if (newAgent == null)
+            {
+                Logger.Error("[LocationSync] Failed to spawn remote agent {AgentID}", agentData.AgentId);
+            }
+            else
+            {
+                bool hideMount = newAgent.HasMount && newAgent.MountAgent != null && newAgent.MountAgent.IsActive();
+                newAgent.FadeOut(true, hideMount);
+                Logger.Error("[LocationSync] Failed to register remote agent {AgentID} — removed duplicate spawn", agentData.AgentId);
+            }
             return;
         }
 
-        agentRegistry.TryRegisterAgent(controllerId, agentData.AgentId, newAgent);
         Logger.Information("[LocationSync] Spawned + registered remote agent {AgentID} at {Pos} (mission '{Scene}')",
             agentData.AgentId, newAgent.Position, Mission.Current?.SceneName);
     }
 
-    public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool hasMount = false, float health = -1f)
+    private Agent SpawnAgentOnGameThread(
+        Vec3 startingPos,
+        CharacterObject character,
+        bool hasMount = false,
+        float health = -1f,
+        MissionEquipmentData missionEquipmentData = null,
+        AgentEquipmentData? currentEquipment = null)
     {
         // A remote player's hero CharacterObject often does not resolve to a fully-initialized
         // object on this client (live campaign: each player has a distinct, not-yet-synced hero),
@@ -565,58 +623,102 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             return null;
         }
 
-        // HandleJoinInfo runs on the network thread. AgentBuildData's ctor (and SpawnAgent) touch
-        // TaleWorlds engine statics (Team.Invalid -> Team.Initialize -> Formation.Reset) that must run
-        // on the main thread, so build AND spawn entirely inside the game-loop closure — not just the
-        // final SpawnAgent call. Doing the ctor off-thread NREs intermittently (notably on rejoin).
-        Agent agent = null;
-        GameThread.RunSafe(() =>
+        try
         {
+            // The player may have left between receiving the join info and this running.
+            if (Mission.Current == null) return null;
+
+            // The owner sends the live mount state because companions can spawn mounted in village centers.
+            bool isVillage = Settlement.CurrentSettlement?.IsVillage == true;
+
+            AgentBuildData agentBuildData = new AgentBuildData(character);
+            agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
+            agentBuildData.InitialPosition(startingPos);
+            agentBuildData.Team(Mission.Current.PlayerAllyTeam);
+            agentBuildData.InitialDirection(Vec2.Forward);
+            agentBuildData.NoHorses(ShouldDisableHorses(hasMount));
+            agentBuildData.Equipment(isVillage ? character.FirstBattleEquipment : character.FirstCivilianEquipment);
+            MissionEquipment missionEquipment = ResolveMissionEquipment(missionEquipmentData);
+            if (missionEquipment != null)
+                agentBuildData.MissionEquipment(missionEquipment);
+            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
+            agentBuildData.Controller(AgentControllerType.None);
+            agentBuildData.ClothingColor1(character.HeroObject.MapFaction.Color);
+            agentBuildData.ClothingColor2(character.HeroObject.MapFaction.Color2);
+
+            Agent agent;
+            // Remote party puppets are not host-owned NPCs and must not be captured for replication.
+            LocationNpcGate.SuppressCapture = true;
             try
             {
-                // The player may have left between receiving the join info and this running.
-                if (Mission.Current == null) return;
-
-                // The owner sends the live mount state because companions can spawn mounted in village centers.
-                bool isVillage = Settlement.CurrentSettlement?.IsVillage == true;
-
-                AgentBuildData agentBuildData = new AgentBuildData(character);
-                agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
-                agentBuildData.InitialPosition(startingPos);
-                agentBuildData.Team(Mission.Current.PlayerAllyTeam);
-                agentBuildData.InitialDirection(Vec2.Forward);
-                agentBuildData.NoHorses(ShouldDisableHorses(hasMount));
-                agentBuildData.Equipment(isVillage ? character.FirstBattleEquipment : character.FirstCivilianEquipment);
-                agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-                agentBuildData.Controller(AgentControllerType.None);
-                agentBuildData.ClothingColor1(character.HeroObject.MapFaction.Color);
-                agentBuildData.ClothingColor2(character.HeroObject.MapFaction.Color2);
-
-                // Remote party puppets are not host-owned NPCs and must not be captured for replication.
-                LocationNpcGate.SuppressCapture = true;
-                try
-                {
-                    agent = Mission.Current.SpawnAgent(agentBuildData);
-                }
-                finally
-                {
-                    LocationNpcGate.SuppressCapture = false;
-                }
-
-                if (health > 0)
-                {
-                    agent.Health = health;
-                }
-                agent.FadeIn();
+                agent = Mission.Current.SpawnAgent(agentBuildData);
             }
-            catch (Exception ex)
+            finally
             {
-                Logger.Warning(ex, "[LocationSync] Build/spawn failed for character '{Name}'", character?.StringId ?? "<null>");
-                agent = null;
+                LocationNpcGate.SuppressCapture = false;
             }
-        }, blocking: true);
 
-        return agent;
+            if (health > 0)
+                agent.Health = health;
+            if (currentEquipment.HasValue)
+                currentEquipment.Value.Apply(agent);
+            agent.FadeIn();
+            return agent;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[LocationSync] Build/spawn failed for character '{Name}'", character?.StringId ?? "<null>");
+            return null;
+        }
+    }
+
+    private MissionEquipmentData PackMissionEquipmentData(MissionEquipment equipment)
+    {
+        if (equipment == null) return null;
+
+        var weaponSlots = new List<MissionWeaponData>();
+        for (EquipmentIndex index = EquipmentIndex.WeaponItemBeginSlot;
+             index < EquipmentIndex.NumAllWeaponSlots;
+             index++)
+        {
+            MissionWeapon weapon = equipment[index];
+            objectManager.TryGetId(weapon.Item, out string itemId);
+            weaponSlots.Add(new MissionWeaponData(
+                itemId,
+                weapon.ItemModifier,
+                weapon.Banner,
+                weapon.RawDataForNetwork,
+                weapon.ReloadPhase,
+                null));
+        }
+        return new MissionEquipmentData(weaponSlots);
+    }
+
+    private MissionEquipment ResolveMissionEquipment(MissionEquipmentData data)
+    {
+        if (data?.WeaponSlots == null ||
+            data.WeaponSlots.Count != (int)EquipmentIndex.NumAllWeaponSlots)
+        {
+            return null;
+        }
+
+        var equipment = new MissionEquipment();
+        for (EquipmentIndex index = EquipmentIndex.WeaponItemBeginSlot;
+             index < EquipmentIndex.NumAllWeaponSlots;
+             index++)
+        {
+            MissionWeaponData weapon = data.WeaponSlots[(int)index];
+            if (weapon == null) continue;
+            objectManager.TryGetObject(weapon.ItemObjectId, out ItemObject item);
+            equipment._weaponSlots[(int)index] = new MissionWeapon(
+                item,
+                weapon.ItemModifier,
+                weapon.Banner,
+                weapon.DataValue,
+                weapon.ReloadPhase,
+                null);
+        }
+        return equipment;
     }
 
     internal static bool ShouldDisableHorses(bool hasMount) => !hasMount;

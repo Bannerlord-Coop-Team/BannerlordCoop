@@ -76,6 +76,7 @@ namespace Coop.IntegrationTests.Serialization
                 MaximumLootersMultiplier = 0.25f,
                 LooterPartySizeMultiplier = 0.33f,
                 ShowPlayerNameplates = true,
+                PlayerWoundedBattleEntry = false,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -91,6 +92,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(3.5f, copy.SmithingCraftedItemsValueMultiplier);
             Assert.Equal(0.25f, copy.MaximumLootersMultiplier);
             Assert.Equal(0.33f, copy.LooterPartySizeMultiplier);
+            Assert.False(copy.PlayerWoundedBattleEntry);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
@@ -118,6 +120,7 @@ namespace Coop.IntegrationTests.Serialization
             MaximumLootersMultiplier = 0f,
             LooterPartySizeMultiplier = 0f,
             ShowPlayerNameplates = false,
+            PlayerWoundedBattleEntry = false,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -139,6 +142,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(0f, copy.MaximumLootersMultiplier);
             Assert.Equal(0f, copy.LooterPartySizeMultiplier);
             Assert.False(copy.ShowPlayerNameplates);
+            Assert.False(copy.PlayerWoundedBattleEntry);
         }
 
         private static T RoundTrip<T>(T original)

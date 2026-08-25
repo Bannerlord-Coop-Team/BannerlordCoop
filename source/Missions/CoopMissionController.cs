@@ -88,6 +88,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
         coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
+        coopMissionComponent.WeaponPickupHandler.Tick(dt);
+        coopMissionComponent.WeaponDropHandler.Tick(dt);
     }
 
     public override void OnPreDisplayMissionTick(float dt)

@@ -195,6 +195,10 @@
     // Toggle player nameplates in co-op missions.
     // (Default) true: Clients may show nameplates above allied remote players.
     // false: Player nameplates are disabled and the client option is hidden.
-    "showPlayerNameplates": true
+    "showPlayerNameplates": true,
+
+    // Toggle players being allowed to join battles when wounded
+    // Default is true
+    "playerWoundedBattleEntry": true,
   }
 }

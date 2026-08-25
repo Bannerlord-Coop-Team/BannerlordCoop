@@ -121,6 +121,8 @@ public sealed class ModOptionsData
     public bool? EnableHeroExecutions { get; set; }
 
     public bool? EnablePlayerClanMemberExecutions { get; set; }
+    
+    public bool? PlayerWoundedBattleEntry { get; set; }
 
     public bool? ShowPlayerNameplates { get; set; }
 
