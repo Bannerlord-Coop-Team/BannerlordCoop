@@ -422,14 +422,39 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.start_attack_mission";
         }
 
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        if (!GameThread.WaitWhilePumping(
-                () => MobileParty.MainParty?.MapEvent != null,
-                deadline))
+        if (MobileParty.MainParty?.MapEvent == null)
         {
-            return "The main party has no replicated map event";
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            GameThread.EnqueueSafe(
+                () => ContinueStartAttackMission(deadline),
+                context: "Wait for replicated battle before debug mission start");
+            return "Waiting for the replicated map event";
         }
 
+        return StartCurrentAttackMission();
+    }
+
+    private static void ContinueStartAttackMission(DateTime deadline)
+    {
+        if (MobileParty.MainParty?.MapEvent == null)
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                Logger.Error("Timed out waiting for the replicated map event before debug mission start");
+                return;
+            }
+
+            GameThread.EnqueueSafe(
+                () => ContinueStartAttackMission(deadline),
+                context: "Wait for replicated battle before debug mission start");
+            return;
+        }
+
+        Logger.Information("Deferred debug mission start: {Result}", StartCurrentAttackMission());
+    }
+
+    private static string StartCurrentAttackMission()
+    {
         var mainParty = MobileParty.MainParty;
         var mapEvent = mainParty.MapEvent;
 
