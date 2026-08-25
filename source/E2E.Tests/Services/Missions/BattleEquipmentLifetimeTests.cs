@@ -105,14 +105,14 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
     }
 
     [Fact]
-    public void DebugFixtureScope_SuppressesOnlyItsScopedClientEquipmentDiagnostic()
+    public void TransientEquipmentScope_SuppressesOnlyItsScopedClientEquipmentDiagnostic()
     {
         var client = testEnvironment.Clients.First();
 
         ClearCapturedLogs();
         client.Call(() =>
         {
-            using (new DebugEquipmentLifetimeFixtureScope())
+            using (new TransientEquipmentLifetimeScope())
             {
                 var fixtureEquipment = new Equipment(Equipment.EquipmentType.Battle);
                 Assert.False(client.ObjectManager.TryGetId(fixtureEquipment, out _));

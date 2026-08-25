@@ -1,5 +1,6 @@
 ﻿using K4os.Compression.LZ4;
 using Common.Util;
+using GameInterface.Registry.Auto;
 using Missions.Messages;
 using ProtoBuf;
 using System;
@@ -121,7 +122,7 @@ public sealed class BattleAgentSpawnBatchCodec : IBattleAgentSpawnBatchCodec
 
             using var stream = new MemoryStream(serialized, writable: false);
             SpawnBatchPayload batch;
-            using (new AllowedThread())
+            using (new TransientEquipmentLifetimeScope())
             {
                 batch = Serializer.Deserialize<SpawnBatchPayload>(stream);
             }

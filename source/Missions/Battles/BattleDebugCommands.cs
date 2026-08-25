@@ -226,7 +226,7 @@ internal static class BattleDebugCommands
 
         bool isPlayerSide = source.Team == mission.PlayerTeam;
         Agent fixtureAgent;
-        using (new DebugEquipmentLifetimeFixtureScope())
+        using (new TransientEquipmentLifetimeScope())
         {
             fixtureAgent = mission.SpawnTroop(
                 fixtureOrigin,
