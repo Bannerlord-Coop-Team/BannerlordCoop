@@ -169,6 +169,26 @@ internal static class JoinDebugCommands
         return "Client session is returning to the main menu.";
     }
 
+    [CommandLineArgumentFunction("reconnect", "coop.debug.connection")]
+    public static string Reconnect(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.connection.reconnect";
+        }
+        if (ModInformation.IsServer)
+        {
+            return "reconnect must be run on a client.";
+        }
+        if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
+        {
+            return "No client session was found.";
+        }
+
+        clientLogic.Connect();
+        return "Client session is reconnecting to the configured server.";
+    }
+
     internal static void ForceArmedInactivePartyDeficit()
     {
         if (Interlocked.Exchange(ref forceNextInactivePartyDeficit, 0) == 0) return;

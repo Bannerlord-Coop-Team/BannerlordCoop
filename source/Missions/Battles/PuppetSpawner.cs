@@ -49,8 +49,10 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IPuppetRoutApplier puppetRoutApplier;
+    private readonly IBattleAuthorityMigrator authorityMigrator;
 
     // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
     // agents without that identity later break team ownership and scoreboard attribution.
@@ -59,6 +61,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly object withdrawnControllerLock = new object();
     private readonly HashSet<string> withdrawnControllers = new HashSet<string>();
     private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
+    private readonly HashSet<Guid> retainedFormerHostAgentIds = new HashSet<Guid>();
 
     public PuppetSpawner(
         IMessageBroker messageBroker,
@@ -70,8 +73,10 @@ public class PuppetSpawner : IPuppetSpawner
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
         IBattleAgentBudget agentBudget,
+        IMissionWeaponDataMapper missionWeaponDataMapper,
         IPuppetRoutApplier puppetRoutApplier = null,
-        IBattleAgentSpawnBatchCodec spawnBatchCodec = null)
+        IBattleAgentSpawnBatchCodec spawnBatchCodec = null,
+        IBattleAuthorityMigrator authorityMigrator = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -82,8 +87,10 @@ public class PuppetSpawner : IPuppetSpawner
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
         this.agentBudget = agentBudget;
+        this.missionWeaponDataMapper = missionWeaponDataMapper;
         this.spawnBatchCodec = spawnBatchCodec ?? new BattleAgentSpawnBatchCodec();
         this.puppetRoutApplier = puppetRoutApplier;
+        this.authorityMigrator = authorityMigrator;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -178,6 +185,7 @@ public class PuppetSpawner : IPuppetSpawner
         if (Mission.Current == null) return true;                       // no mission — drop
         if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
+        bool isRetainedFormerHostRecord = IsRetainedFormerHostRecord(data);
 
         bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
         if (LocalDeploymentBlocksSpawn(isOwnAgent)) return false;
@@ -295,7 +303,8 @@ public class PuppetSpawner : IPuppetSpawner
             data.MovementScopeId,
             data.AgentId,
             data.MovementId,
-            agent);
+            agent,
+            data.AuthorityRevision);
         if (!agentRegistered)
         {
             Logger.Error(
@@ -331,7 +340,8 @@ public class PuppetSpawner : IPuppetSpawner
                     data.MountMovementScopeId,
                     data.MountAgentId,
                     data.MountMovementId,
-                    mount);
+                    mount,
+                    data.MountAuthorityRevision);
                 if (!mountRegistered)
                 {
                     Logger.Error(
@@ -352,6 +362,17 @@ public class PuppetSpawner : IPuppetSpawner
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
         }
 
+        // A retained record of a departed host can drain after the migration sweep. Every peer moves
+        // the late registry entries to the current host; only that host revives the rider as battle AI.
+        if (isRetainedFormerHostRecord && agentRegistered)
+        {
+            authorityMigrator?.ApplyLateSpawnedPuppet(
+                agent,
+                data.AgentId,
+                agent.MountAgent,
+                data.MountAgentId);
+        }
+
         // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
         objectManager.TryGetId(character, out var troopCharacterId);
         casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);
@@ -367,8 +388,9 @@ public class PuppetSpawner : IPuppetSpawner
         {
             lock (withdrawnControllerLock)
             {
+                // Re-entry clears current withdrawal, but former-host lineage stays for retained records
+                // that can still drain after the controller returns.
                 withdrawnControllers.Remove(payload.What.ControllerId);
-                withdrawnHostControllers.Remove(payload.What.ControllerId);
             }
         });
     }
@@ -398,9 +420,23 @@ public class PuppetSpawner : IPuppetSpawner
         // player's party on the game thread, while leaving NPC parties from the old host available to migrate.
         GameThread.RunSafe(() =>
         {
+            var retainedAgentIds = new List<Guid>();
             lock (pendingPuppetLock)
-                pendingPuppets.RemoveAll(data => data.OwnerControllerId == controllerId
-                    && (!wasHost || IsPlayerPartyRecord(data, controllerId)));
+            {
+                pendingPuppets.RemoveAll(data =>
+                {
+                    if (data.OwnerControllerId != controllerId) return false;
+                    bool remove = !wasHost || IsPlayerPartyRecord(data, controllerId);
+                    if (!remove) retainedAgentIds.Add(data.AgentId);
+                    return remove;
+                });
+            }
+
+            if (retainedAgentIds.Count > 0)
+            {
+                lock (withdrawnControllerLock)
+                    retainedFormerHostAgentIds.UnionWith(retainedAgentIds);
+            }
         });
     }
 
@@ -416,6 +452,23 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         return !wasHost || IsPlayerPartyRecord(data, data.OwnerControllerId);
+    }
+
+    private bool IsRetainedFormerHostRecord(BattleAgentSpawnData data)
+    {
+        bool isDepartedHost;
+        lock (withdrawnControllerLock)
+        {
+            if (retainedFormerHostAgentIds.Contains(data.AgentId)) return true;
+            isDepartedHost = withdrawnControllers.Contains(data.OwnerControllerId)
+                && withdrawnHostControllers.Contains(data.OwnerControllerId);
+        }
+
+        if (!isDepartedHost || IsPlayerPartyRecord(data, data.OwnerControllerId)) return false;
+
+        lock (withdrawnControllerLock)
+            retainedFormerHostAgentIds.Add(data.AgentId);
+        return true;
     }
 
     // [Game thread] Match a spawn record to the controller's player party. The hero check covers a record
@@ -556,17 +609,15 @@ public class PuppetSpawner : IPuppetSpawner
 
         for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
         {
-            missionEquipment._weaponSlots[(int)equipmentIndex] = ResolveMissionWeapon(data.WeaponSlots[(int)equipmentIndex]);
+            if (!missionWeaponDataMapper.TryResolve(
+                    data.WeaponSlots[(int)equipmentIndex],
+                    out MissionWeapon weapon))
+            {
+                return null;
+            }
+
+            missionEquipment._weaponSlots[(int)equipmentIndex] = weapon;
         }
         return missionEquipment;
-    }
-
-    private MissionWeapon ResolveMissionWeapon(MissionWeaponData data)
-    {
-        // Items can be null
-        objectManager.TryGetObject<ItemObject>(data.ItemObjectId, out var item);
-
-        var missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, null);
-        return missionWeapon;
     }
 }

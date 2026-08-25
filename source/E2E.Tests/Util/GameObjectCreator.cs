@@ -70,6 +70,7 @@ internal class GameObjectCreator
         { typeof(SiegeEngineType), new SiegeEngineTypeBuilder() },
         { typeof(SiegeEngineConstructionProgress), new SiegeEngineConstructionProgressBuilder()  },
         { typeof(StanceLink), new StanceLinkBuilder() },
+        { typeof(Army), new ArmyBuilder() },
     };
 
     public static T CreateInitializedObject<T>()

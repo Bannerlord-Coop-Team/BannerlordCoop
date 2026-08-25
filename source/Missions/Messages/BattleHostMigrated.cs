@@ -1,20 +1,29 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 
 namespace Missions.Messages;
 
 /// <summary>
-/// [Client, local] This client just became the host of a battle through migration — the previous host
-/// departed and the server promoted us. The battle controller adopts the previous host's orphaned agents
-/// (the AI/enemy it was running, plus its own troops) so the battle continues uninterrupted under us.
+/// [Client] A battle moved to a new host. Every peer updates registry authority; the promoted
+/// host also adopts the previous host's orphaned agents so the battle continues uninterrupted.
 /// </summary>
 public readonly struct BattleHostMigrated : IEvent
 {
     public readonly string MapEventId;
     public readonly string PreviousHostControllerId;
+    public readonly string NewHostControllerId;
 
-    public BattleHostMigrated(string mapEventId, string previousHostControllerId)
+    public BattleHostMigrated(
+        string mapEventId,
+        string previousHostControllerId,
+        string newHostControllerId)
     {
         MapEventId = mapEventId;
         PreviousHostControllerId = previousHostControllerId;
+        NewHostControllerId = newHostControllerId;
+    }
+
+    public BattleHostMigrated(string mapEventId, string previousHostControllerId)
+        : this(mapEventId, previousHostControllerId, null)
+    {
     }
 }
