@@ -151,12 +151,14 @@ public class ClientKingdomHandler : IHandler
         var payload = obj.What;
         if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return;
 
+        // A client proposal never carries a queue-vs-resolve answer, the server decides that for everyone.
         var data = kingdomDecisionDataConverter.Convert(payload.Decision);
         var message = new NetworkAddDecision(
             kingdomId,
             data,
             payload.IgnoreInfluenceCost,
-            payload.RandomNumber);
+            payload.RandomNumber,
+            wasQueued: null);
         network.SendAll(message);
     }
 
@@ -388,21 +390,16 @@ public class ClientKingdomHandler : IHandler
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
         var payload = obj.What;
-        if (!ShouldApplyNetworkDecision(payload.KingdomId)) return;
 
-        var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
+        // Every kingdom's queue is mirrored on every client, otherwise a clan that joins a kingdom mid
+        // session keeps a shorter list than the server and every later decision index is off by one.
+        var message = new AddDecision(
+            payload.KingdomId,
+            payload.Data,
+            payload.IgnoreInfluenceCost,
+            payload.RandomNumber,
+            payload.WasQueued);
         messageBroker.Publish(this, message);
-    }
-
-    private bool ShouldApplyNetworkDecision(string kingdomId)
-    {
-        if (string.IsNullOrWhiteSpace(kingdomId)) return false;
-        if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom)) return true;
-        if (!playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player)) return true;
-        if (string.IsNullOrWhiteSpace(player.ClanId)) return false;
-        if (!objectManager.TryGetObject(player.ClanId, out Clan clan)) return false;
-
-        return clan.Kingdom == kingdom;
     }
 
     private void HandleDestroyKingdom(MessagePayload<DestroyKingdom> obj)

@@ -14,12 +14,23 @@ namespace GameInterface.Services.Kingdoms.Messages
 
         public float RandomNumber { get; }
 
-        public AddDecision(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost, float randomNumber)
+        /// <summary>
+        /// The server's queue-vs-resolve answer, or null when the receiver has to decide locally.
+        /// </summary>
+        public bool? WasQueued { get; }
+
+        public AddDecision(
+            string kingdomId,
+            KingdomDecisionData data,
+            bool ignoreInfluenceCost,
+            float randomNumber,
+            bool? wasQueued)
         {
             KingdomId = kingdomId;
             Data = data;
             IgnoreInfluenceCost = ignoreInfluenceCost;
             RandomNumber = randomNumber;
+            WasQueued = wasQueued;
         }
     }
 }

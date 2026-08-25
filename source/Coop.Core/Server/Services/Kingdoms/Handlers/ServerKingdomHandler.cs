@@ -254,23 +254,17 @@ public class ServerKingdomHandler : IHandler
     {
         var payload = obj.What;
 
+        // A proposing client is not authority on queue-vs-resolve, so the server applies the proposal with
+        // no answer attached. That apply publishes DecisionAdded, and HandleLocalDecisionAdded broadcasts
+        // the server's answer from there, so there is no second relay to send here.
         messageBroker.Publish(
             this,
-            new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber));
-
-        var message = new NetworkAddDecision(
-            payload.KingdomId,
-            payload.Data,
-            payload.IgnoreInfluenceCost,
-            payload.RandomNumber);
-
-        if (obj.Who is NetPeer peer)
-        {
-            network.SendAllBut(peer, message);
-            return;
-        }
-
-        network.SendAll(message);
+            new AddDecision(
+                payload.KingdomId,
+                payload.Data,
+                payload.IgnoreInfluenceCost,
+                payload.RandomNumber,
+                wasQueued: null));
     }
 
     private void HandleLocalKingdomPolicyChanged(MessagePayload<KingdomPolicyChanged> obj)
@@ -301,7 +295,12 @@ public class ServerKingdomHandler : IHandler
         if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return;
 
         var data = kingdomDecisionDataConverter.Convert(payload.Decision);
-        var message = new NetworkAddDecision(kingdomId, data, payload.IgnoreInfluenceCost, payload.RandomNumber);
+        var message = new NetworkAddDecision(
+            kingdomId,
+            data,
+            payload.IgnoreInfluenceCost,
+            payload.RandomNumber,
+            payload.WasQueued);
         network.SendAll(message);
     }
 

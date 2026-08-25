@@ -28,6 +28,7 @@ public class TestEnvironment
     private static readonly object ContainerBuildLock = new object();
 
     private readonly TestNetworkRouter networkOrchestrator;
+    private readonly Action<ContainerBuilder>? configureInstance;
 
     public readonly ILogger Logger = LogManager.GetLogger<TestEnvironment>();
 
@@ -36,8 +37,14 @@ public class TestEnvironment
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(int numClients = 2)
+    /// <param name="configureInstance">
+    /// Runs last against every instance's container builder, so a test can replace a registration that
+    /// needs game state the headless environment does not have. Registered per instance, never shared.
+    /// </param>
+    public TestEnvironment(int numClients = 2, Action<ContainerBuilder>? configureInstance = null)
     {
+        this.configureInstance = configureInstance;
+
         // Setup test network
         networkOrchestrator = new TestNetworkRouter();
 
@@ -118,6 +125,8 @@ public class TestEnvironment
             .SingleInstance();
 
         RegisterMock<ISettlementInterface>(builder);
+
+        configureInstance?.Invoke(builder);
 
         return builder;
     }

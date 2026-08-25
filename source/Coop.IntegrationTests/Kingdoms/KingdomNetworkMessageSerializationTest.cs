@@ -1,6 +1,6 @@
-﻿using Coop.Core.Server.Services.Kingdoms.Messages;
+﻿using Common.Serialization;
+using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Data;
-using ProtoBuf;
 using TaleWorlds.CampaignSystem.Election;
 
 namespace Coop.IntegrationTests.Kingdoms;
@@ -111,6 +111,30 @@ public class KingdomNetworkMessageSerializationTest
         Assert.Equal("The council has reached a decision.", copy.NotificationText);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void NetworkAddDecision_RoundTripsQueueAnswer(bool? wasQueued)
+    {
+        var original = new NetworkAddDecision(
+            "Kingdom_empire",
+            new DeclareWarDecisionData("Clan_realclan", "Kingdom_empire", 5, false, true, false, "Kingdom_vlandia"),
+            ignoreInfluenceCost: true,
+            randomNumber: 0.25f,
+            wasQueued: wasQueued);
+
+        var copy = RoundTrip(original);
+
+        Assert.Equal("Kingdom_empire", copy.KingdomId);
+        Assert.True(copy.IgnoreInfluenceCost);
+        Assert.Equal(0.25f, copy.RandomNumber);
+        Assert.Equal(wasQueued, copy.WasQueued);
+        var data = Assert.IsType<DeclareWarDecisionData>(copy.Data);
+        Assert.Equal("Clan_realclan", data.ProposerClanId);
+        Assert.Equal("Kingdom_vlandia", data.FactionToDeclareWarOnId);
+    }
+
     [Fact]
     public void NetworkRequestChangeKingdomName_RoundTrips()
     {
@@ -134,12 +158,15 @@ public class KingdomNetworkMessageSerializationTest
         Assert.Equal("Kingdom_empire", copy.KingdomId);
     }
 
+    /// <summary>
+    /// Goes through the production serializer so the round trip exercises the runtime model
+    /// <see cref="ProtoBufSerializer.ConfigureRuntimeModel()"/> installs, not protobuf-net's defaults.
+    /// </summary>
     private static T RoundTrip<T>(T original)
     {
-        using var stream = new MemoryStream();
-        Serializer.Serialize(stream, original);
-        stream.Position = 0;
-        return Serializer.Deserialize<T>(stream);
+        ProtoBufSerializer.ConfigureRuntimeModel();
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        return serializer.Deserialize<T>(serializer.Serialize(original!));
     }
 
     private static void AssertVoteData(KingdomDecisionVoteData expected, KingdomDecisionVoteData actual)

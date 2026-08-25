@@ -499,19 +499,25 @@ public class KingdomHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+        // The lookups belong inside the closure, otherwise they can run before the registration a
+        // preceding handler queued on the game thread and the add is dropped while removes still apply.
+        RunKingdomMutation(() =>
         {
-            Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging(payload.KingdomId, out Kingdom kingdom)) return;
 
-        if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
-        {
-            Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
-            return;
-        }
+            if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
+            {
+                Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
+                return;
+            }
 
-        kingdomInterface.RunAddDecision(kingdom, kingdomDecision, payload.IgnoreInfluenceCost, payload.RandomNumber);
+            kingdomInterface.RunAddDecision(
+                kingdom,
+                kingdomDecision,
+                payload.IgnoreInfluenceCost,
+                payload.RandomNumber,
+                payload.WasQueued);
+        });
     }
 
     private static void RunKingdomMutation(Action action)

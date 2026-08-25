@@ -1,6 +1,8 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Handlers;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
@@ -9,6 +11,8 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Library;
@@ -19,6 +23,18 @@ namespace GameInterface.Tests.Services.Kingdoms;
 
 public class KingdomHandlerTests
 {
+    private const string KingdomId = "kingdom-id";
+    private const string ProposerClanId = "clan-id";
+    private const string TargetKingdomId = "target-kingdom-id";
+
+    static KingdomHandlerTests()
+    {
+        // Coop.Tests starts and continuously pumps a dedicated game-loop thread from a [ModuleInitializer]
+        // (TestGameLoopPump); force that initializer to run so the pump is up when this class runs in
+        // isolation. RunModuleConstructor is idempotent.
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
+
     [Fact]
     public void TryGetCulture_UsesObjectManager()
     {
@@ -253,6 +269,99 @@ public class KingdomHandlerTests
         Assert.Equal("kingdom name was empty", reason);
     }
     
+    [Fact]
+    public void AddDecision_ResolvesEveryLookupOnTheGameThread()
+    {
+        Assert.True(GameThread.Instance.IsInitialized, "game-loop pump was not initialized");
+        Assert.False(GameThread.Instance.IsGameThread);
+
+        var lookupThreadIds = new List<int>();
+        var objectManager = CreateDecisionObjectManager(
+            () => lookupThreadIds.Add(Thread.CurrentThread.ManagedThreadId));
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        var handler = CreateHandler<AddDecision>(objectManager, kingdomInterface.Object);
+
+        int gameThreadId = 0;
+        GameThread.Run(() => gameThreadId = Thread.CurrentThread.ManagedThreadId, blocking: true);
+
+        handler(new MessagePayload<AddDecision>(this, CreateAddDecision(wasQueued: true)));
+
+        Assert.NotEmpty(lookupThreadIds);
+        Assert.All(lookupThreadIds, threadId => Assert.Equal(gameThreadId, threadId));
+    }
+
+    [Fact]
+    public void AddDecision_ForwardsTheServerQueueAnswerToTheKingdomInterface()
+    {
+        var objectManager = CreateDecisionObjectManager();
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        var handler = CreateHandler<AddDecision>(objectManager, kingdomInterface.Object);
+
+        handler(new MessagePayload<AddDecision>(this, CreateAddDecision(wasQueued: false)));
+
+        kingdomInterface.Verify(
+            gameInterface => gameInterface.RunAddDecision(
+                It.IsAny<Kingdom>(),
+                It.IsAny<CampaignKingdomDecision>(),
+                false,
+                0.25f,
+                false),
+            Times.Once);
+    }
+
+    [Fact]
+    public void AddDecision_MissingKingdom_DoesNotAdd()
+    {
+        var objectManager = new Mock<IObjectManager>();
+        Kingdom missingKingdom = null!;
+        objectManager.Setup(manager => manager.TryGetObjectWithLogging(KingdomId, out missingKingdom)).Returns(false);
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        var handler = CreateHandler<AddDecision>(objectManager.Object, kingdomInterface.Object);
+
+        handler(new MessagePayload<AddDecision>(this, CreateAddDecision(wasQueued: true)));
+
+        kingdomInterface.Verify(
+            gameInterface => gameInterface.RunAddDecision(
+                It.IsAny<Kingdom>(),
+                It.IsAny<CampaignKingdomDecision>(),
+                It.IsAny<bool>(),
+                It.IsAny<float>(),
+                It.IsAny<bool?>()),
+            Times.Never);
+    }
+
+    private static AddDecision CreateAddDecision(bool wasQueued)
+    {
+        var data = new DeclareWarDecisionData(ProposerClanId, KingdomId, 0, false, false, false, TargetKingdomId);
+        return new AddDecision(KingdomId, data, false, 0.25f, wasQueued);
+    }
+
+    /// <summary>
+    /// Resolves everything <see cref="DeclareWarDecisionData.TryGetKingdomDecision"/> needs, optionally
+    /// reporting each lookup so a test can observe which thread it ran on.
+    /// </summary>
+    private static IObjectManager CreateDecisionObjectManager(Action onLookup = null)
+    {
+        var objectManager = new Mock<IObjectManager>();
+        Kingdom kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        Kingdom targetKingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        Clan proposerClan = ObjectHelper.SkipConstructor<Clan>();
+
+        objectManager.Setup(manager => manager.TryGetObjectWithLogging(KingdomId, out kingdom))
+            .Callback(() => onLookup?.Invoke())
+            .Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(KingdomId, out kingdom))
+            .Callback(() => onLookup?.Invoke())
+            .Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(TargetKingdomId, out targetKingdom))
+            .Callback(() => onLookup?.Invoke())
+            .Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(ProposerClanId, out proposerClan))
+            .Callback(() => onLookup?.Invoke())
+            .Returns(true);
+        return objectManager.Object;
+    }
+
     private static KingdomHandler CreateHandler(IObjectManager objectManager)
     {
         return new KingdomHandler(
@@ -270,20 +379,32 @@ public class KingdomHandlerTests
         IKingdomDecisionVoteManager voteManager,
         IKingdomInterface kingdomInterface)
     {
-        Action<MessagePayload<RemoveDecision>> removeDecisionHandler = null!;
+        return CreateHandler<RemoveDecision>(objectManager, kingdomInterface, voteManager);
+    }
+
+    /// <summary>
+    /// Builds a <see cref="KingdomHandler"/> against mocked collaborators and returns the delegate it
+    /// subscribed for <typeparamref name="T"/>, so a test can drive that one handler directly.
+    /// </summary>
+    private static Action<MessagePayload<T>> CreateHandler<T>(
+        IObjectManager objectManager,
+        IKingdomInterface kingdomInterface,
+        IKingdomDecisionVoteManager voteManager = null) where T : IMessage
+    {
+        Action<MessagePayload<T>> subscribedHandler = null!;
         var messageBroker = new Mock<IMessageBroker>();
         messageBroker
-            .Setup(broker => broker.Subscribe(It.IsAny<Action<MessagePayload<RemoveDecision>>>()!))
-            .Callback<Action<MessagePayload<RemoveDecision>>>(handler => removeDecisionHandler = handler);
+            .Setup(broker => broker.Subscribe(It.IsAny<Action<MessagePayload<T>>>()!))
+            .Callback<Action<MessagePayload<T>>>(handler => subscribedHandler = handler);
         _ = new KingdomHandler(
             messageBroker.Object,
             objectManager,
             new Mock<IPlayerManager>().Object,
-            voteManager,
+            voteManager ?? new Mock<IKingdomDecisionVoteManager>().Object,
             new Mock<IKingdomMembershipState>().Object,
             kingdomInterface,
             new Mock<IKingdomCreator>().Object);
-        return removeDecisionHandler;
+        return subscribedHandler;
     }
 
     private static bool TryGetCulture(KingdomHandler handler, string cultureId, out CultureObject culture)

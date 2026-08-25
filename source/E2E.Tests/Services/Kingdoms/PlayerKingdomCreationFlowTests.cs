@@ -2648,7 +2648,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.NotNull(decisionData);
         Server.SimulateMessage(
             this,
-            new NetworkAddDecision(kingdomId, decisionData, ignoreInfluenceCost: false, randomNumber: 0.5f));
+            new NetworkAddDecision(kingdomId, decisionData, ignoreInfluenceCost: false, randomNumber: 0.5f, wasQueued: null));
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
