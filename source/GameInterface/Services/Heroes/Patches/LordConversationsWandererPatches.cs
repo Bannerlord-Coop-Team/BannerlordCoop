@@ -1,14 +1,78 @@
 ﻿using HarmonyLib;
+using Helpers;
+using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch(typeof(LordConversationsCampaignBehavior))]
 internal class LordConversationsWandererPatches
 {
+    private const string AlleyDialogueId = "wanderer_job_status_1";
+
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.AddWandererConversations))]
+    [HarmonyPostfix]
+    public static void AddWandererConversationsPostfix()
+    {
+        var targetSentence = Campaign.Current.ConversationManager._sentences.FirstOrDefault(sentence => sentence.Id == AlleyDialogueId);
+
+        if (targetSentence == null) return;
+
+        // Vanilla incorrectly uses the NPC's gender to address the player
+        targetSentence.Text = new TextObject("{=EUBxMVXk}Do you have any orders for your alley, {?PLAYER.GENDER}madam{?}sir{\\?}");
+    }
+
+    [ThreadStatic]
+    private static bool IsMeetingWanderer = false;
+
+    [ThreadStatic]
+    private static bool UseWandererIntroduction = false;
+
+    /// <summary>
+    /// Use wanderer dialogue introduction regardless of recruited status.
+    /// After introduction, treat dialogue as a lord conversation by ConversationWandererOnConditionPrefix.
+    /// </summary>
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_meet_on_condition))]
+    [HarmonyPrefix]
+    public static bool ConversationWandererMeetOnConditionPrefix(LordConversationsCampaignBehavior __instance, ref bool __result)
+    {
+        __result = IsNonPrisonerWanderer(CharacterObject.OneToOneConversationCharacter)
+            && __instance.ConversationUseMeetingDialogs();
+
+        if (__result)
+        {
+            IsMeetingWanderer = true;
+            UseWandererIntroduction = true;
+        }
+
+        return false;
+    }
+
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_meet_player_on_condition))]
+    [HarmonyPrefix]
+    public static bool ConversationWandererMeetPlayerOnConditionPrefix(ref bool __result)
+    {
+        __result = IsMeetingWanderer;
+        return false;
+    }
+
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_generic_introduction_on_condition))]
+    [HarmonyPrefix]
+    public static bool ConversationWandererGenericIntroductionOnConditionPostfix(ref bool __result)
+    {
+        if (IsMeetingWanderer)
+        {
+            __result = true;
+            StringHelpers.SetCharacterProperties("CONVERSATION_CHARACTER", Hero.OneToOneConversationHero.CharacterObject, null, false);
+        }
+        return false;
+    }
+
     /// <summary>
     /// Override result to check if in the same clan rather than just checking if a player companion
     /// </summary>
@@ -32,14 +96,21 @@ internal class LordConversationsWandererPatches
     [HarmonyPrefix]
     public static bool ConversationWandererOnConditionPrefix(ref bool __result)
     {
-        __result = CharacterObject.OneToOneConversationCharacter != null
-            && CharacterObject.OneToOneConversationCharacter.IsHero
-            && CharacterObject.OneToOneConversationCharacter.Occupation == Occupation.Wanderer
-            && CharacterObject.OneToOneConversationCharacter.HeroObject.HeroState != Hero.CharacterStates.Prisoner
+        __result = UseWandererIntroduction || IsNonPrisonerWanderer(CharacterObject.OneToOneConversationCharacter)
             && (Hero.OneToOneConversationHero.CompanionOf == null
             || Hero.OneToOneConversationHero.CompanionOf == Clan.PlayerClan);
 
+        UseWandererIntroduction = false;
+
         return false;
+    }
+
+    private static bool IsNonPrisonerWanderer(CharacterObject character)
+    {
+        return character != null
+            && character.IsHero
+            && character.Occupation == Occupation.Wanderer
+            && character.HeroObject.HeroState != Hero.CharacterStates.Prisoner;
     }
 
     /// <summary>
