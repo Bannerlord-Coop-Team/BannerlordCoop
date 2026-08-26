@@ -2,11 +2,11 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Bandits.Messages;
+using GameInterface.Services.MapEvents.Extensions;
 using HarmonyLib;
 using Helpers;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -23,6 +23,8 @@ namespace GameInterface.Services.Bandits.Patches;
 [HarmonyPatch(typeof(BanditInteractionsCampaignBehavior))]
 internal class BanditInteractionsCampaignBehaviorPatches
 {
+    private static PendingBanditSurrender pendingBanditSurrender;
+
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.OnPartyDestroyed))]
     [HarmonyPrefix]
     public static bool OnPartyDestroyedPrefix() => ModInformation.IsServer;
@@ -106,18 +108,21 @@ internal class BanditInteractionsCampaignBehaviorPatches
         // certain affects like increasing security around settlements.
         if (!doBanditsJoinPlayerSide)
         {
-            MapEvent createdBattle = null;
-            if (PlayerEncounter.Battle == null)
+            var playerBattle = PlayerEncounter.Battle;
+            if (playerBattle != null)
             {
-                createdBattle = PlayerEncounter.StartBattle();
+                PublishBanditSurrender(__instance, playerBattle);
+                return false;
             }
 
-            // Guard against a null rejected or unresolved MapEvent
-            if (PlayerEncounter.Battle == null || createdBattle == null) return false;
+            pendingBanditSurrender = new PendingBanditSurrender(
+                __instance,
+                PlayerEncounter.Current,
+                MobileParty.MainParty.Party,
+                conversationParty.Party);
 
-            // Do surrender on server and send message to client to update post battle screens
-            var surrenderMessage = new BanditsSurrenderAsPrisoners(PlayerEncounter.Battle, PlayerEncounter.Battle.PlayerSide);
-            MessageBroker.Instance.Publish(__instance, surrenderMessage);
+            playerBattle = PlayerEncounter.StartBattle();
+            if (playerBattle != null) TryPublishPendingBanditSurrender(playerBattle);
 
             return false;
         }
@@ -147,5 +152,59 @@ internal class BanditInteractionsCampaignBehaviorPatches
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
+    }
+
+    [HarmonyPatch(typeof(MapEventManager), nameof(MapEventManager.OnMapEventCreated))]
+    [HarmonyPostfix]
+    public static void MapEventCreatedPostfix(MapEvent mapEvent)
+    {
+        TryPublishPendingBanditSurrender(mapEvent);
+    }
+
+    [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]
+    [HarmonyFinalizer]
+    public static void PlayerEncounterFinishFinalizer()
+    {
+        pendingBanditSurrender = null;
+    }
+
+    public static void TryPublishPendingBanditSurrender(MapEvent playerBattle)
+    {
+        var pending = pendingBanditSurrender;
+        if (pending == null || playerBattle == null ||
+            playerBattle.FindMapEventParty(pending.MainParty) == null ||
+            playerBattle.FindMapEventParty(pending.ConversationParty) == null) return;
+
+        pendingBanditSurrender = null;
+        PublishBanditSurrender(pending.Behavior, playerBattle);
+    }
+
+    public static void PublishBanditSurrender(BanditInteractionsCampaignBehavior behavior, MapEvent playerBattle)
+    {
+        if (playerBattle == null) return;
+
+        // Do surrender on server and send message to client to update post battle screens
+        var surrenderMessage = new BanditsSurrenderAsPrisoners(playerBattle, playerBattle.PlayerSide);
+        MessageBroker.Instance.Publish(behavior, surrenderMessage);
+    }
+
+    private class PendingBanditSurrender
+    {
+        public BanditInteractionsCampaignBehavior Behavior { get; }
+        public PlayerEncounter Encounter { get; }
+        public PartyBase MainParty { get; }
+        public PartyBase ConversationParty { get; }
+
+        public PendingBanditSurrender(
+            BanditInteractionsCampaignBehavior behavior,
+            PlayerEncounter encounter,
+            PartyBase mainParty,
+            PartyBase conversationParty)
+        {
+            Behavior = behavior;
+            Encounter = encounter;
+            MainParty = mainParty;
+            ConversationParty = conversationParty;
+        }
     }
 }
