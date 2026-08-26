@@ -13,6 +13,7 @@ using GameInterface.Services.MapEvents.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -47,6 +48,36 @@ public class MapEventCollectionTests : MapEventTestBase
         Assert.NotNull(marker.ComponentId);
         foreach (var instance in AllInstances) AssertCommitted(instance, staged);
         foreach (var client in Clients) AssertPending(client, staged, false);
+    }
+
+    [Fact]
+    public void ConnectedClients_FieldBattleReinforcement_ReceivesEventPositionAdder()
+    {
+        var battle = CreateServerMapEvent();
+        string reinforcementId = null;
+        Vec2 expectedOffset = default;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, battle.MapEventId);
+            var reinforcement = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            reinforcement.Position = new CampaignVec2(new Vec2(25f, 15f), true);
+            reinforcement.Party.MapEventSide = mapEvent.AttackerSide;
+
+            Assert.True(Server.ObjectManager.TryGetId(reinforcement, out reinforcementId));
+            expectedOffset = reinforcement.EventPositionAdder;
+        }, MapEventDisabledMethods);
+
+        Assert.NotEqual(Vec2.Zero, expectedOffset);
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var reinforcement = Get<MobileParty>(client, reinforcementId);
+                Assert.Equal(expectedOffset, reinforcement.EventPositionAdder);
+                Assert.Same(Get<MapEvent>(client, battle.MapEventId), reinforcement.MapEvent);
+            });
+        }
     }
 
     [Fact]

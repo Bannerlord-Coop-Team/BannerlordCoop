@@ -3,10 +3,14 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.BugReporting;
+using GameInterface.Services.BugReporting.Messages;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -25,6 +29,7 @@ namespace E2E.Tests.Services.MobileParties;
 public class UnstuckCommandTests : MapEventTestBase
 {
     private EnvironmentInstance Client => TestEnvironment.Clients.First();
+    private EnvironmentInstance SecondClient => TestEnvironment.Clients.Skip(1).First();
 
     public UnstuckCommandTests(ITestOutputHelper output) : base(output) { }
 
@@ -58,6 +63,127 @@ public class UnstuckCommandTests : MapEventTestBase
         var request = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
         Assert.Equal(player.PartyId, request.PartyId);
         Assert.Equal(player.HeroId, request.HeroId);
+    }
+
+    [Fact]
+    public void ServerUnstuckRequest_RequestsDiagnosticLogsFromEveryConnectedClient()
+    {
+        var requester = SetupRegisteredMainHeroAndParty();
+        var secondHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var secondCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var secondPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(
+                "unstuck-report-requester",
+                requester.HeroId,
+                requester.PartyId,
+                null,
+                requester.CharacterId)));
+            Assert.True(playerManager.AddPlayer(new Player(
+                "unstuck-report-second",
+                secondHeroId,
+                secondPartyId,
+                null,
+                secondCharacterId)));
+            playerManager.SetPeer("unstuck-report-requester", Client.NetPeer);
+            playerManager.SetPeer("unstuck-report-second", SecondClient.NetPeer);
+        });
+
+        Server.SimulateMessage(
+            Client.NetPeer,
+            new NetworkRequestPlayerUnstuck(requester.PartyId, requester.HeroId));
+
+        Assert.Collection(
+            Server.NetworkSentMessages.GetMessages<NetworkRequestBugReportLogs>(),
+            _ => { },
+            _ => { });
+    }
+
+    [Fact]
+    public void PlayerBugReport_RequestsDiagnosticLogsFromEveryConnectedClient()
+    {
+        var requester = SetupRegisteredMainHeroAndParty();
+        var secondHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var secondCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var secondPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(
+                "bug-report-requester",
+                requester.HeroId,
+                requester.PartyId,
+                null,
+                requester.CharacterId)));
+            Assert.True(playerManager.AddPlayer(new Player(
+                "bug-report-second",
+                secondHeroId,
+                secondPartyId,
+                null,
+                secondCharacterId)));
+            playerManager.SetPeer("bug-report-requester", Client.NetPeer);
+            playerManager.SetPeer("bug-report-second", SecondClient.NetPeer);
+        });
+
+        SecondClient.Call(() => ((IDisposable)SecondClient.Resolve<IBugReportService>()).Dispose());
+
+        Server.SimulateMessage(
+            Client.NetPeer,
+            new NetworkRequestBugReport(
+                "Party is stuck",
+                "Leaving Danustica keeps reopening the town menu."));
+
+        Assert.Collection(
+            Server.NetworkSentMessages.GetMessages<NetworkRequestBugReportLogs>(),
+            _ => { },
+            _ => { });
+    }
+
+    [Fact]
+    public void RepeatedBugReportWhileCollectionIsActive_DoesNotRequestLogsAgain()
+    {
+        var requester = SetupRegisteredMainHeroAndParty();
+        var secondHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var secondCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var secondPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(
+                "repeated-report-requester",
+                requester.HeroId,
+                requester.PartyId,
+                null,
+                requester.CharacterId)));
+            Assert.True(playerManager.AddPlayer(new Player(
+                "repeated-report-second",
+                secondHeroId,
+                secondPartyId,
+                null,
+                secondCharacterId)));
+            playerManager.SetPeer("repeated-report-requester", Client.NetPeer);
+            playerManager.SetPeer("repeated-report-second", SecondClient.NetPeer);
+        });
+
+        Client.Call(() => ((IDisposable)Client.Resolve<IBugReportService>()).Dispose());
+        SecondClient.Call(() => ((IDisposable)SecondClient.Resolve<IBugReportService>()).Dispose());
+
+        var request = new NetworkRequestBugReport(
+            "Party is stuck",
+            "Leaving Danustica keeps reopening the town menu.");
+        Server.SimulateMessage(Client.NetPeer, request);
+        Server.SimulateMessage(Client.NetPeer, request);
+
+        Assert.Equal(
+            2,
+            Server.NetworkSentMessages.GetMessages<NetworkRequestBugReportLogs>().Count());
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBugReportResult>());
+        Assert.Contains("already in progress", result.Message);
     }
 
     [Fact]
