@@ -35,6 +35,7 @@ public sealed class MirrorAgent
     public EquipmentIndex PrimaryWieldedItemIndex { get; set; } = EquipmentIndex.None;
     public EquipmentIndex OffhandWieldedItemIndex { get; set; } = EquipmentIndex.None;
     public BasicCharacterObject Character { get; set; }
+    public Equipment SpawnEquipment { get; set; }
     public Team Team { get; set; }
     public Formation Formation { get; set; }
     public IAgentOriginBase Origin { get; set; }
