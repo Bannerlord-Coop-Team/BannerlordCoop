@@ -402,8 +402,8 @@ public class CoopConnectMenuVMTests
 
         using var viewModel2 = new CoopConnectMenuVM(browser, messageBroker, store);
         Assert.True(viewModel2.HasLastDirectConnection);
-        Assert.Equal("10.0.0.1", viewModel2.Ip);
-        Assert.Equal("5000", viewModel2.Port);
+        Assert.Equal("localhost", viewModel2.Ip);
+        Assert.Equal("4200", viewModel2.Port);
         Assert.DoesNotContain("10.0.0.1", viewModel2.LastDirectConnectionText);
     }
 

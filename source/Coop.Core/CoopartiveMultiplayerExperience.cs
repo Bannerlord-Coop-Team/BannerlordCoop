@@ -80,6 +80,7 @@ namespace Coop.Core
             messageBroker.Subscribe<EndCoopMode>(Handle);
             messageBroker.Subscribe<SessionJoinInfoResolved>(Handle);
             messageBroker.Subscribe<SessionJoinFailed>(Handle);
+            messageBroker.Subscribe<SessionJoinAbandoned>(Handle);
             messageBroker.Subscribe<HostedServerExited>(Handle);
             messageBroker.Subscribe<NetworkConnected>(Handle);
         }
@@ -415,7 +416,15 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<SessionJoinFailed> obj)
         {
+            pendingPreSuppliedPassword = null;
+            acceptedSessionPassword = null;
             InformationManager.DisplayMessage(new InformationMessage(obj.What.Reason));
+        }
+
+        private void Handle(MessagePayload<SessionJoinAbandoned> obj)
+        {
+            pendingPreSuppliedPassword = null;
+            acceptedSessionPassword = null;
         }
 
         private void Handle(MessagePayload<HostSaveGame> obj)
