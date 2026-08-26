@@ -77,6 +77,9 @@ internal static class BattleDebugCommands
                     LocomotionFlags = Missions.Agents.Packets.AgentData.GetLocomotionMovementFlags(
                         agent.MovementFlags),
                     MovementInput = agent.MovementInputVector,
+                    Controller = agent.Controller,
+                    IsAiPaused = agent.IsPaused,
+                    MaximumSpeedLimit = agent.GetMaximumSpeedLimit(),
                 });
                 ApplyOwnedAgentMovementDrive(agent);
             }
@@ -95,7 +98,10 @@ internal static class BattleDebugCommands
                 RestoreOwnedAgentMovementDrive(
                     entry.Key,
                     entry.Value.LocomotionFlags,
-                    entry.Value.MovementInput);
+                    entry.Value.MovementInput,
+                    entry.Value.Controller,
+                    entry.Value.IsAiPaused,
+                    entry.Value.MaximumSpeedLimit);
             }
 
             ownedAgentMovementDriveStates.Clear();
@@ -178,11 +184,15 @@ internal static class BattleDebugCommands
     {
         public Agent.MovementControlFlag LocomotionFlags { get; set; }
         public Vec2 MovementInput { get; set; }
+        public AgentControllerType Controller { get; set; }
+        public bool IsAiPaused { get; set; }
+        public float MaximumSpeedLimit { get; set; }
     }
 #endif
 
 #if DEBUG
     private const float OwnedAgentMovementDriveAcceleration = 4f;
+    private const float OwnedAgentMovementDriveTargetDistance = 20f;
     private static Agent wieldTestAgent;
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
@@ -774,14 +784,19 @@ internal static class BattleDebugCommands
                 && info.Agent.Mission == mission
                 && info.Agent.IsActive())
             .ToArray();
-        if (ownedAgents.Length == 0)
+        CoopAgentInfo[] driveAgents = ownedAgents
+            .Where(info => !info.Agent.IsMount)
+            .ToArray();
+        if (driveAgents.Length == 0)
+            driveAgents = ownedAgents;
+        if (driveAgents.Length == 0)
             return "The local player has no active authoritative agents";
 
         ObserveMission(mission);
         EnsureBattleDebugTickBehavior(mission);
         battleDebugTickBehavior.BeginOwnedAgentMovementDrive(
             mission,
-            ownedAgents.Select(info => info.Agent),
+            driveAgents.Select(info => info.Agent),
             durationSeconds);
 
         string structuredState = JsonConvert.SerializeObject(new
@@ -789,15 +804,20 @@ internal static class BattleDebugCommands
             success = true,
             controllerId,
             durationSeconds,
-            agentCount = ownedAgents.Length,
-            agentIds = ownedAgents.Select(info => info.AgentId.ToString("D")).ToArray(),
+            agentCount = driveAgents.Length,
+            agentIds = driveAgents.Select(info => info.AgentId.ToString("D")).ToArray(),
         });
         return $"DRIVING_OWNED_AGENTS controller={controllerId}|seconds={durationSeconds}|" +
-            $"agents={ownedAgents.Length}\nLIVE_TEST_JSON={structuredState}";
+            $"agents={driveAgents.Length}\nLIVE_TEST_JSON={structuredState}";
     }
 
     internal static void ApplyOwnedAgentMovementDrive(Agent agent)
     {
+        if (agent.Controller != AgentControllerType.AI)
+            agent.Controller = AgentControllerType.AI;
+        agent.SetIsAIPaused(false);
+        agent.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+
         Missions.Agents.Packets.AgentData.ApplyLocomotionMovementFlags(
             agent,
             Agent.MovementControlFlag.Forward);
@@ -810,6 +830,11 @@ internal static class BattleDebugCommands
         else
             acceleration.Normalize();
 
+        Vec2 direction = acceleration.AsVec2;
+        Vec2 targetPosition = agent.Position.AsVec2 +
+            (direction * OwnedAgentMovementDriveTargetDistance);
+        agent.SetTargetPositionAndDirection(in targetPosition, in acceleration);
+
         acceleration = new Vec3(
             acceleration.X * OwnedAgentMovementDriveAcceleration,
             acceleration.Y * OwnedAgentMovementDriveAcceleration,
@@ -820,10 +845,17 @@ internal static class BattleDebugCommands
     internal static void RestoreOwnedAgentMovementDrive(
         Agent agent,
         Agent.MovementControlFlag locomotionFlags,
-        Vec2 movementInput)
+        Vec2 movementInput,
+        AgentControllerType controller,
+        bool isAiPaused,
+        float maximumSpeedLimit)
     {
+        agent.SetIsAIPaused(isAiPaused);
+        agent.SetMaximumSpeedLimit(maximumSpeedLimit, isMultiplier: false);
         Missions.Agents.Packets.AgentData.ApplyLocomotionMovementFlags(agent, locomotionFlags);
         Missions.Agents.Packets.AgentData.ApplyMovementInput(agent, movementInput);
+        if (agent.Controller != controller)
+            agent.Controller = controller;
     }
 
     internal static bool CanDriveOwnedAgent(Agent agent, Mission mission)
