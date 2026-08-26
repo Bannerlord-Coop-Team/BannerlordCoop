@@ -211,7 +211,8 @@ internal class TroopRosterInterface : ITroopRosterInterface
                 long finalWounded = current.wounded + elementData.WoundedNumber;
                 long finalXp = current.xp + elementData.Xp;
 
-                if (IsAlreadyAppliedHeroRemoval(character, current, elementData.Number, elementData.WoundedNumber, elementData.Xp))
+                if (!IsCharacterWithAddition(deltas, elementData.CharacterId) &&
+                    IsAlreadyAppliedHeroRemoval(character, current, elementData.Number, elementData.WoundedNumber, elementData.Xp))
                     continue;
 
                 if (finalNumber < 0 ||
@@ -262,6 +263,16 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
         var hero = character.HeroObject;
         return hero.PartyBelongedTo == null && hero.PartyBelongedToAsPrisoner == null;
+    }
+
+    private static bool IsCharacterWithAddition(
+        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas,
+        string characterId)
+    {
+        return deltas
+            .Where(x => x.delta.Data != null)
+            .SelectMany(x => x.delta.Data)
+            .Any(x => x.CharacterId == characterId && x.Number > 0);
     }
 
     private void ApplyDeltaElements(

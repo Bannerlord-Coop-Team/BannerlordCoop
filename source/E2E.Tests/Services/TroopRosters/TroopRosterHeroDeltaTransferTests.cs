@@ -221,6 +221,31 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
     }
 
     [Fact]
+    public void AlreadyRemovedHero_StaleTransfer_IsRejectedAtomically()
+    {
+        Server.Call(() =>
+        {
+            var source = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+            var destination = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
+
+            var troopRosterInterface = Server.Resolve<ITroopRosterInterface>();
+            var applied = troopRosterInterface.TryApplyTroopRosterDeltas(new[]
+            {
+                (destination, Delta(characterId, 1)),
+                (source, Delta(characterId, -1)),
+            });
+
+            Assert.False(applied);
+            Assert.Equal(0, source.GetTroopCount(hero.CharacterObject));
+            Assert.Equal(0, destination.GetTroopCount(hero.CharacterObject));
+            Assert.Null(hero.PartyBelongedTo);
+            Assert.Null(hero.PartyBelongedToAsPrisoner);
+        });
+    }
+
+    [Fact]
     public void AlreadyRemovedHero_IsOmittedFromPackedDelta()
     {
         Server.Call(() =>
