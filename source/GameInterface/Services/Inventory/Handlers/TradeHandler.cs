@@ -89,7 +89,7 @@ internal class TradeHandler : IHandler
 
         if (what.CanGainXpFromDiscarding)
         {
-            soldItems = ResolveLeftLootIds(what.FromRoster._data);
+            soldItems = ResolveLeftLootIds(what.FromRoster);
         }
 
         var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.OwnerParty, what.InitialCharacterEquipment);
@@ -243,15 +243,20 @@ internal class TradeHandler : IHandler
         return resolvedItems.ToArray();
     }
 
-    private (ItemRosterElementData, int)[] ResolveLeftLootIds(ItemRosterElement[] items)
+    private (ItemRosterElementData, int)[] ResolveLeftLootIds(ItemRoster discardedItems)
     {
         var resolvedItems = new List<(ItemRosterElementData, int)>();
 
-        for (int i = 0; i < items.Length; i++)
+        for (int i = 0; i < discardedItems.Count; i++)
         {
-            if (TryResolveItemRosterId(items[i], out var resolvedItem))
+            var item = discardedItems.GetElementCopyAtIndex(i);
+
+            if (item.EquipmentElement.Item == null)
+                continue;
+
+            if (TryResolveItemRosterId(item, out var resolvedItem))
             {
-                resolvedItems.Add((resolvedItem, items[i].Amount));
+                resolvedItems.Add((resolvedItem, item.Amount));
             }
         }
 
