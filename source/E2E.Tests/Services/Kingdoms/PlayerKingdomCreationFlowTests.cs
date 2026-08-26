@@ -365,7 +365,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
                 var location = ObjectHelper.SkipConstructor<Location>();
                 Assert.True(client.ObjectManager.AddExisting(LocationId, location));
-                CampaignMission.Current = new StubCampaignMission(location);
+                client.CampaignMissionContext = new StubCampaignMission(location);
                 clientConversationState = client.Resolve<ILocationConversationClientState>();
                 Assert.False(clientConversationState.HasPendingOrHeld);
 
@@ -452,7 +452,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             MissionConversationLogicOverride = null;
             OneToOneConversationHeroOverride = null;
             clientConversationState?.Clear();
-            CampaignMission.Current = null;
+            client.CampaignMissionContext = null;
         }
     }
 
