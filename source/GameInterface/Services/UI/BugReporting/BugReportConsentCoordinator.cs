@@ -10,18 +10,20 @@ public class BugReportConsentCoordinator
 {
     public const string TabId = "BugReporting";
     public const string SectionId = "BugReportLogSharingConsent";
-    public const int CurrentDisclosureVersion = 2;
+    public const int CurrentDisclosureVersion = 3;
     public const string PromptTitle = "Share Co-op Diagnostic Logs?";
     public const string PromptText =
         "When the dedicated server creates a diagnostic bug report, allow this client's current " +
         "BannerlordCoop log to be sent to the dedicated server, packaged with logs from other consenting " +
         "clients, and submitted to BannerlordCoop's bug-report service? Reports create a public GitHub " +
-        "issue containing the reporting player's network ID. Included server and client logs are uploaded " +
-        "to publicly accessible links, and remote deletion or expiry is not guaranteed. Reports may be triggered " +
-        "automatically by recovery actions such as the coop unstuck command. Logs may contain " +
+        "issue containing the reporting player's network ID. The server also creates and uploads its current " +
+        "campaign save for every report. The save and included server and client logs are uploaded to publicly " +
+        "accessible links, and remote deletion or expiry is not guaranteed. Reports may be triggered " +
+        "automatically by recovery actions such as the coop unstuck command. The server save and logs may contain " +
         "player names, Steam IDs, IP addresses, file paths, and gameplay or network details. Runtime " +
-        "command arguments and common credential values are redacted. Saves, configuration files, " +
-        "and memory dumps are not included. Choose No thanks to keep this client's log local. " +
+        "command arguments and common credential values are redacted from logs. Client saves, configuration " +
+        "files, and memory dumps are not included. Choose No thanks to keep this client's log local; the server " +
+        "campaign save is still included. " +
         "Change this later with coop.bug_report_log_sharing enable or disable.";
 
     private readonly ICoopOptionsStore optionsStore;

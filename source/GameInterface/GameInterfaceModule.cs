@@ -87,6 +87,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().InstancePerLifetimeScope();
         builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();
+        builder.RegisterType<BugReportServerSaveProvider>().As<IBugReportServerSaveProvider>().InstancePerDependency();
         builder.RegisterType<BugReportArchiveBuilder>().As<IBugReportArchiveBuilder>().InstancePerDependency();
         builder.RegisterType<BugReportLogValidator>().As<IBugReportLogValidator>().InstancePerDependency();
         builder.RegisterType<BugReportUploader>().As<IBugReportUploader>().InstancePerDependency();

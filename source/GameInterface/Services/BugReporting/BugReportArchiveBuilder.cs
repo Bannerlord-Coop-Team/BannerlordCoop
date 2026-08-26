@@ -56,6 +56,19 @@ public sealed class CollectedBugReportServerLog
     }
 }
 
+/// <summary>Contains the persistent server campaign save captured for a diagnostic report.</summary>
+public sealed class CollectedBugReportServerSave
+{
+    public string FileName { get; }
+    public byte[] Data { get; }
+
+    public CollectedBugReportServerSave(string fileName, byte[] data)
+    {
+        FileName = fileName;
+        Data = data;
+    }
+}
+
 /// <summary>Contains the logs and metadata written to a diagnostic archive.</summary>
 public sealed class BugReportArchiveContents
 {
@@ -64,6 +77,7 @@ public sealed class BugReportArchiveContents
     public IReadOnlyCollection<string> Triggers { get; }
     public IReadOnlyCollection<BugReportSubmission> Submissions { get; }
     public CollectedBugReportServerLog ServerLog { get; }
+    public CollectedBugReportServerSave ServerSave { get; }
     public DateTimeOffset StartedAt { get; }
     public IReadOnlyCollection<CollectedBugReportLog> Logs { get; }
     public int ExpectedClients { get; }
@@ -77,6 +91,7 @@ public sealed class BugReportArchiveContents
         IReadOnlyCollection<string> triggers,
         IReadOnlyCollection<BugReportSubmission> submissions,
         CollectedBugReportServerLog serverLog,
+        CollectedBugReportServerSave serverSave,
         DateTimeOffset startedAt,
         IReadOnlyCollection<CollectedBugReportLog> logs,
         int expectedClients,
@@ -89,6 +104,7 @@ public sealed class BugReportArchiveContents
         Triggers = triggers ?? Array.Empty<string>();
         Submissions = submissions ?? Array.Empty<BugReportSubmission>();
         ServerLog = serverLog;
+        ServerSave = serverSave;
         StartedAt = startedAt;
         Logs = logs ?? Array.Empty<CollectedBugReportLog>();
         ExpectedClients = expectedClients;
@@ -105,6 +121,7 @@ public sealed class BugReportArchiveContents
             Triggers,
             Submissions,
             serverLog,
+            ServerSave,
             StartedAt,
             Logs,
             ExpectedClients,
@@ -123,6 +140,7 @@ public sealed class BugReportArchiveContents
             Triggers,
             Submissions,
             ServerLog,
+            ServerSave,
             StartedAt,
             logs,
             ExpectedClients,
@@ -225,6 +243,7 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
                 WriteManifest(archive, contents);
                 AddSubmissions(archive, contents.Submissions);
                 if (contents.ServerLog != null) AddServerLog(archive, contents.ServerLog);
+                if (contents.ServerSave != null) AddServerSave(archive, contents.ServerSave);
                 foreach (var log in contents.Logs.OrderBy(item => item.ClientNumber))
                 {
                     AddLog(archive, log);
@@ -358,12 +377,13 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
         writer.WriteLine("Started: " + contents.StartedAt.ToString("O", CultureInfo.InvariantCulture));
         writer.WriteLine("Packaged: " + DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         writer.WriteLine("Player submissions: " + contents.Submissions.Count.ToString(CultureInfo.InvariantCulture));
+        writer.WriteLine("Server save included: " + (contents.ServerSave != null ? "yes" : "no"));
         writer.WriteLine("Expected clients: " + contents.ExpectedClients.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Logs included: " + contents.Logs.Count.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Clients declined: " + contents.DeclinedClients.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Clients failed: " + contents.FailedClients.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Clients timed out: " + contents.TimedOutClients.ToString(CultureInfo.InvariantCulture));
-        writer.WriteLine("Only current BannerlordCoop server and client logs are included; saves, configs, and dumps are excluded.");
+        writer.WriteLine("The current server campaign save and current BannerlordCoop logs are included; client saves, configs, and dumps are excluded.");
     }
 
     private static void AddSubmissions(
@@ -387,6 +407,21 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
             writer.Write(submission.Description);
             index++;
         }
+    }
+
+    private static void AddServerSave(ZipArchive archive, CollectedBugReportServerSave save)
+    {
+        if (save.Data == null || save.Data.Length == 0)
+            throw new InvalidDataException("The collected server save was empty.");
+        if (string.IsNullOrWhiteSpace(save.FileName) ||
+            !string.Equals(Path.GetFileName(save.FileName), save.FileName, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("The collected server save had an invalid file name.");
+        }
+
+        var entry = archive.CreateEntry("server/" + save.FileName, CompressionLevel.NoCompression);
+        using var destination = entry.Open();
+        destination.Write(save.Data, 0, save.Data.Length);
     }
 
     private static void AddServerLog(ZipArchive archive, CollectedBugReportServerLog log)
