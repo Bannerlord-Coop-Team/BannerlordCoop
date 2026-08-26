@@ -1,4 +1,5 @@
-﻿using Common.PacketHandlers;
+﻿using Common.Messaging;
+using Common.PacketHandlers;
 using Common.Serialization;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -83,6 +84,49 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
 
         Assert.Equal(1, scheduler.AdvanceBy(TimeSpan.FromMilliseconds(25)));
         Assert.Equal(1, clients[1].InternalMessages.GetMessageCount<NetworkSpawnBattleAgents>());
+    }
+
+    [Fact]
+    public void Mesh_ReliableMessageAndPacket_ShareOrderingWhenLatencyDrops()
+    {
+        EnvironmentInstance[] clients = Clients.ToArray();
+        Connect(clients[0], "ctrl-A", "instance-1");
+        Connect(clients[1], "ctrl-B", "instance-1");
+        IVirtualNetworkScheduler scheduler = clients[0].Resolve<IVirtualNetworkScheduler>();
+        scheduler.DefaultLatency = TimeSpan.FromMilliseconds(100);
+
+        var deliveries = new List<string>();
+        clients[1].Resolve<IMessageBroker>()
+            .Subscribe<NetworkSpawnBattleAgents>(_ => deliveries.Add("message"));
+        var packetHandler = new RecordingPacketHandler(
+            PacketType.AgentAction,
+            () => deliveries.Add("packet"));
+        IPacketManager packetManager = clients[1].Resolve<IPacketManager>();
+        packetManager.RegisterPacketHandler(packetHandler);
+
+        try
+        {
+            clients[0].Call(() =>
+                clients[0].Resolve<IBattleNetwork>().Send("ctrl-B", EmptySpawn()));
+            scheduler.DefaultLatency = TimeSpan.Zero;
+            clients[0].Call(() =>
+                clients[0].Resolve<IBattleNetwork>().Send(
+                    "ctrl-B",
+                    new AgentActionPacket(
+                        "ctrl-A",
+                        Array.Empty<Guid>(),
+                        Array.Empty<AgentActionData>(),
+                        Array.Empty<long>())));
+
+            Assert.Empty(deliveries);
+            Assert.Equal(0, scheduler.AdvanceBy(TimeSpan.FromMilliseconds(99)));
+            Assert.Equal(2, scheduler.AdvanceBy(TimeSpan.FromMilliseconds(1)));
+            Assert.Equal(new[] { "message", "packet" }, deliveries);
+        }
+        finally
+        {
+            packetManager.RemovePacketHandler(packetHandler);
+        }
     }
 
     [Fact]
@@ -185,13 +229,24 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
 
     private sealed class RecordingPacketHandler : IPacketHandler
     {
-        public PacketType PacketType => PacketType.Movement;
+        private readonly Action? onHandle;
+
+        public PacketType PacketType { get; }
         public int HandleCount => Packets.Count;
         public List<IPacket> Packets { get; } = new();
+
+        public RecordingPacketHandler(
+            PacketType packetType = PacketType.Movement,
+            Action? onHandle = null)
+        {
+            PacketType = packetType;
+            this.onHandle = onHandle;
+        }
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
             Packets.Add(packet);
+            onHandle?.Invoke();
         }
 
         public void Dispose()

@@ -13,7 +13,7 @@ namespace E2E.Tests.Environment;
 /// </summary>
 public class MeshNetworkRouter
 {
-    private const string MessageChannel = "message";
+    private const string ReliableOrderedChannel = "packet:ReliableOrdered";
 
     private readonly List<ClientRegistration> clients = new();
     private readonly IVirtualNetworkScheduler scheduler;
@@ -132,7 +132,7 @@ public class MeshNetworkRouter
         scheduler.Schedule(
             sender,
             recipient.Mesh,
-            MessageChannel,
+            ReliableOrderedChannel,
             () => Deliver(() => recipient.Instance.SimulateMessage(sender.NetPeer, wireCopy)));
         scheduler.DrainReady();
     }
