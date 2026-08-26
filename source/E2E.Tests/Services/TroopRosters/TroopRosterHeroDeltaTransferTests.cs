@@ -246,7 +246,7 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
     }
 
     [Fact]
-    public void AlreadyRemovedHero_IsOmittedFromPackedDelta()
+    public void AlreadyRemovedHero_RemovalIsPreservedInPackedDelta()
     {
         Server.Call(() =>
         {
@@ -258,7 +258,8 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             var troopRosterInterface = Server.Resolve<ITroopRosterInterface>();
             var packed = troopRosterInterface.PackTroopRosterDelta(current, initial);
 
-            Assert.Empty(packed.Data);
+            var removal = Assert.Single(packed.Data);
+            Assert.Equal(-1, removal.Number);
         });
     }
 
