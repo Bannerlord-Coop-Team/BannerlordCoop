@@ -95,7 +95,6 @@ internal class StanceLinkHandler : IHandler
 
             if (!objectManager.AddExisting($"{typeof(StanceLink).Name}_{id}", stanceLink))
             {
-                Logger.Error("Unable to register StanceLink with id {Id}", id);
                 return;
             }
             if (ModInformation.IsServer)
