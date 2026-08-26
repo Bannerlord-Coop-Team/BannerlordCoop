@@ -29,7 +29,7 @@ internal sealed partial class TournamentSessionHandler
                 snapshot.Phase != TournamentSessionPhase.LiveMatch ||
                 data.DamageOriginControllerId != player.ControllerId ||
                 snapshot.CurrentMatchId != data.MatchId ||
-                snapshot.Revision != data.Revision ||
+                !IsAcceptedProgressionRevision(snapshot.Revision, data.Revision) ||
                 snapshot.BracketRevision != data.BracketRevision ||
                 !sessionRegistry.TryGetSpawnManifest(data.SessionId, out var manifest) ||
                 manifest.MatchId != data.MatchId ||
@@ -145,6 +145,9 @@ internal sealed partial class TournamentSessionHandler
 
     internal static string GetHitProgressionDedupeKey(TournamentHitProgressionData data)
         => $"{data.SessionId}\n{data.MatchId}\n{data.DamageOriginControllerId}\n{data.DamageSequence}";
+
+    internal static bool IsAcceptedProgressionRevision(long currentRevision, long submittedRevision)
+        => submittedRevision >= 0 && submittedRevision <= currentRevision;
 
     private static bool IsFinite(float value)
         => !float.IsNaN(value) && !float.IsInfinity(value);
