@@ -34,6 +34,7 @@ public sealed class MissionEngineFixture : IDisposable
         // Mission statics / members
         Prefix(typeof(Mission), "get_Current", nameof(Mission_get_Current));
         Prefix(typeof(PartyBase), "get_MainParty", nameof(PartyBase_get_MainParty));
+        Prefix(typeof(Mission), nameof(Mission.GetShootDifficulty), nameof(Mission_GetShootDifficulty));
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
         Prefix(typeof(Mission), "get_DamageToPlayerMultiplier", nameof(Mission_get_DamageToPlayerMultiplier));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
@@ -227,6 +228,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!TryActiveMock(out var mock)) return true;
         __result = mock.Shell;
+        return false;
+    }
+
+    private static bool Mission_GetShootDifficulty(Mission __instance, ref float __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.ShootDifficulty;
         return false;
     }
 
@@ -467,8 +475,8 @@ public sealed class MissionEngineFixture : IDisposable
 
     private static bool Agent_get_Equipment(Agent __instance, ref MissionEquipment __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = null;
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.Equipment;
         return false;
     }
 
@@ -613,6 +621,8 @@ public sealed class MissionEngineFixture : IDisposable
             throw new NullReferenceException(
                 "Mount has no equipment for Mission.OnAgentHit's affector weapon lookup");
         }
+
+        registrationMock?.RegisteredBlow?.Invoke(__instance, blow);
 
         victim.Health -= blow.InflictedDamage;
         if (TryActiveMock(out var activeMock)

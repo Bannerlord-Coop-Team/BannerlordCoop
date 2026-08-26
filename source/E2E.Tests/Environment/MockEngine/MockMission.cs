@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System;
 using System.Runtime.CompilerServices;
 using Common.Util;
 using TaleWorlds.CampaignSystem.Party;
@@ -28,6 +29,8 @@ public sealed class MockMission
     public Agent LastFleeingAgent { get; set; }
     public bool DeploymentInProgress { get; set; }
     public Blow LastRegisteredBlow { get; set; }
+    public Action<Agent, Blow> RegisteredBlow { get; set; } = (_, _) => { };
+    public float ShootDifficulty { get; set; } = 7.5f;
     public DeploymentMissionController DeploymentController { get; }
         = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();
 
@@ -55,7 +58,20 @@ public sealed class MockMission
 
     public IReadOnlyCollection<Agent> Agents => agentsByIndex.Values;
 
-    public void RegisterMissile(int index) => missiles.Add(index);
+    public void RegisterMissile(int index, Agent shooter, MissionWeapon weapon)
+    {
+        Shell._missilesDictionary ??= new Dictionary<int, Mission.Missile>();
+        Shell._missilesDictionary[index] =
+            new Mission.Missile(Shell, index, null, shooter, weapon, null);
+        missiles.Add(index);
+    }
+
+    public void RemoveMissile(int index)
+    {
+        Shell._missilesDictionary?.Remove(index);
+        missiles.Remove(index);
+    }
+
     public bool HasMissile(int index) => missiles.Contains(index);
 
     public MockMission()
