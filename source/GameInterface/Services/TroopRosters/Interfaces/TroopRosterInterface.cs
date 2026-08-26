@@ -174,9 +174,6 @@ internal class TroopRosterInterface : ITroopRosterInterface
             if (!objectManager.TryGetIdWithLogging(character, out var characterId))
                 continue;
 
-            if (IsAlreadyAppliedHeroRemoval(character, cur, numberDelta, woundedDelta, xpDelta))
-                continue;
-
             elements.Add(new TroopRosterElementData(characterId, numberDelta, woundedDelta, xpDelta));
         }
 

@@ -4,6 +4,7 @@ using HarmonyLib;
 using SandBox.GauntletUI;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 
@@ -45,6 +46,14 @@ internal class GauntletPartyScreenPatches
         if (character == null) return;
 
         var partyScreenLogic = __instance._partyState.PartyScreenLogic;
+        RemoveConversationCharacter(partyScreenLogic, character, isPrisoner);
+    }
+
+    private static void RemoveConversationCharacter(
+        PartyScreenLogic partyScreenLogic,
+        CharacterObject character,
+        bool isPrisoner)
+    {
         var partyRoster = isPrisoner
             ? partyScreenLogic.RightOwnerParty.PrisonRoster
             : partyScreenLogic.RightOwnerParty.MemberRoster;
@@ -68,6 +77,8 @@ internal class GauntletPartyScreenPatches
             RemoveCharacter(currentRoster, character);
             if (savedRoster != null) RemoveCharacter(savedRoster, character);
         }
+
+        partyScreenLogic.OnReset(false);
     }
 
     private static void RemoveCharacter(TroopRoster roster, CharacterObject character)
