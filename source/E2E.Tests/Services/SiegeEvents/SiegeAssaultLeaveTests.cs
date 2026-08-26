@@ -276,10 +276,16 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
             var nativeArgs = new MenuCallbackArgs((MenuContext)null, null);
             Assert.False(MenuHelper.EncounterAttackCondition(nativeArgs));
+            Assert.False(MenuHelper.EncounterOrderAttackCondition(nativeArgs));
 
             var (shown, args) = InvokePatchedEncounterAttackCondition();
             Assert.True(shown);
             Assert.True(args.IsEnabled);
+
+            var (sendTroopsShown, sendTroopsArgs) = InvokePatchedEncounterOrderAttackCondition();
+            Assert.True(sendTroopsShown);
+            Assert.True(sendTroopsArgs.IsEnabled);
+            Assert.Equal(GameMenuOption.LeaveType.OrderTroopsToAttack, sendTroopsArgs.optionLeaveType);
 
             var healthyHitPoints = Hero.MainHero.HitPoints;
             var previousOptions = ModConfigProvider.ModOptions;
@@ -318,6 +324,19 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var method = AccessTools.Method(
             typeof(EncounterGameMenuBehavior),
             "game_menu_encounter_attack_on_condition");
+        Assert.NotNull(method);
+
+        var args = new MenuCallbackArgs((MenuContext)null, null);
+        var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+        var shown = (bool)method.Invoke(behavior, new object[] { args });
+        return (shown, args);
+    }
+
+    private static (bool shown, MenuCallbackArgs args) InvokePatchedEncounterOrderAttackCondition()
+    {
+        var method = AccessTools.Method(
+            typeof(EncounterGameMenuBehavior),
+            "game_menu_encounter_order_attack_on_condition");
         Assert.NotNull(method);
 
         var args = new MenuCallbackArgs((MenuContext)null, null);

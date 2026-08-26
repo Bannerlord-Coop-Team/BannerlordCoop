@@ -43,6 +43,7 @@ internal class BattleModeEncounterOptionsPatch
     private static readonly TextObject WoundedTooltip = new("{=UL8za0AO}You are wounded.");
     private static readonly TextObject RaftTooltip = new("{=x9ePfpw5}You are on a raft, in desperate circumstances, and cannot fight");
     private const string AttackCondition = "game_menu_encounter_attack_on_condition";
+    private const string OrderAttackCondition = "game_menu_encounter_order_attack_on_condition";
 
     // Live-mission launch options, greyed while a simulation runs (launch_mission is the shared catch-all every
     // mission path funnels through). Trailing comment = in-game label.
@@ -60,7 +61,7 @@ internal class BattleModeEncounterOptionsPatch
     // Auto-resolve options, greyed while a live mission runs.
     private static readonly HashSet<string> SimulationStartConditions = new()
     {
-        "game_menu_encounter_order_attack_on_condition",  // Send your troops to attack
+        OrderAttackCondition,  // Send your troops to attack
     };
 
     // Handled inversely to the start buckets: forced available / refused rather than only greyed.
@@ -123,7 +124,12 @@ internal class BattleModeEncounterOptionsPatch
         }
 
         if (SimulationStartConditions.Contains(name))
+        {
             EnableAlliedSimulationForIncapacitatedPlayer(__0, __result);
+
+            if (name == OrderAttackCondition && !__result && ShouldShowClientSiegeAttackOption())
+                __result = TryApplyClientSiegeOrderAttackOptionState(__0);
+        }
 
         if (name == AttackCondition && !__result && ShouldShowClientSiegeAttackOption())
         {
@@ -240,6 +246,90 @@ internal class BattleModeEncounterOptionsPatch
 
         args.Tooltip = RaftTooltip;
         args.IsEnabled = false;
+    }
+
+    private static bool TryApplyClientSiegeOrderAttackOptionState(MenuCallbackArgs args)
+    {
+        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        var encounter = PlayerEncounter.Current;
+        var playerSide = MobileParty.MainParty?.MapEventSide;
+        if (mapEvent == null || encounter == null || playerSide == null)
+            return false;
+
+        var isNavalOrder = mapEvent.IsNavalMapEvent ||
+                           (MapEventHelper.IsNavalRaid(mapEvent) && mapEvent.PlayerSide == BattleSideEnum.Attacker);
+        args.optionLeaveType = isNavalOrder
+            ? GameMenuOption.LeaveType.OrderShipsToAttack
+            : GameMenuOption.LeaveType.OrderTroopsToAttack;
+
+        foreach (var party in mapEvent.PartiesOnSide(encounter.OpponentSide))
+        {
+            if (party.Party.MobileParty?.IsInRaftState == true)
+                return false;
+
+            break;
+        }
+
+        MenuHelper.CheckEnemyAttackableHonorably(args);
+
+        var orderableTroops = 0;
+        foreach (var party in playerSide.Parties)
+        {
+            if (party.Party.IsMobile && party.Party.MobileParty.IsInRaftState)
+                continue;
+
+            orderableTroops += CountOrderableTroops(party.Party);
+        }
+
+        if (orderableTroops <= 0)
+            return false;
+
+        if (!MobileParty.MainParty.IsInRaftState && CountOrderableTroops(PartyBase.MainParty) > 0)
+        {
+            MBTextManager.SetTextVariable(
+                "SEND_TROOPS_TEXT",
+                isNavalOrder ? "{=NFnS5YqQ}Send ships." : "{=QfMeoKOm}Send troops.");
+        }
+        else
+        {
+            MBTextManager.SetTextVariable("SEND_TROOPS_TEXT", "{=jo3UHKMD}Leave it to the others.");
+        }
+
+        if (mapEvent.IsInvulnerable)
+            mapEvent.IsInvulnerable = false;
+
+        if (!MobilePartyHelper.CanPartyAttackWithCurrentMorale(MobileParty.MainParty))
+        {
+            args.Tooltip = LowMoraleTooltip;
+            args.IsEnabled = false;
+        }
+        else
+        {
+            var mapFaction = PlayerEncounter.EncounteredParty.MapFaction;
+            if (mapFaction == null || mapFaction.NotAttackableByPlayerUntilTime.IsPast)
+                args.Tooltip = TooltipHelper.GetSendTroopsPowerContextTooltipForMapEvent();
+        }
+
+        return true;
+    }
+
+    private static int CountOrderableTroops(PartyBase party)
+    {
+        var count = 0;
+        foreach (var element in party.MemberRoster)
+        {
+            if (element.Character.IsHero)
+            {
+                if (element.Character != CharacterObject.PlayerCharacter && !element.Character.HeroObject.IsWounded)
+                    count++;
+            }
+            else
+            {
+                count += element.Number - element.WoundedNumber;
+            }
+        }
+
+        return count;
     }
 
     /// <summary>Native uses the empty main party's morale to disable "Leave it to the others" even when healthy
