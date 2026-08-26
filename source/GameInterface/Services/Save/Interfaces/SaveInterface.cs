@@ -35,7 +35,20 @@ internal class SaveInterface : ISaveInterface
         CampaignEventDispatcher.Instance.OnBeforeSave();
 
         var saveDriver = new CoopInMemSaveDriver();
-        Game.Current.Save(metaData, "TransferSave", saveDriver, (SaveResult) => { });
+        SaveResult saveResult = SaveResult.GeneralFailure;
+        Game.Current.Save(metaData, "TransferSave", saveDriver, result => saveResult = result);
+
+        if (saveResult != SaveResult.Success)
+        {
+            Logger.Error("Failed to package game save. Save result was {SaveResult}.", saveResult);
+            return new SaveResults(false, Array.Empty<byte>(), null);
+        }
+
+        if (saveDriver.Data == null || saveDriver.Data.Length == 0)
+        {
+            Logger.Error("Failed to package game save. The completed save returned no data.");
+            return new SaveResults(false, Array.Empty<byte>(), null);
+        }
 
         return new SaveResults(true, saveDriver.Data, Campaign.Current?.UniqueGameId);
     }

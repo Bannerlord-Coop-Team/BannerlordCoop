@@ -144,10 +144,28 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void EnteringState_SuccessWithoutSaveData_DisconnectsJoiningPeer()
+        {
+            var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
+            saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, null, "12345"));
+
+            connectionLogic.SetState<TransferSaveState>();
+
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            var peerGotSave =
+                serverComponent.TestNetwork.SentPackets.TryGetValue(playerPeer.Id, out var packets) &&
+                packets.OfType<GameSaveDataChunkPacket>().Any();
+            Assert.False(peerGotSave);
+        }
+
+        [Fact]
         public void EnteringState_FlushFailureStillClearsSavingState()
         {
             serverComponent.TestNetwork.FlushPendingMessagesException =
                 new InvalidOperationException("Flush failed.");
+            serverComponent.Container.Resolve<Mock<ISaveInterface>>()
+                .Setup(m => m.SaveCurrentGame())
+                .Returns(new SaveResults(true, new byte[] { 1, 2, 3 }, "12345"));
 
             connectionLogic.SetState<TransferSaveState>();
 

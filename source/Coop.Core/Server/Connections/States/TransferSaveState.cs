@@ -70,7 +70,7 @@ public class TransferSaveState : ConnectionStateBase
                 var saveResults = saveInterface.SaveCurrentGame();
 
                 // Disconnect peer on failure — before touching Data, which a failed snapshot may leave null.
-                if (!saveResults.Success)
+                if (!saveResults.Success || saveResults.Data == null || saveResults.Data.Length == 0)
                 {
                     Logger.Error("Join save snapshot failed for peer {PeerId}; disconnecting", connectionLogic.Peer.Id);
                     connectionLogic.Peer.Disconnect();
