@@ -163,11 +163,31 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         int activationIndex = hostBattleNetwork.NetworkSentMessages.Messages.FindIndex(
             message => message is NetworkBattleActivated);
         Assert.InRange(spawnIndex, 0, int.MaxValue);
+        var catchUp = Assert.IsType<NetworkSpawnBattleAgents>(
+            hostBattleNetwork.NetworkSentMessages.Messages[spawnIndex]);
+        Assert.Equal(SpawnBatchPurpose.CatchUp, catchUp.Purpose);
         Assert.InRange(deploymentIndex, 0, int.MaxValue);
         Assert.True(spawnIndex < activationIndex);
         Assert.True(deploymentIndex < activationIndex);
 
         GC.KeepAlive(hostController);
+    }
+
+    [Fact]
+    public void DebugReplay_RequiresAnActiveCoopBattleMission()
+    {
+        using var fixture = new MissionEngineFixture();
+        SetupCoopBattle("host", "joiner");
+        var host = Clients.First();
+
+        host.Call(() =>
+        {
+            fixture.CreateMission(host);
+            var controller = host.Resolve<CoopBattleController>();
+
+            Assert.False(controller.TryDebugReplayOwnedAgentsToConnectedPeer("joiner", out string error));
+            Assert.Equal("there is no active co-op battle mission", error);
+        });
     }
 
     [Fact]
