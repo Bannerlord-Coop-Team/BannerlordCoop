@@ -54,7 +54,6 @@ public class StanceLinkRegistrationGuardTests : IDisposable
 
         FirstClient.Call(() =>
         {
-
             Assert.True(FirstClient.ObjectManager.TryGetObject<IFaction>(faction1Id, out var clientFaction1));
             Assert.True(FirstClient.ObjectManager.TryGetObject<IFaction>(faction2Id, out var clientFaction2));
 
@@ -66,7 +65,6 @@ public class StanceLinkRegistrationGuardTests : IDisposable
         Assert.Empty(FirstClient.NetworkSentMessages.GetMessages<StanceLinkConstructed>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<StanceLinkConstructed>());
     }
-
 
     [Fact]
     public void BanditMismatchedFaction_Server_NeverPublishesRequestStanceLinkConstructed()
