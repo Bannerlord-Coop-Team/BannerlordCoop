@@ -15,7 +15,16 @@ public static class StartupDiagnosticsSequence
         Func<string> resolveInformationalVersion = null)
     {
         string version = (resolveInformationalVersion ?? DefaultResolveInformationalVersion)();
-        emitLogHeader(version);
+        
+        try
+        {
+            emitLogHeader(version);
+        }
+        catch
+        {
+            // Best effort
+        }
+        
         initializeCrashReporting(version);
     }
 

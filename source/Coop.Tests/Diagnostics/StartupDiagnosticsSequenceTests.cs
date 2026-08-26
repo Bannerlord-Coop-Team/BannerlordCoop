@@ -1,5 +1,6 @@
 using Common;
 using Coop.Core.Diagnostics;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
@@ -43,6 +44,19 @@ public class StartupDiagnosticsSequenceTests
             emitLogHeader: _ => { },
             initializeCrashReporting: version => Assert.NotEqual("unknown", version),
             resolveInformationalVersion: () => "9.9.9");
+    }
+
+    [Fact]
+    public void CrashReportingStillInitializesWhenHeaderDelegateThrows()
+    {
+        string crashReportingVersion = null;
+
+        StartupDiagnosticsSequence.Run(
+            emitLogHeader: _ => throw new InvalidOperationException("header emission failed"),
+            initializeCrashReporting: version => crashReportingVersion = version,
+            resolveInformationalVersion: () => "1.2.3-test");
+
+        Assert.Equal("1.2.3-test", crashReportingVersion);
     }
 
     [Fact]
