@@ -264,7 +264,9 @@ public sealed class MovementBatchSender : IMovementBatchSender
             packetCompressor,
             new DelegateMovementTrafficBudgetFactory(trafficBudgetFactory),
             new MovementPriorityScheduler(),
-            new MovementNetworkSettings(1d, 1d))
+            new MovementNetworkSettings(
+                MovementNetworkSettings.DefaultMiBPerSecond,
+                MovementNetworkSettings.DefaultMiBPerSecond))
     {
     }
 
