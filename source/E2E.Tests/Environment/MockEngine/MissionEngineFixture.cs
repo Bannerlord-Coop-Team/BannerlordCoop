@@ -381,6 +381,12 @@ public sealed class MissionEngineFixture : IDisposable
         if (value == oldController) return false;
 
         m.Controller = value;
+        if (m.ResetMaximumSpeedLimitOnNonAiController
+            && value != AgentControllerType.AI
+            && m.IsHuman)
+        {
+            m.MaximumSpeedLimit = -1f;
+        }
         if (m.IsActive)
         {
             if (value == AgentControllerType.AI)

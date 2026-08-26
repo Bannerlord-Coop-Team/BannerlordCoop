@@ -37,6 +37,7 @@ public class BattleDebugMovementDriveTests
             Controller = AgentControllerType.Player,
             IsAiPaused = true,
             MaximumSpeedLimit = 0f,
+            ResetMaximumSpeedLimitOnNonAiController = true,
         };
         AgentMirror.Bind(agent, mirror);
 

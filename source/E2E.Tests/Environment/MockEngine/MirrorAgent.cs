@@ -30,6 +30,7 @@ public sealed class MirrorAgent
     public Vec3 RealGlobalVelocity { get; set; }
     public float MaximumForwardUnlimitedSpeed { get; set; } = 5f;
     public float MaximumSpeedLimit { get; set; } = -1f;
+    public bool ResetMaximumSpeedLimitOnNonAiController { get; set; }
     public int SetMaximumSpeedLimitCalls { get; set; }
     public bool LastMaximumSpeedLimitIsMultiplier { get; set; }
     public EquipmentIndex PrimaryWieldedItemIndex { get; set; } = EquipmentIndex.None;

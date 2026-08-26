@@ -850,12 +850,12 @@ internal static class BattleDebugCommands
         bool isAiPaused,
         float maximumSpeedLimit)
     {
+        if (agent.Controller != controller)
+            agent.Controller = controller;
         agent.SetIsAIPaused(isAiPaused);
         agent.SetMaximumSpeedLimit(maximumSpeedLimit, isMultiplier: false);
         Missions.Agents.Packets.AgentData.ApplyLocomotionMovementFlags(agent, locomotionFlags);
         Missions.Agents.Packets.AgentData.ApplyMovementInput(agent, movementInput);
-        if (agent.Controller != controller)
-            agent.Controller = controller;
     }
 
     internal static bool CanDriveOwnedAgent(Agent agent, Mission mission)
