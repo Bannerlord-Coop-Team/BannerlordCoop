@@ -63,7 +63,6 @@ namespace GameInterface.Services.Kingdoms.Patches
                 pendingOffers = CoopKingdomElection.GetTrackedPlayerAllianceOffers()
                     .Where(decision => decision.Kingdom?._unresolvedDecisions?.Contains(decision) == true)
                     .ToList();
-                if (CoopKingdomElection.IsLegacyPlayerAllianceOfferRestorePending) return;
             }
 
             bool hasSavedProvenance = dataStore.SyncData(saveKey, ref pendingOffers);
@@ -71,14 +70,16 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             if (!hasSavedProvenance)
             {
-                CoopKingdomElection.ScheduleLegacyPlayerAllianceOfferRestore();
+                // The mirrored inbound offer has the same saved shape as a player-originated
+                // ruling-clan proposal, so legacy decisions cannot be classified safely.
+                CoopKingdomElection.RestoreTrackedPlayerAllianceOffers(
+                    Enumerable.Empty<StartAllianceDecision>());
                 return;
             }
 
             CoopKingdomElection.RestoreTrackedPlayerAllianceOffers(
                 (pendingOffers ?? new List<StartAllianceDecision>())
-                    .Where(decision => decision?.Kingdom?._unresolvedDecisions?.Contains(decision) == true),
-                isLegacyFallback: false);
+                    .Where(decision => decision?.Kingdom?._unresolvedDecisions?.Contains(decision) == true));
         }
 
         /// <summary>

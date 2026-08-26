@@ -1607,7 +1607,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void NpcAllianceOffer_LegacyReloadWithoutProvenance_StillDeclines()
+    public void AllianceDecisions_LegacyReloadWithoutProvenance_LeavesAmbiguousDirectionsUntracked()
     {
         var player = CreateSyncedPlayerContext(ControllerId, Clients.First());
         var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
@@ -1624,6 +1624,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(proposingKingdomId, out var proposingKingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(proposingClanId, out var proposingClan));
 
             var npcDecision = new StartAllianceDecision(proposingClan, playerKingdom);
@@ -1632,33 +1633,26 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 .Single(outcome => outcome.ShouldAllianceBeStarted);
             Assert.True(CoopKingdomElection.TryRedirectPlayerAllianceOffer(npcDecision, allianceOutcome));
 
-            var playerDecision = Assert.IsType<StartAllianceDecision>(
+            var inboundDecision = Assert.IsType<StartAllianceDecision>(
                 Assert.Single(playerKingdom.UnresolvedDecisions));
-            playerDecision.TriggerTime = CampaignTime.Zero;
-
-            var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.TryGetPlayer(ControllerId, out var registeredPlayer));
-            Assert.True(playerManager.RemovePlayer(registeredPlayer));
+            inboundDecision.TriggerTime = CampaignTime.Zero;
+            var outgoingDecision = new StartAllianceDecision(playerKingdom.RulingClan, proposingKingdom);
+            playerKingdom._unresolvedDecisions.Add(outgoingDecision);
 
             CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
                 new TestDataStore(isSaving: false, new Dictionary<string, object>()));
 
-            Assert.DoesNotContain(playerDecision, CoopKingdomElection._opponentProposedAllianceDecisions);
-            Assert.False(CoopKingdomElection.IsPendingPlayerAllianceOffer(playerDecision));
+            Assert.DoesNotContain(inboundDecision, CoopKingdomElection._opponentProposedAllianceDecisions);
+            Assert.False(CoopKingdomElection.IsPendingPlayerAllianceOffer(inboundDecision));
+            Assert.False(CoopKingdomElection.IsPendingPlayerAllianceOffer(outgoingDecision));
+            Assert.Contains(inboundDecision, playerKingdom.UnresolvedDecisions);
+            Assert.Contains(outgoingDecision, playerKingdom.UnresolvedDecisions);
+
             var resavedRecords = new Dictionary<string, object>();
             CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
                 new TestDataStore(isSaving: true, resavedRecords));
-            Assert.Empty(resavedRecords);
-            CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
-                new TestDataStore(isSaving: false, resavedRecords));
-            Assert.True(playerManager.AddPlayer(registeredPlayer));
-            Assert.True(CoopKingdomElection.IsPendingPlayerAllianceOffer(playerDecision));
-            Assert.True(playerDecision.OnShowDecision());
-            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
-            GetConcreteVoteManager(Server).ProcessVotingRounds(
-                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
-
-            Assert.Empty(playerKingdom.UnresolvedDecisions);
+            Assert.True(resavedRecords.TryGetValue("_coop_pending_player_alliance_offers", out object savedOffers));
+            Assert.Empty(Assert.IsType<List<StartAllianceDecision>>(savedOffers));
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
