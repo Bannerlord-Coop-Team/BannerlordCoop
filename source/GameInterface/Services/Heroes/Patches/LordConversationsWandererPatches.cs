@@ -28,9 +28,6 @@ internal class LordConversationsWandererPatches
     }
 
     [ThreadStatic]
-    private static bool IsMeetingWanderer = false;
-
-    [ThreadStatic]
     private static bool UseWandererIntroduction = false;
 
     /// <summary>
@@ -46,7 +43,6 @@ internal class LordConversationsWandererPatches
 
         if (__result)
         {
-            IsMeetingWanderer = true;
             UseWandererIntroduction = true;
         }
 
@@ -57,7 +53,7 @@ internal class LordConversationsWandererPatches
     [HarmonyPrefix]
     public static bool ConversationWandererMeetPlayerOnConditionPrefix(ref bool __result)
     {
-        __result = IsMeetingWanderer;
+        __result = UseWandererIntroduction;
         return false;
     }
 
@@ -65,7 +61,7 @@ internal class LordConversationsWandererPatches
     [HarmonyPrefix]
     public static bool ConversationWandererGenericIntroductionOnConditionPostfix(ref bool __result)
     {
-        if (IsMeetingWanderer)
+        if (UseWandererIntroduction)
         {
             __result = true;
             StringHelpers.SetCharacterProperties("CONVERSATION_CHARACTER", Hero.OneToOneConversationHero.CharacterObject, null, false);
