@@ -1,4 +1,6 @@
 ﻿using Common;
+using Common.PacketHandlers;
+using Common.Serialization;
 using Common.Util;
 using Common.Network.Messages;
 using Common.Util;
@@ -158,6 +160,47 @@ public class MapEventCollectionTests : MapEventTestBase
         client.Call(() => Assert.Same(
             Get<PartyBase>(client, partyId),
             Get<MapEventParty>(client, mapEventPartyId).Party));
+    }
+
+    [Fact]
+    public void Server_RejectsNetworkAddBattlePartyPacket()
+    {
+        var message = new NetworkAddBattleParty("side", "map-event-party", "party");
+        var serializer = Server.Resolve<ICommonSerializer>();
+        var packet = MessagePacket.Create(message, serializer);
+
+        Server.SimulatePacket(Clients.First().NetPeer, packet);
+
+        Assert.Equal(0, Server.InternalMessages.GetMessageCount<NetworkAddBattleParty>());
+    }
+
+    [Fact]
+    public void Server_NetworkAddBattlePartyHandlerDoesNotRebindParty()
+    {
+        var staged = CreateServerMapEvent();
+        string mapEventSideId = null;
+        string mapEventPartyId = null;
+        string defenderPartyId = null;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            var attackerParty = Get<MobileParty>(Server, staged.AttackerPartyId).Party;
+            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
+                candidate => ReferenceEquals(candidate.Party, attackerParty));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out mapEventSideId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(
+                Get<MobileParty>(Server, staged.DefenderPartyId).Party,
+                out defenderPartyId));
+        });
+
+        Server.SimulateMessage(Clients.First().NetPeer,
+            new NetworkAddBattleParty(mapEventSideId, mapEventPartyId, defenderPartyId));
+
+        Server.Call(() => Assert.Same(
+            Get<MobileParty>(Server, staged.AttackerPartyId).Party,
+            Get<MapEventParty>(Server, mapEventPartyId).Party));
     }
 
     [Fact]

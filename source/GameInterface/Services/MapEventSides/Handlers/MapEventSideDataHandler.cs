@@ -153,6 +153,9 @@ internal class MapEventSideDataHandler : IHandler
 
     private void Handle_NetworkAddBattleParty(MessagePayload<NetworkAddBattleParty> payload)
     {
+        if (ModInformation.IsServer)
+            return;
+
         var data = payload.What;
 
         GameThread.RunSafe(() =>
