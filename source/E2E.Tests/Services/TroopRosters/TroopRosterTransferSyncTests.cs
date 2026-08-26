@@ -1,6 +1,8 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using Common.Util;
+using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -85,6 +87,64 @@ public class TroopRosterTransferSyncTests : IDisposable
         AssertTroopCountOnClients(leftPartyId, leftHeroCharacterId, expectedCount: 1);
     }
 
+    [Fact]
+    public void ServerAddsAbsentHeroTwice_LeavesRosterAndNetworkUnchanged()
+    {
+        string partyId = null;
+        string heroCharacterId = null;
+
+        Server.Call(() =>
+        {
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+            Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out heroCharacterId));
+
+            party.MemberRoster.AddToCounts(hero.CharacterObject, 2);
+
+            Assert.Equal(0, party.MemberRoster.GetTroopCount(hero.CharacterObject));
+            Assert.DoesNotContain(Server.InternalMessages.OfType<CountsAtIndexAdded>(),
+                message => message.TroopRoster == party.MemberRoster && message.Character == hero.CharacterObject);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        AssertTroopCountOnClients(partyId, heroCharacterId, expectedCount: 0);
+    }
+
+    [Fact]
+    public void ServerRemovesHeroFromMalformedCountThree_SyncsRemainingTwo()
+    {
+        string partyId = null;
+        string heroCharacterId = null;
+
+        Server.Call(() =>
+        {
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+            Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out heroCharacterId));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        SetHeroCountLocally(Server, partyId, heroCharacterId, 3);
+        foreach (var client in Clients)
+        {
+            SetHeroCountLocally(client, partyId, heroCharacterId, 3);
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(heroCharacterId, out var heroCharacter));
+            party.MemberRoster.RemoveTroop(heroCharacter);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Equal(2, GetTroopCount(Server, partyId, heroCharacterId));
+        AssertTroopCountOnClients(partyId, heroCharacterId, expectedCount: 2);
+    }
+
     private void AssertTroopCountOnClients(string partyId, string characterId, int expectedCount)
     {
         foreach (var client in Clients)
@@ -93,6 +153,41 @@ public class TroopRosterTransferSyncTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
             Assert.Equal(expectedCount, party.MemberRoster.GetTroopCount(character));
         }
+    }
+
+    private static void SetHeroCountLocally(
+        EnvironmentInstance instance,
+        string partyId,
+        string characterId,
+        int count)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            int index = party.MemberRoster.FindIndexOfTroop(character);
+            Assert.True(index >= 0);
+            using (new AllowedThread())
+            {
+                party.MemberRoster.data[index]._number = count;
+                party.MemberRoster._totalHeroes = count;
+            }
+        });
+    }
+
+    private static int GetTroopCount(
+        EnvironmentInstance instance,
+        string partyId,
+        string characterId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            count = party.MemberRoster.GetTroopCount(character);
+        });
+        return count;
     }
 
     public void Dispose() => TestEnvironment.Dispose();

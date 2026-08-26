@@ -715,7 +715,8 @@ public abstract class MapEventTestBase : IDisposable
             {
                 int index = party.PrisonRoster.FindIndexOfTroop(hero.CharacterObject);
                 Assert.True(index >= 0);
-                party.PrisonRoster.AddToCountsAtIndex(index, count);
+                party.PrisonRoster.data[index]._number += count;
+                party.PrisonRoster._totalHeroes += count;
             }
         });
     }

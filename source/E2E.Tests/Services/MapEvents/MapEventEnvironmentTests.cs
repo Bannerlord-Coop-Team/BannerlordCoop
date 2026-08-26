@@ -554,6 +554,58 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void PartyScreenDiscard_DuplicatedPlayerPrisoner_ClearsEveryCopyAndRestoresPartyOnce()
+    {
+        var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
+        var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(captorHeroId, out var captorHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                captorParty.MemberRoster.AddToCounts(captorHero.CharacterObject, 1);
+                captorHero.PartyBelongedTo = captorParty;
+            }
+        });
+
+        DefeatPlayerPartyInBattle(playerHeroId, playerPartyId, captorPartyId);
+        TestEnvironment.FlushCoalescer();
+
+        SeedPartyPrisoner(Server, captorPartyId, playerHeroId, 1);
+        foreach (var client in Clients)
+        {
+            SeedPartyPrisoner(client, captorPartyId, playerHeroId, 2);
+        }
+        int unrelatedPrisoners = GetPartyPrisonerCount(Server, captorPartyId) - 2;
+        Assert.True(unrelatedPrisoners >= 0);
+
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 2);
+        foreach (var client in Clients)
+        {
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 3);
+        }
+
+        ReleasePlayerByPartyScreenDiscard(captorHeroId, captorPartyId, playerHeroId);
+
+        AssertCaptivity(Server, playerHeroId, null);
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 0);
+        AssertPartyPrisonerCount(Server, captorPartyId, unrelatedPrisoners);
+        AssertPlayerPartyRestored(Server, playerHeroId, playerPartyId);
+
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, playerHeroId, null);
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 0);
+            AssertPartyPrisonerCount(client, captorPartyId, unrelatedPrisoners);
+            AssertHeroInPartyRoster(client, playerHeroId, playerPartyId);
+        }
+    }
+
+    [Fact]
     public void PartyScreenDiscard_ServerMissingPlayerPrisoner_ClearsStaleClientCopy()
     {
         // Arrange — capture a player normally, then reproduce the live divergence: the server has already
