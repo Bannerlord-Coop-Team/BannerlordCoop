@@ -50,6 +50,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IPuppetRoutApplier puppetRoutApplier;
     private readonly IBattleAuthorityMigrator authorityMigrator;
@@ -73,6 +74,7 @@ public class PuppetSpawner : IPuppetSpawner
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
         IBattleAgentBudget agentBudget,
+        IMissionWeaponDataMapper missionWeaponDataMapper,
         IPuppetRoutApplier puppetRoutApplier = null,
         IBattleAgentSpawnBatchCodec spawnBatchCodec = null,
         IBattleAuthorityMigrator authorityMigrator = null)
@@ -86,6 +88,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
         this.agentBudget = agentBudget;
+        this.missionWeaponDataMapper = missionWeaponDataMapper;
         this.spawnBatchCodec = spawnBatchCodec ?? new BattleAgentSpawnBatchCodec();
         this.puppetRoutApplier = puppetRoutApplier;
         this.authorityMigrator = authorityMigrator;
@@ -610,17 +613,15 @@ public class PuppetSpawner : IPuppetSpawner
 
         for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
         {
-            missionEquipment._weaponSlots[(int)equipmentIndex] = ResolveMissionWeapon(data.WeaponSlots[(int)equipmentIndex]);
+            if (!missionWeaponDataMapper.TryResolve(
+                    data.WeaponSlots[(int)equipmentIndex],
+                    out MissionWeapon weapon))
+            {
+                return null;
+            }
+
+            missionEquipment._weaponSlots[(int)equipmentIndex] = weapon;
         }
         return missionEquipment;
-    }
-
-    private MissionWeapon ResolveMissionWeapon(MissionWeaponData data)
-    {
-        // Items can be null
-        objectManager.TryGetObject<ItemObject>(data.ItemObjectId, out var item);
-
-        var missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, null);
-        return missionWeapon;
     }
 }

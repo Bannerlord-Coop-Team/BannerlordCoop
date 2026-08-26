@@ -62,6 +62,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
+    private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly List<BattleAgentSpawnData> pendingSpawns = new List<BattleAgentSpawnData>();
 
     // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
@@ -81,7 +82,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         IBattleSession session,
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
-        IBattleAgentSpawnBatchCodec spawnBatchCodec)
+        IBattleAgentSpawnBatchCodec spawnBatchCodec,
+        IMissionWeaponDataMapper missionWeaponDataMapper)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -91,6 +93,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         this.casualties = casualties;
         this.deployment = deployment;
         this.spawnBatchCodec = spawnBatchCodec;
+        this.missionWeaponDataMapper = missionWeaponDataMapper;
         movementScopeId =
             session.OwnControllerId + ":" + Guid.NewGuid().ToString("N");
 
@@ -454,18 +457,15 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
         for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
         {
-            var packedWeapon = PackMissionWeapon(equipment._weaponSlots[(int)equipmentIndex]);
+            if (!missionWeaponDataMapper.TryPack(
+                    equipment._weaponSlots[(int)equipmentIndex],
+                    out MissionWeaponData packedWeapon))
+            {
+                return null;
+            }
+
             missionEquipmentData.WeaponSlots.Add(packedWeapon);
         }
         return missionEquipmentData;
-    }
-
-    private MissionWeaponData PackMissionWeapon(MissionWeapon weapon)
-    {
-        // Items can be null
-        objectManager.TryGetId(weapon.Item, out var itemId);
-
-        var missionWeaponData = new MissionWeaponData(itemId, weapon.ItemModifier, weapon.Banner, weapon._dataValue, weapon.ReloadPhase, null);
-        return missionWeaponData;
     }
 }

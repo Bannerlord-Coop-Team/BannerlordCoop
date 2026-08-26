@@ -62,7 +62,15 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
 
     if (ModInformation.IsClient)
     {
+{{~ if SuppressClientDiagnosticWhenUnregistered ~}}
+        if (!ContainerProvider.TryResolve<GameInterface.Services.ObjectManager.IObjectManager>(out var objectManager) ||
+            objectManager.Contains(instance))
+        {
+            Logger.Error("Client updated managed {type}", "{{MemberName}}");
+        }
+{{~ else ~}}
         Logger.Error("Client updated managed {type}", "{{MemberName}}");
+{{~ end ~}}
 {{~ if ReadOnly ~}}
 	    {{MemberName}}FieldInfo.SetValue(instance, newValue);
 {{~ else ~}}

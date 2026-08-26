@@ -40,6 +40,18 @@ public class CoopTroopSupplierTests
         => new PartyReserve(id, supplied, Entries(count, seedBase), isReceiverPlayerParty, sideOffset,
             playerOwnedRank, playerOwnedPartiesBefore);
 
+    private static PartyReserve RankedParty(string id, int seedBase, params int[] supplyOrders)
+    {
+        var entries = supplyOrders
+            .Select((order, index) => new TroopReserveEntry(
+                seedBase + index,
+                $"Char_{seedBase + index}",
+                formationClass: 0,
+                supplyOrder: order))
+            .ToArray();
+        return new PartyReserve(id, suppliedCount: 0, entries);
+    }
+
     private static int SuppliedFor(CoopTroopSupplier supplier, string partyId)
         => supplier.GetSuppliedByParty().First(p => p.partyId == partyId).supplied;
 
@@ -121,6 +133,37 @@ public class CoopTroopSupplierTests
 
         Assert.Equal(0, SuppliedFor(supplier, "army-member"));
         Assert.Equal(1, SuppliedFor(supplier, "player"));
+    }
+
+    [Fact]
+    public void RankedReserve_SuppliesTheSideWideOrderAcrossOwnedParties()
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
+        supplier.SetReserve(new[]
+        {
+            RankedParty("A", 100, 1, 3),
+            RankedParty("B", 200, 2, 4),
+        }, sideTotal: 4, playerOwnedParties: 0, authoritativeBattleSize: 1000);
+
+        supplier.SupplyTroops(3);
+
+        Assert.Equal(2, SuppliedFor(supplier, "A"));
+        Assert.Equal(1, SuppliedFor(supplier, "B"));
+    }
+
+    [Fact]
+    public void RankedOwnersShareTheExactSidePrefix()
+    {
+        var first = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
+        first.SetReserve(new[] { RankedParty("A", 100, 1, 4) },
+            sideTotal: 4, playerOwnedParties: 0, authoritativeBattleSize: 1000);
+        var second = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
+        second.SetReserve(new[] { RankedParty("B", 200, 2, 3) },
+            sideTotal: 4, playerOwnedParties: 0, authoritativeBattleSize: 1000);
+
+        Assert.Equal(1, first.OwnedShareOf(3));
+        Assert.Equal(2, second.OwnedShareOf(3));
+        Assert.Equal(3, first.OwnedShareOf(3) + second.OwnedShareOf(3));
     }
 
     [Fact]

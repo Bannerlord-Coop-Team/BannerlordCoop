@@ -46,6 +46,7 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     private readonly ILocationPartyAgentMap partyAgentMap;
     private readonly IMissionContext missionContext;
     private readonly GameInterface.Services.Locations.Conversations.ILocationNpcHoldRegistry holdRegistry;
+    private readonly GameInterface.Services.Locations.Conversations.ILocationConversationAgentGuard conversationAgentGuard;
 
     public LocationAuthorityMigrator(
         IMessageBroker messageBroker,
@@ -54,7 +55,8 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         ILocationAgentBindingMap bindingMap,
         ILocationPartyAgentMap partyAgentMap,
         IMissionContext missionContext,
-        GameInterface.Services.Locations.Conversations.ILocationNpcHoldRegistry holdRegistry)
+        GameInterface.Services.Locations.Conversations.ILocationNpcHoldRegistry holdRegistry,
+        GameInterface.Services.Locations.Conversations.ILocationConversationAgentGuard conversationAgentGuard)
     {
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
@@ -63,6 +65,7 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         this.partyAgentMap = partyAgentMap;
         this.missionContext = missionContext;
         this.holdRegistry = holdRegistry;
+        this.conversationAgentGuard = conversationAgentGuard;
 
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -107,6 +110,7 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
                 if (partyAgentMap.ShouldAdoptAsNpc(info.AgentId, hasNpcBinding)) continue;
 
                 var agent = info.Agent;
+                conversationAgentGuard.EndConversationWithAgent(agent);
                 coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
                 registry.RemoveAgent(info.AgentId);
 

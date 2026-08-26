@@ -22,7 +22,9 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Utils.Commands;
 using Helpers;
+using Newtonsoft.Json;
 using ProtoBuf;
+using SandBox.GauntletUI;
 using Serilog;
 using System;
 using System.Collections;
@@ -46,6 +48,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
+using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -54,6 +57,85 @@ public class MapEventDebugCommands
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
     private static LateJoinModeFixture lateJoinModeFixture;
+    private static InquiryData pendingPrisonerPromptInquiry;
+
+    [CommandLineArgumentFunction("prisoner_prompt_state", "coop.debug.mapevent")]
+    public static string PrisonerPromptState(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Run this command on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.mapevent.prisoner_prompt_state";
+        return CreatePrisonerPromptStateResult();
+    }
+
+    [CommandLineArgumentFunction("prisoner_prompt", "coop.debug.mapevent")]
+    public static string PrisonerPrompt(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Run this command on a client.";
+        if (args.Count != 1 || (args[0] != "commit" && args[0] != "accept"))
+            return "Usage: coop.debug.mapevent.prisoner_prompt <commit|accept>";
+
+        if (args[0] == "commit")
+        {
+            if (pendingPrisonerPromptInquiry != null)
+                return "A prisoner warning is already pending acceptance.";
+            if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
+                partyState.PartyScreenMode != PartyScreenHelper.PartyScreenMode.Loot)
+                return "The real aftermath Party screen is not active.";
+            if (partyState.PartyScreenLogic?.PrisonerRosters[0]?.TotalManCount <= 0)
+                return "The aftermath screen has no prisoners left behind.";
+            if (!((ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource is { } partyVm))
+                return "The active aftermath Party view model is unavailable.";
+
+            InquiryData capturedInquiry = null;
+            Action<InquiryData, bool, bool> captureInquiry = (data, _, _) => capturedInquiry = data;
+            InformationManager.OnShowInquiry += captureInquiry;
+            try
+            {
+                partyVm.ExecuteDone();
+            }
+            finally
+            {
+                InformationManager.OnShowInquiry -= captureInquiry;
+            }
+
+            if (capturedInquiry?.AffirmativeAction == null || !InformationManager.IsAnyInquiryActive())
+                return "The real leave-prisoners warning did not open.";
+
+            pendingPrisonerPromptInquiry = capturedInquiry;
+            return CreatePrisonerPromptStateResult();
+        }
+
+        var inquiry = pendingPrisonerPromptInquiry;
+        if (inquiry?.AffirmativeAction == null)
+            return "No captured prisoner warning is pending acceptance.";
+
+        pendingPrisonerPromptInquiry = null;
+        InformationManager.HideInquiry();
+        inquiry.AffirmativeAction();
+        return CreatePrisonerPromptStateResult();
+    }
+
+    private static string CreatePrisonerPromptStateResult()
+    {
+        var partyState = Game.Current?.GameStateManager?.ActiveState as PartyState;
+        var logic = partyState?.PartyScreenLogic;
+        var mainParty = MobileParty.MainParty;
+        var army = mainParty?.Army;
+        return "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            success = true,
+            activeState = Game.Current?.GameStateManager?.ActiveState?.GetType().Name,
+            partyScreenActive = partyState != null,
+            partyScreenMode = partyState?.PartyScreenMode.ToString(),
+            leftPrisoners = logic?.PrisonerRosters[0]?.TotalManCount ?? 0,
+            inquiryActive = InformationManager.IsAnyInquiryActive(),
+            capturedInquiryPending = pendingPrisonerPromptInquiry != null,
+            mainPartyMapEventActive = mainParty?.MapEvent != null,
+            mainPartyArmyActive = army != null,
+            mainPartyIsNonLeaderArmyMember = army != null && army.LeaderParty != mainParty,
+            currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
+        });
+    }
 
     private sealed class LateJoinModeFixture
     {
@@ -938,8 +1020,6 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.join_existing <mapEventId> <Attacker|Defender>";
         }
 
-        if (PlayerEncounter.Current != null)
-            return "A player encounter is already active.";
         if (!TryGetObjectManager(out var objectManager))
             return "Unable to resolve ObjectManager";
         if (!objectManager.TryGetObjectWithLogging<MapEvent>(args[0], out var mapEvent))
@@ -947,16 +1027,32 @@ public class MapEventDebugCommands
         if (mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None)
             return $"Map event {args[0]} is already concluded.";
 
+        var encounter = PlayerEncounter.Current;
+        if (encounter != null && PlayerEncounter.Battle != mapEvent)
+            return "A player encounter for another map event is already active.";
+
+        if (encounter?.IsJoinedBattle == true)
+        {
+            if (encounter.PlayerSide != side)
+                return $"The active encounter already joined the {encounter.PlayerSide} side.";
+
+            return $"Started the {side} join encounter for map event {args[0]}.";
+        }
+
         var opposingParty = mapEvent.GetLeaderParty(
             side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
         if (opposingParty == null)
             return $"Map event {args[0]} has no opposing leader party.";
 
-        PlayerEncounter.Start();
-        if (side == BattleSideEnum.Attacker)
-            PlayerEncounter.Current.SetupFields(MobileParty.MainParty.Party, opposingParty);
-        else
-            PlayerEncounter.Current.SetupFields(opposingParty, MobileParty.MainParty.Party);
+        if (encounter == null)
+        {
+            PlayerEncounter.Start();
+            if (side == BattleSideEnum.Attacker)
+                PlayerEncounter.Current.SetupFields(MobileParty.MainParty.Party, opposingParty);
+            else
+                PlayerEncounter.Current.SetupFields(opposingParty, MobileParty.MainParty.Party);
+        }
+
         PlayerEncounter.JoinBattle(side);
 
         return $"Started the {side} join encounter for map event {args[0]}.";
@@ -1896,11 +1992,10 @@ public class MapEventDebugCommands
             GameMenu.SwitchToMenu("encounter");
         }
 
-        var menuContext = Campaign.Current?.CurrentMenuContext;
-        if (menuContext == null)
-            return "No active encounter menu.";
+        var startResult = StartAttackMission(args);
+        if (!startResult.StartsWith("Starting attack mission for ", StringComparison.Ordinal))
+            return startResult;
 
-        MenuHelper.EncounterAttackConsequence(new MenuCallbackArgs(menuContext, null));
         return "Requested entry into the current battle.";
     }
 

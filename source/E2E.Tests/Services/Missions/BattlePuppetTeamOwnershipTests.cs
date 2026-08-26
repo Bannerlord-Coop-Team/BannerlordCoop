@@ -105,7 +105,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     new CasualtyAttributionMap(),
                     deployment.Object,
                     Mock.Of<IAgentFormationAssigner>(),
-                    new BattleAgentBudget());
+                    new BattleAgentBudget(),
+                    client.Resolve<IMissionWeaponDataMapper>());
             });
 
             GameThread.Instance.MarkGameThread();
@@ -284,7 +285,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 new CasualtyAttributionMap(),
                 deployment.Object,
                 Mock.Of<IAgentFormationAssigner>(),
-                new BattleAgentBudget());
+                new BattleAgentBudget(),
+                client.Resolve<IMissionWeaponDataMapper>());
 
             var equipment = new Equipment();
             var missionEquipment = new MissionEquipmentData(new());
@@ -361,7 +363,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     new CasualtyAttributionMap(),
                     deployment.Object,
                     Mock.Of<IAgentFormationAssigner>(),
-                    new BattleAgentBudget());
+                    new BattleAgentBudget(),
+                    client.Resolve<IMissionWeaponDataMapper>());
 
                 var record = new BattleAgentSpawnData(
                     agentId, characterId, default, BattleSideEnum.Attacker, 100f,
@@ -425,6 +428,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 deployment.Object,
                 Mock.Of<IAgentFormationAssigner>(),
                 new BattleAgentBudget(),
+                client.Resolve<IMissionWeaponDataMapper>(),
                 applier);
 
             var record = new BattleAgentSpawnData(

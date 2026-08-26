@@ -48,6 +48,8 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<NetworkChangeClanInfluence>(HandleNetworkInfluencespent);
         messageBroker.Subscribe<SetArmyKingdom>(HandleSetArmyKingdom);
         messageBroker.Subscribe<NetworkSetArmyKingdom>(HandleNetworkSetArmyKingdom);
+        messageBroker.Subscribe<ArmyFullyCreated>(HandleArmyFullyCreated);
+        messageBroker.Subscribe<NetworkArmyFullyCreated>(HandleNetworkArmyFullyCreated);
     }
 
     public void Dispose()
@@ -66,6 +68,8 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeClanInfluence>(HandleNetworkInfluencespent);
         messageBroker.Unsubscribe<SetArmyKingdom>(HandleSetArmyKingdom);
         messageBroker.Unsubscribe<NetworkSetArmyKingdom>(HandleNetworkSetArmyKingdom);
+        messageBroker.Unsubscribe<ArmyFullyCreated>(HandleArmyFullyCreated);
+        messageBroker.Unsubscribe<NetworkArmyFullyCreated>(HandleNetworkArmyFullyCreated);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
@@ -279,6 +283,27 @@ public class ArmyHandler : IHandler
             {
                 army.Kingdom = kingdom;
             }
+        });
+    }
+
+    private void HandleArmyFullyCreated(MessagePayload<ArmyFullyCreated> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Army, out var armyId)) return;
+
+        network.SendAll(new NetworkArmyFullyCreated(armyId));
+    }
+
+    private void HandleNetworkArmyFullyCreated(MessagePayload<NetworkArmyFullyCreated> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObject<Army>(obj.ArmyId, out var army)) return;
+
+            CampaignEventDispatcher.Instance.OnArmyCreated(army);
         });
     }
 }

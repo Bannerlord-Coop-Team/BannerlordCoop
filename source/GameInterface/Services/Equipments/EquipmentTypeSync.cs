@@ -8,6 +8,8 @@ class EquipmentSync : IAutoSync
 {
     public EquipmentSync(AutoSyncRegistry autoSyncBuilder)
     {
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType)));
+        autoSyncBuilder.AddField(
+            AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType)),
+            suppressClientDiagnosticWhenUnregistered: true);
     }
 }
