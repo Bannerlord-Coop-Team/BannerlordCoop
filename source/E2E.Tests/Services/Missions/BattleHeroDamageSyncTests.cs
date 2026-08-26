@@ -53,7 +53,15 @@ public class BattleHeroDamageSyncTests : MissionTestEnvironment
 
             // The hero takes a 30-damage hit, routed to its owner (this client).
             var blow = new Blow(0) { InflictedDamage = 30, DamageType = DamageTypes.Pierce };
-            client.Resolve<IMessageBroker>().Publish(this, new NetworkApplyBattleDamage(heroAgentId, Guid.Empty, blow, default));
+            AttackCollisionData collisionData = default;
+            var damageData = client.Resolve<IBattleDamageCodec>().Encode(in blow, in collisionData);
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkApplyBattleDamage(
+                    heroAgentId,
+                    Guid.Empty,
+                    damageData,
+                    blow.IsMissile));
 
             // The blow landed on the agent (in-mission health 100 -> 70)...
             Assert.True(AgentMirror.TryGet(agent, out var mirror));
