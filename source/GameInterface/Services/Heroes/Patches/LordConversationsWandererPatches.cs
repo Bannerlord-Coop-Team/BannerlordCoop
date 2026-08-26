@@ -27,7 +27,7 @@ internal class LordConversationsWandererPatches
     }
 
     /// <summary>
-    /// Wrap introduction conditions to use always wanderer dialogue for introductions.
+    /// Wrap introduction conditions to always use wanderer dialogue for introductions.
     /// In the context of introductions, conditions should be met the same as in vanilla
     /// even when a wanderer has already been recruited.
     /// </summary>
