@@ -561,9 +561,9 @@ public class KingdomDebugCommand
 
     // coop.debug.kingdom.force_player_join_kingdom
     /// <summary>
-    /// Forces a registered co-op player's clan to join a kingdom. Server only.
+    /// Forces a registered co-op player's clan into a kingdom or restores its kingdomless state. Server only.
     /// </summary>
-    /// <param name="args">controller id, kingdom id</param>
+    /// <param name="args">controller id, kingdom id or none</param>
     /// <returns>result message</returns>
     [CommandLineArgumentFunction("force_player_join_kingdom", "coop.debug.kingdom")]
     public static string ForcePlayerJoinKingdom(List<string> args)
@@ -575,7 +575,7 @@ public class KingdomDebugCommand
 
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.kingdom.force_player_join_kingdom <controllerId> <kingdomId>";
+            return "Usage: coop.debug.kingdom.force_player_join_kingdom <controllerId> <kingdomId|none>";
         }
 
         if (TryGetPlayerManager(out var playerManager) == false)
@@ -611,7 +611,9 @@ public class KingdomDebugCommand
             return $"Clan not found for player {controllerId} with clan id: {player.ClanId}";
         }
 
-        if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom))
+        bool restoreKingdomlessState = string.Equals(kingdomId, "none", StringComparison.OrdinalIgnoreCase);
+        Kingdom kingdom = null;
+        if (!restoreKingdomlessState && !objectManager.TryGetObject(kingdomId, out kingdom))
         {
             return $"Kingdom not found with id: {kingdomId}";
         }
@@ -619,6 +621,11 @@ public class KingdomDebugCommand
         Kingdom previousKingdom = clan.Kingdom;
         if (previousKingdom == kingdom)
         {
+            if (restoreKingdomlessState)
+            {
+                return $"Player {controllerId}'s clan {clan.StringId} is already kingdomless.";
+            }
+
             return $"Player {controllerId}'s clan {clan.StringId} is already in kingdom {kingdom.StringId}.";
         }
 
@@ -633,10 +640,20 @@ public class KingdomDebugCommand
         if (clan.Kingdom != kingdom)
         {
             string currentKingdomId = clan.Kingdom?.StringId ?? "<none>";
+            if (restoreKingdomlessState)
+            {
+                return $"Tried to restore player {controllerId}'s clan {clan.StringId} to kingdomless state, but current kingdom is {currentKingdomId}.";
+            }
+
             return $"Tried to force player {controllerId}'s clan {clan.StringId} to join {kingdom.StringId}, but current kingdom is {currentKingdomId}.";
         }
 
         string previousKingdomId = previousKingdom?.StringId ?? "<none>";
+        if (restoreKingdomlessState)
+        {
+            return $"Restored player {controllerId}'s clan {clan.StringId} to kingdomless state. Previous kingdom: {previousKingdomId}.";
+        }
+
         return $"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.";
     }
 

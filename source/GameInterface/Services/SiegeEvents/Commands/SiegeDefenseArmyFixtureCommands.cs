@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using Common;
 using Common.Messaging;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -389,7 +390,12 @@ internal static class SiegeDefenseArmyFixtureCommands
             throw new InvalidOperationException("Unable to resolve the fixture restoration services.");
 
         if (fixture.MapEvent != null && !fixture.MapEvent.IsFinalized)
-            fixture.MapEvent.FinalizeEvent();
+        {
+            // Route fixture cleanup through the normal finalization path so joined players receive the encounter close.
+            MessageBroker.Instance.Publish(fixture.MapEvent, new MapEventFinalizeAttempted(fixture.MapEvent));
+            if (!fixture.MapEvent.IsFinalized)
+                throw new InvalidOperationException("Unable to finalize the siege defense army fixture map event.");
+        }
 
         var settlement = fixture.Settlement;
         if (ReferenceEquals(settlement.SiegeEvent, fixture.SiegeEvent))
