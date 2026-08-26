@@ -459,6 +459,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             pendingDirectIp = connectIP;
             pendingDirectPort = connectPort;
             pendingDirectPassword = connectPassword;
+            pendingSteamLobbyId = 0;
+            pendingSteamHostName = null;
+            pendingSteamPassword = null;
         }
         catch (Exception ex)
         {
@@ -499,6 +502,10 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     {
         if (disposed || lastSteamLobbyId == 0) return;
 
+        pendingSteamLobbyId = lastSteamLobbyId;
+        pendingSteamHostName = lastSteamLobbyHostName;
+        pendingSteamPassword = lastSteamLobbyPassword;
+        pendingDirectIp = pendingDirectPort = pendingDirectPassword = null;
         messageBroker.Publish(this, new JoinSteamLobby(lastSteamLobbyId, lastSteamLobbyPassword));
     }
 
@@ -667,8 +674,11 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         pendingSteamLobbyId = lobbyId;
         pendingSteamHostName = discoveredSteamLobbies.FirstOrDefault(l => l.LobbyId == lobbyId)?.HostText
             ?? string.Empty;
-        pendingSteamPassword = connectPassword;
-        messageBroker.Publish(this, new JoinSteamLobby(lobbyId, connectPassword));
+        pendingSteamPassword = null;
+        pendingDirectIp = null;
+        pendingDirectPort = null;
+        pendingDirectPassword = null;
+        messageBroker.Publish(this, new JoinSteamLobby(lobbyId, null));
     }
 
     private void HandleNetworkConnected(MessagePayload<ClientNetworkConnected> payload)
@@ -682,7 +692,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
         else if (pendingSteamLobbyId != 0)
         {
-            PersistSteamLobby(pendingSteamLobbyId, pendingSteamHostName, pendingSteamPassword);
+            var steamPassword = payload.What.AcceptedPassword ?? pendingSteamPassword;
+            PersistSteamLobby(pendingSteamLobbyId, pendingSteamHostName, steamPassword);
             pendingSteamLobbyId = 0;
             pendingSteamHostName = pendingSteamPassword = null;
         }

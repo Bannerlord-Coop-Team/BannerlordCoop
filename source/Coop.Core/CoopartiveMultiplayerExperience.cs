@@ -47,6 +47,7 @@ namespace Coop.Core
         private volatile bool clientConnectedOnce;
         private bool passwordInquiryPending;
         private string pendingPreSuppliedPassword;
+        private string acceptedSessionPassword;
         private int coopStartGeneration;
         // Bumped when a new host attempt starts, so a prior attempt's deferred exit handling drops out.
         private volatile int hostSessionGeneration;
@@ -242,6 +243,7 @@ namespace Coop.Core
             hostedSession = false;
             clientConnectedOnce = false;
             pendingPreSuppliedPassword = null;
+            acceptedSessionPassword = null;
         }
 
         private void Handle(MessagePayload<HostedServerExited> obj)
@@ -271,7 +273,11 @@ namespace Coop.Core
         {
             clientConnectedOnce = true;
             setCrashPhase("connected");
-            messageBroker.Publish(this, new ClientNetworkConnected());
+            var accepted = acceptedSessionPassword;
+            acceptedSessionPassword = null;
+            GameThread.RunSafe(
+                () => messageBroker.Publish(this, new ClientNetworkConnected { AcceptedPassword = accepted }),
+                context: nameof(NetworkConnected));
         }
 
         private void Handle(MessagePayload<JoinSteamLobby> payload)
@@ -284,12 +290,14 @@ namespace Coop.Core
             var joinInfo = obj.What.JoinInfo;
             if (!CanStartResolvedJoin()) return;
 
+            var preSuppliedPassword = pendingPreSuppliedPassword;
+            pendingPreSuppliedPassword = null;
+
             if (joinInfo.PasswordRequired)
             {
-                if (!string.IsNullOrEmpty(pendingPreSuppliedPassword))
+                if (!string.IsNullOrEmpty(preSuppliedPassword))
                 {
-                    joinInfo.Password = pendingPreSuppliedPassword;
-                    pendingPreSuppliedPassword = null;
+                    joinInfo.Password = preSuppliedPassword;
                     StartResolvedJoin(joinInfo);
                 }
                 else
@@ -318,6 +326,7 @@ namespace Coop.Core
                 {
                     passwordInquiryPending = false;
                     joinInfo.Password = password ?? string.Empty;
+                    acceptedSessionPassword = joinInfo.Password;
                     StartResolvedJoin(joinInfo);
                 },
                 () =>

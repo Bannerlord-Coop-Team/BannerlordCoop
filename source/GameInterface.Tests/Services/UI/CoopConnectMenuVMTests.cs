@@ -503,7 +503,6 @@ public class CoopConnectMenuVMTests
         using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
 
         SelectSteamLobbiesTab(viewModel);
-        viewModel.Password = "lobbypass";
         browser.Complete(CreateLobby(777, "Test Keep"));
         viewModel.SteamLobbies[0].ExecuteJoin();
         messageBroker.Publish(viewModel, new ClientNetworkConnected());
@@ -514,11 +513,11 @@ public class CoopConnectMenuVMTests
 
         Assert.NotNull(published);
         Assert.Equal(777UL, published.LobbyId);
-        Assert.Equal("lobbypass", published.PreSuppliedPassword);
+        Assert.Null(published.PreSuppliedPassword);
     }
 
     [Fact]
-    public void LastConnection_SteamLobby_PasswordRoundTrip()
+    public void LastConnection_SteamLobby_DirectPasswordNotSavedOnJoin()
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
@@ -527,7 +526,7 @@ public class CoopConnectMenuVMTests
         using (var viewModel = new CoopConnectMenuVM(browser, messageBroker, store))
         {
             SelectSteamLobbiesTab(viewModel);
-            viewModel.Password = "supersecret";
+            viewModel.Password = "directformpassword";
             browser.Complete(CreateLobby(42, "Fortress"));
             viewModel.SteamLobbies[0].ExecuteJoin();
             messageBroker.Publish(viewModel, new ClientNetworkConnected());
@@ -535,7 +534,7 @@ public class CoopConnectMenuVMTests
 
         var saved = store.Options.GetSectionOrDefault<LastConnectionData>(
             LastConnectionData.TabId, LastConnectionData.SectionId, null);
-        Assert.NotNull(saved.SteamLobbyPasswordProtected);
+        Assert.True(string.IsNullOrEmpty(saved.SteamLobbyPasswordProtected));
 
         using var viewModel2 = new CoopConnectMenuVM(browser, messageBroker, store);
         JoinSteamLobby published = null;
@@ -543,7 +542,7 @@ public class CoopConnectMenuVMTests
         viewModel2.ActionReconnectSteamLobby();
 
         Assert.NotNull(published);
-        Assert.Equal("supersecret", published.PreSuppliedPassword);
+        Assert.True(string.IsNullOrEmpty(published.PreSuppliedPassword));
     }
 
     [Fact]
@@ -616,6 +615,49 @@ public class CoopConnectMenuVMTests
 
         Assert.True(viewModel.HasNoLastConnection);
         Assert.False(viewModel.HasLastSteamLobby);
+    }
+
+    [Fact]
+    public void NormalSteamJoin_DoesNotPassDirectConnectPassword_AsPreSuppliedPassword()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        viewModel.Password = "directpass";
+
+        JoinSteamLobby published = null;
+        messageBroker.Subscribe<JoinSteamLobby>(payload => published = payload.What);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(CreateLobby(42, "Test Keep"));
+        viewModel.SteamLobbies[0].ExecuteJoin();
+
+        Assert.NotNull(published);
+        Assert.Null(published.PreSuppliedPassword);
+    }
+
+    [Fact]
+    public void FailedDirect_ThenSteamSuccess_PersistsSteamNotDirect()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        var store = new TestCoopOptionsStore();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, store);
+
+        // Direct attempt — connection never confirmed (no ClientNetworkConnected)
+        viewModel.Ip = "10.0.0.1";
+        viewModel.Port = "4200";
+        viewModel.ActionConnect();
+
+        // Steam join now succeeds
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(CreateLobby(999, "Stronghold"));
+        viewModel.SteamLobbies[0].ExecuteJoin();
+        messageBroker.Publish(viewModel, new ClientNetworkConnected());
+
+        Assert.False(viewModel.HasLastDirectConnection);
+        Assert.True(viewModel.HasLastSteamLobby);
     }
 
     private static void SelectLastConnectionTab(CoopConnectMenuVM viewModel)
