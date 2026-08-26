@@ -4,7 +4,7 @@ using System;
 
 namespace GameInterface.Services.BugReporting;
 
-/// <summary>Creates the persistent server campaign save attached to a diagnostic report.</summary>
+/// <summary>Creates the native-format server campaign save attached to a diagnostic report.</summary>
 public interface IBugReportServerSaveProvider
 {
     bool TryCapture(out CollectedBugReportServerSave save);
@@ -31,7 +31,7 @@ public class BugReportServerSaveProvider : IBugReportServerSaveProvider
         save = null;
         try
         {
-            var result = saveInterface.SaveCurrentGameToFile(SaveName);
+            var result = saveInterface.SaveCurrentGameAsFileData(SaveName);
             if (!result.Success || result.Data == null || result.Data.Length == 0)
             {
                 logger.Warning("The server campaign save for the diagnostic bug report could not be created");

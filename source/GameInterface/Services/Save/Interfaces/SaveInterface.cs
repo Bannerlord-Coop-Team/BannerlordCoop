@@ -12,7 +12,7 @@ namespace GameInterface.Services.Heroes.Interfaces;
 public interface ISaveInterface : IGameAbstraction
 {
     SaveResults SaveCurrentGame();
-    SaveResults SaveCurrentGameToFile(string saveName);
+    SaveResults SaveCurrentGameAsFileData(string saveName);
 }
 
 internal class SaveInterface : ISaveInterface
@@ -29,19 +29,16 @@ internal class SaveInterface : ISaveInterface
             result.CampaignId);
     }
 
-    public SaveResults SaveCurrentGameToFile(string saveName)
+    public SaveResults SaveCurrentGameAsFileData(string saveName)
     {
         if (string.IsNullOrWhiteSpace(saveName))
             throw new ArgumentException("Save name cannot be empty.", nameof(saveName));
 
-        var saveDriver = new FileDriver();
+        var saveDriver = new CoopFileInMemSaveDriver();
         var result = SaveCurrentGame(saveName, saveDriver);
-        if (!result.Success) return result;
+        if (!result.Success || saveDriver.Data.Length == 0) return ReportSaveFailure("saved game data");
 
-        var data = FileHelper.GetFileContent(FileDriver.GetSaveFilePath(saveName + ".sav"));
-        if (data == null || data.Length == 0) return ReportSaveFailure("saved game file");
-
-        return new SaveResults(true, data, result.CampaignId);
+        return new SaveResults(true, saveDriver.Data, result.CampaignId);
     }
 
     private SaveResults SaveCurrentGame(string saveName, ISaveDriver saveDriver)

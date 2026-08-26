@@ -4,8 +4,10 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.BugReporting.Messages;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
+using GameInterface.Services.Save.Patches;
 using GameInterface.Services.UI.BugReporting;
 using Moq;
 using System;
@@ -17,6 +19,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using TaleWorlds.SaveSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Services.BugReporting;
@@ -179,12 +182,12 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
-    public void ServerSaveProvider_PersistsAndReturnsTheCampaignSave()
+    public void ServerSaveProvider_ReturnsTheCampaignSaveFileData()
     {
         var saveData = Encoding.UTF8.GetBytes("campaign save");
         var saveInterface = new Mock<ISaveInterface>();
         saveInterface
-            .Setup(value => value.SaveCurrentGameToFile(BugReportServerSaveProvider.SaveName))
+            .Setup(value => value.SaveCurrentGameAsFileData(BugReportServerSaveProvider.SaveName))
             .Returns(new SaveResults(true, saveData, "campaign-id"));
         var provider = new BugReportServerSaveProvider(saveInterface.Object, Mock.Of<Serilog.ILogger>());
 
@@ -194,8 +197,35 @@ public class CoopLogBugReportTests : IDisposable
         Assert.Equal("coop_bug_report.sav", save.FileName);
         Assert.Equal(saveData, save.Data);
         saveInterface.Verify(
-            value => value.SaveCurrentGameToFile(BugReportServerSaveProvider.SaveName),
+            value => value.SaveCurrentGameAsFileData(BugReportServerSaveProvider.SaveName),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ServerSaveSnapshot_DoesNotOverwriteExistingSavePair()
+    {
+        Directory.CreateDirectory(tempRoot);
+        var campaignPath = Path.Combine(tempRoot, "coop_bug_report.sav");
+        var sessionPath = Path.Combine(tempRoot, "coop_bug_report.json");
+        var existingCampaign = Encoding.UTF8.GetBytes("existing campaign");
+        var existingSession = Encoding.UTF8.GetBytes("existing session");
+        File.WriteAllBytes(campaignPath, existingCampaign);
+        File.WriteAllBytes(sessionPath, existingSession);
+        var driver = new CoopFileInMemSaveDriver();
+        var gameData = new GameData(
+            new byte[] { 1 },
+            new byte[] { 2 },
+            new[] { new byte[] { 3 } },
+            new[] { new byte[] { 4 } });
+
+        await driver.Save(BugReportServerSaveProvider.SaveName, 1, new MetaData(), gameData);
+
+        Assert.Equal(existingCampaign, File.ReadAllBytes(campaignPath));
+        Assert.Equal(existingSession, File.ReadAllBytes(sessionPath));
+        Assert.NotEmpty(driver.Data);
+        Assert.Equal(gameData.Header, driver.Load(BugReportServerSaveProvider.SaveName).GameData.Header);
+        Assert.False(SavePatches.ShouldPublishGameSaved(driver));
+        Assert.True(SavePatches.ShouldPublishGameSaved(new FileDriver()));
     }
 
     [Fact]
