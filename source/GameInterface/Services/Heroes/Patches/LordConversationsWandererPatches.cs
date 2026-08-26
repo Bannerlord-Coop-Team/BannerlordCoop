@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using Helpers;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -24,49 +23,89 @@ internal class LordConversationsWandererPatches
         if (targetSentence == null) return;
 
         // Vanilla incorrectly uses the NPC's gender to address the player
-        targetSentence.Text = new TextObject("{=EUBxMVXk}Do you have any orders for your alley, {?PLAYER.GENDER}madam{?}sir{\\?}");
+        targetSentence.Text = new TextObject("{=coop_wanderer_alley_orders}Do you have any orders for your alley, {?PLAYER.GENDER}madam{?}sir{\\?}");
     }
-
-    [ThreadStatic]
-    private static bool UseWandererIntroduction = false;
 
     /// <summary>
-    /// Use wanderer dialogue introduction regardless of recruited status.
-    /// After introduction, treat dialogue as a lord conversation by ConversationWandererOnConditionPrefix.
+    /// Wrap introduction conditions to use always wanderer dialogue for introductions.
+    /// In the context of introductions, conditions should be met the same as in vanilla
+    /// even when a wanderer has already been recruited.
     /// </summary>
+    [ThreadStatic]
+    private static int wandererIntroductionConditionDepth;
+    
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_meet_on_condition))]
     [HarmonyPrefix]
-    public static bool ConversationWandererMeetOnConditionPrefix(LordConversationsCampaignBehavior __instance, ref bool __result)
-    {
-        __result = IsNonPrisonerWanderer(CharacterObject.OneToOneConversationCharacter)
-            && __instance.ConversationUseMeetingDialogs();
+    public static void ConversationWandererMeetOnConditionPrefix() =>
+        EnterWandererIntroductionCondition();
 
-        if (__result)
-        {
-            UseWandererIntroduction = true;
-        }
-
-        return false;
-    }
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_meet_on_condition))]
+    [HarmonyFinalizer]
+    public static void ConversationWandererMeetOnConditionFinalizer() =>
+        ExitWandererIntroductionCondition();
 
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_meet_player_on_condition))]
     [HarmonyPrefix]
-    public static bool ConversationWandererMeetPlayerOnConditionPrefix(ref bool __result)
-    {
-        __result = UseWandererIntroduction;
-        return false;
-    }
+    public static void ConversationWandererMeetPlayerOnConditionPrefix() =>
+        EnterWandererIntroductionCondition();
+
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_meet_player_on_condition))]
+    [HarmonyFinalizer]
+    public static void ConversationWandererMeetPlayerOnConditionFinalizer() =>
+        ExitWandererIntroductionCondition();
+
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_introduction_on_condition))]
+    [HarmonyPrefix]
+    public static void ConversationWandererIntroductionOnConditionPrefix() =>
+        EnterWandererIntroductionCondition();
+
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_introduction_on_condition))]
+    [HarmonyFinalizer]
+    public static void ConversationWandererIntroductionOnConditionFinalizer() =>
+        ExitWandererIntroductionCondition();
 
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_generic_introduction_on_condition))]
     [HarmonyPrefix]
-    public static bool ConversationWandererGenericIntroductionOnConditionPostfix(ref bool __result)
+    public static void ConversationWandererGenericIntroductionOnConditionPrefix() =>
+        EnterWandererIntroductionCondition();
+
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_generic_introduction_on_condition))]
+    [HarmonyFinalizer]
+    public static void ConversationWandererGenericIntroductionOnConditionFinalizer() =>
+        ExitWandererIntroductionCondition();
+
+    /// <summary>
+    /// Don't load wanderer dialogue for companions of a different clan, instead treat the dialogue as a lord dialogue.
+    /// All companion dialogue in vanilla assumes they are a companion of the player in the conversation.
+    /// </summary>
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_on_condition))]
+    [HarmonyPrefix]
+    public static bool ConversationWandererOnConditionPrefix(ref bool __result)
     {
-        if (UseWandererIntroduction)
-        {
-            __result = true;
-            StringHelpers.SetCharacterProperties("CONVERSATION_CHARACTER", Hero.OneToOneConversationHero.CharacterObject, null, false);
-        }
+        __result = IsNonPrisonerWanderer(CharacterObject.OneToOneConversationCharacter)
+            && (wandererIntroductionConditionDepth > 0
+            || Hero.OneToOneConversationHero.CompanionOf == null
+            || Hero.OneToOneConversationHero.CompanionOf == Clan.PlayerClan);
+
         return false;
+    }
+
+    private static void EnterWandererIntroductionCondition()
+    {
+        wandererIntroductionConditionDepth++;
+    }
+
+    private static void ExitWandererIntroductionCondition()
+    {
+        wandererIntroductionConditionDepth--;
+    }
+
+    private static bool IsNonPrisonerWanderer(CharacterObject character)
+    {
+        return character != null
+            && character.IsHero
+            && character.Occupation == Occupation.Wanderer
+            && character.HeroObject.HeroState != Hero.CharacterStates.Prisoner;
     }
 
     /// <summary>
@@ -82,31 +121,6 @@ internal class LordConversationsWandererPatches
             && Hero.OneToOneConversationHero.Clan == Clan.PlayerClan;
 
         return false;
-    }
-
-    /// <summary>
-    /// Don't load wanderer dialogue for companions of a different clan, instead treat the dialogue as a lord dialogue.
-    /// All companion dialogue in vanilla assumes they are a companion of the player in the conversation.
-    /// </summary>
-    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_wanderer_on_condition))]
-    [HarmonyPrefix]
-    public static bool ConversationWandererOnConditionPrefix(ref bool __result)
-    {
-        __result = UseWandererIntroduction || IsNonPrisonerWanderer(CharacterObject.OneToOneConversationCharacter)
-            && (Hero.OneToOneConversationHero.CompanionOf == null
-            || Hero.OneToOneConversationHero.CompanionOf == Clan.PlayerClan);
-
-        UseWandererIntroduction = false;
-
-        return false;
-    }
-
-    private static bool IsNonPrisonerWanderer(CharacterObject character)
-    {
-        return character != null
-            && character.IsHero
-            && character.Occupation == Occupation.Wanderer
-            && character.HeroObject.HeroState != Hero.CharacterStates.Prisoner;
     }
 
     /// <summary>
