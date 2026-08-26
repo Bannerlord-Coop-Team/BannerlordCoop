@@ -66,8 +66,7 @@ public class BattleResultCommitter : IBattleResultCommitter
 
     public void AcceptResolvedState(BattleState battleState)
     {
-        if (battleState != BattleState.AttackerVictory && battleState != BattleState.DefenderVictory)
-            return;
+        if (!IsSupportedResultState(battleState)) return;
 
         lock (resolvedStateGate)
         {
@@ -101,6 +100,11 @@ public class BattleResultCommitter : IBattleResultCommitter
             battleState = resolvedState;
         }
 
-        return battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory;
+        return IsSupportedResultState(battleState);
     }
+
+    internal static bool IsSupportedResultState(BattleState battleState)
+        => battleState == BattleState.AttackerVictory
+            || battleState == BattleState.DefenderVictory
+            || battleState == BattleState.DefenderPullBack;
 }
