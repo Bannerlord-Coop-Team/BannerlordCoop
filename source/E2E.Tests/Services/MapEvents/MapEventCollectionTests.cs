@@ -54,6 +54,36 @@ public class MapEventCollectionTests : MapEventTestBase
     }
 
     [Fact]
+    public void ConnectedClients_FieldBattleReinforcement_ReceivesEventPositionAdder()
+    {
+        var battle = CreateServerMapEvent();
+        string reinforcementId = null;
+        Vec2 expectedOffset = default;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, battle.MapEventId);
+            var reinforcement = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            reinforcement.Position = new CampaignVec2(new Vec2(25f, 15f), true);
+            reinforcement.Party.MapEventSide = mapEvent.AttackerSide;
+
+            Assert.True(Server.ObjectManager.TryGetId(reinforcement, out reinforcementId));
+            expectedOffset = reinforcement.EventPositionAdder;
+        }, MapEventDisabledMethods);
+
+        Assert.NotEqual(Vec2.Zero, expectedOffset);
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var reinforcement = Get<MobileParty>(client, reinforcementId);
+                Assert.Equal(expectedOffset, reinforcement.EventPositionAdder);
+                Assert.Same(Get<MapEvent>(client, battle.MapEventId), reinforcement.MapEvent);
+            });
+        }
+    }
+
+    [Fact]
     public void Client_RunAfterCommit_RunsAfterPartySidesAreAssigned()
     {
         var staged = CreateServerMapEvent(commit: false);
