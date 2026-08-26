@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using Common;
 using Common.Messaging;
+using GameInterface.Services.Armies;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
@@ -386,7 +387,8 @@ internal static class SiegeDefenseArmyFixtureCommands
         if (fixture == null)
             throw new InvalidOperationException("The siege defense army fixture is not active.");
         if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface)
-            || !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            || !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot)
+            || !ContainerProvider.TryResolve<IArmyDisbander>(out var armyDisbander))
             throw new InvalidOperationException("Unable to resolve the fixture restoration services.");
 
         if (fixture.MapEvent != null && !fixture.MapEvent.IsFinalized)
@@ -408,8 +410,8 @@ internal static class SiegeDefenseArmyFixtureCommands
             }
         }
 
-        if (fixture.Army != null && fixture.Army.Kingdom != null)
-            DisbandArmyAction.ApplyByObjectiveFinished(fixture.Army);
+        if (fixture.Army != null)
+            armyDisbander.Disband(fixture.Army, Army.ArmyDispersionReason.ObjectiveFinished);
 
         foreach (var snapshot in fixture.AllParties)
         {
