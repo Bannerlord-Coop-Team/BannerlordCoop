@@ -91,12 +91,18 @@ public sealed class MockMission
     /// spawning a cavalry rider's mount implicitly (from its equipment) inside the same SpawnAgent call.</summary>
     public bool SpawnMounted { get; set; }
 
+    /// <summary>While true, mirrors the engine's clone of overridden equipment inside SpawnAgent.</summary>
+    public bool CloneSpawnEquipmentOnSpawn { get; set; }
+
     public bool DismountRiderOnNextBlow { get; set; }
 
     /// <summary>Headless replacement for <see cref="Mission.SpawnAgent"/>: mints a skip-ctor agent, mirrors the
     /// build data, assigns a mission-local index, and tracks it.</summary>
     public Agent SpawnAgent(AgentBuildData buildData)
     {
+        Equipment spawnEquipment = CloneSpawnEquipmentOnSpawn
+            ? buildData.AgentOverridenSpawnEquipment?.Clone()
+            : buildData.AgentOverridenSpawnEquipment;
         var agent = ObjectHelper.SkipConstructor<Agent>();
         var mirror = new MirrorAgent
         {
@@ -106,6 +112,7 @@ public sealed class MockMission
             Team = buildData.AgentTeam,
             Position = buildData.AgentInitialPosition ?? default,
             Origin = buildData.AgentOrigin,
+            SpawnEquipment = spawnEquipment,
             Mission = Shell,
         };
         AgentMirror.Bind(agent, mirror);

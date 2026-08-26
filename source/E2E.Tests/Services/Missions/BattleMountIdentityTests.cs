@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Common.Messaging;
+using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
@@ -222,9 +223,51 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             Assert.True(registry.TryGetAgentInfo(horse, out var horseInfo));
             Assert.Equal("owner", horseInfo.CurrentAuthority);
 
-            var record = peer.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Single().Agents.Single();
+            var initialBatch = peer.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Single();
+            Assert.Equal(SpawnBatchPurpose.Initial, initialBatch.Purpose);
+            var record = initialBatch.Agents.Single();
             Assert.Equal(riderInfo.AgentId, record.AgentId);
             Assert.Equal(horseInfo.AgentId, record.MountAgentId);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
+    public void DebugFixtureOrigin_FlushesInitialWithoutMapEventCasualtyAttribution()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (_, partyIds) = SetupCoopBattle("owner", "peer");
+        var owner = Clients.First();
+        SetControllerId(owner, "owner");
+        string characterId = CreateRegisteredObject<CharacterObject>();
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            var controller = owner.Resolve<CoopBattleController>();
+            var network = owner.Resolve<MockBattleNetwork>();
+            Assert.True(owner.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var party));
+            Assert.NotNull(party.Party.MapEventSide);
+            Assert.Contains(party.Party, party.Party.MapEventSide.Parties.Select(mapEventParty => mapEventParty.Party));
+
+            network.NetworkSentMessages.Clear();
+            var origin = new DebugReplicationFixtureAgentOrigin(
+                character,
+                party.Party,
+                rank: -1,
+                banner: null,
+                new UniqueTroopDescriptor(int.MaxValue));
+            var agent = mock.SpawnAgent(new AgentBuildData(character)
+                .Controller(AgentControllerType.AI)
+                .TroopOrigin(origin));
+            owner.Resolve<IMessageBroker>().Publish(this, new AgentSpawnedInBattle(agent));
+            controller.OnMissionTick(0f);
+
+            var initial = network.NetworkSentMessages.GetMessages<NetworkSpawnBattleAgents>().Single();
+            Assert.Equal(SpawnBatchPurpose.Initial, initial.Purpose);
+            Assert.Null(initial.Agents.Single().MapEventPartyId);
 
             GC.KeepAlive(controller);
         });

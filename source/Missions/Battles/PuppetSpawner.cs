@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
@@ -261,7 +262,10 @@ public class PuppetSpawner : IPuppetSpawner
         BattleSpawnGate.SuppressCapture = true;
         try
         {
-            agent = Mission.Current.SpawnAgent(buildData);
+            using (new TransientEquipmentSyncScope())
+            {
+                agent = Mission.Current.SpawnAgent(buildData);
+            }
         }
         finally
         {
