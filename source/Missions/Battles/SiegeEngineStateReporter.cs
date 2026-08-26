@@ -61,7 +61,7 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
         if (requireNoSuccessors && hasAssignment && assignment.SuccessorControllerIds.Count > 0) return;
 
         if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent)) return;
-        if (!mapEvent.IsSiegeAssault) return;
+        if (!ShouldReport(mapEvent)) return;
 
         var enginesLogic = Mission.Current?.GetMissionBehavior<MissionSiegeEnginesLogic>();
         if (enginesLogic == null) return;
@@ -76,4 +76,7 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
             hostEpoch));
         reportedEpoch = hostEpoch;
     }
+
+    internal static bool ShouldReport(MapEvent mapEvent)
+        => mapEvent?.IsSiegeAssault == true || mapEvent?.IsSiegeAmbush == true;
 }
