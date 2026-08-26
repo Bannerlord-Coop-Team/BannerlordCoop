@@ -10,10 +10,10 @@ using TaleWorlds.MountAndBlade;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>Regression coverage for compact routed-damage engine struct encoding.</summary>
-public class BattleDamageCodecTests
+public class BattleDamageDataMapperTests
 {
     [Fact]
-    public void EncodeDecode_RoundTripsFullEngineStructDataUnderPacketBudget()
+    public void PackResolve_RoundTripsFullEngineStructDataUnderPacketBudget()
     {
         var blow = new Blow(17)
         {
@@ -98,8 +98,8 @@ public class BattleDamageCodecTests
         collisionData.IsShieldBroken = true;
         collisionData.IsSneakAttack = true;
 
-        var codec = new BattleDamageCodec();
-        BattleDamageData encoded = codec.Encode(in blow, in collisionData);
+        var mapper = new BattleDamageDataMapper();
+        BattleDamageData encoded = mapper.Pack(in blow, in collisionData);
 
         new SurrogateCollection();
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
@@ -111,8 +111,8 @@ public class BattleDamageCodecTests
                 isMissile: true),
             serializer).Data;
         Assert.InRange(messagePayload.Length, 1, 1199);
-        Assert.True(codec.TryDecode(encoded, out Blow decodedBlow, out AttackCollisionData decodedCollision));
-        BattleDamageData reencoded = codec.Encode(in decodedBlow, in decodedCollision);
+        Assert.True(mapper.TryResolve(encoded, out Blow decodedBlow, out AttackCollisionData decodedCollision));
+        BattleDamageData reencoded = mapper.Pack(in decodedBlow, in decodedCollision);
 
         Assert.Equal(serializer.Serialize(encoded), serializer.Serialize(reencoded));
         Assert.Equal(blow.BlowFlag, decodedBlow.BlowFlag);
@@ -168,14 +168,14 @@ public class BattleDamageCodecTests
     }
 
     [Fact]
-    public void TryDecode_MissingOwnedData_ReturnsFalse()
+    public void TryResolve_MissingOwnedData_ReturnsFalse()
     {
-        var codec = new BattleDamageCodec();
+        var mapper = new BattleDamageDataMapper();
         Blow blow = default;
         AttackCollisionData collisionData = default;
-        BattleDamageData valid = codec.Encode(in blow, in collisionData);
+        BattleDamageData valid = mapper.Pack(in blow, in collisionData);
         var invalid = new BattleDamageData(null, valid.Collision);
 
-        Assert.False(codec.TryDecode(invalid, out _, out _));
+        Assert.False(mapper.TryResolve(invalid, out _, out _));
     }
 }

@@ -48,7 +48,7 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         var steamBridge = new Mock<ISteamMissionBridge>();
         var compressor = new MovementPacketCompressor(serializer);
-        var damageCodec = new BattleDamageCodec();
+        var damageDataMapper = new BattleDamageDataMapper();
         var relayedPackets = new List<RelayPacket>();
         relayNetwork
             .Setup(network => network.SendAll(It.IsAny<IPacket>()))
@@ -71,7 +71,7 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
         var logicalPayloads = new List<byte[]>(logicalMessageCount);
         for (int i = 0; i < logicalMessageCount; i++)
         {
-            IMessage message = CreateBattleMessage(i, damageCodec);
+            IMessage message = CreateBattleMessage(i, damageDataMapper);
             logicalPayloads.Add(MessagePacket.Create(message, serializer).Data);
             client.Send(controllerId, message);
         }
@@ -229,7 +229,7 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
         });
     }
 
-    private static IMessage CreateBattleMessage(int index, IBattleDamageCodec damageCodec)
+    private static IMessage CreateBattleMessage(int index, IBattleDamageDataMapper damageDataMapper)
     {
         Guid victimId = CreateGuid(index);
         Guid attackerId = CreateGuid(index + 10_000);
@@ -246,7 +246,7 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
                 {
                     InflictedDamage = blow.InflictedDamage,
                 };
-                BattleDamageData damageData = damageCodec.Encode(in blow, in collisionData);
+                BattleDamageData damageData = damageDataMapper.Pack(in blow, in collisionData);
                 return new NetworkApplyBattleDamage(
                     victimId,
                     attackerId,

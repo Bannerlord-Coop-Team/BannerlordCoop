@@ -127,7 +127,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             // The routed hit arrives, addressed to horse A's own id.
             Blow blow = DamagingBlow();
             AttackCollisionData collisionData = default;
-            var damageData = owner.Resolve<IBattleDamageCodec>().Encode(in blow, in collisionData);
+            var damageData = owner.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             owner.Resolve<IMessageBroker>().Publish(this,
                 new NetworkApplyBattleDamage(
                     horseAId,

@@ -4,26 +4,26 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>Converts routed damage between engine structs and the owned network representation.</summary>
-public interface IBattleDamageCodec
+public interface IBattleDamageDataMapper
 {
-    BattleDamageData Encode(in Blow blow, in AttackCollisionData collisionData);
-    bool TryDecode(
+    BattleDamageData Pack(in Blow blow, in AttackCollisionData collisionData);
+    bool TryResolve(
         BattleDamageData damageData,
         out Blow blow,
         out AttackCollisionData collisionData);
 }
 
 /// <summary>Maps routed-damage engine structs to a versioned, field-owned wire representation.</summary>
-public class BattleDamageCodec : IBattleDamageCodec
+public class BattleDamageDataMapper : IBattleDamageDataMapper
 {
-    public BattleDamageData Encode(in Blow blow, in AttackCollisionData collisionData)
+    public BattleDamageData Pack(in Blow blow, in AttackCollisionData collisionData)
     {
         return new BattleDamageData(
             new BattleBlowData(blow),
             new BattleCollisionData(collisionData));
     }
 
-    public bool TryDecode(
+    public bool TryResolve(
         BattleDamageData damageData,
         out Blow blow,
         out AttackCollisionData collisionData)

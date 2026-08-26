@@ -54,7 +54,7 @@ public class BattleHeroDamageSyncTests : MissionTestEnvironment
             // The hero takes a 30-damage hit, routed to its owner (this client).
             var blow = new Blow(0) { InflictedDamage = 30, DamageType = DamageTypes.Pierce };
             AttackCollisionData collisionData = default;
-            var damageData = client.Resolve<IBattleDamageCodec>().Encode(in blow, in collisionData);
+            var damageData = client.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             client.Resolve<IMessageBroker>().Publish(
                 this,
                 new NetworkApplyBattleDamage(

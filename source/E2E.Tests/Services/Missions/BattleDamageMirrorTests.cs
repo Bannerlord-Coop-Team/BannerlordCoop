@@ -56,7 +56,7 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
 
             var blow = new Blow(0) { InflictedDamage = 40, DamageType = DamageTypes.Pierce };
             var collisionData = new AttackCollisionData { InflictedDamage = 40 };
-            var damageData = client.Resolve<IBattleDamageCodec>().Encode(in blow, in collisionData);
+            var damageData = client.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             client.Resolve<IMessageBroker>().Publish(
                 this,
                 new NetworkApplyBattleDamage(
@@ -98,7 +98,7 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
             blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = 999;
 
             AttackCollisionData collisionData = default;
-            var damageData = client.Resolve<IBattleDamageCodec>().Encode(in blow, in collisionData);
+            var damageData = client.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             client.Resolve<IMessageBroker>().Publish(
                 this,
                 new NetworkApplyBattleDamage(
@@ -146,7 +146,7 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
                 DamageType = DamageTypes.Pierce
             };
             AttackCollisionData collisionData = default;
-            var damageData = client.Resolve<IBattleDamageCodec>().Encode(in blow, in collisionData);
+            var damageData = client.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             client.Resolve<IMessageBroker>().Publish(
                 this,
                 new NetworkApplyBattleDamage(

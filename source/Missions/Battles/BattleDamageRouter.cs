@@ -40,7 +40,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IGuardedHitWindow guardedHitWindow;
     private readonly IAgentNativeMountState agentNativeMountState;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
-    private readonly IBattleDamageCodec battleDamageCodec;
+    private readonly IBattleDamageDataMapper battleDamageDataMapper;
     private readonly Func<Agent, bool?> mountAuthorityProbe;
     private readonly object inboundDamageGate = new();
     private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
@@ -136,7 +136,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         IGuardedHitWindow guardedHitWindow,
         IAgentNativeMountState agentNativeMountState,
         IPuppetMountStateRepairer puppetMountStateRepairer,
-        IBattleDamageCodec battleDamageCodec)
+        IBattleDamageDataMapper battleDamageDataMapper)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -145,7 +145,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         this.guardedHitWindow = guardedHitWindow;
         this.agentNativeMountState = agentNativeMountState;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
-        this.battleDamageCodec = battleDamageCodec;
+        this.battleDamageDataMapper = battleDamageDataMapper;
 
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
@@ -412,7 +412,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     {
         Blow blow = pending.Hit.Blow;
         AttackCollisionData collisionData = pending.Hit.CollisionData;
-        BattleDamageData damageData = battleDamageCodec.Encode(in blow, in collisionData);
+        BattleDamageData damageData = battleDamageDataMapper.Pack(in blow, in collisionData);
         return new NetworkApplyBattleDamage(
             victimId,
             pending.AttackerId,
@@ -426,7 +426,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
     {
         NetworkApplyBattleDamage damage = payload.What;
-        if (!battleDamageCodec.TryDecode(
+        if (!battleDamageDataMapper.TryResolve(
                 damage.DamageData,
                 out Blow blow,
                 out AttackCollisionData collisionData))

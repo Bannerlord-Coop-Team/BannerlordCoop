@@ -103,7 +103,7 @@ public class CoopBattleController : CoopMissionController
         IAgentNativeMountState agentNativeMountState,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
-        IBattleDamageCodec battleDamageCodec,
+        IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper)
         : base(
             network,
@@ -154,7 +154,7 @@ public class CoopBattleController : CoopMissionController
             guardedHitWindow,
             agentNativeMountState,
             puppetMountStateRepairer,
-            battleDamageCodec);
+            battleDamageDataMapper);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
         puppetSpawner = new PuppetSpawner(

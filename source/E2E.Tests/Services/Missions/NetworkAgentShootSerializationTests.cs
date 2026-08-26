@@ -74,8 +74,8 @@ public class NetworkAgentShootSerializationTests
         blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = 42;
         var attackerWeapon = new WeaponComponentData(null, WeaponClass.Arrow, default);
         AttackCollisionData collisionData = default;
-        var codec = new BattleDamageCodec();
-        BattleDamageData damageData = codec.Encode(in blow, in collisionData);
+        var mapper = new BattleDamageDataMapper();
+        BattleDamageData damageData = mapper.Pack(in blow, in collisionData);
 
         var original = new NetworkApplyBattleDamage(
             Guid.NewGuid(),
@@ -90,7 +90,7 @@ public class NetworkAgentShootSerializationTests
 
         var result = Assert.IsType<NetworkApplyBattleDamage>(serializer.Deserialize<IMessage>(packet.Data));
 
-        Assert.True(codec.TryDecode(result.DamageData, out Blow decodedBlow, out _));
+        Assert.True(mapper.TryResolve(result.DamageData, out Blow decodedBlow, out _));
         Assert.InRange(packet.Data.Length, 1, 1199);
         Assert.Equal(blow.InflictedDamage, decodedBlow.InflictedDamage);
         Assert.Equal(blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex,
