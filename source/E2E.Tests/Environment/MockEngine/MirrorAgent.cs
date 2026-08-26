@@ -25,6 +25,8 @@ public sealed class MirrorAgent
     public Vec3 Position { get; set; }
     public int TeleportToPositionCalls { get; set; }
     public int SetTargetPositionAndDirectionCalls { get; set; }
+    public int ClearTargetFrameCalls { get; set; }
+    public bool TargetFrameLocked { get; set; }
     public Vec2 LastTargetPosition { get; set; }
     public Vec3 LastTargetDirection { get; set; }
     public Vec3 RealGlobalVelocity { get; set; }

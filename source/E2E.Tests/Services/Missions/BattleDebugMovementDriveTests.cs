@@ -64,6 +64,7 @@ public class BattleDebugMovementDriveTests
         Assert.False(mirror.IsAiPaused);
         Assert.Equal(-1f, mirror.MaximumSpeedLimit);
         Assert.Equal(1, mirror.SetTargetPositionAndDirectionCalls);
+        Assert.True(mirror.TargetFrameLocked);
         Assert.InRange(mirror.LastTargetPosition.X, 15.99f, 16.01f);
         Assert.InRange(mirror.LastTargetPosition.Y, 20.99f, 21.01f);
 
@@ -87,6 +88,8 @@ public class BattleDebugMovementDriveTests
         Assert.Equal(originalController, mirror.Controller);
         Assert.Equal(originalIsAiPaused, mirror.IsAiPaused);
         Assert.Equal(originalMaximumSpeedLimit, mirror.MaximumSpeedLimit);
+        Assert.Equal(1, mirror.ClearTargetFrameCalls);
+        Assert.False(mirror.TargetFrameLocked);
     }
 }
 #endif

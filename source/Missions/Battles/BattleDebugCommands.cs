@@ -854,6 +854,7 @@ internal static class BattleDebugCommands
             agent.Controller = controller;
         agent.SetIsAIPaused(isAiPaused);
         agent.SetMaximumSpeedLimit(maximumSpeedLimit, isMultiplier: false);
+        agent.ClearTargetFrame();
         Missions.Agents.Packets.AgentData.ApplyLocomotionMovementFlags(agent, locomotionFlags);
         Missions.Agents.Packets.AgentData.ApplyMovementInput(agent, movementInput);
     }
