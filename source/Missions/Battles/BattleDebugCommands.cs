@@ -1,8 +1,11 @@
 ﻿using Common;
 using GameInterface;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Commands;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.ObjectManager;
 using Missions.Agents.Packets;
+using Newtonsoft.Json;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
@@ -100,6 +103,229 @@ internal static class BattleDebugCommands
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
     private static bool wieldTestActive;
+    private static Mission columnReinforcementFixtureMission;
+    private static Formation columnReinforcementFixtureFormation;
+    private static MissionBattleSideSpawnContext columnReinforcementFixtureSpawnContext;
+    private static ArrangementOrder columnReinforcementFixtureOriginalOrder;
+    private static BattleSideEnum columnReinforcementFixtureSide;
+    private static int columnReinforcementFixtureFormationIndex;
+    private static int columnReinforcementFixtureKilled;
+
+    private sealed class ColumnReinforcementCandidate
+    {
+        public BattleSideEnum Side { get; set; }
+        public int FormationIndex { get; set; }
+        public Formation Formation { get; set; }
+        public MissionBattleSideSpawnContext SpawnContext { get; set; }
+        public Agent[] Agents { get; set; }
+    }
+
+    [CommandLineArgumentFunction("column_reinforcement_fixture", "coop.debug.battle")]
+    public static string ColumnReinforcementFixture(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.battle.column_reinforcement_fixture <start|state|restore>";
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "start":
+                return StartColumnReinforcementFixture();
+            case "state":
+                return GetColumnReinforcementFixtureState();
+            case "restore":
+                return RestoreColumnReinforcementFixture();
+            default:
+                return "Usage: coop.debug.battle.column_reinforcement_fixture <start|state|restore>";
+        }
+    }
+
+    private static string StartColumnReinforcementFixture()
+    {
+        if (columnReinforcementFixtureMission != null &&
+            Mission.Current != columnReinforcementFixtureMission)
+        {
+            ClearColumnReinforcementFixture();
+        }
+        if (columnReinforcementFixtureMission != null)
+            return "COLUMN_REINFORCEMENT_FIXTURE already active";
+
+        Mission mission = Mission.Current;
+        CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
+        DefaultBattleMissionAgentSpawnLogic spawnLogic =
+            mission?.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();
+        if (mission == null || controller == null || spawnLogic == null)
+            return "COLUMN_REINFORCEMENT_FIXTURE no active coop battle";
+        if (!controller.Deployment.IsActivated)
+            return "COLUMN_REINFORCEMENT_FIXTURE finish deployment first";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "COLUMN_REINFORCEMENT_FIXTURE network agent registry is unavailable";
+
+        ColumnReinforcementCandidate candidate = null;
+        foreach (BattleSideEnum side in new[] { BattleSideEnum.Defender, BattleSideEnum.Attacker })
+        {
+            MissionBattleSideSpawnContext spawnContext =
+                spawnLogic._battleSideSpawnContexts[(int)side];
+            if (spawnContext == null)
+                continue;
+
+            candidate = FindColumnReinforcementCandidate(
+                mission,
+                registry,
+                side,
+                spawnContext,
+                spawnContext._reservedTroops);
+            if (candidate == null && spawnContext._troopSupplier is CoopTroopSupplier supplier)
+            {
+                candidate = supplier.WithSupplyPreview(16, preview =>
+                {
+                    var projectedReserve = new List<IAgentOriginBase>(spawnContext._reservedTroops);
+                    projectedReserve.AddRange(preview);
+                    ColumnReinforcementCandidate previewCandidate =
+                        FindColumnReinforcementCandidate(
+                            mission,
+                            registry,
+                            side,
+                            spawnContext,
+                            projectedReserve);
+                    if (previewCandidate == null)
+                        return null;
+
+                    spawnContext.ReserveTroops(16);
+                    return FindColumnReinforcementCandidate(
+                        mission,
+                        registry,
+                        side,
+                        spawnContext,
+                        spawnContext._reservedTroops);
+                });
+            }
+
+            if (candidate != null)
+                break;
+        }
+
+        if (candidate == null)
+        {
+            return "COLUMN_REINFORCEMENT_FIXTURE no reserve is assigned to an eligible locally controlled formation";
+        }
+
+        columnReinforcementFixtureMission = mission;
+        columnReinforcementFixtureFormation = candidate.Formation;
+        columnReinforcementFixtureSpawnContext = candidate.SpawnContext;
+        columnReinforcementFixtureOriginalOrder = candidate.Formation.ArrangementOrder;
+        columnReinforcementFixtureSide = candidate.Side;
+        columnReinforcementFixtureFormationIndex = candidate.FormationIndex;
+        columnReinforcementFixtureKilled = candidate.Agents.Length;
+
+        candidate.Formation.SetArrangementOrder(ArrangementOrder.ArrangementOrderColumn);
+        foreach (Agent agent in candidate.Agents)
+            BattleTeamKillCommands.Kill(agent);
+
+        return "COLUMN_REINFORCEMENT_FIXTURE_STARTED " +
+               $"side={candidate.Side} formation={candidate.FormationIndex} " +
+               $"killed={candidate.Agents.Length} active=0 " +
+               $"reserved={candidate.SpawnContext.ReservedTroopsCount} arrangement=Column";
+    }
+
+    private static ColumnReinforcementCandidate FindColumnReinforcementCandidate(
+        Mission mission,
+        INetworkAgentRegistry registry,
+        BattleSideEnum side,
+        MissionBattleSideSpawnContext spawnContext,
+        List<IAgentOriginBase> reservedTroops)
+    {
+        foreach (var assignment in MissionGameModels.Current.BattleSpawnModel
+                     .GetReinforcementAssignments(side, reservedTroops))
+        {
+            Team team = Mission.GetAgentTeam(assignment.origin, spawnContext.IsPlayerSide);
+            Formation formation = team?.GetFormation((FormationClass)assignment.formationIndex);
+            if (formation == null)
+                continue;
+
+            Agent[] agents = mission.Agents
+                .Where(agent => agent != null
+                    && agent != Agent.Main
+                    && agent.IsActive()
+                    && agent.IsHuman
+                    && agent.Formation == formation
+                    && registry.IsLocallyControlled(agent))
+                .ToArray();
+            if (agents.Length == 0)
+                continue;
+
+            return new ColumnReinforcementCandidate
+            {
+                Side = side,
+                FormationIndex = assignment.formationIndex,
+                Formation = formation,
+                SpawnContext = spawnContext,
+                Agents = agents,
+            };
+        }
+
+        return null;
+    }
+
+    private static string GetColumnReinforcementFixtureState()
+    {
+        if (columnReinforcementFixtureMission == null)
+            return "COLUMN_REINFORCEMENT_FIXTURE inactive";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "COLUMN_REINFORCEMENT_FIXTURE network agent registry is unavailable";
+        if (Mission.Current != columnReinforcementFixtureMission ||
+            columnReinforcementFixtureFormation == null ||
+            columnReinforcementFixtureSpawnContext == null)
+        {
+            ClearColumnReinforcementFixture();
+            return "COLUMN_REINFORCEMENT_FIXTURE mission ended";
+        }
+
+        int active = Mission.Current.Agents.Count(agent => agent != null
+            && agent.IsActive()
+            && agent.IsHuman
+            && agent != Agent.Main
+            && agent.Formation == columnReinforcementFixtureFormation
+            && registry.IsLocallyControlled(agent));
+        int vanguardPositions = columnReinforcementFixtureFormation.Arrangement is ColumnFormation column
+            ? column.GetUnitPositionsOnVanguardFileIndex().Count
+            : -1;
+
+        return "COLUMN_REINFORCEMENT_FIXTURE_STATE " +
+               $"side={columnReinforcementFixtureSide} " +
+               $"formation={columnReinforcementFixtureFormationIndex} " +
+               $"killed={columnReinforcementFixtureKilled} active={active} " +
+               $"replacementObserved={active > 0} " +
+               $"reserved={columnReinforcementFixtureSpawnContext.ReservedTroopsCount} " +
+               $"reinforcementActive={columnReinforcementFixtureSpawnContext.ReinforcementSpawnActive} " +
+               $"arrangement={columnReinforcementFixtureFormation.Arrangement.GetType().Name} " +
+               $"vanguardPositions={vanguardPositions}";
+    }
+
+    private static string RestoreColumnReinforcementFixture()
+    {
+        if (columnReinforcementFixtureMission == null)
+            return "COLUMN_REINFORCEMENT_FIXTURE inactive";
+
+        bool missionActive = Mission.Current == columnReinforcementFixtureMission;
+        if (missionActive && columnReinforcementFixtureFormation != null)
+            columnReinforcementFixtureFormation.SetArrangementOrder(columnReinforcementFixtureOriginalOrder);
+
+        int killed = columnReinforcementFixtureKilled;
+        ClearColumnReinforcementFixture();
+        return "COLUMN_REINFORCEMENT_FIXTURE_RESTORED " +
+               $"arrangementRestored={missionActive} casualtiesRemain={killed}";
+    }
+
+    private static void ClearColumnReinforcementFixture()
+    {
+        columnReinforcementFixtureMission = null;
+        columnReinforcementFixtureFormation = null;
+        columnReinforcementFixtureSpawnContext = null;
+        columnReinforcementFixtureOriginalOrder = default;
+        columnReinforcementFixtureSide = BattleSideEnum.None;
+        columnReinforcementFixtureFormationIndex = -1;
+        columnReinforcementFixtureKilled = 0;
+    }
 
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)
@@ -273,6 +499,93 @@ internal static class BattleDebugCommands
 
 #endif
 
+#if DEBUG
+    [CommandLineArgumentFunction("item_modifier_state", "coop.debug.battle")]
+    public static string ItemModifierState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.item_modifier_state";
+
+        Mission mission = Mission.Current;
+        CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
+        if (mission == null || controller == null)
+            return "No active coop battle mission";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Object manager is unavailable";
+
+        int activeAgents = 0;
+        int weaponCount = 0;
+        int modifiedWeapons = 0;
+        int unmodifiedWeapons = 0;
+        int canonicalModifiers = 0;
+        int unregisteredModifiers = 0;
+        int nonCanonicalModifiers = 0;
+        var modifierIds = new HashSet<string>();
+
+        foreach (Agent agent in mission.Agents)
+        {
+            if (!agent.IsActive() || !agent.IsHuman) continue;
+
+            activeAgents++;
+            MissionEquipment equipment = agent.Equipment;
+            if (equipment == null) continue;
+
+            for (EquipmentIndex index = EquipmentIndex.WeaponItemBeginSlot;
+                 index < EquipmentIndex.NumAllWeaponSlots;
+                 index++)
+            {
+                MissionWeapon weapon = equipment[index];
+                if (weapon.Item == null) continue;
+
+                weaponCount++;
+                ItemModifier modifier = weapon.ItemModifier;
+                if (modifier == null)
+                {
+                    unmodifiedWeapons++;
+                    continue;
+                }
+
+                modifiedWeapons++;
+                if (!objectManager.TryGetId(modifier, out string modifierId))
+                {
+                    unregisteredModifiers++;
+                    continue;
+                }
+
+                modifierIds.Add(modifierId);
+                if (!objectManager.TryGetObject(modifierId, out ItemModifier canonicalModifier) ||
+                    !ReferenceEquals(modifier, canonicalModifier))
+                {
+                    nonCanonicalModifiers++;
+                    continue;
+                }
+
+                canonicalModifiers++;
+            }
+        }
+
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            controllerId = controller.Session.OwnControllerId,
+            activeAgents,
+            weaponCount,
+            modifiedWeapons,
+            unmodifiedWeapons,
+            canonicalModifiers,
+            unregisteredModifiers,
+            nonCanonicalModifiers,
+            distinctModifierIds = modifierIds.OrderBy(id => id).ToArray(),
+        });
+
+        return
+            $"ITEM_MODIFIER_STATE activeAgents={activeAgents}|weapons={weaponCount}|" +
+            $"modified={modifiedWeapons}|unmodified={unmodifiedWeapons}|" +
+            $"canonical={canonicalModifiers}|unregistered={unregisteredModifiers}|" +
+            $"nonCanonical={nonCanonicalModifiers}\n" +
+            $"LIVE_TEST_JSON={structuredState}";
+    }
+#endif
+
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
     public static string State(List<string> args)
     {
@@ -337,6 +650,47 @@ internal static class BattleDebugCommands
             $"enemyMovedSinceLast={moved} damageReceivedEvents={ownDamageEvents} " +
             $"resultState={result?.BattleState.ToString() ?? "None"} " +
             $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
+    }
+
+    [CommandLineArgumentFunction("size_state", "coop.debug.battle")]
+    public static string SizeState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.size_state";
+
+        Mission mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        var spawnHandler = mission?.GetMissionBehavior<CoopBattleMissionSpawnHandler>();
+        if (mission == null || controller == null || spawnHandler == null)
+            return "No active coop battle mission";
+        if (!ContainerProvider.TryResolve<IBattleAgentBudget>(out var agentBudget))
+            return "Battle agent budget is unavailable";
+
+        CoopBattleMissionSpawnHandler.BattleSizeState state = spawnHandler.CaptureBattleSizeState();
+        int activeAgents = mission.Agents.Count(agent => agent.IsActive());
+        int targetTotal = state.DefenderTarget + state.AttackerTarget;
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            controllerId = controller.Session.OwnControllerId,
+            state.IsSized,
+            authoritativeBattleSize = state.BattleSize,
+            state.DefenderTotal,
+            state.AttackerTotal,
+            state.DefenderTarget,
+            state.AttackerTarget,
+            authoritativeTargetTotal = targetTotal,
+            state.AllocationRevision,
+            activeAgents,
+            renderedAgentLimit = agentBudget.MaxRenderedAgents,
+        });
+
+        return
+            $"BATTLE_SIZE_STATE battleSize={state.BattleSize}|" +
+            $"defenderTotal={state.DefenderTotal}|attackerTotal={state.AttackerTotal}|" +
+            $"defenderTarget={state.DefenderTarget}|attackerTarget={state.AttackerTarget}|" +
+            $"targetTotal={targetTotal}|activeAgents={activeAgents}|" +
+            $"renderedAgentLimit={agentBudget.MaxRenderedAgents}\n" +
+            $"LIVE_TEST_JSON={structuredState}";
     }
 
     [CommandLineArgumentFunction("charge_owned_formations", "coop.debug.battle")]

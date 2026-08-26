@@ -1,6 +1,7 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Locations;
 using Missions.Messages;
 using SandBox;
 using SandBox.Missions.MissionLogics;
@@ -97,7 +98,15 @@ public class LocationPopulationDirector : ILocationPopulationDirector
             // The suppression gate lifted with the host confirmation, so these run natively; the
             // capture patches replicate everything they spawn. The seeded-RNG and civilian-count
             // patches wrap SpawnLocationCharacters exactly as they wrap the native AfterStart call.
-            agentHandler.SpawnLocationCharacters();
+            LocationNpcGate.IsReplayingNativePopulation = true;
+            try
+            {
+                agentHandler.SpawnLocationCharacters();
+            }
+            finally
+            {
+                LocationNpcGate.IsReplayingNativePopulation = false;
+            }
 
             SandBoxHelpers.MissionHelper.SpawnHorses();
             if (!Campaign.Current.IsNight)

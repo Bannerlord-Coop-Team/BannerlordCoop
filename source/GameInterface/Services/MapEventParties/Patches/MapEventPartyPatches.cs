@@ -23,58 +23,29 @@ internal class MapEventPartyPatches
 {
     [HarmonyPatch(nameof(MapEventParty.OnTroopKilled))]
     [HarmonyPrefix]
-    private static bool PrefixOnTroopKilled(MapEventParty __instance, ref UniqueTroopDescriptor troopSeed)
+    private static bool PrefixOnTroopKilled()
     {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsServer) return true;
-
-        // Coop battle: casualties flow owner→server (BattleCasualtyHandler); suppress the host's mission
-        // auto-accounting so the troop isn't decremented twice. The server-applied path runs under
-        // AllowedThread, so the IsOriginalAllowed check above already lets it through.
-        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
-
-        __instance._roster.OnTroopKilled(troopSeed);
-        MessageBroker.Instance.Publish(__instance, new OnTroopKilledAttempted(__instance, troopSeed.UniqueSeed));
-
-        return false;
+        // Casualties are reported from inside the mission and applied through the synchronization path.
+        // Allow server or explicitly synchronized calls, skip locally generated MapEventParty calls on clients.
+        return ShouldRunTroopStateUpdate(CallOriginalPolicy.IsOriginalAllowed(), ModInformation.IsServer);
     }
 
     [HarmonyPatch(nameof(MapEventParty.OnTroopWounded))]
     [HarmonyPrefix]
-    private static bool PrefixOnTroopWounded(MapEventParty __instance, ref UniqueTroopDescriptor troopSeed)
+    private static bool PrefixOnTroopWounded()
     {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsServer) return true;
-
-        // Coop battle: casualties flow owner→server; suppress the host's mission auto-accounting (see OnTroopKilled).
-        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
-
-        __instance._roster.OnTroopWounded(troopSeed);
-        MessageBroker.Instance.Publish(__instance, new OnTroopWoundedAttempted(__instance, troopSeed.UniqueSeed));
-
-        return false;
+        // Casualties are reported from inside the mission and applied through the synchronization path.
+        // Allow server or explicitly synchronized calls, skip locally generated MapEventParty calls on clients.
+        return ShouldRunTroopStateUpdate(CallOriginalPolicy.IsOriginalAllowed(), ModInformation.IsServer);
     }
 
     [HarmonyPatch(nameof(MapEventParty.OnTroopRouted))]
     [HarmonyPrefix]
-    private static bool PrefixOnTroopRouted(MapEventParty __instance, ref UniqueTroopDescriptor troopSeed)
+    private static bool PrefixOnTroopRouted()
     {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsServer) return true;
-
-        // Coop battle: casualties flow owner→server; suppress the host's mission auto-accounting (see OnTroopKilled).
-        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
-
-        __instance._roster.OnTroopRouted(troopSeed);
-        MessageBroker.Instance.Publish(__instance, new OnTroopRoutedAttempted(__instance, troopSeed.UniqueSeed));
-
-        return false;
+        // Routed troops are reported from inside the mission and applied through the synchronization path.
+        // Allow server or explicitly synchronized calls, skip locally generated MapEventParty calls on clients.
+        return ShouldRunTroopStateUpdate(CallOriginalPolicy.IsOriginalAllowed(), ModInformation.IsServer);
     }
 
     [HarmonyPatch(nameof(MapEventParty.OnTroopScoreHit))]
@@ -100,6 +71,15 @@ internal class MapEventPartyPatches
             __instance, attackerElement.Troop, attackedTroop, damage, isFatal, isSimulatedHit));
 
         return false;
+    }
+    
+    /// <summary>
+    /// Determines whether a troop state update may execute the original game method.
+    /// Normal client generated calls are skipped because troop casualties are synchronized from the mission.
+    /// </summary>
+    internal static bool ShouldRunTroopStateUpdate(bool isOriginalAllowed, bool isServer)
+    {
+        return isOriginalAllowed || isServer;
     }
 
     [HarmonyPatch(nameof(MapEventParty.CommitXpGain))]

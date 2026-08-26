@@ -229,11 +229,6 @@ internal class BattleJoinLeaveHandler : IHandler
                         Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
                         return;
                     }
-                    if (mapEvent.IsActiveSlowVillageRaid() && data.Side == BattleSideEnum.Defender)
-                    {
-                        Logger.Warning("Ignoring defender join request: map event {MapEventId} is an active slow village raid", data.MapEventId);
-                        return;
-                    }
                     var side = mapEvent.GetMapEventSide(data.Side);
                     if (side == null)
                     {

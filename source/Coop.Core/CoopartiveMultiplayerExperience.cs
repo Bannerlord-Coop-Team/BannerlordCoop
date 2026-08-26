@@ -39,6 +39,7 @@ namespace Coop.Core
         private readonly SteamOrDirectJoinEndpointPreparer joinEndpointPreparer = new SteamOrDirectJoinEndpointPreparer();
         private readonly ServerProcessManager serverProcessManager;
         private readonly Action<string> setCrashPhase;
+        private readonly string coopLogFilePath;
         private readonly object containerGate = new object();
         private readonly bool standaloneServerProcess;
         private volatile bool coopStarting;
@@ -59,7 +60,8 @@ namespace Coop.Core
 
         public CoopartiveMultiplayerExperience(
             bool standaloneServerProcess = false,
-            Action<string> setCrashPhase = null)
+            Action<string> setCrashPhase = null,
+            string coopLogFilePath = null)
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
@@ -67,6 +69,7 @@ namespace Coop.Core
             serverProcessManager = new ServerProcessManager(messageBroker);
             this.standaloneServerProcess = standaloneServerProcess;
             this.setCrashPhase = setCrashPhase ?? (_ => { });
+            this.coopLogFilePath = coopLogFilePath;
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<AttemptHost>(Handle);
@@ -438,6 +441,9 @@ namespace Coop.Core
                     $"The server password cannot exceed {ConnectionPassword.MaxLength} characters");
             if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
                 throw new ArgumentOutOfRangeException(nameof(visibility));
+            if (!ManagedServerConfig.IsValidPort(ManagedServerConfig.Port))
+                throw new ArgumentOutOfRangeException(nameof(ManagedServerConfig.Port),
+                    "The server port must be between 1 and 65535");
 
             DestroyContainer();
             setCrashPhase("starting-server");
@@ -447,7 +453,12 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
-            builder.RegisterInstance(new NetworkConfig { Token = password ?? string.Empty })
+            builder.RegisterInstance(new CoopLogFile(coopLogFilePath)).As<ICoopLogFile>().SingleInstance();
+            builder.RegisterInstance(new NetworkConfig
+            {
+                Token = password ?? string.Empty,
+                Port = ManagedServerConfig.Port,
+            })
                 .As<INetworkConfig>()
                 .SingleInstance();
             builder.RegisterInstance(new SessionAdvertisementConfig { Visibility = visibility })
@@ -608,6 +619,7 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ClientModule>();
             builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterInstance(new CoopLogFile(coopLogFilePath)).As<ICoopLogFile>().SingleInstance();
 
             if (configuration != null)
             {

@@ -140,6 +140,8 @@ public class CoopTournamentController : CoopMissionController
         this.missionContext = missionContext;
         spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
         session = new TournamentMissionSession(controllerIdProvider);
+        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+            () => session.IsLocalHost);
         matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
         agentSpawner = new TournamentAgentSpawner(objectManager, controllerIdProvider, coopMissionComponent);
         manifestBuilder = new TournamentSpawnManifestBuilder(objectManager, coopMissionComponent);
@@ -165,6 +167,7 @@ public class CoopTournamentController : CoopMissionController
         tournamentBehavior = behavior ?? throw new ArgumentNullException(nameof(behavior));
         fightController = nativeFightController ?? throw new ArgumentNullException(nameof(nativeFightController));
         fightController.SetAgentRemovalProvider(() => !matchLifecycle.IsClearing);
+        fightController.SetLeaveAllowedProvider(() => tournamentBehavior.Snapshot.IsCompleted);
         fightController.SetHitProgressionRecorder(CaptureHitProgression);
         fightController.SetGuardReactionRecorder(
             coopMissionComponent.AgentActionHandler.ObserveBlockedHit);
@@ -1505,9 +1508,7 @@ public class CoopTournamentController : CoopMissionController
         var records = new List<TournamentWorldItemRuntimeData>();
         foreach (SpawnedItemEntity item in Mission.Current.MissionObjects.OfType<SpawnedItemEntity>())
         {
-            Guid worldItemId = worldItemRegistry.GetOrCreateId(item);
-            if (worldItemId == Guid.Empty || item == null || item.IsRemoved ||
-                !item.GameEntity.IsValid) continue;
+            if (!TryGetRuntimeWorldItemId(item, out Guid worldItemId)) continue;
 
             MissionWeapon weapon = item.WeaponCopy;
             if (weapon.IsEmpty) continue;
@@ -1537,6 +1538,29 @@ public class CoopTournamentController : CoopMissionController
         }
         serialized = records.ToArray();
         return true;
+    }
+
+    internal bool TryGetRuntimeWorldItemId(SpawnedItemEntity item, out Guid worldItemId)
+    {
+        worldItemId = Guid.Empty;
+        if (item == null || coopMissionComponent.WeaponDropHandler.IsWorldItemIdentityPending(item))
+            return false;
+        return TryAllocateRuntimeWorldItemId(
+            item,
+            !item.IsRemoved && item.GameEntity.IsValid,
+            out worldItemId);
+    }
+
+    internal bool TryAllocateRuntimeWorldItemId(
+        SpawnedItemEntity item,
+        bool isAvailable,
+        out Guid worldItemId)
+    {
+        worldItemId = Guid.Empty;
+        if (item == null || !isAvailable) return false;
+
+        worldItemId = worldItemRegistry.GetOrCreateId(item);
+        return worldItemId != Guid.Empty;
     }
 
     private void ReconcileRuntimeEquipment(
