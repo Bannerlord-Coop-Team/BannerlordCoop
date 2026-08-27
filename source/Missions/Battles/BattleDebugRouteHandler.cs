@@ -27,7 +27,7 @@ internal class BattleDebugRouteHandler : IHandler
         messageBroker.Unsubscribe<NetworkRouteBattleEnemies>(Handle);
     }
 
-    private static void Handle(MessagePayload<NetworkRouteBattleEnemies> payload)
+    private void Handle(MessagePayload<NetworkRouteBattleEnemies> payload)
     {
         if (ModInformation.IsServer) return;
 

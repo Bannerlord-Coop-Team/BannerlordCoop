@@ -318,15 +318,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
 
-        var pendingField = AccessTools.Field(typeof(LocationConversationPatches), "pending");
-        var heldNpcKeyField = AccessTools.Field(typeof(LocationConversationPatches), "heldNpcKey");
         var onAgentInteractionPrefix = AccessTools.Method(typeof(LocationConversationPatches), "OnAgentInteractionPrefix");
         var onConversationEndPostfix = AccessTools.Method(typeof(LocationConversationPatches), "OnConversationEndPostfix");
-        // These are process-wide statics on LocationConversationPatches: in a real game only one client runs
-        // per process, but this harness runs several "clients" in one, so a previous test's leftovers could
-        // otherwise leak in here.
-        pendingField.SetValue(null, null);
-        heldNpcKeyField.SetValue(null, null);
+        ILocationConversationClientState clientConversationState = null;
 
         using var fixture = new MissionEngineFixture();
         var harmony = new Harmony($"e2e.vassal-oath-settlement.{Guid.NewGuid():N}");
@@ -371,8 +365,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
                 var location = ObjectHelper.SkipConstructor<Location>();
                 Assert.True(client.ObjectManager.AddExisting(LocationId, location));
-                CampaignMission.Current = new StubCampaignMission(location);
-                
+                client.CampaignMissionContext = new StubCampaignMission(location);
+                clientConversationState = client.Resolve<ILocationConversationClientState>();
+                Assert.False(clientConversationState.HasPendingOrHeld);
+
                 new LocationConversationTracker(client.ObjectManager);
             });
             
@@ -388,10 +384,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionStarted>());
             Assert.True(started.IsLocationInteraction);
 
-            // The approval round-trip runs synchronously through the mock network, so StartApprovedConversation
-            // has already consumed `pending` and set `heldNpcKey` for real by the time control returns here.
-            Assert.Null(pendingField.GetValue(null));
-            Assert.Equal(LocationConversationTracker.ComposeKey(LocationId, ruler.CharacterId), heldNpcKeyField.GetValue(null));
+            // The approval round-trip runs synchronously through the mock network, so the scoped client state
+            // has consumed its pending request and now holds the approved target.
+            Assert.Equal(
+                LocationConversationTracker.ComposeKey(LocationId, ruler.CharacterId),
+                clientConversationState.HeldNpcKey);
             Server.Call(() =>
             {
                 Assert.True(Server.Resolve<LocationConversationTracker>().TryGetEngagement(client.NetPeer, out var lockedNpcKey));
@@ -427,7 +424,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Server.NetworkSentMessages.Clear();
             client.Call(() => onConversationEndPostfix.Invoke(null, null));
 
-            Assert.Null(heldNpcKeyField.GetValue(null));
+            Assert.Null(clientConversationState.HeldNpcKey);
             var ended = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionEnded>());
             Assert.True(ended.IsLocationInteraction);
             Server.Call(() =>
@@ -454,9 +451,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             harmony.UnpatchAll(harmony.Id);
             MissionConversationLogicOverride = null;
             OneToOneConversationHeroOverride = null;
-            pendingField.SetValue(null, null);
-            heldNpcKeyField.SetValue(null, null);
-            CampaignMission.Current = null;
+            clientConversationState?.Clear();
+            client.CampaignMissionContext = null;
         }
     }
 
@@ -1325,6 +1321,191 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             Assert.Empty(kingdom.UnresolvedDecisions);
             Assert.False(GetVoteManager(client).ShouldSuppressLocalDecision(decision));
+        });
+    }
+
+    [Fact]
+    public void SingleClanKingdomDecisionResolution_DoesNotReopenBeforeRemovalApplies()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+            PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
+            }
+
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            var shownInquiries = new List<InquiryData>();
+            Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+            EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+                "OnShowInquiry",
+                BindingFlags.Public | BindingFlags.Static);
+            showInquiryEvent.AddEventHandler(null, onShowInquiry);
+            try
+            {
+                decisionsVm.HandleDecision(decision);
+
+                // Outcome inquiry for the single-clan resolution should have fired exactly once.
+                Assert.Single(shownInquiries);
+
+                GetVoteManager(client).ApplyResolved(kingdomId, 0, 0, true);
+
+                Assert.Null(decisionsVm.CurrentDecision);
+                Assert.True(GetVoteManager(client).ShouldSuppressLocalDecision(decision));
+
+                decisionsVm.OnFrameTick();
+
+                // Must not have reopened the inquiry in the resolve/remove gap.
+                Assert.Single(shownInquiries);
+                Assert.Null(decisionsVm.CurrentDecision);
+                Assert.Contains(decision, decisionsVm._examinedDecisionsSinceInit);
+            }
+            finally
+            {
+                showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+            }
+
+            client.SimulateMessage(this, new NetworkRemoveDecision(kingdomId, 0));
+
+            Assert.Empty(kingdom.UnresolvedDecisions);
+            Assert.False(GetVoteManager(client).ShouldSuppressLocalDecision(decision));
+        });
+    }
+
+    [Fact]
+    public void SingleClanKingdomDecisionResolution_DoesNotProcessNextDecisionWhileOutcomeInquiryPending()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+
+            PolicyObject firstPolicy = PolicyObject.All.First(c => !kingdom.ActivePolicies.Contains(c));
+            PolicyObject secondPolicy = PolicyObject.All.First(c => c != firstPolicy && !kingdom.ActivePolicies.Contains(c));
+
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, firstPolicy, false));
+                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, secondPolicy, false));
+            }
+
+            var firstDecision = kingdom.UnresolvedDecisions[0];
+            var secondDecision = kingdom.UnresolvedDecisions[1];
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+
+            var shownInquiries = new List<InquiryData>();
+            Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+            EventInfo showInquiryEvent = typeof(InformationManager).GetEvent("OnShowInquiry", BindingFlags.Public | BindingFlags.Static);
+            showInquiryEvent.AddEventHandler(null, onShowInquiry);
+            try
+            {
+                decisionsVm.HandleDecision(firstDecision);
+
+                // Outcome inquiry for firstDecision is up; OnSingleDecisionOver hasn't fired,
+                // so _shouldCheckForDecision must still be false here.
+                Assert.Single(shownInquiries);
+                Assert.Contains(firstDecision, decisionsVm._examinedDecisionsSinceInit);
+                Assert.DoesNotContain(secondDecision, decisionsVm._examinedDecisionsSinceInit);
+
+                // A frame tick landing in this gap must not pick up secondDecision.
+                decisionsVm.OnFrameTick();
+
+                Assert.Single(shownInquiries);
+                Assert.Null(decisionsVm.CurrentDecision);
+                Assert.DoesNotContain(secondDecision, decisionsVm._examinedDecisionsSinceInit);
+
+                //Player clicking OK, thus OnSingleDecision runs
+                shownInquiries[0].AffirmativeAction?.Invoke();
+
+                decisionsVm.OnFrameTick(); // calls HandleNextDecision into HandleDecision since shouldCheckForDecision is now true
+
+                Assert.Equal(2, shownInquiries.Count);
+                Assert.Contains(secondDecision, decisionsVm._examinedDecisionsSinceInit);
+            }
+            finally
+            {
+                showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+            }
+        });
+    }
+
+    [Fact]
+    public void SingleClanKingdomDecisionResolution_DoesNotProcessDecisionWhenMapActionsDisabled()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposerClan));
+            PolicyObject policy = PolicyObject.All.First(candidate => !kingdom.ActivePolicies.Contains(candidate));
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions.Add(new KingdomPolicyDecision(proposerClan, policy, false));
+            }
+
+            var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+
+            var shownInquiries = new List<InquiryData>();
+            Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+            EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+                "OnShowInquiry",
+                BindingFlags.Public | BindingFlags.Static);
+            showInquiryEvent.AddEventHandler(null, onShowInquiry);
+            try
+            {
+                using (new AllowedThread())
+                {
+                    Hero.MainHero.ChangeState(Hero.CharacterStates.Prisoner);
+                }
+
+                decisionsVm.HandleDecision(decision);
+
+                // Map actions disabled, thus prefix's guard clause must return true (fall through to
+                // vanilla HandleDecision), which also bails out on the disabled-reason check
+                // and never touches the decision.
+                Assert.Empty(shownInquiries);
+                Assert.Null(decisionsVm.CurrentDecision);
+                Assert.DoesNotContain(decision, decisionsVm._examinedDecisionsSinceInit);
+            }
+            finally
+            {
+                showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+                using (new AllowedThread())
+                {
+                    Hero.MainHero.ChangeState(Hero.CharacterStates.Active);
+                }
+            }
         });
     }
 

@@ -87,6 +87,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().InstancePerLifetimeScope();
         builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();
+        builder.RegisterType<BugReportServerSaveProvider>().As<IBugReportServerSaveProvider>().InstancePerDependency();
         builder.RegisterType<BugReportArchiveBuilder>().As<IBugReportArchiveBuilder>().InstancePerDependency();
         builder.RegisterType<BugReportLogValidator>().As<IBugReportLogValidator>().InstancePerDependency();
         builder.RegisterType<BugReportUploader>().As<IBugReportUploader>().InstancePerDependency();
@@ -142,6 +143,13 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LiveTestCommandDispatcher>().As<ILiveTestCommandDispatcher>().InstancePerDependency();
         builder.RegisterType<CoopModulePathResolver>().As<ICoopModulePathResolver>().InstancePerDependency();
         builder.RegisterType<FixedTownNpcService>().AsSelf().InstancePerLifetimeScope();
+        builder.RegisterType<LocationNpcGateState>().As<ILocationNpcGate>().InstancePerLifetimeScope();
+        builder.RegisterType<LocationConversationClientState>()
+            .As<ILocationConversationClientState>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<SettlementHeroSpawnPool>()
+            .As<ISettlementHeroSpawnPool>()
+            .InstancePerDependency();
         builder.RegisterType<KingdomCreationSettlementTracker>().AsSelf().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreator>().AsSelf().As<IKingdomCreator>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionOutcomeResolver>().AsSelf().As<IKingdomDecisionOutcomeResolver>().InstancePerLifetimeScope();

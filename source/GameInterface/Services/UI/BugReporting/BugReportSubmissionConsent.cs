@@ -18,11 +18,12 @@ public class BugReportSubmissionConsent : IBugReportSubmissionConsent
     public const string PromptText =
         "Submitting this report sends your network ID, summary, and description to the dedicated " +
         "server and BannerlordCoop's bug-report service. The reporting network ID is published in a " +
-        "public GitHub issue. Included server and client logs are uploaded to publicly accessible links, " +
-        "and remote deletion or expiry is not guaranteed. Allowing also enables sharing this client's " +
-        "current BannerlordCoop log with the report. Logs may contain player names, Steam IDs, IP " +
-        "addresses, file paths, and gameplay or network details. Runtime command arguments and " +
-        "common credential values are redacted. Saves, configuration files, and memory dumps are " +
+        "public GitHub issue. The server creates and uploads its current campaign save with the report. " +
+        "The save and included server and client logs are uploaded to publicly accessible links, and remote " +
+        "deletion or expiry is not guaranteed. Allowing also enables sharing this client's current " +
+        "BannerlordCoop log with the report. The server save and logs may contain player names, Steam IDs, " +
+        "IP addresses, file paths, and gameplay or network details. Runtime command arguments and common " +
+        "credential values are redacted from logs. Client saves, configuration files, and memory dumps are " +
         "not included. Choose Allow to enable diagnostic log sharing and submit this report. " +
         "Choose No thanks to cancel this bug report. Change log sharing later with " +
         "coop.bug_report_log_sharing enable or disable.";

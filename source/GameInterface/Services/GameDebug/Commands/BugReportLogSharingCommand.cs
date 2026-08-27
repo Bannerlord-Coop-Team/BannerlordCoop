@@ -3,6 +3,8 @@ using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.CoopOptions;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
@@ -26,26 +28,26 @@ public class BugReportLogSharingCommand
                 : "Diagnostic bug-report log sharing is disabled.";
         }
 
-        bool enabled;
         if (args[0].Equals("enable", StringComparison.OrdinalIgnoreCase))
         {
-            enabled = true;
+            if (InformationManager.IsAnyInquiryActive())
+                return "Close the current prompt before enabling diagnostic bug-report log sharing.";
+
+            var consent = new BugReportConsentCoordinator(
+                store,
+                exception => InformationManager.DisplayMessage(new InformationMessage(
+                    "[Bug Report] Could not save the log-sharing preference: " + exception.Message)));
+            consent.ShowPrompt(inquiry => InformationManager.ShowInquiry(inquiry));
+            return "Review the diagnostic log-sharing privacy prompt and choose Allow to enable it.";
         }
-        else if (args[0].Equals("disable", StringComparison.OrdinalIgnoreCase))
-        {
-            enabled = false;
-        }
-        else
-        {
+
+        if (!args[0].Equals("disable", StringComparison.OrdinalIgnoreCase))
             return "Usage: coop.bug_report_log_sharing status|enable|disable";
-        }
 
         try
         {
-            preference.SetEnabled(enabled);
-            return enabled
-                ? "Diagnostic bug-report log sharing enabled."
-                : "Diagnostic bug-report log sharing disabled.";
+            preference.SetEnabled(false);
+            return "Diagnostic bug-report log sharing disabled.";
         }
         catch (Exception exception)
         {
