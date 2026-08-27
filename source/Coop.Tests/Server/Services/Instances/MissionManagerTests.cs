@@ -99,6 +99,28 @@ public class MissionManagerTests
     }
 
     [Fact]
+    public void OldMembershipDisconnectRemovesPunchEndpointFromNewInstance()
+    {
+        var manager = new MissionManager();
+        var peer = CreatePeer(1);
+        var netManager = new NetManager(null);
+        var internalEndpoint = new IPEndPoint(IPAddress.Loopback, 53007);
+        var externalEndpoint = new IPEndPoint(IPAddress.Loopback, 53008);
+
+        Assert.True(manager.TryEnterMission(peer, "moving", "old-instance", out _));
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            internalEndpoint,
+            externalEndpoint,
+            "moving%new-instance");
+
+        MissionDeparture departure = Assert.Single(manager.HandleDisconnect(peer));
+
+        Assert.Equal("old-instance", departure.InstanceId);
+        Assert.Empty(GetInstance(manager, "new-instance").PunchEndpoints);
+    }
+
+    [Fact]
     public void RepunchReplacesEarlierEndpointForController()
     {
         var manager = new MissionManager();

@@ -536,8 +536,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private MissionDeparture RemoveMembership(MissionMembership membership)
     {
         membership.Instance.Memberships.Remove(membership);
-        membership.Instance.PunchEndpoints.RemoveAll(
-            endpoints => endpoints.ControllerId == membership.ControllerId);
+        RemoveControllerEndpointEverywhere(membership.ControllerId);
         if (byPeer.TryGetValue(membership.Peer, out var peerMembership) &&
             ReferenceEquals(peerMembership, membership))
         {
