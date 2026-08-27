@@ -1755,25 +1755,27 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void StartAllianceDecision_ClanTypedOuterKingdomId_UsesProposerCurrentKingdom()
+    public void StartAllianceDecision_ClanTypedDecisionKingdomId_UsesReferencedClanKingdom()
     {
         var client = Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         var player = CreateSyncedPlayerContext(ControllerId, client);
         var recipientKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        var recipientRulerClanId = CreateSyncedNpcClan();
+        var proposingClanId = CreateSyncedNpcClan();
         var targetRulerClanId = CreateSyncedNpcClan();
 
-        ConfigureClanInKingdom(recipientRulerClanId, recipientKingdomId);
         ConfigureClanInKingdom(player.ClanId, recipientKingdomId);
+        ConfigureClanInKingdom(proposingClanId, proposingKingdomId);
         ConfigureClanInKingdom(targetRulerClanId, targetKingdomId);
         EnsureKingdomRegisteredEverywhere(recipientKingdomId);
+        EnsureKingdomRegisteredEverywhere(proposingKingdomId);
         EnsureKingdomRegisteredEverywhere(targetKingdomId);
         ConfigureAllianceModelEverywhere();
 
         var decisionData = new StartAllianceDecisionData(
-            recipientRulerClanId,
+            proposingClanId,
             player.ClanId,
             triggerTime: 0,
             isEnforced: false,
@@ -1793,13 +1795,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(proposingKingdomId, out var proposingKingdom));
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
-            Assert.True(client.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(proposingClanId, out var proposingClan));
 
             var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
-            Assert.Same(recipientRulerClan, decision.ProposerClan);
+            Assert.Same(proposingClan, decision.ProposerClan);
             Assert.Same(recipientKingdom, decision.Kingdom);
             Assert.Same(targetKingdom, decision.KingdomToStartAllianceWith);
+            Assert.Empty(proposingKingdom.UnresolvedDecisions);
             Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
         });
     }

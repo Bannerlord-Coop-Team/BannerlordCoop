@@ -32,25 +32,24 @@ namespace GameInterface.Services.Kingdoms.Data
         {
             proposerClan = null;
             kingdom = null;
-            if (!objectManager.TryGetObject(ProposerClanId, out proposerClan))
+            if (!objectManager.TryGetObject(ProposerClanId, out proposerClan) ||
+                !objectManager.TryGetObject(KingdomId, out object kingdomReference))
             {
                 return false;
             }
 
-            if (objectManager.TryGetObject(KingdomId, out kingdom))
+            if (kingdomReference is Kingdom serializedKingdom)
             {
+                kingdom = serializedKingdom;
                 return true;
             }
 
-            if (!objectManager.TryGetObject(KingdomId, out Clan malformedKingdomIdClan) ||
-                proposerClan.Kingdom == null ||
-                malformedKingdomIdClan.Kingdom != proposerClan.Kingdom)
+            if (kingdomReference is not Clan serializedClan || serializedClan.Kingdom == null)
             {
-                kingdom = null;
                 return false;
             }
 
-            kingdom = proposerClan.Kingdom;
+            kingdom = serializedClan.Kingdom;
             return true;
         }
 
