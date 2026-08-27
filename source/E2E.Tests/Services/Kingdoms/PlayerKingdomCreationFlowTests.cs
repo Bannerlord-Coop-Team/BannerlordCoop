@@ -1864,6 +1864,69 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void StartAllianceDecision_ClanTypedTargetKingdomId_UsesReferencedClanKingdom()
+    {
+        const string compactTargetClanId = "target-alliance-collision";
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var recipientKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposerClanId = CreateSyncedNpcClan();
+        var targetRulerClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, recipientKingdomId);
+        ConfigureClanInKingdom(proposerClanId, proposingKingdomId);
+        ConfigureClanInKingdom(targetRulerClanId, targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(recipientKingdomId);
+        EnsureKingdomRegisteredEverywhere(proposingKingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        ConfigureAllianceModelEverywhere();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            var targetClanReference = ObjectHelper.SkipConstructor<Clan>();
+            targetClanReference._kingdom = targetKingdom;
+            Assert.True(client.ObjectManager.AddExisting($"Clan_{compactTargetClanId}", targetClanReference));
+            Assert.True(client.ObjectManager.AddExisting(
+                $"Kingdom_{compactTargetClanId}",
+                ObjectHelper.SkipConstructor<Kingdom>()));
+        });
+
+        var decisionData = new StartAllianceDecisionData(
+            proposerClanId,
+            recipientKingdomId,
+            triggerTime: 0,
+            isEnforced: false,
+            notifyPlayer: false,
+            playerExamined: false,
+            kingdomToStartAllianceWithId: compactTargetClanId,
+            isProposedByOpponent: true);
+
+        client.Call(() => client.SimulateMessage(
+            this,
+            new NetworkAddDecision(
+                recipientKingdomId,
+                decisionData,
+                ignoreInfluenceCost: true,
+                randomNumber: 0.5f)));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(compactTargetClanId, out var conflictingKingdom));
+
+            var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
+            Assert.Same(targetKingdom, decision.KingdomToStartAllianceWith);
+            Assert.NotSame(conflictingKingdom, decision.KingdomToStartAllianceWith);
+            Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
+        });
+    }
+
+    [Fact]
     public void AllianceTimeoutFixture_NormalizesEveryReversibleEligibilityInputAndRestoresThemAfterExplicitAndFailedStagePaths()
     {
         const string fixtureControllerId = "testclient";

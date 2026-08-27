@@ -79,7 +79,7 @@ namespace GameInterface.Services.Kingdoms.Data
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndDecisionKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||
-                !objectManager.TryGetObject(KingdomToStartAllianceWithId, out Kingdom kingdomToStartAllianceWith))
+                !TryGetTargetKingdomReference(objectManager, out Kingdom kingdomToStartAllianceWith))
             {
                 kingdomDecision = null;
                 return false;
@@ -98,6 +98,35 @@ namespace GameInterface.Services.Kingdoms.Data
             startAllianceDecision._allianceCampaignBehavior = allianceCampaignBehavior;
             kingdomDecision = startAllianceDecision;
             return true;
+        }
+
+        private bool TryGetTargetKingdomReference(IObjectManager objectManager, out Kingdom kingdom)
+        {
+            kingdom = null;
+            if (objectManager.TryGetObject(KingdomToStartAllianceWithId, out object kingdomReference))
+            {
+                if (kingdomReference is Kingdom serializedKingdom)
+                {
+                    kingdom = serializedKingdom;
+                    return true;
+                }
+
+                if (kingdomReference is Clan serializedClan && serializedClan.Kingdom != null)
+                {
+                    kingdom = serializedClan.Kingdom;
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (objectManager.TryGetObject(KingdomToStartAllianceWithId, out Clan compactClan) && compactClan.Kingdom != null)
+            {
+                kingdom = compactClan.Kingdom;
+                return true;
+            }
+
+            return objectManager.TryGetObject(KingdomToStartAllianceWithId, out kingdom);
         }
     }
 }
