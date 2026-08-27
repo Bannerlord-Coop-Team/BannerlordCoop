@@ -380,7 +380,6 @@ public class BattleDamageRouter : IBattleDamageRouter
             bool hasSiegeShot = siegeShotAuthorities.TryGetValue(missileIndex, out siegeAuthority);
             if (hasSiegeShot)
             {
-                siegeShotAuthorities.Remove(missileIndex);
                 if (!siegeAuthority.Accepted
                     || !machineState.TryGetMachineAuthority(
                         siegeAuthority.MachineId,

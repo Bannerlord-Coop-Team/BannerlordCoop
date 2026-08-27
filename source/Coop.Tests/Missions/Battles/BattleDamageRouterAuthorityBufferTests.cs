@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.MapEvents.Messages;
 using Missions;
 using Missions.Agents;
 using Missions.Battles;
@@ -60,6 +61,67 @@ public class BattleDamageRouterAuthorityBufferTests
         Assert.NotNull(removedEvent);
         var callback = Assert.IsType<Action<int>>(removedEvent!.GetValue(missionScope.Instance));
         callback(17);
+
+        Assert.Empty(authorityMap);
+    }
+
+    [Fact]
+    public void SiegeMissile_AuthorityStampSurvivesMultipleAgentHitsUntilMissileRemoval()
+    {
+        const int missileIndex = 17;
+        Assert.Null(Mission.Current);
+        var broker = new Mock<IMessageBroker>();
+        Action<MessagePayload<BattlePuppetHit>> receive = null;
+        broker.Setup(b => b.Subscribe(
+                It.IsAny<Action<MessagePayload<BattlePuppetHit>>>()))
+            .Callback<Action<MessagePayload<BattlePuppetHit>>>(handler => receive = handler);
+
+        var machineState = new Mock<ISiegeMachineStateReplicator>();
+        ConfigureAuthority(machineState, "owner-a", 7, 3);
+        var missionComponent = new Mock<ICoopMissionComponent>();
+        missionComponent.SetupGet(component => component.AgentRegistry)
+            .Returns(Mock.Of<INetworkAgentRegistry>());
+        missionComponent.SetupGet(component => component.MissileHandler)
+            .Returns(Mock.Of<IMissileHandler>());
+
+        using var sut = new BattleDamageRouter(
+            Mock.Of<IBattleNetwork>(),
+            broker.Object,
+            missionComponent.Object,
+            Mock.Of<IBattleSession>(),
+            machineState.Object,
+            Mock.Of<IGuardedHitWindow>(),
+            Mock.Of<IAgentNativeMountState>(),
+            Mock.Of<IPuppetMountStateRepairer>());
+
+        using var missionScope = new MissionCurrentScope();
+        FieldInfo missilesField = typeof(Mission).GetField(
+            "_missilesDictionary", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(missilesField);
+        missilesField!.SetValue(missionScope.Instance, Activator.CreateInstance(missilesField.FieldType));
+        sut.Initialize(missionScope.Instance);
+
+        FieldInfo authorityField = typeof(BattleDamageRouter).GetField(
+            "siegeShotAuthorities", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(authorityField);
+        var authorityMap = Assert.IsAssignableFrom<IDictionary>(authorityField!.GetValue(sut));
+        Type stampType = authorityMap.GetType().GetGenericArguments()[1];
+        object authorityStamp = Activator.CreateInstance(stampType, 42, "owner-a", 7, 3, true);
+        Assert.NotNull(authorityStamp);
+        authorityMap.Add(missileIndex, authorityStamp);
+
+        Assert.NotNull(receive);
+        var hit = new BattlePuppetHit(null, null, MissileBlow(missileIndex), default);
+        receive(new MessagePayload<BattlePuppetHit>(this, hit));
+        Assert.Single(authorityMap.Keys);
+        receive(new MessagePayload<BattlePuppetHit>(this, hit));
+        Assert.Single(authorityMap.Keys);
+
+        FieldInfo removedEvent = typeof(Mission).GetField(
+            "OnMissileRemovedEvent", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(removedEvent);
+        var callback = Assert.IsType<Action<int>>(removedEvent!.GetValue(missionScope.Instance));
+        callback(missileIndex);
 
         Assert.Empty(authorityMap);
     }
@@ -192,14 +254,7 @@ public class BattleDamageRouterAuthorityBufferTests
         Blow blow = default;
         if (missile)
         {
-            blow = new Blow(17);
-            object weaponRecord = blow.WeaponRecord;
-            FieldInfo isMissileField = typeof(BlowWeaponRecord).GetField(
-                "_isMissile", BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.NotNull(isMissileField);
-            isMissileField.SetValue(weaponRecord, true);
-            blow.WeaponRecord = (BlowWeaponRecord)weaponRecord;
-            blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = 42;
+            blow = MissileBlow(42);
         }
 
         return new NetworkApplyBattleDamage(victimId, Guid.Empty, blow, default,
@@ -208,6 +263,19 @@ public class BattleDamageRouterAuthorityBufferTests
             hostEpoch: hostEpoch,
             authorityRevision: authorityRevision,
             missileShotSequence: missileShotSequence);
+    }
+
+    private static Blow MissileBlow(int missileIndex)
+    {
+        var blow = new Blow(17);
+        object weaponRecord = blow.WeaponRecord;
+        FieldInfo isMissileField = typeof(BlowWeaponRecord).GetField(
+            "_isMissile", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(isMissileField);
+        isMissileField.SetValue(weaponRecord, true);
+        blow.WeaponRecord = (BlowWeaponRecord)weaponRecord;
+        blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = missileIndex;
+        return blow;
     }
 
     private static void ConfigureAuthority(
