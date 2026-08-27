@@ -592,6 +592,18 @@ public sealed class MissionEngineFixture : IDisposable
             throw new KeyNotFoundException(
                 $"Missile index {blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex} not in the mock mission's missile set (models Mission.OnAgentHit)");
 
+        int affectorWeaponSlot = blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+        if (!blow.IsMissile
+            && affectorWeaponSlot >= 0
+            && TryActiveMock(out mock)
+            && mock.FindAgentWithIndex(blow.OwnerId) is Agent affectorAgent
+            && AgentMirror.TryGet(affectorAgent, out var affector)
+            && affector.IsMount)
+        {
+            throw new NullReferenceException(
+                "Mount has no equipment for Mission.OnAgentHit's affector weapon lookup");
+        }
+
         victim.Health -= blow.InflictedDamage;
         if (TryActiveMock(out var activeMock)
             && activeMock.DismountRiderOnNextBlow)

@@ -21,12 +21,22 @@ internal sealed class CoopTournamentVM : TournamentVM
 
     internal readonly struct UIState
     {
+        internal enum PlayerRole
+        {
+            None,
+            Fighter,
+            Resting,
+            Eliminated,
+            Spectator
+        }
+
         public readonly bool CanJoin;
         public readonly bool CanWatch;
         public readonly bool CanSkip;
         public readonly bool CanLeave;
         public readonly bool CanBet;
         public readonly bool IsMatchActive;
+        public readonly PlayerRole Role;
         public readonly int ReadyCount;
         public readonly int SkipCount;
         public readonly int VoterCount;
@@ -39,6 +49,7 @@ internal sealed class CoopTournamentVM : TournamentVM
             bool canLeave,
             bool canBet,
             bool isMatchActive,
+            PlayerRole role,
             int readyCount,
             int skipCount,
             int voterCount,
@@ -50,6 +61,7 @@ internal sealed class CoopTournamentVM : TournamentVM
             CanLeave = canLeave;
             CanBet = canBet;
             IsMatchActive = isMatchActive;
+            Role = role;
             ReadyCount = readyCount;
             SkipCount = skipCount;
             VoterCount = voterCount;
@@ -89,6 +101,7 @@ internal sealed class CoopTournamentVM : TournamentVM
     private bool canBet;
     private bool isJoinVisible;
     private bool isCoopMatchActive;
+    private bool leaveMenuOpen;
     private string readyCountText;
     private string skipCountText;
     private string selectedChoiceText;
@@ -96,6 +109,7 @@ internal sealed class CoopTournamentVM : TournamentVM
     private bool hasAcceptedBetResult;
     private long acceptedBetSequence;
     private BetSummary acceptedBetSummary;
+    private UIState lastUIState;
 
     public CoopTournamentVM(
         Action disableUI,
@@ -184,9 +198,20 @@ internal sealed class CoopTournamentVM : TournamentVM
         {
             if (isCoopMatchActive == value) return;
             isCoopMatchActive = value;
-            base.IsCurrentMatchActive = value;
+            base.IsCurrentMatchActive = value && !leaveMenuOpen;
             OnPropertyChangedWithValue(value, nameof(IsCoopMatchActive));
             OnPropertyChanged(nameof(ShouldShowUI));
+        }
+    }
+
+    internal bool IsLeaveMenuOpen
+    {
+        get => leaveMenuOpen;
+        set
+        {
+            if (leaveMenuOpen == value) return;
+            leaveMenuOpen = value;
+            base.IsCurrentMatchActive = isCoopMatchActive && !leaveMenuOpen;
         }
     }
 
@@ -610,7 +635,14 @@ internal sealed class CoopTournamentVM : TournamentVM
         bool localIsInCurrentMatch = localContestant != null && currentMatch?.Teams.Any(team =>
             team.ParticipantSlotIds.Contains(localContestant.SlotId)) == true;
         bool localIsSpectator = currentSnapshot?.SpectatorControllerIds.Contains(localControllerId) == true;
-        bool localIsVoter = localContestant != null || localIsSpectator;
+        UIState.PlayerRole role = localContestant == null
+            ? localIsSpectator ? UIState.PlayerRole.Spectator : UIState.PlayerRole.None
+            : localIsInCurrentMatch
+                ? UIState.PlayerRole.Fighter
+                : IsInRemainingBracket(currentSnapshot, localContestant.SlotId)
+                    ? UIState.PlayerRole.Resting
+                    : UIState.PlayerRole.Eliminated;
+        bool localIsVoter = role != UIState.PlayerRole.None;
         TournamentPlayerChoice selectedChoice = currentSnapshot?.Choices
             .FirstOrDefault(item => item.ControllerId == localControllerId)?.Choice ??
             TournamentPlayerChoice.None;
@@ -622,11 +654,27 @@ internal sealed class CoopTournamentVM : TournamentVM
             currentSnapshot != null && (localIsVoter || currentSnapshot.IsCompleted),
             awaitingChoice && localIsInCurrentMatch && hasRemainingBet,
             currentSnapshot?.Phase == TournamentSessionPhase.LiveMatch,
+            role,
             currentSnapshot?.ReadyCount ?? 0,
             currentSnapshot?.SkipCount ?? 0,
             currentSnapshot?.VoterCount ?? 0,
             selectedChoice);
     }
+
+    internal static TournamentPlayerChoice? GetAdvanceChoice(UIState state)
+    {
+        if (state.CanJoin) return TournamentPlayerChoice.Join;
+        if (state.CanSkip) return TournamentPlayerChoice.Skip;
+        if (state.CanWatch) return TournamentPlayerChoice.Watch;
+        return null;
+    }
+
+    internal static bool ShouldOpenLeaveMenu(UIState state)
+        => state.IsMatchActive && state.CanLeave && state.Role == UIState.PlayerRole.Spectator;
+
+    internal TournamentPlayerChoice? GetAdvanceChoice() => GetAdvanceChoice(lastUIState);
+
+    internal bool ShouldOpenLeaveMenu() => ShouldOpenLeaveMenu(lastUIState);
 
     private static TournamentContestantData GetLocalContestant(
         TournamentSessionSnapshot currentSnapshot,
@@ -644,6 +692,15 @@ internal sealed class CoopTournamentVM : TournamentVM
             .SelectMany(round => round.Matches)
             .FirstOrDefault(match => match.MatchId == currentSnapshot.CurrentMatchId);
     }
+    private static bool IsInRemainingBracket(TournamentSessionSnapshot currentSnapshot, string slotId)
+    {
+        if (currentSnapshot?.Rounds == null) return false;
+        return currentSnapshot.Rounds
+            .SelectMany(round => round.Matches ?? Array.Empty<TournamentMatchData>())
+            .Where(match => match != null && match.State != (int)TournamentMatch.MatchState.Finished)
+            .SelectMany(match => match.Teams ?? Array.Empty<TournamentTeamData>())
+            .Any(team => team != null && team.ParticipantSlotIds.Contains(slotId));
+    }
     private void RefreshCoopState()
     {
         int maximumBet = RefreshBetQuote();
@@ -654,6 +711,7 @@ internal sealed class CoopTournamentVM : TournamentVM
         bool hasRemainingBet = snapshot != null && MaximumBetValue > 0;
         UIState state = CalculateUIState(snapshot, controller.LocalControllerId, hasRemainingBet);
 
+        lastUIState = state;
         CanJoin = state.CanJoin;
         IsJoinVisible = state.CanJoin;
         CanWatch = state.CanWatch;
