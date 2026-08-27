@@ -136,50 +136,27 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         if (liveParties == null || liveSettlements == null)
             return FailCreation("live campaign objects are unavailable", out failure);
 
-        bool created = TryCreate(party, out PartyBehaviorUpdateData behavior, out failure);
+        PartyBehaviorUpdateData behavior;
         if (TryGetInvalidJoinReferences(
             party,
             liveParties,
             liveSettlements,
             out string invalidReferences))
         {
-            if (!TryGetCompactId(party, out _))
-                return false;
-
-            try
-            {
-                // Mirror vanilla's removed-target cleanup so behavior and navigation stay coherent.
-                party.SetMoveModeHold();
-                party.SetNavigationModeHold();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to reset stale join references on party {Party}", party.StringId);
-                return FailCreation(
-                    $"failed to reset stale join references ({invalidReferences}): " +
-                    $"{ex.GetType().Name}: {ex.Message}",
-                    out failure);
-            }
+            if (!TryGetCompactId(party, out string partyId))
+                return FailCreation("party is not registered", out failure);
 
             Logger.Warning(
-                "Reset stale join references ({References}) on party {Party} to Hold",
+                "Normalized stale join references ({References}) on party {Party} for join baseline",
                 invalidReferences,
                 party.StringId);
 
-            if (!TryCreate(party, out behavior, out failure))
-                return false;
-            if (TryGetInvalidJoinReferences(
-                party,
-                liveParties,
-                liveSettlements,
-                out string remainingReferences))
-            {
-                return FailCreation(
-                    $"stale join references remain after reset ({remainingReferences})",
-                    out failure);
-            }
+            // Stale objects cannot be represented on the joining client. Preserve the movement state.
+            behavior = party.PartyMoveMode == MoveModeType.Hold
+                ? CreateHeldJoinBehavior(party, partyId)
+                : CreatePointJoinBehavior(party, partyId);
         }
-        else if (!created)
+        else if (!TryCreate(party, out behavior, out failure))
         {
             return false;
         }
@@ -202,6 +179,41 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         failure = null;
         return true;
     }
+
+    private static PartyBehaviorUpdateData CreatePointJoinBehavior(MobileParty party, string partyId)
+    {
+        CampaignVec2 destination = party.MoveTargetParty?.Position ?? party.MoveTargetPoint;
+        return new PartyBehaviorUpdateData(
+            partyId,
+            AiBehavior.GoToPoint,
+            null,
+            destination,
+            party.Position,
+            AiBehavior.GoToPoint,
+            destination,
+            party.DesiredAiNavigationType)
+        {
+            MoveTargetPoint = destination,
+            PartyMoveMode = MoveModeType.Point,
+            IsCurrentlyAtSea = party.IsCurrentlyAtSea,
+        };
+    }
+
+    private static PartyBehaviorUpdateData CreateHeldJoinBehavior(MobileParty party, string partyId) =>
+        new PartyBehaviorUpdateData(
+            partyId,
+            AiBehavior.Hold,
+            null,
+            party.Position,
+            party.Position,
+            AiBehavior.Hold,
+            party.Position,
+            MobileParty.NavigationType.None)
+        {
+            MoveTargetPoint = party.MoveTargetPoint,
+            PartyMoveMode = MoveModeType.Hold,
+            IsCurrentlyAtSea = party.IsCurrentlyAtSea,
+        };
 
     private bool TryGetInvalidJoinReferences(
         MobileParty party,
