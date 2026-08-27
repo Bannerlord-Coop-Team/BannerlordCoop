@@ -2,6 +2,7 @@ using Common;
 using Common.Messaging;
 using GameInterface.Services.MapTracks.Data;
 using GameInterface.Services.MapTracks.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
@@ -202,6 +203,21 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
 
         behavior._allTracks.Add(track);
         behavior._trackLocator.UpdateLocator(track);
+
+        // Add own player party track to detected tracks early to avoid xp gain from regular detection
+        if (party.IsPlayerParty())
+        {
+            if (!objectManager.TryGetIdWithLogging(party, out var playerPartyId)) return;
+
+            AddPlayerPartyKeys(playerPartyId);
+            playerDetectedTracks[playerPartyId].Add(track);
+
+            var trackChange = new Dictionary<string, List<MapTrackData>>
+            {
+                [playerPartyId] = new() { ToMapTrackData(track) }
+            };
+            PublishUpdateClientsMapTrackData(trackChange, false);
+        }
     }
 
     public void SyncTrackMapFactions(MapTracksCampaignBehavior behavior, IDataStore dataStore)
