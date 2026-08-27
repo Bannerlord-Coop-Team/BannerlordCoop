@@ -1755,6 +1755,105 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void StartAllianceDecision_ClanTypedOuterKingdomId_UsesProposerCurrentKingdom()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var recipientKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var recipientRulerClanId = CreateSyncedNpcClan();
+        var targetRulerClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(recipientRulerClanId, recipientKingdomId);
+        ConfigureClanInKingdom(player.ClanId, recipientKingdomId);
+        ConfigureClanInKingdom(targetRulerClanId, targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(recipientKingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        ConfigureAllianceModelEverywhere();
+
+        var decisionData = new StartAllianceDecisionData(
+            recipientRulerClanId,
+            player.ClanId,
+            triggerTime: 0,
+            isEnforced: false,
+            notifyPlayer: false,
+            playerExamined: false,
+            kingdomToStartAllianceWithId: targetKingdomId,
+            isProposedByOpponent: true);
+
+        client.Call(() => client.SimulateMessage(
+            this,
+            new NetworkAddDecision(
+                player.ClanId,
+                decisionData,
+                ignoreInfluenceCost: true,
+                randomNumber: 0.5f)));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(recipientRulerClanId, out var recipientRulerClan));
+
+            var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
+            Assert.Same(recipientRulerClan, decision.ProposerClan);
+            Assert.Same(recipientKingdom, decision.Kingdom);
+            Assert.Same(targetKingdom, decision.KingdomToStartAllianceWith);
+            Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
+        });
+    }
+
+    [Fact]
+    public void StartAllianceDecision_ValidSerializedKingdom_RemainsAuthoritativeAfterProposerMoves()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var recipientKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposerCurrentKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposerClanId = CreateSyncedNpcClan();
+        var targetRulerClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, recipientKingdomId);
+        ConfigureClanInKingdom(proposerClanId, proposerCurrentKingdomId);
+        ConfigureClanInKingdom(targetRulerClanId, targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(recipientKingdomId);
+        EnsureKingdomRegisteredEverywhere(proposerCurrentKingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        ConfigureAllianceModelEverywhere();
+
+        var decisionData = new StartAllianceDecisionData(
+            proposerClanId,
+            recipientKingdomId,
+            triggerTime: 0,
+            isEnforced: false,
+            notifyPlayer: false,
+            playerExamined: false,
+            kingdomToStartAllianceWithId: targetKingdomId,
+            isProposedByOpponent: true);
+
+        client.Call(() => client.SimulateMessage(
+            this,
+            new NetworkAddDecision(
+                player.ClanId,
+                decisionData,
+                ignoreInfluenceCost: true,
+                randomNumber: 0.5f)));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(proposerCurrentKingdomId, out var proposerCurrentKingdom));
+
+            var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
+            Assert.Same(recipientKingdom, decision.Kingdom);
+            Assert.Empty(proposerCurrentKingdom.UnresolvedDecisions);
+        });
+    }
+
+    [Fact]
     public void AllianceTimeoutFixture_NormalizesEveryReversibleEligibilityInputAndRestoresThemAfterExplicitAndFailedStagePaths()
     {
         const string fixtureControllerId = "testclient";

@@ -28,10 +28,36 @@ namespace GameInterface.Services.Kingdoms.Data
             IsProposedByOpponent = isProposedByOpponent;
         }
 
+        public bool TryGetProposerClanAndDecisionKingdom(IObjectManager objectManager, out Clan proposerClan, out Kingdom kingdom)
+        {
+            proposerClan = null;
+            kingdom = null;
+            if (!objectManager.TryGetObject(ProposerClanId, out proposerClan))
+            {
+                return false;
+            }
+
+            if (objectManager.TryGetObject(KingdomId, out kingdom))
+            {
+                return true;
+            }
+
+            if (!objectManager.TryGetObject(KingdomId, out Clan malformedKingdomIdClan) ||
+                proposerClan.Kingdom == null ||
+                malformedKingdomIdClan.Kingdom != proposerClan.Kingdom)
+            {
+                kingdom = null;
+                return false;
+            }
+
+            kingdom = proposerClan.Kingdom;
+            return true;
+        }
+
         /// <inheritdoc/>
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
-            if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||
+            if (!TryGetProposerClanAndDecisionKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||
                 !objectManager.TryGetObject(KingdomToStartAllianceWithId, out Kingdom kingdomToStartAllianceWith))
             {
                 kingdomDecision = null;

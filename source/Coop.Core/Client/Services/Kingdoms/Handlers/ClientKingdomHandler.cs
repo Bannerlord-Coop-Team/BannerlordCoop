@@ -5,6 +5,7 @@ using Common.Util;
 using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -388,21 +389,40 @@ public class ClientKingdomHandler : IHandler
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
         var payload = obj.What;
-        if (!ShouldApplyNetworkDecision(payload.KingdomId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ShouldApplyNetworkDecision(payload, out string kingdomId)) return;
 
-        var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
-        messageBroker.Publish(this, message);
+            var message = new AddDecision(kingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
+            messageBroker.Publish(this, message);
+        }, context: nameof(ClientKingdomHandler));
     }
 
-    private bool ShouldApplyNetworkDecision(string kingdomId)
+    private bool ShouldApplyNetworkDecision(NetworkAddDecision payload, out string kingdomId)
     {
+        kingdomId = payload.KingdomId;
         if (string.IsNullOrWhiteSpace(kingdomId)) return false;
-        if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom)) return true;
+        if (!TryGetDecisionKingdom(payload, out Kingdom kingdom)) return true;
+        if (objectManager.TryGetId(kingdom, out string resolvedKingdomId))
+        {
+            kingdomId = resolvedKingdomId;
+        }
         if (!playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player)) return true;
         if (string.IsNullOrWhiteSpace(player.ClanId)) return false;
         if (!objectManager.TryGetObject(player.ClanId, out Clan clan)) return false;
 
         return clan.Kingdom == kingdom;
+    }
+
+    private bool TryGetDecisionKingdom(NetworkAddDecision payload, out Kingdom kingdom)
+    {
+        if (payload.Data is StartAllianceDecisionData startAllianceDecisionData &&
+            startAllianceDecisionData.TryGetProposerClanAndDecisionKingdom(objectManager, out _, out kingdom))
+        {
+            return true;
+        }
+
+        return objectManager.TryGetObject(payload.KingdomId, out kingdom);
     }
 
     private void HandleDestroyKingdom(MessagePayload<DestroyKingdom> obj)

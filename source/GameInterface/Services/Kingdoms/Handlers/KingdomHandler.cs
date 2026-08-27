@@ -499,26 +499,39 @@ public class KingdomHandler : IHandler
     private void HandleAddDecision(MessagePayload<AddDecision> obj)
     {
         var payload = obj.What;
-
-        if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+        RunKingdomMutation(() =>
         {
-            Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
-            return;
+            if (!TryGetDecisionKingdom(payload, out Kingdom kingdom))
+            {
+                Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
+                return;
+            }
+
+            if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
+            {
+                Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
+                return;
+            }
+
+            bool isPendingPlayerAllianceOffer = payload.Data is StartAllianceDecisionData { IsProposedByOpponent: true };
+            kingdomInterface.RunAddDecision(
+                kingdom,
+                kingdomDecision,
+                payload.IgnoreInfluenceCost,
+                payload.RandomNumber,
+                isPendingPlayerAllianceOffer);
+        });
+    }
+
+    private bool TryGetDecisionKingdom(AddDecision payload, out Kingdom kingdom)
+    {
+        if (payload.Data is StartAllianceDecisionData startAllianceDecisionData &&
+            startAllianceDecisionData.TryGetProposerClanAndDecisionKingdom(objectManager, out _, out kingdom))
+        {
+            return true;
         }
 
-        if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
-        {
-            Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
-            return;
-        }
-
-        bool isPendingPlayerAllianceOffer = payload.Data is StartAllianceDecisionData { IsProposedByOpponent: true };
-        kingdomInterface.RunAddDecision(
-            kingdom,
-            kingdomDecision,
-            payload.IgnoreInfluenceCost,
-            payload.RandomNumber,
-            isPendingPlayerAllianceOffer);
+        return objectManager.TryGetObject(payload.KingdomId, out kingdom);
     }
 
     private static void RunKingdomMutation(Action action)
