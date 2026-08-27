@@ -24,9 +24,9 @@ public class AutoSyncRegistryItem
             || Properties.Contains(new Debuggable<PropertyInfo>(property, false));
     }
 
-    public void AddField(FieldInfo field, bool debug, bool coalesce)
+    public void AddField(FieldInfo field, bool debug, bool coalesce, bool suppressClientDiagnosticWhenUnregistered)
     {
-        Fields.Add(new Debuggable<FieldInfo>(field, debug, coalesce));
+        Fields.Add(new Debuggable<FieldInfo>(field, debug, coalesce, suppressClientDiagnosticWhenUnregistered));
     }
 
     public void AddProperty(PropertyInfo property, bool debug, bool coalesce)
@@ -64,11 +64,17 @@ public class Debuggable<T>
     public bool Debug;
     // Route this member's per-change sends through the per-tick coalescer instead of SendAll.
     public bool Coalesce;
+    public bool SuppressClientDiagnosticWhenUnregistered;
 
-    public Debuggable(T value, bool debug, bool coalesce = false)
+    public Debuggable(
+        T value,
+        bool debug,
+        bool coalesce = false,
+        bool suppressClientDiagnosticWhenUnregistered = false)
     {
         Value = value;
         Debug = debug;
         Coalesce = coalesce;
+        SuppressClientDiagnosticWhenUnregistered = suppressClientDiagnosticWhenUnregistered;
     }
 }

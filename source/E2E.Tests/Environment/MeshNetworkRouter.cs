@@ -13,21 +13,21 @@ namespace E2E.Tests.Environment;
 /// </summary>
 public class MeshNetworkRouter
 {
-    private const string MessageChannel = "message";
+    private const string ReliableOrderedChannel = "packet:ReliableOrdered";
 
     private readonly List<ClientRegistration> clients = new();
     private readonly IVirtualNetworkScheduler scheduler;
 
     public MeshNetworkRouter(IVirtualNetworkScheduler scheduler)
     {
-        if (scheduler == null) throw new ArgumentNullException(nameof(scheduler));
+        ArgumentNullException.ThrowIfNull(scheduler);
         this.scheduler = scheduler;
     }
 
     public void AddClient(ClientInstance instance, MockBattleNetwork mesh)
     {
-        if (instance == null) throw new ArgumentNullException(nameof(instance));
-        if (mesh == null) throw new ArgumentNullException(nameof(mesh));
+        ArgumentNullException.ThrowIfNull(instance);
+        ArgumentNullException.ThrowIfNull(mesh);
         clients.Add(new ClientRegistration(instance, mesh));
     }
 
@@ -84,11 +84,24 @@ public class MeshNetworkRouter
             SchedulePacket(sender, recipient, packet);
     }
 
+    public void SendAll(MockBattleNetwork sender, IPacket packet, byte[] serializedPacket)
+    {
+        foreach (ClientRegistration recipient in RecipientsOf(sender))
+            SchedulePacket(sender, recipient, packet, serializedPacket);
+    }
+
     public void Send(MockBattleNetwork sender, string controllerId, IPacket packet)
     {
         foreach (ClientRegistration recipient in RecipientsOf(sender))
             if (ControllerIdOf(recipient.Instance) == controllerId)
                 SchedulePacket(sender, recipient, packet);
+    }
+
+    public void Send(MockBattleNetwork sender, string controllerId, IPacket packet, byte[] serializedPacket)
+    {
+        foreach (ClientRegistration recipient in RecipientsOf(sender))
+            if (ControllerIdOf(recipient.Instance) == controllerId)
+                SchedulePacket(sender, recipient, packet, serializedPacket);
     }
 
     public void SendAllBut(MockBattleNetwork sender, string excludedControllerId, IPacket packet)
@@ -119,7 +132,7 @@ public class MeshNetworkRouter
         scheduler.Schedule(
             sender,
             recipient.Mesh,
-            MessageChannel,
+            ReliableOrderedChannel,
             () => Deliver(() => recipient.Instance.SimulateMessage(sender.NetPeer, wireCopy)));
         scheduler.DrainReady();
     }
@@ -130,6 +143,21 @@ public class MeshNetworkRouter
         IPacket packet)
     {
         IPacket wireCopy = SenderInstance(sender).EnsureSerializable(packet);
+        scheduler.Schedule(
+            sender,
+            recipient.Mesh,
+            $"packet:{packet.DeliveryMethod}",
+            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy)));
+        scheduler.DrainReady();
+    }
+
+    private void SchedulePacket(
+        MockBattleNetwork sender,
+        ClientRegistration recipient,
+        IPacket packet,
+        byte[] serializedPacket)
+    {
+        byte[] wireCopy = serializedPacket.ToArray();
         scheduler.Schedule(
             sender,
             recipient.Mesh,
