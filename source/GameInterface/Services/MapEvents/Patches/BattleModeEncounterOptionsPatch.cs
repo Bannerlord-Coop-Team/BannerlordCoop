@@ -316,7 +316,7 @@ internal class BattleModeEncounterOptionsPatch
     private static int CountOrderableTroops(PartyBase party)
     {
         var count = 0;
-        foreach (var element in party.MemberRoster)
+        foreach (var element in party.MemberRoster.GetTroopRoster())
         {
             if (element.Character.IsHero)
             {

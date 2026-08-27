@@ -93,6 +93,9 @@ internal class BattleJoinLeaveHandler : IHandler
 
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
     {
+        if (ModInformation.IsServer)
+            return;
+
         var message = payload.What;
 
         GameThread.RunSafe(() =>
