@@ -220,11 +220,21 @@ public class LocationHandler : IHandler
                 ReconcileSettlementRosters(locationComplex, obj.Entries ?? Array.Empty<LocationCharacterData>());
             }
 
+            if (Settlement.CurrentSettlement != settlement) return;
+
             // Update settlement overlay if relevant to this client
             var overlay = MapScreen.Instance?._menuViewContext?.GetMenuView<GauntletMenuOverlayBaseView>()?._overlayDataSource as SettlementMenuOverlayVM;
-            if (settlement == null || overlay?._settlement != settlement) return;
+            if (overlay?._settlement == settlement)
+            {
+                overlay.Refresh();
+            }
 
-            overlay.Refresh();
+            // Update menu options. Certain options can remain unavailable like entering a keep
+            var menuContext = Campaign.Current?.CurrentMenuContext;
+            if (menuContext?.GameMenu != null)
+            {
+                Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menuContext);
+            }
         });
     }
 
