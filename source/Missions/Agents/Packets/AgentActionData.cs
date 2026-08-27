@@ -377,6 +377,23 @@ namespace Missions.Agents.Packets
             Agent.MovementControlFlag defendFlags,
             Agent.GuardMode guardMode,
             int guardReactionChannel = -1)
+            : this(
+                agent,
+                defendFlags,
+                guardMode,
+                guardReactionChannel,
+                GetCurrentActionSpeed(agent, 0),
+                GetCurrentActionSpeed(agent, 1))
+        {
+        }
+
+        internal AgentActionData(
+            Agent agent,
+            Agent.MovementControlFlag defendFlags,
+            Agent.GuardMode guardMode,
+            int guardReactionChannel,
+            float? action0Speed,
+            float? action1Speed)
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
@@ -407,11 +424,11 @@ namespace Missions.Agents.Packets
             Action0Index = cache0.Index;
             Action0Progress = agent.GetCurrentActionProgress(0);
             Action0Flag = (ulong)agent.GetCurrentAnimationFlag(0);
-            Action0Speed = GetCurrentActionSpeed(agent, 0);
+            Action0Speed = action0Speed;
             Action1Index = cache1.Index;
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
-            Action1Speed = GetCurrentActionSpeed(agent, 1);
+            Action1Speed = action1Speed;
             int validGuardReactionChannel =
                 guardReactionChannel >= 0
                 && guardReactionChannel <= 1
@@ -506,7 +523,8 @@ namespace Missions.Agents.Packets
                         IsMounted && GuardActionChannel == channel,
                     preserveCurrentGuardReaction: false))
             {
-                if (actionIndex >= 0
+                if (actionSpeed.HasValue
+                    && actionIndex >= 0
                     && agent.GetCurrentAction(channel).Index == actionIndex)
                 {
                     agent.SetCurrentActionSpeed(channel, resolvedActionSpeed);

@@ -250,7 +250,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
 
     public CoopAgentInfo GetAgentInfo(SettlementClientFixture client, Agent agent)
     {
-        if (client == null) throw new ArgumentNullException(nameof(client));
+        ArgumentNullException.ThrowIfNull(client);
         CoopAgentInfo info = null;
         client.Instance.Call(() =>
         {
@@ -262,7 +262,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
 
     public CoopAgentInfo GetAgentInfo(SettlementClientFixture client, Guid agentId)
     {
-        if (client == null) throw new ArgumentNullException(nameof(client));
+        ArgumentNullException.ThrowIfNull(client);
         CoopAgentInfo info = null;
         client.Instance.Call(() =>
         {
@@ -274,7 +274,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
 
     public void DespawnAgent(SettlementClientFixture owner, Agent agent)
     {
-        if (owner == null) throw new ArgumentNullException(nameof(owner));
+        ArgumentNullException.ThrowIfNull(owner);
         MirrorAgent state = GetAgentState(agent);
         owner.Instance.Call(() =>
         {

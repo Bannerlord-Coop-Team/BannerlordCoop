@@ -29,6 +29,7 @@ namespace E2E.Tests.Environment.MockEngine;
 /// </summary>
 public sealed class MissionEngineFixture : IDisposable
 {
+    private const int FirstInvalidMockActionIndex = 1000000;
     private readonly Harmony harmony = new("e2e.mockengine");
     private static readonly Dictionary<ILifetimeScope, MockMission> ByContainer = new();
 
@@ -782,7 +783,8 @@ public sealed class MissionEngineFixture : IDisposable
         const string prefix = "mock_action_";
         __result = __0 != null
             && __0.StartsWith(prefix, StringComparison.Ordinal)
-            && int.TryParse(__0.Substring(prefix.Length), out int actionIndex)
+            && int.TryParse(__0.AsSpan(prefix.Length), out int actionIndex)
+            && actionIndex < FirstInvalidMockActionIndex
                 ? actionIndex
                 : -1;
         return false;
@@ -791,7 +793,10 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool AgentActionData_GetActionNameWithCode(int actionCode, ref string __result)
     {
         if (!TryActiveMock(out _)) return true;
-        __result = actionCode >= 0 ? $"mock_action_{actionCode}" : null;
+        __result = actionCode >= 0
+            && actionCode < FirstInvalidMockActionIndex
+            ? $"mock_action_{actionCode}"
+            : null;
         return false;
     }
 
@@ -801,6 +806,7 @@ public sealed class MissionEngineFixture : IDisposable
         ref float __result)
     {
         if (!AgentMirror.TryGet(agent, out var mirror)) return true;
+        mirror.GetCurrentActionSpeedCalls++;
         __result = channel == 0 ? mirror.Action0Speed : mirror.Action1Speed;
         return false;
     }

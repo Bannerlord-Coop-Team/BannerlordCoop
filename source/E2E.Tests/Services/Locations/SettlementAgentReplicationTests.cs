@@ -160,6 +160,72 @@ public class SettlementAgentReplicationTests : SettlementTestEnvironment
     }
 
     [Fact]
+    public void AmbientSpeedJitter_ManyNpcsKeepsReliableActionOutputBounded()
+    {
+        const int npcCount = 24;
+        const int jitterFrames = 120;
+        const int actionIndex = 231;
+        var clients = Clients.ToArray();
+        var (instanceId, _) = CreateSettlement("A", "B");
+        SettlementClientFixture owner = EnterLocation(clients[0], instanceId);
+        EnterLocation(clients[1], instanceId);
+        DrainNetwork();
+        string characterId =
+            CreateRegisteredObject<TaleWorlds.CampaignSystem.CharacterObject>();
+        Agent[] npcs = Enumerable.Range(0, npcCount)
+            .Select(index => SpawnNpc(
+                owner,
+                characterId,
+                new Vec3(index, 0f, 0f),
+                Vec2.Forward))
+            .ToArray();
+        DrainNetwork();
+
+        foreach (Agent npc in npcs)
+            SetAgentAction(npc, actionIndex, speed: 1f);
+        Tick(0.05f);
+        DrainNetwork();
+
+        var states = npcs.Select(GetAgentState).ToArray();
+        foreach (var state in states)
+            state.GetCurrentActionSpeedCalls = 0;
+        owner.Mesh.NetworkSentPackets.Packets.Clear();
+
+        for (int frame = 0; frame < jitterFrames; frame++)
+        {
+            for (int index = 0; index < states.Length; index++)
+            {
+                int jitterStep = ((frame + index) % 5) - 2;
+                states[index].Action0Speed = 1f + (jitterStep * 0.005f);
+            }
+
+            Tick(1f / 60f);
+        }
+
+        Assert.Empty(
+            owner.Mesh.NetworkSentPackets
+                .GetPackets<AgentActionPacket>());
+        Assert.Equal(
+            npcCount * jitterFrames,
+            states.Sum(state => state.GetCurrentActionSpeedCalls));
+
+        foreach (var state in states)
+            state.Action0Speed = 0.65f;
+        Tick(1f / 60f);
+
+        AgentActionPacket[] significantUpdates = owner.Mesh.NetworkSentPackets
+            .GetPackets<AgentActionPacket>()
+            .ToArray();
+        Assert.Equal(3, significantUpdates.Length);
+        Assert.Equal(
+            npcCount,
+            significantUpdates.Sum(packet => packet.AgentIds.Length));
+        Assert.All(
+            significantUpdates.SelectMany(packet => packet.Actions),
+            action => Assert.Equal(0.65f, action.Action0Speed));
+    }
+
+    [Fact]
     public void SpawnCompanion_ReplicatesCharacterGuidOriginAuthorityAndDespawn()
     {
         var clients = Clients.ToArray();

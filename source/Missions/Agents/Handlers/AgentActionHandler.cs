@@ -62,7 +62,8 @@ public class AgentActionHandler : IAgentActionHandler
 {
     // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
     private const int MaxAgentsPerActionPacket = 8;
-    private const float ActionSpeedDeltaThreshold = 0.001f;
+    private const float DiscreteActionSpeedDeltaThreshold = 0.001f;
+    private const float AmbientActionSpeedDeltaThreshold = 0.05f;
 
     private readonly IBattleNetwork client;
     private readonly IPacketManager packetManager;
@@ -85,6 +86,8 @@ public class AgentActionHandler : IAgentActionHandler
         public int Action1;
         public float Action0Speed;
         public float Action1Speed;
+        public bool HasAction0PublishedSpeed;
+        public bool HasAction1PublishedSpeed;
         public Agent.MovementControlFlag DefendFlags;
         public Agent.GuardMode GuardMode;
         public Agent.GuardMode ActionGuardMode;
@@ -220,8 +223,6 @@ public class AgentActionHandler : IAgentActionHandler
 
         int action0 = agent.GetCurrentAction(0).Index;
         int action1 = agent.GetCurrentAction(1).Index;
-        float action0Speed = AgentActionData.GetCurrentActionSpeed(agent, 0);
-        float action1Speed = AgentActionData.GetCurrentActionSpeed(agent, 1);
         _localAgentStates.TryGetValue(info.AgentId, out var state);
         bool hadState = state.HasObservation;
         bool isPlayerControlled =
@@ -319,45 +320,12 @@ public class AgentActionHandler : IAgentActionHandler
                 || AgentActionData.IsGuardMode(state.GuardMode));
         bool action0Changed = !hadState || state.Action0 != action0;
         bool action1Changed = !hadState || state.Action1 != action1;
-        bool action0SpeedChanged =
-            hadState
-            && state.Action0 == action0
-            && Math.Abs(state.Action0Speed - action0Speed)
-                > ActionSpeedDeltaThreshold;
-        bool action1SpeedChanged =
-            hadState
-            && state.Action1 == action1
-            && Math.Abs(state.Action1Speed - action1Speed)
-                > ActionSpeedDeltaThreshold;
-        if (!action0Changed && !action1Changed
-            && !action0SpeedChanged && !action1SpeedChanged
-            && !defendChanged && !guardChanged
-            && !guardedMountStateChanged
-            && !guardedControllerRoleChanged)
-        {
-            if (hadState)
-            {
-                state.DefendFlags = defendFlags;
-                state.Action0Speed = action0Speed;
-                state.Action1Speed = action1Speed;
-                state.ActionGuardMode = actionGuardMode;
-                _localAgentStates[info.AgentId] = state;
-            }
-            return;
-        }
-
-        bool action0Discrete =
-            IsDiscreteAction(agent.GetCurrentActionType(0));
-        bool action1Discrete =
-            IsDiscreteAction(agent.GetCurrentActionType(1));
-        bool action0Defending = AgentActionData.IsDefendingAction(
-            agent.GetCurrentActionType(0));
-        bool action1Defending = AgentActionData.IsDefendingAction(
-            agent.GetCurrentActionType(1));
-        int guardReactionChannel = GetGuardReactionChannel(
-            agent,
-            hadState,
-            state);
+        Agent.ActionCodeType action0Type =
+            agent.GetCurrentActionType(0);
+        Agent.ActionCodeType action1Type =
+            agent.GetCurrentActionType(1);
+        bool action0Discrete = IsDiscreteAction(action0Type);
+        bool action1Discrete = IsDiscreteAction(action1Type);
 
         // Native command actions are untyped, so recognize the main agent's order gesture by action name.
         if (agent == Mission.Current.MainAgent)
@@ -367,6 +335,67 @@ public class AgentActionHandler : IAgentActionHandler
             action1Discrete |= IsOrderGesture(
                 AgentActionData.GetActionNameWithCode(action1));
         }
+
+        // Point-driven location performances replicate semantically. Only non-point ambient actions use this stream.
+        bool locationAmbientAgent =
+            LocationNpcGate.IsCoopLocationMissionActive
+            && !isPlayerControlled
+            && agent.CurrentlyUsedGameObject == null;
+        bool publishAction0Speed =
+            CanPublishActionSpeed(
+                action0,
+                action0Discrete,
+                locationAmbientAgent);
+        bool publishAction1Speed =
+            CanPublishActionSpeed(
+                action1,
+                action1Discrete,
+                locationAmbientAgent);
+        float action0Speed = ReadActionSpeed(
+            agent,
+            channel: 0,
+            publishAction0Speed,
+            action0Discrete,
+            hadState,
+            action0Changed,
+            state.HasAction0PublishedSpeed,
+            state.Action0Speed,
+            out bool action0SpeedChanged);
+        float action1Speed = ReadActionSpeed(
+            agent,
+            channel: 1,
+            publishAction1Speed,
+            action1Discrete,
+            hadState,
+            action1Changed,
+            state.HasAction1PublishedSpeed,
+            state.Action1Speed,
+            out bool action1SpeedChanged);
+        if (!action0Changed && !action1Changed
+            && !action0SpeedChanged && !action1SpeedChanged
+            && !defendChanged && !guardChanged
+            && !guardedMountStateChanged
+            && !guardedControllerRoleChanged)
+        {
+            if (hadState)
+            {
+                state.DefendFlags = defendFlags;
+                state.HasAction0PublishedSpeed &= publishAction0Speed;
+                state.HasAction1PublishedSpeed &= publishAction1Speed;
+                state.ActionGuardMode = actionGuardMode;
+                _localAgentStates[info.AgentId] = state;
+            }
+            return;
+        }
+
+        bool action0Defending =
+            AgentActionData.IsDefendingAction(action0Type);
+        bool action1Defending =
+            AgentActionData.IsDefendingAction(action1Type);
+        int guardReactionChannel = GetGuardReactionChannel(
+            agent,
+            hadState,
+            state);
 
         bool heldMountedGuardUnchanged =
             agent.HasMount
@@ -396,39 +425,22 @@ public class AgentActionHandler : IAgentActionHandler
                 state.HasAction1DefendingAction,
                 state.Action1DefendingAction);
 
-        // Settlement ambient flavor NOT driven by a scene point (one-off gestures, barks) is
-        // CONTINUOUS and untyped (ActionCodeType.Other), so the discrete filter drops it — correct
-        // for battle locomotion churn, wrong for location NPCs. Point-driven performances (dances,
-        // sitting, work loops) are EXCLUDED here: their use is replicated semantically
-        // (NetworkNpcPointUse) and the local point animates the puppet itself — broadcasting the
-        // point's output actions on top would fight it.
-        bool locationAmbientAgent =
-            LocationNpcGate.IsCoopLocationMissionActive
-            && !isPlayerControlled
-            && agent.CurrentlyUsedGameObject == null;
-
         // Defend input and realized guard state can change before the animation index, so send them explicitly too.
         bool discreteActionChanged =
-            (action0Changed
-                && !action0GuardLocomotionChurn
-                && (action0Discrete
-                    || locationAmbientAgent
-                    || (hadState && state.Action0WasDiscrete)))
-            || (action1Changed
-                && !action1GuardLocomotionChurn
-                && (action1Discrete
-                    || locationAmbientAgent
-                    || (hadState && state.Action1WasDiscrete)))
-            || (action0SpeedChanged
-                && action0 >= 0
-                && (action0Discrete
-                    || locationAmbientAgent
-                    || state.Action0WasDiscrete))
-            || (action1SpeedChanged
-                && action1 >= 0
-                && (action1Discrete
-                    || locationAmbientAgent
-                    || state.Action1WasDiscrete));
+            HasPublishableActionChanged(
+                action0Changed,
+                action0GuardLocomotionChurn,
+                action0Discrete,
+                locationAmbientAgent,
+                hadState && state.Action0WasDiscrete,
+                action0SpeedChanged)
+            || HasPublishableActionChanged(
+                action1Changed,
+                action1GuardLocomotionChurn,
+                action1Discrete,
+                locationAmbientAgent,
+                hadState && state.Action1WasDiscrete,
+                action1SpeedChanged);
         bool broadcast =
             defendChanged
             || guardChanged
@@ -438,8 +450,18 @@ public class AgentActionHandler : IAgentActionHandler
         state.HasObservation = true;
         state.Action0 = action0;
         state.Action1 = action1;
-        state.Action0Speed = action0Speed;
-        state.Action1Speed = action1Speed;
+        UpdateActionSpeedObservation(
+            ref state.Action0Speed,
+            ref state.HasAction0PublishedSpeed,
+            publishAction0Speed,
+            broadcast,
+            action0Speed);
+        UpdateActionSpeedObservation(
+            ref state.Action1Speed,
+            ref state.HasAction1PublishedSpeed,
+            publishAction1Speed,
+            broadcast,
+            action1Speed);
         state.DefendFlags = defendFlags;
         state.GuardMode = guardMode;
         state.ActionGuardMode = actionGuardMode;
@@ -451,12 +473,12 @@ public class AgentActionHandler : IAgentActionHandler
         state.IsPlayerControlled = isPlayerControlled;
         UpdateDefendingAction(
             action0,
-            agent.GetCurrentActionType(0),
+            action0Type,
             ref state.HasAction0DefendingAction,
             ref state.Action0DefendingAction);
         UpdateDefendingAction(
             action1,
-            agent.GetCurrentActionType(1),
+            action1Type,
             ref state.HasAction1DefendingAction,
             ref state.Action1DefendingAction);
         if (defendFlags == Agent.MovementControlFlag.None
@@ -477,7 +499,9 @@ public class AgentActionHandler : IAgentActionHandler
             agent,
             defendFlags,
             guardMode,
-            guardReactionChannel);
+            guardReactionChannel,
+            publishAction0Speed ? action0Speed : (float?)null,
+            publishAction1Speed ? action1Speed : (float?)null);
 #if DEBUG
         MissionActionDiagnostics.RecordOutboundAction();
 #endif
@@ -651,6 +675,81 @@ public class AgentActionHandler : IAgentActionHandler
         if (_disposed) return;
 
         remoteActionProcessor.Receive((AgentActionPacket)packet);
+    }
+
+    private static bool CanPublishActionSpeed(
+        int action,
+        bool actionDiscrete,
+        bool locationAmbientAgent)
+    {
+        return action >= 0
+            && (actionDiscrete || locationAmbientAgent);
+    }
+
+    private static float ReadActionSpeed(
+        Agent agent,
+        int channel,
+        bool publishActionSpeed,
+        bool actionDiscrete,
+        bool hadState,
+        bool actionChanged,
+        bool hasPublishedSpeed,
+        float previousSpeed,
+        out bool speedChanged)
+    {
+        if (!publishActionSpeed)
+        {
+            speedChanged = false;
+            return 1f;
+        }
+
+        float speed = AgentActionData.GetCurrentActionSpeed(
+            agent,
+            channel);
+        float threshold = actionDiscrete
+            ? DiscreteActionSpeedDeltaThreshold
+            : AmbientActionSpeedDeltaThreshold;
+        speedChanged =
+            hadState
+            && !actionChanged
+            && (!hasPublishedSpeed
+                || Math.Abs(previousSpeed - speed) > threshold);
+        return speed;
+    }
+
+    private static bool HasPublishableActionChanged(
+        bool actionChanged,
+        bool guardLocomotionChurn,
+        bool actionDiscrete,
+        bool locationAmbientAgent,
+        bool actionWasDiscrete,
+        bool actionSpeedChanged)
+    {
+        return actionSpeedChanged
+            || (actionChanged
+                && !guardLocomotionChurn
+                && (actionDiscrete
+                    || locationAmbientAgent
+                    || actionWasDiscrete));
+    }
+
+    private static void UpdateActionSpeedObservation(
+        ref float publishedSpeed,
+        ref bool hasPublishedSpeed,
+        bool publishActionSpeed,
+        bool broadcast,
+        float observedSpeed)
+    {
+        if (!publishActionSpeed)
+        {
+            hasPublishedSpeed = false;
+            return;
+        }
+
+        if (!broadcast) return;
+
+        publishedSpeed = observedSpeed;
+        hasPublishedSpeed = true;
     }
 
     // Discrete actions worth replicating explicitly. Pure locomotion (Idle / the generic Other bucket that
