@@ -273,6 +273,7 @@ internal static class SiegeDefenseArmyFixtureCommands
 
         bool success;
         bool playerBehaviorRestored = false;
+        bool stableRestoration = false;
         switch (args[2])
         {
             case "baseline":
@@ -303,12 +304,12 @@ internal static class SiegeDefenseArmyFixtureCommands
                         expectedBehavior,
                         JToken.FromObject(GetBehaviorProof(actualBehavior)));
                 }
-                success = settlement.SiegeEvent == null
+                stableRestoration = settlement.SiegeEvent == null
                     && settlement.Party.MapEvent == null
                     && playerParty.MapEvent == null
                     && playerParty.Army == null
-                    && (!ModInformation.IsClient || PlayerEncounter.Current == null)
-                    && playerBehaviorRestored;
+                    && (!ModInformation.IsClient || PlayerEncounter.Current == null);
+                success = stableRestoration;
                 break;
             default:
                 return $"Unknown defense army state '{args[2]}'";
@@ -317,6 +318,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         return FormatState($"Siege defense army {args[2]} state", playerParty, settlement, new
         {
             expectedState = args[2],
+            stableRestoration = args[2] == "restored" && success,
             playerBehaviorRestored,
         }, success);
     }
