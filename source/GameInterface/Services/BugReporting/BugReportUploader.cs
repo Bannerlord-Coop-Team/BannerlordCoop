@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -11,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Services.BugReporting;
 
-/// <summary>Posts diagnostic bug reports as JSON when an endpoint is configured.</summary>
+/// <summary>Uploads the server save as a raw artifact, then posts diagnostic report metadata as JSON.</summary>
 public interface IBugReportUploader
 {
     bool IsConfigured { get; }
@@ -28,6 +29,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
     public const string PublishableKeyEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_PUBLISHABLE_KEY";
     public const string AuthorizationTokenEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_TOKEN";
     internal const int MaximumCompressedReportBytes = 10 * 1024 * 1024;
+    internal const int MaximumServerSaveBytes = 48 * 1024 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
@@ -90,7 +92,30 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             return new BugReportUploadResult(
                 false,
                 true,
-                "The bug report exceeds the upload size limit.");
+                "The bug report logs exceed the upload size limit.");
+        }
+
+        if (report.ServerSave != null)
+        {
+            if (string.IsNullOrWhiteSpace(report.ServerSave.FileName) ||
+                !string.Equals(
+                    Path.GetFileName(report.ServerSave.FileName),
+                    report.ServerSave.FileName,
+                    StringComparison.Ordinal))
+            {
+                return new BugReportUploadResult(false, true, "The server campaign save had an invalid file name.");
+            }
+
+            if (!IsWithinServerSaveLimit(report.ServerSave.Data?.LongLength ?? 0))
+            {
+                return new BugReportUploadResult(
+                    false,
+                    true,
+                    "The server campaign save exceeds the upload size limit.");
+            }
+
+            var saveUpload = await UploadServerSaveAsync(report, cancellationToken).ConfigureAwait(false);
+            if (!saveUpload.Uploaded) return saveUpload;
         }
 
         var json = JsonSerializer.Serialize(CreateRequest(report), JsonOptions);
@@ -98,9 +123,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json"),
         };
-        request.Headers.TryAddWithoutValidation("apikey", supabasePublishableKey);
-        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + authorizationToken);
-        request.Headers.TryAddWithoutValidation("Idempotency-Key", report.RequestId);
+        AddRequestHeaders(request, report.RequestId);
         using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         var details = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
@@ -124,6 +147,46 @@ public class BugReportUploader : IBugReportUploader, IDisposable
     internal static bool IsWithinCompressedLogLimit(long compressedBytes)
     {
         return compressedBytes >= 0 && compressedBytes <= MaximumCompressedReportBytes;
+    }
+
+    internal static bool IsWithinServerSaveLimit(long saveBytes)
+    {
+        return saveBytes > 0 && saveBytes <= MaximumServerSaveBytes;
+    }
+
+    private async Task<BugReportUploadResult> UploadServerSaveAsync(
+        BugReportArchiveContents report,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, endpoint)
+        {
+            Content = new ByteArrayContent(report.ServerSave.Data),
+        };
+        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            "application/octet-stream");
+        request.Headers.TryAddWithoutValidation("X-Bug-Report-Artifact", "server-save");
+        request.Headers.TryAddWithoutValidation("X-Bug-Report-Id", report.RequestId);
+        request.Headers.TryAddWithoutValidation("X-Bug-Report-File-Name", report.ServerSave.FileName);
+        AddRequestHeaders(request, report.RequestId + "-server-save");
+
+        using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        var details = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        if (response.IsSuccessStatusCode)
+            return new BugReportUploadResult(true, true, details);
+
+        return new BugReportUploadResult(
+            false,
+            true,
+            string.IsNullOrWhiteSpace(details)
+                ? "The server-save endpoint returned " + ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture) + "."
+                : details);
+    }
+
+    private void AddRequestHeaders(HttpRequestMessage request, string idempotencyKey)
+    {
+        request.Headers.TryAddWithoutValidation("apikey", supabasePublishableKey);
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + authorizationToken);
+        request.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
     }
 
     private static long GetCompressedLogBytes(BugReportArchiveContents report)
@@ -158,6 +221,11 @@ public class BugReportUploader : IBugReportUploader, IDisposable
                 submission.Summary,
                 submission.Description))
             .ToArray();
+        var serverSave = report.ServerSave == null
+            ? null
+            : new BugReportJsonServerSave(
+                report.ServerSave.FileName,
+                report.ServerSave.Data.LongLength);
 
         return new BugReportJsonRequest(
             report.RequestId,
@@ -171,6 +239,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             ModInformation.Commit,
             ModInformation.BuildVersion,
             serverLog,
+            serverSave,
             clientLogs,
             submissions,
             report.ExpectedClients,
@@ -198,7 +267,7 @@ public sealed class BugReportUploadResult
 /// <summary>Defines the versioned JSON payload posted to the bug-report endpoint.</summary>
 internal sealed class BugReportJsonRequest
 {
-    public int SchemaVersion => 1;
+    public int SchemaVersion => 2;
     public string ReportId { get; }
     public string ReportingClientNetworkId { get; }
     public string Summary { get; }
@@ -210,6 +279,7 @@ internal sealed class BugReportJsonRequest
     public string Commit { get; }
     public string BuildVersion { get; }
     public BugReportJsonLog ServerLog { get; }
+    public BugReportJsonServerSave ServerSave { get; }
     public IReadOnlyCollection<BugReportJsonClientLog> ClientLogs { get; }
     public IReadOnlyCollection<BugReportJsonSubmission> Submissions { get; }
     public int ExpectedClients { get; }
@@ -229,6 +299,7 @@ internal sealed class BugReportJsonRequest
         string commit,
         string buildVersion,
         BugReportJsonLog serverLog,
+        BugReportJsonServerSave serverSave,
         IReadOnlyCollection<BugReportJsonClientLog> clientLogs,
         IReadOnlyCollection<BugReportJsonSubmission> submissions,
         int expectedClients,
@@ -247,6 +318,7 @@ internal sealed class BugReportJsonRequest
         Commit = commit;
         BuildVersion = buildVersion;
         ServerLog = serverLog;
+        ServerSave = serverSave;
         ClientLogs = clientLogs;
         Submissions = submissions;
         ExpectedClients = expectedClients;
@@ -269,6 +341,20 @@ internal sealed class BugReportJsonLog
         FileName = fileName;
         UncompressedLength = uncompressedLength;
         Data = data;
+    }
+}
+
+/// <summary>Describes the raw server-save artifact uploaded before the JSON report.</summary>
+internal sealed class BugReportJsonServerSave
+{
+    public string FileName { get; }
+    public string Artifact => "server-save";
+    public long Length { get; }
+
+    public BugReportJsonServerSave(string fileName, long length)
+    {
+        FileName = fileName;
+        Length = length;
     }
 }
 

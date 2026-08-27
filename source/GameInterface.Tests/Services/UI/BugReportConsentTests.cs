@@ -16,7 +16,9 @@ public class BugReportConsentTests
     {
         Assert.Contains("sent to the dedicated server", BugReportConsentCoordinator.PromptText);
         Assert.Contains("IP addresses", BugReportConsentCoordinator.PromptText);
-        Assert.Contains("Saves, configuration files, and memory dumps are not included",
+        Assert.Contains("current campaign save", BugReportConsentCoordinator.PromptText);
+        Assert.Contains("campaign save is still included", BugReportConsentCoordinator.PromptText);
+        Assert.Contains("Client saves, configuration files, and memory dumps are not included",
             BugReportConsentCoordinator.PromptText);
         Assert.Contains("cancel this bug report", BugReportSubmissionConsent.PromptText);
         Assert.Contains("public GitHub issue", BugReportConsentCoordinator.PromptText);
@@ -25,6 +27,9 @@ public class BugReportConsentTests
         Assert.Contains("public GitHub issue", BugReportSubmissionConsent.PromptText);
         Assert.Contains("publicly accessible links", BugReportSubmissionConsent.PromptText);
         Assert.Contains("remote deletion or expiry is not guaranteed", BugReportSubmissionConsent.PromptText);
+        Assert.Contains("current campaign save", BugReportSubmissionConsent.PromptText);
+        Assert.Contains("Client saves, configuration files, and memory dumps are not included",
+            BugReportSubmissionConsent.PromptText);
     }
 
     [Theory]
@@ -48,14 +53,18 @@ public class BugReportConsentTests
     }
 
     [Fact]
-    public void LegacyConsentWithoutPublicDisclosure_IsDisabledAndPromptedAgain()
+    public void ConsentWithoutServerSaveDisclosure_IsDisabledAndPromptedAgain()
     {
         var store = new TestOptionsStore();
         var options = store.LoadOrDefault();
         options.SetSection(
             BugReportConsentCoordinator.TabId,
             BugReportConsentCoordinator.SectionId,
-            new BugReportConsentOptions { ShareBugReportLogs = true });
+            new BugReportConsentOptions
+            {
+                ShareBugReportLogs = true,
+                DisclosureVersion = 2,
+            });
         store.Save(options);
         var coordinator = new BugReportConsentCoordinator(store, _ => { });
         InquiryData inquiry = null;
@@ -64,6 +73,23 @@ public class BugReportConsentTests
 
         Assert.NotNull(inquiry);
         Assert.False(new BugReportLogSharingPreference(store).IsEnabled());
+    }
+
+    [Fact]
+    public void ExplicitEnablePrompt_DoesNotEnableSharingUntilDisclosureIsAccepted()
+    {
+        var store = new TestOptionsStore();
+        var preference = new BugReportLogSharingPreference(store);
+        var coordinator = new BugReportConsentCoordinator(store, _ => { });
+        InquiryData inquiry = null;
+
+        coordinator.ShowPrompt(value => inquiry = value);
+
+        Assert.NotNull(inquiry);
+        Assert.Contains("public GitHub issue", inquiry.Text);
+        Assert.False(preference.IsEnabled());
+        inquiry.AffirmativeAction();
+        Assert.True(preference.IsEnabled());
     }
 
     [Fact]
