@@ -74,6 +74,7 @@ internal class StanceLinkHandler : IHandler
 
             if (stanceLink == null)
             {
+                if (faction1.IsEliminated || faction2.IsEliminated) return;
                 if (ModInformation.IsServer)
                 {
                     stanceLink = new StanceLink(obj.StanceType, faction1, faction2);

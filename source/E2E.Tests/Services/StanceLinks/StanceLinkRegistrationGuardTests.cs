@@ -1,4 +1,5 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.StanceLinks.Messages;
 using TaleWorlds.CampaignSystem;
@@ -64,6 +65,37 @@ public class StanceLinkRegistrationGuardTests : IDisposable
         });
         Assert.Empty(FirstClient.NetworkSentMessages.GetMessages<StanceLinkConstructed>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<StanceLinkConstructed>());
+    }
+
+    [Fact]
+    public void DelayedEliminatedFaction_Server_NeverCreatesStanceLink()
+    {
+        string faction1Id = null;
+        string faction2Id = null;
+        Server.Call(() =>
+        {
+            var faction1 = Kingdom.CreateKingdom("guard_elim_kingdom_5");
+            var faction2 = Kingdom.CreateKingdom("guard_elim_kingdom_6");
+
+            Assert.True(Server.ObjectManager.TryGetId(faction1, out faction1Id));
+            Assert.True(Server.ObjectManager.TryGetId(faction2, out faction2Id));
+            using (new AllowedThread())
+            {
+                faction2.DeactivateKingdom();
+            }
+        });
+
+        FirstClient.Call(() =>
+        {
+            Assert.True(FirstClient.ObjectManager.TryGetObject<IFaction>(faction1Id, out var clientFaction1));
+            Assert.True(FirstClient.ObjectManager.TryGetObject<IFaction>(faction2Id, out var clientFaction2));
+            Assert.False(clientFaction2.IsEliminated);
+            for (int i = 0; i < 10; i++)
+            {
+                Assert.NotNull(FactionManager.Instance.GetStanceLinkInternal(clientFaction1, clientFaction2));
+            }
+        });
+        Assert.Empty(FactionManager.Instance._stances.GetStanceLinks());
     }
 
     [Fact]
