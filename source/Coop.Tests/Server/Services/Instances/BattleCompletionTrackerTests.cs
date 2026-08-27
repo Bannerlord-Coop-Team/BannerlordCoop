@@ -27,6 +27,25 @@ public class BattleCompletionTrackerTests
     }
 
     [Fact]
+    public void SiegeAmbushCompletion_ReconcilesWithoutVictoryState()
+    {
+        var tracker = new BattleCompletionTracker();
+
+        var concluded = tracker.TryRecordResult(
+            "ambush",
+            "host",
+            BattleState.DefenderPullBack,
+            1,
+            new[] { "host" },
+            "host",
+            1,
+            out var state);
+
+        Assert.True(concluded);
+        Assert.Equal(BattleState.DefenderPullBack, state);
+    }
+
+    [Fact]
     public void HostReport_WaitsForEveryCurrentMember()
     {
         var tracker = new BattleCompletionTracker();

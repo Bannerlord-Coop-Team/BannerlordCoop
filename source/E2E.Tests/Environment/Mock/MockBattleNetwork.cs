@@ -59,7 +59,7 @@ public class MockBattleNetwork : IBattleNetwork
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
-        if (router == null) throw new ArgumentNullException(nameof(router));
+        ArgumentNullException.ThrowIfNull(router);
         this.router = router;
     }
 
@@ -114,10 +114,11 @@ public class MockBattleNetwork : IBattleNetwork
 
     public void SendAll(IPacket packet, byte[] serializedPacket)
     {
+        ArgumentNullException.ThrowIfNull(serializedPacket);
         NetworkSentPackets.Add(packet);
         SerializedPacketSends.Add(new SerializedPacketSend(null, packet, serializedPacket));
         if (RoutePackets)
-            router.SendAll(this, packet);
+            router.SendAll(this, packet, serializedPacket);
     }
 
     public void Send(string controllerId, IPacket packet)
@@ -130,12 +131,13 @@ public class MockBattleNetwork : IBattleNetwork
 
     public void Send(string controllerId, IPacket packet, byte[] serializedPacket)
     {
+        ArgumentNullException.ThrowIfNull(serializedPacket);
         NetworkSentPackets.Add(packet);
         DirectPacketSends.Add(new DirectPacketSend(controllerId, packet));
         SerializedPacketSends.Add(
             new SerializedPacketSend(controllerId, packet, serializedPacket));
         if (RoutePackets)
-            router.Send(this, controllerId, packet);
+            router.Send(this, controllerId, packet, serializedPacket);
     }
 
     public void SendAllBut(string controllerId, IPacket packet)
