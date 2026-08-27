@@ -1810,7 +1810,7 @@ public class KingdomDebugCommand
             }
 
             AllianceTimeoutNeighbor selectedThreat = GetVanillaThreateningNeighbor(querierKingdom, out float threatScore);
-            if (selectedThreat == threatNeighbor && threatScore > ThreatScoreThreshold) return true;
+            if (selectedThreat?.Kingdom == threatNeighbor.Kingdom && threatScore > ThreatScoreThreshold) return true;
 
             error = $"The alliance-timeout fixture could not select {threatNeighbor.Kingdom.StringId} " +
                 "as the vanilla threatening neighbor.";
