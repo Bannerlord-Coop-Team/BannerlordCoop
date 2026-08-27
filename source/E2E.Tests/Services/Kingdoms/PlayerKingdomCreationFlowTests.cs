@@ -318,15 +318,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
 
-        var pendingField = AccessTools.Field(typeof(LocationConversationPatches), "pending");
-        var heldNpcKeyField = AccessTools.Field(typeof(LocationConversationPatches), "heldNpcKey");
         var onAgentInteractionPrefix = AccessTools.Method(typeof(LocationConversationPatches), "OnAgentInteractionPrefix");
         var onConversationEndPostfix = AccessTools.Method(typeof(LocationConversationPatches), "OnConversationEndPostfix");
-        // These are process-wide statics on LocationConversationPatches: in a real game only one client runs
-        // per process, but this harness runs several "clients" in one, so a previous test's leftovers could
-        // otherwise leak in here.
-        pendingField.SetValue(null, null);
-        heldNpcKeyField.SetValue(null, null);
+        ILocationConversationClientState clientConversationState = null;
 
         using var fixture = new MissionEngineFixture();
         var harmony = new Harmony($"e2e.vassal-oath-settlement.{Guid.NewGuid():N}");
@@ -371,8 +365,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
                 var location = ObjectHelper.SkipConstructor<Location>();
                 Assert.True(client.ObjectManager.AddExisting(LocationId, location));
-                CampaignMission.Current = new StubCampaignMission(location);
-                
+                client.CampaignMissionContext = new StubCampaignMission(location);
+                clientConversationState = client.Resolve<ILocationConversationClientState>();
+                Assert.False(clientConversationState.HasPendingOrHeld);
+
                 new LocationConversationTracker(client.ObjectManager);
             });
             
@@ -388,10 +384,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionStarted>());
             Assert.True(started.IsLocationInteraction);
 
-            // The approval round-trip runs synchronously through the mock network, so StartApprovedConversation
-            // has already consumed `pending` and set `heldNpcKey` for real by the time control returns here.
-            Assert.Null(pendingField.GetValue(null));
-            Assert.Equal(LocationConversationTracker.ComposeKey(LocationId, ruler.CharacterId), heldNpcKeyField.GetValue(null));
+            // The approval round-trip runs synchronously through the mock network, so the scoped client state
+            // has consumed its pending request and now holds the approved target.
+            Assert.Equal(
+                LocationConversationTracker.ComposeKey(LocationId, ruler.CharacterId),
+                clientConversationState.HeldNpcKey);
             Server.Call(() =>
             {
                 Assert.True(Server.Resolve<LocationConversationTracker>().TryGetEngagement(client.NetPeer, out var lockedNpcKey));
@@ -427,7 +424,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Server.NetworkSentMessages.Clear();
             client.Call(() => onConversationEndPostfix.Invoke(null, null));
 
-            Assert.Null(heldNpcKeyField.GetValue(null));
+            Assert.Null(clientConversationState.HeldNpcKey);
             var ended = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionEnded>());
             Assert.True(ended.IsLocationInteraction);
             Server.Call(() =>
@@ -454,9 +451,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             harmony.UnpatchAll(harmony.Id);
             MissionConversationLogicOverride = null;
             OneToOneConversationHeroOverride = null;
-            pendingField.SetValue(null, null);
-            heldNpcKeyField.SetValue(null, null);
-            CampaignMission.Current = null;
+            clientConversationState?.Clear();
+            client.CampaignMissionContext = null;
         }
     }
 

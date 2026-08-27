@@ -2,6 +2,7 @@
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
@@ -63,6 +64,28 @@ public class MissionTestEnvironment : E2ETestEnvironment
         return mission;
     }
 
+    /// <summary>Creates a headless mission and joins its client to the deterministic mission mesh.</summary>
+    protected static MockMission CreateConnectedMission(
+        MissionEngineFixture fixture,
+        EnvironmentInstance instance,
+        string instanceId)
+    {
+        MockMission mission = fixture.CreateMission(instance);
+        MockBattleNetwork mesh = instance.Resolve<MockBattleNetwork>();
+        mesh.Start();
+        mesh.ConnectToInstance(instanceId);
+        return mission;
+    }
+
+    /// <summary>Decodes a received battle-agent batch from its actual wire payload.</summary>
+    protected static BattleAgentSpawnData[] DecodeSpawnBatch(
+        EnvironmentInstance instance,
+        NetworkSpawnBattleAgents message)
+    {
+        Assert.True(instance.Resolve<IBattleAgentSpawnBatchCodec>().TryDecode(message, out var agents));
+        return agents;
+    }
+
     /// <summary>
     /// Stands up a coop field battle: one player <see cref="MobileParty"/> per supplied controller id, all in
     /// a single <see cref="MapEvent"/> and registered as players on every instance, with client <c>i</c> given
@@ -113,14 +136,18 @@ public class MissionTestEnvironment : E2ETestEnvironment
     }
 
     /// <summary>Registers a hero/party pair as a player on every instance (controller id → party).</summary>
-    protected void RegisterAsPlayerParty(string controllerId, string heroId, string partyId)
+    protected void RegisterAsPlayerParty(
+        string controllerId,
+        string heroId,
+        string partyId,
+        string characterObjectId = "MyCharacterObjectId")
     {
         void Register(EnvironmentInstance instance)
         {
             instance.Call(() =>
             {
                 var registry = instance.Resolve<IPlayerManager>();
-                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", "MyCharacterObjectId"));
+                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", characterObjectId));
                 Assert.True(registry.TryGetPlayer(controllerId, out _));
             });
         }

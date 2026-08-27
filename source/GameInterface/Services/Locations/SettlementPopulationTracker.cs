@@ -6,7 +6,6 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -35,6 +34,7 @@ internal class SettlementPopulationTracker : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly FixedTownNpcService fixedTownNpcService;
+    private readonly ISettlementHeroSpawnPool heroSpawnPool;
 
     // Keyed by Settlement.StringId; holds the settlement so cleanup never rescans the campaign.
     private readonly Dictionary<string, Settlement> populatedSettlements = new Dictionary<string, Settlement>();
@@ -44,12 +44,14 @@ internal class SettlementPopulationTracker : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        FixedTownNpcService fixedTownNpcService)
+        FixedTownNpcService fixedTownNpcService,
+        ISettlementHeroSpawnPool heroSpawnPool)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.fixedTownNpcService = fixedTownNpcService;
+        this.heroSpawnPool = heroSpawnPool;
 
         messageBroker.Subscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
@@ -144,18 +146,26 @@ internal class SettlementPopulationTracker : IHandler
             if (!populatedSettlements.ContainsKey(settlement.StringId)) return;
             if (settlement.LocationComplex == null) return;
 
-            var refreshed = false;
+            var ambientCandidates = new HashSet<Hero>(heroSpawnPool.GetAmbientCandidates(settlement));
+            var reconciled = false;
             foreach (var hero in heroes)
             {
                 if (hero == null) continue;
-                // Player heroes are the player agents themselves and are never placed as roster NPCs.
-                if (PlayerManager.TryGetControlledObjectInfo(hero, out _)) continue;
 
-                RefreshHeroPlacement(hero, settlement);
-                refreshed = true;
+                if (ambientCandidates.Contains(hero))
+                {
+                    RefreshHeroPlacement(hero, settlement);
+                    reconciled = true;
+                }
+                else if (settlement.LocationComplex.GetLocationOfCharacter(hero) != null)
+                {
+                    // Player-party companions use the mission mesh, so remove an older ambient entry directly.
+                    settlement.LocationComplex.RemoveCharacterIfExists(hero);
+                    reconciled = true;
+                }
             }
 
-            if (!refreshed) return;
+            if (!reconciled) return;
             if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return;
 
             BroadcastRosterSnapshot(settlement, settlementId);
@@ -200,7 +210,7 @@ internal class SettlementPopulationTracker : IHandler
         }
         else
         {
-            foreach (var hero in CollectHeroesToPlace(settlement))
+            foreach (var hero in heroSpawnPool.GetAmbientCandidates(settlement))
             {
                 try
                 {
@@ -214,43 +224,6 @@ internal class SettlementPopulationTracker : IHandler
         }
 
         fixedTownNpcService.Populate(settlement);
-    }
-
-    private static IEnumerable<Hero> CollectHeroesToPlace(Settlement settlement)
-    {
-        var heroes = new HashSet<Hero>();
-
-        foreach (var hero in settlement.HeroesWithoutParty ?? Enumerable.Empty<Hero>())
-        {
-            heroes.Add(hero);
-        }
-
-        foreach (var party in settlement.Parties ?? (IReadOnlyList<MobileParty>)new List<MobileParty>())
-        {
-            if (party.LeaderHero == null) continue;
-            if (party.IsPlayerParty()) continue;
-
-            heroes.Add(party.LeaderHero);
-        }
-
-        try
-        {
-            foreach (var character in settlement.SettlementComponent?.GetPrisonerHeroes()
-                ?? Enumerable.Empty<CharacterObject>())
-            {
-                if (character.HeroObject != null)
-                {
-                    heroes.Add(character.HeroObject);
-                }
-            }
-        }
-        catch (Exception)
-        {
-            // Prisoner enumeration depends on the settlement component type; skip when unavailable.
-        }
-
-        // Player heroes are the player agents themselves and are never placed as roster NPCs.
-        return heroes.Where(hero => hero != null && PlayerManager.TryGetControlledObjectInfo(hero, out _) == false);
     }
 
     private void RefreshHeroPlacement(Hero hero, Settlement settlement)

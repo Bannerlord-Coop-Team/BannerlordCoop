@@ -58,6 +58,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(attacker, "attacker");
         SetControllerId(owner, "owner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         var horseId = Guid.NewGuid();
         Agent ownerRider = null, ownerHorse = null, puppetHorse = null;
@@ -65,7 +66,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             (ownerRider, ownerHorse) = RegisterMountedRider(
                 mock, owner.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.AI);
@@ -73,7 +74,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         attacker.Call(() =>
         {
-            var mock = fixture.CreateMission(attacker);
+            var mock = CreateConnectedMission(fixture, attacker, missionInstanceId);
             attackerController = attacker.Resolve<CoopBattleController>();
             (_, puppetHorse) = RegisterMountedRider(
                 mock, attacker.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
@@ -149,13 +150,14 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(attacker, "attacker");
         SetControllerId(owner, "owner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         Agent ownerHorse = null;
         CoopBattleController ownerController = null, attackerController = null;
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
             var rider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
@@ -165,7 +167,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         attacker.Call(() =>
         {
-            var mock = fixture.CreateMission(attacker);
+            var mock = CreateConnectedMission(fixture, attacker, missionInstanceId);
             attackerController = attacker.Resolve<CoopBattleController>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
             var riderPuppet = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None));
@@ -192,11 +194,13 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var characterId = CreateRegisteredObject<CharacterObject>();
 
+        peer.Call(() => CreateConnectedMission(fixture, peer, missionInstanceId));
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             mock.SpawnMounted = true; // the engine spawns a cavalry rider's horse inside the same SpawnAgent call
             var controller = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
@@ -216,9 +220,10 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             Assert.True(registry.TryGetAgentInfo(horse, out var horseInfo));
             Assert.Equal("owner", horseInfo.CurrentAuthority);
 
-            var initialBatch = peer.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Single();
-            Assert.Equal(SpawnBatchPurpose.Initial, initialBatch.Purpose);
-            var record = initialBatch.Agents.Single();
+            NetworkSpawnBattleAgents message = Assert.Single(
+                peer.InternalMessages.GetMessages<NetworkSpawnBattleAgents>());
+            Assert.Equal(SpawnBatchPurpose.Initial, message.Purpose);
+            BattleAgentSpawnData record = DecodeSpawnBatch(peer, message).Single();
             Assert.Equal(riderInfo.AgentId, record.AgentId);
             Assert.Equal(horseInfo.AgentId, record.MountAgentId);
 
@@ -275,6 +280,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         var horseId = Guid.NewGuid();
         Agent ownerHorse = null, puppetHorse = null;
@@ -282,7 +288,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
             peerController = peer.Resolve<CoopBattleController>();
             (_, puppetHorse) = RegisterMountedRider(
                 mock, peer.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
@@ -290,7 +296,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             (_, ownerHorse) = RegisterMountedRider(
                 mock, owner.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.AI);
@@ -327,6 +333,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(attacker, "attacker");
         SetControllerId(owner, "owner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         var horseId = Guid.NewGuid();
         Agent ownerRider = null, ownerHorse = null, puppetRider = null, puppetHorse = null;
@@ -334,7 +341,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         attacker.Call(() =>
         {
-            var mock = fixture.CreateMission(attacker);
+            var mock = CreateConnectedMission(fixture, attacker, missionInstanceId);
             attackerController = attacker.Resolve<CoopBattleController>();
             (puppetRider, puppetHorse) = RegisterMountedRider(
                 mock, attacker.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
@@ -344,7 +351,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
             (ownerRider, ownerHorse) = RegisterMountedRider(
@@ -402,6 +409,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         var horseId = Guid.NewGuid();
         Agent puppetHorse = null;
@@ -409,7 +417,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
             peerController = peer.Resolve<CoopBattleController>();
             var (puppetRider, horse) = RegisterMountedRider(
                 mock, peer.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
@@ -420,7 +428,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             var (rider, _) = RegisterMountedRider(
                 mock, owner.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.AI);
@@ -450,13 +458,14 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         Agent riderPuppet = null, puppetHorse = null;
         CoopBattleController ownerController = null, peerController = null;
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
             peerController = peer.Resolve<CoopBattleController>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
             riderPuppet = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None));
@@ -467,7 +476,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
             var rider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
@@ -504,11 +513,13 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(joiner, "joiner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var characterId = CreateRegisteredObject<CharacterObject>();
 
+        joiner.Call(() => CreateConnectedMission(fixture, joiner, missionInstanceId));
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             mock.SpawnMounted = true;
             var controller = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
@@ -528,7 +539,9 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             rider.MountAgent = null;
             owner.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("joiner", null));
 
-            var record = joiner.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Last().Agents.Single();
+            NetworkSpawnBattleAgents message = joiner.InternalMessages
+                .GetMessages<NetworkSpawnBattleAgents>().Last();
+            BattleAgentSpawnData record = DecodeSpawnBatch(joiner, message).Single();
             Assert.Equal(riderInfo.AgentId, record.AgentId);
             Assert.Equal(horseInfo.AgentId, record.MountAgentId);
 
@@ -545,13 +558,15 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(joiner, "joiner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var characterId = CreateRegisteredObject<CharacterObject>();
         var riderId = Guid.NewGuid();
         var mountId = Guid.NewGuid();
 
+        joiner.Call(() => CreateConnectedMission(fixture, joiner, missionInstanceId));
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             mock.SpawnMounted = true;
             var controller = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
@@ -570,7 +585,9 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
             owner.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("joiner", null));
 
-            var record = joiner.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Last().Agents.Single();
+            NetworkSpawnBattleAgents message = joiner.InternalMessages
+                .GetMessages<NetworkSpawnBattleAgents>().Last();
+            BattleAgentSpawnData record = DecodeSpawnBatch(joiner, message).Single();
             Assert.Equal(riderId, record.AgentId);
             Assert.Equal("rider-origin", record.OriginalOwnerControllerId);
             Assert.Equal("rider-origin:epoch-1", record.MovementScopeId);

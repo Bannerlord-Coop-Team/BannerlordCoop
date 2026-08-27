@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Common.Util;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -20,6 +21,7 @@ public sealed class MockMission
     public Mission Shell { get; }
 
     public Agent MainAgent { get; set; }
+    public PartyBase MainParty { get; set; }
     public float DamageToPlayerMultiplier { get; set; } = 1f;
     public bool EndMissionCalled { get; set; }
     public int AgentFleeingCalls { get; set; }
@@ -111,8 +113,12 @@ public sealed class MockMission
             Character = buildData.AgentCharacter,
             Team = buildData.AgentTeam,
             Position = buildData.AgentInitialPosition ?? default,
+            MovementDirection = buildData.AgentInitialDirection ?? default,
             Origin = buildData.AgentOrigin,
             SpawnEquipment = spawnEquipment,
+            BodyProperties = buildData.BodyPropertiesOverriden ? buildData.AgentBodyProperties : default,
+            ClothingColor1 = buildData.AgentClothingColor1,
+            ClothingColor2 = buildData.AgentClothingColor2,
             Mission = Shell,
         };
         AgentMirror.Bind(agent, mirror);
