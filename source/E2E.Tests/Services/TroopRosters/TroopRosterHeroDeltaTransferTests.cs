@@ -199,7 +199,7 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
     }
 
     [Fact]
-    public void AlreadyRemovedHero_NegativeDelta_IsAcceptedWithoutChangingRoster()
+    public void AlreadyRemovedHero_NegativeDelta_IsRejectedWithoutChangingRoster()
     {
         Server.Call(() =>
         {
@@ -213,7 +213,7 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
                 (roster, Delta(characterId, -1)),
             });
 
-            Assert.True(applied);
+            Assert.False(applied);
             Assert.Equal(0, roster.GetTroopCount(hero.CharacterObject));
             Assert.Null(hero.PartyBelongedTo);
             Assert.Null(hero.PartyBelongedToAsPrisoner);

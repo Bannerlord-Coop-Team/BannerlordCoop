@@ -208,10 +208,6 @@ internal class TroopRosterInterface : ITroopRosterInterface
                 long finalWounded = current.wounded + elementData.WoundedNumber;
                 long finalXp = current.xp + elementData.Xp;
 
-                if (!IsCharacterWithAddition(deltas, elementData.CharacterId) &&
-                    IsAlreadyAppliedHeroRemoval(character, current, elementData.Number, elementData.WoundedNumber, elementData.Xp))
-                    continue;
-
                 if (finalNumber < 0 ||
                     finalNumber > int.MaxValue ||
                     finalWounded < 0 ||
@@ -240,36 +236,6 @@ internal class TroopRosterInterface : ITroopRosterInterface
         ApplyDeltaElements(elements, applyAdditions: false);
         ApplyDeltaElements(elements, applyAdditions: true);
         return true;
-    }
-
-    private static bool IsAlreadyAppliedHeroRemoval(
-        CharacterObject character,
-        (int number, int wounded, int xp) current,
-        int numberDelta,
-        int woundedDelta,
-        int xpDelta)
-    {
-        if (!character.IsHero ||
-            current.number != 0 ||
-            current.wounded != 0 ||
-            current.xp != 0 ||
-            numberDelta >= 0 ||
-            woundedDelta != 0 ||
-            xpDelta != 0)
-            return false;
-
-        var hero = character.HeroObject;
-        return hero.PartyBelongedTo == null && hero.PartyBelongedToAsPrisoner == null;
-    }
-
-    private static bool IsCharacterWithAddition(
-        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas,
-        string characterId)
-    {
-        return deltas
-            .Where(x => x.delta.Data != null)
-            .SelectMany(x => x.delta.Data)
-            .Any(x => x.CharacterId == characterId && x.Number > 0);
     }
 
     private void ApplyDeltaElements(
