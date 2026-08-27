@@ -279,11 +279,14 @@ public class PuppetDeathApplier : IPuppetDeathApplier
 
     private static Blow CreateReplicatedBlow(NetworkBattleAgentDied message, int ownerId)
     {
-        return new Blow(ownerId)
+        var blow = new Blow(ownerId)
         {
             InflictedDamage = message.InflictedDamage,
             VictimBodyPart = message.VictimBodyPart,
         };
+        // Death broadcasts carry no weapon. Slot zero makes vanilla dereference a mount's missing equipment.
+        blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = -1;
+        return blow;
     }
 
     private static KillingBlow CreateReplicatedKillingBlow(Blow blow, int deathAction)

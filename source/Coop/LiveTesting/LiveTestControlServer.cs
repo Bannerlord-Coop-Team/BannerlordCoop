@@ -534,6 +534,27 @@ namespace Coop.LiveTesting
                 "Coop",
                 "Coop.Steam",
             };
+            bool coopSteamLoaded = AppDomain.CurrentDomain.GetAssemblies().Any(assembly =>
+                string.Equals(assembly.GetName().Name, "Coop.Steam", StringComparison.Ordinal));
+            if (!coopSteamLoaded)
+            {
+                string coopAssemblyDirectory = System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location);
+                if (!string.IsNullOrEmpty(coopAssemblyDirectory))
+                {
+                    string coopSteamAssemblyPath = System.IO.Path.Combine(coopAssemblyDirectory, "Coop.Steam.dll");
+                    if (File.Exists(coopSteamAssemblyPath))
+                    {
+                        try
+                        {
+                            System.Reflection.Assembly.LoadFrom(coopSteamAssemblyPath);
+                        }
+                        catch (Exception exception)
+                        {
+                            Logger.Debug(exception, "[LiveTest] Could not load {AssemblyPath} for the status probe", coopSteamAssemblyPath);
+                        }
+                    }
+                }
+            }
             var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies()
                 .Where(assembly => modAssemblyNames.Contains(
                     assembly.GetName().Name,

@@ -17,11 +17,15 @@ public struct TroopReserveEntry
     public string CharacterId { get; }
     [ProtoMember(4)]
     public int FormationClass { get; }
+    /// <summary>One-based side-wide mission supply order, or zero when ordinary apportionment applies.</summary>
+    [ProtoMember(5)]
+    public int SupplyOrder { get; }
 
-    public TroopReserveEntry(int seed, string characterId, int formationClass)
+    public TroopReserveEntry(int seed, string characterId, int formationClass, int supplyOrder = 0)
     {
         Seed = seed;
         CharacterId = characterId;
         FormationClass = formationClass;
+        SupplyOrder = supplyOrder;
     }
 }
