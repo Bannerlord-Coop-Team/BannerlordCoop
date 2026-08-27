@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.StanceLinks;
 using GameInterface.Services.StanceLinks.Messages;
 using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
@@ -72,16 +73,18 @@ public class StanceLinkRegistrationGuardTests : IDisposable
     {
         string faction1Id = null;
         string faction2Id = null;
+        IFaction faction1 = null;
+        IFaction faction2 = null;
         Server.Call(() =>
         {
-            var faction1 = Kingdom.CreateKingdom("guard_elim_kingdom_5");
-            var faction2 = Kingdom.CreateKingdom("guard_elim_kingdom_6");
+            faction1 = Kingdom.CreateKingdom("guard_elim_kingdom_5");
+            faction2 = Kingdom.CreateKingdom("guard_elim_kingdom_6");
 
             Assert.True(Server.ObjectManager.TryGetId(faction1, out faction1Id));
             Assert.True(Server.ObjectManager.TryGetId(faction2, out faction2Id));
             using (new AllowedThread())
             {
-                faction2.DeactivateKingdom();
+                ((Kingdom)faction2).DeactivateKingdom();
             }
         });
 
@@ -95,7 +98,10 @@ public class StanceLinkRegistrationGuardTests : IDisposable
                 Assert.NotNull(FactionManager.Instance.GetStanceLinkInternal(clientFaction1, clientFaction2));
             }
         });
-        Assert.Empty(FactionManager.Instance._stances.GetStanceLinks());
+        var id = StanceLinkHandler.GetStanceLinkKey(faction1, faction2);
+        var stanceLinkKey = $"{typeof(StanceLink).Name}_{id}";
+        Assert.False(Server.ObjectManager.TryGetObject<StanceLink>(stanceLinkKey, out _));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<StanceLinkConstructed>());
     }
 
     [Fact]
