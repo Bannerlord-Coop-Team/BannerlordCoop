@@ -1,9 +1,10 @@
-using GameInterface;
+﻿using GameInterface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using HarmonyLib;
 using SandBox;
 using SandBox.Missions.MissionLogics;
@@ -43,6 +44,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         typeof(HighlightsController),
         typeof(SandboxHighlightsController),
         typeof(MissionMapTimeView),
+        typeof(PlayerNameplateMissionView),
         typeof(CoopTournamentController),
     };
 
@@ -50,18 +52,21 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
     private readonly ITournamentGameInterface tournamentGameInterface;
     private readonly Func<CoopTournamentController> controllerFactory;
     private readonly Func<MissionMapTimeView> mapTimeViewFactory;
+    private readonly Func<PlayerNameplateMissionView> playerNameplateViewFactory;
 
     public CoopTournamentLauncher(
         Harmony harmony,
         IObjectManager objectManager,
         ITournamentGameInterface tournamentGameInterface,
         Func<CoopTournamentController> controllerFactory,
-        Func<MissionMapTimeView> mapTimeViewFactory)
+        Func<MissionMapTimeView> mapTimeViewFactory,
+        Func<PlayerNameplateMissionView> playerNameplateViewFactory)
     {
         this.objectManager = objectManager;
         this.tournamentGameInterface = tournamentGameInterface;
         this.controllerFactory = controllerFactory;
         this.mapTimeViewFactory = mapTimeViewFactory;
+        this.playerNameplateViewFactory = playerNameplateViewFactory;
         TournamentCombatPatchInstaller.Install(harmony);
     }
 
@@ -151,6 +156,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
             new HighlightsController(),
             new SandboxHighlightsController(),
             mapTimeViewFactory(),
+            playerNameplateViewFactory(),
             coopController
         };
         if (!behaviors.Select(behavior => behavior.GetType()).SequenceEqual(BehaviorOrder))

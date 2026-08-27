@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -23,7 +23,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// auto-resolve (<see cref="BattleModeRegistry.IsSimulation"/>) the mission-start options grey out. The mode comes
 /// from the server's <see cref="Messages.Start.NetworkBattleModeSet"/>. The surrender option gets the inverse
 /// treatment: forced available for a defender that cannot fight (see <see cref="PostfixSurrenderCondition"/>) and
-/// refused while either mode owns the event. Other options (join, leave, talk) are untouched.
+/// refused while either mode owns the event. Abandon army is hidden while a destroyed battle waits for deferred
+/// encounter cleanup; other options (join, regular leave, talk) are untouched.
 /// </summary>
 /// <remarks>
 /// One shared postfix per option-condition in <see cref="MissionStartConditions"/> / <see cref="SimulationStartConditions"/> /
@@ -59,6 +60,7 @@ internal class BattleModeEncounterOptionsPatch
 
     // Handled inversely to the start buckets: forced available / refused rather than only greyed.
     private const string SurrenderCondition = "game_menu_encounter_surrender_on_condition"; // Surrender.
+    private const string AbandonArmyCondition = "game_menu_encounter_abandon_army_on_condition"; // Abandon army.
 
     static IEnumerable<MethodBase> TargetMethods()
     {
@@ -79,6 +81,26 @@ internal class BattleModeEncounterOptionsPatch
         var surrender = AccessTools.Method(typeof(EncounterGameMenuBehavior), SurrenderCondition);
         if (surrender != null)
             yield return surrender;
+
+        var abandonArmy = AccessTools.Method(typeof(EncounterGameMenuBehavior), AbandonArmyCondition);
+        if (abandonArmy != null)
+            yield return abandonArmy;
+    }
+
+    [HarmonyPrefix]
+    static bool Prefix(MethodBase __originalMethod, ref bool __result)
+    {
+        if (ModInformation.IsServer || __originalMethod.Name != AbandonArmyCondition) return true;
+        if (!ShouldSkipAbandonArmyCondition(MobileParty.MainParty)) return true;
+
+        __result = false;
+        return false;
+    }
+
+    internal static bool ShouldSkipAbandonArmyCondition(MobileParty mainParty)
+    {
+        var army = mainParty?.Army;
+        return army != null && army.LeaderParty != mainParty && mainParty.MapEvent == null;
     }
 
     [HarmonyPostfix]

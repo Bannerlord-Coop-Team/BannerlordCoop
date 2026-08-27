@@ -152,12 +152,16 @@ internal class CompanionsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void DailyTickPostfix()
     {
-        foreach (Hero hero in Hero.AllAliveHeroes)
+        RepairStuckHeroes(Hero.AllAliveHeroes, hero => MakeHeroFugitiveAction.Apply(hero, true));
+    }
+
+    internal static void RepairStuckHeroes(IEnumerable<Hero> heroes, Action<Hero> makeHeroFugitive)
+    {
+        foreach (Hero hero in heroes)
         {
             if (hero.IsPrisoner && hero.PartyBelongedToAsPrisoner == null)
             {
-                MakeHeroFugitiveAction.Apply(hero, true);
-                break;
+                makeHeroFugitive(hero);
             }
         }
     }

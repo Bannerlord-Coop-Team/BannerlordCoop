@@ -898,8 +898,10 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     {
         var reserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
             "rt_battle", (int)BattleSideEnum.Attacker,
-            new[] { new PartyReserve("own-party", 0, Array.Empty<TroopReserveEntry>(), isReceiverPlayerParty: true,
-                sideOffset: 7, playerOwnedRank: 2) },
+            new[] { new PartyReserve("own-party", 0,
+                new[] { new TroopReserveEntry(42, "priority-character", 0, supplyOrder: 9) },
+                isReceiverPlayerParty: true, sideOffset: 7, playerOwnedRank: 2,
+                playerOwnedPartiesBefore: 2) },
             sideTotalTroops: 42,
             playerOwnedPartyCount: 3,
             allocationRevision: 17,
@@ -914,6 +916,9 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         Assert.True(party.IsReceiverPlayerParty);
         Assert.Equal(7, party.SideOffset);
         Assert.Equal(2, party.PlayerOwnedRank);
+        Assert.Equal(2, party.PlayerOwnedPartiesBefore);
+        Assert.True(party.HasPlayerOwnedPartiesBefore);
+        Assert.Equal(9, Assert.Single(party.Entries).SupplyOrder);
 
         var emptyReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
             "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>(),

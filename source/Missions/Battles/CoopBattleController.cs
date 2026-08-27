@@ -74,6 +74,7 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeMachineStateReplicator siegeMachineState;
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private readonly IMissionContext debugMissionContext;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
     private int lastResultSnapshotEpochReported;
 
@@ -102,7 +103,8 @@ public class CoopBattleController : CoopMissionController
         IGuardedHitWindow guardedHitWindow,
         IAgentNativeMountState agentNativeMountState,
         IPuppetMountStateRepairer puppetMountStateRepairer,
-        IBattleAgentSpawnBatchCodec spawnBatchCodec)
+        IBattleAgentSpawnBatchCodec spawnBatchCodec,
+        IMissionWeaponDataMapper missionWeaponDataMapper)
         : base(
             network,
             messageBroker,
@@ -111,6 +113,9 @@ public class CoopBattleController : CoopMissionController
             Missions.Agents.Handlers.MovementCadenceProfile.Battle)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
+        debugMissionContext = missionContext;
+        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+            () => session.IsLocalHost);
         var casualties = new CasualtyAttributionMap();
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
@@ -124,11 +129,19 @@ public class CoopBattleController : CoopMissionController
             worldItemRegistry,
             session,
             missionContext);
-        replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, spawnBatchCodec);
+        replicator = new OwnedAgentReplicator(
+            network,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            session,
+            casualties,
+            deployment,
+            spawnBatchCodec,
+            missionWeaponDataMapper);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
-        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget, puppetRoutApplier, spawnBatchCodec);
         puppetDeathApplier = new PuppetDeathApplier(
             messageBroker,
             coopMissionComponent,
@@ -148,6 +161,20 @@ public class CoopBattleController : CoopMissionController
             puppetMountStateRepairer);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
+        puppetSpawner = new PuppetSpawner(
+            messageBroker,
+            objectManager,
+            playerManager,
+            coopMissionComponent,
+            session,
+            casualties,
+            deployment,
+            formationAssigner,
+            agentBudget,
+            missionWeaponDataMapper,
+            puppetRoutApplier,
+            spawnBatchCodec,
+            authorityMigrator);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
         // watermark spans every host-authority message type (engine placement + machine state/authority)
         // — a superseded hosting generation is dropped consistently across both. The policy is a
@@ -427,6 +454,37 @@ public class CoopBattleController : CoopMissionController
         ResultCommitter.ReportAcceptedResult();
     }
 
+    // The live fixture only replays to a peer that this mission has actually mapped to a connected P2P link.
+    internal bool TryDebugReplayOwnedAgentsToConnectedPeer(string controllerId, out string error)
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(controllerId))
+        {
+            error = "the target controller id is empty";
+            return false;
+        }
+        if (!Session.HasInstance || Mission.Current?.GetMissionBehavior<CoopBattleController>() != this)
+        {
+            error = "there is no active co-op battle mission";
+            return false;
+        }
+        if (Session.IsOwn(controllerId))
+        {
+            error = "the target must be a remote controller";
+            return false;
+        }
+        if (debugMissionContext == null ||
+            !debugMissionContext.TryGetPeer(controllerId, out NetPeer peer) ||
+            peer.ConnectionState != ConnectionState.Connected)
+        {
+            error = "the target is not a connected mission peer";
+            return false;
+        }
+
+        replicator.ReplicateCurrentAgentsTo(controllerId);
+        return true;
+    }
+
     protected override void SendJoinInfo(string controllerId)
     {
         // Announce presence so the handshake completes and the P2P link is proven.
@@ -444,6 +502,8 @@ public class CoopBattleController : CoopMissionController
             siegeEngineDeployment.CatchUpJoiner(controllerId);
             siegeMachineState.CatchUpJoiner(controllerId);
             Deployment.CatchUpJoiner(controllerId);
+            if (Session.IsLocalHost)
+                coopMissionComponent.WeaponDropHandler.CatchUpJoiner(controllerId);
 
             if (Session.IsLocalHost && ResultCommitter.TryGetResolvedState(out var battleState))
             {

@@ -41,6 +41,23 @@ namespace GameInterface.Tests
         }
 
         [Fact]
+        public void PlayerLeaveSettlementPatch_PatchesVillageHostileActionLeaveOptions()
+        {
+            var harmony = new Harmony(nameof(PlayerLeaveSettlementPatch_PatchesVillageHostileActionLeaveOptions));
+            try
+            {
+                var patched = harmony.CreateClassProcessor(typeof(PlayerLeaveSettlementPatch)).Patch();
+
+                Assert.Contains(patched, method => method.Name.Contains("game_menu_village_hostile_action_warn_leave_on_consequence"));
+                Assert.Contains(patched, method => method.Name.Contains("village_looted_leave_on_consequence"));
+            }
+            finally
+            {
+                harmony.UnpatchAll(harmony.Id);
+            }
+        }
+
+        [Fact]
         public void PlayerLeaveSiegeEncounterPatch_NeutralPartyRequestsSynchronizedLeave()
         {
             var party = ObjectHelper.SkipConstructor<MobileParty>();

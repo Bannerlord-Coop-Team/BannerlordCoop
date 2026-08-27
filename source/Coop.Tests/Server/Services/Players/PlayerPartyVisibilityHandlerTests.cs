@@ -254,11 +254,11 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
     }
 
     [Fact]
-    public void CaptivityRelease_SynchronizedOwner_ActivatesParty()
+    public void CaptivityRelease_SynchronizedAtSeaOwner_ActivatesAndShowsParty()
     {
         var player = CreatePlayer();
         var party = CreateParty(isActive: false);
-        party._currentSettlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
+        party._isCurrentlyAtSea = true;
         var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
         var (playerManager, connectionCollection, objectManager) =
             CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: true);
@@ -274,6 +274,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
         Assert.True(party.IsActive);
+        Assert.True(party.IsVisible);
+        Assert.True(party.IsInspected);
     }
 
     [Fact]

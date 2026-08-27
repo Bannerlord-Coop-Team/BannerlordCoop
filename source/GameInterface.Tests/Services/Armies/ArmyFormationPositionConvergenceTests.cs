@@ -35,10 +35,8 @@ public class ArmyFormationPositionConvergenceTests
     }
 
     [Fact]
-    public void DistantCompanion_PositionUpdateDoesNotSatisfyVanillaAttachmentDistance()
+    public void DistantCompanion_DoesNotReportPosition()
     {
-        CampaignVec2 reportedLeaderPosition = Position(12f, 12f);
-        CampaignVec2 distantCompanionPosition = Position(20f, 20f);
         var state = State(
             Position(11f, 12f),
             isArmyLeader: true,
@@ -49,8 +47,37 @@ public class ArmyFormationPositionConvergenceTests
             state,
             hasPreviousPosition: false,
             previousPosition: default));
-        Assert.True(convergence.ShouldApply(state, reportedLeaderPosition));
-        Assert.False(distantCompanionPosition.DistanceSquared(reportedLeaderPosition) < 1.5f);
+    }
+
+    [Fact]
+    public void ReportedPositionWithoutNearbyCompanion_IsRejected()
+    {
+        CampaignVec2 reportedPosition = Position(12f, 12f);
+        var state = State(
+            Position(11f, 12f),
+            isArmyLeader: true,
+            hasConvergingMember: true,
+            hasNearbyConvergingMember: false);
+
+        Assert.False(convergence.ShouldApply(state, reportedPosition));
+    }
+
+    [Fact]
+    public void NearbyCompanion_BoundedCorrectionIsApplied()
+    {
+        CampaignVec2 reportedPosition = Position(12f, 12f);
+        var state = EligibleState(Position(11f, 12f));
+
+        Assert.True(convergence.ShouldApply(state, reportedPosition));
+    }
+
+    [Fact]
+    public void CorrectionBeyondAttachmentDistance_IsRejected()
+    {
+        CampaignVec2 reportedPosition = Position(12f, 12f);
+        var state = EligibleState(Position(10f, 12f));
+
+        Assert.False(convergence.ShouldApply(state, reportedPosition));
     }
 
     [Fact]
@@ -58,9 +85,6 @@ public class ArmyFormationPositionConvergenceTests
     {
         CampaignVec2 reportedPosition = Position(12f, 12f);
 
-        Assert.True(convergence.ShouldApply(
-            EligibleState(Position(11f, 12f)),
-            reportedPosition));
         Assert.False(convergence.ShouldApply(
             EligibleState(reportedPosition),
             reportedPosition));
@@ -130,7 +154,8 @@ public class ArmyFormationPositionConvergenceTests
             isInSettlement: false,
             isCurrentlyAtSea: false,
             hasConvergingMember,
-            hasNearbyConvergingMember ?? hasConvergingMember);
+            hasNearbyConvergingMember ?? hasConvergingMember,
+            attachmentDistanceSquared: 1.5f);
 
     private static CampaignVec2 Position(float x, float y) =>
         new CampaignVec2(new Vec2(x, y), isOnLand: true);

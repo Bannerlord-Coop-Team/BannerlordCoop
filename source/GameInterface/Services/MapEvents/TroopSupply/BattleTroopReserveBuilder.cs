@@ -7,9 +7,12 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameInterface.Configuration;
+using GameInterface.Services.Heroes.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.TroopSupply;
@@ -52,6 +55,9 @@ public readonly struct SideReserve
 /// </summary>
 public interface IBattleTroopReserveBuilder : IGameAbstraction
 {
+    /// <summary>Prepare the native mission queues and snapshot any mission-specific authoritative supply order.</summary>
+    void PrepareMissionReserves(MapEvent mapEvent, MobileParty initiatingParty);
+
     /// <summary>
     /// The reserves <paramref name="controllerId"/> currently owns. A party whose resolved owning controller
     /// is in <paramref name="absentControllers"/> (a member explicitly marked absent without withdrawing) is
@@ -88,6 +94,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     // party that joins AFTER the battle started (a mid-battle joiner) gets flattened on demand the next time
     // reserves are built — otherwise it would never be in the ledger and that player would own nothing.
     private readonly HashSet<string> builtParties = new HashSet<string>();
+    private readonly Dictionary<string, Dictionary<int, int>> ambushSupplyOrders =
+        new Dictionary<string, Dictionary<int, int>>();
     private readonly object gate = new object();
 
     public BattleTroopReserveBuilder(IBattleTroopLedger ledger, IObjectManager objectManager, IPlayerManager playerManager)
@@ -95,6 +103,24 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         this.ledger = ledger;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+    }
+
+    public void PrepareMissionReserves(MapEvent mapEvent, MobileParty initiatingParty)
+    {
+        if (mapEvent == null) return;
+
+        FlattenedTroopRoster defenderPriority = null;
+        if (mapEvent.IsSiegeAmbush)
+            defenderPriority = BuildSiegeAmbushPriorityRoster(mapEvent, initiatingParty);
+
+        mapEvent.AttackerSide.MakeReadyForMission(null);
+        mapEvent.DefenderSide.MakeReadyForMission(defenderPriority);
+
+        if (!mapEvent.IsSiegeAmbush || !objectManager.TryGetId(mapEvent, out var mapEventId))
+            return;
+
+        lock (gate)
+            ambushSupplyOrders[mapEventId] = BuildAmbushSupplyOrders(mapEvent.DefenderSide);
     }
 
     public IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost,
@@ -141,6 +167,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
             // Only a present player's own party reserves a player slot. Offline or absent registrations fall
             // to the host and must not reduce the allocation available to the players who entered this battle.
+            int playerOwnedPartiesBefore = partySide == BattleSideEnum.Attacker
+                ? attackerPlayerParties
+                : defenderPlayerParties;
             var playerOwnedRank = -1;
             if (entries.Count > 0
                 && ResolveOwningController(partyOwnerController, null, absentControllers) != null)
@@ -162,7 +191,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 entriesArray,
                 isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId),
                 sideOffset: partyOffset,
-                playerOwnedRank: playerOwnedRank);
+                playerOwnedRank: playerOwnedRank,
+                playerOwnedPartiesBefore: playerOwnedPartiesBefore);
             if (partySide == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else
@@ -215,6 +245,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // Drop the whole battle's reserves in one shot — covers every party (including any no longer
             // enumerable) and leaves no empty per-battle entry behind, so a restart re-flattens fresh.
             ledger.Remove(mapEventId);
+            ambushSupplyOrders.Remove(mapEventId);
             Logger.Information("[TroopSupply] Forgot ALL reserves of battle {MapEventId} ({Count} flatten-cache entries cleared)",
                 mapEventId, forgotten);
         }
@@ -231,6 +262,11 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     {
         lock (gate)
         {
+            ambushSupplyOrders.TryGetValue(mapEventId, out var defenderSupplyOrders);
+            int nextAmbushSupplyOrder = defenderSupplyOrders == null || defenderSupplyOrders.Count == 0
+                ? 1
+                : defenderSupplyOrders.Values.Max() + 1;
+
             // Flatten every party not yet in the ledger. Re-scanned on each reserve build so a mid-battle
             // joiner's party (added after the initial build) is picked up rather than left out.
             foreach (var party in EnumerateParties(mapEvent))
@@ -242,8 +278,12 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                     continue; // already flattened
 
                 bool hadRoster = party._roster != null;
-                var entries = FlattenParty(party);
-                PlacePlayerHeroFirstInReserve(party, entries);
+                var supplyOrders = party.Party?.Side == BattleSideEnum.Defender
+                    ? defenderSupplyOrders
+                    : null;
+                var entries = FlattenParty(party, supplyOrders, ref nextAmbushSupplyOrder);
+                if (supplyOrders == null)
+                    PlacePlayerHeroFirstInReserve(party, entries);
                 ledger.SetReserve(mapEventId, partyId, entries);
                 builtParties.Add(partyId);
                 Logger.Information("[TroopSupply] Built reserve: party {PartyId} side {Side} -> {Count} troops (roster was {Roster})",
@@ -254,7 +294,10 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
     // Hand out the server's current flattened descriptors so every client spawns the same agent identities.
     // Setup may re-flatten the server roster later, so authoritative applies match by CharacterId instead.
-    private List<TroopReserveEntry> FlattenParty(MapEventParty party)
+    private List<TroopReserveEntry> FlattenParty(
+        MapEventParty party,
+        Dictionary<int, int> supplyOrders,
+        ref int nextSupplyOrder)
     {
         var entries = new List<TroopReserveEntry>();
 
@@ -267,12 +310,20 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
         foreach (var element in roster)
         {
-            if (element.IsWounded || element.IsRouted || element.IsKilled)
+            if (element.IsRouted || element.IsKilled)
                 continue;
 
             var character = element.Troop;
             if (character == null)
                 continue;
+
+            var isPlayer = character.HeroObject?.IsPlayerHero() == true;
+
+            // Skip if the troop is not a player, or if the config option is disabled and they are a player + wounded.
+            if (element.IsWounded && !(isPlayer && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry))
+            {
+                continue;
+            }
 
             // Heroes and regular troops alike are keyed by their CharacterObject id (hero CharacterObjects are
             // registered too — CharacterObjectRegistry), so resolve it uniformly.
@@ -282,10 +333,139 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 continue;
             }
 
+            int supplyOrder = 0;
+            if (supplyOrders != null &&
+                !supplyOrders.TryGetValue(element.Descriptor.UniqueSeed, out supplyOrder))
+            {
+                supplyOrder = nextSupplyOrder++;
+                supplyOrders[element.Descriptor.UniqueSeed] = supplyOrder;
+            }
+
             entries.Add(new TroopReserveEntry(
-                element.Descriptor.UniqueSeed, characterId, (int)character.GetFormationClass()));
+                element.Descriptor.UniqueSeed,
+                characterId,
+                (int)character.GetFormationClass(),
+                supplyOrder));
         }
+
+        if (supplyOrders != null)
+            entries.Sort((left, right) => left.SupplyOrder.CompareTo(right.SupplyOrder));
         return entries;
+    }
+
+    private FlattenedTroopRoster BuildSiegeAmbushPriorityRoster(
+        MapEvent mapEvent,
+        MobileParty initiatingParty)
+    {
+        var priority = new FlattenedTroopRoster();
+        if (initiatingParty == null) return priority;
+
+        AddSiegeAmbushPriorityTroops(initiatingParty.MemberRoster, priority);
+
+        var siegeEvent = mapEvent.MapEventSettlement?.SiegeEvent;
+        var garrison = siegeEvent?.BesiegedSettlement?.Town?.GarrisonParty;
+        if (garrison != null &&
+            ReferenceEquals(siegeEvent.BesiegedSettlement.OwnerClan, initiatingParty.ActualClan))
+        {
+            AddSiegeAmbushPriorityTroops(garrison.MemberRoster, priority);
+        }
+
+        if (siegeEvent != null &&
+            initiatingParty.Army != null &&
+            ReferenceEquals(initiatingParty.Army.LeaderParty, initiatingParty))
+        {
+            foreach (var involvedParty in siegeEvent.GetSiegeEventSide(BattleSideEnum.Defender)
+                         .GetInvolvedPartiesForEventType())
+            {
+                if (ReferenceEquals(involvedParty, initiatingParty.Party)) continue;
+                AddSiegeAmbushPriorityTroops(involvedParty.MemberRoster, priority);
+            }
+        }
+
+        return priority;
+    }
+
+    private static void AddSiegeAmbushPriorityTroops(
+        TroopRoster roster,
+        FlattenedTroopRoster priority)
+    {
+        if (roster == null) return;
+
+        foreach (var element in roster.GetTroopRoster())
+        {
+            var character = element.Character;
+            if (character != null && (character.IsHero || character.HasMount()))
+                priority.Add(element);
+        }
+    }
+
+    private Dictionary<int, int> BuildAmbushSupplyOrders(MapEventSide defenderSide)
+    {
+        var supplyOrders = new Dictionary<int, int>();
+        var readyTroops = defenderSide?._readyTroopsPriorityList;
+        if (readyTroops == null || readyTroops.Count == 0)
+            return supplyOrders;
+
+        var partyIndices = new Dictionary<MapEventParty, int>();
+        for (int i = 0; i < defenderSide.Parties.Count; i++)
+            partyIndices[defenderSide.Parties[i]] = i;
+
+        var ordered = readyTroops
+            .OrderByDescending(item => item.Item3)
+            .ThenBy(item => partyIndices.TryGetValue(item.Item2, out var index) ? index : int.MaxValue)
+            .ThenBy(item => item.Item1.Descriptor.UniqueSeed)
+            .ToList();
+
+        int nextOrder = 1;
+        foreach (var party in defenderSide.Parties)
+        {
+            if (!TryGetPlayerCharacterId(party, out var characterId)) continue;
+
+            foreach (var item in ordered)
+            {
+                if (!ReferenceEquals(item.Item2, party) ||
+                    !objectManager.TryGetId(item.Item1.Troop, out var troopId) ||
+                    !string.Equals(troopId, characterId, StringComparison.Ordinal) ||
+                    supplyOrders.ContainsKey(item.Item1.Descriptor.UniqueSeed))
+                {
+                    continue;
+                }
+
+                supplyOrders[item.Item1.Descriptor.UniqueSeed] = nextOrder++;
+                break;
+            }
+        }
+
+        foreach (var item in ordered)
+        {
+            int seed = item.Item1.Descriptor.UniqueSeed;
+            if (!supplyOrders.ContainsKey(seed))
+                supplyOrders[seed] = nextOrder++;
+        }
+
+        return supplyOrders;
+    }
+
+    private bool TryGetPlayerCharacterId(MapEventParty party, out string characterId)
+    {
+        characterId = null;
+        var mobileParty = party.Party?.MobileParty;
+        if (mobileParty == null || !objectManager.TryGetId(mobileParty, out var mobilePartyId))
+            return false;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!string.Equals(player.MobilePartyId, mobilePartyId, StringComparison.Ordinal) ||
+                string.IsNullOrEmpty(player.CharacterObjectId))
+            {
+                continue;
+            }
+
+            characterId = player.CharacterObjectId;
+            return true;
+        }
+
+        return false;
     }
 
     private void PlacePlayerHeroFirstInReserve(MapEventParty party, List<TroopReserveEntry> entries)

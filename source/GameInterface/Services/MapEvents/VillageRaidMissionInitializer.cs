@@ -1,7 +1,7 @@
-using Common.Logging;
-using SandBox;
+﻿using Common.Logging;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -32,11 +32,13 @@ internal class VillageRaidMissionInitializer : IBattleMissionInitializer
         if (!TryGetVillageScene(battle, out Settlement settlement, out string villageScene, logWarnings: false))
             throw new InvalidOperationException("Village raid mission initializer could not resolve a village raid scene");
 
-        MissionInitializerRecord record = SandBoxMissions.CreateSandBoxMissionInitializerRecord(
-            villageScene,
-            LandRaidSceneLevel,
-            false,
-            DecalAtlasGroup.Battle);
+        MissionInitializerRecord record = new MissionInitializerRecord(villageScene);
+        record.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+        record.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+        record.TerrainType = (int)Campaign.Current.MapSceneWrapper.GetFaceTerrainType(battle.Position.Face);
+        record.SceneLevels = LandRaidSceneLevel;
+        record.DoNotUseLoadingScreen = false;
+        record.DecalAtlasGroup = (int)DecalAtlasGroup.Battle;
         record.RandomTerrainSeed = randomTerrainSeed;
         record.PlayingInCampaignMode = true;
         record.AtmosphereOnCampaign = atmosphereOnCampaign;

@@ -1,6 +1,11 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Logging;
+using E2E.Tests.Environment;
+using GameInterface.Surrogates;
 using HarmonyLib;
+using Missions.Battles;
+using Missions.Messages;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 using static TaleWorlds.Core.Equipment;
 
@@ -11,6 +16,8 @@ namespace E2E.Tests.Services.Equipments;
 
 public class EquipmentSyncTests : IDisposable
 {
+    private const string EquipmentTypeDiagnostic = "Client updated managed \"_equipmentType\"";
+
     E2ETestEnvironment TestEnvironment { get; }
     public EquipmentSyncTests(ITestOutputHelper output)
     {
@@ -179,6 +186,125 @@ public class EquipmentSyncTests : IDisposable
             Assert.Equal(equipment._equipmentType, equipmentType);
         }
 
+    }
+
+    [Theory]
+    [InlineData(SpawnBatchPurpose.Initial)]
+    [InlineData(SpawnBatchPurpose.Deployment)]
+    [InlineData(SpawnBatchPurpose.CatchUp)]
+    public void ClientTransientSpawnEquipment_DoesNotReportManagedMutation(SpawnBatchPurpose purpose)
+    {
+        _ = new SurrogateCollection();
+        var server = TestEnvironment.Server;
+        var client = TestEnvironment.Clients.First();
+        NetworkSpawnBattleAgents? wireMessage = null;
+
+        server.Call(() =>
+        {
+            var codec = new BattleAgentSpawnBatchCodec();
+            var record = new BattleAgentSpawnData(
+                Guid.NewGuid(),
+                "imperial_infantry",
+                new Vec3(1f, 2f, 0f),
+                BattleSideEnum.Attacker,
+                100f,
+                "owner",
+                "map_event_party",
+                1,
+                new Equipment(EquipmentType.Civilian),
+                default,
+                missionEquipmentData: null);
+            NetworkSpawnBattleAgents encoded = codec.Encode(
+                new[] { record },
+                purpose).Single();
+
+            wireMessage = CreateWireMessage(encoded);
+        });
+
+        var diagnostics = new List<string>();
+        void CaptureEquipmentTypeDiagnostic(string message)
+        {
+            if (message == EquipmentTypeDiagnostic)
+                diagnostics.Add(message);
+        }
+
+        OutputSinkManager.AddLogCallback(CaptureEquipmentTypeDiagnostic);
+        try
+        {
+            client.Call(() =>
+            {
+                var codec = new BattleAgentSpawnBatchCodec();
+                Assert.True(codec.TryDecode(wireMessage!, out BattleAgentSpawnData[] decoded));
+
+                Equipment equipment = Assert.Single(decoded).SpawnEquipment;
+                Assert.Equal(EquipmentType.Civilian, equipment._equipmentType);
+                Assert.False(client.ObjectManager.Contains(equipment));
+            });
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(CaptureEquipmentTypeDiagnostic);
+        }
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void ClientRegisteredEquipmentMutation_ReportsManagedMutation()
+    {
+        var server = TestEnvironment.Server;
+        var client = TestEnvironment.Clients.First();
+        var field = AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType));
+        var intercept = TestEnvironment.GetIntercept(field);
+        string? equipmentId = null;
+
+        server.Call(() =>
+        {
+            var equipment = new Equipment();
+            Assert.True(server.ObjectManager.TryGetId(equipment, out equipmentId));
+        });
+
+        var diagnostics = new List<string>();
+        void CaptureEquipmentTypeDiagnostic(string message)
+        {
+            if (message == EquipmentTypeDiagnostic)
+                diagnostics.Add(message);
+        }
+
+        OutputSinkManager.AddLogCallback(CaptureEquipmentTypeDiagnostic);
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject(equipmentId, out Equipment equipment));
+                Assert.True(client.ObjectManager.Contains(equipment));
+
+                intercept.Invoke(null, new object[] { equipment, EquipmentType.Civilian });
+
+                Assert.Equal(EquipmentType.Civilian, equipment._equipmentType);
+            });
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(CaptureEquipmentTypeDiagnostic);
+        }
+
+        Assert.Single(diagnostics);
+    }
+
+    private static NetworkSpawnBattleAgents CreateWireMessage(NetworkSpawnBattleAgents encoded)
+    {
+        return new NetworkSpawnBattleAgents(
+            encoded.Payload,
+            encoded.UncompressedLength,
+            encoded.RecordCount,
+            encoded.IsCompressed,
+            encoded.TransferId,
+            encoded.BatchIndex,
+            encoded.BatchCount,
+            encoded.Purpose,
+            encoded.PayloadSha256,
+            agents: null!);
     }
 
 }

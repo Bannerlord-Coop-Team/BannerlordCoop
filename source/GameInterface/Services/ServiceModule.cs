@@ -3,6 +3,7 @@ using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Locations.Conversations;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,16 @@ internal class ServiceModule : Module
     {
         foreach (var type in GetHandlers())
         {
+            if (type == typeof(LocationConversationTracker))
+            {
+                builder.RegisterType<LocationConversationTracker>()
+                    .AsSelf()
+                    .As<ILocationConversationTracker>()
+                    .InstancePerLifetimeScope()
+                    .AutoActivate();
+                continue;
+            }
+
             builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
         }
 

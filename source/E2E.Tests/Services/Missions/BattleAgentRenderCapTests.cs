@@ -86,6 +86,114 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
     private static IPuppetSpawner GetPuppetSpawner(CoopBattleController controller)
         => (IPuppetSpawner)AccessTools.Field(typeof(CoopBattleController), "puppetSpawner").GetValue(controller);
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void FormerHostRecord_BufferedBeforeMigration_DrainsUnderCurrentAuthority(bool promotedHost)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B", "C");
+        var receiver = promotedHost ? Clients.Skip(1).First() : Clients.First();
+        if (!promotedHost)
+            SetControllerId(receiver, "observer");
+
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var agentId = Guid.NewGuid();
+
+        try
+        {
+            receiver.Call(() =>
+            {
+                var mock = fixture.CreateMission(receiver);
+                var controller = receiver.Resolve<CoopBattleController>();
+                var registry = receiver.Resolve<INetworkAgentRegistry>();
+                var hosts = receiver.Resolve<IBattleHostRegistry>();
+
+                controller.Session.TryBegin(mapEventId);
+                hosts.Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }, epoch: 1));
+                BattleSpawnGate.BeginBattle(mapEventId);
+
+                Assert.True(receiver.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var npcParty));
+                var mapEventParty = npcParty.MapEvent.AttackerSide.Parties.Single(p => p.Party == npcParty.Party);
+                Assert.True(receiver.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+
+                FloodToLiveCount(mock, EngineAgentLimit);
+                var record = new BattleAgentSpawnData(
+                    agentId,
+                    characterId,
+                    default,
+                    BattleSideEnum.Attacker,
+                    100f,
+                    "A",
+                    mapEventPartyId,
+                    7,
+                    new Equipment(),
+                    new BodyProperties(),
+                    new MissionEquipmentData(new()),
+                    authorityRevision: 0);
+
+                receiver.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+                Assert.False(registry.TryGetAgentInfo(agentId, out _));
+
+                receiver.Resolve<IMessageBroker>().Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                receiver.Resolve<IMessageBroker>().Publish(
+                    this,
+                    new NetworkBattleHostAssigned(mapEventId, "B", Array.Empty<string>(), epoch: 2));
+                receiver.Resolve<IMessageBroker>().Publish(
+                    this,
+                    new NetworkMissionPeerEntered("A", mapEventId));
+
+                DeleteAgents(mock, 1);
+                GetPuppetSpawner(controller).DrainPendingPuppets();
+
+                Assert.True(registry.TryGetAgentInfo(agentId, out var info));
+                Assert.Equal("B", info.CurrentAuthority);
+                Assert.Equal(1, info.AuthorityRevision);
+                Assert.Equal(
+                    promotedHost ? AgentControllerType.AI : AgentControllerType.None,
+                    info.Agent.Controller);
+
+                // Re-entry clears the departure state, but the buffered old-host NPC record above stays retained.
+                // A fresh record for the returning player's own party stays under that player at revision 0.
+                DeleteAgents(mock, 1);
+
+                Assert.True(receiver.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var returningParty));
+                var returningMapEventParty = returningParty.MapEvent.AttackerSide.Parties.Single(
+                    p => p.Party == returningParty.Party);
+                Assert.True(receiver.ObjectManager.TryGetId(returningMapEventParty, out var returningMapEventPartyId));
+
+                var returningAgentId = Guid.NewGuid();
+                var returningRecord = new BattleAgentSpawnData(
+                    returningAgentId,
+                    characterId,
+                    default,
+                    BattleSideEnum.Attacker,
+                    100f,
+                    "A",
+                    returningMapEventPartyId,
+                    8,
+                    new Equipment(),
+                    new BodyProperties(),
+                    new MissionEquipmentData(new()),
+                    authorityRevision: 0);
+                receiver.Resolve<IMessageBroker>().Publish(
+                    this,
+                    new NetworkSpawnBattleAgents(new[] { returningRecord }));
+
+                Assert.True(registry.TryGetAgentInfo(returningAgentId, out var returningInfo));
+                Assert.Equal("A", returningInfo.CurrentAuthority);
+                Assert.Equal(0, returningInfo.AuthorityRevision);
+                Assert.Equal(AgentControllerType.None, returningInfo.Agent.Controller);
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
     private static TroopReserveEntry[] Entries(string characterId, int count, int seedBase = 500)
     {
         var entries = new TroopReserveEntry[count];

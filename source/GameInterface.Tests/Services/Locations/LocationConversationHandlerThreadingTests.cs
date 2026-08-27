@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Locations.Conversations;
@@ -41,6 +41,7 @@ public sealed class LocationConversationHandlerThreadingTests
                 messageBroker,
                 network,
                 tracker,
+                new LocationConversationClientState(),
                 new Mock<IPlayerManager>().Object);
 
             var peer = network.CreatePeer();
