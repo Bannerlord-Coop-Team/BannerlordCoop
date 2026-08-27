@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.Save.Patches;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -13,6 +14,17 @@ namespace GameInterface.Services.Save.Commands
 
 #if DEBUG
         private static int evidenceHoldMilliseconds;
+
+        [CommandLineArgumentFunction("last_failure", "coop.debug.save")]
+        public static string LastFailure(List<string> args)
+        {
+            if (!ModInformation.IsServer)
+                return "Command can only be run on the server.";
+            if (args.Count != 0)
+                return "Usage: coop.debug.save.last_failure";
+
+            return SaveManagerSaveDiagnosticsPatch.LastFailure;
+        }
 #endif
 
         [CommandLineArgumentFunction("save_as", "coop.debug.save")]

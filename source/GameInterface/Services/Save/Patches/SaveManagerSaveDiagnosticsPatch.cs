@@ -3,6 +3,7 @@ using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Save;
 
@@ -12,23 +13,37 @@ namespace GameInterface.Services.Save.Patches;
 internal static class SaveManagerSaveDiagnosticsPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger(typeof(SaveManagerSaveDiagnosticsPatch));
+    private const string NoFailure = "saveResult=none|saveErrors=<no details>";
+    private static string lastFailure = NoFailure;
+
+    internal static string LastFailure => Volatile.Read(ref lastFailure);
 
     [HarmonyPostfix]
     internal static void Postfix(SaveOutput __result)
     {
         if (__result == null)
         {
+            Volatile.Write(ref lastFailure, FormatFailure("<null>", null));
             Logger.Error("Game save failed without a save result.");
             return;
         }
 
-        if (__result.Successful) return;
+        if (__result.Successful)
+        {
+            Volatile.Write(ref lastFailure, NoFailure);
+            return;
+        }
 
-        Logger.Error(
-            "Game save failed with {SaveResult}: {SaveErrors}",
-            __result.Result,
-            FormatErrorMessages(__result.Errors?.Select(error => error?.Message)));
+        string failure = FormatFailure(
+            __result.Result.ToString(),
+            __result.Errors?.Select(error => error?.Message));
+        Volatile.Write(ref lastFailure, failure);
+
+        Logger.Error("Game save failed: {SaveFailure}", failure);
     }
+
+    internal static string FormatFailure(string saveResult, IEnumerable<string> errors) =>
+        $"saveResult={saveResult}|saveErrors={FormatErrorMessages(errors)}";
 
     internal static string FormatErrorMessages(IEnumerable<string> errors)
     {
