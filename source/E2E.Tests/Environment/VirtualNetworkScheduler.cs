@@ -64,7 +64,7 @@ public class VirtualNetworkScheduler : IVirtualNetworkScheduler
         ValidateEndpoint(sender, nameof(sender));
         ValidateEndpoint(receiver, nameof(receiver));
         if (string.IsNullOrEmpty(channel)) throw new ArgumentException("A channel is required", nameof(channel));
-        if (delivery == null) throw new ArgumentNullException(nameof(delivery));
+        ArgumentNullException.ThrowIfNull(delivery);
 
         var endpoints = new EndpointPair(sender, receiver);
         var stream = new DeliveryStream(endpoints, channel);

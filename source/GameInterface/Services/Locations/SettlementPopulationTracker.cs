@@ -147,16 +147,25 @@ internal class SettlementPopulationTracker : IHandler
             if (settlement.LocationComplex == null) return;
 
             var ambientCandidates = new HashSet<Hero>(heroSpawnPool.GetAmbientCandidates(settlement));
-            var refreshed = false;
+            var reconciled = false;
             foreach (var hero in heroes)
             {
-                if (hero == null || !ambientCandidates.Contains(hero)) continue;
+                if (hero == null) continue;
 
-                RefreshHeroPlacement(hero, settlement);
-                refreshed = true;
+                if (ambientCandidates.Contains(hero))
+                {
+                    RefreshHeroPlacement(hero, settlement);
+                    reconciled = true;
+                }
+                else if (settlement.LocationComplex.GetLocationOfCharacter(hero) != null)
+                {
+                    // Player-party companions use the mission mesh, so remove an older ambient entry directly.
+                    settlement.LocationComplex.RemoveCharacterIfExists(hero);
+                    reconciled = true;
+                }
             }
 
-            if (!refreshed) return;
+            if (!reconciled) return;
             if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return;
 
             BroadcastRosterSnapshot(settlement, settlementId);

@@ -1,4 +1,6 @@
-﻿using Common.PacketHandlers;
+﻿using Common.Messaging;
+using Common.PacketHandlers;
+using Common.Serialization;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
@@ -229,7 +231,7 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void Mesh_NonEmptySerializedPayload_RoutesAsCloneAndPreservesValues()
+    public void Mesh_NonEmptySerializedPayload_RoutesDeserializedWireValues()
     {
         EnvironmentInstance[] clients = Clients.ToArray();
         Connect(clients[0], "ctrl-A", "instance-1");
@@ -240,23 +242,67 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
 
         try
         {
-            byte[] packetPayload = { 2, 4, 6, 8 };
-            byte[] serializedPayload = { 9, 7, 5, 3 };
-            var packet = new CompressedMovementPacket(12, packetPayload);
+            var packet = new CompressedMovementPacket(12, new byte[] { 2, 4, 6, 8 });
+            var wirePacket = new CompressedMovementPacket(34, new byte[] { 9, 7, 5, 3 });
+            byte[] serializedPayload = clients[0].Resolve<ICommonSerializer>().Serialize(wirePacket);
             MockBattleNetwork sender = Mesh(clients[0]);
 
             clients[0].Call(() => sender.SendAll(packet, serializedPayload));
 
             CompressedMovementPacket received = Assert.IsType<CompressedMovementPacket>(
                 Assert.Single(receiver.Packets));
-            Assert.Equal(packetPayload, received.Payload);
-            Assert.NotSame(packetPayload, received.Payload);
+            Assert.Equal(wirePacket.UncompressedLength, received.UncompressedLength);
+            Assert.Equal(wirePacket.Payload, received.Payload);
+            Assert.NotEqual(packet.Payload, received.Payload);
             SerializedPacketSend captured = Assert.Single(sender.SerializedPacketSends);
             Assert.Equal(serializedPayload, captured.Payload);
         }
         finally
         {
             packetManager.RemovePacketHandler(receiver);
+        }
+    }
+
+    [Fact]
+    public void Mesh_ReliableMessageAndPacket_ShareOrderingWhenLatencyDrops()
+    {
+        EnvironmentInstance[] clients = Clients.ToArray();
+        Connect(clients[0], "ctrl-A", "instance-1");
+        Connect(clients[1], "ctrl-B", "instance-1");
+        IVirtualNetworkScheduler scheduler = clients[0].Resolve<IVirtualNetworkScheduler>();
+        scheduler.DefaultLatency = TimeSpan.FromMilliseconds(100);
+
+        var deliveries = new List<string>();
+        clients[1].Resolve<IMessageBroker>()
+            .Subscribe<NetworkSpawnBattleAgents>(_ => deliveries.Add("message"));
+        var packetHandler = new RecordingPacketHandler(
+            PacketType.AgentAction,
+            () => deliveries.Add("packet"));
+        IPacketManager packetManager = clients[1].Resolve<IPacketManager>();
+        packetManager.RegisterPacketHandler(packetHandler);
+
+        try
+        {
+            clients[0].Call(() =>
+                clients[0].Resolve<IBattleNetwork>().Send("ctrl-B", EmptySpawn()));
+            scheduler.DefaultLatency = TimeSpan.Zero;
+            clients[0].Call(() =>
+                clients[0].Resolve<IBattleNetwork>().Send(
+                    "ctrl-B",
+                    new AgentActionPacket(
+                        "ctrl-A",
+                        Array.Empty<Guid>(),
+                        Array.Empty<AgentActionData>(),
+                        Array.Empty<long>())));
+
+            Assert.Empty(deliveries);
+            Assert.Equal(0, scheduler.AdvanceBy(TimeSpan.FromMilliseconds(99)));
+            Assert.Equal(2, scheduler.AdvanceBy(TimeSpan.FromMilliseconds(1)));
+            Assert.Equal(new[] { "message", "packet" }, deliveries);
+        }
+        finally
+        {
+            packetManager.RemovePacketHandler(packetHandler);
         }
     }
 
@@ -268,8 +314,8 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
         Connect(clients[1], "ctrl-B", "instance-1");
         Connect(clients[2], "ctrl-C", "instance-1");
 
-        var receiverB = new RecordingPacketHandler(PacketType.Movement);
-        var receiverC = new RecordingPacketHandler(PacketType.Movement);
+        var receiverB = new RecordingPacketHandler();
+        var receiverC = new RecordingPacketHandler();
         IPacketManager packetManagerB = clients[1].Resolve<IPacketManager>();
         IPacketManager packetManagerC = clients[2].Resolve<IPacketManager>();
         packetManagerB.RegisterPacketHandler(receiverB);
@@ -278,7 +324,7 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
         try
         {
             var packet = new MovementPacket(Array.Empty<Guid>(), Array.Empty<AgentData>());
-            byte[] serializedPacket = { 1, 2, 3 };
+            byte[] serializedPacket = clients[0].Resolve<ICommonSerializer>().Serialize(packet);
             MockBattleNetwork sender = Mesh(clients[0]);
 
             clients[0].Call(() =>
@@ -307,6 +353,46 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
         }
     }
 
+    [Fact]
+    public void Mesh_SerializedPacketOverloads_RouteProvidedPayloadThroughRestore()
+    {
+        EnvironmentInstance[] clients = Clients.ToArray();
+        Connect(clients[0], "ctrl-A", "instance-1");
+        Connect(clients[1], "ctrl-B", "instance-1");
+        Connect(clients[2], "ctrl-C", "instance-1");
+
+        var receiverB = new RecordingPacketHandler();
+        var receiverC = new RecordingPacketHandler();
+        IPacketManager packetManagerB = clients[1].Resolve<IPacketManager>();
+        IPacketManager packetManagerC = clients[2].Resolve<IPacketManager>();
+        packetManagerB.RegisterPacketHandler(receiverB);
+        packetManagerC.RegisterPacketHandler(receiverC);
+
+        try
+        {
+            var logicalPacket = new MovementPacket(Array.Empty<Guid>(), Array.Empty<AgentData>());
+            var corruptEnvelope = new CompressedMovementPacket(512, new byte[] { 1, 2, 3 });
+            byte[] serializedPacket = clients[0].Resolve<ICommonSerializer>().Serialize(corruptEnvelope);
+            MockBattleNetwork sender = Mesh(clients[0]);
+
+            clients[0].Call(() =>
+            {
+                sender.SendAll(logicalPacket, serializedPacket);
+                sender.Send("ctrl-B", logicalPacket, serializedPacket);
+            });
+
+            Assert.Empty(receiverB.Packets);
+            Assert.Empty(receiverC.Packets);
+            Assert.Equal(2, sender.SerializedPacketSends.Count);
+            Assert.All(sender.SerializedPacketSends, send => Assert.Same(serializedPacket, send.Payload));
+        }
+        finally
+        {
+            packetManagerB.RemovePacketHandler(receiverB);
+            packetManagerC.RemovePacketHandler(receiverC);
+        }
+    }
+
     private void Connect(EnvironmentInstance client, string controllerId, string instanceId)
     {
         SetControllerId(client, controllerId);
@@ -320,18 +406,24 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
 
     private sealed class RecordingPacketHandler : IPacketHandler
     {
+        private readonly Action? onHandle;
+
         public PacketType PacketType { get; }
         public int HandleCount => Packets.Count;
         public List<IPacket> Packets { get; } = new();
 
-        public RecordingPacketHandler(PacketType packetType)
+        public RecordingPacketHandler(
+            PacketType packetType = PacketType.Movement,
+            Action? onHandle = null)
         {
             PacketType = packetType;
+            this.onHandle = onHandle;
         }
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
             Packets.Add(packet);
+            onHandle?.Invoke();
         }
 
         public void Dispose()
