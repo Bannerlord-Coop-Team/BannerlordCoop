@@ -1,6 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
@@ -22,6 +27,122 @@ namespace E2E.Tests.Services.Missions;
 public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
 {
     public BattlePuppetTeamOwnershipTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public async Task WireSpawn_EquipmentCloneRemainsTransientThroughPuppetSpawn()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (_, partyIds) = SetupCoopBattle("local", "remote");
+        var client = Clients.First();
+        var agentId = Guid.NewGuid();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var capturedLogs = new List<string>();
+        var logGate = new object();
+
+        void CaptureLog(string message)
+        {
+            lock (logGate) capturedLogs.Add(message);
+        }
+
+        bool ContainsEquipmentDiagnostic()
+        {
+            lock (logGate)
+            {
+                return capturedLogs.Any(message =>
+                    (message.Contains("Client created managed") &&
+                     message.Contains("TaleWorlds.Core.Equipment")) ||
+                    (message.Contains("Client updated managed") &&
+                     message.Contains("_equipmentType")));
+            }
+        }
+
+        NetworkSpawnBattleAgents wire = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var remoteParty));
+            var mapEventParty = remoteParty.MapEvent.DefenderSide.Parties
+                .Single(party => party.Party == remoteParty.Party);
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+
+            var record = new BattleAgentSpawnData(
+                agentId,
+                characterId,
+                default,
+                BattleSideEnum.Defender,
+                100f,
+                "remote",
+                mapEventPartyId,
+                1,
+                new Equipment(Equipment.EquipmentType.Battle),
+                new BodyProperties(),
+                missionEquipmentData: null);
+            NetworkSpawnBattleAgents encoded = new BattleAgentSpawnBatchCodec()
+                .Encode(new[] { record }, SpawnBatchPurpose.Initial)
+                .Single();
+            wire = ProtoBuf.Serializer.DeepClone(encoded);
+        });
+
+        PuppetSpawner spawner = null;
+        OutputSinkManager.AddLogCallback(CaptureLog);
+        try
+        {
+            MockMission mission = null;
+            client.Call(() =>
+            {
+                mission = fixture.CreateMission(client);
+                mission.PlayerTeam = mission.AttackerTeam;
+                mission.AddTeam(BattleSideEnum.Defender);
+                mission.CloneSpawnEquipmentOnSpawn = true;
+
+                var deployment = new Mock<IBattleDeploymentCoordinator>();
+                deployment.SetupGet(value => value.IsCommitted).Returns(true);
+                spawner = new PuppetSpawner(
+                    client.Resolve<IMessageBroker>(),
+                    client.ObjectManager,
+                    client.Resolve<GameInterface.Services.Players.IPlayerManager>(),
+                    client.Resolve<ICoopMissionComponent>(),
+                    Mock.Of<IBattleSession>(),
+                    new CasualtyAttributionMap(),
+                    deployment.Object,
+                    Mock.Of<IAgentFormationAssigner>(),
+                    new BattleAgentBudget(),
+                    client.Resolve<IMissionWeaponDataMapper>());
+            });
+
+            GameThread.Instance.MarkGameThread();
+            await Task.Run(() => client.SimulateMessage(this, wire, markGameThread: false));
+            Assert.True(GameThread.Instance.QueueLength > 0);
+            client.Call(() =>
+            {
+                using (AllowedThread.Suspend())
+                {
+                    GameThread.Instance.Update(TimeSpan.Zero);
+                }
+            });
+
+            client.Call(() =>
+            {
+                var registry = client.Resolve<INetworkAgentRegistry>();
+                Assert.True(registry.TryGetAgentInfo(agentId, out var agentInfo));
+                Assert.True(AgentMirror.TryGet(agentInfo.Agent, out var mirror));
+                Assert.NotNull(mirror.SpawnEquipment);
+                Assert.False(client.ObjectManager.TryGetId(mirror.SpawnEquipment, out _));
+            });
+            Assert.False(ContainsEquipmentDiagnostic());
+
+            client.Call(() =>
+            {
+                var unsupportedEquipment = new Equipment(Equipment.EquipmentType.Battle);
+                Assert.False(client.ObjectManager.TryGetId(unsupportedEquipment, out _));
+            });
+            Assert.True(ContainsEquipmentDiagnostic());
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(CaptureLog);
+            if (spawner != null) client.Call(spawner.Dispose);
+        }
+    }
 
     [Fact]
     [Trait("Requirement", "BR-022")]
@@ -164,7 +285,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 new CasualtyAttributionMap(),
                 deployment.Object,
                 Mock.Of<IAgentFormationAssigner>(),
-                new BattleAgentBudget());
+                new BattleAgentBudget(),
+                client.Resolve<IMissionWeaponDataMapper>());
 
             var equipment = new Equipment();
             var missionEquipment = new MissionEquipmentData(new());
@@ -241,7 +363,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     new CasualtyAttributionMap(),
                     deployment.Object,
                     Mock.Of<IAgentFormationAssigner>(),
-                    new BattleAgentBudget());
+                    new BattleAgentBudget(),
+                    client.Resolve<IMissionWeaponDataMapper>());
 
                 var record = new BattleAgentSpawnData(
                     agentId, characterId, default, BattleSideEnum.Attacker, 100f,
@@ -305,6 +428,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 deployment.Object,
                 Mock.Of<IAgentFormationAssigner>(),
                 new BattleAgentBudget(),
+                client.Resolve<IMissionWeaponDataMapper>(),
                 applier);
 
             var record = new BattleAgentSpawnData(
