@@ -14,7 +14,7 @@
                        HorizontalAlignment="Center" MarginBottom="24" StackLayout.LayoutMethod="HorizontalLeftToRight">
               <ItemTemplate>
                 <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
-                              SuggestedWidth="210" SuggestedHeight="58" Brush="Header.Tab.Center"
+                              SuggestedWidth="168" SuggestedHeight="58" Brush="Header.Tab.Center"
                               Command.Click="ExecuteSelection" IsSelected="@IsSelected" UpdateChildrenStates="true">
                   <Children>
                     <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
@@ -29,6 +29,7 @@
 			<!-- COOP_OPTIONS_PROVIDER:Providers/MapTimeTab/MapTimeTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/ChatTab/ChatTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/PlayerNameplatesTab/PlayerNameplatesTab.xml -->
+			<!-- COOP_OPTIONS_PROVIDER:Providers/NetworkTab/NetworkTab.xml -->
 
             <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
                        HorizontalAlignment="Center" MarginTop="36"

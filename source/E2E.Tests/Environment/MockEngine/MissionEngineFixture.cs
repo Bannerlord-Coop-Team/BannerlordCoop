@@ -90,6 +90,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.StopUsingGameObject), nameof(Agent_StopUsingGameObject));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
+        Prefix(typeof(Agent), nameof(Agent.CreateBloodBurstAtLimb), nameof(Agent_CreateBloodBurstAtLimb));
         Prefix(typeof(Agent), nameof(Agent.OnFleeing), nameof(Agent_OnFleeing));
         // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
         Prefix(typeof(Agent), "get_IsHuman", nameof(Agent_get_IsHuman));
@@ -524,6 +525,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         __result = m.IsActive;
+        return false;
+    }
+
+    private static bool Agent_CreateBloodBurstAtLimb(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.BloodBurstCalls++;
         return false;
     }
 
