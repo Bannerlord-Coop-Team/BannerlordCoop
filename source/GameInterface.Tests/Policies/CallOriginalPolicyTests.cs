@@ -1,4 +1,4 @@
-using GameInterface.Policies;
+﻿using GameInterface.Policies;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -49,5 +49,52 @@ public class CallOriginalPolicyTests
         }
 
         Assert.False(CallOriginalPolicy.AreOriginalsAllowedOnAllThreads);
+    }
+
+    [Fact]
+    public void CurrentOperationScope_IsLimitedToInvokingThread()
+    {
+        Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+
+        using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+        {
+            Assert.True(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+            Assert.True(CallOriginalPolicy.IsOriginalAllowed());
+            Assert.False(Task.Run(() => CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation)
+                .GetAwaiter().GetResult());
+        }
+
+        Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+    }
+
+    [Fact]
+    public void NestedCurrentOperationScope_DoesNotRevokeOuterScope()
+    {
+        using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+        {
+            using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+            {
+                Assert.True(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+            }
+
+            Assert.True(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+        }
+
+        Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+    }
+
+    [Fact]
+    public void CurrentOperationScope_DoubleDispose_DoesNotRevokeAnotherScope()
+    {
+        using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+        {
+            var scope = CallOriginalPolicy.AllowOriginalsForCurrentOperation();
+            scope.Dispose();
+            scope.Dispose();
+
+            Assert.True(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+        }
+
+        Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
     }
 }
