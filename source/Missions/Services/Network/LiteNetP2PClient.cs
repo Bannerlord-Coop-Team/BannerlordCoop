@@ -382,6 +382,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     public void OnPeerConnected(NetPeer peer)
     {
         bool rejectPeer = false;
+        string controllerIdToPromote = null;
         lock (peerGate)
         {
             if (pendingPeerControllers.TryGetValue(peer, out var controllerId))
@@ -400,11 +401,12 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 }
                 else
                 {
-                    PromotePeer(peer, controllerId);
+                    controllerIdToPromote = controllerId;
                 }
             }
         }
 
+        if (controllerIdToPromote != null) PromotePeer(peer, controllerIdToPromote);
         if (rejectPeer) netManager.DisconnectPeer(peer);
 
         // Proof-of-P2P diagnostic: the remote endpoint here is the OTHER CLIENT's socket, reached
@@ -421,6 +423,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (entered.SteamId == 0) return;
 
         var invalidPeers = new List<NetPeer>();
+        var peersToPromote = new List<NetPeer>();
         bool alreadyTracked;
         int generation;
         lock (peerGate)
@@ -441,7 +444,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 }
                 else if (connectedPendingPeers.Contains(pair.Key))
                 {
-                    PromotePeer(pair.Key, entered.ControllerId);
+                    peersToPromote.Add(pair.Key);
                 }
             }
 
@@ -460,6 +463,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             alreadyTracked = HasTrackedPeer(entered.ControllerId);
         }
 
+        foreach (var peerToPromote in peersToPromote) PromotePeer(peerToPromote, entered.ControllerId);
         foreach (var invalidPeer in invalidPeers) netManager.DisconnectPeer(invalidPeer);
         if (alreadyTracked) return;
 
@@ -575,11 +579,25 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private void PromotePeer(NetPeer peer, string controllerId)
     {
         // Submit earlier relay traffic before switching this controller to the direct route.
-        reliableMessageBatcher.Flush(controllerId, SendReliableMessagePayload);
-        pendingPeerControllers.Remove(peer);
-        connectedPendingPeers.Remove(peer);
-        mappedPeerControllers[peer] = controllerId;
-        missionContext.MapPeer(controllerId, peer);
+        reliableMessageBatcher.FlushThen(
+            controllerId,
+            SendReliableMessagePayload,
+            () =>
+            {
+                lock (peerGate)
+                {
+                    if (!pendingPeerControllers.TryGetValue(peer, out string pendingControllerId) ||
+                        pendingControllerId != controllerId)
+                    {
+                        return;
+                    }
+
+                    pendingPeerControllers.Remove(peer);
+                    connectedPendingPeers.Remove(peer);
+                    mappedPeerControllers[peer] = controllerId;
+                    missionContext.MapPeer(controllerId, peer);
+                }
+            });
     }
 
     private void RemovePeerTracking(NetPeer peer, out string controllerId)
