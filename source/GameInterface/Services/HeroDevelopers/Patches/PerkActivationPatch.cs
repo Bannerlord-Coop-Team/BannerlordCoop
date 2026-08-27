@@ -26,10 +26,11 @@ namespace GameInterface.Services.HeroDevelopers.Patches
 
             if (ModInformation.IsClient) return false;
 
-            if (ShouldRefreshPlayerPartyRoster(hero))
+            if (hero.PartyBelongedTo?.IsPlayerParty() == true && (perk == DefaultPerks.OneHanded.Prestige || perk == DefaultPerks.TwoHanded.Hope || perk == DefaultPerks.Athletics.ImposingStature || perk == DefaultPerks.Bow.MerryMen || perk == DefaultPerks.Tactics.HordeLeader || perk == DefaultPerks.Scouting.MountedScouts || perk == DefaultPerks.Leadership.Authority || perk == DefaultPerks.Leadership.LeaderOfMasses || perk == DefaultPerks.Leadership.UltimateLeader))
             {
                 hero.PartyBelongedTo.MemberRoster.UpdateVersion();
 
+                // Publish message to update roster version on clients
                 var message = new UpdateRosterVersionAfterPerkChange(hero.PartyBelongedTo.MemberRoster);
                 MessageBroker.Instance.Publish(__instance, message);
             }
@@ -37,8 +38,5 @@ namespace GameInterface.Services.HeroDevelopers.Patches
             // Hero == Hero.MainHero won't be true on the server. Safe to run the behavior's logic without a custom implementation
             return true;
         }
-
-        internal static bool ShouldRefreshPlayerPartyRoster(Hero hero)
-            => hero?.PartyBelongedTo?.IsPlayerParty() == true;
     }
 }
