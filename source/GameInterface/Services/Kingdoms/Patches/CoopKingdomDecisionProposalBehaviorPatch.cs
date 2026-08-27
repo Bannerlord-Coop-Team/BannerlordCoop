@@ -57,11 +57,12 @@ namespace GameInterface.Services.Kingdoms.Patches
         internal static void SyncPendingPlayerAllianceOffers(IDataStore dataStore)
         {
             const string saveKey = "_coop_pending_player_alliance_offers";
-            List<StartAllianceDecision> pendingOffers = null;
+            List<KingdomDecision> pendingOffers = null;
             if (dataStore.IsSaving)
             {
                 pendingOffers = CoopKingdomElection.GetTrackedPlayerAllianceOffers()
                     .Where(decision => decision.Kingdom?._unresolvedDecisions?.Contains(decision) == true)
+                    .Cast<KingdomDecision>()
                     .ToList();
             }
 
@@ -78,7 +79,8 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
 
             CoopKingdomElection.RestoreTrackedPlayerAllianceOffers(
-                (pendingOffers ?? new List<StartAllianceDecision>())
+                (pendingOffers ?? new List<KingdomDecision>())
+                    .OfType<StartAllianceDecision>()
                     .Where(decision => decision?.Kingdom?._unresolvedDecisions?.Contains(decision) == true));
         }
 

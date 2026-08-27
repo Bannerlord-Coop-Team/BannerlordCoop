@@ -1590,6 +1590,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var saveRecords = new Dictionary<string, object>();
             CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
                 new TestDataStore(isSaving: true, saveRecords));
+            Assert.True(saveRecords.TryGetValue("_coop_pending_player_alliance_offers", out object savedOffers));
+            Assert.Contains(playerDecision, Assert.IsType<List<KingdomDecision>>(savedOffers));
             CoopKingdomElection._opponentProposedAllianceDecisions.Clear();
             CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
                 new TestDataStore(isSaving: false, saveRecords));
@@ -1652,7 +1654,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             CoopKingdomDecisionProposalBehaviorPatch.SyncPendingPlayerAllianceOffers(
                 new TestDataStore(isSaving: true, resavedRecords));
             Assert.True(resavedRecords.TryGetValue("_coop_pending_player_alliance_offers", out object savedOffers));
-            Assert.Empty(Assert.IsType<List<StartAllianceDecision>>(savedOffers));
+            Assert.Empty(Assert.IsType<List<KingdomDecision>>(savedOffers));
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllianceStarted>());
