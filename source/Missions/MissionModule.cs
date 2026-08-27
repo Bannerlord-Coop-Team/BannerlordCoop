@@ -11,6 +11,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
 using Missions.Agents.Voice;
 using Missions.Battles;
+using Missions.Data;
 using Missions.Locations;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Patches;
@@ -69,6 +70,9 @@ public class MissionModule : Module
         builder.RegisterType<BattleAgentSpawnBatchCodec>()
             .As<IBattleAgentSpawnBatchCodec>()
             .InstancePerDependency();
+        builder.RegisterType<MissionWeaponDataMapper>()
+            .As<IMissionWeaponDataMapper>()
+            .InstancePerDependency();
         builder.RegisterType<CompressedMovementPacketHandler>()
             .AsSelf()
             .InstancePerLifetimeScope()
@@ -125,6 +129,9 @@ public class MissionModule : Module
         builder.RegisterType<LocationAgentSpawnBatchCodec>()
             .As<ILocationAgentSpawnBatchCodec>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<LocationPartyPuppetRegistrar>()
+            .As<ILocationPartyPuppetRegistrar>()
+            .InstancePerDependency();
         builder.RegisterType<LocationControllerWithdrawalState>()
             .As<ILocationControllerWithdrawalState>()
             .InstancePerDependency();

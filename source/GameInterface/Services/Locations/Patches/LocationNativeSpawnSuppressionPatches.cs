@@ -1,7 +1,8 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using SandBox;
 using SandBox.Missions.MissionLogics;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Locations.Patches;
 
@@ -51,6 +52,15 @@ internal class LocationNativeSpawnSuppressionPatches
 
     internal static bool ShouldAllowEnteringLocationSpawn(bool isOwnedCompanion, bool suppressNativeSpawns)
         => isOwnedCompanion || !suppressNativeSpawns;
+
+    [HarmonyPatch(nameof(MissionAgentHandler.SimulateAgent))]
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.High)]
+    private static bool SkipPlayerPartySimulation(Agent agent)
+        => ShouldSimulateAgent(LocationNpcGate.IsReplayingNativePopulation, agent);
+
+    internal static bool ShouldSimulateAgent(bool isReplayingNativePopulation, Agent agent)
+        => !isReplayingNativePopulation || !LocationNpcGate.IsPlayerPartyAgent(agent);
 
     [HarmonyPatch(nameof(MissionAgentHandler.SpawnWanderingAgentWithDelay))]
     [HarmonyPrefix]

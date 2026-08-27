@@ -113,36 +113,48 @@ internal class BattleJoinLeaveHandler : IHandler
 
                 mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
 
-                var positions = message.Positions;
-
                 var trackParties = !initializationBarrier.IsPending(mapEvent);
-                using (new AllowedThread())
-                {
-                    if (trackParties)
-                        mapEvent.TroopUpgradeTracker._mapEventParties.Clear();
-
-                    for (int i = 0; i < message.MapEventPartyIds.Length; i++)
-                    {
-                        var mapEventPartyId = message.MapEventPartyIds[i];
-                        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
-                            continue;
-
-                        if (trackParties)
-                            mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
-                        var mobileParty = mapEventParty.Party.MobileParty;
-                        if (mobileParty != null && positions != null && i < positions.Length)
-                            mobileParty.Position = positions[i];
-                    }
-                }
-
-                if (!siegeJoinMenuActivationGate.ResumeAfterSnapshot(mapEvent))
-                    SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
+                initializationBarrier.RunAfterCommit(mapEvent,
+                    () => ApplyInvolvedParties(mapEvent, message, trackParties));
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
         });
+    }
+
+    private void ApplyInvolvedParties(MapEvent mapEvent, NetworkAddInvolvedParties message, bool trackParties)
+    {
+        try
+        {
+            var positions = message.Positions;
+            using (new AllowedThread())
+            {
+                if (trackParties)
+                    mapEvent.TroopUpgradeTracker._mapEventParties.Clear();
+
+                for (int i = 0; i < message.MapEventPartyIds.Length; i++)
+                {
+                    var mapEventPartyId = message.MapEventPartyIds[i];
+                    if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+                        continue;
+
+                    if (trackParties)
+                        mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+                    var mobileParty = mapEventParty.Party.MobileParty;
+                    if (mobileParty != null && positions != null && i < positions.Length)
+                        mobileParty.Position = positions[i];
+                }
+            }
+
+            if (!siegeJoinMenuActivationGate.ResumeAfterSnapshot(mapEvent))
+                SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
+        }
     }
 
     private static void SwitchSiegeJoinerToEncounterIfNeeded(MapEvent mapEvent)

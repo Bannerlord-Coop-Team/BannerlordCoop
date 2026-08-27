@@ -33,6 +33,13 @@ internal class EncounterManagerPatches
         if (IsPendingParty(attackerParty?.Party))
             return false;
 
+        // A besieger can already have AssaultSettlement queued when its conversation hold disables the AI.
+        // Suppress that pending encounter until the conversation releases the party.
+        if (ModInformation.IsServer &&
+            ContainerProvider.TryResolve<ConversationPartyTracker>(out var conversationPartyTracker) &&
+            ConversationPartyHold.IsInPlayerConversation(conversationPartyTracker, attackerParty))
+            return false;
+
         if (IsAwaitingMissionExit(attackerParty?.Party))
             return false;
 

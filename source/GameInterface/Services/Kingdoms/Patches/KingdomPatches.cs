@@ -1,5 +1,7 @@
 ﻿using Common;
+using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
@@ -60,6 +62,15 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
 
             return true;
+        }
+        [HarmonyPatch(nameof(Kingdom.CreateArmy))]
+        [HarmonyPostfix]
+        public static void PostfixCreateArmy(Kingdom __instance, Hero armyLeader)
+        {
+            if (ModInformation.IsClient) return;
+            var army = armyLeader.PartyBelongedTo?.Army;
+            if (army == null) return;
+            MessageBroker.Instance.Publish(__instance, new ArmyFullyCreated(army));
         }
     }
 }

@@ -153,7 +153,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.Empty(tracker._mapEventParties);
         });
 
-        client.SimulateMessage(Server.NetPeer, new NetworkAddBattleParty(attackerSideId, mapEventPartyId));
+        client.SimulateMessage(Server.NetPeer, new NetworkAddBattleParty(attackerSideId, mapEventPartyId, partyBaseId));
 
         client.Call(() =>
         {
@@ -523,7 +523,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 Server.Resolve<IPlayerManager>(),
                 Server.Resolve<INetwork>(),
                 Server.Resolve<IMapEventLogger>(),
-                Server.Resolve<IBattleMissionInitializerResolver>());
+                Server.Resolve<IBattleMissionInitializerResolver>(),
+                null!);
 
             Assert.True(handler.RemoveWoundedNonInitiatorParties(mapEvent, initiatingPartyId));
         }, disabledMethods);
@@ -583,7 +584,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 Server.Resolve<IPlayerManager>(),
                 Server.Resolve<INetwork>(),
                 Server.Resolve<IMapEventLogger>(),
-                Server.Resolve<IBattleMissionInitializerResolver>());
+                Server.Resolve<IBattleMissionInitializerResolver>(),
+                null!);
 
             Assert.True(handler.RemoveWoundedNonInitiatorParties(mapEvent, initiatingPartyId));
         }, disabledMethods);
