@@ -1,4 +1,6 @@
 using Common;
+using Common.Network.Messages;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Chat.Handlers;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
@@ -166,6 +168,67 @@ public class ServerChatHandlerTests : IDisposable
         Assert.Equal(new[] { "requester", "connected" }, snapshot.ControllerIds);
         Assert.Single(participantNetwork.ImmediateSends);
         Assert.IsType<NetworkChatParticipants>(participantNetwork.ImmediateSends[0].Payload);
+    }
+
+    [Fact]
+    public void PlayerCampaignSynchronized_BroadcastsConnectedPlayersToAllPeers()
+    {
+        using var broker = new StubMessageBroker();
+        using var broadcastNetwork = new TestNetwork();
+        var joiningPeer = broadcastNetwork.CreatePeer();
+        var otherPeer = broadcastNetwork.CreatePeer();
+        var joining = Player("joining");
+        var other = Player("other");
+        var offline = Player("offline");
+        var players = new Mock<IPlayerManager>();
+        players.SetupGet(manager => manager.Players).Returns(new[] { joining, other, offline });
+        players.Setup(manager => manager.IsConnected(joining)).Returns(true);
+        players.Setup(manager => manager.IsConnected(other)).Returns(true);
+        players.Setup(manager => manager.IsConnected(offline)).Returns(false);
+
+        using var pushHandler = new ServerChatHandler(
+            broker,
+            broadcastNetwork,
+            players.Object,
+            playerNameResolver.Object);
+
+        broker.Publish(joiningPeer, new PlayerCampaignSynchronized(joiningPeer));
+        DrainGameThread();
+
+        foreach (var peer in new[] { joiningPeer, otherPeer })
+        {
+            var snapshot = Assert.Single(
+                broadcastNetwork.GetPeerMessagesFromType<NetworkChatParticipants>(peer));
+            Assert.Equal(new[] { "joining", "other" }, snapshot.ControllerIds);
+        }
+    }
+
+    [Fact]
+    public void PlayerDisconnected_BroadcastsConnectedPlayersToAllPeers()
+    {
+        using var broker = new StubMessageBroker();
+        using var broadcastNetwork = new TestNetwork();
+        var departedPeer = broadcastNetwork.CreatePeer();
+        var otherPeer = broadcastNetwork.CreatePeer();
+        var departed = Player("departed");
+        var other = Player("other");
+        var players = new Mock<IPlayerManager>();
+        players.SetupGet(manager => manager.Players).Returns(new[] { departed, other });
+        players.Setup(manager => manager.IsConnected(departed)).Returns(false);
+        players.Setup(manager => manager.IsConnected(other)).Returns(true);
+
+        using var pushHandler = new ServerChatHandler(
+            broker,
+            broadcastNetwork,
+            players.Object,
+            playerNameResolver.Object);
+
+        broker.Publish(departedPeer, new PlayerDisconnected(departedPeer, default));
+        DrainGameThread();
+
+        var snapshot = Assert.Single(
+            broadcastNetwork.GetPeerMessagesFromType<NetworkChatParticipants>(otherPeer));
+        Assert.Equal(new[] { "other" }, snapshot.ControllerIds);
     }
 
     public void Dispose()
