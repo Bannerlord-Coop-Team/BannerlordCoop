@@ -1760,6 +1760,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var client = Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         var player = CreateSyncedPlayerContext(ControllerId, client);
+        var conflictingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var recipientKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var proposingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
@@ -1769,14 +1770,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         ConfigureClanInKingdom(player.ClanId, recipientKingdomId);
         ConfigureClanInKingdom(proposingClanId, proposingKingdomId);
         ConfigureClanInKingdom(targetRulerClanId, targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(conflictingKingdomId);
         EnsureKingdomRegisteredEverywhere(recipientKingdomId);
         EnsureKingdomRegisteredEverywhere(proposingKingdomId);
         EnsureKingdomRegisteredEverywhere(targetKingdomId);
         ConfigureAllianceModelEverywhere();
+        var compactRecipientClanId = ObjectManager.Compact(player.ClanId, typeof(Clan));
+        Assert.Equal(ObjectManager.Compact(conflictingKingdomId, typeof(Kingdom)), compactRecipientClanId);
 
         var decisionData = new StartAllianceDecisionData(
             proposingClanId,
-            player.ClanId,
+            compactRecipientClanId,
             triggerTime: 0,
             isEnforced: false,
             notifyPlayer: false,
@@ -1787,7 +1791,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() => client.SimulateMessage(
             this,
             new NetworkAddDecision(
-                player.ClanId,
+                compactRecipientClanId,
                 decisionData,
                 ignoreInfluenceCost: true,
                 randomNumber: 0.5f)));
@@ -1797,6 +1801,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(proposingKingdomId, out var proposingKingdom));
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(conflictingKingdomId, out var conflictingKingdom));
             Assert.True(client.ObjectManager.TryGetObject<Clan>(proposingClanId, out var proposingClan));
 
             var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
@@ -1804,6 +1809,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(recipientKingdom, decision.Kingdom);
             Assert.Same(targetKingdom, decision.KingdomToStartAllianceWith);
             Assert.Empty(proposingKingdom.UnresolvedDecisions);
+            Assert.Empty(conflictingKingdom.UnresolvedDecisions);
             Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
         });
     }

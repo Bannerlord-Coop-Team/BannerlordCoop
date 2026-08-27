@@ -33,7 +33,7 @@ namespace GameInterface.Services.Kingdoms.Data
             proposerClan = null;
             kingdom = null;
             if (!objectManager.TryGetObject(ProposerClanId, out proposerClan) ||
-                !objectManager.TryGetObject(KingdomId, out object kingdomReference))
+                !TryGetDecisionKingdomReference(objectManager, out object kingdomReference))
             {
                 return false;
             }
@@ -51,6 +51,28 @@ namespace GameInterface.Services.Kingdoms.Data
 
             kingdom = serializedClan.Kingdom;
             return true;
+        }
+
+        private bool TryGetDecisionKingdomReference(IObjectManager objectManager, out object kingdomReference)
+        {
+            if (objectManager.TryGetObject(KingdomId, out kingdomReference))
+            {
+                return true;
+            }
+
+            if (objectManager.TryGetObject(KingdomId, out Clan serializedClan))
+            {
+                kingdomReference = serializedClan;
+                return true;
+            }
+
+            if (objectManager.TryGetObject(KingdomId, out Kingdom serializedKingdom))
+            {
+                kingdomReference = serializedKingdom;
+                return true;
+            }
+
+            return false;
         }
 
         /// <inheritdoc/>
