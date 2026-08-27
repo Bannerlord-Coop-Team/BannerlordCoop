@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Serialization;
 using Coop.Core;
 using Coop.Core.Common.Session;
+using Coop.Core.Diagnostics;
 using Coop.CrashReporting;
 using Coop.Lib.NoHarmony;
 #if DEBUG
@@ -122,9 +123,18 @@ namespace Coop
             }
             ManagedServerConfig.Password = serverPassword;
             ManagedServerConfig.Visibility = serverVisibility;
-
+            
             SetupLogging();
-            InitializeCrashReporting();
+            var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
+            StartupDiagnosticsSequence.Run(version =>
+                {
+                    informationalVersion = version;
+                    CoopLogHeader(moduleInfoProvider);
+                },
+                version => InitializeCrashReporting());
+
+            Logger.Verbose("Coop Mod Module Started");
+            
             Updateables.Add(new FpsLogger());
 
 #if DEBUG
@@ -138,7 +148,7 @@ namespace Coop
             if (!isServer)
             {
                 unsupportedModuleWarning = new UnsupportedModuleWarningHandler(
-                    new TaleWorldsModuleInfoProvider(),
+                    moduleInfoProvider,
                     new CoopOptionsStore(),
                     exception => Logger.Warning(
                         exception,
@@ -261,19 +271,42 @@ namespace Coop
 #else
                 .MinimumLevel.Information();
 #endif
-
             Logger = LogManager.GetLogger<CoopMod>();
+        }
 
-            informationalVersion = ModInformation.BuildVersion;
-            Logger.Information("BannerlordCoop build {Build}", informationalVersion);
+        private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
+        {
+            var modules = moduleInfoProvider.GetModuleInfos().ToArray();
+            var native = modules.FirstOrDefault(m => m.IsOfficial && m.Id.Equals("Native",  StringComparison.OrdinalIgnoreCase));
+
+            if (native.Id == null)
+            {
+                // ModuleInfo was not initialized (not found).
+                native.Id = "Unknown";
+                native.IsDlc = false;
+                native.IsOfficial = false;
+                native.Version = ApplicationVersion.Empty;
+            }
+            
+            Logger.Information("========================================================");
+            Logger.Information("Bannerlord Coop - {client}", isServer ? "Server" : "Client");
+            Logger.Information("Game Version: {major}.{minor}.{revision}", native.Version.Major, native.Version.Minor, native.Version.Revision);
+            Logger.Information("Coop Build {version}", informationalVersion);
             Logger.Information(
                 "[Protobuf] MonoRuntime={MonoRuntime} AutoCompile={AutoCompile} StructFactoryWorkaround={StructFactoryWorkaround} CLRVersion={ClrVersion}",
                 ProtoBufSerializer.IsMonoRuntime,
                 ProtoBufSerializer.AutoCompileEnabled,
                 ProtoBufSerializer.StructFactoryWorkaroundEnabled,
                 Environment.Version);
+            Logger.Information("Current modules:" );
 
-            Logger.Verbose("Coop Mod Module Started");
+            foreach (var module in modules)
+            {
+                string official = module.IsOfficial ? "Official" : "Unofficial";
+                Logger.Information("{official} {version} {name}", official, module.Version.ToString(), module.Id);
+            }
+            
+            Logger.Information("========================================================");
         }
 
         private void InitializeCrashReporting()
