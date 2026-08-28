@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -56,8 +57,7 @@ namespace GameInterface.Services.Kingdoms.Data
 
             if (objectManager.TryGetObject(KingdomId, out Clan compactClan))
             {
-                kingdom = compactClan.Kingdom;
-                return kingdom != null;
+                return TryGetKingdomFromReference(compactClan, out kingdom);
             }
 
             return objectManager.TryGetObject(KingdomId, out kingdom);
@@ -68,7 +68,14 @@ namespace GameInterface.Services.Kingdoms.Data
             kingdom = kingdomReference as Kingdom;
             if (kingdom != null) return true;
 
-            kingdom = (kingdomReference as Clan)?.Kingdom;
+            var clan = kingdomReference as Clan;
+            if (clan == null) return false;
+
+            kingdom = clan.Kingdom;
+            if (kingdom != null) return true;
+
+            kingdom = Kingdom.All.FirstOrDefault(candidate =>
+                candidate.RulingClan == clan || candidate.Clans.Contains(clan));
             return kingdom != null;
         }
 

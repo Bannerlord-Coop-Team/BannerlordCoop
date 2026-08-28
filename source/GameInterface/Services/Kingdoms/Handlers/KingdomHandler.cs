@@ -507,6 +507,8 @@ public class KingdomHandler : IHandler
                 return;
             }
 
+            HydrateInboundAllianceProposer(payload.Data, kingdom);
+
             if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
             {
                 Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
@@ -531,6 +533,19 @@ public class KingdomHandler : IHandler
         }
 
         return objectManager.TryGetObject(payload.KingdomId, out kingdom);
+    }
+
+    private void HydrateInboundAllianceProposer(KingdomDecisionData data, Kingdom kingdom)
+    {
+        if (!ModInformation.IsClient) return;
+        if (data is not StartAllianceDecisionData { IsProposedByOpponent: true } startAllianceDecisionData) return;
+        if (!objectManager.TryGetObject(startAllianceDecisionData.ProposerClanId, out Clan proposerClan)) return;
+        if (proposerClan.Kingdom != null) return;
+
+        using (new AllowedThread())
+        {
+            kingdomMembershipState.EnsureClanInKingdom(kingdom, proposerClan, publishCollectionChanges: false);
+        }
     }
 
     private static void RunKingdomMutation(Action action)
