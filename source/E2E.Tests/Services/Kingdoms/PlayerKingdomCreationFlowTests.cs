@@ -1993,6 +1993,34 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void AllianceOfferPendingStatusChanged_ClanReferences_UseOwningKingdoms()
+    {
+        var client = Clients.First();
+        var requestingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var requestingClanId = CreateSyncedNpcClan();
+        var targetClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(requestingClanId, requestingKingdomId);
+        ConfigureClanInKingdom(targetClanId, targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(requestingKingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(requestingKingdomId, out var requestingKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+
+            client.SimulateMessage(
+                this,
+                new NetworkAllianceOfferPendingStatusChanged(requestingClanId, targetClanId, isPending: true));
+
+            Assert.True(AllianceOfferPendingRegistry.IsPending(requestingKingdom.StringId, targetKingdom.StringId));
+            AllianceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, isPending: false);
+        });
+    }
+
+    [Fact]
     public void AllianceTimeoutFixture_NormalizesEveryReversibleEligibilityInputAndRestoresThemAfterExplicitAndFailedStagePaths()
     {
         const string fixtureControllerId = "testclient";

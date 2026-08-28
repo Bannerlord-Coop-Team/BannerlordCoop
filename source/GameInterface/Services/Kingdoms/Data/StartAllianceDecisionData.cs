@@ -49,18 +49,23 @@ namespace GameInterface.Services.Kingdoms.Data
 
         private bool TryGetDecisionKingdomReference(IObjectManager objectManager, out Kingdom kingdom)
         {
+            return TryGetKingdomReference(objectManager, KingdomId, out kingdom);
+        }
+
+        public static bool TryGetKingdomReference(IObjectManager objectManager, string kingdomId, out Kingdom kingdom)
+        {
             kingdom = null;
-            if (objectManager.TryGetObject(KingdomId, out object kingdomReference))
+            if (objectManager.TryGetObject(kingdomId, out object kingdomReference))
             {
                 return TryGetKingdomFromReference(kingdomReference, out kingdom);
             }
 
-            if (objectManager.TryGetObject(KingdomId, out Clan compactClan))
+            if (objectManager.TryGetObject(kingdomId, out Clan compactClan))
             {
                 return TryGetKingdomFromReference(compactClan, out kingdom);
             }
 
-            return objectManager.TryGetObject(KingdomId, out kingdom);
+            return objectManager.TryGetObject(kingdomId, out kingdom);
         }
 
         private static bool TryGetKingdomFromReference(object kingdomReference, out Kingdom kingdom)
@@ -106,31 +111,7 @@ namespace GameInterface.Services.Kingdoms.Data
 
         private bool TryGetTargetKingdomReference(IObjectManager objectManager, out Kingdom kingdom)
         {
-            kingdom = null;
-            if (objectManager.TryGetObject(KingdomToStartAllianceWithId, out object kingdomReference))
-            {
-                if (kingdomReference is Kingdom serializedKingdom)
-                {
-                    kingdom = serializedKingdom;
-                    return true;
-                }
-
-                if (kingdomReference is Clan serializedClan && serializedClan.Kingdom != null)
-                {
-                    kingdom = serializedClan.Kingdom;
-                    return true;
-                }
-
-                return false;
-            }
-
-            if (objectManager.TryGetObject(KingdomToStartAllianceWithId, out Clan compactClan) && compactClan.Kingdom != null)
-            {
-                kingdom = compactClan.Kingdom;
-                return true;
-            }
-
-            return objectManager.TryGetObject(KingdomToStartAllianceWithId, out kingdom);
+            return TryGetKingdomReference(objectManager, KingdomToStartAllianceWithId, out kingdom);
         }
     }
 }
