@@ -8,6 +8,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Xml.Linq;
 using Xunit;
 
@@ -74,6 +75,13 @@ public class BugReportOptionsTests
             tab.Apply(options);
             store.Save(options);
             tab.AfterApply();
+
+            using var document = JsonDocument.Parse(File.ReadAllText(filePath));
+            var savedSection = document.RootElement
+                .GetProperty(BugReportOptionsTabProvider.TabId)
+                .GetProperty(BugReportSection.SectionId);
+            Assert.False(savedSection.GetProperty("showBugReportButton").GetBoolean());
+            Assert.False(savedSection.TryGetProperty("ShowBugReportButton", out _));
 
             var savedOptions = store.LoadOrDefault();
             Assert.False(BugReportOptionsTabProvider.GetShowBugReportButtonOrDefault(savedOptions));

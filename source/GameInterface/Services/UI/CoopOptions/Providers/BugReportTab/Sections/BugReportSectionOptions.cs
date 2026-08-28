@@ -1,10 +1,13 @@
-﻿namespace GameInterface.Services.UI.CoopOptions.Providers.BugReportTab.Sections;
+﻿using System.Text.Json.Serialization;
+
+namespace GameInterface.Services.UI.CoopOptions.Providers.BugReportTab.Sections;
 
 /// <summary>Persists the client's bug-report button visibility choice.</summary>
 public class BugReportSectionOptions
 {
     public const bool DefaultShowBugReportButton = true;
 
+    [JsonPropertyName("showBugReportButton")]
     public bool? ShowBugReportButton { get; set; }
 
     public bool GetShowBugReportButtonOrDefault()
