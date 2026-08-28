@@ -31,6 +31,9 @@ public abstract class CommonModule : Module
 
         #region Network
         builder.RegisterType<NetworkConfig>().As<INetworkConfig>().InstancePerLifetimeScope();
+        builder.RegisterGeneric(typeof(ReliableMessageBatcher<>))
+            .As(typeof(IReliableMessageBatcher<>))
+            .InstancePerDependency();
         #endregion
 
         #region Communication

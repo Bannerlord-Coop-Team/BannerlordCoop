@@ -42,6 +42,7 @@ internal class BugReportService : IBugReportService, IDisposable
     private readonly IPlayerManager playerManager;
     private readonly IBugReportLogSharingPreference logSharingPreference;
     private readonly ICoopLogSnapshotProvider logSnapshotProvider;
+    private readonly IBugReportServerSaveProvider serverSaveProvider;
     private readonly IBugReportArchiveBuilder archiveBuilder;
     private readonly IBugReportLogValidator logValidator;
     private readonly IBugReportUploader uploader;
@@ -60,6 +61,7 @@ internal class BugReportService : IBugReportService, IDisposable
         IPlayerManager playerManager,
         IBugReportLogSharingPreference logSharingPreference,
         ICoopLogSnapshotProvider logSnapshotProvider,
+        IBugReportServerSaveProvider serverSaveProvider,
         IBugReportArchiveBuilder archiveBuilder,
         IBugReportLogValidator logValidator,
         IBugReportUploader uploader,
@@ -70,6 +72,7 @@ internal class BugReportService : IBugReportService, IDisposable
         this.playerManager = playerManager;
         this.logSharingPreference = logSharingPreference;
         this.logSnapshotProvider = logSnapshotProvider;
+        this.serverSaveProvider = serverSaveProvider;
         this.archiveBuilder = archiveBuilder;
         this.logValidator = logValidator;
         this.uploader = uploader;
@@ -264,6 +267,16 @@ internal class BugReportService : IBugReportService, IDisposable
                 null,
                 CollectionTimeout,
                 Timeout.InfiniteTimeSpan);
+        }
+
+        try
+        {
+            if (serverSaveProvider.TryCapture(out var serverSave))
+                collection.ServerSave = serverSave;
+        }
+        catch (Exception exception)
+        {
+            Logger.Warning(exception, "Capturing the server campaign save for a bug report failed");
         }
 
         Logger.Information(
@@ -585,6 +598,7 @@ internal class BugReportService : IBugReportService, IDisposable
                 collection.Triggers.OrderBy(trigger => trigger).ToArray(),
                 collection.Submissions.ToArray(),
                 null,
+                collection.ServerSave,
                 collection.StartedAt,
                 logs,
                 collection.Clients.Count,
@@ -631,6 +645,7 @@ internal class BugReportService : IBugReportService, IDisposable
         }
 
         if (contents.ServerLog == null &&
+            contents.ServerSave == null &&
             contents.Logs.Count == 0 &&
             contents.Submissions.Count == 0)
         {
@@ -656,7 +671,11 @@ internal class BugReportService : IBugReportService, IDisposable
         if (upload.Uploaded)
         {
             Logger.Information("Uploaded diagnostic bug report {RequestId}", contents.RequestId);
-            SendResult(finalized, "The bug report and available diagnostic logs were submitted.");
+            SendResult(
+                finalized,
+                contents.ServerSave != null
+                    ? "The bug report, server save, and available diagnostic logs were submitted."
+                    : "The bug report and available diagnostic logs were submitted, but the server save could not be created.");
             return;
         }
 
@@ -687,9 +706,9 @@ internal class BugReportService : IBugReportService, IDisposable
         if (!upload.EndpointConfigured)
         {
             Logger.Information(
-                "Diagnostic bug report {RequestId} was not uploaded because authorization is not configured",
+                "Diagnostic bug report {RequestId} was not uploaded because the endpoint is not configured",
                 contents.RequestId);
-            SendResult(finalized, "The bug report was saved on the server; upload authorization is not configured.");
+            SendResult(finalized, "The bug report was saved on the server; the upload endpoint is not configured.");
         }
         else
         {
@@ -798,6 +817,7 @@ internal class BugReportService : IBugReportService, IDisposable
         public Dictionary<NetPeer, ClientCollection> Clients { get; }
         public HashSet<NetPeer> Requesters { get; } = new HashSet<NetPeer>();
         public Timer Timer { get; set; }
+        public CollectedBugReportServerSave ServerSave { get; set; }
         public bool Finalizing { get; set; }
         public long BufferedBytes { get; set; }
 
