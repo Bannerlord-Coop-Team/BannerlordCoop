@@ -146,7 +146,7 @@ public class TournamentBracketRebindTests
     }
 
     [Fact]
-    public void RebindCanonicalBracket_StableSlotReusesPortraitWithoutBindingNotifications()
+    public void RebindCanonicalBracket_StableSlotReusesPortraitAndPreservesKnockoutState()
     {
         CharacterObject character = CreateCharacter("stable-character");
         TournamentParticipant previousParticipant = CreateParticipant(character, 101, 1);
@@ -187,7 +187,7 @@ public class TournamentBracketRebindTests
         Assert.Equal("9", participantViewModel.Score);
         Assert.True(participantViewModel.IsQualifiedForNextRound);
         Assert.Equal(Color.FromUint(0xFF112233), participantViewModel.TeamColor);
-        Assert.False(participantViewModel.IsDead);
+        Assert.True(participantViewModel.IsDead);
         Assert.Equal("stable-character", participantViewModel.Name);
         Assert.Equal(1, participantViewModel.State);
         Assert.False(participantViewModel.IsMainHero);
@@ -198,7 +198,7 @@ public class TournamentBracketRebindTests
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public void RebindCanonicalBracket_IdentityChangeRefreshesBothPortraitBindings(
+    public void CanReuseParticipantPortrait_IdentityChangeReturnsFalse(
         bool changeCharacter,
         bool changeDescriptor)
     {
@@ -208,9 +208,6 @@ public class TournamentBracketRebindTests
             CreateFourRounds(CreateMatch(0, TournamentMatch.MatchState.Ready, false)));
         TournamentParticipantVM participantViewModel = roundViewModels[0].Match1.Team1.Participant1;
         SetParticipantIdentity(participantViewModel, previousParticipant);
-        participantViewModel.IsDead = true;
-        var previousCharacter = participantViewModel.Character;
-        var previousVisual = participantViewModel.Visual;
 
         CharacterObject canonicalCharacter = changeCharacter
             ? CreateCharacter("replacement-character")
@@ -220,33 +217,14 @@ public class TournamentBracketRebindTests
             canonicalCharacter,
             canonicalDescriptor,
             4);
-        TournamentMatch canonicalMatch = CreateMatch(
-            new[] { canonicalParticipant },
-            TournamentMatch.MatchState.Ready,
-            0xFF445566);
-        TournamentRound[] canonicalRounds = CreateFourRounds(canonicalMatch);
-        int portraitRefreshes = 0;
 
-        CoopTournamentVM.RebindCanonicalBracket(
-            roundViewModels,
-            canonicalRounds,
-            canonicalMatch,
-            index => new TextObject($"Round {index}"),
-            (viewModel, participant, color) =>
-            {
-                portraitRefreshes++;
-                ReplacePortrait(viewModel);
-            });
-
-        Assert.Equal(1, portraitRefreshes);
-        Assert.NotSame(previousCharacter, participantViewModel.Character);
-        Assert.NotSame(previousVisual, participantViewModel.Visual);
-        Assert.Same(canonicalParticipant, participantViewModel.Participant);
-        Assert.False(participantViewModel.IsDead);
+        Assert.False(CoopTournamentVM.CanReuseParticipantPortrait(
+            participantViewModel,
+            canonicalParticipant));
     }
 
     [Fact]
-    public void RebindCanonicalBracket_DoesNotSharePortraitAcrossRoundSlots()
+    public void CanReuseParticipantPortrait_DoesNotSharePortraitAcrossRoundSlots()
     {
         CharacterObject character = CreateCharacter("advancing-character");
         TournamentParticipant previousParticipant = CreateParticipant(character, 301, 1);
@@ -255,45 +233,19 @@ public class TournamentBracketRebindTests
         TournamentParticipantVM firstRoundViewModel = roundViewModels[0].Match1.Team1.Participant1;
         TournamentParticipantVM secondRoundViewModel = roundViewModels[1].Match1.Team1.Participant1;
         SetParticipantIdentity(firstRoundViewModel, previousParticipant);
-        var firstRoundCharacter = firstRoundViewModel.Character;
-        var firstRoundVisual = firstRoundViewModel.Visual;
 
         TournamentParticipant canonicalParticipant = CreateParticipant(character, 301, 5);
-        TournamentMatch firstRoundMatch = CreateMatch(
-            new[] { canonicalParticipant },
-            TournamentMatch.MatchState.Finished,
-            0xFF778899,
-            canonicalParticipant);
-        TournamentMatch secondRoundMatch = CreateMatch(
-            new[] { canonicalParticipant },
-            TournamentMatch.MatchState.Ready,
-            0xFF778899);
-        TournamentRound[] canonicalRounds = CreateFourRounds(firstRoundMatch);
-        canonicalRounds[1] = CreateRound(secondRoundMatch);
-        int portraitRefreshes = 0;
 
-        CoopTournamentVM.RebindCanonicalBracket(
-            roundViewModels,
-            canonicalRounds,
-            secondRoundMatch,
-            index => new TextObject($"Round {index}"),
-            (viewModel, participant, color) =>
-            {
-                portraitRefreshes++;
-                ReplacePortrait(viewModel);
-            });
-
-        Assert.Equal(1, portraitRefreshes);
-        Assert.Same(firstRoundCharacter, firstRoundViewModel.Character);
-        Assert.Same(firstRoundVisual, firstRoundViewModel.Visual);
-        Assert.NotSame(firstRoundCharacter, secondRoundViewModel.Character);
-        Assert.NotSame(firstRoundVisual, secondRoundViewModel.Visual);
-        Assert.Same(canonicalParticipant, firstRoundViewModel.Participant);
-        Assert.Same(canonicalParticipant, secondRoundViewModel.Participant);
+        Assert.True(CoopTournamentVM.CanReuseParticipantPortrait(
+            firstRoundViewModel,
+            canonicalParticipant));
+        Assert.False(CoopTournamentVM.CanReuseParticipantPortrait(
+            secondRoundViewModel,
+            canonicalParticipant));
     }
 
     [Fact]
-    public void RebindCanonicalBracket_EmptyIntervalClearsIdentityBeforeFreshPortrait()
+    public void RebindCanonicalBracket_EmptyIntervalClearsIdentityBeforeReuseCheck()
     {
         CharacterObject character = CreateCharacter("returning-character");
         TournamentParticipant previousParticipant = CreateParticipant(character, 401, 1);
@@ -302,8 +254,6 @@ public class TournamentBracketRebindTests
         TournamentParticipantVM participantViewModel = roundViewModels[0].Match1.Team1.Participant1;
         SetParticipantIdentity(participantViewModel, previousParticipant);
         participantViewModel.IsDead = true;
-        var previousCharacter = participantViewModel.Character;
-        var previousVisual = participantViewModel.Visual;
         TournamentMatch emptyMatch = CreateMatch(
             Array.Empty<TournamentParticipant>(),
             TournamentMatch.MatchState.Ready,
@@ -314,8 +264,7 @@ public class TournamentBracketRebindTests
             roundViewModels,
             emptyRounds,
             emptyMatch,
-            index => new TextObject($"Round {index}"),
-            (viewModel, participant, color) => ReplacePortrait(viewModel));
+            index => new TextObject($"Round {index}"));
 
         Assert.False(participantViewModel.IsValid);
         Assert.True(participantViewModel.IsInitialized);
@@ -324,28 +273,10 @@ public class TournamentBracketRebindTests
         Assert.False(participantViewModel.IsDead);
 
         TournamentParticipant returningParticipant = CreateParticipant(character, 401, 2);
-        TournamentMatch returningMatch = CreateMatch(
-            new[] { returningParticipant },
-            TournamentMatch.MatchState.Ready,
-            0xFF99AABB);
-        TournamentRound[] returningRounds = CreateFourRounds(returningMatch);
-        int portraitRefreshes = 0;
 
-        CoopTournamentVM.RebindCanonicalBracket(
-            roundViewModels,
-            returningRounds,
-            returningMatch,
-            index => new TextObject($"Round {index}"),
-            (viewModel, participant, color) =>
-            {
-                portraitRefreshes++;
-                ReplacePortrait(viewModel);
-            });
-
-        Assert.Equal(1, portraitRefreshes);
-        Assert.NotSame(previousCharacter, participantViewModel.Character);
-        Assert.NotSame(previousVisual, participantViewModel.Visual);
-        Assert.Same(returningParticipant, participantViewModel.Participant);
+        Assert.False(CoopTournamentVM.CanReuseParticipantPortrait(
+            participantViewModel,
+            returningParticipant));
     }
 
     [Fact]
@@ -519,13 +450,6 @@ public class TournamentBracketRebindTests
         => (TournamentParticipant)typeof(TournamentParticipantVM)
             .GetField("_latestParticipant", BindingFlags.Instance | BindingFlags.NonPublic)
             .GetValue(participantViewModel);
-
-    private static void ReplacePortrait(TournamentParticipantVM participantViewModel)
-    {
-        var replacement = new TournamentParticipantVM();
-        participantViewModel.Character = replacement.Character;
-        participantViewModel.Visual = replacement.Visual;
-    }
 
     private static TournamentMatch CreateMatch(
         int score,

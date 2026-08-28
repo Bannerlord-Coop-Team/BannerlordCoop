@@ -406,25 +406,10 @@ internal sealed class CoopTournamentVM : TournamentVM
         IReadOnlyList<TournamentRound> canonicalRounds,
         TournamentMatch canonicalCurrentMatch,
         Func<int, TextObject> getRoundTitle)
-        => RebindCanonicalBracket(
-            roundViewModels,
-            canonicalRounds,
-            canonicalCurrentMatch,
-            getRoundTitle,
-            (participantViewModel, participant, teamColor) =>
-                participantViewModel.Refresh(participant, teamColor));
-
-    internal static TournamentMatchVM RebindCanonicalBracket(
-        IReadOnlyList<TournamentRoundVM> roundViewModels,
-        IReadOnlyList<TournamentRound> canonicalRounds,
-        TournamentMatch canonicalCurrentMatch,
-        Func<int, TextObject> getRoundTitle,
-        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
     {
         if (roundViewModels == null) throw new ArgumentNullException(nameof(roundViewModels));
         if (canonicalRounds == null) throw new ArgumentNullException(nameof(canonicalRounds));
         if (getRoundTitle == null) throw new ArgumentNullException(nameof(getRoundTitle));
-        if (refreshParticipantPortrait == null) throw new ArgumentNullException(nameof(refreshParticipantPortrait));
         if (roundViewModels.Count != canonicalRounds.Count)
             throw new ArgumentException("The canonical tournament bracket must contain all native rounds.", nameof(canonicalRounds));
 
@@ -436,8 +421,7 @@ internal sealed class CoopTournamentVM : TournamentVM
             BindCanonicalRound(
                 roundViewModel,
                 canonicalRound,
-                getRoundTitle(roundIndex),
-                refreshParticipantPortrait);
+                getRoundTitle(roundIndex));
 
             for (int matchIndex = 0; matchIndex < canonicalRound.Matches.Length; matchIndex++)
             {
@@ -458,8 +442,7 @@ internal sealed class CoopTournamentVM : TournamentVM
     private static void BindCanonicalRound(
         TournamentRoundVM roundViewModel,
         TournamentRound canonicalRound,
-        TextObject roundTitle,
-        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
+        TextObject roundTitle)
     {
         roundViewModel.Round = canonicalRound;
         roundViewModel.Count = canonicalRound.Matches.Length;
@@ -472,8 +455,7 @@ internal sealed class CoopTournamentVM : TournamentVM
             if (matchIndex < canonicalRound.Matches.Length)
                 BindCanonicalMatch(
                     matchViewModel,
-                    canonicalRound.Matches[matchIndex],
-                    refreshParticipantPortrait);
+                    canonicalRound.Matches[matchIndex]);
             else
                 ClearMatchViewModel(matchViewModel);
         }
@@ -481,8 +463,7 @@ internal sealed class CoopTournamentVM : TournamentVM
 
     private static void BindCanonicalMatch(
         TournamentMatchVM matchViewModel,
-        TournamentMatch canonicalMatch,
-        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
+        TournamentMatch canonicalMatch)
     {
         matchViewModel.Match = canonicalMatch;
         matchViewModel.Count = canonicalMatch.Teams.Count();
@@ -494,7 +475,7 @@ internal sealed class CoopTournamentVM : TournamentVM
             TournamentTeamVM teamViewModel = matchViewModel.Teams[teamIndex];
             TournamentTeam canonicalTeam = canonicalMatch.Teams.ElementAtOrDefault(teamIndex);
             if (canonicalTeam != null)
-                BindCanonicalTeam(teamViewModel, canonicalTeam, refreshParticipantPortrait);
+                BindCanonicalTeam(teamViewModel, canonicalTeam);
             else
                 ClearTeamViewModel(teamViewModel);
         }
@@ -502,8 +483,7 @@ internal sealed class CoopTournamentVM : TournamentVM
 
     private static void BindCanonicalTeam(
         TournamentTeamVM teamViewModel,
-        TournamentTeam canonicalTeam,
-        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
+        TournamentTeam canonicalTeam)
     {
         teamViewModel._team = canonicalTeam;
         teamViewModel.Count = canonicalTeam.TeamSize;
@@ -518,8 +498,7 @@ internal sealed class CoopTournamentVM : TournamentVM
                 BindCanonicalParticipant(
                     participantViewModel,
                     canonicalTeam.Participants.ElementAtOrDefault(participantIndex),
-                    teamColor,
-                    refreshParticipantPortrait);
+                    teamColor);
             }
             else
             {
@@ -531,8 +510,7 @@ internal sealed class CoopTournamentVM : TournamentVM
     private static void BindCanonicalParticipant(
         TournamentParticipantVM participantViewModel,
         TournamentParticipant canonicalParticipant,
-        Color teamColor,
-        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
+        Color teamColor)
     {
         if (canonicalParticipant == null)
         {
@@ -541,8 +519,12 @@ internal sealed class CoopTournamentVM : TournamentVM
             return;
         }
 
-        if (!CanReuseParticipantPortrait(participantViewModel, canonicalParticipant))
-            refreshParticipantPortrait(participantViewModel, canonicalParticipant, teamColor);
+        bool canReusePortrait = CanReuseParticipantPortrait(participantViewModel, canonicalParticipant);
+        if (!canReusePortrait)
+        {
+            participantViewModel.Refresh(canonicalParticipant, teamColor);
+            participantViewModel.IsDead = false;
+        }
 
         participantViewModel.Participant = canonicalParticipant;
         participantViewModel._latestParticipant = canonicalParticipant;
@@ -555,7 +537,6 @@ internal sealed class CoopTournamentVM : TournamentVM
         participantViewModel.IsMainHero = isPlayerCharacter;
         participantViewModel.IsInitialized = true;
         participantViewModel.IsValid = true;
-        participantViewModel.IsDead = false;
         participantViewModel.IsQualifiedForNextRound = false;
     }
 
