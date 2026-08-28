@@ -6,6 +6,8 @@ using E2E.Tests.Environment.Instance;
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
+using SandBox;
+using SandBox.Missions.MissionLogics;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -71,6 +73,31 @@ public sealed class MissionEngineFixture : IDisposable
             AccessTools.Method(typeof(Mission), nameof(Mission.GetMissionBehavior)).MakeGenericMethod(typeof(DeploymentMissionController)),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Mission_GetMissionBehavior))));
 
+        // Settlement population is a native presentation/AI boundary. The composed location fixture supplies
+        // the roster-driven spawn callback, while these shims let the production director and suppression
+        // patches decide whether the boundary runs.
+        harmony.Patch(
+            AccessTools.Method(typeof(MissionAgentHandler), nameof(MissionAgentHandler.SpawnLocationCharacters)),
+            prefix: new HarmonyMethod(
+                AccessTools.Method(typeof(MissionEngineFixture), nameof(MissionAgentHandler_SpawnLocationCharacters)),
+                Priority.Last));
+        foreach (string methodName in new[]
+        {
+            nameof(SandBoxHelpers.MissionHelper.SpawnHorses),
+            nameof(SandBoxHelpers.MissionHelper.SpawnSheeps),
+            nameof(SandBoxHelpers.MissionHelper.SpawnCows),
+            nameof(SandBoxHelpers.MissionHelper.SpawnHogs),
+            nameof(SandBoxHelpers.MissionHelper.SpawnGeese),
+            nameof(SandBoxHelpers.MissionHelper.SpawnChicken),
+        })
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(SandBoxHelpers.MissionHelper), methodName),
+                prefix: new HarmonyMethod(
+                    AccessTools.Method(typeof(MissionEngineFixture), nameof(LocationAnimalPopulation)),
+                    Priority.Last));
+        }
+
         // Agent members
         Prefix(typeof(Agent), "get_Controller", nameof(Agent_get_Controller));
         Prefix(typeof(Agent), "set_Controller", nameof(Agent_set_Controller));
@@ -134,6 +161,16 @@ public sealed class MissionEngineFixture : IDisposable
         // "unresolved" (-1) instead so the cctor completes.
         Prefix(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName), nameof(MBAnimation_GetActionCodeWithName));
         Prefix(typeof(Agent), "get_ActionSet", nameof(Agent_get_ActionSet));
+        Prefix(typeof(MBGlobals), nameof(MBGlobals.GetActionSet), nameof(MBGlobals_GetActionSet));
+        Prefix(typeof(BasicCharacterObject), nameof(BasicCharacterObject.GetStepSize), nameof(BasicCharacterObject_GetStepSize));
+        harmony.Patch(
+            AccessTools.Method(
+                typeof(MonsterExtensions),
+                nameof(MonsterExtensions.FillAnimationSystemData),
+                new[] { typeof(Monster), typeof(MBActionSet), typeof(float), typeof(bool) }),
+            prefix: new HarmonyMethod(
+                AccessTools.Method(typeof(MissionEngineFixture), nameof(MonsterExtensions_FillAnimationSystemData))));
+        Prefix(typeof(Agent), nameof(Agent.SetActionSet), nameof(Agent_SetActionSet));
         Prefix(typeof(MBActionSet), nameof(MBActionSet.GetActionAnimationDuration), nameof(MBActionSet_GetActionAnimationDuration));
         // Standalone mount movement: a masterless horse's own AgentMountData capture/apply reads and writes
         // the movement natives, and the apply path's staleness guard compares agent.Mission to Mission.Current.
@@ -281,10 +318,39 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Mission_get_AllAgents(Mission __instance, ref TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList __result)
         => Mission_get_Agents(__instance, ref __result);
 
-    private static bool Mission_GetMissionBehavior(Mission __instance, ref DeploymentMissionController __result)
+    private static bool Mission_GetMissionBehavior(Mission __instance, ref object __result)
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
-        __result = mock.DeploymentInProgress ? mock.DeploymentController : null;
+
+        if (mock.LocationPopulationBoundaryEnabled)
+            __result = mock.LocationAgentHandler;
+        else
+            __result = mock.DeploymentInProgress ? mock.DeploymentController : null;
+        return false;
+    }
+
+    private static bool MissionAgentHandler_SpawnLocationCharacters(
+        MissionAgentHandler __instance,
+        bool __runOriginal)
+    {
+        if (!TryActiveMock(out var mock) || !ReferenceEquals(__instance, mock.LocationAgentHandler))
+            return true;
+
+        if (__runOriginal)
+        {
+            mock.NativeLocationPopulationCalls++;
+            mock.NativeLocationPopulation?.Invoke();
+        }
+        return false;
+    }
+
+    private static bool LocationAnimalPopulation(bool __runOriginal)
+    {
+        if (!TryActiveMock(out var mock) || !mock.LocationPopulationBoundaryEnabled)
+            return true;
+
+        if (__runOriginal)
+            mock.NativeLocationAnimalPopulationCalls++;
         return false;
     }
 
@@ -751,6 +817,32 @@ public sealed class MissionEngineFixture : IDisposable
         if (!AgentMirror.TryGet(__instance, out _)) return true;
         __result = MBActionSet.GetActionSetWithIndex(0);
         return false;
+    }
+
+    private static bool MBGlobals_GetActionSet(ref MBActionSet __result)
+    {
+        if (!TryActiveMock(out _)) return true;
+        __result = MBActionSet.GetActionSetWithIndex(0);
+        return false;
+    }
+
+    private static bool BasicCharacterObject_GetStepSize(ref float __result)
+    {
+        if (!TryActiveMock(out _)) return true;
+        __result = 0.5f;
+        return false;
+    }
+
+    private static bool MonsterExtensions_FillAnimationSystemData(ref AnimationSystemData __result)
+    {
+        if (!TryActiveMock(out _)) return true;
+        __result = default;
+        return false;
+    }
+
+    private static bool Agent_SetActionSet(Agent __instance)
+    {
+        return !AgentMirror.TryGet(__instance, out _);
     }
 
     private static bool MBActionSet_GetActionAnimationDuration(ref float __result)
