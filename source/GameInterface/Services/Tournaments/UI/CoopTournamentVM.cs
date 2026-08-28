@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
 using SandBox.Tournaments.MissionLogics;
@@ -406,10 +406,25 @@ internal sealed class CoopTournamentVM : TournamentVM
         IReadOnlyList<TournamentRound> canonicalRounds,
         TournamentMatch canonicalCurrentMatch,
         Func<int, TextObject> getRoundTitle)
+        => RebindCanonicalBracket(
+            roundViewModels,
+            canonicalRounds,
+            canonicalCurrentMatch,
+            getRoundTitle,
+            (participantViewModel, participant, teamColor) =>
+                participantViewModel.Refresh(participant, teamColor));
+
+    internal static TournamentMatchVM RebindCanonicalBracket(
+        IReadOnlyList<TournamentRoundVM> roundViewModels,
+        IReadOnlyList<TournamentRound> canonicalRounds,
+        TournamentMatch canonicalCurrentMatch,
+        Func<int, TextObject> getRoundTitle,
+        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
     {
         if (roundViewModels == null) throw new ArgumentNullException(nameof(roundViewModels));
         if (canonicalRounds == null) throw new ArgumentNullException(nameof(canonicalRounds));
         if (getRoundTitle == null) throw new ArgumentNullException(nameof(getRoundTitle));
+        if (refreshParticipantPortrait == null) throw new ArgumentNullException(nameof(refreshParticipantPortrait));
         if (roundViewModels.Count != canonicalRounds.Count)
             throw new ArgumentException("The canonical tournament bracket must contain all native rounds.", nameof(canonicalRounds));
 
@@ -418,8 +433,11 @@ internal sealed class CoopTournamentVM : TournamentVM
         {
             TournamentRoundVM roundViewModel = roundViewModels[roundIndex];
             TournamentRound canonicalRound = canonicalRounds[roundIndex];
-            ResetRoundViewModel(roundViewModel);
-            roundViewModel.Initialize(canonicalRound, getRoundTitle(roundIndex));
+            BindCanonicalRound(
+                roundViewModel,
+                canonicalRound,
+                getRoundTitle(roundIndex),
+                refreshParticipantPortrait);
 
             for (int matchIndex = 0; matchIndex < canonicalRound.Matches.Length; matchIndex++)
             {
@@ -437,22 +455,158 @@ internal sealed class CoopTournamentVM : TournamentVM
         return currentMatchViewModel;
     }
 
-    private static void ResetRoundViewModel(TournamentRoundVM roundViewModel)
+    private static void BindCanonicalRound(
+        TournamentRoundVM roundViewModel,
+        TournamentRound canonicalRound,
+        TextObject roundTitle,
+        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
     {
-        roundViewModel.IsValid = false;
-        foreach (TournamentMatchVM matchViewModel in roundViewModel.Matches)
+        roundViewModel.Round = canonicalRound;
+        roundViewModel.Count = canonicalRound.Matches.Length;
+        roundViewModel.IsValid = true;
+        roundViewModel.Name = roundTitle.ToString();
+
+        for (int matchIndex = 0; matchIndex < roundViewModel.Matches.Count; matchIndex++)
         {
-            matchViewModel.IsValid = false;
-            foreach (TournamentTeamVM teamViewModel in matchViewModel.Teams)
+            TournamentMatchVM matchViewModel = roundViewModel.Matches[matchIndex];
+            if (matchIndex < canonicalRound.Matches.Length)
+                BindCanonicalMatch(
+                    matchViewModel,
+                    canonicalRound.Matches[matchIndex],
+                    refreshParticipantPortrait);
+            else
+                ClearMatchViewModel(matchViewModel);
+        }
+    }
+
+    private static void BindCanonicalMatch(
+        TournamentMatchVM matchViewModel,
+        TournamentMatch canonicalMatch,
+        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
+    {
+        matchViewModel.Match = canonicalMatch;
+        matchViewModel.Count = canonicalMatch.Teams.Count();
+        matchViewModel.IsValid = true;
+        matchViewModel.State = 0;
+
+        for (int teamIndex = 0; teamIndex < matchViewModel.Teams.Count; teamIndex++)
+        {
+            TournamentTeamVM teamViewModel = matchViewModel.Teams[teamIndex];
+            TournamentTeam canonicalTeam = canonicalMatch.Teams.ElementAtOrDefault(teamIndex);
+            if (canonicalTeam != null)
+                BindCanonicalTeam(teamViewModel, canonicalTeam, refreshParticipantPortrait);
+            else
+                ClearTeamViewModel(teamViewModel);
+        }
+    }
+
+    private static void BindCanonicalTeam(
+        TournamentTeamVM teamViewModel,
+        TournamentTeam canonicalTeam,
+        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
+    {
+        teamViewModel._team = canonicalTeam;
+        teamViewModel.Count = canonicalTeam.TeamSize;
+        teamViewModel.IsValid = true;
+        Color teamColor = Color.FromUint(canonicalTeam.TeamColor);
+
+        for (int participantIndex = 0; participantIndex < teamViewModel.Participants.Count; participantIndex++)
+        {
+            TournamentParticipantVM participantViewModel = teamViewModel.Participants[participantIndex];
+            if (participantIndex < canonicalTeam.TeamSize)
             {
-                teamViewModel.IsValid = false;
-                foreach (TournamentParticipantVM participantViewModel in teamViewModel.Participants)
-                {
-                    participantViewModel.IsInitialized = false;
-                    participantViewModel.IsValid = false;
-                }
+                BindCanonicalParticipant(
+                    participantViewModel,
+                    canonicalTeam.Participants.ElementAtOrDefault(participantIndex),
+                    teamColor,
+                    refreshParticipantPortrait);
+            }
+            else
+            {
+                ClearParticipantViewModel(participantViewModel, false);
             }
         }
+    }
+
+    private static void BindCanonicalParticipant(
+        TournamentParticipantVM participantViewModel,
+        TournamentParticipant canonicalParticipant,
+        Color teamColor,
+        Action<TournamentParticipantVM, TournamentParticipant, Color> refreshParticipantPortrait)
+    {
+        if (canonicalParticipant == null)
+        {
+            ClearParticipantViewModel(participantViewModel, true);
+            participantViewModel.TeamColor = teamColor;
+            return;
+        }
+
+        if (!CanReuseParticipantPortrait(participantViewModel, canonicalParticipant))
+            refreshParticipantPortrait(participantViewModel, canonicalParticipant, teamColor);
+
+        participantViewModel.Participant = canonicalParticipant;
+        participantViewModel._latestParticipant = canonicalParticipant;
+        participantViewModel.TeamColor = teamColor;
+        bool isPlayerCharacter = ReferenceEquals(
+            canonicalParticipant.Character,
+            Game.Current?.PlayerTroop);
+        participantViewModel.State = isPlayerCharacter ? 2 : 1;
+        participantViewModel.Name = canonicalParticipant.Character.Name.ToString();
+        participantViewModel.IsMainHero = isPlayerCharacter;
+        participantViewModel.IsInitialized = true;
+        participantViewModel.IsValid = true;
+        participantViewModel.IsDead = false;
+        participantViewModel.IsQualifiedForNextRound = false;
+    }
+
+    internal static bool CanReuseParticipantPortrait(
+        TournamentParticipantVM participantViewModel,
+        TournamentParticipant canonicalParticipant)
+    {
+        TournamentParticipant previousParticipant = participantViewModel?.Participant;
+        return participantViewModel?.IsInitialized == true &&
+               participantViewModel.IsValid &&
+               participantViewModel.Character != null &&
+               participantViewModel.Visual != null &&
+               previousParticipant?.Character != null &&
+               canonicalParticipant?.Character != null &&
+               ReferenceEquals(previousParticipant.Character, canonicalParticipant.Character) &&
+               previousParticipant.Descriptor.UniqueSeed == canonicalParticipant.Descriptor.UniqueSeed;
+    }
+
+    private static void ClearMatchViewModel(TournamentMatchVM matchViewModel)
+    {
+        matchViewModel.Match = null;
+        matchViewModel.Count = 0;
+        matchViewModel.State = 0;
+        matchViewModel.IsValid = false;
+        foreach (TournamentTeamVM teamViewModel in matchViewModel.Teams)
+            ClearTeamViewModel(teamViewModel);
+    }
+
+    private static void ClearTeamViewModel(TournamentTeamVM teamViewModel)
+    {
+        teamViewModel._team = null;
+        teamViewModel.Count = 0;
+        teamViewModel.IsValid = false;
+        foreach (TournamentParticipantVM participantViewModel in teamViewModel.Participants)
+            ClearParticipantViewModel(participantViewModel, false);
+    }
+
+    private static void ClearParticipantViewModel(
+        TournamentParticipantVM participantViewModel,
+        bool isInitialized)
+    {
+        participantViewModel.Participant = null;
+        participantViewModel._latestParticipant = null;
+        participantViewModel.IsInitialized = isInitialized;
+        participantViewModel.IsValid = false;
+        participantViewModel.IsDead = false;
+        participantViewModel.IsMainHero = false;
+        participantViewModel.IsQualifiedForNextRound = false;
+        participantViewModel.State = 0;
+        participantViewModel.Score = "-";
+        participantViewModel.Name = string.Empty;
     }
 
     internal static void RefreshCanonicalMatch(TournamentMatchVM matchViewModel)
