@@ -435,6 +435,8 @@ namespace Coop.Core
         private void Handle(MessagePayload<EndCoopMode> payload)
         {
             setCrashPhase("ending-session");
+            pendingPreSuppliedPassword = null;
+            acceptedSessionPassword = null;
 
             // Network callbacks can publish this event from the poller. Teardown on the game thread
             // lets the poll callback return before the container waits for that poller to stop.
@@ -448,6 +450,7 @@ namespace Coop.Core
                 clientConnectedOnce = false;
 
                 messageBroker.Publish(this, new CoopModeEnded());
+                messageBroker.Publish(this, new ClientSessionEnded());
             }, context: nameof(EndCoopMode));
         }
 

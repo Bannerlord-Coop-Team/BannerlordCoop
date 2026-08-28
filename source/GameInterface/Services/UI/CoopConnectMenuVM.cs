@@ -146,6 +146,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         messageBroker.Subscribe<ClientNetworkConnected>(HandleNetworkConnected);
         messageBroker.Subscribe<SessionJoinFailed>(HandleJoinFailed);
         messageBroker.Subscribe<SessionJoinAbandoned>(HandleJoinAbandoned);
+        messageBroker.Subscribe<ClientSessionEnded>(HandleSessionEnded);
 
         LoadLastConnection();
         SelectTab(Tabs[0]);
@@ -510,7 +511,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     public void ActionReconnectSteamLobby()
     {
-        if (disposed || lastSteamLobbyId == 0) return;
+        if (disposed || lastSteamLobbyId == 0 || steamJoinInFlight) return;
 
         steamJoinInFlight = true;
         pendingSteamLobbyId = lastSteamLobbyId;
@@ -543,6 +544,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         messageBroker.Unsubscribe<ClientNetworkConnected>(HandleNetworkConnected);
         messageBroker.Unsubscribe<SessionJoinFailed>(HandleJoinFailed);
         messageBroker.Unsubscribe<SessionJoinAbandoned>(HandleJoinAbandoned);
+        messageBroker.Unsubscribe<ClientSessionEnded>(HandleSessionEnded);
         lobbyRequestGeneration++;
         IsRefreshingSteamLobbies = false;
         discoveredSteamLobbies.Clear();
@@ -817,6 +819,14 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         {
             // IO failure — not critical
         }
+    }
+
+    private void HandleSessionEnded(MessagePayload<ClientSessionEnded> _)
+    {
+        steamJoinInFlight = false;
+        pendingDirectIp = pendingDirectPort = pendingDirectPassword = null;
+        pendingSteamLobbyId = 0;
+        pendingSteamHostName = pendingSteamPassword = null;
     }
 
     private void HandleJoinFailed(MessagePayload<SessionJoinFailed> _)
