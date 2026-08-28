@@ -1774,6 +1774,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         EnsureKingdomRegisteredEverywhere(recipientKingdomId);
         EnsureKingdomRegisteredEverywhere(proposingKingdomId);
         EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        ConfigureKingdomCultureEverywhere(recipientKingdomId, player.CultureId);
         ConfigureAllianceModelEverywhere();
         var compactRecipientClanId = ObjectManager.Compact(player.ClanId, typeof(Clan));
         Assert.Equal(ObjectManager.Compact(conflictingKingdomId, typeof(Kingdom)), compactRecipientClanId);
@@ -1787,6 +1788,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             playerExamined: false,
             kingdomToStartAllianceWithId: targetKingdomId,
             isProposedByOpponent: true);
+
+        KingdomDecisionsVM decisionsVm = null;
+        client.Call(() => decisionsVm = new KingdomDecisionsVM(() => { }));
 
         client.Call(() => client.SimulateMessage(
             this,
@@ -1803,6 +1807,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(conflictingKingdomId, out var conflictingKingdom));
             Assert.True(client.ObjectManager.TryGetObject<Clan>(proposingClanId, out var proposingClan));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var playerParty));
 
             var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
             Assert.Same(proposingClan, decision.ProposerClan);
@@ -1823,11 +1829,44 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                         player.ClanId,
                         player.ClanId,
                         ControllerId,
-                        hasFinalVote: true,
+                        hasFinalVote: false,
                         isConnected: true),
-                }));
+            }));
 
+            Assert.False(voteManager.HasLocalPlayerSubmittedVote(decision));
+            using (new AllowedThread())
+            {
+                playerParty._partyComponent = new LordPartyComponent(playerHero, playerHero, null);
+            }
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            decisionsVm.RefreshWith(decision);
+            DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
+            DecisionOptionVM noOption = decisionItem.DecisionOptionsList.Single(candidate =>
+                candidate.Option is StartAllianceDecision.StartAllianceDecisionOutcome outcome &&
+                !outcome.ShouldAllianceBeStarted);
+            noOption.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
+            decisionItem._currentSelectedOption = noOption;
+
+            using (new AllowedThread())
+            {
+                Clan.PlayerClan._kingdom = null;
+            }
+
+            decisionsVm.OnFrameTick();
+            Assert.Same(decision, decisionsVm.CurrentDecision.KingdomDecisionMaker._decision);
+            decisionItem.ExecuteFinalSelection();
+
+            Assert.Single(
+                client.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>(),
+                message => message.VoteData.IsFinal);
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartAlliance>());
             Assert.True(voteManager.HasLocalPlayerSubmittedVote(decision));
+
+            using (new AllowedThread())
+            {
+                Clan.PlayerClan._kingdom = recipientKingdom;
+            }
         });
     }
 

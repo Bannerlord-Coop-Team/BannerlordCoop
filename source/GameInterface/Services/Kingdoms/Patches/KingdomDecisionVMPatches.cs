@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Kingdoms.Extentions;
 using Common.Logging;
 using GameInterface.Services.Clans.Handlers;
+using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -51,6 +52,30 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             voteManager.RegisterDecisionItem(__instance.CurrentDecision);
             KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
+        }
+
+        [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
+        [HarmonyPrefix]
+        internal static bool OnFrameTickPrefix(KingdomDecisionsVM __instance)
+        {
+            if (Clan.PlayerClan?.Kingdom != null) return true;
+
+            StartAllianceDecision currentAllianceDecision =
+                __instance.CurrentDecision?.KingdomDecisionMaker?._decision as StartAllianceDecision;
+            if (CoopKingdomElection.IsTrackedPlayerAllianceOffer(currentAllianceDecision))
+            {
+                __instance.IsActive = __instance.IsCurrentDecisionActive;
+                return false;
+            }
+
+            bool hasPendingAllianceDecision = CoopKingdomElection.GetTrackedPlayerAllianceOffers()
+                .Any(decision =>
+                    decision?.Kingdom?._unresolvedDecisions?.Contains(decision) == true &&
+                    decision.Kingdom.Clans.Any(clan => clan.IsPlayerClan()));
+            if (!hasPendingAllianceDecision) return true;
+
+            __instance.IsActive = __instance.IsCurrentDecisionActive;
+            return false;
         }
 
         [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]

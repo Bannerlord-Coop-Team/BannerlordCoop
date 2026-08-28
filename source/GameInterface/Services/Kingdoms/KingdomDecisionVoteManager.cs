@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Extentions;
@@ -366,7 +367,7 @@ namespace GameInterface.Services.Kingdoms
         public bool ShouldSuppressLocalDecision(KingdomDecision decision)
         {
             if (decision == null || Clan.PlayerClan == null) return false;
-            if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
+            if (!IsLocalPlayerDecisionKingdomMember(decision)) return false;
             if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.IsResolved) return true;
             return !IsLocalPlayerEligible(decision);
         }
@@ -379,7 +380,7 @@ namespace GameInterface.Services.Kingdoms
         public bool HasLocalPlayerSubmittedVote(KingdomDecision decision)
         {
             if (decision == null || Clan.PlayerClan == null) return false;
-            if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
+            if (!IsLocalPlayerDecisionKingdomMember(decision)) return false;
             if (LocalSubmittedDecisions.Contains(decision)) return true;
             if (!TryGetClanId(Clan.PlayerClan, out string canonicalClanId)) return false;
 
@@ -401,7 +402,7 @@ namespace GameInterface.Services.Kingdoms
 
             if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.HasRoundSnapshot)
             {
-                return Clan.PlayerClan.Kingdom == decision.Kingdom;
+                return IsLocalPlayerDecisionKingdomMember(decision);
             }
 
             return IsLocalPlayerEligible(decision);
@@ -1532,7 +1533,7 @@ namespace GameInterface.Services.Kingdoms
         private bool IsLocalPlayerEligible(KingdomDecision decision)
         {
             if (decision == null || Clan.PlayerClan == null) return false;
-            if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
+            if (!IsLocalPlayerDecisionKingdomMember(decision)) return false;
 
             if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.HasRoundSnapshot)
             {
@@ -1540,6 +1541,14 @@ namespace GameInterface.Services.Kingdoms
             }
 
             return true;
+        }
+
+        private static bool IsLocalPlayerDecisionKingdomMember(KingdomDecision decision)
+        {
+            if (Clan.PlayerClan.Kingdom == decision.Kingdom) return true;
+
+            return CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision) &&
+                   decision.Kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true;
         }
 
         private bool TryGetDecision(KingdomDecisionVoteData voteData, out KingdomDecision decision)
