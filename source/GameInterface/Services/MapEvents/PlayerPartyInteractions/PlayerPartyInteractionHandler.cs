@@ -817,6 +817,10 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
     {
+        var outcome = new PlayerPartyInteractionOutcome(session, outcomeType);
+        var applied = outcomeHandler.Handle(outcome);
+        var finalOutcomeType = applied ? outcomeType : GetDeclinedOutcome(session.Proposal);
+
         lock (sessionGate)
         {
             if (!sessionsById.TryRemove(session.SessionId, out _)) return;
@@ -826,23 +830,20 @@ internal class PlayerPartyInteractionHandler : IHandler
             conversationPartyTracker.EndPvpConversation(session.InitiatorPartyId);
         }
 
-        var outcome = new PlayerPartyInteractionOutcome(session, outcomeType);
-        outcomeHandler.Handle(outcome);
-
         network.SendAll(new NetworkPlayerPartyInteractionEnded(
             session.SessionId,
             session.InitiatorPartyId,
             session.ResponderPartyId,
-            outcomeType));
+            finalOutcomeType));
 
-        if (outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ||
-            outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded)
+        if (finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ||
+            finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded)
         {
             hostileEncounterService.TryStartHostileEncounter(
                 session.SessionId,
                 session.InitiatorPartyId,
                 session.ResponderPartyId,
-                outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded);
+                finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded);
         }
     }
 
@@ -906,7 +907,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             return false;
         }
 
-        if (initiatorClan.Kingdom != null && initiatorClan.Kingdom != responderKingdom && !initiatorClan.IsUnderMercenaryService)
+        if (initiatorClan.Kingdom != null && !initiatorClan.IsUnderMercenaryService)
         {
             unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorIsInKingdom;
             return false;
