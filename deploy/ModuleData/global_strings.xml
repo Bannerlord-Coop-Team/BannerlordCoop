@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <strings>
-    <string id="str_coop_server_managed_player_received_damage" text="{=!}Managing this option is disabled on clients; the server does this." />
-    <string id="coop_wanderer_alley_orders" text="Do you have any orders for your alley, {?PLAYER.GENDER}madam{?}sir{\?}" />
+    <string id="str_coop_server_managed_player_received_damage" text="Managing this option is disabled on clients; the server does this." />
+    <string id="str_coop_wanderer_alley_orders" text="Do you have any orders for your alley, {?PLAYER.GENDER}madam{?}sir{\?}" />
+    <string id="str_coop_cannot_execute_heroes" text="Executing heroes has been disabled by the host."/>
+    <string id="str_coop_cannot_execute_players" text="Executing player heroes has been disabled by the host."/>
+    <string id="str_coop_cannot_execute_player_clan_members" text="Executing members of other players' clans has been disabled by the host."/>
     <!-- Add other custom text here in the future-->
 </strings>

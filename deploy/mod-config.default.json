@@ -180,6 +180,11 @@
     // Default is false and won't have any effect if enableHeroExecutions is false.
     "enablePlayerClanMemberExecutions": false,
 
+    // Toggle players being able to execute each other.
+    // WARNING: The only requirement for doing this is having another player as prisoner.
+    // Default is false and won't have any effect if enableHeroExecutions is false.
+    "enablePlayerExecutions": false,
+
     // Toggle player nameplates in co-op missions.
     // (Default) true: Clients may show nameplates above allied remote players.
     // false: Player nameplates are disabled and the client option is hidden.
