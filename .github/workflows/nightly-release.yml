@@ -293,6 +293,7 @@ jobs:
             test -s "$binary/$required"
           done
           cp 'deploy/Server Instructions.md' deploy/mod-config.default.json "$module/"
+          cp -R deploy/ModuleData "$module/"
           cp -R UIMovies/. "$module/GUI/Prefabs/"
 
           coop_version=$(sed -n 's/.*<CoopVersion>\([^<]*\)<\/CoopVersion>.*/\1/p' source/Directory.Build.props)
