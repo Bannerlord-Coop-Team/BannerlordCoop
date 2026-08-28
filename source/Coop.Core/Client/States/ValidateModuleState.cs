@@ -74,7 +74,6 @@ public class ValidateModuleState : ClientStateBase
         this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
-        messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
 
 #if DEBUG
         controllerIdProvider.SetControllerFromProgramArgs();
@@ -101,7 +100,6 @@ public class ValidateModuleState : ClientStateBase
         validationTimeoutTimer?.Dispose();
         messageBroker.Unsubscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
-        messageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
     }
 
     internal void TimeoutValidation()
@@ -182,13 +180,26 @@ public class ValidateModuleState : ClientStateBase
         }
         else
         {
-            Logic.StartCharacterCreation();
+            // Leave validation before vanilla activates the intro video, otherwise its forced loading
+            // window stays over the video until the real character-creation state activates.
+            GameThread.RunSafe(BeginCharacterCreation, context: nameof(Handle_NetworkClientValidated));
         }
     }
 
-    internal void Handle_CharacterCreationStarted(MessagePayload<CharacterCreationStarted> obj)
+    private void BeginCharacterCreation()
     {
-        Logic.SetState<CharacterCreationState>();
+        if (disposed || Logic.State != this) return;
+
+        try
+        {
+            Logic.SetState<CharacterCreationState>();
+            gameStateInterface.StartNewGame();
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to start character creation");
+            coopFinalizer.Finalize("Failed to start character creation.");
+        }
     }
 
     public override void EnterMainMenu()
