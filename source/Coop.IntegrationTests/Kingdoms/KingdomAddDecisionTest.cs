@@ -31,7 +31,7 @@ namespace Coop.IntegrationTests.Kingdoms
             var triggerMessage = new DecisionAdded(kingdom, decision, false, 0.5f);
             var server = TestEnvironment.Server;
             // Act
-            server.SimulateMessage(this, triggerMessage);
+            GameThreadTestRunner.Run(() => server.SimulateMessage(this, triggerMessage));
             // Assert
             // Verify the server sends a single message to it's game interface
             Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkAddDecision>());
@@ -52,7 +52,7 @@ namespace Coop.IntegrationTests.Kingdoms
             var decision = CreateDecision(client1);
             var triggerMessage = new DecisionAdded(kingdom, decision, false, 0f);
             // Act
-            client1.SimulateMessage(this, triggerMessage);
+            GameThreadTestRunner.Run(() => client1.SimulateMessage(this, triggerMessage));
             // Assert
             Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkAddDecision>());
             Assert.Equal(1, server.InternalMessages.GetMessageCount<NetworkAddDecision>());
