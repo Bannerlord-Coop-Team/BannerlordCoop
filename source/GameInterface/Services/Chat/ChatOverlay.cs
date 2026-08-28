@@ -18,7 +18,7 @@ namespace GameInterface.Services.Chat;
 internal sealed class ChatOverlay : GlobalLayer, IDisposable
 {
     private const string InputWidgetId = "CoopChatMessageInput";
-    private const int LayerOrder = 1;
+    private const int LayerOrder = 110;
 
     private readonly ChatVM dataSource;
     private readonly Action refreshParticipants;

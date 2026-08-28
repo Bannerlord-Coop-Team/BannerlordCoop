@@ -1,5 +1,9 @@
 ﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.BugReporting;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
+using GameInterface.Services.UI.Messages;
 using SandBox.View.Map;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -30,26 +34,37 @@ internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
 
     private readonly IBugReportService bugReportService;
     private readonly IBugReportSubmissionConsent submissionConsent;
+    private readonly ICoopOptionsStore optionsStore;
+    private readonly IMessageBroker messageBroker;
     private BugReportVM dataSource;
     private GauntletLayer gauntletLayer;
     private GauntletMovieIdentifier movie;
     private EditableTextWidget summaryInput;
     private bool initialized;
+    private bool showBugReportButton;
 
     public BugReportOverlay(
         IBugReportService bugReportService,
-        IBugReportSubmissionConsent submissionConsent)
+        IBugReportSubmissionConsent submissionConsent,
+        ICoopOptionsStore optionsStore,
+        IMessageBroker messageBroker)
     {
         if (bugReportService == null) throw new ArgumentNullException(nameof(bugReportService));
         if (submissionConsent == null) throw new ArgumentNullException(nameof(submissionConsent));
+        if (optionsStore == null) throw new ArgumentNullException(nameof(optionsStore));
+        if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         this.bugReportService = bugReportService;
         this.submissionConsent = submissionConsent;
+        this.optionsStore = optionsStore;
+        this.messageBroker = messageBroker;
     }
 
     public void Initialize()
     {
         if (initialized || ModInformation.IsServer || Game.Current == null) return;
 
+        showBugReportButton = BugReportOptionsTabProvider.GetShowBugReportButtonOrDefault(
+            optionsStore.LoadOrDefault());
         dataSource = new BugReportVM(Submit);
         dataSource.OpenRequested += FocusForm;
         dataSource.CloseRequested += ReleaseInputFocus;
@@ -60,6 +75,7 @@ internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
         SetPassiveInputRestrictions();
         Layer = gauntletLayer;
         ScreenManager.AddGlobalLayer(this, false);
+        messageBroker.Subscribe<BugReportVisibilitySelected>(HandleVisibilitySelected);
         initialized = true;
     }
 
@@ -77,6 +93,7 @@ internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
     {
         if (!initialized) return;
 
+        messageBroker.Unsubscribe<BugReportVisibilitySelected>(HandleVisibilitySelected);
         dataSource.OpenRequested -= FocusForm;
         dataSource.CloseRequested -= ReleaseInputFocus;
         dataSource.Submitted -= HandleSubmitted;
@@ -179,17 +196,25 @@ internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
             isConversationActive |= missionScreen.IsConversationActive;
 
         var shouldShow = ShouldShowPresentation(
+            showBugReportButton,
             isGameplayScreen,
             LoadingWindow.IsLoadingWindowActive,
             isConversationActive);
         dataSource.SetPresentationVisible(shouldShow);
     }
 
+    private void HandleVisibilitySelected(MessagePayload<BugReportVisibilitySelected> payload)
+    {
+        showBugReportButton = payload.What.ShowBugReportButton;
+        if (!showBugReportButton) dataSource.SetPresentationVisible(false);
+    }
+
     internal static bool ShouldShowPresentation(
+        bool showBugReportButton,
         bool isGameplayScreen,
         bool isLoading,
         bool isConversationActive)
     {
-        return isGameplayScreen && !isLoading && !isConversationActive;
+        return showBugReportButton && isGameplayScreen && !isLoading && !isConversationActive;
     }
 }

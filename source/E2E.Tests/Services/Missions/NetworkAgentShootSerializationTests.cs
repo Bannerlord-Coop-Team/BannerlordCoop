@@ -2,6 +2,7 @@
 using Common.PacketHandlers;
 using Common.Serialization;
 using GameInterface.Surrogates;
+using Missions.Battles;
 using Missions.Messages;
 using Missions.Missiles.Message;
 using System;
@@ -72,12 +73,15 @@ public class NetworkAgentShootSerializationTests
         blow.WeaponRecord._isMissile = true;
         blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = 42;
         var attackerWeapon = new WeaponComponentData(null, WeaponClass.Arrow, default);
+        AttackCollisionData collisionData = default;
+        var mapper = new BattleDamageDataMapper();
+        BattleDamageData damageData = mapper.Pack(in blow, in collisionData);
 
         var original = new NetworkApplyBattleDamage(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            blow,
-            default,
+            damageData,
+            blow.IsMissile,
             missileShotSequence: 4_500_000_123L,
             attackerWeapon: attackerWeapon);
 
@@ -86,6 +90,11 @@ public class NetworkAgentShootSerializationTests
 
         var result = Assert.IsType<NetworkApplyBattleDamage>(serializer.Deserialize<IMessage>(packet.Data));
 
+        Assert.True(mapper.TryResolve(result.DamageData, out Blow decodedBlow, out _));
+        Assert.InRange(packet.Data.Length, 1, 1199);
+        Assert.Equal(blow.InflictedDamage, decodedBlow.InflictedDamage);
+        Assert.Equal(blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex,
+            decodedBlow.WeaponRecord.AffectorWeaponSlotOrMissileIndex);
         Assert.Equal(original.VictimAgentId, result.VictimAgentId);
         Assert.Equal(original.AttackerAgentId, result.AttackerAgentId);
         Assert.True(result.IsMissile);

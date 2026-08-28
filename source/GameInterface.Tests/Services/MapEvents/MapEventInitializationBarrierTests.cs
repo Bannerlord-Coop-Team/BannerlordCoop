@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.SiegeEvents;
 using Moq;
 using System;
 using System.Collections.Concurrent;
@@ -12,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -138,6 +140,21 @@ public class MapEventInitializationBarrierTests
         return new MapEventInitializationBarrier(
             new Mock<IMessageBroker>().Object,
             new Mock<INetwork>().Object,
-            objectManager.Object);
+            objectManager.Object,
+            new StubSiegeEventGraphSynchronizer());
+    }
+
+    private sealed class StubSiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
+    {
+        public bool TryCapture(
+            SiegeEvent siegeEvent,
+            out SiegeEventGraphSnapshot snapshot,
+            MobileParty fallbackLeaderParty = null)
+        {
+            snapshot = default;
+            return false;
+        }
+
+        public bool TryApply(SiegeEventGraphSnapshot snapshot) => false;
     }
 }

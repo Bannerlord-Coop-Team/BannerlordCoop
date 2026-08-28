@@ -144,13 +144,18 @@ internal class MapEventSideDataHandler : IHandler
             return;
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEventSide, out var mapEventSideId))
             return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEventParty.Party, out var partyId))
+            return;
 
-        var message = new NetworkAddBattleParty(mapEventSideId, mapEventPartyId);
+        var message = new NetworkAddBattleParty(mapEventSideId, mapEventPartyId, partyId);
         network.SendAll(message);
     }
 
     private void Handle_NetworkAddBattleParty(MessagePayload<NetworkAddBattleParty> payload)
     {
+        if (ModInformation.IsServer)
+            return;
+
         var data = payload.What;
 
         GameThread.RunSafe(() =>
@@ -161,7 +166,10 @@ internal class MapEventSideDataHandler : IHandler
                     return;
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(data.MapEventPartyId, out var mapEventParty))
                     return;
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party))
+                    return;
 
+                using (new AllowedThread()) mapEventParty.Party = party;
                 initializationBarrier.AttachClient(
                     mapEventSide,
                     mapEventParty,

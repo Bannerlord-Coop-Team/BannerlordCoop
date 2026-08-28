@@ -6,12 +6,14 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.Locations.Messages.Conversation;
 using GameInterface.Services.Players;
 using Missions;
 using Missions.Taverns;
 using Moq;
+using SandBox;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.AgentOrigins;
@@ -93,6 +95,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
 
             MobileParty party = Server.GetRegisteredObject<MobileParty>(player.MobilePartyId);
             Settlement settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+            EnsureHeadlessSettlementComponent(settlement);
             EnterSettlementAction.ApplyForParty(party, settlement);
         });
     }
@@ -106,11 +109,53 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
                 throw new InvalidOperationException($"Player {controllerId} is not registered");
 
             MobileParty party = Server.GetRegisteredObject<MobileParty>(player.MobilePartyId);
+            EnsureHeadlessSettlementComponent(party.CurrentSettlement);
             LeaveSettlementAction.ApplyForParty(party);
         });
     }
 
-    public SettlementClientFixture EnterLocation(EnvironmentInstance client, string instanceId)
+    public void AddAmbientLocationCharacter(string instanceId, string characterId)
+    {
+        if (string.IsNullOrEmpty(characterId))
+            throw new ArgumentException("characterId is required", nameof(characterId));
+
+        if (string.IsNullOrEmpty(instanceId))
+            throw new ArgumentException("Invalid location instance id", nameof(instanceId));
+        string[] ids = instanceId.Split('|');
+        if (ids.Length != 2)
+            throw new ArgumentException("Invalid location instance id", nameof(instanceId));
+
+        // Campaign setup supplies the same roster to each process before native mission population runs.
+        void Add(EnvironmentInstance instance)
+        {
+            instance.Call(() =>
+            {
+                Location location = instance.GetRegisteredObject<Location>(ids[1]);
+                CharacterObject character = instance.GetRegisteredObject<CharacterObject>(characterId);
+                LocationCharacter entry = LocationCharacterFactory.Create(
+                    character,
+                    originParty: null,
+                    specialItem: null,
+                    spawnTag: "npc_common",
+                    actionSetCode: null,
+                    behaviorsMethodName: null,
+                    characterRelation: (int)LocationCharacter.CharacterRelations.Neutral,
+                    fixedLocation: false,
+                    useCivilianEquipment: true);
+                location._characterList ??= new List<LocationCharacter>();
+                location._characterList.Add(entry);
+            });
+        }
+
+        Add(Server);
+        foreach (EnvironmentInstance client in Clients)
+            Add(client);
+    }
+
+    public SettlementClientFixture EnterLocation(
+        EnvironmentInstance client,
+        string instanceId,
+        bool enableNativePopulationBoundary = false)
     {
         ArgumentNullException.ThrowIfNull(client);
         if (string.IsNullOrEmpty(instanceId)) throw new ArgumentException("instanceId is required", nameof(instanceId));
@@ -150,6 +195,20 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
                 mission = missionEngine.CreateMission(client);
                 mission.PlayerTeam = mission.DefenderTeam;
                 mission.MainParty = playerParty.Party;
+                mission.LocationPopulationBoundaryEnabled = enableNativePopulationBoundary;
+                if (enableNativePopulationBoundary)
+                {
+                    mission.NativeLocationPopulation = () =>
+                    {
+                        foreach (LocationCharacter entry in location.GetCharacterList())
+                        {
+                            Mission.Current.SpawnAgent(
+                                entry.GetAgentBuildData()
+                                    .Controller(AgentControllerType.AI)
+                                    .Team(mission.DefenderTeam.Shell));
+                        }
+                    };
+                }
                 playerAgent = mission.SpawnAgent(
                     new AgentBuildData(character)
                         .Controller(AgentControllerType.Player)
@@ -183,6 +242,12 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
             mesh);
         activeClients.Add(client, fixture);
         return fixture;
+    }
+
+    public void RunNativePopulation(SettlementClientFixture fixture)
+    {
+        if (fixture == null) throw new ArgumentNullException(nameof(fixture));
+        fixture.Instance.Call(() => fixture.Mission.LocationAgentHandler.SpawnLocationCharacters());
     }
 
     public void LeaveLocation(EnvironmentInstance client)
@@ -386,6 +451,20 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
     {
         ArgumentNullException.ThrowIfNull(action);
         Server.Call(action);
+    }
+
+    private static void EnsureHeadlessSettlementComponent(Settlement? settlement)
+    {
+        if (settlement == null || settlement.SettlementComponent != null) return;
+        settlement.SetSettlementComponent(new HeadlessSettlementComponent());
+    }
+
+    /// <summary>Supplies no-op settlement callbacks required by native campaign enter/leave actions.</summary>
+    private sealed class HeadlessSettlementComponent : SettlementComponent
+    {
+        private readonly IFaction mapFaction = Mock.Of<IFaction>();
+
+        public override IFaction MapFaction => mapFaction;
     }
 
     private static string GetSettlementId(string instanceId)
