@@ -1,0 +1,11 @@
+<ListPanel DataSource="{BugReportTab}" IsVisible="@IsSelected" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
+    <Children>
+        <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                   LayoutImp.LayoutMethod="VerticalTopToBottom">
+            <ItemTemplate>
+                <!-- COOP_OPTIONS_SECTION:Sections/BugReportSection.xml -->
+            </ItemTemplate>
+        </ListPanel>
+    </Children>
+</ListPanel>

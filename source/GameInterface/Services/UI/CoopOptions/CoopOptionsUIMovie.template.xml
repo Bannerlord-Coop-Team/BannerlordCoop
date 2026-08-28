@@ -6,7 +6,7 @@
 
         <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
 
-        <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="840" HeightSizePolicy="CoverChildren"
+        <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="1050" HeightSizePolicy="CoverChildren"
                    HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-80"
                    LayoutImp.LayoutMethod="VerticalTopToBottom">
           <Children>
@@ -27,6 +27,7 @@
 
             <!-- COOP_OPTIONS_PROVIDER:Providers/KillFeedTab/KillFeedTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/MapTimeTab/MapTimeTab.xml -->
+			<!-- COOP_OPTIONS_PROVIDER:Providers/BugReportTab/BugReportTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/ChatTab/ChatTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/PlayerNameplatesTab/PlayerNameplatesTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/NetworkTab/NetworkTab.xml -->
