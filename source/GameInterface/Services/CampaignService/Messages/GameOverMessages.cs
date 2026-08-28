@@ -8,13 +8,16 @@ namespace GameInterface.Services.CampaignService.Messages;
 public readonly struct ClientGameOver : IEvent
 {
     public readonly Hero PlayerHero;
+    public readonly Hero Killer;
     public readonly KillCharacterAction.KillCharacterActionDetail Detail;
 
     public ClientGameOver(
         Hero playerHero,
+        Hero killer,
         KillCharacterAction.KillCharacterActionDetail detail)
     {
         PlayerHero = playerHero;
+        Killer = killer;
         Detail = detail;
     }
 }

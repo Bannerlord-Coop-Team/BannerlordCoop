@@ -49,7 +49,7 @@ internal class KillCharacterActionPatches
             return false;
         }
 
-        if (victim.IsPlayerHero() && !isForced)
+        if (victim.IsPlayerHero())
         {
             CampaignEventDispatcher.Instance.OnBeforeMainCharacterDied(victim, killer, actionDetail, showNotification);
             return false;

@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.CampaignService.Handlers;
 using GameInterface.Services.Players.Messages;
 using HarmonyLib;
 using SandBox.GauntletUI;
@@ -20,7 +19,6 @@ internal class GauntletGameOverScreenPatches
     [HarmonyPostfix]
     public static void CloseGameOverScreenPostfix()
     {
-        GameOverState.IsGameOver = false;
-        MessageBroker.Instance.Publish(null, new PlayerDeleteRequested());
+        MessageBroker.Instance.Publish(null, new PlayerDisconnectRequested());
     }
 }

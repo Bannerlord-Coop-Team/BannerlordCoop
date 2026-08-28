@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Heroes.Audit;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
@@ -12,6 +13,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -278,6 +280,44 @@ public class HeroDebugCommand
         }
 
         return $"Set age to {age} for {heroes.Count} hero(es) named '{heroName}'";
+    }
+
+    [CommandLineArgumentFunction("kill_player", "coop.debug.hero")]
+    public static string KillPlayer(List<string> args)
+    {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_player")) return error;
+
+        const string usage = "Usage: coop.debug.hero.kill_player <hero id> <old_age|battle|execution> [killer hero id]";
+        if (args.Count < 2 || args.Count > 3) return usage;
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(args[0], out Hero hero)) return $"Hero with id {args[0]} not found.";
+        if (!hero.IsPlayerHero() || !hero.IsAlive) return "The hero must be a living registered player.";
+
+        KillCharacterAction.KillCharacterActionDetail detail;
+        switch (args[1].ToLowerInvariant())
+        {
+            case "old_age":
+                detail = KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge;
+                break;
+            case "battle":
+                detail = KillCharacterAction.KillCharacterActionDetail.DiedInBattle;
+                break;
+            case "execution":
+                detail = KillCharacterAction.KillCharacterActionDetail.Executed;
+                break;
+            default:
+                return usage;
+        }
+
+        Hero killer = null;
+        if (args.Count == 3 && !objectManager.TryGetObject(args[2], out killer)) return $"Hero with id {args[2]} not found.";
+        if (detail == KillCharacterAction.KillCharacterActionDetail.Executed && killer == null)
+            return "Execution requires a killer hero id, use coop.debug.hero.list to find one.";
+
+        hero.AddDeathMark(killer, detail);
+        KillCharacterAction.ApplyByDeathMarkForced(hero, true);
+        return $"Player {hero.Name} was killed with detail {detail}.";
     }
 
     [CommandLineArgumentFunction("ill_days", "coop.debug.hero")]

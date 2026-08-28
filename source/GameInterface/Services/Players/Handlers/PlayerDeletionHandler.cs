@@ -1,10 +1,12 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Messages;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -16,14 +18,8 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.Players.Handlers;
 
 /// <summary>
-/// Handles the coop.delete_player flow. The client forwards <see cref="PlayerDeleteRequested"/> to
-/// the server as <see cref="NetworkRequestDeletePlayer"/>; the server resolves the player from the
-/// requesting connection (never from client-sent ids), deletes its registration everywhere
-/// (<see cref="NetworkPlayerRemoved"/> lifts the player-party destroy protection on the other
-/// clients first), kicks the requester, then kills the hero and destroys the party with patches
-/// live so the existing death/destroy sync replicates both to the remaining clients. A request
-/// that cannot be applied is answered with <see cref="NetworkDeletePlayerDenied"/> and the
-/// requester stays connected.
+/// Deletes the requesting player and its world objects, optionally keeping the peer connected
+/// until the death statistics are dismissed.
 /// </summary>
 internal class PlayerDeletionHandler : IHandler
 {
@@ -33,22 +29,27 @@ internal class PlayerDeletionHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly ISiegeEventInterface siegeEventInterface;
 
     public PlayerDeletionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<PlayerDeleteRequested>(Handle_PlayerDeleteRequested);
         messageBroker.Subscribe<NetworkRequestDeletePlayer>(Handle_NetworkRequestDeletePlayer);
         messageBroker.Subscribe<NetworkPlayerRemoved>(Handle_NetworkPlayerRemoved);
         messageBroker.Subscribe<NetworkDeletePlayerDenied>(Handle_NetworkDeletePlayerDenied);
+        messageBroker.Subscribe<PlayerDisconnectRequested>(Handle_PlayerDisconnectRequested);
+        messageBroker.Subscribe<NetworkRequestPlayerDisconnect>(Handle_NetworkRequestPlayerDisconnect);
     }
 
     public void Dispose()
@@ -57,6 +58,8 @@ internal class PlayerDeletionHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestDeletePlayer>(Handle_NetworkRequestDeletePlayer);
         messageBroker.Unsubscribe<NetworkPlayerRemoved>(Handle_NetworkPlayerRemoved);
         messageBroker.Unsubscribe<NetworkDeletePlayerDenied>(Handle_NetworkDeletePlayerDenied);
+        messageBroker.Unsubscribe<PlayerDisconnectRequested>(Handle_PlayerDisconnectRequested);
+        messageBroker.Unsubscribe<NetworkRequestPlayerDisconnect>(Handle_NetworkRequestPlayerDisconnect);
     }
 
     /// <summary>
@@ -70,15 +73,33 @@ internal class PlayerDeletionHandler : IHandler
         // from the requesting connection.
         objectManager.TryGetId(Hero.MainHero, out var heroId);
 
-        network.SendAll(new NetworkRequestDeletePlayer(heroId));
+        network.SendAll(new NetworkRequestDeletePlayer(heroId, payload.What.KeepConnected));
+    }
+
+    private void Handle_PlayerDisconnectRequested(MessagePayload<PlayerDisconnectRequested> obj)
+    {
+        if (ModInformation.IsServer) return;
+
+        network.SendAll(new NetworkRequestPlayerDisconnect());
+    }
+
+    private void Handle_NetworkRequestPlayerDisconnect(MessagePayload<NetworkRequestPlayerDisconnect> obj)
+    {
+        if (ModInformation.IsClient) return;
+        if (obj.Who is not NetPeer peer) return;
+
+        GameThread.RunSafe(() =>
+        {
+            peer.Disconnect();
+        });
     }
 
     /// <summary>
-    /// Server: delete the requesting peer's player and disconnect it.
+    /// Server: delete the requesting peer's player, optionally keeping its connection.
     /// </summary>
     private void Handle_NetworkRequestDeletePlayer(MessagePayload<NetworkRequestDeletePlayer> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         if (!(payload.Who is NetPeer peer))
         {
@@ -87,11 +108,11 @@ internal class PlayerDeletionHandler : IHandler
             return;
         }
 
-        var requestedHeroId = payload.What.HeroId;
-        GameThread.RunSafe(() => DeletePlayer(peer, requestedHeroId), context: nameof(PlayerDeletionHandler));
+        var data = payload.What;
+        GameThread.RunSafe(() => DeletePlayer(peer, data.HeroId, data.KeepConnected), context: nameof(PlayerDeletionHandler));
     }
 
-    private void DeletePlayer(NetPeer peer, string requestedHeroId)
+    private void DeletePlayer(NetPeer peer, string requestedHeroId, bool keepConnected)
     {
         if (!playerManager.TryGetPlayer(peer, out var player))
         {
@@ -114,7 +135,8 @@ internal class PlayerDeletionHandler : IHandler
         objectManager.TryGetObject<Hero>(player.HeroId, out var hero);
         objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party);
 
-        if (party != null && (party.Party?.MapEvent != null || party.BesiegerCamp != null))
+        bool hasDied = hero != null && (!hero.IsAlive || hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None);
+        if (!hasDied && party != null && (party.Party?.MapEvent != null || party.BesiegerCamp != null))
         {
             network.Send(peer, new NetworkDeletePlayerDenied(
                 "Cannot delete a player whose party is in a battle or siege; leave it first " +
@@ -125,31 +147,41 @@ internal class PlayerDeletionHandler : IHandler
         Logger.Information("Deleting player {ControllerId} (hero {HeroId}) at its own request",
             player.ControllerId, player.HeroId);
 
+        messageBroker.Publish(this, new PlayerDeletionStarted(peer));
+
+        if (hasDied && party != null)
+        {
+            if (party.Party.MapEvent != null)
+            {
+                messageBroker.Publish(this, new PlayerLeaveBattleAttempted(party.Party, finishLocalMenus: false));
+            }
+
+            if (party.BesiegerCamp != null)
+            {
+                siegeEventInterface.BreakSiege(party);
+            }
+        }
+
         playerManager.RemovePlayer(player);
 
-        // The other clients drop their player registration off this message. It must go out
-        // BEFORE the kill/destroy below replicate: DestroyPartyActionPatch blocks destroys of
-        // registered player parties on every peer, and all these messages ride the same ordered
-        // stream.
         network.SendAllBut(peer, new NetworkPlayerRemoved(player.ControllerId, player.HeroId));
 
-        // Kick the requester before applying the world changes so the resulting broadcasts skip
-        // it — that client is heading to the main menu and must not apply a destroy of its own
-        // main party. Disconnect marks the peer non-connected synchronously, so later SendAlls
-        // no longer include it.
-        peer.Disconnect();
+        if (!keepConnected) peer.Disconnect();
 
-        // Patches stay live for both actions so the server-side apply is what replicates: the
-        // kill is server-only and its state flip broadcasts through the hero field sync (clan
-        // cascades via their own patched actions), and the party destroy's prefix broadcasts the
-        // destruction to the remaining clients. Kill first so the hero leaves the party through
-        // the native death flow, then destroy whatever party is left, mirroring vanilla's defeat
-        // teardown order.
+        // Keep patches live and preserve the real death cause and killer.
         if (hero != null && hero.IsAlive)
         {
-            // (showNotification: false, isForced: true) — forced skips the can-die model checks,
-            // same as the companion removal flow.
-            TryStep("hero kill", () => KillCharacterAction.ApplyByRemove(hero, false, true));
+            TryStep("hero kill", () =>
+            {
+                if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None)
+                {
+                    KillCharacterAction.ApplyByDeathMarkForced(hero, false);
+                }
+                else
+                {
+                    KillCharacterAction.ApplyByRemove(hero, false, true);
+                }
+            });
         }
 
         // Re-resolved because the kill can cascade into destroying the party itself. Inactive

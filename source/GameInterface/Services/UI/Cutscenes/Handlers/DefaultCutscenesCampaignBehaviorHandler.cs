@@ -10,12 +10,9 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.UI.Cutscenes.Handlers;
 
@@ -51,7 +48,8 @@ internal class DefaultCutscenesCampaignBehaviorHandler : IHandler
         var data = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(data.Victim, out var victimId)) return;
-        if (!objectManager.TryGetIdWithLogging(data.Killer, out var killerId)) return;
+        string killerId = null;
+        if (data.Killer != null && !objectManager.TryGetIdWithLogging(data.Killer, out killerId)) return;
 
         network.SendAll(new NetworkInitiateCutscenePlayerCharacterDied(victimId, killerId, data.Detail));
     }
@@ -64,9 +62,10 @@ internal class DefaultCutscenesCampaignBehaviorHandler : IHandler
         {
             if (!TryGetCutscenesBehavior(out var cutscenesBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.VictimId, out var victim)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.KillerId, out var killer)) return;
+            if (victim != Hero.MainHero) return;
 
-            //cutscenesBehavior.OnBeforeMainCharacterDied(victim, killer, data.Detail);
+            Hero killer = null;
+            if (data.KillerId != null && !objectManager.TryGetObjectWithLogging(data.KillerId, out killer)) return;
 
             var detail = data.Detail;
             SceneNotificationData sceneNotificationData = null;
@@ -97,10 +96,10 @@ internal class DefaultCutscenesCampaignBehaviorHandler : IHandler
                 }
                 else if (detail == KillCharacterAction.KillCharacterActionDetail.Executed || detail == KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent)
                 {
-                    TextObject to = new TextObject("{=uYjEknNX}{VICTIM.NAME}'s execution by {EXECUTER.NAME}", null);
-                    to.SetCharacterProperties("VICTIM", victim.CharacterObject, false);
-                    to.SetCharacterProperties("EXECUTER", killer.CharacterObject, false);
-                    sceneNotificationData = HeroExecutionSceneNotificationData.CreateForInformingPlayer(killer, victim, SceneNotificationData.RelevantContextType.Map, null);
+                    if (killer != null)
+                    {
+                        sceneNotificationData = HeroExecutionSceneNotificationData.CreateForInformingPlayer(killer, victim, SceneNotificationData.RelevantContextType.Map, null);
+                    }
                 }
             }
             if (sceneNotificationData != null)

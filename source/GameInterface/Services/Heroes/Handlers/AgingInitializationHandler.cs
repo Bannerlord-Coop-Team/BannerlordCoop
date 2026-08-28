@@ -5,6 +5,8 @@ using Common.Network;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 
@@ -53,13 +55,12 @@ internal class AgingInitializationHandler : IHandler
         agingPlayerData = obj.What.AgingPlayerData;
     }
 
-    // Need to load trade data when the hero changes for the player
+    // Need to load aging data when the hero changes for the player
     private void Handle(MessagePayload<PlayerHeroChanged> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.NewHero, out string playerHeroId)) return;
 
-        Campaign.Current.MainHeroIllDays = GetMainHeroIllDays(playerHeroId);
-        // TODO: Refresh MapInfoVM._isMainHeroSick to update health icon in the bottom right when ill immediately
+        UpdateMainHeroIllDays(GetMainHeroIllDays(playerHeroId));
 
         network.SendAll(new NetworkInitializeServerAgingDataKeys(playerHeroId));
     }
@@ -90,7 +91,13 @@ internal class AgingInitializationHandler : IHandler
 
             if (playerHero != Hero.MainHero) return;
 
-            Campaign.Current.MainHeroIllDays = data.NewIllDays;
+            UpdateMainHeroIllDays(data.NewIllDays);
         });
+    }
+
+    private void UpdateMainHeroIllDays(int illDays)
+    {
+        Campaign.Current.MainHeroIllDays = illDays;
+        MapScreen.Instance?.GetMapView<GauntletMapBarView>()?._mapBarGlobalLayer?._dataSource?.MapInfo?.Tick();
     }
 }
