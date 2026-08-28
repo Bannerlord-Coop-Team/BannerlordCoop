@@ -6,6 +6,11 @@ using Coop.Core.Server.Connections;
 using GameInterface;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using LiteNetLib;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -63,6 +68,129 @@ internal static class JoinDebugCommands
               $"forcedInactiveParty={lastForcedPartyId}"
             : $"state={clientLogic.State?.GetType().Name ?? "none"} {GetPartyCounts()} " +
               $"forcedInactiveParty={lastForcedPartyId}";
+    }
+
+    [CommandLineArgumentFunction("player_party_readiness", "coop.debug.connection")]
+    public static string PlayerPartyReadiness(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return PlayerPartyReadinessResult(
+                controllerId: null,
+                success: false,
+                reason: "Command can only be run on the server.",
+                playerRegistered: false,
+                connected: false,
+                peerBound: false,
+                currentPeerBinding: false,
+                completedSynchronization: false,
+                peerId: null,
+                partyId: null,
+                partyStringId: null,
+                partyActive: null,
+                heroId: null,
+                heroResolved: false,
+                heroCaptive: null,
+                heroIsPrisoner: null,
+                heroBelongsToPrisonerParty: null,
+                classification: PlayerPartyReadinessContract.InvalidFixtureRosterUnavailable);
+        if (args.Count != 1 || string.IsNullOrWhiteSpace(args[0]))
+            return PlayerPartyReadinessResult(
+                controllerId: null,
+                success: false,
+                reason: "Usage: coop.debug.connection.player_party_readiness <controllerId>",
+                playerRegistered: false,
+                connected: false,
+                peerBound: false,
+                currentPeerBinding: false,
+                completedSynchronization: false,
+                peerId: null,
+                partyId: null,
+                partyStringId: null,
+                partyActive: null,
+                heroId: null,
+                heroResolved: false,
+                heroCaptive: null,
+                heroIsPrisoner: null,
+                heroBelongsToPrisonerParty: null,
+                classification: PlayerPartyReadinessContract.InvalidFixtureRosterUnavailable);
+        if (!ContainerProvider.TryResolve<IConnectionCollection>(out var connections) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return PlayerPartyReadinessResult(
+                controllerId: args[0],
+                success: false,
+                reason: "The player, connection, or object registry is unavailable.",
+                playerRegistered: false,
+                connected: false,
+                peerBound: false,
+                currentPeerBinding: false,
+                completedSynchronization: false,
+                peerId: null,
+                partyId: null,
+                partyStringId: null,
+                partyActive: null,
+                heroId: null,
+                heroResolved: false,
+                heroCaptive: null,
+                heroIsPrisoner: null,
+                heroBelongsToPrisonerParty: null,
+                classification: PlayerPartyReadinessContract.InvalidFixtureRosterUnavailable);
+        }
+
+        string controllerId = args[0];
+        bool playerRegistered = playerManager.TryGetPlayer(controllerId, out Player player);
+        bool connected = playerRegistered && playerManager.IsConnected(player);
+        NetPeer peer = null;
+        bool peerBound = playerRegistered && playerManager.TryGetPeer(controllerId, out peer);
+        bool currentPeerBinding = peerBound && playerManager.TryGetPlayer(peer, out Player peerPlayer) &&
+            ReferenceEquals(player, peerPlayer);
+        bool completedSynchronization = currentPeerBinding &&
+            connections.HasCompletedCampaignSynchronization(peer);
+        MobileParty party = null;
+        bool partyResolved = playerRegistered &&
+            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out party);
+        bool? partyActive = partyResolved ? party.IsActive : null;
+        Hero hero = null;
+        bool heroResolved = playerRegistered &&
+            objectManager.TryGetObject<Hero>(player.HeroId, out hero);
+        bool? heroIsPrisoner = heroResolved ? hero.IsPrisoner : null;
+        bool? heroBelongsToPrisonerParty = heroResolved
+            ? hero.PartyBelongedToAsPrisoner != null
+            : null;
+        bool? heroCaptive = heroResolved
+            ? hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null
+            : null;
+        string classification = PlayerPartyReadinessContract.Classify(
+            playerRegistered,
+            connected,
+            currentPeerBinding,
+            completedSynchronization,
+            partyResolved,
+            partyActive == true,
+            heroResolved,
+            heroCaptive == true);
+        bool success = classification == PlayerPartyReadinessContract.Eligible;
+
+        return PlayerPartyReadinessResult(
+            controllerId,
+            success,
+            PlayerPartyReadinessContract.GetReason(classification),
+            playerRegistered,
+            connected,
+            peerBound,
+            currentPeerBinding,
+            completedSynchronization,
+            peerBound ? (int?)peer.Id : null,
+            playerRegistered ? player.MobilePartyId : null,
+            partyResolved ? party.StringId : null,
+            partyActive,
+            playerRegistered ? player.HeroId : null,
+            heroResolved,
+            heroCaptive,
+            heroIsPrisoner,
+            heroBelongsToPrisonerParty,
+            classification);
     }
 
     [CommandLineArgumentFunction("arm_inactive_party_deficit", "coop.debug.connection")]
@@ -247,5 +375,88 @@ internal static class JoinDebugCommands
         string active = party.IsActive ? "true" : "false";
         return $"LIVE_TEST_JSON={{\"partyId\":\"{party.StringId}\",\"active\":{active}}}";
     }
+
+    private static string PlayerPartyReadinessResult(
+        string controllerId,
+        bool success,
+        string reason,
+        bool playerRegistered,
+        bool connected,
+        bool peerBound,
+        bool currentPeerBinding,
+        bool completedSynchronization,
+        int? peerId,
+        string partyId,
+        string partyStringId,
+        bool? partyActive,
+        string heroId,
+        bool heroResolved,
+        bool? heroCaptive,
+        bool? heroIsPrisoner,
+        bool? heroBelongsToPrisonerParty,
+        string classification) =>
+        "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            success,
+            reason,
+            role = ModInformation.IsServer ? "server" : "client",
+            controllerId,
+            playerRegistered,
+            connected,
+            peerBound,
+            currentPeerBinding,
+            completedSynchronization,
+            peerId,
+            partyId,
+            partyStringId,
+            partyActive,
+            heroId,
+            heroResolved,
+            heroCaptive,
+            heroIsPrisoner,
+            heroBelongsToPrisonerParty,
+            classification,
+            fixtureEligible = classification == PlayerPartyReadinessContract.Eligible,
+            currentSynchronizedNonCaptiveInactive =
+                classification == PlayerPartyReadinessContract.CurrentSynchronizedNonCaptiveInactive
+        });
+}
+
+internal static class PlayerPartyReadinessContract
+{
+    internal const string Eligible = "eligible";
+    internal const string InvalidFixtureRosterCaptive = "invalid-fixture-roster-captive";
+    internal const string InvalidFixtureRosterUnavailable = "invalid-fixture-roster-unavailable";
+    internal const string CurrentSynchronizedNonCaptiveInactive =
+        "current-synchronized-noncaptive-inactive";
+
+    internal static string Classify(
+        bool playerRegistered,
+        bool connected,
+        bool currentPeerBinding,
+        bool completedSynchronization,
+        bool partyResolved,
+        bool partyActive,
+        bool heroResolved,
+        bool heroCaptive)
+    {
+        if (heroResolved && heroCaptive) return InvalidFixtureRosterCaptive;
+        if (!playerRegistered || !connected || !currentPeerBinding ||
+            !completedSynchronization || !partyResolved || !heroResolved)
+        {
+            return InvalidFixtureRosterUnavailable;
+        }
+
+        return partyActive ? Eligible : CurrentSynchronizedNonCaptiveInactive;
+    }
+
+    internal static string GetReason(string classification) => classification switch
+    {
+        Eligible => null,
+        InvalidFixtureRosterCaptive => "The selected player hero is captive.",
+        CurrentSynchronizedNonCaptiveInactive =>
+            "The current synchronized non-captive player party remains inactive.",
+        _ => "The selected player is unavailable for the defender fixture."
+    };
 }
 #endif
