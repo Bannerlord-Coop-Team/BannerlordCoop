@@ -26,7 +26,7 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     void PollActions();
 
     /// <summary>[Game thread] Detect realized action changes after the completed native Agent tick.</summary>
-    void PollActionsAfterNativeTick();
+    void PollActionsAfterNativeTick(float elapsedSeconds = 0f);
 
     /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
     void CatchUpJoiner(string controllerId);
@@ -64,6 +64,7 @@ public class AgentActionHandler : IAgentActionHandler
     private const int MaxAgentsPerActionPacket = 8;
     private const float DiscreteActionSpeedDeltaThreshold = 0.001f;
     private const float AmbientActionSpeedDeltaThreshold = 0.05f;
+    private const float AmbientActionSpeedSampleIntervalSeconds = 0.25f;
 
     private readonly IBattleNetwork client;
     private readonly IPacketManager packetManager;
@@ -77,6 +78,7 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
         new Dictionary<Guid, LocalAgentActionState>();
 
+    private float ambientActionSpeedSampleElapsed;
     private bool _disposed;
 
     private struct LocalAgentActionState
@@ -132,15 +134,15 @@ public class AgentActionHandler : IAgentActionHandler
 
     public void PollActions()
     {
-        PollActions(afterNativeTick: false);
+        PollActions(afterNativeTick: false, elapsedSeconds: 0f);
     }
 
-    public void PollActionsAfterNativeTick()
+    public void PollActionsAfterNativeTick(float elapsedSeconds = 0f)
     {
-        PollActions(afterNativeTick: true);
+        PollActions(afterNativeTick: true, elapsedSeconds);
     }
 
-    private void PollActions(bool afterNativeTick)
+    private void PollActions(bool afterNativeTick, float elapsedSeconds)
     {
 #if DEBUG
         using ActionPollMeasurement pollMeasurement =
@@ -152,6 +154,9 @@ public class AgentActionHandler : IAgentActionHandler
         List<Guid> ids = null;
         List<AgentActionData> actions = null;
         List<long> sequences = null;
+        bool sampleAmbientActionSpeed =
+            afterNativeTick
+            && ShouldSampleAmbientActionSpeed(elapsedSeconds);
 
         if (afterNativeTick)
         {
@@ -161,6 +166,7 @@ public class AgentActionHandler : IAgentActionHandler
                 PollAgentAction(
                     info,
                     afterNativeTick: true,
+                    sampleAmbientActionSpeed,
                     ref ids,
                     ref actions,
                     ref sequences);
@@ -183,6 +189,7 @@ public class AgentActionHandler : IAgentActionHandler
             PollAgentAction(
                 mainAgentInfo,
                 afterNativeTick: false,
+                sampleAmbientActionSpeed: false,
                 ref ids,
                 ref actions,
                 ref sequences);
@@ -201,6 +208,7 @@ public class AgentActionHandler : IAgentActionHandler
     private void PollAgentAction(
         CoopAgentInfo info,
         bool afterNativeTick,
+        bool sampleAmbientActionSpeed,
         ref List<Guid> ids,
         ref List<AgentActionData> actions,
         ref List<long> sequences)
@@ -356,6 +364,7 @@ public class AgentActionHandler : IAgentActionHandler
             channel: 0,
             publishAction0Speed,
             action0Discrete,
+            sampleAmbientActionSpeed,
             hadState,
             action0Changed,
             state.HasAction0PublishedSpeed,
@@ -366,6 +375,7 @@ public class AgentActionHandler : IAgentActionHandler
             channel: 1,
             publishAction1Speed,
             action1Discrete,
+            sampleAmbientActionSpeed,
             hadState,
             action1Changed,
             state.HasAction1PublishedSpeed,
@@ -686,11 +696,26 @@ public class AgentActionHandler : IAgentActionHandler
             && (actionDiscrete || locationAmbientAgent);
     }
 
+    private bool ShouldSampleAmbientActionSpeed(float elapsedSeconds)
+    {
+        ambientActionSpeedSampleElapsed += Math.Max(0f, elapsedSeconds);
+        if (ambientActionSpeedSampleElapsed
+            < AmbientActionSpeedSampleIntervalSeconds)
+        {
+            return false;
+        }
+
+        ambientActionSpeedSampleElapsed %=
+            AmbientActionSpeedSampleIntervalSeconds;
+        return true;
+    }
+
     private static float ReadActionSpeed(
         Agent agent,
         int channel,
         bool publishActionSpeed,
         bool actionDiscrete,
+        bool sampleAmbientActionSpeed,
         bool hadState,
         bool actionChanged,
         bool hasPublishedSpeed,
@@ -701,6 +726,16 @@ public class AgentActionHandler : IAgentActionHandler
         {
             speedChanged = false;
             return 1f;
+        }
+
+        bool readSpeed = actionDiscrete
+            || sampleAmbientActionSpeed
+            || actionChanged
+            || !hasPublishedSpeed;
+        if (!readSpeed)
+        {
+            speedChanged = false;
+            return previousSpeed;
         }
 
         float speed = AgentActionData.GetCurrentActionSpeed(

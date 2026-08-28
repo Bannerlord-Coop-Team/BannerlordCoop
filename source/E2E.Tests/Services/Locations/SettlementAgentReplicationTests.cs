@@ -118,16 +118,29 @@ public class SettlementAgentReplicationTests : SettlementTestEnvironment
 
         Tick(0.05f);
 
+        Assert.DoesNotContain(
+            owner.Mesh.NetworkSentPackets
+                .GetPackets<AgentActionPacket>(),
+            packet =>
+            {
+                int offset = Array.IndexOf(packet.AgentIds, ownedInfo.AgentId);
+                return offset >= 0
+                    && packet.Actions[offset].Action0Index == actionIndex
+                    && packet.Actions[offset].Action0Speed == updatedActionSpeed;
+            });
+
+        Tick(0.25f);
+
         Assert.Single(
             owner.Mesh.NetworkSentPackets
-                .GetPackets<AgentActionPacket>()
-                .Where(packet =>
-                {
-                    int offset = Array.IndexOf(packet.AgentIds, ownedInfo.AgentId);
-                    return offset >= 0
-                        && packet.Actions[offset].Action0Index == actionIndex
-                        && packet.Actions[offset].Action0Speed == updatedActionSpeed;
-                }));
+                .GetPackets<AgentActionPacket>(),
+            packet =>
+            {
+                int offset = Array.IndexOf(packet.AgentIds, ownedInfo.AgentId);
+                return offset >= 0
+                    && packet.Actions[offset].Action0Index == actionIndex
+                    && packet.Actions[offset].Action0Speed == updatedActionSpeed;
+            });
         Assert.Equal(actionSpeed, receivedState.Action0Speed);
         Assert.Equal(0, AdvanceNetwork(TimeSpan.FromMilliseconds(99)));
         Assert.Equal(actionSpeed, receivedState.Action0Speed);
@@ -160,7 +173,7 @@ public class SettlementAgentReplicationTests : SettlementTestEnvironment
     }
 
     [Fact]
-    public void AmbientSpeedJitter_ManyNpcsKeepsReliableActionOutputBounded()
+    public void AmbientSpeedJitter_ManyNpcsKeepsNativeReadsAndReliableActionOutputBounded()
     {
         const int npcCount = 24;
         const int jitterFrames = 120;
@@ -206,13 +219,16 @@ public class SettlementAgentReplicationTests : SettlementTestEnvironment
             owner.Mesh.NetworkSentPackets
                 .GetPackets<AgentActionPacket>());
         Assert.Equal(
-            npcCount * jitterFrames,
+            npcCount * 8,
             states.Sum(state => state.GetCurrentActionSpeedCalls));
 
         foreach (var state in states)
             state.Action0Speed = 0.65f;
-        Tick(1f / 60f);
+        Tick(0.25f);
 
+        Assert.Equal(
+            npcCount * 9,
+            states.Sum(state => state.GetCurrentActionSpeedCalls));
         AgentActionPacket[] significantUpdates = owner.Mesh.NetworkSentPackets
             .GetPackets<AgentActionPacket>()
             .ToArray();
