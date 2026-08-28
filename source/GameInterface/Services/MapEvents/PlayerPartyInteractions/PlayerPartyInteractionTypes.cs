@@ -10,7 +10,8 @@ public enum PlayerPartyInteractionPhase
     ProposalPending,
     TradeActive,
     HostileDemandConfirm,
-    HostileDemandPending
+    HostileDemandPending,
+    MercenaryConfirm
 }
 
 public enum PlayerPartyInteractionOption
@@ -20,6 +21,9 @@ public enum PlayerPartyInteractionOption
     OfferServices,
     JoinClan,
     Vassal,
+    Mercenary,
+    ConfirmMercenary,
+    CancelMercenary,
     AcceptProposal,
     DeclineProposal,
     Leave,
@@ -39,12 +43,26 @@ public enum PlayerPartyInteractionVassalUnavailableReason
     InitiatorClanTierTooLow
 }
 
+public enum PlayerPartyInteractionMercenaryUnavailableReason
+{
+    None,
+    InitiatorHasNoClan,
+    InitiatorIsNotClanLeader,
+    InitiatorClanTierTooLow,
+    AlreadyMercenaryForThisKingdom,
+    InitiatorClanHasSettlement,
+    NotEnoughRelation,
+    ClanIsInKingdom,
+    TargetHasNoKingdom,
+    IncompatibleWars
+}
 public enum PlayerPartyInteractionProposal
 {
     None,
     Trade,
     JoinClan,
     Vassal,
+    Mercenary,
     HostileDemand
 }
 
@@ -58,6 +76,8 @@ public enum PlayerPartyInteractionOutcomeType
     ClanJoinDeclined,
     VassalAccepted,
     VassalDeclined,
+    MercenaryAccepted,
+    MercenaryDeclined,
     Rejected,
     Disconnected,
     HostileDemandAccepted,

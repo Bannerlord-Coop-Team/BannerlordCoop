@@ -31,6 +31,7 @@ public static class PlayerPartyInteractionDialogState
     public static bool InitiatorAcceptedTrade => hasState && currentState.InitiatorAcceptedTrade;
     public static bool ResponderAcceptedTrade => hasState && currentState.ResponderAcceptedTrade;
     public static bool IsHostile => hasState && currentState.IsHostile;
+    public static int MercenaryAwardMultiplier => hasState ? currentState.MercenaryAwardMultiplier : 0;
     public static bool HasActiveState => hasState;
 
     internal static void Apply(NetworkPlayerPartyInteractionState state)
@@ -76,6 +77,9 @@ public static class PlayerPartyInteractionDialogState
         if (option == PlayerPartyInteractionOption.Vassal && TryGetVassalUnavailableExplanation(out explanation))
             return false;
 
+        if (option == PlayerPartyInteractionOption.Mercenary && TryGetMercenaryUnavailableExplanation(out explanation))
+            return false;
+
         explanation = new TextObject("{=coop_player_party_interaction_disabled}This option is not available.");
         return false;
     }
@@ -102,6 +106,44 @@ public static class PlayerPartyInteractionDialogState
         }
     }
 
+    private static bool TryGetMercenaryUnavailableExplanation(out TextObject explanation)
+    {
+        switch(currentState.MercenaryUnavailableReason)
+        {
+            case PlayerPartyInteractionMercenaryUnavailableReason.InitiatorHasNoClan:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_requires_clan}You must have a clan to join as mercenary.");
+                return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.InitiatorIsNotClanLeader:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_is_not_clan_leader}You must lead a clan to join as mercenary.");
+                return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_requires_tier_one}Your clan must be at least tier 1 to join as mercenary.");
+                return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.AlreadyMercenaryForThisKingdom:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_already_mercenary}Your clan is already a mercenary for this kingdom");
+                return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanHasSettlement:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_requires_no_settlement}Clans that own a settlement are not considered as mercenaries.");
+                    return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.NotEnoughRelation:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_requires_relation}You need {relation} relation with player");
+                    explanation.SetTextVariable("RELATION", Campaign.Current.Models.DiplomacyModel.MinimumRelationWithConversationCharacterToJoinKingdom);
+                    return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.ClanIsInKingdom:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_clan_is_in_kingdom}You must leave your current kingdom to apply as a mercenary.");
+                    return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.TargetHasNoKingdom:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_target_has_no_kingdom}The other player must be in a kingdom.");
+                return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_incompatible_wars}You are at war with a faction the other player's kingdom is not at war with.");
+                return true;
+            default:
+                explanation = null;
+                return false;
+        }
+    }
+
     public static string GetDialogText()
     {
         switch (Phase)
@@ -120,6 +162,10 @@ public static class PlayerPartyInteractionDialogState
                 return "Let us review the trade.";
             case PlayerPartyInteractionPhase.OfferServices:
                 return "What service do you wish to offer?";
+            case PlayerPartyInteractionPhase.MercenaryConfirm:
+                var mercenaryConfirmText = new TextObject("{=coop_player_party_mercenary_confirm}Mercenaries receive influence like vassals for fighting, but it is exchanged at the end of each day for denars at the rate of {MERCENARY_AWARD}{GOLD_ICON} per influence point. Do you accept these terms?");
+                mercenaryConfirmText.SetTextVariable("MERCENARY_AWARD", MercenaryAwardMultiplier);
+                return mercenaryConfirmText.ToString();
             default:
                 return "What would you like to discuss?";
         }
@@ -173,13 +219,78 @@ public static class PlayerPartyInteractionDialogState
             PlayerPartyInteractionProposal.None,
             GetLocalServiceOptions(),
             currentState.IsInitiator,
+            currentState.MercenaryAwardMultiplier,
             currentState.InitiatorAcceptedTrade,
             currentState.ResponderAcceptedTrade,
             currentState.PartyItems,
             currentState.OtherPartyItems,
             GetLocalServiceEnabledOptions(),
             currentState.IsHostile,
-            currentState.VassalUnavailableReason);
+            currentState.VassalUnavailableReason,
+            currentState.MercenaryUnavailableReason);
+
+        RefreshConversation();
+    }
+    public static void SelectMercenary()
+    {
+        var enabled = HasActiveState &&
+                      Phase == PlayerPartyInteractionPhase.OfferServices &&
+                      IsOptionEnabled(PlayerPartyInteractionOption.Mercenary);
+
+        if (!enabled) return;
+
+        Submit(PlayerPartyInteractionOption.Mercenary);
+
+        currentState = new NetworkPlayerPartyInteractionState(
+            currentState.SessionId,
+            currentState.PartyId,
+            currentState.OtherPartyId,
+            currentState.OtherPlayerName,
+            PlayerPartyInteractionPhase.MercenaryConfirm,
+            PlayerPartyInteractionProposal.Mercenary,
+            new[] { PlayerPartyInteractionOption.ConfirmMercenary, PlayerPartyInteractionOption.CancelMercenary },
+            currentState.IsInitiator,
+            currentState.MercenaryAwardMultiplier,
+            currentState.InitiatorAcceptedTrade,
+            currentState.ResponderAcceptedTrade,
+            currentState.PartyItems,
+            currentState.OtherPartyItems,
+            new[] { PlayerPartyInteractionOption.ConfirmMercenary, PlayerPartyInteractionOption.CancelMercenary },
+            currentState.IsHostile,
+            currentState.VassalUnavailableReason,
+            currentState.MercenaryUnavailableReason);
+
+        RefreshConversation();
+    }
+
+    public static void ConfirmMercenary()
+    {
+        var enabled = HasActiveState &&
+                      Phase == PlayerPartyInteractionPhase.MercenaryConfirm &&
+                      IsOptionEnabled(PlayerPartyInteractionOption.ConfirmMercenary);
+
+        if (!enabled) return;
+
+        Submit(PlayerPartyInteractionOption.ConfirmMercenary);
+
+        currentState = new NetworkPlayerPartyInteractionState(
+            currentState.SessionId,
+            currentState.PartyId,
+            currentState.OtherPartyId,
+            currentState.OtherPlayerName,
+            PlayerPartyInteractionPhase.WaitingForResponse,
+            currentState.Proposal,
+            Array.Empty<PlayerPartyInteractionOption>(),
+            currentState.IsInitiator,
+            currentState.MercenaryAwardMultiplier,
+            currentState.InitiatorAcceptedTrade,
+            currentState.ResponderAcceptedTrade,
+            currentState.PartyItems,
+            currentState.OtherPartyItems,
+            Array.Empty<PlayerPartyInteractionOption>(),
+            currentState.IsHostile,
+            currentState.VassalUnavailableReason,
+            currentState.MercenaryUnavailableReason);
 
         RefreshConversation();
     }
@@ -194,6 +305,11 @@ public static class PlayerPartyInteractionDialogState
                 return "(COMING SOON) I wish to offer my services in your clan.";
             case PlayerPartyInteractionProposal.Vassal:
                 return "I wish to swear my allegiance to your majesty.";
+            case PlayerPartyInteractionProposal.Mercenary:
+                var mercenaryProposalText = new TextObject("{=coop_player_party_mercenary_proposal}{OTHER_NAME} offers to serve as a mercenary. The kingdom will pay {MERCENARY_AWARD}{GOLD_ICON} gold per influence point earned, whenever the contract is honored. Do you accept?");
+                mercenaryProposalText.SetTextVariable("OTHER_NAME", OtherPlayerName);
+                mercenaryProposalText.SetTextVariable("MERCENARY_AWARD", MercenaryAwardMultiplier);
+                return mercenaryProposalText.ToString();
             case PlayerPartyInteractionProposal.HostileDemand:
                 return "I offer you one chance to surrender or die";
             default:
@@ -230,6 +346,7 @@ public static class PlayerPartyInteractionDialogState
     private static bool IsServiceOption(PlayerPartyInteractionOption option)
         => option == PlayerPartyInteractionOption.JoinClan ||
            option == PlayerPartyInteractionOption.Vassal ||
+           option == PlayerPartyInteractionOption.Mercenary ||
            option == PlayerPartyInteractionOption.Leave;
 
     internal static void RefreshConversation()

@@ -84,9 +84,13 @@ internal class PlayerPartyInteractionOutcomeHandler
             case PlayerPartyInteractionOutcomeType.VassalAccepted:
                 HandleVassalAccepted(outcome);
                 break;
+            case PlayerPartyInteractionOutcomeType.MercenaryAccepted:
+                HandleMercenaryAccepted(outcome);
+                break;
             case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:
             case PlayerPartyInteractionOutcomeType.TradeDeclined:
             case PlayerPartyInteractionOutcomeType.VassalDeclined:
+            case PlayerPartyInteractionOutcomeType.MercenaryDeclined:
             case PlayerPartyInteractionOutcomeType.Left:
             case PlayerPartyInteractionOutcomeType.Rejected:
             case PlayerPartyInteractionOutcomeType.Disconnected:
@@ -132,8 +136,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         var responderHero = responderParty.LeaderHero;
         var targetKingdom = responderHero?.Clan?.Kingdom;
         if (initiatorClan == null ||
-            initiatorClan.Kingdom != null ||
-            initiatorClan.Tier < 2 ||
+            initiatorClan.Tier < Campaign.Current.Models.ClanTierModel.VassalEligibleTier ||
             responderHero?.IsKingdomLeader != true ||
             targetKingdom?.RulingClan != responderHero.Clan)
         {
@@ -143,7 +146,18 @@ internal class PlayerPartyInteractionOutcomeHandler
                 outcome.ResponderPartyId);
             return;
         }
-
+        if (initiatorClan.IsUnderMercenaryService)
+        {
+            if (initiatorClan.Kingdom == targetKingdom)
+            {
+                EndMercenaryServiceAction.EndByBecomingVassal(initiatorClan);
+                return;
+            }
+            else
+            {
+                EndMercenaryServiceAction.EndByLeavingKingdom(initiatorClan);
+            }
+        }
         kingdomMembershipState.MoveClanToKingdom(
             null,
             targetKingdom,
@@ -213,6 +227,60 @@ internal class PlayerPartyInteractionOutcomeHandler
             initiatorParty.MobileParty.ActualClan = responderClan;
     }
 
+    private void HandleMercenaryAccepted(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            RunOnGameThread(() => ApplyMercenaryJoin(outcome), "Apply player-party Mercenary join");
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party mercenary join. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+        }
+    }
+
+    private void ApplyMercenaryJoin(PlayerPartyInteractionOutcome outcome)
+    {
+        if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
+        {
+            Logger.Warning("Unable to apply player-party mercenary: initiator party not found. PartyId={PartyId}", outcome.InitiatorPartyId);
+            return;
+        }
+
+        if (!objectManager.TryGetObject(outcome.ResponderPartyId, out PartyBase responderParty))
+        {
+            Logger.Warning("Unable to apply player-party mercenary: responder party not found. PartyId={PartyId}", outcome.ResponderPartyId);
+            return;
+        }
+
+        var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
+        var responderHero = responderParty.LeaderHero;
+        var targetKingdom = responderHero?.Clan?.Kingdom;
+
+        if (initiatorClan == null
+            || initiatorParty.LeaderHero != initiatorClan.Leader
+            || targetKingdom == null
+            || initiatorClan.Tier < Campaign.Current.Models.ClanTierModel.MercenaryEligibleTier)
+        {
+            Logger.Warning(
+                "Unable to apply player-party mercenary: eligibility changed before acceptance. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+            outcome.InitiatorPartyId,
+            outcome.ResponderPartyId);
+            return;
+        }
+        int awardMultiplier = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(initiatorClan, targetKingdom, true);
+        if (initiatorClan.MapFaction.IsKingdomFaction && initiatorClan.IsUnderMercenaryService)
+        {
+            awardMultiplier = awardMultiplier * 3 / 2;
+            ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(initiatorClan, true);
+        }
+        ChangeKingdomAction.ApplyByJoinFactionAsMercenary(initiatorClan, targetKingdom, default, awardMultiplier, true);
+        GainKingdomInfluenceAction.ApplyForJoiningFaction(initiatorClan.Leader, 5f);
+    }
     private void ApplyAcceptedTrade(PlayerPartyInteractionOutcome outcome)
     {
         if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
