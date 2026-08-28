@@ -47,7 +47,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         IPacketManager packetManager,
         IMessagePacketHandler messagePacketHandler,
         ICommonSerializer serializer,
-        CancellationTokenSource sessionCancellation) : base(config, serializer, sessionCancellation)
+        IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
+        CancellationTokenSource sessionCancellation)
+        : base(config, serializer, reliableMessageBatcher, sessionCancellation)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;

@@ -74,6 +74,7 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeMachineStateReplicator siegeMachineState;
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private readonly IMissionContext debugMissionContext;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
     private int lastResultSnapshotEpochReported;
 
@@ -103,6 +104,7 @@ public class CoopBattleController : CoopMissionController
         IAgentNativeMountState agentNativeMountState,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
+        IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper)
         : base(
             network,
@@ -112,6 +114,7 @@ public class CoopBattleController : CoopMissionController
             Missions.Agents.Handlers.MovementCadenceProfile.Battle)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
+        debugMissionContext = missionContext;
         coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
             () => session.IsLocalHost);
         var casualties = new CasualtyAttributionMap();
@@ -152,7 +155,8 @@ public class CoopBattleController : CoopMissionController
             session,
             guardedHitWindow,
             agentNativeMountState,
-            puppetMountStateRepairer);
+            puppetMountStateRepairer,
+            battleDamageDataMapper);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
         puppetSpawner = new PuppetSpawner(
@@ -435,6 +439,37 @@ public class CoopBattleController : CoopMissionController
         Deployment.OnLocalDeploymentFinished(replicator.BroadcastOwnDeployedTroops);
 
         ResultCommitter.ReportAcceptedResult();
+    }
+
+    // The live fixture only replays to a peer that this mission has actually mapped to a connected P2P link.
+    internal bool TryDebugReplayOwnedAgentsToConnectedPeer(string controllerId, out string error)
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(controllerId))
+        {
+            error = "the target controller id is empty";
+            return false;
+        }
+        if (!Session.HasInstance || Mission.Current?.GetMissionBehavior<CoopBattleController>() != this)
+        {
+            error = "there is no active co-op battle mission";
+            return false;
+        }
+        if (Session.IsOwn(controllerId))
+        {
+            error = "the target must be a remote controller";
+            return false;
+        }
+        if (debugMissionContext == null ||
+            !debugMissionContext.TryGetPeer(controllerId, out NetPeer peer) ||
+            peer.ConnectionState != ConnectionState.Connected)
+        {
+            error = "the target is not a connected mission peer";
+            return false;
+        }
+
+        replicator.ReplicateCurrentAgentsTo(controllerId);
+        return true;
     }
 
     protected override void SendJoinInfo(string controllerId)

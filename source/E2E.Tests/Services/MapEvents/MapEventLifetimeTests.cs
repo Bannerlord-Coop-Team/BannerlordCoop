@@ -119,11 +119,7 @@ public class MapEventLifetimeTests : MapEventTestBase
             attacker = GameObjectCreator.CreateInitializedObject<MobileParty>();
             mainPartyStandIn = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var siegeEvent = new SiegeEvent(settlement, attacker);
-
-            siegeEvent.BesiegerCamp._besiegerParties.Add(attacker);
-            siegeEvent.BesiegerCamp._leaderParty = attacker;
-            siegeEvent.BesiegerCamp._faction = attacker.MapFaction;
+            CreateReplicableSiegeEvent(settlement, attacker);
 
             mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
@@ -205,10 +201,7 @@ public class MapEventLifetimeTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(sallyingMobilePartyId, out var sallyingParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
-            var siegeEvent = new SiegeEvent(settlement, besieger);
-            siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
-            siegeEvent.BesiegerCamp._leaderParty = besieger;
-            siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
+            CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
@@ -310,10 +303,7 @@ public class MapEventLifetimeTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(sallyingMobilePartyId, out var sallyingParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
-            var siegeEvent = new SiegeEvent(settlement, besieger);
-            siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
-            siegeEvent.BesiegerCamp._leaderParty = besieger;
-            siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
+            CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
@@ -420,10 +410,7 @@ public class MapEventLifetimeTests : MapEventTestBase
             besiegerHero.PartyBelongedTo = besieger;
             besieger.LordPartyComponent._leader = besiegerHero;
 
-            var siegeEvent = new SiegeEvent(settlement, besieger);
-            siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
-            siegeEvent.BesiegerCamp._leaderParty = besieger;
-            siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
+            CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
@@ -464,6 +451,18 @@ public class MapEventLifetimeTests : MapEventTestBase
     {
         dispatchedSiegeLeader = attackerParty;
         return false;
+    }
+
+    private static void CreateReplicableSiegeEvent(Settlement settlement, MobileParty besieger)
+    {
+        var siegeEvent = new SiegeEvent(settlement, besieger);
+        siegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Attacker, null);
+        settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Defender, null);
+        siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
+        siegeEvent.BesiegerCamp._leaderParty = besieger;
+        siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
     }
 
     [Fact]

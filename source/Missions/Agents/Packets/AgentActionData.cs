@@ -12,7 +12,6 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentActionData
     {
-
         internal const Agent.MovementControlFlag DefendMovementFlagsMask =
             Agent.MovementControlFlag.DefendMask | Agent.MovementControlFlag.DefendBlock;
 

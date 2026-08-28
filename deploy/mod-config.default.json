@@ -73,12 +73,6 @@
     // Toggle auto allocation of perks for members of player clans.
     "autoAllocateClanMemberPerks": false
   },
-  "network": {
-    // Total compressed movement payload this client may send and receive per second.
-    // These are local per-client limits; the dedicated server does not originate mission movement.
-    "movementOutgoingMiBPerSecond": 1.0,
-    "movementIncomingMiBPerSecond": 1.0,
-  },
   "modOptions": {
     // Total human troops initially allocated across both sides of a battle.
     // Valid range: 200-1000. Default is 1000.

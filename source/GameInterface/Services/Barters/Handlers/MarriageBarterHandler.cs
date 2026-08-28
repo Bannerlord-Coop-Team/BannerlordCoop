@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -43,7 +43,7 @@ internal sealed class MarriageBarterHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IRomanceAuthority romanceAuthority;
     private readonly ConversationPartyTracker conversationPartyTracker;
-    private readonly LocationConversationTracker locationConversationTracker;
+    private readonly ILocationConversationTracker locationConversationTracker;
     private readonly IBarterClientPresentation barterClientPresentation;
     private readonly ISendCoalescer sendCoalescer;
     private readonly Dictionary<NetPeer, MarriageAuthorization> authorizations =
@@ -56,7 +56,7 @@ internal sealed class MarriageBarterHandler : IHandler
         IPlayerManager playerManager,
         IRomanceAuthority romanceAuthority,
         ConversationPartyTracker conversationPartyTracker,
-        LocationConversationTracker locationConversationTracker,
+        ILocationConversationTracker locationConversationTracker,
         IBarterClientPresentation barterClientPresentation,
         ISendCoalescer sendCoalescer = null)
     {

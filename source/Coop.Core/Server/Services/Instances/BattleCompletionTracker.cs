@@ -59,7 +59,9 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         concludedState = BattleState.None;
         if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(controllerId) ||
             currentMembers == null ||
-            (battleState != BattleState.AttackerVictory && battleState != BattleState.DefenderVictory))
+            (battleState != BattleState.AttackerVictory
+             && battleState != BattleState.DefenderVictory
+             && battleState != BattleState.DefenderPullBack))
         {
             return false;
         }

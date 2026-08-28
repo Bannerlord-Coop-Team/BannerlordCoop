@@ -5,6 +5,7 @@ using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -21,6 +22,20 @@ namespace GameInterface.Services.Locations.Patches;
 [HarmonyPatch(typeof(HeroAgentSpawnCampaignBehavior))]
 internal class HeroAgentSpawnRosterPatches
 {
+    [HarmonyPatch(nameof(HeroAgentSpawnCampaignBehavior.OnSettlementEntered))]
+    [HarmonyPostfix]
+    static void OnSettlementEnteredPostfix(MobileParty mobileParty, Settlement settlement, Hero hero)
+    {
+        if (!ModInformation.IsServer || settlement == null) return;
+
+        Hero affectedHero = hero ?? mobileParty?.LeaderHero;
+        if (affectedHero == null) return;
+
+        MessageBroker.Instance.Publish(
+            null,
+            new SettlementRosterHeroesChanged(settlement, new[] { affectedHero }));
+    }
+
     [HarmonyPatch(nameof(HeroAgentSpawnCampaignBehavior.OnGovernorChanged))]
     [HarmonyPostfix]
     static void OnGovernorChangedPostfix(Town town, Hero oldGovernor, Hero newGovernor)
