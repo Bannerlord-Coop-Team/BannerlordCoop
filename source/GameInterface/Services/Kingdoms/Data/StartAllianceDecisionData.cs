@@ -32,47 +32,44 @@ namespace GameInterface.Services.Kingdoms.Data
         {
             proposerClan = null;
             kingdom = null;
-            if (!objectManager.TryGetObject(ProposerClanId, out proposerClan) ||
-                !TryGetDecisionKingdomReference(objectManager, out object kingdomReference))
+            if (!objectManager.TryGetObject(ProposerClanId, out proposerClan))
             {
                 return false;
             }
 
-            if (kingdomReference is Kingdom serializedKingdom)
+            if (TryGetDecisionKingdomReference(objectManager, out kingdom))
             {
-                kingdom = serializedKingdom;
                 return true;
             }
 
-            if (kingdomReference is not Clan serializedClan || serializedClan.Kingdom == null)
-            {
-                return false;
-            }
-
-            kingdom = serializedClan.Kingdom;
-            return true;
+            kingdom = proposerClan.Kingdom;
+            return kingdom != null;
         }
 
-        private bool TryGetDecisionKingdomReference(IObjectManager objectManager, out object kingdomReference)
+        private bool TryGetDecisionKingdomReference(IObjectManager objectManager, out Kingdom kingdom)
         {
-            if (objectManager.TryGetObject(KingdomId, out kingdomReference))
+            kingdom = null;
+            if (objectManager.TryGetObject(KingdomId, out object kingdomReference))
             {
-                return true;
+                return TryGetKingdomFromReference(kingdomReference, out kingdom);
             }
 
-            if (objectManager.TryGetObject(KingdomId, out Clan serializedClan))
+            if (objectManager.TryGetObject(KingdomId, out Clan compactClan))
             {
-                kingdomReference = serializedClan;
-                return true;
+                kingdom = compactClan.Kingdom;
+                return kingdom != null;
             }
 
-            if (objectManager.TryGetObject(KingdomId, out Kingdom serializedKingdom))
-            {
-                kingdomReference = serializedKingdom;
-                return true;
-            }
+            return objectManager.TryGetObject(KingdomId, out kingdom);
+        }
 
-            return false;
+        private static bool TryGetKingdomFromReference(object kingdomReference, out Kingdom kingdom)
+        {
+            kingdom = kingdomReference as Kingdom;
+            if (kingdom != null) return true;
+
+            kingdom = (kingdomReference as Clan)?.Kingdom;
+            return kingdom != null;
         }
 
         /// <inheritdoc/>

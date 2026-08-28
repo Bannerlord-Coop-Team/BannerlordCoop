@@ -416,10 +416,9 @@ public class ClientKingdomHandler : IHandler
 
     private bool TryGetDecisionKingdom(NetworkAddDecision payload, out Kingdom kingdom)
     {
-        if (payload.Data is StartAllianceDecisionData startAllianceDecisionData &&
-            startAllianceDecisionData.TryGetProposerClanAndDecisionKingdom(objectManager, out _, out kingdom))
+        if (payload.Data is StartAllianceDecisionData startAllianceDecisionData)
         {
-            return true;
+            return startAllianceDecisionData.TryGetProposerClanAndDecisionKingdom(objectManager, out _, out kingdom);
         }
 
         return objectManager.TryGetObject(payload.KingdomId, out kingdom);
