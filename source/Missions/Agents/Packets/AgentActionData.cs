@@ -12,6 +12,7 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentActionData
     {
+
         internal const Agent.MovementControlFlag DefendMovementFlagsMask =
             Agent.MovementControlFlag.DefendMask | Agent.MovementControlFlag.DefendBlock;
 
@@ -699,21 +700,56 @@ namespace Missions.Agents.Packets
         [ProtoMember(8)]
         public uint EventFlag { get; }
         [ProtoMember(9)]
-        public bool CrouchMode { get; }
+        public byte StateFlags { get; private set; }
         [ProtoMember(10)]
         public int GuardState { get; }
         [ProtoMember(11)]
         public int GuardPresentationChannel { get; }
-        [ProtoMember(12)]
-        public bool IsMounted { get; }
         [ProtoMember(13)]
         public int GuardActionChannel { get; }
-        [ProtoMember(14)]
-        public bool GuardActionIsDefending { get; }
-        [ProtoMember(15)]
-        public bool IsPlayerControlled { get; }
-        [ProtoMember(16)]
-        public bool GuardActionIsReaction { get; }
+        [ProtoIgnore]
+        public bool CrouchMode
+        {
+            get => HasFlag(1);
+            private set => SetFlag(1, value);
+        }
+        [ProtoIgnore]
+        public bool IsMounted
+        {
+            get => HasFlag(2);
+            private set => SetFlag(2, value);
+        }
+        [ProtoIgnore]
+        public bool GuardActionIsDefending
+        {
+            get => HasFlag(4);
+            private set => SetFlag(4, value);
+        }
+        [ProtoIgnore]
+        public bool IsPlayerControlled
+        {
+            get => HasFlag(8);
+            private set => SetFlag(8, value);
+        }
+        [ProtoIgnore]
+        public bool GuardActionIsReaction
+        {
+            get => HasFlag(16);
+            private set => SetFlag(16, value);
+        }
+
+        private bool HasFlag(byte flag) =>
+            (StateFlags & flag) != 0;
+
+        private void SetFlag(
+            byte flag,
+            bool enabled)
+        {
+            StateFlags = enabled
+                ? (byte)(StateFlags | flag)
+                : (byte)(StateFlags & ~flag);
+        }
+
         internal Agent.MovementControlFlag DefendFlags =>
             GetDefendMovementFlags((Agent.MovementControlFlag)MovementFlag);
         internal Agent.GuardMode GuardMode => FromWireGuardState(GuardState);
