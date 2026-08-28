@@ -1,9 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common.Messaging;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -25,6 +26,9 @@ namespace E2E.Tests.Services.MapEvents;
 /// </summary>
 public class IdempotentCleanupTests : MapEventTestBase
 {
+    private static bool failNextFinalizeEventAux;
+    private static int finalizeEventAuxAttempts;
+
     public IdempotentCleanupTests(ITestOutputHelper output) : base(output) { }
 
     /// <summary>
@@ -80,6 +84,64 @@ public class IdempotentCleanupTests : MapEventTestBase
             AssertPartyRosterUntouched(instance, eventB.AttackerPartyId, troopId, attackerBaseline[instance], 3);
             AssertPartyRosterUntouched(instance, eventB.DefenderPartyId, troopId, defenderBaseline[instance], 2);
         }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-091")]
+    public void FailureBeforeFinalizeEventAux_AllowsTheNextAttemptToFinalize()
+    {
+        var mapEventContext = CreateServerMapEvent();
+        var harmony = new Harmony($"{nameof(IdempotentCleanupTests)}.finalize-retry.{Guid.NewGuid():N}");
+
+        try
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(MapEvent), "FinalizeEventAux"),
+                prefix: new HarmonyMethod(
+                    typeof(IdempotentCleanupTests),
+                    nameof(FailFirstFinalizeEventAux))
+                {
+                    priority = Priority.First,
+                });
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+                var handler = Server.Resolve<BattleFinalizeHandler>();
+                var finalize = AccessTools.Method(typeof(BattleFinalizeHandler), "FinalizeAndCollectPlayers");
+
+                failNextFinalizeEventAux = true;
+                finalizeEventAuxAttempts = 0;
+                finalize.Invoke(handler, new object?[] { mapEvent, null });
+
+                Assert.False(mapEvent.IsFinalized);
+
+                finalize.Invoke(handler, new object?[] { mapEvent, null });
+
+                Assert.True(mapEvent.IsFinalized);
+                Assert.Equal(2, finalizeEventAuxAttempts);
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            failNextFinalizeEventAux = false;
+            finalizeEventAuxAttempts = 0;
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+        AssertMapEventRemoved(Server, mapEventContext.MapEventId);
+        foreach (var client in Clients)
+            AssertMapEventRemoved(client, mapEventContext.MapEventId);
+    }
+
+    private static void FailFirstFinalizeEventAux()
+    {
+        finalizeEventAuxAttempts++;
+        if (!failNextFinalizeEventAux)
+            return;
+
+        failNextFinalizeEventAux = false;
+        throw new InvalidOperationException("failure before FinalizeEventAux");
     }
 
     private static int GetPartyManCount(EnvironmentInstance instance, string partyId)

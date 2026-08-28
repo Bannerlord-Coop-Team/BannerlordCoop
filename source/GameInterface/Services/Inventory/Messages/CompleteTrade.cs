@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Inventory.Data;
-using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using System.Collections.Generic;
 using TaleWorlds.Core;
@@ -50,11 +49,6 @@ internal readonly struct CompleteTrade : ICommand
     [ProtoMember(19)]
     public readonly (ItemRosterElementData, int)[] SoldItems;
 
-    [ProtoMember(20)]
-    public readonly string TroopRosterId;
-    [ProtoMember(21)]
-    public readonly TroopRosterData TroopRosterData;
-
     public CompleteTrade(
         string fromItemRosterId,
         bool isFromItemRosterNull,
@@ -74,9 +68,7 @@ internal readonly struct CompleteTrade : ICommand
         bool isSettlementComponentNull,
         string currentSettlementComponentId,
         (ItemRosterElementData, int)[] boughtItems,
-        (ItemRosterElementData, int)[] soldItems,
-        string troopRosterId,
-        TroopRosterData troopRosterData)
+        (ItemRosterElementData, int)[] soldItems)
     {
         FromItemRosterId = fromItemRosterId;
         IsFromItemRosterNull = isFromItemRosterNull;
@@ -97,7 +89,5 @@ internal readonly struct CompleteTrade : ICommand
         CurrentSettlementComponentId = currentSettlementComponentId;
         BoughtItems = boughtItems;
         SoldItems = soldItems;
-        TroopRosterId = troopRosterId;
-        TroopRosterData = troopRosterData;
     }
 }

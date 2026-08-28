@@ -2,6 +2,7 @@
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -67,6 +68,16 @@ internal class PlayerDebugCommands
 
         string mapEventId = party.MapEvent?.StringId ?? "none";
         bool hasVisual = party.Party.GetPartyVisual() != null;
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            controllerId = player.ControllerId,
+            partyId = player.MobilePartyId,
+            partyStringId = party.StringId,
+            connected = playerManager.IsConnected(player),
+            active = party.IsActive,
+            mapEvent = mapEventId,
+            visual = hasVisual,
+        });
 
         return
             $"controller={player.ControllerId}|" +
@@ -74,7 +85,8 @@ internal class PlayerDebugCommands
             $"connected={playerManager.IsConnected(player)}|" +
             $"active={party.IsActive}|" +
             $"mapEvent={mapEventId}|" +
-            $"visual={hasVisual}";
+            $"visual={hasVisual}" +
+            $"\nLIVE_TEST_JSON={structuredState}";
     }
 
     /// <summary>

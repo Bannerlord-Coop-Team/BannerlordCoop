@@ -43,6 +43,14 @@ internal class SiegeEventCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnPeaceDeclaredPrefix() => ModInformation.IsClient;
 
+    [HarmonyPatch(nameof(SiegeEventCampaignBehavior.SyncData))]
+    [HarmonyPostfix]
+    private static void SyncDataPostfix(IDataStore dataStore)
+    {
+        if (ContainerProvider.TryResolve<IAiSiegeTerminalPolicy>(out var terminalPolicy))
+            terminalPolicy.SyncData(dataStore);
+    }
+
     // Vanilla only reacts to MobileParty.MainParty leaving the besieged settlement, which never
     // matches on the dedicated host; re-derive the trigger as "a player-led party left".
     [HarmonyPatch(nameof(SiegeEventCampaignBehavior.OnSettlementLeft))]
@@ -95,5 +103,19 @@ internal class SiegeEventCampaignBehaviorPatches
 
         siegeEvent.GetSiegeEventSide(side).SetSiegeStrategy(strategy);
         return false;
+    }
+}
+
+// Retry on an hourly campaign turn, after any map-event teardown that deferred the decision has completed.
+[HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
+internal class AiSiegeTerminalRetryPatches
+{
+    [HarmonyPostfix]
+    private static void HourlyTickPostfix()
+    {
+        if (ModInformation.IsClient) return;
+        if (!ContainerProvider.TryResolve<IAiSiegeTerminalPolicy>(out var terminalPolicy)) return;
+
+        terminalPolicy.RetryDeferredTransitions();
     }
 }

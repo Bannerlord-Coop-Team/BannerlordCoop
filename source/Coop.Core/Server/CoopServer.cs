@@ -64,7 +64,9 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ISendCoalescer coalescer,
         ICommonSerializer serializer,
-        CancellationTokenSource sessionCancellation) : base(configuration, serializer, sessionCancellation)
+        IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
+        CancellationTokenSource sessionCancellation)
+        : base(configuration, serializer, reliableMessageBatcher, sessionCancellation)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;

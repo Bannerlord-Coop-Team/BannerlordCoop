@@ -324,8 +324,9 @@ internal class BattleHostHandler : IHandler
             return;
 
         var result = payload.What;
-        if (result.BattleState != BattleState.AttackerVictory &&
-            result.BattleState != BattleState.DefenderVictory)
+        if (result.BattleState != BattleState.AttackerVictory
+            && result.BattleState != BattleState.DefenderVictory
+            && result.BattleState != BattleState.DefenderPullBack)
         {
             return;
         }
@@ -391,7 +392,7 @@ internal class BattleHostHandler : IHandler
     {
         if (receiver == null) return;
         long allocationRevision = ++reserveSnapshotRevision;
-        int battleSize = battleSizeProvider.GetBattleSize(mapEvent);
+        int battleSize = battleSizeProvider.GetBattleSize();
         foreach (var sideReserve in reserves)
             network.Send(receiver, new NetworkBattleTroopReserve(
                 mapEventId, (int)sideReserve.Side, sideReserve.Parties, sideReserve.TotalTroops,
@@ -881,14 +882,17 @@ internal class BattleHostHandler : IHandler
             message.Epoch,
             string.Join(", ", assignment.SuccessorControllerIds));
 
-        // Migration: the host changed and it is now us — adopt the previous host's orphaned agents so the
-        // battle continues uninterrupted (the controller does the actual adoption with the live mission).
-        if (previousHost != null
-            && previousHost != message.HostControllerId
-            && isLocalHost)
+        // Every peer advances each affected agent from its own canonical authority revision. Only the
+        // promoted peer revives the adopted AI.
+        if (previousHost != null && previousHost != message.HostControllerId)
         {
-            Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
-            messageBroker.Publish(this, new BattleHostMigrated(message.MapEventId, previousHost));
+            messageBroker.Publish(this, new BattleHostMigrated(
+                message.MapEventId,
+                previousHost,
+                message.HostControllerId));
+
+            if (isLocalHost)
+                Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
         }
     }
 
@@ -1027,8 +1031,9 @@ internal class BattleHostHandler : IHandler
         hostRegistry.Set(mapEventId, assignment);
         network.SendAll(ToMessage(mapEventId, assignment));
         if (battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) &&
-            (runtimeState.ResolvedState == BattleState.AttackerVictory ||
-             runtimeState.ResolvedState == BattleState.DefenderVictory))
+            (runtimeState.ResolvedState == BattleState.AttackerVictory
+             || runtimeState.ResolvedState == BattleState.DefenderVictory
+             || runtimeState.ResolvedState == BattleState.DefenderPullBack))
         {
             BroadcastResolvedState(mapEventId, assignment, runtimeState.ResolvedState);
         }

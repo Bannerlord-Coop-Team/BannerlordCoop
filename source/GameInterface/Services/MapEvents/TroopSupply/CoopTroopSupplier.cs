@@ -36,6 +36,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         private readonly int playerOwnedPartyCount;
         private readonly bool ownsReceiverPlayerParty;
         private readonly int receiverPlayerRank;
+        private readonly bool hasPlayerOwnedPartiesBefore;
+        private readonly int[] supplyOrders;
 
         public long Revision { get; }
         public int BattleSize { get; }
@@ -46,7 +48,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         internal AllocationSnapshot(long revision, int battleSize, int sideTotalTroops, int totalTroops,
             int suppliedTroops,
             int playerOwnedPartyCount, bool ownsReceiverPlayerParty, int receiverPlayerRank,
-            int[] partyOffsets, int[] partyCounts)
+            bool hasPlayerOwnedPartiesBefore,
+            int[] partyOffsets, int[] partyCounts, int[] supplyOrders)
         {
             Revision = revision;
             BattleSize = battleSize;
@@ -56,8 +59,10 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             this.playerOwnedPartyCount = playerOwnedPartyCount;
             this.ownsReceiverPlayerParty = ownsReceiverPlayerParty;
             this.receiverPlayerRank = receiverPlayerRank;
+            this.hasPlayerOwnedPartiesBefore = hasPlayerOwnedPartiesBefore;
             this.partyOffsets = partyOffsets;
             this.partyCounts = partyCounts;
+            this.supplyOrders = supplyOrders;
         }
 
         public int OwnedShareOf(int sideAllocation)
@@ -66,6 +71,15 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
             int total = SideTotalTroops;
             if (total <= 0) return 0;
+            sideAllocation = Math.Min(sideAllocation, total);
+            if (supplyOrders != null)
+            {
+                int rankedShare = 0;
+                foreach (int supplyOrder in supplyOrders)
+                    if (supplyOrder > 0 && supplyOrder <= sideAllocation)
+                        rankedShare++;
+                return rankedShare;
+            }
             if (TotalTroops >= total) return sideAllocation;
 
             if (playerOwnedPartyCount > 0)
@@ -73,9 +87,14 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 if (sideAllocation < playerOwnedPartyCount)
                     return receiverPlayerRank >= 0 && receiverPlayerRank < sideAllocation ? 1 : 0;
 
-                int share = ApportionByInterval(sideAllocation - playerOwnedPartyCount, total);
+                int apportionmentTotal = hasPlayerOwnedPartiesBefore
+                    ? Math.Max(0, total - playerOwnedPartyCount)
+                    : total;
+                int share = ApportionByInterval(sideAllocation - playerOwnedPartyCount, apportionmentTotal);
                 if (ownsReceiverPlayerParty) share += 1;
-                return Math.Min(share, sideAllocation);
+                return hasPlayerOwnedPartiesBefore
+                    ? Math.Min(share, Math.Min(sideAllocation, TotalTroops))
+                    : Math.Min(share, sideAllocation);
             }
 
             return Math.Min(ApportionByInterval(sideAllocation, total), sideAllocation);
@@ -111,6 +130,10 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         public int SideOffset;
         /// <summary>Its position among the side's player-owned parties, or -1; see <see cref="PartyReserve.PlayerOwnedRank"/>.</summary>
         public int PlayerOwnedRank;
+        /// <summary>Player-owned parties before this party in the complete side order.</summary>
+        public int PlayerOwnedPartiesBefore;
+        /// <summary>Whether the sender supplied the guaranteed-slot offset metadata.</summary>
+        public bool HasPlayerOwnedPartiesBefore;
     }
 
     private readonly object gate = new object();
@@ -125,6 +148,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private long allocationRevision;
     private int battleSize;
     private int reserveRevision;
+    private bool usesSupplyOrder;
     private int numWounded, numKilled, numRouted;
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
     // objects without hitting the service locator each call. Null only in tests that don't exercise that path.
@@ -195,6 +219,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                         Supplied = supplied,
                         SideOffset = party.SideOffset,
                         PlayerOwnedRank = party.PlayerOwnedRank,
+                        PlayerOwnedPartiesBefore = party.PlayerOwnedPartiesBefore,
+                        HasPlayerOwnedPartiesBefore = party.HasPlayerOwnedPartiesBefore,
                     };
                     // Allocate this client's own party first. Otherwise an army's AI parties can fill the
                     // render cap before the local hero is reserved, leaving deployment without a player agent.
@@ -208,6 +234,19 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                         seedToPartyId[entry.Seed] = party.PartyId;
                 }
             }
+            usesSupplyOrder = false;
+            bool foundEntry = false;
+            bool allEntriesRanked = true;
+            foreach (var party in parties)
+            {
+                foreach (var entry in party.Entries)
+                {
+                    foundEntry = true;
+                    if (entry.SupplyOrder <= 0)
+                        allEntriesRanked = false;
+                }
+            }
+            usesSupplyOrder = foundEntry && allEntriesRanked;
             populated = true;
             reserveRevision++;
 
@@ -256,17 +295,34 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             int receiverPlayerRank = -1;
             var partyOffsets = new int[parties.Count];
             var partyCounts = new int[parties.Count];
+            bool hasGuaranteedSlotOffsets = true;
+            foreach (var party in parties)
+                hasGuaranteedSlotOffsets &= party.HasPlayerOwnedPartiesBefore;
             for (int i = 0; i < parties.Count; i++)
             {
                 var party = parties[i];
                 int count = party.Entries.Length;
-                partyOffsets[i] = party.SideOffset;
-                partyCounts[i] = count;
+                partyOffsets[i] = hasGuaranteedSlotOffsets
+                    ? Math.Max(0, party.SideOffset - party.PlayerOwnedPartiesBefore)
+                    : party.SideOffset;
+                partyCounts[i] = hasGuaranteedSlotOffsets
+                    ? Math.Max(0, count - (party.PlayerOwnedRank >= 0 ? 1 : 0))
+                    : count;
                 total += count;
                 supplied += party.Supplied;
                 if (party.PartyId != playerPartyId) continue;
 
                 receiverPlayerRank = party.PlayerOwnedRank;
+            }
+
+            int[] ownedSupplyOrders = null;
+            if (usesSupplyOrder)
+            {
+                ownedSupplyOrders = new int[total];
+                int supplyOrderIndex = 0;
+                foreach (var party in parties)
+                    foreach (var entry in party.Entries)
+                        ownedSupplyOrders[supplyOrderIndex++] = entry.SupplyOrder;
             }
 
             return new AllocationSnapshot(
@@ -278,8 +334,10 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 playerOwnedPartyCount,
                 playerPartyId != null,
                 receiverPlayerRank,
+                hasGuaranteedSlotOffsets,
                 partyOffsets,
-                partyCounts);
+                partyCounts,
+                ownedSupplyOrders);
         }
     }
 
@@ -306,6 +364,48 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             return 0;
         }
     }
+
+#if DEBUG
+    /// <summary>Runs a debug allocation decision while reserve refreshes are blocked.</summary>
+    internal TResult WithSupplyPreview<TResult>(
+        int numberToAllocate,
+        Func<List<IAgentOriginBase>, TResult> action)
+    {
+        if (action == null) throw new ArgumentNullException(nameof(action));
+
+        var origins = new List<IAgentOriginBase>();
+        lock (gate)
+        {
+            if (numberToAllocate > 0)
+            {
+                int slotBudget = agentBudget != null
+                    ? agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current))
+                    : int.MaxValue;
+                int allocated = 0;
+                var previewPointers = new int[parties.Count];
+                for (int i = 0; i < parties.Count; i++)
+                    previewPointers[i] = parties[i].Supplied;
+
+                while (allocated < numberToAllocate)
+                {
+                    int partyIndex = GetNextPartyIndex(previewPointers);
+                    if (partyIndex < 0) break;
+
+                    var party = parties[partyIndex];
+                    var origin = CreateOrigin(party.Entries[previewPointers[partyIndex]], party.PartyId);
+                    int slots = SlotsForOrigin(origin);
+                    if (slots > slotBudget) return action(origins);
+
+                    previewPointers[partyIndex]++;
+                    allocated++;
+                    slotBudget -= slots;
+                    if (origin != null) origins.Add(origin);
+                }
+            }
+            return action(origins);
+        }
+    }
+#endif
 
     /// <summary>Whether this authoritative reserve snapshot still contains a party.</summary>
     public bool ContainsParty(string partyId)
@@ -450,23 +550,21 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         int supplied = 0;
         lock (gate)
         {
-            bool stop = false;
-            foreach (var party in parties)
+            while (supplied < numberToAllocate)
             {
-                while (!stop && supplied < numberToAllocate && party.Supplied < party.Entries.Length)
-                {
-                    var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
-                    int slots = SlotsForOrigin(origin);
-                    // Stop rather than skip: the supplied pointer advances sequentially, so a troop that does
-                    // not fit now must remain unsupplied (wave-eligible) instead of being jumped over.
-                    if (slots > slotBudget) { stop = true; break; }
+                var party = GetNextPartyWithRemaining();
+                if (party == null) break;
 
-                    party.Supplied++;
-                    supplied++;
-                    slotBudget -= slots;
-                    if (origin != null) origins.Add(origin);
-                }
-                if (stop || supplied >= numberToAllocate) break;
+                var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
+                int slots = SlotsForOrigin(origin);
+                // Stop rather than skip: the supplied pointer advances sequentially, so a troop that does
+                // not fit now must remain unsupplied (wave-eligible) instead of being jumped over.
+                if (slots > slotBudget) break;
+
+                party.Supplied++;
+                supplied++;
+                slotBudget -= slots;
+                if (origin != null) origins.Add(origin);
             }
         }
         Logger.Information("[TroopSupply] {MapEvent} side {Side}: SupplyTroops({Req}) -> {Ret} origins ({Withheld} withheld at the engine agent limit), {Remaining} remaining",
@@ -487,17 +585,48 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     {
         lock (gate)
         {
-            foreach (var party in parties)
-            {
-                if (party.Supplied < party.Entries.Length)
-                {
-                    var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
-                    party.Supplied++;
-                    return origin;
-                }
-            }
-            return null;
+            var party = GetNextPartyWithRemaining();
+            if (party == null) return null;
+
+            var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
+            party.Supplied++;
+            return origin;
         }
+    }
+
+    private PartyState GetNextPartyWithRemaining()
+    {
+        PartyState next = null;
+        int nextOrder = int.MaxValue;
+        foreach (var party in parties)
+        {
+            if (party.Supplied >= party.Entries.Length) continue;
+            if (!usesSupplyOrder) return party;
+
+            int supplyOrder = party.Entries[party.Supplied].SupplyOrder;
+            if (supplyOrder >= nextOrder) continue;
+            next = party;
+            nextOrder = supplyOrder;
+        }
+        return next;
+    }
+
+    private int GetNextPartyIndex(int[] pointers)
+    {
+        int nextIndex = -1;
+        int nextOrder = int.MaxValue;
+        for (int i = 0; i < parties.Count; i++)
+        {
+            var party = parties[i];
+            if (pointers[i] >= party.Entries.Length) continue;
+            if (!usesSupplyOrder) return i;
+
+            int supplyOrder = party.Entries[pointers[i]].SupplyOrder;
+            if (supplyOrder >= nextOrder) continue;
+            nextIndex = i;
+            nextOrder = supplyOrder;
+        }
+        return nextIndex;
     }
 
     /// <summary>Supply the next remaining troop from one party without consuming any other party.</summary>
@@ -523,12 +652,16 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         var origins = new List<IAgentOriginBase>();
         lock (gate)
         {
-            foreach (var party in parties)
-                foreach (var entry in party.Entries)
-                {
-                    var origin = CreateOrigin(entry, party.PartyId);
-                    if (origin != null) origins.Add(origin);
-                }
+            var pointers = new int[parties.Count];
+            while (true)
+            {
+                int partyIndex = GetNextPartyIndex(pointers);
+                if (partyIndex < 0) break;
+
+                var party = parties[partyIndex];
+                var origin = CreateOrigin(party.Entries[pointers[partyIndex]++], party.PartyId);
+                if (origin != null) origins.Add(origin);
+            }
         }
         return origins;
     }

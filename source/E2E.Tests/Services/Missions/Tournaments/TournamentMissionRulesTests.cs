@@ -3,6 +3,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using Missions;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
@@ -344,6 +345,7 @@ public class TournamentMissionRulesTests
             typeof(HighlightsController),
             typeof(SandboxHighlightsController),
             typeof(MissionMapTimeView),
+            typeof(PlayerNameplateMissionView),
             typeof(CoopTournamentController)
         }, CoopTournamentLauncher.BehaviorOrder);
     }
@@ -393,5 +395,34 @@ public class TournamentMissionRulesTests
         Assert.Equal(
             collisionData.CollisionResult,
             recordedCollision);
+    }
+
+    [Fact]
+    public void OnEndMissionRequest_BlocksVanillaProgressionWhileActive()
+    {
+        var controller =
+            ObjectHelper.SkipConstructor<
+                CoopTournamentFightMissionController>();
+
+        Assert.Null(controller.OnEndMissionRequest(out var defaultCanLeave));
+        Assert.False(defaultCanLeave);
+
+        controller.SetLeaveAllowedProvider(() => false);
+        Assert.Null(controller.OnEndMissionRequest(out var activeCanLeave));
+        Assert.False(activeCanLeave);
+    }
+
+    [Fact]
+    public void OnEndMissionRequest_AllowsLeaveOnceCompleted()
+    {
+        var controller =
+            ObjectHelper.SkipConstructor<
+                CoopTournamentFightMissionController>();
+        controller.SetLeaveAllowedProvider(() => true);
+
+        InquiryData inquiry = controller.OnEndMissionRequest(out var canLeave);
+
+        Assert.Null(inquiry);
+        Assert.True(canLeave);
     }
 }

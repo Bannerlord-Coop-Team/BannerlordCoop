@@ -42,14 +42,17 @@ namespace GameInterface.Services.Kingdoms.Data
             }
 
             List<PolicyObject> kingdomPolicies = new List<PolicyObject>();
-            foreach (string policyObjectId in KingdomPolicies)
+            if (KingdomPolicies != null)
             {
-                if (!objectManager.TryGetObject(policyObjectId, out PolicyObject kingdomPolicy))
+                foreach (string policyObjectId in KingdomPolicies)
                 {
-                    kingdomDecision = null;
-                    return false;
+                    if (!objectManager.TryGetObject(policyObjectId, out PolicyObject kingdomPolicy))
+                    {
+                        kingdomDecision = null;
+                        return false;
+                    }
+                    kingdomPolicies.Add(kingdomPolicy);
                 }
-                kingdomPolicies.Add(kingdomPolicy);
             }
 
             KingdomPolicyDecision kingdomPolicyDecision = (KingdomPolicyDecision)FormatterServices.GetUninitializedObject(typeof(KingdomPolicyDecision));

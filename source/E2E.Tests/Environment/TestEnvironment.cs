@@ -30,7 +30,8 @@ public class TestEnvironment
     public IContainer Container => container;
 
     private readonly TestNetworkRouter networkOrchestrator = new();
-    private readonly MeshNetworkRouter meshOrchestrator = new();
+    private readonly VirtualNetworkScheduler meshScheduler = new();
+    private readonly MeshNetworkRouter meshOrchestrator;
 
     private readonly bool registerGameInterface;
 
@@ -41,6 +42,7 @@ public class TestEnvironment
     public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false)
     {
         this.registerGameInterface = registerGameInterface;
+        meshOrchestrator = new MeshNetworkRouter(meshScheduler);
 
         Server = CreateServer(output);
 
@@ -109,6 +111,10 @@ public class TestEnvironment
         }
 
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
+        builder.RegisterInstance(meshScheduler)
+            .AsSelf()
+            .As<IVirtualNetworkScheduler>()
+            .SingleInstance();
         builder.RegisterType<MockAgentVisualActionAccessor>()
             .As<IAgentVisualActionAccessor>()
             .InstancePerDependency();
@@ -135,7 +141,7 @@ public class TestEnvironment
             this.battleSize = battleSize;
         }
 
-        public int GetBattleSize(TaleWorlds.CampaignSystem.MapEvents.MapEvent mapEvent) => battleSize;
+        public int GetBattleSize() => battleSize;
     }
 }
 

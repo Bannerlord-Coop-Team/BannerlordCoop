@@ -1,4 +1,4 @@
-using GameInterface.Services.Locations.Messages;
+﻿using GameInterface.Services.Locations.Messages;
 using GameInterface.Surrogates;
 using Missions.Locations;
 using Missions.Messages;
@@ -42,6 +42,7 @@ public sealed class LocationAgentSpawnBatchCodecTests
         Assert.Equal(records.Select(record => record.AgentId), decoded.Select(record => record.AgentId));
         Assert.Equal(records.Select(record => record.CharacterId), decoded.Select(record => record.CharacterId));
         Assert.Equal(records.Select(record => record.Kind), decoded.Select(record => record.Kind));
+        Assert.Equal(records.Select(record => record.AuthorityRevision), decoded.Select(record => record.AuthorityRevision));
     }
 
     [Fact]
@@ -175,7 +176,8 @@ public sealed class LocationAgentSpawnBatchCodecTests
                 currentEquipment: null,
                 rosterEntry: new LocationCharacterData(
                     "settlement1_center", "townsman_empire", null, null,
-                    "npc_common", null, null, 0, false, true));
+                    "npc_common", null, null, 0, false, true),
+                authorityRevision: i + 4);
         }
         return records;
     }

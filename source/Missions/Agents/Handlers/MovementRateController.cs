@@ -282,7 +282,9 @@ public sealed class MovementRateController : IMovementRateController
             Stopwatch.Frequency,
             ReadFrameLimitHz,
             enableHeartbeat: true,
-            networkSettings: new MovementNetworkSettings(1d, 1d))
+            networkSettings: new MovementNetworkSettings(
+                MovementNetworkSettings.DefaultMiBPerSecond,
+                MovementNetworkSettings.DefaultMiBPerSecond))
     {
     }
 
@@ -308,7 +310,9 @@ public sealed class MovementRateController : IMovementRateController
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.missionContext = missionContext;
-        this.networkSettings = networkSettings ?? new MovementNetworkSettings(1d, 1d);
+        this.networkSettings = networkSettings ?? new MovementNetworkSettings(
+            MovementNetworkSettings.DefaultMiBPerSecond,
+            MovementNetworkSettings.DefaultMiBPerSecond);
         this.timestampProvider = timestampProvider;
         this.timestampFrequency = timestampFrequency;
         this.frameLimitProvider = frameLimitProvider;
@@ -484,16 +488,16 @@ public sealed class MovementRateController : IMovementRateController
     public double GetReceiverIncomingBytesPerSecond(string controllerId)
     {
         if (string.IsNullOrEmpty(controllerId))
-            return MovementNetworkSettings.BytesPerMiB;
+            return MovementNetworkSettings.DefaultBytesPerSecond;
 
         lock (gate)
         {
-            if (disposed) return MovementNetworkSettings.BytesPerMiB;
+            if (disposed) return MovementNetworkSettings.DefaultBytesPerSecond;
 
             PruneExpiredReceiverCaps();
             return receiverCaps.TryGetValue(controllerId, out ReceiverCapEntry receiverCap)
                 ? NormalizeIncomingByteRate(receiverCap.MaximumIncomingBytesPerSecond)
-                : MovementNetworkSettings.BytesPerMiB;
+                : MovementNetworkSettings.DefaultBytesPerSecond;
         }
     }
 

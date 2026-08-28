@@ -1,11 +1,13 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Utils.Commands;
+using Newtonsoft.Json;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -66,6 +68,65 @@ public class HeroDebugCommand
     {
         return string.IsNullOrEmpty(prefix) ||
                heroName?.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    [CommandLineArgumentFunction("home_settlement_snapshot", "coop.debug.hero")]
+    public static string HomeSettlementSnapshot(List<string> args)
+    {
+        if (args.Count != 1 || !bool.TryParse(args[0], out bool resolveMissing))
+            return "Usage: coop.debug.hero.home_settlement_snapshot <true|false>";
+
+        if (Campaign.Current == null)
+            return "Campaign is not loaded.";
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return $"Unable to get {nameof(IObjectManager)}";
+
+        var homeSettlements = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        int cacheMissesBeforeRead = 0;
+        int nullCount = 0;
+        int unregisteredSettlementCount = 0;
+
+        foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes())
+        {
+            if (!objectManager.TryGetId(hero, out string heroId)) continue;
+
+            if (hero._homeSettlement == null) cacheMissesBeforeRead++;
+            var homeSettlement = resolveMissing ? hero.HomeSettlement : hero._homeSettlement;
+            if (homeSettlement == null)
+            {
+                homeSettlements.Add(heroId, null);
+                nullCount++;
+                continue;
+            }
+
+            if (objectManager.TryGetId(homeSettlement, out string settlementId))
+            {
+                homeSettlements.Add(heroId, settlementId);
+            }
+            else
+            {
+                homeSettlements.Add(heroId, $"unregistered:{homeSettlement.StringId}");
+                unregisteredSettlementCount++;
+            }
+        }
+
+        string role = ModInformation.IsServer ? "server" : "client";
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            role,
+            resolveMissing,
+            heroCount = homeSettlements.Count,
+            cacheMissesBeforeRead,
+            nullCount,
+            unregisteredSettlementCount,
+            homeSettlements,
+        });
+
+        return $"role={role} resolveMissing={resolveMissing} heroCount={homeSettlements.Count} " +
+               $"cacheMissesBeforeRead={cacheMissesBeforeRead} nullCount={nullCount} " +
+               $"unregisteredSettlementCount={unregisteredSettlementCount}" + Environment.NewLine +
+               $"LIVE_TEST_JSON={structuredState}";
     }
 
     [CommandLineArgumentFunction("id", "coop.debug.hero")]
@@ -193,23 +254,39 @@ public class HeroDebugCommand
         return auditor.Audit();
     }
 
-    [CommandLineArgumentFunction("change", "coop.debug.hero")]
-    public static string ChangeTimeStamp(List<string> args)
+    [CommandLineArgumentFunction("add_power", "coop.debug.hero")]
+    public static string AddPower(List<string> args)
     {
-        Hero hero = Hero.MainHero;
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.add_power"))
+        {
+            return error;
+        }
 
-        hero.AddPower(66);
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.add_power <heroId> <power>";
+        }
 
-        return "Updated to " + hero._power;
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+        if (int.TryParse(args[1], out int power) == false)
+        {
+            return $"{args[1]} is not a valid integer";
+        }
+
+        hero.AddPower(power);
+
+        return $"Hero power changed to: {hero.Power}";
     }
 
-    [CommandLineArgumentFunction("getChange", "coop.debug.hero")]
-    public static string GetTimeStamp(List<string> args)
-    {
-        Hero hero = Hero.FindFirst(x => x._power == 66);
-
-        return hero.Name.Value;
-    }
     [CommandLineArgumentFunction("SetGold", "coop.debug.hero")]
     public static string SetGold(List<string> args)
     {
@@ -388,6 +465,11 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("set_hitpoints", "coop.debug.hero")]
     public static string SetHeroHitPoints(List<string> args)
     {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_hitpoints"))
+        {
+            return error;
+        }
+
         if (args.Count != 2)
         {
             return "Usage: coop.debug.hero.set_hitpoints <heroId> <hitPoints>";
@@ -421,6 +503,11 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("set_banneritem", "coop.debug.hero")]
     public static string SetHeroBannerItem(List<string> args)
     {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_banneritem"))
+        {
+            return error;
+        }
+
         if (args.Count != 2)
         {
             return "Usage: coop.debug.hero.set_banneritem <heroId> <bannerItem>";
@@ -523,6 +610,11 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("set_issue", "coop.debug.hero")]
     public static string SetHeroIssue(List<string> args)
     {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_issue"))
+        {
+            return error;
+        } 
+
         if (args.Count != 2)
         {
             return "Usage: coop.debug.hero.set_issue <heroId> <issueId>";
