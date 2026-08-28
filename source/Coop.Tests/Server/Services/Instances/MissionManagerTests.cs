@@ -121,6 +121,57 @@ public class MissionManagerTests
     }
 
     [Fact]
+    public void OldMembershipPunchNewThenEnterNewRetainsNewPunchEndpoint()
+    {
+        var manager = new MissionManager();
+        var peer = CreatePeer(1);
+        var netManager = new NetManager(null);
+        var internalEndpoint = new IPEndPoint(IPAddress.Loopback, 53009);
+        var externalEndpoint = new IPEndPoint(IPAddress.Loopback, 53010);
+
+        Assert.True(manager.TryEnterMission(peer, "moving", "old-instance", out _));
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            internalEndpoint,
+            externalEndpoint,
+            "moving%new-instance");
+
+        Assert.True(manager.TryEnterMission(peer, "moving", "new-instance", out var entry));
+
+        Assert.Equal("old-instance", Assert.Single(entry.PreviousDepartures).InstanceId);
+        MissionInstance.Endpoints endpoint = Assert.Single(
+            GetInstance(manager, "new-instance").PunchEndpoints);
+        Assert.Equal("moving", endpoint.ControllerId);
+        Assert.Equal(internalEndpoint, endpoint.Internal);
+        Assert.Equal(externalEndpoint, endpoint.External);
+    }
+
+    [Fact]
+    public void OldMembershipPunchNewThenGracefulLeaveRetainsNewPunchEndpoint()
+    {
+        var manager = new MissionManager();
+        var peer = CreatePeer(1);
+        var netManager = new NetManager(null);
+        var internalEndpoint = new IPEndPoint(IPAddress.Loopback, 53011);
+        var externalEndpoint = new IPEndPoint(IPAddress.Loopback, 53012);
+
+        Assert.True(manager.TryEnterMission(peer, "moving", "old-instance", out _));
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            internalEndpoint,
+            externalEndpoint,
+            "moving%new-instance");
+
+        Assert.True(manager.TryLeaveMission(peer, "moving", "old-instance", out _));
+
+        MissionInstance.Endpoints endpoint = Assert.Single(
+            GetInstance(manager, "new-instance").PunchEndpoints);
+        Assert.Equal("moving", endpoint.ControllerId);
+        Assert.Equal(internalEndpoint, endpoint.Internal);
+        Assert.Equal(externalEndpoint, endpoint.External);
+    }
+
+    [Fact]
     public void RepunchReplacesEarlierEndpointForController()
     {
         var manager = new MissionManager();

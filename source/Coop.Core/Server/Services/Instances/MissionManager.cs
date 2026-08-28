@@ -376,7 +376,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             var departures = new List<MissionDeparture>(staleMemberships.Count);
             foreach (var membership in staleMemberships)
             {
-                var departure = RemoveMembership(membership);
+                var departure = RemoveMembership(membership, isDisconnect: true);
                 departures.Add(departure);
                 Logger.Information("Controller {Controller} disconnected from instance {Instance}",
                     departure.ControllerId, departure.InstanceId);
@@ -533,10 +533,14 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     }
 
     // Snapshot the (controllerId, peer) pairs still routed through the instance. Caller holds the lock.
-    private MissionDeparture RemoveMembership(MissionMembership membership)
+    private MissionDeparture RemoveMembership(MissionMembership membership, bool isDisconnect = false)
     {
         membership.Instance.Memberships.Remove(membership);
-        RemoveControllerEndpointEverywhere(membership.ControllerId);
+        if (isDisconnect)
+            RemoveControllerEndpointEverywhere(membership.ControllerId);
+        else
+            membership.Instance.PunchEndpoints.RemoveAll(e => e.ControllerId == membership.ControllerId);
+
         if (byPeer.TryGetValue(membership.Peer, out var peerMembership) &&
             ReferenceEquals(peerMembership, membership))
         {
