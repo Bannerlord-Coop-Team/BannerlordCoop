@@ -70,6 +70,9 @@ public class MissionModule : Module
         builder.RegisterType<BattleAgentSpawnBatchCodec>()
             .As<IBattleAgentSpawnBatchCodec>()
             .InstancePerDependency();
+        builder.RegisterType<BattleDamageDataMapper>()
+            .As<IBattleDamageDataMapper>()
+            .InstancePerDependency();
         builder.RegisterType<MissionWeaponDataMapper>()
             .As<IMissionWeaponDataMapper>()
             .InstancePerDependency();

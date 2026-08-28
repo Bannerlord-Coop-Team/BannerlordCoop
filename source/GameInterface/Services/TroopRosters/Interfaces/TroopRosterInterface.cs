@@ -9,7 +9,6 @@ using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -208,6 +207,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
                 long finalNumber = current.number + elementData.Number;
                 long finalWounded = current.wounded + elementData.WoundedNumber;
                 long finalXp = current.xp + elementData.Xp;
+
                 if (finalNumber < 0 ||
                     finalNumber > int.MaxValue ||
                     finalWounded < 0 ||
