@@ -21,6 +21,7 @@ using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -1130,6 +1131,131 @@ public class KingdomDebugCommand
 
         MakePeaceAction.Apply(faction1, faction2);
         return $"Made peace between '{faction1.Name}' and '{faction2.Name}'.";
+    }
+    
+    // coop.debug.kingdom.force_ally
+    /// <summary>
+    /// forms an alliance between two kingdoms (run on the server). Alternative
+    /// to StartAllianceDecision, which the kingdom AI may vote against. If the kingdoms are at war,
+    /// peace is made first.
+    /// </summary>
+    /// <param name="args">kingdom1Id, kingdom2Id</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("force_ally", "coop.debug.kingdom")]
+    public static string ForceAlly(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Command is only available to run on the server";
+        }
+        
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.kingdom.force_ally <kingdom1Id> <kingdom2Id> (run on the server)";
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(args[0], out Kingdom kingdom1) == false)
+        {
+            return $"Kingdom not found with id: {args[0]}";
+        }
+
+        if (objectManager.TryGetObject(args[1], out Kingdom kingdom2) == false)
+        {
+            return $"Kingdom not found with id: {args[1]}";
+        }
+
+        if (kingdom1 == kingdom2)
+        {
+            return "A kingdom cannot ally with itself.";
+        }
+
+        var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
+        if (behavior == null)
+        {
+            return "AllianceCampaignBehavior is not available.";
+        }
+
+        if (behavior.IsAllyWithKingdom(kingdom1, kingdom2))
+        {
+            return $"'{kingdom1.Name}' and '{kingdom2.Name}' are already allied.";
+        }
+
+        if (kingdom1.IsAtWarWith(kingdom2))
+        {
+            MakePeaceAction.Apply(kingdom1, kingdom2);
+        }
+
+        behavior.StartAlliance(kingdom1, kingdom2);
+        return $"Forced alliance between '{kingdom1.Name}' and '{kingdom2.Name}'.";
+    }
+
+    // coop.debug.kingdom.force_trade_agreement
+    /// <summary>
+    /// forms a trade agreement between two kingdoms (run on the server). Alternative to TradeAgreementDecision, 
+    /// whichthe kingdom AI may vote against. If the kingdoms are at war, peace is made first.
+    /// </summary>
+    /// <param name="args">kingdom1Id, kingdom2Id</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("force_trade_agreement", "coop.debug.kingdom")]
+    public static string ForceTradeAgreement(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Command is only available to run on the server";
+        }
+
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.kingdom.force_trade_agreement <kingdom1Id> <kingdom2Id> (run on the server)";
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(args[0], out Kingdom kingdom1) == false)
+        {
+            return $"Kingdom not found with id: {args[0]}";
+        }
+
+        if (objectManager.TryGetObject(args[1], out Kingdom kingdom2) == false)
+        {
+            return $"Kingdom not found with id: {args[1]}";
+        }
+
+        if (kingdom1 == kingdom2)
+        {
+            return "A kingdom cannot form a trade agreement with itself.";
+        }
+
+        var behavior = Campaign.Current.GetCampaignBehavior<TradeAgreementsCampaignBehavior>();
+        if (behavior == null)
+        {
+            return "TradeAgreementsCampaignBehavior is not available.";
+        }
+
+        if (behavior.TryGetTradeAgreement(kingdom1, kingdom2, out _))
+        {
+            return $"'{kingdom1.Name}' and '{kingdom2.Name}' already have a trade agreement.";
+        }
+
+        if (kingdom1.IsAtWarWith(kingdom2))
+        {
+            MakePeaceAction.Apply(kingdom1, kingdom2);
+        }
+
+        behavior.MakeTradeAgreement(
+            kingdom1,
+            kingdom2,
+            Campaign.Current.Models.TradeAgreementModel.GetTradeAgreementDurationInYears(kingdom1, kingdom2));
+
+        return $"Forced trade agreement between '{kingdom1.Name}' and '{kingdom2.Name}'.";
     }
 
     private static string ChangeKingdomCollection(List<string> args, CollectionOperation operation)
