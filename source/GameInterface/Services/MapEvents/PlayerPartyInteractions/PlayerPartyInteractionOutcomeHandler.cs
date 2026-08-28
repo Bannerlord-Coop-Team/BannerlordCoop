@@ -190,7 +190,6 @@ internal class PlayerPartyInteractionOutcomeHandler
             bool result = false;
             RunOnGameThread(() => result = ApplyClanJoin(outcome), "Apply player-party clan join");
             return result;
-            
         }
         catch (Exception e)
         {
