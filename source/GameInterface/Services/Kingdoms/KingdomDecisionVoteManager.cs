@@ -1552,12 +1552,25 @@ namespace GameInterface.Services.Kingdoms
         {
             decision = null;
             if (objectManager == null) return false;
+            if (StartAllianceDecisionData.TryGetKingdomReference(objectManager, kingdomId, out Kingdom allianceKingdom) &&
+                TryGetDecision(allianceKingdom, decisionIndex, out KingdomDecision allianceDecision) &&
+                CoopKingdomElection.IsTrackedPlayerAllianceOffer(allianceDecision))
+            {
+                decision = allianceDecision;
+                return true;
+            }
             if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom)) return false;
-            if (kingdom._unresolvedDecisions == null) return false;
+            return TryGetDecision(kingdom, decisionIndex, out decision);
+        }
+
+        private static bool TryGetDecision(Kingdom kingdom, int decisionIndex, out KingdomDecision decision)
+        {
+            decision = null;
+            if (kingdom?._unresolvedDecisions == null) return false;
             if (decisionIndex < 0 || decisionIndex >= kingdom._unresolvedDecisions.Count) return false;
 
             decision = kingdom._unresolvedDecisions[decisionIndex];
-            return true;
+            return decision != null;
         }
 
         private static bool TryGetDecisionIndex(KingdomDecision decision, out int decisionIndex)

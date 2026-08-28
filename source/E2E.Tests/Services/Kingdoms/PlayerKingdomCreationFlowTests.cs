@@ -1811,6 +1811,23 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Empty(proposingKingdom.UnresolvedDecisions);
             Assert.Empty(conflictingKingdom.UnresolvedDecisions);
             Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
+
+            var voteManager = GetVoteManager(client);
+            voteManager.ApplyRoundStatus(new KingdomDecisionRoundStatusData(
+                compactRecipientClanId,
+                0,
+                (DateTime.UtcNow + TimeSpan.FromSeconds(60)).Ticks,
+                new[]
+                {
+                    new KingdomDecisionRoundClanStatusData(
+                        player.ClanId,
+                        player.ClanId,
+                        ControllerId,
+                        hasFinalVote: true,
+                        isConnected: true),
+                }));
+
+            Assert.True(voteManager.HasLocalPlayerSubmittedVote(decision));
         });
     }
 
