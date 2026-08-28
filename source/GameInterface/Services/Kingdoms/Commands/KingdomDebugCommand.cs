@@ -1196,8 +1196,8 @@ public class KingdomDebugCommand
 
     // coop.debug.kingdom.force_trade_agreement
     /// <summary>
-    /// forms a trade agreement between two kingdoms (run on the server). Alternative to TradeAgreementDecision, 
-    /// whichthe kingdom AI may vote against. If the kingdoms are at war, peace is made first.
+    /// forms a trade agreement between two kingdoms (run on the server). Alternative to TradeAgreementDecision,
+    /// which the kingdom AI may vote against. If the kingdoms are at war, peace is made first.
     /// </summary>
     /// <param name="args">kingdom1Id, kingdom2Id</param>
     /// <returns>result message</returns>
