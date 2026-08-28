@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
@@ -7,7 +8,6 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -26,6 +26,7 @@ internal class KillCharacterActionPatches
     private static readonly ILogger Logger = LogManager.GetLogger<KillCharacterActionPatches>();
 
     [HarmonyPatch(nameof(KillCharacterAction.ApplyInternal))]
+    [HarmonyPrefix]
     public static bool ApplyInternalPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail, bool showNotification, bool isForced = false)
     {
         if (!victim.CanDie(actionDetail) && !isForced) return false;
@@ -136,7 +137,7 @@ internal class KillCharacterActionPatches
         //    TraitLevelingHelper.OnLordExecuted();
         //}
 
-        if (victim.Clan != null && !victim.Clan.IsEliminated && !victim.Clan.IsBanditFaction && victim.Clan != Clan.PlayerClan)
+        if (victim.Clan != null && !victim.Clan.IsEliminated && !victim.Clan.IsBanditFaction && !victim.Clan.IsPlayerClan())
         {
             if (victim.Clan.Leader == victim)
             {

@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -60,6 +59,7 @@ internal class AgingInitializationHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.NewHero, out string playerHeroId)) return;
 
         Campaign.Current.MainHeroIllDays = GetMainHeroIllDays(playerHeroId);
+        // TODO: Refresh MapInfoVM._isMainHeroSick to update health icon in the bottom right when ill immediately
 
         network.SendAll(new NetworkInitializeServerAgingDataKeys(playerHeroId));
     }

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Heroes.Audit;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Utils.Commands;
@@ -277,6 +278,36 @@ public class HeroDebugCommand
         }
 
         return $"Set age to {age} for {heroes.Count} hero(es) named '{heroName}'";
+    }
+
+    [CommandLineArgumentFunction("ill_days", "coop.debug.hero")]
+    public static string HeroIllDays(List<string> args)
+    {
+        if (args.Count < 1)
+        {
+            return "Usage: coop.debug.hero.hero_ill_days <heroName>";
+        }
+
+        if (!ContainerProvider.TryResolve<IAgingCampaignBehaviorInterface>(out var agingBehaviorInterface)) return "Unable to resolve behavior interface.";
+
+        string heroName = string.Join(" ", args.Take(args.Count));
+
+        var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
+            .Where(h => h.Name?.ToString() == heroName)
+            .ToList();
+
+        if (heroes.Count == 0)
+        {
+            return $"Unable to find hero with name: {heroName}";
+        }
+
+        StringBuilder stringBuilder = new();
+        foreach (var hero in heroes)
+        {
+            stringBuilder.AppendLine($"{hero.StringId}: {agingBehaviorInterface.GetPlayerIllDays(hero)}");
+        }
+
+        return stringBuilder.ToString();
     }
 
     [CommandLineArgumentFunction("gold_state", "coop.debug.hero")]

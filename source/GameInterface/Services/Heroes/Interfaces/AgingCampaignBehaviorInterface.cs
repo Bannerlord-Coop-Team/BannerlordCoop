@@ -6,6 +6,7 @@ using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
 using Helpers;
 using Serilog;
@@ -16,7 +17,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -37,6 +37,7 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     private AgingPlayerData AgingPlayerData => coopSessionProvider.CoopSession.AgingPlayerData;
 
@@ -44,12 +45,14 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
         ICoopSessionProvider coopSessionProvider,
         IObjectManager objectManager,
         IMessageBroker messageBroker,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.network = network;
+        this.playerManager = playerManager;
     }
 
     public void DailyTickHero(AgingCampaignBehavior behavior, Hero hero)
@@ -94,12 +97,16 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
                     }
                 }
             }
-            if (hero.IsPlayerHero() && GetIsPlayerIll(hero) && hero.HeroState != Hero.CharacterStates.Dead)
+            if (hero.IsPlayerHero()
+                && GetIsPlayerIll(hero)
+                && hero.HeroState != Hero.CharacterStates.Dead
+                && hero.PartyBelongedTo?.MapEvent == null // Only run check to progress player hero illness if not in a map event
+                && !playerManager.IsOwnerOfHeroDisconnected(hero)) // Only run check to progress player hero illness if player is online
             {
                 AddPlayerIllDays(hero, 1);
-                if (GetPlayerIllDays(hero) > 3)
+                if (GetPlayerIllDays(hero) > 1)//3)
                 {
-                    hero.HitPoints -= 50;//MathF.Ceiling((float)hero.HitPoints * (0.05f * (float)GetPlayerIllDays(hero)));
+                    hero.HitPoints = 1;//MathF.Ceiling((float)hero.HitPoints * (0.05f * (float)GetPlayerIllDays(hero)));
                     if (hero.HitPoints <= 1 && hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None)
                     {
                         if (behavior._extraLivesContainer.TryGetValue(hero, out int numberOfExtraLives))
@@ -217,7 +224,10 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
             }
             else
             {
-                if (hero.IsPlayerHero() && !GetIsPlayerIll(hero))
+                if (hero.IsPlayerHero() 
+                    && !GetIsPlayerIll(hero)
+                    && hero.PartyBelongedTo?.MapEvent == null // Only run check to start player hero illness when not in a map event
+                    && !playerManager.IsOwnerOfHeroDisconnected(hero)) // Only run check to start player hero illness if player is online
                 {
                     AddPlayerIllDays(hero, 1);
 
