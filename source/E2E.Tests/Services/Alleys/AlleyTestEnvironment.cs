@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using Common.Network;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.Locations;
 using E2E.Tests.Util;
@@ -105,11 +104,14 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
         bool won,
         params TroopRosterElementData[] survivingGarrison)
     {
-        client.Call(() => client.Resolve<INetwork>().SendAll(
-            new RequestAlleyDefenseResolved(
-                scenario.PlayerAlleyId,
-                won,
-                survivingGarrison)));
+        client.Call(() =>
+        {
+            Alley alley = client.GetRegisteredObject<Alley>(scenario.PlayerAlleyId);
+            TroopRoster roster = won ? CreateRoster(client, survivingGarrison) : null;
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new AlleyDefenseResolvedRequested(alley, won, roster));
+        });
     }
 
     public void SeedLoadedAlleys()

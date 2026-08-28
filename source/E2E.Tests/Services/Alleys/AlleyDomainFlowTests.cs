@@ -273,6 +273,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         Assert.Null(resolved.UnderAttackByAlleyId);
         Assert.Contains(resolved.Garrison,
             element => element.CharacterId == troopId && element.Number == 2 && element.Xp == 10);
+        ownerClient.Call(() => Assert.Null(
+            GetClientAlleyData(ownerClient, scenario.PlayerAlleyId).UnderAttackBy));
 
         foreach (var instance in Clients.Prepend(Server))
         {
