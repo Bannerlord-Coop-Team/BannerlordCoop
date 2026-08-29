@@ -19,6 +19,7 @@ public sealed class MirrorAgent
     public bool IsActive { get; set; } = true;
     public bool IsHuman { get; set; } = true;
     public bool WasKilled { get; set; }
+    public int BloodBurstCalls { get; set; }
     public int OnFleeingCalls { get; set; }
     public bool IsAiPaused { get; set; }
     public int DeathAction { get; set; } = -1;
@@ -96,6 +97,8 @@ public sealed class MirrorAgent
     public float LastSetActionStartProgress { get; set; }
     public bool LastSetActionForceFaceMorphRestart { get; set; }
     public float Action0Speed { get; set; } = 1f;
+    public float Action1Speed { get; set; } = 1f;
+    public int GetCurrentActionSpeedCalls { get; set; }
     public int SetCurrentActionSpeedCalls { get; set; }
     public bool HasVisualSkeleton { get; set; }
     public int SkeletonAction0Index { get; set; } = -1;

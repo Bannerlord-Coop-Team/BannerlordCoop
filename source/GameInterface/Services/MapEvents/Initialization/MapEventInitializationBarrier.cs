@@ -8,6 +8,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.SiegeEvents;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
@@ -53,16 +54,22 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly ISiegeEventGraphSynchronizer siegeEventGraphSynchronizer;
     private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
     private HashSet<PartyBase> pendingParties = new HashSet<PartyBase>();
     private DeferredEncounterCleanup deferredEncounterCleanup;
     private bool disposed;
 
-    public MapEventInitializationBarrier(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public MapEventInitializationBarrier(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        ISiegeEventGraphSynchronizer siegeEventGraphSynchronizer)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.siegeEventGraphSynchronizer = siegeEventGraphSynchronizer;
         messageBroker.Subscribe<NetworkMapEventPartyPending>(HandlePendingParty);
         messageBroker.Subscribe<NetworkMapEventInitialized>(HandleCommit);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -141,7 +148,16 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return;
         }
 
-        network.SendAll(new NetworkMapEventInitialized(mapEventId, false, trackerId, componentId, visualId));
+        SiegeEventGraphSnapshot siegeGraph = default;
+        if (mapEvent.IsSiegeAssault &&
+            !siegeEventGraphSynchronizer.TryCapture(mapEvent.MapEventSettlement?.SiegeEvent, out siegeGraph))
+        {
+            AbortServer(mapEvent);
+            return;
+        }
+
+        network.SendAll(new NetworkMapEventInitialized(
+            mapEventId, false, trackerId, componentId, visualId, siegeGraph));
         state.Committed = true;
         state.Announced.Clear();
         PublishPendingParties();
@@ -206,6 +222,14 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent)) return;
             if (message.IsTerminal)
             {
+                FinishClient(mapEvent, abort: true);
+                return;
+            }
+
+            if (message.SiegeGraph.IsComplete && !siegeEventGraphSynchronizer.TryApply(message.SiegeGraph))
+            {
+                Logger.Error("Client could not apply the siege graph carried by MapEvent {MapEventId}",
+                    message.MapEventId);
                 FinishClient(mapEvent, abort: true);
                 return;
             }

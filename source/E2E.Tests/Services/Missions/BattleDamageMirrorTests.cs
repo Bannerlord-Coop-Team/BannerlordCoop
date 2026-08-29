@@ -56,9 +56,14 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
 
             var blow = new Blow(0) { InflictedDamage = 40, DamageType = DamageTypes.Pierce };
             var collisionData = new AttackCollisionData { InflictedDamage = 40 };
+            var damageData = client.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             client.Resolve<IMessageBroker>().Publish(
                 this,
-                new NetworkApplyBattleDamage(victimId, Guid.Empty, blow, collisionData));
+                new NetworkApplyBattleDamage(
+                    victimId,
+                    Guid.Empty,
+                    damageData,
+                    blow.IsMissile));
 
             Assert.True(AgentMirror.TryGet(agent, out var mirror));
             Assert.Equal(expectedHealth, mirror.Health);
@@ -92,7 +97,15 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
             blow.WeaponRecord._isMissile = true;
             blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = 999;
 
-            client.Resolve<IMessageBroker>().Publish(this, new NetworkApplyBattleDamage(victimId, Guid.Empty, blow, default));
+            AttackCollisionData collisionData = default;
+            var damageData = client.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkApplyBattleDamage(
+                    victimId,
+                    Guid.Empty,
+                    damageData,
+                    blow.IsMissile));
 
             var field = typeof(CoopBattleController).GetField("damageRouter", BindingFlags.Instance | BindingFlags.NonPublic);
             var router = Assert.IsAssignableFrom<IBattleDamageRouter>(field?.GetValue(controller));
@@ -132,13 +145,15 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
                 InflictedDamage = 10,
                 DamageType = DamageTypes.Pierce
             };
+            AttackCollisionData collisionData = default;
+            var damageData = client.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             client.Resolve<IMessageBroker>().Publish(
                 this,
                 new NetworkApplyBattleDamage(
                     riderId,
                     Guid.Empty,
-                    blow,
-                    default));
+                    damageData,
+                    blow.IsMissile));
 
             Assert.Null(rider.MountAgent);
             Assert.Null(mount.RiderAgent);

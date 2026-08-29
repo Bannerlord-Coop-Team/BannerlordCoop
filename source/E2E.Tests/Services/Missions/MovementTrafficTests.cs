@@ -1123,6 +1123,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             .Returns(new[] { unusableControllerId });
         var messageBroker = new Mock<IMessageBroker>();
         var packetManager = new Mock<IPacketManager>();
+        var messagePacketHandler = new Mock<IMessagePacketHandler>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         var steamBridge = new Mock<ISteamMissionBridge>();
 
@@ -1133,9 +1134,11 @@ public class MovementTrafficTests : MissionTestEnvironment
             serializer,
             messageBroker.Object,
             packetManager.Object,
+            messagePacketHandler.Object,
             controllerIdProvider.Object,
             steamBridge.Object,
-            compressor);
+            compressor,
+            new ReliableMessageBatcher<string>(serializer));
         client.ConnectToInstance(instanceId);
 
         Assert.Equal(0, client.GetMaxUnreliablePayloadBytes());
@@ -1203,6 +1206,7 @@ public class MovementTrafficTests : MissionTestEnvironment
         var missionContext = new Mock<IMissionContext>();
         var messageBroker = new Mock<IMessageBroker>();
         var packetManager = new Mock<IPacketManager>();
+        var messagePacketHandler = new Mock<IMessagePacketHandler>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         var steamBridge = new Mock<ISteamMissionBridge>();
 
@@ -1213,9 +1217,11 @@ public class MovementTrafficTests : MissionTestEnvironment
             serializer,
             messageBroker.Object,
             packetManager.Object,
+            messagePacketHandler.Object,
             controllerIdProvider.Object,
             steamBridge.Object,
-            compressor);
+            compressor,
+            new ReliableMessageBatcher<string>(serializer));
         client.ConnectToInstance(instanceId);
 
         client.Send(controllerId, oversizedPacket);

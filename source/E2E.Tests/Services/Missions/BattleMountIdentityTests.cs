@@ -127,8 +127,15 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             riderMirror.MountAgent = horseB;
 
             // The routed hit arrives, addressed to horse A's own id.
+            Blow blow = DamagingBlow();
+            AttackCollisionData collisionData = default;
+            var damageData = owner.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             owner.Resolve<IMessageBroker>().Publish(this,
-                new NetworkApplyBattleDamage(horseAId, Guid.Empty, DamagingBlow(), default));
+                new NetworkApplyBattleDamage(
+                    horseAId,
+                    Guid.Empty,
+                    damageData,
+                    blow.IsMissile));
 
             Assert.True(AgentMirror.TryGet(horseA, out var horseAMirror));
             Assert.Equal(70f, horseAMirror.Health); // the horse that was actually struck
