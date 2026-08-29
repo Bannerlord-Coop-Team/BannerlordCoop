@@ -1818,6 +1818,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Empty(conflictingKingdom.UnresolvedDecisions);
             Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
 
+            string compactIdOutcomes = KingdomDebugCommand.ListKingdomDecisionOutcomes(
+                new List<string> { compactRecipientClanId, "1" });
+            Assert.Equal("Decision index is out of bounds.", compactIdOutcomes);
+
             var voteManager = GetVoteManager(client);
             voteManager.ApplyRoundStatus(new KingdomDecisionRoundStatusData(
                 compactRecipientClanId,
@@ -1982,6 +1986,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(recipientKingdom, proposerClan.Kingdom);
             Assert.Contains(proposerClan, recipientKingdom.Clans);
             Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
+
+            string outcomes = KingdomDebugCommand.ListKingdomDecisionOutcomes(
+                new List<string> { proposerClanId, "1" });
+            Assert.StartsWith("Decision outcomes for StartAllianceDecision", outcomes);
         });
     }
 

@@ -3158,7 +3158,11 @@ public class KingdomDebugCommand
             return false;
         }
 
-        if (objectManager.TryGetObject(args[0], out kingdom) == false)
+        bool isFullClanId = args[0].StartsWith("Clan_", StringComparison.Ordinal);
+        bool kingdomResolved = isFullClanId
+            ? StartAllianceDecisionData.TryGetKingdomReference(objectManager, args[0], out kingdom)
+            : objectManager.TryGetObject(args[0], out kingdom);
+        if (!kingdomResolved)
         {
             message = $"Kingdom with ID: '{args[0]}' not found";
             return false;
