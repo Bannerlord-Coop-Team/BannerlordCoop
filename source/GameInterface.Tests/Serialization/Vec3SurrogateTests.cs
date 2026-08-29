@@ -55,6 +55,17 @@ public class Vec3SurrogateTests
     }
 
     [Fact]
+    public void Serialize_UsesFieldTwoForZ()
+    {
+        Vec3Surrogate surrogate = new Vec3(1f, 2f, 3f);
+
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, surrogate);
+
+        Assert.Equal((byte)0x15, stream.ToArray()[9]);
+    }
+
+    [Fact]
     public void ImplicitConversions_AllocateNoMemoryAfterWarmup()
     {
         var value = new Vec3(1024.25f, -2048.5f, 512.75f);

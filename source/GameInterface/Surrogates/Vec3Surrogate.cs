@@ -10,7 +10,7 @@ internal struct Vec3Surrogate
     [ProtoMember(1, DataFormat = DataFormat.FixedSize)]
     public ulong XY { get; set; }
 
-    [ProtoMember(3)]
+    [ProtoMember(2)]
     public float Z { get; set; }
 
     public Vec3Surrogate(Vec3 v)
