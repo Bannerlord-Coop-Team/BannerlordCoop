@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -104,9 +105,9 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
                 && !playerManager.IsOwnerOfHeroDisconnected(hero)) // Only run check to progress player hero illness if player is online
             {
                 AddPlayerIllDays(hero, 1);
-                if (GetPlayerIllDays(hero) > 1)//3)
+                if (GetPlayerIllDays(hero) > 3)
                 {
-                    hero.HitPoints = 1;//MathF.Ceiling((float)hero.HitPoints * (0.05f * (float)GetPlayerIllDays(hero)));
+                    hero.HitPoints = MathF.Ceiling((float)hero.HitPoints * (0.05f * (float)GetPlayerIllDays(hero)));
                     if (hero.HitPoints <= 1 && hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None)
                     {
                         if (behavior._extraLivesContainer.TryGetValue(hero, out int numberOfExtraLives))
@@ -211,7 +212,7 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
             && hero.Age >= (float)Campaign.Current.Models.AgeModel.BecomeOldAge
             && !CampaignOptions.IsLifeDeathCycleDisabled 
             && hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None 
-            && MBRandom.RandomFloat < 1)//hero.ProbabilityOfDeath)
+            && MBRandom.RandomFloat < hero.ProbabilityOfDeath)
         {
             if (behavior._extraLivesContainer.TryGetValue(hero, out var numberOfExtraLives) && numberOfExtraLives > 0)
             {
