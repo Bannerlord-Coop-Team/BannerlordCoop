@@ -5,6 +5,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -39,6 +40,7 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IMissionMembershipRegistry missionMembershipRegistry;
 
     private AgingPlayerData AgingPlayerData => coopSessionProvider.CoopSession.AgingPlayerData;
 
@@ -47,25 +49,27 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
         IObjectManager objectManager,
         IMessageBroker messageBroker,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IMissionMembershipRegistry missionMembershipRegistry = null)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.network = network;
         this.playerManager = playerManager;
+        this.missionMembershipRegistry = missionMembershipRegistry;
     }
 
     public void DailyTickHero(AgingCampaignBehavior behavior, Hero hero)
     {
-        if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
-
         bool isGameStart = (int)CampaignTime.Now.ToDays == behavior._gameStartDay;
         if (!CampaignOptions.IsLifeDeathCycleDisabled && !isGameStart && !hero.IsTemplate)
         {
             if (hero.IsAlive && hero.CanDie(KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge))
             {
-                if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None && (hero.PartyBelongedTo == null || (hero.PartyBelongedTo.MapEvent == null && hero.PartyBelongedTo.SiegeEvent == null)))
+                if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None
+                    && CanApplyDeathMark(hero)
+                    && (hero.PartyBelongedTo == null || (hero.PartyBelongedTo.MapEvent == null && hero.PartyBelongedTo.SiegeEvent == null)))
                 {
                     KillCharacterAction.ApplyByDeathMark(hero, false);
                 }
@@ -101,8 +105,7 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
             if (hero.IsPlayerHero()
                 && GetIsPlayerIll(hero)
                 && hero.HeroState != Hero.CharacterStates.Dead
-                && hero.PartyBelongedTo?.MapEvent == null // Only run check to progress player hero illness if not in a map event
-                && !playerManager.IsOwnerOfHeroDisconnected(hero)) // Only run check to progress player hero illness if player is online
+                && CanProcessNaturalDeath(hero))
             {
                 AddPlayerIllDays(hero, 1);
                 if (GetPlayerIllDays(hero) > 3)
@@ -158,7 +161,7 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
 
             battleEquipment ??= MBEquipmentRosterExtensions.All.Find(x => x.StringId == "generic_bat_dummy").GetBattleEquipments().First<Equipment>();
             civilianEquipment ??= MBEquipmentRosterExtensions.All.Find(x => x.StringId == "generic_civ_dummy").GetCivilianEquipments().First<Equipment>();
-            
+
             EquipmentHelper.AssignHeroEquipmentFromEquipment(hero, battleEquipment);
             EquipmentHelper.AssignHeroEquipmentFromEquipment(hero, civilianEquipment);
         }
@@ -208,10 +211,12 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
 
     private void IsItTimeOfDeath(AgingCampaignBehavior behavior, Hero hero)
     {
-        if (hero.IsAlive 
+        if (!CanProcessNaturalDeath(hero)) return;
+
+        if (hero.IsAlive
             && hero.Age >= (float)Campaign.Current.Models.AgeModel.BecomeOldAge
-            && !CampaignOptions.IsLifeDeathCycleDisabled 
-            && hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None 
+            && !CampaignOptions.IsLifeDeathCycleDisabled
+            && hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None
             && MBRandom.RandomFloat < hero.ProbabilityOfDeath)
         {
             if (behavior._extraLivesContainer.TryGetValue(hero, out var numberOfExtraLives) && numberOfExtraLives > 0)
@@ -225,15 +230,11 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
             }
             else
             {
-                if (hero.IsPlayerHero() 
-                    && !GetIsPlayerIll(hero)
-                    && hero.PartyBelongedTo?.MapEvent == null // Only run check to start player hero illness when not in a map event
-                    && !playerManager.IsOwnerOfHeroDisconnected(hero)) // Only run check to start player hero illness if player is online
+                if (hero.IsPlayerHero() && !GetIsPlayerIll(hero))
                 {
                     AddPlayerIllDays(hero, 1);
 
-                    var message = new NotifyCaughtIllness(hero);
-                    messageBroker.Publish(this, message);
+                    messageBroker.Publish(this, new NotifyCaughtIllness(hero));
                     return;
                 }
                 if (!hero.IsPlayerHero() && (hero.PartyBelongedTo == null || (hero.PartyBelongedTo.MapEvent == null && hero.PartyBelongedTo.SiegeEvent == null)))
@@ -242,6 +243,29 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
                 }
             }
         }
+    }
+
+    private bool CanProcessNaturalDeath(Hero hero)
+    {
+        if (!PlayerManager.TryGetControlledObjectInfo(hero, out var controlledObject)) return true;
+
+        // Don't process for disconnected players
+        if (playerManager.IsOwnerOfHeroDisconnected(hero)) return false;
+
+        // Don't process for players involved in a battle
+        if (hero.PartyBelongedTo?.MapEvent != null || hero.PartyBelongedTo?.SiegeEvent != null)
+        {
+            return false;
+        }
+
+        // Don't process for players in a mission
+        return missionMembershipRegistry?.IsControllerInMission(controlledObject.ObjectControllerId) != true;
+    }
+
+    private bool CanApplyDeathMark(Hero hero)
+    {
+        return hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge
+            || CanProcessNaturalDeath(hero);
     }
 
     private void KillPlayerHeroWithIllness(Hero hero)
