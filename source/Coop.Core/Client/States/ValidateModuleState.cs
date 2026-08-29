@@ -167,14 +167,12 @@ public class ValidateModuleState : ClientStateBase
 
     internal void Handle_NetworkClientValidated(MessagePayload<NetworkClientValidated> obj)
     {
-        // The server's terminal validation response. Claim completion before touching Logic so a
-        // timeout firing at the same instant loses the race and no-ops, rather than tearing the
-        // container down in the window between here and the state transition below (which would leave
-        // this handler resolving the next state from a disposed container).
-        if (!TryClaimCompletion()) return;
-
         if (obj.What.HeroExists)
         {
+            // Claim before touching Logic so a concurrent timeout cannot tear down the container
+            // while this handler resolves and enters the next state.
+            if (!TryClaimCompletion()) return;
+
             Logic.Player = obj.What.Player;
             Logic.LoadSavedData();
         }
@@ -189,6 +187,7 @@ public class ValidateModuleState : ClientStateBase
     private void BeginCharacterCreation()
     {
         if (disposed || Logic.State != this) return;
+        if (!TryClaimCompletion()) return;
 
         try
         {
