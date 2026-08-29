@@ -292,17 +292,15 @@ public class MissionPeerCredentialMappingTests
             new IPEndPoint(IPAddress.Loopback, 65530),
             NatAddressType.Internal,
             new ConnectionToken("direct-host", InstanceId, replacementCredential));
+        Assert.Empty(fixture.PendingPeers);
+
+        fixture.Announce("direct-host", steamId: 0, replacementCredential);
 
         var replacementPeer = Assert.Single(
             fixture.PendingPeers,
             pair => pair.Value == "direct-host").Key;
         Assert.Equal(replacementCredential, fixture.GetPeerCredential(replacementPeer));
         fixture.Client.OnPeerConnected(replacementPeer);
-        fixture.MissionContext.Verify(
-            context => context.MapPeer("direct-host", It.IsAny<NetPeer>()),
-            Times.Once);
-
-        fixture.Announce("direct-host", steamId: 0, replacementCredential);
 
         Assert.DoesNotContain(oldPeer, fixture.MappedPeers.Keys);
         Assert.Equal("direct-host", fixture.MappedPeers[replacementPeer]);
@@ -328,20 +326,93 @@ public class MissionPeerCredentialMappingTests
             new IPEndPoint(IPAddress.Loopback, 65530),
             NatAddressType.Internal,
             new ConnectionToken("direct-host", InstanceId, replacementCredential));
+        Assert.Empty(fixture.PendingPeers);
+
+        fixture.Announce("direct-host", steamId: 0, replacementCredential);
 
         var replacementPeer = Assert.Single(
             fixture.PendingPeers,
             pair => pair.Value == "direct-host").Key;
         fixture.Client.OnPeerConnected(replacementPeer);
-        fixture.MissionContext.Verify(
-            context => context.MapPeer("direct-host", It.IsAny<NetPeer>()),
-            Times.Once);
-
-        fixture.Announce("direct-host", steamId: 0, replacementCredential);
 
         Assert.Equal("direct-host", fixture.MappedPeers[replacementPeer]);
         fixture.MissionContext.Verify(
             context => context.MapPeer("direct-host", It.IsAny<NetPeer>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public void DelayedOldNatIntroductionAfterRotatedAnnouncement_DoesNotBlockCurrentRoute()
+    {
+        using var fixture = new Fixture(startNetwork: true);
+        var oldCredential = Guid.NewGuid();
+        var currentCredential = Guid.NewGuid();
+        fixture.Announce("direct-host", steamId: 0, oldCredential);
+        var oldPeer = fixture.TrackPending("direct-host", oldCredential, actualSteamId: 0);
+        fixture.Client.OnPeerConnected(oldPeer);
+        fixture.SetLocalCredential(Guid.NewGuid());
+
+        fixture.Announce("direct-host", steamId: 0, currentCredential);
+        fixture.Client.OnNatIntroductionSuccess(
+            new IPEndPoint(IPAddress.Loopback, 65529),
+            NatAddressType.Internal,
+            new ConnectionToken("direct-host", InstanceId, oldCredential));
+
+        Assert.Empty(fixture.PendingPeers);
+
+        fixture.Client.OnNatIntroductionSuccess(
+            new IPEndPoint(IPAddress.Loopback, 65530),
+            NatAddressType.Internal,
+            new ConnectionToken("direct-host", InstanceId, currentCredential));
+
+        var currentPeer = Assert.Single(
+            fixture.PendingPeers,
+            pair => pair.Value == "direct-host").Key;
+        Assert.Equal(currentCredential, fixture.GetPeerCredential(currentPeer));
+        fixture.Client.OnPeerConnected(currentPeer);
+
+        Assert.DoesNotContain(oldPeer, fixture.MappedPeers.Keys);
+        Assert.Equal("direct-host", fixture.MappedPeers[currentPeer]);
+        fixture.MissionContext.Verify(context => context.RemovePeer(oldPeer), Times.Once);
+        fixture.MissionContext.Verify(
+            context => context.MapPeer("direct-host", It.IsAny<NetPeer>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public void DeferredNatIntroductionForSteamPeer_UsesAuthenticatedSteamRouteAfterAnnouncement()
+    {
+        using var fixture = new Fixture(startNetwork: true);
+        var oldCredential = Guid.NewGuid();
+        var currentCredential = Guid.NewGuid();
+        var steamEndPoint = new IPEndPoint(IPAddress.Loopback, 65530);
+        fixture.SteamBridge
+            .Setup(bridge => bridge.TryConnect(9001, out steamEndPoint))
+            .Returns(true);
+        fixture.Announce("steam-peer", steamId: 9001, oldCredential);
+        var oldPeer = fixture.TrackPending("steam-peer", oldCredential, actualSteamId: 9001);
+        fixture.Client.OnPeerConnected(oldPeer);
+        fixture.SetLocalCredential(Guid.NewGuid());
+
+        fixture.Client.OnNatIntroductionSuccess(
+            new IPEndPoint(IPAddress.Loopback, 65529),
+            NatAddressType.Internal,
+            new ConnectionToken("steam-peer", InstanceId, currentCredential));
+        fixture.Announce("steam-peer", steamId: 9001, currentCredential);
+
+        var currentPeer = Assert.Single(
+            fixture.PendingPeers,
+            pair => pair.Value == "steam-peer").Key;
+        Assert.Equal(currentCredential, fixture.GetPeerCredential(currentPeer));
+        fixture.Client.OnPeerConnected(currentPeer);
+
+        Assert.Equal("steam-peer", fixture.MappedPeers[currentPeer]);
+        fixture.SteamBridge.Verify(
+            bridge => bridge.TryConnect(9001, out steamEndPoint),
+            Times.Once);
+        fixture.MissionContext.Verify(context => context.RemovePeer(oldPeer), Times.Once);
+        fixture.MissionContext.Verify(
+            context => context.MapPeer("steam-peer", It.IsAny<NetPeer>()),
             Times.Exactly(2));
     }
 

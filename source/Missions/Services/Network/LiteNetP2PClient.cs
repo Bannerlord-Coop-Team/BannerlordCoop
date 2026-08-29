@@ -56,6 +56,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly Dictionary<NetPeer, string> mappedPeerControllers = new();
     private readonly Dictionary<NetPeer, ulong> peerSteamIds = new();
     private readonly Dictionary<NetPeer, Guid> peerCredentials = new();
+    private readonly Dictionary<(string ControllerId, Guid PeerCredential), IPEndPoint> deferredNatIntroductions = new();
     private readonly HashSet<NetPeer> connectedPendingPeers = new();
     private readonly HashSet<NetPeer> rotatingPendingPeers = new();
     private readonly object relayPayloadBudgetGate = new();
@@ -185,6 +186,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             mappedPeerControllers.Clear();
             peerSteamIds.Clear();
             peerCredentials.Clear();
+            deferredNatIntroductions.Clear();
             connectedPendingPeers.Clear();
             rotatingPendingPeers.Clear();
         }
@@ -293,11 +295,23 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         lock (peerGate)
         {
             if (instanceId != connectionToken.InstanceId ||
-                localPeerCredential == Guid.Empty ||
-                HasTrackedPeer(connectionToken.ControllerId, connectionToken.PeerCredential))
+                localPeerCredential == Guid.Empty)
             {
                 return;
             }
+
+            if (controllerPeerCredentials.TryGetValue(
+                    connectionToken.ControllerId,
+                    out var announcedCredential) &&
+                announcedCredential != connectionToken.PeerCredential)
+            {
+                deferredNatIntroductions[(
+                    connectionToken.ControllerId,
+                    connectionToken.PeerCredential)] = targetEndPoint;
+                return;
+            }
+
+            if (HasTrackedPeer(connectionToken.ControllerId, connectionToken.PeerCredential)) return;
 
             Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
             var peer = netManager.Connect(
@@ -308,14 +322,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                     localPeerCredential));
             if (peer != null)
             {
-                bool credentialRotationPending =
-                    controllerPeerCredentials.TryGetValue(
-                        connectionToken.ControllerId,
-                        out var announcedCredential) &&
-                    announcedCredential != connectionToken.PeerCredential;
                 pendingPeerControllers[peer] = connectionToken.ControllerId;
                 peerCredentials[peer] = connectionToken.PeerCredential;
-                if (credentialRotationPending) rotatingPendingPeers.Add(peer);
             }
         }
     }
@@ -511,6 +519,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         var invalidPeers = new List<NetPeer>();
+        IPEndPoint deferredNatEndPoint;
         bool alreadyTracked;
         int generation;
         lock (peerGate)
@@ -555,16 +564,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 invalidPeers.Add(pair.Key);
             }
 
+            deferredNatIntroductions.TryGetValue(
+                (entered.ControllerId, entered.PeerCredential),
+                out deferredNatEndPoint);
             alreadyTracked = HasTrackedPeer(entered.ControllerId);
         }
 
         foreach (var invalidPeer in invalidPeers) netManager.DisconnectPeer(invalidPeer);
         if (alreadyTracked) return;
-
-        // A zero Steam id is a valid server announcement for direct campaign peers. The credential
-        // still authenticates any inbound/NAT socket; Steam is needed only to initiate a Steam link.
-        if (entered.SteamId == 0) return;
-        if (!steamBridge.TryConnect(entered.SteamId, out var endpoint)) return;
 
         Guid ownCredential;
         lock (peerGate)
@@ -572,6 +579,40 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             ownCredential = localPeerCredential;
         }
         if (ownCredential == Guid.Empty) return;
+
+        if (deferredNatEndPoint != null && entered.SteamId == 0)
+        {
+            lock (peerGate)
+            {
+                if (generation != instanceGeneration ||
+                    entered.InstanceId != instanceId ||
+                    HasTrackedPeer(entered.ControllerId))
+                {
+                    return;
+                }
+
+                Logger.Information("Connecting P2P: {TargetEndPoint}", deferredNatEndPoint);
+                var peer = netManager.Connect(
+                    deferredNatEndPoint,
+                    new ConnectionToken(
+                        ControllerId,
+                        entered.InstanceId,
+                        localPeerCredential));
+                if (peer != null)
+                {
+                    deferredNatIntroductions.Remove(
+                        (entered.ControllerId, entered.PeerCredential));
+                    pendingPeerControllers[peer] = entered.ControllerId;
+                    peerCredentials[peer] = entered.PeerCredential;
+                }
+            }
+            return;
+        }
+
+        // A zero Steam id is a valid server announcement for direct campaign peers. The credential
+        // still authenticates any inbound/NAT socket; Steam is needed only to initiate a Steam link.
+        if (entered.SteamId == 0) return;
+        if (!steamBridge.TryConnect(entered.SteamId, out var endpoint)) return;
 
         var token = new ConnectionToken(ControllerId, entered.InstanceId, ownCredential);
         bool redundantConnection;
@@ -618,6 +659,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 controllerSteamIds.Remove(controllerId);
             }
             controllerPeerCredentials.Remove(controllerId);
+            RemoveDeferredNatIntroductions(controllerId);
             trackedPeers = RemoveTrackedPeers(controllerId);
         }
 
@@ -731,6 +773,16 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         return peers;
+    }
+
+    private void RemoveDeferredNatIntroductions(string controllerId)
+    {
+        foreach (var key in deferredNatIntroductions.Keys
+            .Where(key => key.ControllerId == controllerId)
+            .ToArray())
+        {
+            deferredNatIntroductions.Remove(key);
+        }
     }
 
     private void PromotePeer(NetPeer peer, string controllerId)
