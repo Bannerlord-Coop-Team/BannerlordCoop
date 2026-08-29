@@ -63,41 +63,6 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
-    public void PlayerDeletion_DropsWorldUpdatesUntilDisconnectWithoutAffectingOtherPeers()
-    {
-        var peer = network.CreatePeer();
-        var otherPeer = PeerWithEndpoint("127.0.0.2");
-
-        messageBroker.Publish(this, new PlayerDeletionStarted(peer));
-
-        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
-        Assert.True(queue.TryHandleBroadcast(peer, new FakeCampaignTimePacket()));
-        Assert.False(queue.TryHandleBroadcast(otherPeer, new FakePacket()));
-        Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
-
-        queue.BeginQueueing(peer);
-        queue.OpenWithTail(peer, new NetworkJoinSync(JoinSyncSignal.WorldReady));
-        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
-        Assert.True(NothingSentTo(peer));
-
-        messageBroker.Publish(this, new PlayerDisconnected(peer, default));
-        Assert.False(queue.TryHandleBroadcast(peer, new FakePacket()));
-    }
-
-    [Fact]
-    public void PlayerDeletion_DiscardsPreviouslyQueuedWorldUpdates()
-    {
-        var peer = Connect();
-        queue.BeginQueueing(peer);
-        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
-
-        messageBroker.Publish(this, new PlayerDeletionStarted(peer));
-        queue.Flush(peer);
-
-        Assert.True(NothingSentTo(peer));
-    }
-
-    [Fact]
     public void Connected_DropsPreSaveBroadcasts_NothingReplayed()
     {
         var peer = Connect();

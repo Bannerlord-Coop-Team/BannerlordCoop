@@ -65,10 +65,10 @@
     // Realistic: Enable battle death for all heroes
     "battleDeath": "VeryEasy",
 
-    // (Not currently supported) Toggle aging, births and natural deaths.
+    // Toggle aging, births and natural deaths.
     // NOTE: Having this off doesn't necessarily disable battle deaths
     // To disable battle deaths change "battleDeath" and "clanMemberDeathChance" instead
-    "birthAndDeath": false,
+    "birthAndDeath": true,
 
     // Toggle auto allocation of perks for members of player clans.
     "autoAllocateClanMemberPerks": false
