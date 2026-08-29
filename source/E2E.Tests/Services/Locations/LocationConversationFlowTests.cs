@@ -1,4 +1,5 @@
 ﻿using Common.Network;
+using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
@@ -84,6 +85,122 @@ public sealed class LocationConversationFlowTests : MapEventTestBase
         var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionEnded>().Single();
         Assert.Equal(receiverPartyId, ended.DefenderPartyId);
         Assert.True(ended.IsLocationInteraction);
+    }
+
+    [Fact]
+    public void ResponderEndingPlayerConversation_ReleasesBothParticipantsAndWaitingInteraction()
+    {
+        var clients = Clients.Take(2).ToArray();
+        var initiatorClient = clients[0];
+        var responderClient = clients[1];
+        var initiator = CreateLocationPlayer("LocationInitiator", initiatorClient);
+        var responder = CreateLocationPlayer("LocationResponder", responderClient);
+        var responderPartyId = GetPartyBaseId(responder.MobilePartyId);
+
+        Server.NetworkSentMessages.Clear();
+        initiatorClient.Call(() =>
+            initiatorClient.Resolve<INetwork>().SendAll(new NetworkRequestLocationConversation(
+                "test_location",
+                responder.CharacterId,
+                generation: 1)));
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionStarted>());
+
+        Server.NetworkSentMessages.Clear();
+        responderClient.Call(() =>
+            responderClient.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionEnded>().Single();
+        Assert.Equal(responderPartyId, ended.DefenderPartyId);
+        Assert.True(ended.IsLocationInteraction);
+
+        Server.NetworkSentMessages.Clear();
+        responderClient.Call(() =>
+            responderClient.Resolve<INetwork>().SendAll(new NetworkRequestLocationConversation(
+                "test_location",
+                initiator.CharacterId,
+                generation: 2)));
+
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkAllowLocationConversation>().Single().Generation);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLocationConversationDenied>());
+    }
+
+    [Fact]
+    public void ResponderDisconnect_ReleasesBothParticipantsAndWaitingInteraction()
+    {
+        var clients = Clients.Take(2).ToArray();
+        var initiatorClient = clients[0];
+        var responderClient = clients[1];
+        CreateLocationPlayer("DisconnectInitiator", initiatorClient);
+        var responder = CreateLocationPlayer("DisconnectResponder", responderClient);
+        var responderPartyId = GetPartyBaseId(responder.MobilePartyId);
+        var npcCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        initiatorClient.Call(() =>
+            initiatorClient.Resolve<INetwork>().SendAll(new NetworkRequestLocationConversation(
+                "test_location",
+                responder.CharacterId,
+                generation: 1)));
+
+        Server.NetworkSentMessages.Clear();
+        Server.SimulateMessage(this, new PlayerDisconnected(responderClient.NetPeer, default));
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionEnded>().Single();
+        Assert.Equal(responderPartyId, ended.DefenderPartyId);
+        Assert.True(ended.IsLocationInteraction);
+
+        var released = Server.NetworkSentMessages.GetMessages<NetworkLocationNpcReleased>().Single();
+        Assert.Equal("test_location", released.LocationId);
+        Assert.Equal(responder.CharacterId, released.CharacterId);
+
+        Server.NetworkSentMessages.Clear();
+        initiatorClient.Call(() =>
+            initiatorClient.Resolve<INetwork>().SendAll(new NetworkRequestLocationConversation(
+                "test_location",
+                npcCharacterId,
+                generation: 2)));
+
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkAllowLocationConversation>().Single().Generation);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLocationConversationDenied>());
+    }
+
+    [Fact]
+    public void NpcContention_AllowsCompetingRequestAfterRelease()
+    {
+        var clients = Clients.Take(2).ToArray();
+        var firstClient = clients[0];
+        var secondClient = clients[1];
+        CreateLocationPlayer("NpcFirst", firstClient);
+        CreateLocationPlayer("NpcSecond", secondClient);
+        var npcCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Server.NetworkSentMessages.Clear();
+        firstClient.Call(() =>
+            firstClient.Resolve<INetwork>().SendAll(new NetworkRequestLocationConversation(
+                "test_location",
+                npcCharacterId,
+                generation: 1)));
+        secondClient.Call(() =>
+            secondClient.Resolve<INetwork>().SendAll(new NetworkRequestLocationConversation(
+                "test_location",
+                npcCharacterId,
+                generation: 2)));
+
+        Assert.Equal(1, Server.NetworkSentMessages.GetMessages<NetworkAllowLocationConversation>().Single().Generation);
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkLocationConversationDenied>().Single().Generation);
+
+        firstClient.Call(() =>
+            firstClient.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+
+        Server.NetworkSentMessages.Clear();
+        secondClient.Call(() =>
+            secondClient.Resolve<INetwork>().SendAll(new NetworkRequestLocationConversation(
+                "test_location",
+                npcCharacterId,
+                generation: 3)));
+
+        Assert.Equal(3, Server.NetworkSentMessages.GetMessages<NetworkAllowLocationConversation>().Single().Generation);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLocationConversationDenied>());
     }
 
     [Fact]

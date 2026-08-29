@@ -2,6 +2,7 @@
 using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.UI.CoopOptions.Providers;
+using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
@@ -81,6 +82,9 @@ public class CoopOptionsVM : ViewModel
 
     [DataSourceProperty]
     public CoopOptionsTabVM MapTimeTab { get; set; }
+
+    [DataSourceProperty]
+    public CoopOptionsTabVM BugReportTab { get; set; }
 
     [DataSourceProperty]
     public CoopOptionsTabVM ChatTab { get; set; }
@@ -194,6 +198,11 @@ public class CoopOptionsVM : ViewModel
         {
             MapTimeTab = tab;
             OnPropertyChanged(nameof(MapTimeTab));
+        }
+        else if (tabId == BugReportOptionsTabProvider.TabId)
+        {
+            BugReportTab = tab;
+            OnPropertyChanged(nameof(BugReportTab));
         }
         else if (tabId == ChatOptionsTabProvider.TabId)
         {

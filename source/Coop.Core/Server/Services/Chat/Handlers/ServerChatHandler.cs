@@ -2,6 +2,8 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Players;
@@ -37,12 +39,16 @@ internal sealed class ServerChatHandler : IHandler
 
         messageBroker.Subscribe<NetworkSendChatMessage>(HandleChatMessage);
         messageBroker.Subscribe<NetworkRequestChatParticipants>(HandleParticipantRequest);
+        messageBroker.Subscribe<PlayerCampaignSynchronized>(HandlePlayerCampaignSynchronized);
+        messageBroker.Subscribe<PlayerDisconnected>(HandlePlayerDisconnected);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSendChatMessage>(HandleChatMessage);
         messageBroker.Unsubscribe<NetworkRequestChatParticipants>(HandleParticipantRequest);
+        messageBroker.Unsubscribe<PlayerCampaignSynchronized>(HandlePlayerCampaignSynchronized);
+        messageBroker.Unsubscribe<PlayerDisconnected>(HandlePlayerDisconnected);
     }
 
     private void HandleChatMessage(MessagePayload<NetworkSendChatMessage> payload)
@@ -80,11 +86,30 @@ internal sealed class ServerChatHandler : IHandler
             return;
         }
 
-        string[] controllerIds = playerManager.Players
+        network.SendImmediate(peer, new NetworkChatParticipants(GetConnectedControllerIds()));
+    }
+
+    private void HandlePlayerCampaignSynchronized(MessagePayload<PlayerCampaignSynchronized> payload)
+    {
+        GameThread.RunSafe(BroadcastParticipants, context: nameof(ServerChatHandler));
+    }
+
+    private void HandlePlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
+    {
+        GameThread.RunSafe(BroadcastParticipants, context: nameof(ServerChatHandler));
+    }
+
+    private void BroadcastParticipants()
+    {
+        network.SendAll(new NetworkChatParticipants(GetConnectedControllerIds()));
+    }
+
+    private string[] GetConnectedControllerIds()
+    {
+        return playerManager.Players
             .Where(playerManager.IsConnected)
             .Select(player => player.ControllerId)
             .ToArray();
-        network.SendImmediate(peer, new NetworkChatParticipants(controllerIds));
     }
 
     internal void RouteMessage(NetPeer senderPeer, NetworkSendChatMessage request)

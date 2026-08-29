@@ -17,7 +17,8 @@ permissions:
 
 concurrency:
   group: nightly-release
-  cancel-in-progress: false
+  # Dispatch cancels an in-flight scheduled run. A late cron waits, then refuses to overwrite.
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 env:
   R2_PRIVATE_BUCKET: bannerlordcoop-build-inputs
@@ -25,8 +26,113 @@ env:
   NIGHTLY_GATEWAY_ORIGIN: https://bannerlordcoop-nightly-gateway.garrett-luskey.workers.dev
 
 jobs:
-  build:
+  guard:
     if: github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_publish: ${{ steps.decide.outputs.should_publish }}
+    steps:
+      - name: Resolve due nightly date
+        id: due
+        env:
+          REQUESTED_RELEASE_DATE: ${{ inputs.release_date }}
+        run: |
+          set -eu
+          due_epoch=$(date +%s)
+          due_hour=$(TZ=America/Chicago date +%H)
+          due_minute=$(TZ=America/Chicago date +%M)
+          if [ "$due_hour" -lt 23 ] || { [ "$due_hour" -eq 23 ] && [ "$due_minute" -lt 57 ]; }; then
+            due_epoch=$((due_epoch - 86400))
+          fi
+          due_date=$(TZ=America/Chicago date -d "@$due_epoch" +%F)
+          if [ -n "$REQUESTED_RELEASE_DATE" ]; then
+            if ! printf '%s' "$REQUESTED_RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+              echo 'release_date must use YYYY-MM-DD' >&2
+              exit 1
+            fi
+            if [ "$REQUESTED_RELEASE_DATE" != "$due_date" ]; then
+              echo 'release_date must be the currently due nightly' >&2
+              exit 1
+            fi
+          fi
+          printf 'release_date=%s\n' "$due_date" >> "$GITHUB_OUTPUT"
+
+      - name: Keep a late scheduled nightly from overwriting a published one
+        id: decide
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          RELEASE_DATE: ${{ steps.due.outputs.release_date }}
+        with:
+          script: |
+            const releaseDate = process.env.RELEASE_DATE;
+            const cutoffMinutes = (23 * 60) + 57;
+            function centralDateParts(instant) {
+              const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/Chicago',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+              }).formatToParts(instant);
+              const values = new Map(parts.map((part) => [part.type, part.value]));
+              return {
+                year: values.get('year'),
+                month: values.get('month'),
+                day: values.get('day'),
+                hour: Number(values.get('hour')),
+                minute: Number(values.get('minute')),
+              };
+            }
+            function belongsToNightlyReleaseWindow(timestamp, date) {
+              const instant = new Date(timestamp);
+              if (!Number.isFinite(instant.getTime())) return false;
+              const values = centralDateParts(instant);
+              const localDate = `${values.year}-${values.month}-${values.day}`;
+              const next = new Date(`${date}T12:00:00.000Z`);
+              next.setUTCDate(next.getUTCDate() + 1);
+              const nextDate = next.toISOString().slice(0, 10);
+              const localMinutes = (values.hour * 60) + values.minute;
+              return (
+                (localDate === date && localMinutes >= cutoffMinutes)
+                || (localDate === nextDate && localMinutes < cutoffMinutes)
+              );
+            }
+            if (context.eventName !== 'schedule') {
+              core.setOutput('should_publish', 'true');
+              return;
+            }
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+              throw new Error('Due nightly date is invalid');
+            }
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'nightly-release.yml',
+              branch: 'development',
+              status: 'success',
+              per_page: 30,
+            });
+            const published = response.data.workflow_runs.find((run) =>
+              run.id !== context.runId
+              && (
+                belongsToNightlyReleaseWindow(run.created_at, releaseDate)
+                || belongsToNightlyReleaseWindow(run.updated_at, releaseDate)
+              ));
+            if (published) {
+              core.info(
+                `Scheduled nightly for ${releaseDate} will not overwrite ${published.html_url} (${published.event}).`,
+              );
+              core.setOutput('should_publish', 'false');
+              return;
+            }
+            core.setOutput('should_publish', 'true');
+
+  build:
+    needs: guard
+    if: github.ref == 'refs/heads/development' && needs.guard.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
@@ -65,9 +171,24 @@ jobs:
               workflow_id: 'nightly-release.yml',
               branch: 'development',
               status: 'success',
-              per_page: 1,
+              per_page: 20,
             });
-            return response.data.workflow_runs[0]?.head_sha ?? '';
+            for (const run of response.data.workflow_runs) {
+              const jobs = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 20,
+              });
+              const published = jobs.data.jobs.some((job) =>
+                job.name === 'sign-and-publish'
+                && job.conclusion === 'success'
+                && (job.steps ?? []).some((step) =>
+                  step.name === 'Publish latest client to private Patron R2'
+                  && step.conclusion === 'success'));
+              if (published) return run.head_sha;
+            }
+            return '';
 
       - name: Link Bannerlord assemblies
         run: ln -s /home/mb2 mb2
@@ -172,6 +293,7 @@ jobs:
             test -s "$binary/$required"
           done
           cp 'deploy/Server Instructions.md' deploy/mod-config.default.json "$module/"
+          cp -R deploy/ModuleData "$module/"
           cp -R UIMovies/. "$module/GUI/Prefabs/"
 
           coop_version=$(sed -n 's/.*<CoopVersion>\([^<]*\)<\/CoopVersion>.*/\1/p' source/Directory.Build.props)
@@ -454,7 +576,33 @@ jobs:
           "archive_bytes=$archiveBytes" >> $env:GITHUB_OUTPUT
           "archive_sha256=$archiveSha256" >> $env:GITHUB_OUTPUT
 
+      - name: Skip scheduled overwrite of a published nightly
+        id: published
+        shell: pwsh
+        env:
+          RCLONE_CONFIG_PATRON_TYPE: s3
+          RCLONE_CONFIG_PATRON_PROVIDER: Cloudflare
+          RCLONE_CONFIG_PATRON_ACCESS_KEY_ID: ${{ secrets.R2_PATRON_NIGHTLY_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_PATRON_SECRET_ACCESS_KEY: ${{ secrets.R2_PATRON_NIGHTLY_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          RELEASE_DATE: ${{ needs.build.outputs.release_date }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          'overwrite=true' | Add-Content $env:GITHUB_OUTPUT
+          if ($env:GITHUB_EVENT_NAME -ne 'schedule') { return }
+          if ($env:RELEASE_DATE -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Release date is invalid' }
+          $env:RCLONE_CONFIG_PATRON_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          $manifest = Join-Path $env:RUNNER_TEMP 'published-client.json'
+          & (Join-Path $PWD 'rclone.exe') copyto "patron:$env:R2_NIGHTLY_BUCKET/nightly/client.json" $manifest --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          if ($LASTEXITCODE -ne 0) { return }
+          $published = Get-Content -LiteralPath $manifest -Raw -Encoding utf8 | ConvertFrom-Json
+          if ([string]$published.releaseDate -eq $env:RELEASE_DATE) {
+            Write-Host "Scheduled nightly will not overwrite the published $($env:RELEASE_DATE) client."
+            'overwrite=false' | Add-Content $env:GITHUB_OUTPUT
+          }
+
       - name: Publish dedicated-server client input
+        if: steps.published.outputs.overwrite == 'true'
         shell: bash
         env:
           RCLONE_CONFIG_PRIVATE_TYPE: s3
@@ -486,6 +634,7 @@ jobs:
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
       - name: Publish latest client to private Patron R2
+        if: steps.published.outputs.overwrite == 'true'
         shell: bash
         env:
           RCLONE_CONFIG_PATRON_TYPE: s3
@@ -517,7 +666,7 @@ jobs:
 
   cleanup-private-handoff:
     needs: [build, sign-and-publish]
-    if: ${{ always() && needs.build.outputs.handoff_key != '' }}
+    if: ${{ always() && needs.build.result == 'success' && needs.build.outputs.handoff_key != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
