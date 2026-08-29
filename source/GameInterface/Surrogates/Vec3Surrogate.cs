@@ -40,3 +40,4 @@ internal struct Vec3Surrogate
         public uint Bits;
     }
 }
+
