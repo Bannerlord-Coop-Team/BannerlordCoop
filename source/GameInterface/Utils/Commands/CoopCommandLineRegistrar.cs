@@ -123,9 +123,12 @@ public sealed class CoopCommandLineRegistrar : ICoopCommandLineRegistrar
     {
         foreach (KeyValuePair<string, Registration> registration in registrations)
         {
-            if (!gameCommands.Contains(registration.Key) ||
-                !ReferenceEquals(gameCommands[registration.Key], registration.Value.GameCommand))
+            if (!gameCommands.Contains(registration.Key)) continue;
+
+            object currentRegistration = gameCommands[registration.Key];
+            if (!ReferenceEquals(currentRegistration, registration.Value.GameCommand))
             {
+                PruneDisposedPreviousRegistrations(registration.Key, currentRegistration);
                 continue;
             }
 
@@ -140,6 +143,25 @@ public sealed class CoopCommandLineRegistrar : ICoopCommandLineRegistrar
             {
                 gameCommands[registration.Key] = previousRegistration;
             }
+        }
+    }
+
+    private void PruneDisposedPreviousRegistrations(string fullName, object currentRegistration)
+    {
+        object candidate = currentRegistration;
+        while (candidate != null && TryGetOwningRegistrar(candidate, out CoopCommandLineRegistrar owner))
+        {
+            if (!owner.registrations.TryGetValue(fullName, out Registration registration) ||
+                !ReferenceEquals(registration.GameCommand, candidate))
+            {
+                return;
+            }
+
+            object activePreviousRegistration = FindActivePreviousRegistration(
+                fullName,
+                registration.PreviousRegistration);
+            registration.PreviousRegistration = activePreviousRegistration;
+            candidate = activePreviousRegistration;
         }
     }
 
@@ -206,6 +228,6 @@ public sealed class CoopCommandLineRegistrar : ICoopCommandLineRegistrar
 
         public object GameCommand { get; }
 
-        public object PreviousRegistration { get; }
+        public object PreviousRegistration { get; set; }
     }
 }

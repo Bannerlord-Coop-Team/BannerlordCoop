@@ -2,6 +2,8 @@
 using GameInterface.Utils.Commands;
 using Moq;
 using Serilog;
+using System;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -63,6 +65,77 @@ public class CoopCommandLineRegistrarTests
         }
 
         Assert.False(CommandLineFunctionality.HasFunctionForCommand(FullName));
+    }
+
+    [Fact]
+    public void Registration_WhenThreeGenerationsOverlap_UnlinksDisposedPredecessors()
+    {
+        var argsFactory = new CoopCommandArgsFactory();
+        var registrations = CreateOverlappingRegistrations(argsFactory);
+
+        try
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            Assert.False(registrations.FirstRegistrar.IsAlive);
+            Assert.False(registrations.FirstRegistry.IsAlive);
+            Assert.False(registrations.SecondRegistrar.IsAlive);
+            Assert.False(registrations.SecondRegistry.IsAlive);
+
+            string output = CommandLineFunctionality.CallFunction(
+                FullName,
+                "current",
+                out bool found);
+
+            Assert.True(found);
+            Assert.Equal("current", output);
+        }
+        finally
+        {
+            registrations.ActiveRegistrar.Dispose();
+        }
+
+        Assert.False(CommandLineFunctionality.HasFunctionForCommand(FullName));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (
+        WeakReference FirstRegistrar,
+        WeakReference FirstRegistry,
+        WeakReference SecondRegistrar,
+        WeakReference SecondRegistry,
+        CoopCommandLineRegistrar ActiveRegistrar) CreateOverlappingRegistrations(
+            CoopCommandArgsFactory argsFactory)
+    {
+        var firstRegistry = new CoopCommandRegistry(
+            new[] { new CaptureCommand() },
+            Mock.Of<ILogger>());
+        var secondRegistry = new CoopCommandRegistry(
+            new[] { new CaptureCommand() },
+            Mock.Of<ILogger>());
+        var thirdRegistry = new CoopCommandRegistry(
+            new[] { new CaptureCommand() },
+            Mock.Of<ILogger>());
+        var firstRegistrar = new CoopCommandLineRegistrar(firstRegistry, argsFactory);
+        var secondRegistrar = new CoopCommandLineRegistrar(secondRegistry, argsFactory);
+        var thirdRegistrar = new CoopCommandLineRegistrar(thirdRegistry, argsFactory);
+
+        var firstRegistrarReference = new WeakReference(firstRegistrar);
+        var firstRegistryReference = new WeakReference(firstRegistry);
+        var secondRegistrarReference = new WeakReference(secondRegistrar);
+        var secondRegistryReference = new WeakReference(secondRegistry);
+
+        firstRegistrar.Dispose();
+        secondRegistrar.Dispose();
+
+        return (
+            firstRegistrarReference,
+            firstRegistryReference,
+            secondRegistrarReference,
+            secondRegistryReference,
+            thirdRegistrar);
     }
 
     private sealed class CaptureCommand : ICoopCommand
