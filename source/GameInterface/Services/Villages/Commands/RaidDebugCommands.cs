@@ -185,7 +185,10 @@ public class RaidDebugCommands
             var playerHero = fixture.PlayerParty.LeaderHero;
             if (playerHero == null)
                 return "The fixture player party needs a leader hero.";
-            fixture.PlayerParty.MemberRoster.AddToCounts(playerHero.CharacterObject, 100);
+            var basicTroop = playerHero.Culture?.BasicTroop;
+            if (basicTroop == null)
+                return "The fixture player hero needs a culture basic troop.";
+            fixture.PlayerParty.MemberRoster.AddToCounts(basicTroop, 100);
 
             fixture.Positioned = true;
             return LiveTestJson(fixture.Token);
