@@ -3,8 +3,10 @@ using Missions.Agents.Handlers;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
+using System;
 using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Packets
@@ -375,6 +377,23 @@ namespace Missions.Agents.Packets
             Agent.MovementControlFlag defendFlags,
             Agent.GuardMode guardMode,
             int guardReactionChannel = -1)
+            : this(
+                agent,
+                defendFlags,
+                guardMode,
+                guardReactionChannel,
+                GetCurrentActionSpeed(agent, 0),
+                GetCurrentActionSpeed(agent, 1))
+        {
+        }
+
+        internal AgentActionData(
+            Agent agent,
+            Agent.MovementControlFlag defendFlags,
+            Agent.GuardMode guardMode,
+            int guardReactionChannel,
+            float? action0Speed,
+            float? action1Speed)
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
@@ -405,9 +424,11 @@ namespace Missions.Agents.Packets
             Action0Index = cache0.Index;
             Action0Progress = agent.GetCurrentActionProgress(0);
             Action0Flag = (ulong)agent.GetCurrentAnimationFlag(0);
+            Action0Speed = action0Speed;
             Action1Index = cache1.Index;
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
+            Action1Speed = action1Speed;
             int validGuardReactionChannel =
                 guardReactionChannel >= 0
                 && guardReactionChannel <= 1
@@ -455,108 +476,125 @@ namespace Missions.Agents.Packets
             ApplyDefendMovementFlags(agent, movementFlags);
 
             // Install action transitions, but let an unchanged native action advance on its local timeline.
-            if (!ShouldSuppressReleasedPlayerGuardAction(0)
-                && (!suppressMountedGuardActionTransition
-                    || GuardActionChannel != 0)
-                && NeedsActionTransition(
+            ApplyActionChannel(
+                agent,
+                visualActionAccessor,
+                channel: 0,
+                Action0Index,
+                Action0Progress,
+                Action0Flag,
+                Action0Speed,
+                suppressMountedGuardActionTransition);
+            ApplyActionChannel(
+                agent,
+                visualActionAccessor,
+                channel: 1,
+                Action1Index,
+                Action1Progress,
+                Action1Flag,
+                Action1Speed,
+                suppressMountedGuardActionTransition);
+        }
+
+        private void ApplyActionChannel(
+            Agent agent,
+            IAgentVisualActionAccessor visualActionAccessor,
+            int channel,
+            int actionIndex,
+            float actionProgress,
+            ulong actionFlag,
+            float? actionSpeed,
+            bool suppressMountedGuardActionTransition)
+        {
+            bool suppressTransition =
+                ShouldSuppressReleasedPlayerGuardAction(channel)
+                || (suppressMountedGuardActionTransition
+                    && GuardActionChannel == channel)
+                || ShouldPreserveCurrentGuardReaction(agent, channel);
+            if (suppressTransition) return;
+
+            float resolvedActionSpeed = actionSpeed ?? 1f;
+            if (!NeedsActionTransition(
                     agent,
-                    0,
-                    Action0Index,
+                    channel,
+                    actionIndex,
                     visualActionAccessor,
                     preserveVisibleAction:
-                        IsMounted && GuardActionChannel == 0,
-                    preserveCurrentGuardReaction:
-                        ShouldPreserveCurrentGuardReaction(
-                            agent,
-                            0)))
+                        IsMounted && GuardActionChannel == channel,
+                    preserveCurrentGuardReaction: false))
             {
-                if (TryResolveActionTransition(
-                    agent,
-                    0,
-                    Action0Index,
-                    out ActionIndexCache action0))
+                if (actionSpeed.HasValue
+                    && actionIndex >= 0
+                    && agent.GetCurrentAction(channel).Index == actionIndex)
                 {
-                    bool forceGuardDirectionTransition =
-                        ShouldForceMountedGuardDirectionTransition(
-                            agent,
-                            0);
-                    AnimFlags actionFlags = (AnimFlags)Action0Flag;
-                    if (forceGuardDirectionTransition)
-                    {
-                        ClearMountedGuardDirectionAction(agent, 0);
-                        ApplyGuardDirectionTransition(
-                            agent,
-                            GuardMode);
-                        actionFlags |= AnimFlags.anf_restart;
-                    }
-#if DEBUG
-                    MissionActionDiagnostics.RecordActionCommand(
-                        agent,
-                        channel: 0,
-                        action0.Index,
-                        Action0Progress,
-                        actionFlags,
-                        "action-packet");
-#endif
-                    agent.SetActionChannel(
-                        0,
-                        action0,
-                        ignorePriority: forceGuardDirectionTransition,
-                        additionalFlags: actionFlags,
-                        startProgress: Action0Progress);
+                    agent.SetCurrentActionSpeed(channel, resolvedActionSpeed);
                 }
+                return;
             }
 
-            if (!ShouldSuppressReleasedPlayerGuardAction(1)
-                && (!suppressMountedGuardActionTransition
-                    || GuardActionChannel != 1)
-                && NeedsActionTransition(
+            if (!TryResolveActionTransition(
                     agent,
-                    1,
-                    Action1Index,
-                    visualActionAccessor,
-                    preserveVisibleAction:
-                        IsMounted && GuardActionChannel == 1,
-                    preserveCurrentGuardReaction:
-                        ShouldPreserveCurrentGuardReaction(
-                            agent,
-                            1)))
+                    channel,
+                    actionIndex,
+                    out ActionIndexCache action))
             {
-                if (TryResolveActionTransition(
+                return;
+            }
+
+            bool forceGuardDirectionTransition =
+                ShouldForceMountedGuardDirectionTransition(
                     agent,
-                    1,
-                    Action1Index,
-                    out ActionIndexCache action1))
-                {
-                    bool forceGuardDirectionTransition =
-                        ShouldForceMountedGuardDirectionTransition(
-                            agent,
-                            1);
-                    AnimFlags actionFlags = (AnimFlags)Action1Flag;
-                    if (forceGuardDirectionTransition)
-                    {
-                        ClearMountedGuardDirectionAction(agent, 1);
-                        ApplyGuardDirectionTransition(
-                            agent,
-                            GuardMode);
-                        actionFlags |= AnimFlags.anf_restart;
-                    }
+                    channel);
+            AnimFlags actionFlags = (AnimFlags)actionFlag;
+            if (forceGuardDirectionTransition)
+            {
+                ClearMountedGuardDirectionAction(agent, channel);
+                ApplyGuardDirectionTransition(agent, GuardMode);
+                actionFlags |= AnimFlags.anf_restart;
+            }
 #if DEBUG
-                    MissionActionDiagnostics.RecordActionCommand(
-                        agent,
-                        channel: 1,
-                        action1.Index,
-                        Action1Progress,
-                        actionFlags,
-                        "action-packet");
+            MissionActionDiagnostics.RecordActionCommand(
+                agent,
+                channel,
+                action.Index,
+                actionProgress,
+                actionFlags,
+                "action-packet");
 #endif
-                    agent.SetActionChannel(
-                        1,
-                        action1,
-                        ignorePriority: forceGuardDirectionTransition,
-                        additionalFlags: actionFlags,
-                        startProgress: Action1Progress);
-                }
+            agent.SetActionChannel(
+                channel,
+                action,
+                ignorePriority: forceGuardDirectionTransition,
+                additionalFlags: actionFlags,
+                actionSpeed: resolvedActionSpeed,
+                startProgress: actionProgress);
+        }
+
+        // Agent exposes only a speed setter, so read the rendered channel through its publicized skeleton API.
+        internal static float GetCurrentActionSpeed(Agent agent, int channel)
+        {
+            Skeleton skeleton = null;
+            try
+            {
+                MBAgentVisuals visuals = agent?.AgentVisuals;
+                if (ReferenceEquals(visuals, null) || !visuals.IsValid()) return 1f;
+
+                skeleton = visuals.GetSkeleton();
+                if (ReferenceEquals(skeleton, null)) return 1f;
+
+                float speed = skeleton.GetAnimationSpeedAtChannel(channel);
+                return float.IsNaN(speed) || float.IsInfinity(speed)
+                    ? 1f
+                    : Math.Max(0f, speed);
+            }
+            catch (NullReferenceException)
+            {
+                return 1f;
+            }
+            finally
+            {
+                if (!ReferenceEquals(skeleton, null))
+                    skeleton.ManualInvalidate();
             }
         }
 
@@ -714,6 +752,11 @@ namespace Missions.Agents.Packets
         public bool IsPlayerControlled { get; }
         [ProtoMember(16)]
         public bool GuardActionIsReaction { get; }
+        // Nullable keeps packets from older peers (where these fields are absent) at the native 1x default.
+        [ProtoMember(17)]
+        public float? Action0Speed { get; }
+        [ProtoMember(18)]
+        public float? Action1Speed { get; }
         internal Agent.MovementControlFlag DefendFlags =>
             GetDefendMovementFlags((Agent.MovementControlFlag)MovementFlag);
         internal Agent.GuardMode GuardMode => FromWireGuardState(GuardState);
