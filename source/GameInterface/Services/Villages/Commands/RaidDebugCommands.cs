@@ -16,6 +16,8 @@ using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
 using Newtonsoft.Json;
 using SandBox.GauntletUI;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -287,6 +289,9 @@ public class RaidDebugCommands
         var inventoryVm = inventoryScreen?._dataSource;
         var otherItemCount = inventoryVm?._inventoryLogic?.GetElementCountOnSide(
             InventoryLogic.InventorySide.OtherInventory) ?? 0;
+        var mapScreen = ScreenManager.TopScreen as MapScreen;
+        var simulationVm = (mapScreen?._battleSimulationView as GauntletMapBattleSimulationView)?._dataSource;
+        var battleSimulation = PlayerEncounter.Current?.BattleSimulation;
         var mapEvent = MapEvent.PlayerMapEvent;
         var mapEventId = string.Empty;
         if (mapEvent != null && ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
@@ -298,12 +303,38 @@ public class RaidDebugCommands
             inventoryActive = Game.Current?.GameStateManager?.ActiveState is InventoryState,
             topScreenIsInventory = inventoryScreen != null,
             otherItemCount,
+            simulationActive = simulationVm?.IsSimulation == true,
+            simulationFinished = battleSimulation?.IsSimulationFinished == true,
+            simulationResultVisible = simulationVm?.IsSimulation == true && simulationVm.IsOver,
             warningActive = InformationManager.IsAnyInquiryActive(),
             encounterState = PlayerEncounter.Current?.EncounterState.ToString() ?? "none",
             encounterSettlementId = PlayerEncounter.EncounterSettlement?.StringId ?? string.Empty,
             mapEventId = mapEventId ?? string.Empty,
             menuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? string.Empty,
             settlementId = Settlement.CurrentSettlement?.StringId ?? string.Empty
+        });
+    }
+
+    [CommandLineArgumentFunction("raid_loot_warning_complete_simulation", "coop.debug.mapevent")]
+    public static string CompleteRaidLootWarningSimulation(List<string> args)
+    {
+        if (ModInformation.IsServer) return "Run this command on the client.";
+        if (args.Count != 0) return "Usage: coop.debug.mapevent.raid_loot_warning_complete_simulation";
+
+        var battleSimulation = PlayerEncounter.Current?.BattleSimulation;
+        if (battleSimulation == null || !battleSimulation.IsSimulationFinished)
+            return "The completed battle simulation is not ready.";
+
+        var mapScreen = ScreenManager.TopScreen as MapScreen;
+        var simulationVm = (mapScreen?._battleSimulationView as GauntletMapBattleSimulationView)?._dataSource;
+        if (simulationVm?.IsSimulation != true || !simulationVm.IsOver)
+            return "The completed battle simulation result is not open.";
+
+        simulationVm.ExecuteQuitAction();
+        return LiveTestJson(new
+        {
+            success = true,
+            simulationFinished = battleSimulation.IsSimulationFinished
         });
     }
 
