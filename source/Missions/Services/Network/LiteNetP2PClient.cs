@@ -676,14 +676,26 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private void HandlePeerDeparture(string controllerId, string departedInstanceId)
     {
         List<(NetPeer Peer, bool Mapped)> trackedPeers;
-        ulong remoteSteamId = 0;
+        var remoteSteamIds = new HashSet<ulong>();
         lock (peerGate)
         {
             if (departedInstanceId != instanceId) return;
 
-            if (controllerSteamIds.TryGetValue(controllerId, out remoteSteamId))
+            if (controllerSteamIds.TryGetValue(controllerId, out ulong announcedSteamId))
             {
                 controllerSteamIds.Remove(controllerId);
+                if (announcedSteamId != 0) remoteSteamIds.Add(announcedSteamId);
+            }
+            foreach (var pair in peerSteamIds)
+            {
+                if (!pendingPeerControllers.TryGetValue(pair.Key, out string trackedControllerId))
+                {
+                    mappedPeerControllers.TryGetValue(pair.Key, out trackedControllerId);
+                }
+                if (trackedControllerId == controllerId && pair.Value != 0)
+                {
+                    remoteSteamIds.Add(pair.Value);
+                }
             }
             controllerPeerCredentials.Remove(controllerId);
             RemoveDeferredNatIntroductions(controllerId);
@@ -698,35 +710,45 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             netManager.DisconnectPeer(peer);
         }
 
-        if (remoteSteamId != 0) steamBridge.Disconnect(remoteSteamId);
+        foreach (ulong remoteSteamId in remoteSteamIds)
+        {
+            steamBridge.Disconnect(remoteSteamId);
+        }
     }
 
     private void Handle_SteamPeerDisconnected(ulong remoteSteamId)
     {
-        string controllerId = null;
-        List<(NetPeer Peer, bool Mapped)> trackedPeers = null;
+        var disconnectedControllers = new List<(
+            string ControllerId,
+            List<(NetPeer Peer, bool Mapped)> TrackedPeers)>();
         lock (peerGate)
         {
-            foreach (var pair in controllerSteamIds)
+            var controllerIds = new HashSet<string>();
+            foreach (var pair in peerSteamIds)
             {
-                if (pair.Value == remoteSteamId)
+                if (pair.Value != remoteSteamId) continue;
+                if (pendingPeerControllers.TryGetValue(pair.Key, out string controllerId) ||
+                    mappedPeerControllers.TryGetValue(pair.Key, out controllerId))
                 {
-                    controllerId = pair.Key;
-                    break;
+                    controllerIds.Add(controllerId);
                 }
             }
 
-            if (controllerId != null) trackedPeers = RemoveTrackedPeers(controllerId);
+            foreach (string controllerId in controllerIds)
+            {
+                disconnectedControllers.Add((controllerId, RemoveTrackedPeers(controllerId)));
+            }
         }
 
-        if (trackedPeers == null) return;
-
-        foreach (var (peer, mapped) in trackedPeers)
+        foreach (var (controllerId, trackedPeers) in disconnectedControllers)
         {
-            if (mapped) missionContext.RemovePeer(peer);
+            foreach (var (peer, mapped) in trackedPeers)
+            {
+                if (mapped) missionContext.RemovePeer(peer);
+            }
+            reliableMessageBatcher.Flush(controllerId, SendReliableMessagePayload);
+            foreach (var (peer, _) in trackedPeers) netManager.DisconnectPeer(peer);
         }
-        reliableMessageBatcher.Flush(controllerId, SendReliableMessagePayload);
-        foreach (var (peer, _) in trackedPeers) netManager.DisconnectPeer(peer);
     }
 
     private bool HasTrackedPeer(string controllerId)

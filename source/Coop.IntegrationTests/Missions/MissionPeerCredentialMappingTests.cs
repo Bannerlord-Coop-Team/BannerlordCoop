@@ -165,6 +165,37 @@ public class MissionPeerCredentialMappingTests
     }
 
     [Fact]
+    public void ZeroSteamIdAnnouncementSteamDisconnect_RemovesAuthenticatedRoute()
+    {
+        using var fixture = new Fixture();
+        var credential = Guid.NewGuid();
+        fixture.Announce("direct-host", steamId: 0, credential);
+        var peer = fixture.TrackPending("direct-host", credential, actualSteamId: 9001);
+        fixture.Client.OnPeerConnected(peer);
+
+        fixture.SteamBridge.Raise(bridge => bridge.PeerDisconnected += null, 9001UL);
+
+        Assert.DoesNotContain(peer, fixture.MappedPeers.Keys);
+        fixture.MissionContext.Verify(context => context.RemovePeer(peer), Times.Once);
+    }
+
+    [Fact]
+    public void ZeroSteamIdAnnouncementDeparture_ClosesAuthenticatedSteamTunnel()
+    {
+        using var fixture = new Fixture();
+        var credential = Guid.NewGuid();
+        fixture.Announce("direct-host", steamId: 0, credential);
+        var peer = fixture.TrackPending("direct-host", credential, actualSteamId: 9001);
+        fixture.Client.OnPeerConnected(peer);
+
+        fixture.Depart("direct-host");
+
+        fixture.SteamBridge.Verify(bridge => bridge.Disconnect(9001), Times.Once);
+        Assert.DoesNotContain(peer, fixture.MappedPeers.Keys);
+        fixture.MissionContext.Verify(context => context.RemovePeer(peer), Times.Once);
+    }
+
+    [Fact]
     public void OldRouteDisconnectDuringAuthenticatedReplacement_KeepsSharedSteamTunnel()
     {
         using var fixture = new Fixture(startNetwork: true, authenticatedSteamId: 9001);
