@@ -400,6 +400,18 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("ill_days", "coop.debug.hero")]
     public static string HeroIllDays(List<string> args)
     {
+        if (ModInformation.IsClient)
+        {
+            if (Campaign.Current.MainHeroIllDays == -1)
+            {
+                return $"{Hero.MainHero.Name} is not ill.";
+            }
+            else
+            {
+                return $"{Hero.MainHero.Name} has been ill for {Campaign.Current.MainHeroIllDays} day(s).";
+            }
+        }
+
         if (args.Count < 1)
         {
             return "Usage: coop.debug.hero.hero_ill_days <heroName>";
