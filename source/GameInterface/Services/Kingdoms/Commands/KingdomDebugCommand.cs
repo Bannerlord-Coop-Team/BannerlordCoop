@@ -161,10 +161,14 @@ public class KingdomDebugCommand
         if (args.Count < 2) return "Usage: <kingdomId> <decisionIndex>";
 
         KingdomDecision decision;
-        Kingdom playerKingdom = Clan.PlayerClan?.Kingdom;
+        Clan playerClan = Clan.PlayerClan;
+        Kingdom playerKingdom = playerClan?.Kingdom;
         bool isPlayerKingdom = playerKingdom != null &&
             (string.Equals(playerKingdom.StringId, args[0], StringComparison.Ordinal) ||
-             string.Equals($"{nameof(Kingdom)}_{playerKingdom.StringId}", args[0], StringComparison.Ordinal));
+             string.Equals($"{nameof(Kingdom)}_{playerKingdom.StringId}", args[0], StringComparison.Ordinal) ||
+             TryGetObjectManager(out var objectManager) &&
+             (MatchesRegisteredReference(objectManager, args[0], playerKingdom, typeof(Kingdom)) ||
+              MatchesRegisteredReference(objectManager, args[0], playerClan, typeof(Clan))));
         if (isPlayerKingdom)
         {
             if (!int.TryParse(args[1], out int index)) return $"Decision index is not a number: {args[1]}";
@@ -204,6 +208,23 @@ public class KingdomDebugCommand
         InformationManager.HideInquiry();
         inquiry.AffirmativeAction();
         return "KINGDOM_DECISION_SCREEN_OPENED";
+    }
+
+    internal static bool MatchesRegisteredReference(
+        IObjectManager objectManager,
+        string referenceId,
+        object instance,
+        Type referenceType)
+    {
+        if (objectManager == null || string.IsNullOrEmpty(referenceId) || instance == null || referenceType == null)
+            return false;
+        if (!objectManager.TryGetId(instance, out string registeredId)) return false;
+
+        return string.Equals(referenceId, registeredId, StringComparison.Ordinal) ||
+            string.Equals(
+                referenceId,
+                global::GameInterface.Services.ObjectManager.ObjectManager.Compact(registeredId, referenceType),
+                StringComparison.Ordinal);
     }
 
     [CommandLineArgumentFunction("close", "coop.debug.kingdom")]

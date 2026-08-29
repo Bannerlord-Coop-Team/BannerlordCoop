@@ -1,7 +1,12 @@
+using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.ObjectManager;
+using Moq;
 using ProtoBuf;
+using Serilog;
 using System.IO;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
@@ -36,6 +41,31 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.NotNull(fieldInfo);
             object? obj = fieldInfo?.GetValue(null);
             Assert.NotNull(obj);
+        }
+
+        [Fact]
+        public void CompactClanReference_MatchesRegisteredPlayerClan()
+        {
+            var objectManager = new ObjectManager(Mock.Of<ILogger>());
+            var playerClan = new Clan();
+            const string registeredClanId = "Clan_Created_27";
+            Assert.True(objectManager.AddExisting(registeredClanId, playerClan));
+
+            Assert.True(KingdomDebugCommand.MatchesRegisteredReference(
+                objectManager,
+                "Created_27",
+                playerClan,
+                typeof(Clan)));
+            Assert.True(KingdomDebugCommand.MatchesRegisteredReference(
+                objectManager,
+                registeredClanId,
+                playerClan,
+                typeof(Clan)));
+            Assert.False(KingdomDebugCommand.MatchesRegisteredReference(
+                objectManager,
+                "Created_28",
+                playerClan,
+                typeof(Clan)));
         }
     }
 }
