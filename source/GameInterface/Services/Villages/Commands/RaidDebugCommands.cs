@@ -182,6 +182,11 @@ public class RaidDebugCommands
             if (!AreFactionsAtWar(fixture.PlayerParty.MapFaction, fixture.Settlement.MapFaction))
                 return "The fixture factions are no longer at war.";
 
+            var playerHero = fixture.PlayerParty.LeaderHero;
+            if (playerHero == null)
+                return "The fixture player party needs a leader hero.";
+            fixture.PlayerParty.MemberRoster.AddToCounts(playerHero.CharacterObject, 100);
+
             fixture.Positioned = true;
             return LiveTestJson(fixture.Token);
         }
