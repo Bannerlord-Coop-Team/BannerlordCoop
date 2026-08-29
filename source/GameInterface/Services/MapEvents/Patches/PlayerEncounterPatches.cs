@@ -461,8 +461,10 @@ internal class PlayerEncounterPatches
 
         var playerEncounter = PlayerEncounter.Current;
         if (playerEncounter == null) return false;
-        if (MapEvent.PlayerMapEvent != null &&
-            !MapEventInitializationBarrier.IsBattleResultEncounter(playerEncounter))
+        var mapEvent = MapEvent.PlayerMapEvent;
+        if (mapEvent != null &&
+            (!mapEvent.IsRaid ||
+             !MapEventInitializationBarrier.IsBattleResultEncounter(playerEncounter)))
             return true;
         if (PlayerCaptivity.IsCaptive) return false;
 

@@ -997,6 +997,54 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void ForceSuppliesSimulationResult_WithLiveMapEvent_UsesVanillaEncounterEnd()
+    {
+        var client = Clients.First();
+        var (heroId, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+
+            using (new AllowedThread())
+            {
+                mobileParty.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+                hero.PartyBelongedTo = mobileParty;
+            }
+
+            var mapEvent = CreateHostileActionMapEvent(
+                mobileParty.Party,
+                settlement.Party,
+                VillageHostileAction.ForceSupplies);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventId);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: mapEventId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = mobileParty;
+            }
+
+            encounter.ForceSupplies = true;
+            encounter.EncounterState = PlayerEncounterState.End;
+
+            Assert.Same(mapEvent, MapEvent.PlayerMapEvent);
+            Assert.True(PlayerEncounterPatches.UpdatePrefix());
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void RaidDefenderVictoryFinalizeRequest_ResetsPlayersToVillage()
     {
         var client = Clients.First();

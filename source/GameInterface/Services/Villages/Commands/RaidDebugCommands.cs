@@ -13,6 +13,7 @@ using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
+using HarmonyLib;
 using Newtonsoft.Json;
 using SandBox.GauntletUI;
 using System;
@@ -382,10 +383,10 @@ public class RaidDebugCommands
                 fixture.PlayerParty.CurrentSettlement != fixture.OriginalSettlement)
                 settlementInterface.PartyLeaveSettlement(fixture.PlayerParty);
 
-            RestoreParty(fixture.PlayerPartySnapshot);
-            RestoreParty(fixture.SettlementPartySnapshot);
             foreach (var hero in fixture.Heroes)
                 RestoreHeroProgression(hero);
+            RestoreParty(fixture.PlayerPartySnapshot);
+            RestoreParty(fixture.SettlementPartySnapshot);
             foreach (var hero in fixture.Heroes)
                 RestoreHeroMembership(hero);
             foreach (var clan in fixture.Clans)
@@ -394,20 +395,16 @@ public class RaidDebugCommands
             fixture.Settlement.Village.VillageState = fixture.OriginalVillageState;
             fixture.Settlement.SettlementHitPoints = fixture.OriginalSettlementHitPoints;
 
-            if (fixture.OriginalSettlement != null)
+            if (fixture.OriginalSettlement != null &&
+                fixture.PlayerParty.CurrentSettlement != fixture.OriginalSettlement)
             {
-                if (fixture.PlayerParty.CurrentSettlement != fixture.OriginalSettlement)
-                {
-                    fixture.PlayerParty.Position = fixture.OriginalSettlement.GatePosition;
-                    HoldAndPublishPosition(fixture.PlayerParty);
-                    settlementInterface.PartyEnterSettlement(fixture.PlayerParty, fixture.OriginalSettlement);
-                }
-            }
-            else
-            {
-                fixture.PlayerParty.Position = fixture.OriginalPosition;
+                fixture.PlayerParty.Position = fixture.OriginalSettlement.GatePosition;
                 HoldAndPublishPosition(fixture.PlayerParty);
+                settlementInterface.PartyEnterSettlement(fixture.PlayerParty, fixture.OriginalSettlement);
             }
+
+            fixture.PlayerParty.Position = fixture.OriginalPosition;
+            HoldAndPublishPosition(fixture.PlayerParty);
 
             RestoreFactionState(fixture.FactionState);
 
@@ -438,7 +435,7 @@ public class RaidDebugCommands
             fixture.Heroes.All(HeroMatches) &&
             fixture.Clans.All(ClanMatches) &&
             FactionStateMatches(fixture.FactionState) &&
-            (fixture.OriginalSettlement != null || fixture.PlayerParty.Position == fixture.OriginalPosition);
+            fixture.PlayerParty.Position == fixture.OriginalPosition;
 
         if (restored)
             raidLootWarningFixture = null;
@@ -487,6 +484,9 @@ public class RaidDebugCommands
         return true;
     }
 
+    internal static bool IsFixtureHero(Hero hero) =>
+        raidLootWarningFixture?.Heroes.Any(snapshot => snapshot.Hero == hero) == true;
+
     private static void HoldAndPublishPosition(MobileParty party)
     {
         party.SetMoveModeHold();
@@ -529,6 +529,8 @@ public class RaidDebugCommands
             .Where(party => party != null)
             .SelectMany(party => party.MemberRoster.GetTroopRoster()
                 .Select(element => element.Character?.HeroObject)
+                .Concat(party.PrisonRoster.GetTroopRoster()
+                    .Select(element => element.Character?.HeroObject))
                 .Concat(new[] { party.LeaderHero }))
             .Where(hero => hero != null)
             .Distinct()
@@ -543,6 +545,7 @@ public class RaidDebugCommands
             hero.PartyBelongedToAsPrisoner,
             hero.HitPoints,
             hero.Gold,
+            hero.Level,
             hero.DeathMark,
             hero.DeathMarkKillerHero,
             Skills.All.ToDictionary(skill => skill, hero.GetSkillValue),
@@ -632,13 +635,14 @@ public class RaidDebugCommands
 
     private static void RestoreHeroProgression(HeroSnapshot snapshot)
     {
-        if (snapshot.Hero.IsPrisoner)
+        if (snapshot.PrisonerParty == null && snapshot.Hero.IsPrisoner)
             EndCaptivityAction.ApplyByPeace(snapshot.Hero);
 
         snapshot.Hero.DeathMark = snapshot.DeathMark;
         snapshot.Hero.DeathMarkKillerHero = snapshot.DeathMarkKillerHero;
         snapshot.Hero.HitPoints = snapshot.HitPoints;
         snapshot.Hero.Gold = snapshot.Gold;
+        snapshot.Hero.Level = snapshot.Level;
         snapshot.Hero.ChangeState(snapshot.State);
 
         foreach (var skill in snapshot.SkillLevels)
@@ -649,7 +653,7 @@ public class RaidDebugCommands
 
         foreach (var skillXp in snapshot.SkillXps)
             snapshot.Hero.HeroDeveloper.SetSkillXp(skillXp.Key, skillXp.Value);
-        snapshot.Hero.HeroDeveloper._totalXp = snapshot.TotalXp;
+        snapshot.Hero.HeroDeveloper.TotalXp = snapshot.TotalXp;
         snapshot.Hero.HeroDeveloper.UnspentFocusPoints = snapshot.UnspentFocusPoints;
         snapshot.Hero.HeroDeveloper.UnspentAttributePoints = snapshot.UnspentAttributePoints;
     }
@@ -747,6 +751,7 @@ public class RaidDebugCommands
             snapshot.Hero.PartyBelongedToAsPrisoner != snapshot.PrisonerParty ||
             snapshot.Hero.HitPoints != snapshot.HitPoints ||
             snapshot.Hero.Gold != snapshot.Gold ||
+            snapshot.Hero.Level != snapshot.Level ||
             snapshot.Hero.DeathMark != snapshot.DeathMark ||
             snapshot.Hero.DeathMarkKillerHero != snapshot.DeathMarkKillerHero ||
             snapshot.SkillLevels.Any(skill => snapshot.Hero.GetSkillValue(skill.Key) != skill.Value))
@@ -887,6 +892,7 @@ public class RaidDebugCommands
         public PartyBase PrisonerParty { get; }
         public int HitPoints { get; }
         public int Gold { get; }
+        public int Level { get; }
         public KillCharacterAction.KillCharacterActionDetail DeathMark { get; }
         public Hero DeathMarkKillerHero { get; }
         public Dictionary<SkillObject, int> SkillLevels { get; }
@@ -902,6 +908,7 @@ public class RaidDebugCommands
             PartyBase prisonerParty,
             int hitPoints,
             int gold,
+            int level,
             KillCharacterAction.KillCharacterActionDetail deathMark,
             Hero deathMarkKillerHero,
             Dictionary<SkillObject, int> skillLevels,
@@ -916,6 +923,7 @@ public class RaidDebugCommands
             PrisonerParty = prisonerParty;
             HitPoints = hitPoints;
             Gold = gold;
+            Level = level;
             DeathMark = deathMark;
             DeathMarkKillerHero = deathMarkKillerHero;
             SkillLevels = skillLevels;
@@ -1017,5 +1025,23 @@ public class RaidDebugCommands
             FirstPoliticalStagnation = firstPoliticalStagnation;
             SecondPoliticalStagnation = secondPoliticalStagnation;
         }
+    }
+}
+
+[HarmonyPatch(typeof(Hero), nameof(Hero.CanDie))]
+internal static class RaidLootWarningFixtureHeroDeathPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(
+        Hero __instance,
+        KillCharacterAction.KillCharacterActionDetail causeOfDeath,
+        ref bool __result)
+    {
+        if (causeOfDeath != KillCharacterAction.KillCharacterActionDetail.DiedInBattle ||
+            !RaidDebugCommands.IsFixtureHero(__instance))
+            return true;
+
+        __result = false;
+        return false;
     }
 }
