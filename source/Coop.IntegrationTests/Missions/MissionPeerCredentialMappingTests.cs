@@ -522,16 +522,20 @@ public class MissionPeerCredentialMappingTests
                     .Returns(true);
             }
 
+            var serializer = new Mock<ICommonSerializer>();
+
             Client = new LiteNetP2PClient(
                 config.Object,
                 new Mock<IRelayNetwork>().Object,
                 MissionContext.Object,
-                new Mock<ICommonSerializer>().Object,
+                serializer.Object,
                 messageBroker,
                 new Mock<IPacketManager>().Object,
+                new Mock<IMessagePacketHandler>().Object,
                 controllerIdProvider.Object,
                 SteamBridge.Object,
-                new Mock<IMovementPacketCompressor>().Object);
+                new Mock<IMovementPacketCompressor>().Object,
+                new ReliableMessageBatcher<string>(serializer.Object));
             Client.ConnectToInstance(InstanceId);
             if (startNetwork) Client.Start();
 

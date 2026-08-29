@@ -152,6 +152,7 @@ public class MissionDisconnectDetectionTests
         var serializer = new Mock<ICommonSerializer>();
         var messageBroker = new Mock<IMessageBroker>();
         var packetManager = new Mock<IPacketManager>();
+        var messagePacketHandler = new Mock<IMessagePacketHandler>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         var steamBridge = new Mock<ISteamMissionBridge>();
         var movementPacketCompressor = new Mock<IMovementPacketCompressor>();
@@ -163,9 +164,11 @@ public class MissionDisconnectDetectionTests
             serializer.Object,
             messageBroker.Object,
             packetManager.Object,
+            messagePacketHandler.Object,
             controllerIdProvider.Object,
             steamBridge.Object,
-            movementPacketCompressor.Object);
+            movementPacketCompressor.Object,
+            new ReliableMessageBatcher<string>(serializer.Object));
 
         var droppedPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 55001), 1);
 

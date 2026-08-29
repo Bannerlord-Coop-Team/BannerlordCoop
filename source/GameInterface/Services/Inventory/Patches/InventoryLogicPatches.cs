@@ -7,7 +7,6 @@ using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Inventory;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Inventory.Patches;
@@ -66,8 +65,7 @@ internal class InventoryLogicPatches
             __instance.CurrentMobileParty,
             __instance.CurrentSettlementComponent,
             __instance.GetBoughtItems(),
-            __instance.GetSoldItems(),
-            PartyBase.MainParty.MemberRoster
+            __instance.GetSoldItems()
         );
 
         MessageBroker.Instance.Publish(__instance, message);

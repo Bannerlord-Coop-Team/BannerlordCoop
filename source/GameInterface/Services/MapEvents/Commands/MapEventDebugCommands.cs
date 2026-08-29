@@ -6,6 +6,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -24,6 +25,7 @@ using GameInterface.Utils.Commands;
 using Helpers;
 using Newtonsoft.Json;
 using ProtoBuf;
+using SandBox.GauntletUI;
 using Serilog;
 using System;
 using System.Collections;
@@ -47,6 +49,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
+using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -55,6 +58,85 @@ public class MapEventDebugCommands
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
     private static LateJoinModeFixture lateJoinModeFixture;
+    private static InquiryData pendingPrisonerPromptInquiry;
+
+    [CommandLineArgumentFunction("prisoner_prompt_state", "coop.debug.mapevent")]
+    public static string PrisonerPromptState(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Run this command on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.mapevent.prisoner_prompt_state";
+        return CreatePrisonerPromptStateResult();
+    }
+
+    [CommandLineArgumentFunction("prisoner_prompt", "coop.debug.mapevent")]
+    public static string PrisonerPrompt(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Run this command on a client.";
+        if (args.Count != 1 || (args[0] != "commit" && args[0] != "accept"))
+            return "Usage: coop.debug.mapevent.prisoner_prompt <commit|accept>";
+
+        if (args[0] == "commit")
+        {
+            if (pendingPrisonerPromptInquiry != null)
+                return "A prisoner warning is already pending acceptance.";
+            if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
+                partyState.PartyScreenMode != PartyScreenHelper.PartyScreenMode.Loot)
+                return "The real aftermath Party screen is not active.";
+            if (partyState.PartyScreenLogic?.PrisonerRosters[0]?.TotalManCount <= 0)
+                return "The aftermath screen has no prisoners left behind.";
+            if (!((ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource is { } partyVm))
+                return "The active aftermath Party view model is unavailable.";
+
+            InquiryData capturedInquiry = null;
+            Action<InquiryData, bool, bool> captureInquiry = (data, _, _) => capturedInquiry = data;
+            InformationManager.OnShowInquiry += captureInquiry;
+            try
+            {
+                partyVm.ExecuteDone();
+            }
+            finally
+            {
+                InformationManager.OnShowInquiry -= captureInquiry;
+            }
+
+            if (capturedInquiry?.AffirmativeAction == null || !InformationManager.IsAnyInquiryActive())
+                return "The real leave-prisoners warning did not open.";
+
+            pendingPrisonerPromptInquiry = capturedInquiry;
+            return CreatePrisonerPromptStateResult();
+        }
+
+        var inquiry = pendingPrisonerPromptInquiry;
+        if (inquiry?.AffirmativeAction == null)
+            return "No captured prisoner warning is pending acceptance.";
+
+        pendingPrisonerPromptInquiry = null;
+        InformationManager.HideInquiry();
+        inquiry.AffirmativeAction();
+        return CreatePrisonerPromptStateResult();
+    }
+
+    private static string CreatePrisonerPromptStateResult()
+    {
+        var partyState = Game.Current?.GameStateManager?.ActiveState as PartyState;
+        var logic = partyState?.PartyScreenLogic;
+        var mainParty = MobileParty.MainParty;
+        var army = mainParty?.Army;
+        return "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            success = true,
+            activeState = Game.Current?.GameStateManager?.ActiveState?.GetType().Name,
+            partyScreenActive = partyState != null,
+            partyScreenMode = partyState?.PartyScreenMode.ToString(),
+            leftPrisoners = logic?.PrisonerRosters[0]?.TotalManCount ?? 0,
+            inquiryActive = InformationManager.IsAnyInquiryActive(),
+            capturedInquiryPending = pendingPrisonerPromptInquiry != null,
+            mainPartyMapEventActive = mainParty?.MapEvent != null,
+            mainPartyArmyActive = army != null,
+            mainPartyIsNonLeaderArmyMember = army != null && army.LeaderParty != mainParty,
+            currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
+        });
+    }
 
     private sealed class LateJoinModeFixture
     {
@@ -94,6 +176,7 @@ public class MapEventDebugCommands
     {
         public BattleRewardPlayerSnapshot Initiator;
         public BattleRewardPlayerSnapshot LateJoiner;
+        public Army Army;
         public MobileParty BanditParty;
         public MobileParty ReinforcementParty;
         public CharacterObject BanditTroop;
@@ -105,12 +188,14 @@ public class MapEventDebugCommands
         public bool ReinforcementAdded;
         public bool PartialRoutIssued;
         public bool EnemiesRouted;
+        public bool InitiatorKingdomChanged;
     }
 
     private sealed class BattleRewardPlayerSnapshot
     {
         public string ControllerId;
         public Hero Hero;
+        public Hero LeaderHero;
         public MobileParty Party;
         public TroopRosterElement[] MemberRoster;
         public TroopRosterElement[] PrisonRoster;
@@ -118,6 +203,9 @@ public class MapEventDebugCommands
         public PartyBehaviorUpdateData Behavior;
         public int HitPoints;
         public float RecentEventsMorale;
+        public float ClanInfluence;
+        public Kingdom ClanKingdom;
+        public CampaignTime ClanLastFactionChangeTime;
     }
 
     private sealed class PlayerFieldBattleFixture
@@ -939,8 +1027,6 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.join_existing <mapEventId> <Attacker|Defender>";
         }
 
-        if (PlayerEncounter.Current != null)
-            return "A player encounter is already active.";
         if (!TryGetObjectManager(out var objectManager))
             return "Unable to resolve ObjectManager";
         if (!objectManager.TryGetObjectWithLogging<MapEvent>(args[0], out var mapEvent))
@@ -948,16 +1034,32 @@ public class MapEventDebugCommands
         if (mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None)
             return $"Map event {args[0]} is already concluded.";
 
+        var encounter = PlayerEncounter.Current;
+        if (encounter != null && PlayerEncounter.Battle != mapEvent)
+            return "A player encounter for another map event is already active.";
+
+        if (encounter?.IsJoinedBattle == true)
+        {
+            if (encounter.PlayerSide != side)
+                return $"The active encounter already joined the {encounter.PlayerSide} side.";
+
+            return $"Started the {side} join encounter for map event {args[0]}.";
+        }
+
         var opposingParty = mapEvent.GetLeaderParty(
             side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
         if (opposingParty == null)
             return $"Map event {args[0]} has no opposing leader party.";
 
-        PlayerEncounter.Start();
-        if (side == BattleSideEnum.Attacker)
-            PlayerEncounter.Current.SetupFields(MobileParty.MainParty.Party, opposingParty);
-        else
-            PlayerEncounter.Current.SetupFields(opposingParty, MobileParty.MainParty.Party);
+        if (encounter == null)
+        {
+            PlayerEncounter.Start();
+            if (side == BattleSideEnum.Attacker)
+                PlayerEncounter.Current.SetupFields(MobileParty.MainParty.Party, opposingParty);
+            else
+                PlayerEncounter.Current.SetupFields(opposingParty, MobileParty.MainParty.Party);
+        }
+
         PlayerEncounter.JoinBattle(side);
 
         return $"Started the {side} join encounter for map event {args[0]}.";
@@ -1017,7 +1119,7 @@ public class MapEventDebugCommands
         return $"Battle reward fixture preflight prepared: finalized={mapEventId}, battleState=None.";
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_start testclient testclient2
+    // coop.debug.mapevent.battle_reward_fixture_start testclient testclient2 army
     /// <summary>Creates the two-player late-join field battle from #2308.</summary>
     [CommandLineArgumentFunction("battle_reward_fixture_start", "coop.debug.mapevent")]
     public static string StartBattleRewardFixture(List<string> args)
@@ -1025,8 +1127,9 @@ public class MapEventDebugCommands
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
-        if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_start <initiatorControllerId> <lateJoinerControllerId>";
+        var createArmy = args.Count == 3 && string.Equals(args[2], "army", StringComparison.OrdinalIgnoreCase);
+        if (args.Count != 2 && !createArmy)
+            return "Usage: coop.debug.mapevent.battle_reward_fixture_start <initiatorControllerId> <lateJoinerControllerId> [army]";
 
         if (args[0] == args[1])
             return "The initiator and late joiner must be different players.";
@@ -1042,6 +1145,9 @@ public class MapEventDebugCommands
 
         if (VillageHostileFactionStanceHelper.HasWarStance(initiatorParty.MapFaction, lateJoinerParty.MapFaction))
             return "The fixture players must be allied.";
+
+        if (createArmy && (initiatorParty.Army != null || lateJoinerParty.Army != null))
+            return "Both fixture players must be outside an army before starting army mode.";
 
         if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
             return "Unable to resolve the mobile-party behavior snapshot service.";
@@ -1105,6 +1211,46 @@ public class MapEventDebugCommands
                 totalTroops: 20,
                 new CampaignVec2(new Vec2(fixturePosition.X - 0.2f, fixturePosition.Y), isOnLand: true));
 
+            if (createArmy)
+            {
+                var clan = initiator.Hero.Clan;
+                if (clan == null)
+                    throw new InvalidOperationException($"Player {initiator.ControllerId} must belong to a clan for army mode.");
+
+                var kingdom = clan.Kingdom;
+                if (kingdom == null)
+                {
+                    kingdom = danustica.MapFaction as Kingdom ?? danustica.OwnerClan?.Kingdom;
+                    if (kingdom == null)
+                        throw new InvalidOperationException("Danustica does not belong to a kingdom for army mode.");
+                    if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+                        throw new InvalidOperationException("Unable to resolve the kingdom membership state service.");
+
+                    fixture.InitiatorKingdomChanged = true;
+                    kingdomMembershipState.MoveClanToKingdom(
+                        null,
+                        kingdom,
+                        clan,
+                        publishCollectionChanges: true,
+                        republishExistingCollections: true);
+                    if (clan.Kingdom != kingdom)
+                        throw new InvalidOperationException("The initiator clan was not added to the fixture kingdom.");
+                }
+
+                if (initiator.Party.LeaderHero != initiator.Hero)
+                    throw new InvalidOperationException("The fixture initiator must lead its party before creating an army.");
+
+                fixture.Army = new Army(kingdom, initiator.Party, Army.ArmyTypes.Raider);
+                fixture.Army.Gather(danustica);
+                CampaignEventDispatcher.Instance.OnArmyCreated(fixture.Army);
+                if (fixture.Army == null || fixture.Army.LeaderParty != initiator.Party)
+                    throw new InvalidOperationException("The fixture army was not created with the initiator as its leader.");
+
+                lateJoiner.Party.Army = fixture.Army;
+                if (lateJoiner.Party.Army != fixture.Army)
+                    throw new InvalidOperationException("The late joiner was not added to the fixture army.");
+            }
+
             var banditComponent = (BanditPartyComponent)referenceBandit.PartyComponent;
             fixture.BanditParty = BanditPartyComponent.CreateBanditParty(
                 $"debug_2308_reward_bandits_{Guid.NewGuid():N}",
@@ -1138,6 +1284,10 @@ public class MapEventDebugCommands
                 throw new InvalidOperationException("Unable to resolve the fixture's network ids.");
             }
 
+            var armyId = "none";
+            if (fixture.Army != null && !objectManager.TryGetId(fixture.Army, out armyId))
+                throw new InvalidOperationException("Unable to resolve the fixture army's network id.");
+
             network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
                 $"debug-2308-initiator-{Guid.NewGuid():N}",
                 banditPartyId,
@@ -1148,11 +1298,14 @@ public class MapEventDebugCommands
                    $"initiatorTroops={initiator.Party.MemberRoster.TotalManCount}, lateJoiner={args[1]}, " +
                    $"lateJoinerTroops={lateJoiner.Party.MemberRoster.TotalManCount}, " +
                    $"bandit={fixture.BanditParty.StringId}, banditTroops={fixture.BanditParty.MemberRoster.TotalManCount}, " +
+                   $"army={armyId}, armyMember={lateJoiner.Party.Army == fixture.Army && fixture.Army != null}, " +
                    $"position={fixturePosition.X:R}|{fixturePosition.Y:R}.";
         }
         catch (Exception e)
         {
             Logger.Error(e, "Failed to create battle reward fixture");
+            if (createArmy && fixture.Army == null)
+                fixture.Army = fixture.Initiator.Party.Army;
             if (TryRestoreBattleRewardFixture(fixture, out var restoreError))
                 battleRewardFixture = null;
             else
@@ -1338,11 +1491,16 @@ public class MapEventDebugCommands
         TryGetObjectManager(out var objectManager);
         string mapEventId = null;
         objectManager?.TryGetId(fixture.MapEvent, out mapEventId);
+        string armyId = null;
+        if (fixture.Army != null)
+            objectManager?.TryGetId(fixture.Army, out armyId);
 
         return $"Battle reward fixture state: mapEvent={mapEventId ?? "unregistered"}, " +
                $"finalized={fixture.MapEvent.IsFinalized}, lateJoinerAdded={fixture.LateJoinerAdded}, " +
                $"reinforcementAdded={fixture.ReinforcementAdded}, partialRoutIssued={fixture.PartialRoutIssued}, " +
-               $"enemiesRouted={fixture.EnemiesRouted}, " +
+               $"enemiesRouted={fixture.EnemiesRouted}, army={armyId ?? "none"}, " +
+               $"armyLeader={fixture.Army?.LeaderParty?.StringId ?? "none"}, " +
+               $"lateJoinerArmyMember={fixture.Army != null && fixture.LateJoiner.Party.Army == fixture.Army}, " +
                FormatBattleRewardPlayerState("initiator", fixture.Initiator, fixture.InitiatorMapEventParty) + ", " +
                FormatBattleRewardPlayerState("lateJoiner", fixture.LateJoiner, fixture.LateJoinerMapEventParty) + ".";
     }
@@ -1360,6 +1518,11 @@ public class MapEventDebugCommands
 
         var encounter = PlayerEncounter.Current;
         var mainParty = PartyBase.MainParty;
+        var mainMobileParty = mainParty?.MobileParty;
+        var army = mainMobileParty?.Army;
+        string armyId = null;
+        if (army != null && ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            objectManager.TryGetId(army, out armyId);
         return $"Battle reward client state: encounter={encounter != null}, " +
                $"encounterState={(encounter == null ? "none" : encounter.EncounterState.ToString())}, " +
                $"activeState={GameStateManager.Current?.ActiveState?.GetType().Name ?? "none"}, " +
@@ -1367,7 +1530,9 @@ public class MapEventDebugCommands
                $"pendingMembers={encounter?.RosterToReceiveLootMembers.TotalManCount ?? 0}, " +
                $"pendingPrisoners={encounter?.RosterToReceiveLootPrisoners.TotalManCount ?? 0}, " +
                $"partyItems={mainParty?.ItemRoster.Sum(element => element.Amount) ?? 0}, " +
-               $"partyPrisoners={mainParty?.PrisonRoster.TotalManCount ?? 0}.";
+               $"partyPrisoners={mainParty?.PrisonRoster.TotalManCount ?? 0}, " +
+               $"army={armyId ?? "none"}, armyLeader={army?.LeaderParty?.StringId ?? "none"}, " +
+               $"isArmyLeader={army != null && army.LeaderParty == mainMobileParty}.";
     }
 
     // coop.debug.mapevent.battle_reward_fixture_restore
@@ -1428,6 +1593,7 @@ public class MapEventDebugCommands
         {
             ControllerId = controllerId,
             Hero = hero,
+            LeaderHero = party.LeaderHero,
             Party = party,
             MemberRoster = party.MemberRoster.GetTroopRoster().ToArray(),
             PrisonRoster = party.PrisonRoster.GetTroopRoster().ToArray(),
@@ -1435,6 +1601,9 @@ public class MapEventDebugCommands
             Behavior = behavior,
             HitPoints = hero.HitPoints,
             RecentEventsMorale = party.RecentEventsMorale,
+            ClanInfluence = hero.Clan?.Influence ?? 0f,
+            ClanKingdom = hero.Clan?.Kingdom,
+            ClanLastFactionChangeTime = hero.Clan?.LastFactionChangeTime ?? CampaignTime.Zero,
         };
         return true;
     }
@@ -1444,16 +1613,30 @@ public class MapEventDebugCommands
         int totalTroops,
         CampaignVec2 position)
     {
-        RestoreTroopRoster(snapshot.Party.MemberRoster, Array.Empty<TroopRosterElement>());
+        var heroRoster = snapshot.Party.MemberRoster.GetTroopRoster()
+            .Where(element => element.Character.IsHero)
+            .ToArray();
+        RestoreTroopRoster(snapshot.Party.MemberRoster, heroRoster);
         RestoreTroopRoster(snapshot.Party.PrisonRoster, Array.Empty<TroopRosterElement>());
         snapshot.Party.ItemRoster.Clear();
 
-        snapshot.Party.MemberRoster.AddToCounts(snapshot.Hero.CharacterObject, 1, insertAtFront: true);
+        if (snapshot.Party.MemberRoster.GetTroopCount(snapshot.Hero.CharacterObject) == 0)
+            snapshot.Party.MemberRoster.AddToCounts(snapshot.Hero.CharacterObject, 1, insertAtFront: true);
+
         var basicTroop = snapshot.Hero.Culture?.BasicTroop;
         if (basicTroop == null)
             throw new InvalidOperationException($"Player {snapshot.ControllerId} has no culture basic troop.");
 
-        snapshot.Party.MemberRoster.AddToCounts(basicTroop, totalTroops - 1);
+        var regularTroopCount = totalTroops - snapshot.Party.MemberRoster.TotalManCount;
+        if (regularTroopCount < 1)
+            throw new InvalidOperationException($"Player {snapshot.ControllerId} has too many heroes for the fixture.");
+
+        snapshot.Party.MemberRoster.AddToCounts(basicTroop, regularTroopCount);
+        if (snapshot.Party.LeaderHero != snapshot.Hero)
+            snapshot.Party.ChangePartyLeader(snapshot.Hero);
+        if (snapshot.Party.LeaderHero != snapshot.Hero)
+            throw new InvalidOperationException($"Player {snapshot.ControllerId} could not lead the fixture party.");
+
         snapshot.Hero.HitPoints = snapshot.Hero.MaxHitPoints;
         snapshot.Party.Position = position;
         snapshot.Party.SetMoveModeHold();
@@ -1486,10 +1669,18 @@ public class MapEventDebugCommands
             if (fixture.MapEvent != null && !fixture.MapEvent.IsFinalized)
                 fixture.MapEvent.FinalizeEvent();
 
+            if (fixture.Army != null && fixture.Initiator.Party.Army == fixture.Army)
+                DisbandArmyAction.ApplyInternal(fixture.Army, Army.ArmyDispersionReason.NotEnoughParty);
+            if (fixture.Army != null && fixture.LateJoiner.Party.Army == fixture.Army)
+                fixture.LateJoiner.Party.Army = null;
+
             if (fixture.BanditParty?.IsActive == true && fixture.BanditParty.MapEvent == null)
                 DestroyPartyAction.Apply(null, fixture.BanditParty);
             if (fixture.ReinforcementParty?.IsActive == true && fixture.ReinforcementParty.MapEvent == null)
                 DestroyPartyAction.Apply(null, fixture.ReinforcementParty);
+
+            if (fixture.InitiatorKingdomChanged)
+                RestoreBattleRewardClanKingdom(fixture.Initiator);
 
             if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
                 throw new InvalidOperationException("Unable to resolve the mobile-party behavior snapshot service.");
@@ -1507,6 +1698,23 @@ public class MapEventDebugCommands
         }
     }
 
+    private static void RestoreBattleRewardClanKingdom(BattleRewardPlayerSnapshot snapshot)
+    {
+        var clan = snapshot.Hero.Clan;
+        if (clan == null)
+            throw new InvalidOperationException($"Unable to restore the clan kingdom for {snapshot.ControllerId}.");
+        if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+            throw new InvalidOperationException("Unable to resolve the kingdom membership state service.");
+
+        kingdomMembershipState.MoveClanToKingdom(
+            clan.Kingdom,
+            snapshot.ClanKingdom,
+            clan,
+            publishCollectionChanges: true,
+            republishExistingCollections: true);
+        clan.LastFactionChangeTime = snapshot.ClanLastFactionChangeTime;
+    }
+
     private static void RestoreBattleRewardPlayer(
         BattleRewardPlayerSnapshot snapshot,
         IMobilePartyBehaviorSnapshot behaviorSnapshot)
@@ -1517,8 +1725,18 @@ public class MapEventDebugCommands
         foreach (var element in snapshot.ItemRoster)
             snapshot.Party.ItemRoster.Add(element);
 
+        if (snapshot.Party.LeaderHero != snapshot.LeaderHero)
+            snapshot.Party.ChangePartyLeader(snapshot.LeaderHero);
+
         snapshot.Hero.HitPoints = snapshot.HitPoints;
         snapshot.Party.RecentEventsMorale = snapshot.RecentEventsMorale;
+        var clan = snapshot.Hero.Clan;
+        if (clan != null)
+        {
+            var influenceDelta = snapshot.ClanInfluence - clan.Influence;
+            if (Math.Abs(influenceDelta) > 0.001f)
+                ChangeClanInfluenceAction.Apply(clan, influenceDelta);
+        }
         snapshot.Party.Position = snapshot.Behavior.PartyPosition;
         snapshot.Party.IsCurrentlyAtSea = snapshot.Behavior.IsCurrentlyAtSea;
         if (!behaviorSnapshot.TryApply(snapshot.Party, snapshot.Behavior, out _))
@@ -1897,11 +2115,10 @@ public class MapEventDebugCommands
             GameMenu.SwitchToMenu("encounter");
         }
 
-        var menuContext = Campaign.Current?.CurrentMenuContext;
-        if (menuContext == null)
-            return "No active encounter menu.";
+        var startResult = StartAttackMission(args);
+        if (!startResult.StartsWith("Starting attack mission for ", StringComparison.Ordinal))
+            return startResult;
 
-        MenuHelper.EncounterAttackConsequence(new MenuCallbackArgs(menuContext, null));
         return "Requested entry into the current battle.";
     }
 

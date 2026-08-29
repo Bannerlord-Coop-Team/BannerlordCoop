@@ -8,7 +8,6 @@ using Common.Util;
 using Coop.Core.Common.Network.Packets;
 using LiteNetLib;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -31,6 +30,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     // Profiles outbound packets; dumps per-type counts and byte totals every 10 seconds (server only).
     private readonly PacketProfiler packetProfiler = new PacketProfiler(TimeSpan.FromSeconds(10));
+    private readonly IReliableMessageBatcher<NetPeer> reliableMessageBatcher;
 
     // Guard against repeated container and explicit disposal.
     private int disposed;
@@ -40,11 +40,17 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     protected CoopNetworkBase(
         INetworkConfig configuration,
         ICommonSerializer serializer,
+        IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
         CancellationTokenSource sessionCancellation)
     {
+        if (reliableMessageBatcher == null)
+            throw new ArgumentNullException(nameof(reliableMessageBatcher));
+
         Config = configuration;
         this.serializer = serializer;
         this.sessionCancellation = sessionCancellation;
+        this.reliableMessageBatcher = reliableMessageBatcher;
+        this.reliableMessageBatcher.AggregateSent += RecordAggregateSent;
 
         netManager = new NetManager(this)
         {
@@ -104,7 +110,9 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         // Wake blocking game-thread marshals before waiting for the poll callback to return.
         sessionCancellation.Cancel();
         poller.StopAndWait(Timeout.InfiniteTimeSpan);
+        reliableMessageBatcher.AggregateSent -= RecordAggregateSent;
         packetProfiler.Dispose();
+        reliableMessageBatcher.Clear();
         netManager.Stop();
     }
 
@@ -186,15 +194,10 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
             // envelope's framing overhead is recorded separately when a batch actually leaves.
             packetProfiler.Record(packet, payload.Length);
 
-            if (immediate || payload.Length >= AggregationBudgetBytes)
-            {
-                // Keep the reliable stream's order: everything buffered was logically sent first.
-                FlushPeerMessages(netPeer);
-                netPeer.Send(payload, packet.DeliveryMethod);
-                return;
-            }
-
-            EnqueueMessage(netPeer, payload);
+            if (immediate)
+                reliableMessageBatcher.SendImmediate(netPeer, payload, SendReliableMessagePayload);
+            else
+                reliableMessageBatcher.Send(netPeer, payload, SendReliableMessagePayload);
             return;
         }
 
@@ -208,7 +211,11 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         if (packet.DeliveryMethod == DeliveryMethod.ReliableOrdered ||
             packet.DeliveryMethod == DeliveryMethod.ReliableUnordered)
         {
-            FlushPeerMessages(netPeer);
+            reliableMessageBatcher.FlushThen(
+                netPeer,
+                SendReliableMessagePayload,
+                () => netPeer.Send(data, GetChannel(packet), packet.DeliveryMethod));
+            return;
         }
 
         netPeer.Send(data, GetChannel(packet), packet.DeliveryMethod);
@@ -225,94 +232,26 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     private static byte GetChannel(IPacket packet) => packet is GameSaveDataPacket or GameSaveDataChunkPacket ? BulkChannel : (byte)0;
 
-    #region Message aggregation
-
-    /// <summary>
-    /// Combined payload budget per aggregate batch. LiteNetLib's reliable channel caps unacked
-    /// packets — not bytes — in flight (a hardcoded 64-packet window in 1.3.1), so per-peer
-    /// throughput scales with packet fullness.
-    /// </summary>
-    /// <remarks>
-    /// Why 1200: a LiteNetLib connection starts at InitialMtu (1024B) and probes upward ("MTU
-    /// discovery") to MaxPacketSize (1432B = Ethernet 1500 minus IP/UDP/LiteNetLib headers),
-    /// normally settling at 1432 within seconds. 1200B of payload plus envelope framing (~10-30B
-    /// protobuf + 4B channeled header) fits one 1432B datagram — one packet, one window slot. On a
-    /// link still at 1024 (pre-discovery, or a path that never upgrades) the envelope splits into
-    /// two reliable fragments — two window slots, still ~10x fewer than one packet per message.
-    /// </remarks>
-    public const int AggregationBudgetBytes = 1200;
-
-    private sealed class PeerMessageBuffer
-    {
-        public readonly object Lock = new object();
-        public readonly MessageAggregationBuffer Buffer = new MessageAggregationBuffer(AggregationBudgetBytes);
-    }
-
-    private readonly ConcurrentDictionary<NetPeer, PeerMessageBuffer> pendingMessages =
-        new ConcurrentDictionary<NetPeer, PeerMessageBuffer>();
-
-    private void EnqueueMessage(NetPeer netPeer, byte[] payload)
-    {
-        var peerBuffer = pendingMessages.GetOrAdd(netPeer, _ => new PeerMessageBuffer());
-        lock (peerBuffer.Lock)
-        {
-            var overflow = peerBuffer.Buffer.Append(payload);
-            // Sending under the peer's lock keeps batches in enqueue order on the reliable stream.
-            if (overflow != null) SendBatch(netPeer, overflow);
-        }
-    }
-
-    private void FlushPeerMessages(NetPeer netPeer)
-    {
-        if (pendingMessages.TryGetValue(netPeer, out var peerBuffer) == false) return;
-
-        lock (peerBuffer.Lock)
-        {
-            var batch = peerBuffer.Buffer.Drain();
-            if (batch != null) SendBatch(netPeer, batch);
-        }
-    }
-
     /// <summary>
     /// Sends every peer's buffered messages and prunes buffers of disconnected peers. Normally called
     /// from the network update; the join-save path also calls it while the poll thread is blocked.
     /// </summary>
     public void FlushPendingMessages()
     {
-        foreach (var entry in pendingMessages)
-        {
-            if (entry.Key.ConnectionState != ConnectionState.Connected)
-            {
-                pendingMessages.TryRemove(entry.Key, out _);
-                continue;
-            }
-
-            FlushPeerMessages(entry.Key);
-        }
+        reliableMessageBatcher.FlushAll(
+            peer => peer.ConnectionState == ConnectionState.Connected,
+            SendReliableMessagePayload);
     }
 
-    private void SendBatch(NetPeer netPeer, List<byte[]> payloads)
+    private void RecordAggregateSent(AggregateMessagePacket packet, int framingOverhead)
     {
-        // A batch of one goes bare — the historical wire format — sparing the envelope overhead.
-        if (payloads.Count == 1)
-        {
-            netPeer.Send(payloads[0], DeliveryMethod.ReliableOrdered);
-            return;
-        }
-
-        var envelope = new AggregateMessagePacket(payloads.ToArray());
-        byte[] data = serializer.Serialize(envelope);
-
-        // Inner messages were profiled at their logical send; record only the framing overhead here,
-        // which also makes the number of wire packets aggregation produced visible in the profile.
-        int framingOverhead = data.Length;
-        foreach (var payload in payloads) framingOverhead -= payload.Length;
-        packetProfiler.Record(envelope, framingOverhead);
-
-        netPeer.Send(data, envelope.DeliveryMethod);
+        packetProfiler.Record(packet, framingOverhead);
     }
 
-    #endregion
+    private static void SendReliableMessagePayload(NetPeer netPeer, byte[] payload)
+    {
+        netPeer.Send(payload, DeliveryMethod.ReliableOrdered);
+    }
 
     public void Send(NetPeer netPeer, IMessage message)
     {
