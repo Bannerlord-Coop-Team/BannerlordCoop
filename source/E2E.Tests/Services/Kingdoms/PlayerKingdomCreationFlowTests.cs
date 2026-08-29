@@ -1824,9 +1824,14 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.StartsWith("Decision outcomes for StartAllianceDecision", compactIdOutcomes);
 
             var voteManager = GetVoteManager(client);
+            var earlierDecision = new DeclareWarDecision(recipientKingdom.RulingClan, targetKingdom);
+            using (new AllowedThread())
+            {
+                recipientKingdom._unresolvedDecisions.Insert(0, earlierDecision);
+            }
             voteManager.ApplyRoundStatus(new KingdomDecisionRoundStatusData(
                 compactRecipientClanId,
-                0,
+                1,
                 (DateTime.UtcNow + TimeSpan.FromSeconds(60)).Ticks,
                 new[]
                 {
@@ -1837,7 +1842,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                         hasFinalVote: false,
                         isConnected: true),
             }));
-
             Assert.False(voteManager.HasLocalPlayerSubmittedVote(decision));
             using (new AllowedThread())
             {
@@ -1859,7 +1863,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             }
 
             string kingdomlessCompactIdOutcomes = KingdomDebugCommand.ListKingdomDecisionOutcomes(
-                new List<string> { compactRecipientClanId, "1" });
+                new List<string> { compactRecipientClanId, "2" });
             Assert.StartsWith("Decision outcomes for StartAllianceDecision", kingdomlessCompactIdOutcomes);
 
             decisionsVm.OnFrameTick();
@@ -1871,6 +1875,23 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 message => message.VoteData.IsFinal);
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartAlliance>());
             Assert.True(voteManager.HasLocalPlayerSubmittedVote(decision));
+
+            CoopKingdomElection.RemoveTrackedPlayerAllianceOffer(decision);
+            using (new AllowedThread())
+            {
+                recipientKingdom._unresolvedDecisions.Remove(earlierDecision);
+            }
+            var conflictingDecision = new StartAllianceDecision(proposingClan, conflictingKingdom);
+            using (new AllowedThread())
+            {
+                conflictingKingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
+                conflictingKingdom._unresolvedDecisions.Add(conflictingDecision);
+            }
+            voteManager.CloseDecision(compactRecipientClanId, 0);
+
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.False(decisionItem.IsActive);
+            Assert.Same(conflictingDecision, Assert.Single(conflictingKingdom.UnresolvedDecisions));
 
             using (new AllowedThread())
             {

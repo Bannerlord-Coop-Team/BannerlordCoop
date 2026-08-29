@@ -128,6 +128,11 @@ namespace GameInterface.Services.Kingdoms
             }
         }
 
+        private static void BindDecisionReference(KingdomDecision decision, string kingdomId)
+        {
+            CoopKingdomElection.BindDecisionReference(decision, kingdomId);
+        }
+
         public bool TryCreateVoteData(DecisionOptionVM decisionOption, out KingdomDecisionVoteData voteData, bool isFinal = false)
         {
             voteData = null;
@@ -240,6 +245,7 @@ namespace GameInterface.Services.Kingdoms
                 return;
             }
 
+            BindDecisionReference(decision, status.KingdomId);
             KingdomDecisionVoteState state = GetOrCreateState(decision);
             if (state.LastPublishedRoundStatus != null &&
                 state.LastPublishedRoundStatus.HasSameContent(status))
@@ -703,6 +709,7 @@ namespace GameInterface.Services.Kingdoms
             if (decision == null) return;
 
             DecisionStates.Remove(decision);
+            CoopKingdomElection.RemoveDecisionReferences(decision);
             LocalSubmittedDecisions.Remove(decision);
             foreach (KingdomDecision staleDecision in DecisionStates.Keys
                          .Where(key => key == null || key.Kingdom == null)
@@ -1561,6 +1568,22 @@ namespace GameInterface.Services.Kingdoms
         {
             decision = null;
             if (objectManager == null) return false;
+
+            List<KingdomDecision> boundDecisions = DecisionStates.Values
+                .Where(state =>
+                    CoopKingdomElection.HasDecisionReference(state.Decision, kingdomId) &&
+                    TryGetDecisionIndex(state.DecisionKingdom, state.Decision, out int currentIndex) &&
+                    currentIndex == decisionIndex)
+                .Select(state => state.Decision)
+                .ToList();
+            if (boundDecisions.Count > 0)
+            {
+                if (boundDecisions.Count != 1) return false;
+
+                decision = boundDecisions[0];
+                return true;
+            }
+
             if (StartAllianceDecisionData.TryGetKingdomReference(objectManager, kingdomId, out Kingdom allianceKingdom) &&
                 TryGetDecision(allianceKingdom, decisionIndex, out KingdomDecision allianceDecision) &&
                 CoopKingdomElection.IsTrackedPlayerAllianceOffer(allianceDecision))
@@ -1588,6 +1611,18 @@ namespace GameInterface.Services.Kingdoms
             if (decision?.Kingdom?._unresolvedDecisions == null) return false;
 
             decisionIndex = decision.Kingdom._unresolvedDecisions.IndexOf(decision);
+            return decisionIndex >= 0;
+        }
+
+        private static bool TryGetDecisionIndex(
+            Kingdom kingdom,
+            KingdomDecision decision,
+            out int decisionIndex)
+        {
+            decisionIndex = -1;
+            if (kingdom?._unresolvedDecisions == null || decision == null) return false;
+
+            decisionIndex = kingdom._unresolvedDecisions.IndexOf(decision);
             return decisionIndex >= 0;
         }
 
@@ -2060,6 +2095,7 @@ namespace GameInterface.Services.Kingdoms
         {
             public string KingdomId { get; private set; }
             public KingdomDecision Decision { get; }
+            public Kingdom DecisionKingdom { get; }
             public CoopKingdomElection Election { get; }
             public int DecisionIndex { get; private set; }
             public HashSet<string> EligibleClanIds { get; }
@@ -2084,6 +2120,7 @@ namespace GameInterface.Services.Kingdoms
             {
                 KingdomId = kingdomId;
                 Decision = decision;
+                DecisionKingdom = decision?.Kingdom;
                 DecisionIndex = decisionIndex;
                 Election = new CoopKingdomElection(decision);
                 Election.SetupPlayerVoteElection();

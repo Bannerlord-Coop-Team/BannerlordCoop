@@ -2,6 +2,7 @@
 using GameInterface.Services.Clans.Extensions;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Core;
@@ -13,6 +14,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
     {
         private float? randomFloat;
         public static readonly HashSet<KingdomDecision> _opponentProposedAllianceDecisions = new();
+        private static readonly ConditionalWeakTable<KingdomDecision, HashSet<string>> DecisionReferences = new();
         public float RandomFloat
         {
             get
@@ -205,6 +207,29 @@ namespace GameInterface.Services.Kingdoms.Extentions
         internal static void RemoveTrackedPlayerAllianceOffer(KingdomDecision decision)
         {
             _opponentProposedAllianceDecisions.Remove(decision);
+        }
+
+        internal static void BindDecisionReference(KingdomDecision decision, string kingdomId)
+        {
+            if (decision == null || string.IsNullOrWhiteSpace(kingdomId)) return;
+
+            DecisionReferences.GetOrCreateValue(decision).Add(kingdomId);
+        }
+
+        internal static bool HasDecisionReference(KingdomDecision decision, string kingdomId)
+        {
+            return decision != null &&
+                   !string.IsNullOrWhiteSpace(kingdomId) &&
+                   DecisionReferences.TryGetValue(decision, out HashSet<string> references) &&
+                   references.Contains(kingdomId);
+        }
+
+        internal static void RemoveDecisionReferences(KingdomDecision decision)
+        {
+            if (decision != null)
+            {
+                DecisionReferences.Remove(decision);
+            }
         }
 
         internal static IEnumerable<StartAllianceDecision> GetTrackedPlayerAllianceOffers()
