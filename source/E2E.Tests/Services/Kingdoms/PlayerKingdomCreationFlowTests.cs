@@ -48,6 +48,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Kingdoms;
@@ -1994,6 +1995,72 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             string outcomes = KingdomDebugCommand.ListKingdomDecisionOutcomes(
                 new List<string> { proposerClanId, "1" });
             Assert.StartsWith("Decision outcomes for StartAllianceDecision", outcomes);
+        });
+    }
+
+    [Fact]
+    public void StartAllianceDecision_RulingClanReference_UsesRegisteredKingdomOutsideCampaignCollection()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var recipientKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var proposerClanId = CreateSyncedNpcClan();
+        var targetRulerClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, recipientKingdomId);
+        ConfigureClanInKingdom(proposerClanId, recipientKingdomId);
+        ConfigureClanInKingdom(targetRulerClanId, targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(recipientKingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        ConfigureAllianceModelEverywhere();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(proposerClanId, out var proposerClan));
+            using (new AllowedThread())
+            {
+                recipientKingdom._rulingClan = proposerClan;
+                KingdomCollectionSync.RemoveClan(recipientKingdom, proposerClan, publish: false);
+                Campaign.Current.CampaignObjectManager._kingdoms.Remove(recipientKingdom);
+            }
+            Assert.Null(proposerClan.Kingdom);
+            Assert.DoesNotContain(recipientKingdom, Kingdom.All);
+            Assert.Contains(recipientKingdom, MBObjectManager.Instance.GetObjectTypeList<Kingdom>());
+        });
+
+        var decisionData = new StartAllianceDecisionData(
+            proposerClanId,
+            proposerClanId,
+            triggerTime: 0,
+            isEnforced: false,
+            notifyPlayer: false,
+            playerExamined: false,
+            kingdomToStartAllianceWithId: targetKingdomId,
+            isProposedByOpponent: true);
+
+        client.Call(() => client.SimulateMessage(
+            this,
+            new NetworkAddDecision(
+                proposerClanId,
+                decisionData,
+                ignoreInfluenceCost: true,
+                randomNumber: 0.5f)));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(recipientKingdomId, out var recipientKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(proposerClanId, out var proposerClan));
+
+            var decision = Assert.IsType<StartAllianceDecision>(Assert.Single(recipientKingdom.UnresolvedDecisions));
+            Assert.Same(proposerClan, decision.ProposerClan);
+            Assert.Same(recipientKingdom, decision.Kingdom);
+            Assert.Same(targetKingdom, decision.KingdomToStartAllianceWith);
+            Assert.Same(recipientKingdom, proposerClan.Kingdom);
+            Assert.True(CoopKingdomElection.IsTrackedPlayerAllianceOffer(decision));
         });
     }
 

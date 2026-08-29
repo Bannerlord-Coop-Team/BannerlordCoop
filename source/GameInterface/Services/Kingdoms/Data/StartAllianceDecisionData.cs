@@ -6,6 +6,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
@@ -81,6 +82,11 @@ namespace GameInterface.Services.Kingdoms.Data
 
             kingdom = Kingdom.All.FirstOrDefault(candidate =>
                 candidate.RulingClan == clan || candidate.Clans.Contains(clan));
+            if (kingdom != null) return true;
+
+            kingdom = MBObjectManager.Instance?.GetObjectTypeList<Kingdom>()
+                .FirstOrDefault(candidate =>
+                    candidate.RulingClan == clan || candidate.Clans.Contains(clan));
             return kingdom != null;
         }
 
