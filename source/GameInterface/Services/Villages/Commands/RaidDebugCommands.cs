@@ -529,6 +529,30 @@ public class RaidDebugCommands
     internal static bool IsFixtureHero(Hero hero) =>
         raidLootWarningFixture?.Heroes.Any(snapshot => snapshot.Hero == hero) == true;
 
+    internal static void TryAddRaidLootWarningFixtureLoot(
+        MapEvent mapEvent,
+        Dictionary<MapEventParty, ItemRoster> playerLootRosters)
+    {
+        var fixture = raidLootWarningFixture;
+        if (fixture?.Campaign != Campaign.Current ||
+            !fixture.Prepared ||
+            !fixture.Positioned ||
+            fixture.LootSeeded ||
+            fixture.PlayerParty.MapEvent != mapEvent)
+            return;
+
+        var playerMapEventParty = mapEvent
+            .GetMapEventSide(mapEvent.WinningSide)
+            .Parties
+            .FirstOrDefault(party => party.Party == fixture.PlayerParty.Party);
+        if (playerMapEventParty == null ||
+            !playerLootRosters.TryGetValue(playerMapEventParty, out var playerLootRoster))
+            return;
+
+        playerLootRoster.AddToCounts(DefaultItems.Grain, 1);
+        fixture.LootSeeded = true;
+    }
+
     private static void HoldAndPublishPosition(MobileParty party)
     {
         party.SetMoveModeHold();
@@ -875,6 +899,7 @@ public class RaidDebugCommands
         public FactionStateSnapshot FactionState { get; }
         public bool Positioned { get; set; }
         public bool Prepared { get; set; }
+        public bool LootSeeded { get; set; }
         public bool Restored { get; set; }
 
         public RaidLootWarningFixture(

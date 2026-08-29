@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
@@ -201,6 +202,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     LootDefeatedPartyPrisoners(winnerParties, defeatedParties, playerLootData.LootedMembers);
                     mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties); // TODO
                     CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
+                    RaidDebugCommands.TryAddRaidLootWarningFixtureLoot(mapEvent, playerLootData.LootedItems);
                 }
 
                 // Need to patch the gold change to display plunder message
