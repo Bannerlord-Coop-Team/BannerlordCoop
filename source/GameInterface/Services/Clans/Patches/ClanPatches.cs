@@ -2,8 +2,10 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
@@ -91,5 +93,18 @@ internal class ClanPatches
 
         var message = new UpdateBannerColorsOfClan(__instance);
         MessageBroker.Instance.Publish(__instance, message);
+    }
+
+    [HarmonyPatch(nameof(Clan.GetHeirApparents))]
+    [HarmonyPostfix]
+    public static void GetHeirApparentsPostfix(Dictionary<Hero, int> __result)
+    {
+        foreach (var heirApparent in __result.Keys)
+        {
+            if (heirApparent.IsPlayerHero())
+            {
+                __result.Remove(heirApparent);
+            }
+        }
     }
 }

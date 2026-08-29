@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.HeirSelection.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System.Collections.Generic;
@@ -9,38 +10,32 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.Heroes.Patches;
+namespace GameInterface.Services.Heroes.HeirSelection.Patches;
 
 [HarmonyPatch(typeof(HeirSelectionCampaignBehavior))]
 internal class HeirSelectionCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(HeirSelectionCampaignBehavior.OnBeforeMainCharacterDied))]
     [HarmonyPrefix]
-    public static bool OnBeforeMainCharacterDiedPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification = true)
+    public static bool OnBeforeMainCharacterDiedPrefix(HeirSelectionCampaignBehavior __instance, Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification = true)
     {
         if (ModInformation.IsClient || !victim.IsPlayerHero()) return false;
 
         victim.AddDeathMark(killer, detail);
 
         Dictionary<Hero, int> heirApparents = victim.Clan.GetHeirApparents();
-        if (heirApparents.Count == 0)
+        if (heirApparents.Count == 0) // No heirs, client should be sent to game over screen
         {
-            MessageBroker.Instance.Publish(null, new ClientGameOver(victim, killer, detail));
+            MessageBroker.Instance.Publish(__instance, new ClientGameOver(victim, killer, detail));
         }
-        else
+        else // Client needs to select heirs and publish new character to control
         {
-            MessageBroker.Instance.Publish(null, new ClientGameOver(victim, killer, detail));
+            if (victim.IsPrisoner)
+            {
+                EndCaptivityAction.ApplyByDeath(victim);
+            }
 
-            ////TODO: Heir selection on player death instead of GameOver
-            //if (victim.IsPrisoner)
-            //{
-            //    EndCaptivityAction.ApplyByDeath(victim);
-            //}
-            //if (PlayerEncounter.Current != null && (PlayerEncounter.Battle == null || !PlayerEncounter.Battle.IsFinalized))
-            //{
-            //    PlayerEncounter.Finish(true);
-            //}
-            //CampaignEventDispatcher.Instance.OnHeirSelectionRequested(heirApparents);
+            MessageBroker.Instance.Publish(__instance, new ClientSelectHeir(victim, heirApparents));
         }
 
         return false;
@@ -64,9 +59,13 @@ internal class HeirSelectionCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(HeirSelectionCampaignBehavior.OnHeirSelectionOver))]
     [HarmonyPrefix]
-    public static bool OnHeirSelectionOverPrefix(Hero selectedHeir)
+    public static bool OnHeirSelectionOverPrefix(HeirSelectionCampaignBehavior __instance, Hero selectedHeir)
     {
-        // TODO: Implement for coop
+        if (ModInformation.IsServer) return false;
+
+        var message = new HeirSelectionOver(Hero.MainHero, selectedHeir);
+        MessageBroker.Instance.Publish(__instance, message);
+
         return false;
     }
 }
