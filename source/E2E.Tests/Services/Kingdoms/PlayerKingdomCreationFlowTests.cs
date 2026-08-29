@@ -1820,7 +1820,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             string compactIdOutcomes = KingdomDebugCommand.ListKingdomDecisionOutcomes(
                 new List<string> { compactRecipientClanId, "1" });
-            Assert.Equal("Decision index is out of bounds.", compactIdOutcomes);
+            Assert.StartsWith("Decision outcomes for StartAllianceDecision", compactIdOutcomes);
 
             var voteManager = GetVoteManager(client);
             voteManager.ApplyRoundStatus(new KingdomDecisionRoundStatusData(
@@ -1856,6 +1856,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             {
                 Clan.PlayerClan._kingdom = null;
             }
+
+            string kingdomlessCompactIdOutcomes = KingdomDebugCommand.ListKingdomDecisionOutcomes(
+                new List<string> { compactRecipientClanId, "1" });
+            Assert.StartsWith("Decision outcomes for StartAllianceDecision", kingdomlessCompactIdOutcomes);
 
             decisionsVm.OnFrameTick();
             Assert.Same(decision, decisionsVm.CurrentDecision.KingdomDecisionMaker._decision);

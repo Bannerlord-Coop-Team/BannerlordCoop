@@ -3179,16 +3179,6 @@ public class KingdomDebugCommand
             return false;
         }
 
-        bool isFullClanId = args[0].StartsWith("Clan_", StringComparison.Ordinal);
-        bool kingdomResolved = isFullClanId
-            ? StartAllianceDecisionData.TryGetKingdomReference(objectManager, args[0], out kingdom)
-            : objectManager.TryGetObject(args[0], out kingdom);
-        if (!kingdomResolved)
-        {
-            message = $"Kingdom with ID: '{args[0]}' not found";
-            return false;
-        }
-
         if (!int.TryParse(args[1], out int index))
         {
             message = $"Decision index is not a number: {args[1]}";
@@ -3196,6 +3186,26 @@ public class KingdomDebugCommand
         }
 
         zeroBasedIndex = index - 1;
+        if (StartAllianceDecisionData.TryGetKingdomReference(objectManager, args[0], out Kingdom allianceKingdom) &&
+            zeroBasedIndex >= 0 &&
+            zeroBasedIndex < allianceKingdom._unresolvedDecisions.Count)
+        {
+            KingdomDecision allianceDecision = allianceKingdom._unresolvedDecisions[zeroBasedIndex];
+            if (CoopKingdomElection.IsTrackedPlayerAllianceOffer(allianceDecision))
+            {
+                kingdom = allianceKingdom;
+                decision = allianceDecision;
+                message = string.Empty;
+                return true;
+            }
+        }
+
+        if (!objectManager.TryGetObject(args[0], out kingdom))
+        {
+            message = $"Kingdom with ID: '{args[0]}' not found";
+            return false;
+        }
+
         if (zeroBasedIndex < 0 || zeroBasedIndex >= kingdom._unresolvedDecisions.Count)
         {
             message = "Decision index is out of bounds.";
