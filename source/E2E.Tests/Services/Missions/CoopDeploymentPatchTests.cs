@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.Reflection;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
@@ -21,12 +21,23 @@ public class CoopDeploymentPatchTests
     public CoopDeploymentPatchTests(ITestOutputHelper output) { }
 
     [Fact]
+    public void CoopEmptyTeamDeploymentPatch_DoesNotStoreTeamsInStaticFields()
+    {
+        var patchType = GetPatchType();
+        var teamFields = patchType
+            .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+            .Where(field => StoresTeam(field.FieldType))
+            .Select(field => field.Name)
+            .ToArray();
+
+        Assert.Empty(teamFields);
+    }
+
+    [Fact]
     public void CoopEmptyTeamDeploymentPatch_IsDiscoverableByPatchAll_AndHooksItsTargets()
     {
         // The patch class is internal to GameInterface; reach it via the assembly so the test sees what PatchAll sees.
-        var patchType = typeof(BattleSpawnGate).Assembly
-            .GetType("GameInterface.Services.MapEvents.Patches.CoopEmptyTeamDeploymentPatch");
-        Assert.NotNull(patchType);
+        var patchType = GetPatchType();
 
         var harmony = new Harmony("e2e.coopdeploy.patchtest");
         try
@@ -45,5 +56,23 @@ public class CoopDeploymentPatchTests
         {
             harmony.UnpatchAll("e2e.coopdeploy.patchtest");
         }
+    }
+
+    private static Type GetPatchType()
+    {
+        var patchType = typeof(BattleSpawnGate).Assembly
+            .GetType("GameInterface.Services.MapEvents.Patches.CoopEmptyTeamDeploymentPatch");
+        Assert.NotNull(patchType);
+        return patchType;
+    }
+
+    private static bool StoresTeam(Type type)
+    {
+        if (type == typeof(Team))
+            return true;
+        if (type.IsArray)
+            return StoresTeam(type.GetElementType()!);
+
+        return type.IsGenericType && type.GetGenericArguments().Any(StoresTeam);
     }
 }
