@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
@@ -28,7 +29,6 @@ internal class HeirSelectionHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
-    private readonly HashSet<string> pendingHeirSelections = new();
 
     public HeirSelectionHandler(
         IMessageBroker messageBroker,
@@ -45,7 +45,7 @@ internal class HeirSelectionHandler : IHandler
         this.playerPartyRestorer = playerPartyRestorer;
         this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
 
-        messageBroker.Subscribe<ClientSelectHeir>(Handle_ClientSelectHeir);
+        messageBroker.Subscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
         messageBroker.Subscribe<NetworkClientSelectHeir>(Handle_NetworkClientSelectHeir);
 
         messageBroker.Subscribe<HeirSelectionOver>(Handle_HeirSelectionOver);
@@ -57,7 +57,7 @@ internal class HeirSelectionHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<ClientSelectHeir>(Handle_ClientSelectHeir);
+        messageBroker.Unsubscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
         messageBroker.Unsubscribe<NetworkClientSelectHeir>(Handle_NetworkClientSelectHeir);
 
         messageBroker.Unsubscribe<HeirSelectionOver>(Handle_HeirSelectionOver);
@@ -67,22 +67,31 @@ internal class HeirSelectionHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
     }
 
-    private void Handle_ClientSelectHeir(MessagePayload<ClientSelectHeir> obj)
+    private void Handle_PlayerHeirSelectionRequested(MessagePayload<PlayerHeirSelectionRequested> obj)
     {
-        var data = obj.What;
+        var playerHero = obj.What.PlayerHero;
+        if (playerHero == null || !playerHero.IsDead) return;
 
-        if (!objectManager.TryGetIdWithLogging(data.PlayerVictim, out var playerVictimId)) return;
+        if (!objectManager.TryGetIdWithLogging(playerHero, out var playerVictimId)) return;
         if (!TryGetPeerForHero(playerVictimId, out var peer)) return;
 
+        var heirApparents = playerHero.Clan?.GetHeirApparents();
+
+        // Player has no remaining heirs, send to game over screen and disconnect
+        if (heirApparents == null || heirApparents.Count == 0)
+        {
+            network.Send(peer, new NetworkClientGameOver(playerVictimId));
+            return;
+        }
+
+        // Resolve heir apparent ids for client's HeirSelectionPopupVM
         var heirIdApparents = new Dictionary<string, int>();
-        foreach (var heirApparent in data.HeirApparents)
+        foreach (var heirApparent in heirApparents)
         {
             if (!objectManager.TryGetIdWithLogging(heirApparent.Key, out var heirHeroId)) continue;
 
             heirIdApparents[heirHeroId] = heirApparent.Value;
         }
-
-        if (!pendingHeirSelections.Add(playerVictimId)) return;
 
         network.Send(peer, new NetworkClientSelectHeir(heirIdApparents));
     }
@@ -127,12 +136,6 @@ internal class HeirSelectionHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!pendingHeirSelections.Contains(data.OriginalHeroId))
-            {
-                Logger.Debug($"Ignoring heir selection for hero {data.OriginalHeroId} because no selection is pending");
-                return;
-            }
-
             if (!playerManager.TryGetPlayer(peer, out var player) || player.HeroId != data.OriginalHeroId)
             {
                 Logger.Warning($"Ignoring heir selection for hero {data.OriginalHeroId} from peer {peer.Id} because that peer no longer controls the hero");
@@ -142,7 +145,7 @@ internal class HeirSelectionHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.SelectedHeirId, out var selectedHeir)) return;
 
-            if (!originalHero.IsAlive ||
+            if (!originalHero.IsDead ||
                 originalHero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None ||
                 originalHero.Clan == null ||
                 selectedHeir == originalHero ||
@@ -152,7 +155,6 @@ internal class HeirSelectionHandler : IHandler
                 return;
             }
 
-            pendingHeirSelections.Remove(data.OriginalHeroId);
             applyHeirSelectionActionInterface.ApplyByDeath(originalHero, selectedHeir);
         });
     }
@@ -169,14 +171,14 @@ internal class HeirSelectionHandler : IHandler
 
         objectManager.TryGetObject(registeredPlayer.MobilePartyId, out MobileParty originalParty);
 
-        var replacementSeed = new Player(
+        var replacementPlayerData = new Player(
             registeredPlayer.ControllerId,
             heirId,
             registeredPlayer.MobilePartyId,
             clanId,
             characterObjectId);
 
-        if (!playerPartyRestorer.TryRestore(replacementSeed, out var replacementPlayer))
+        if (!playerPartyRestorer.TryRestore(replacementPlayerData, out var replacementPlayer))
         {
             Logger.Error($"Could not prepare heir {heirId} as the new player for controller {registeredPlayer.ControllerId}");
             return;
@@ -190,13 +192,20 @@ internal class HeirSelectionHandler : IHandler
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 
+        messageBroker.Publish(this, new PlayerHeirSelectionCompleted(data.Heir));
         network.SendAll(new NetworkChangePlayerCharacterAfterHeirSelection(replacementPlayer, originalHeroId));
 
-        if (originalParty != null &&
-            originalParty.IsActive &&
-            replacementPlayer.MobilePartyId != registeredPlayer.MobilePartyId)
+        // Only disband/destroy party if the selected heir isn't in the same party as the dead/retired player
+        if (originalParty != null && replacementPlayer.MobilePartyId != registeredPlayer.MobilePartyId)
         {
-            DisbandPartyAction.StartDisband(originalParty);
+            if (originalParty.IsActive)
+            {
+                DisbandPartyAction.StartDisband(originalParty);
+            }
+            else
+            {
+                DestroyPartyAction.Apply(null, originalParty);
+            }
         }
     }
 

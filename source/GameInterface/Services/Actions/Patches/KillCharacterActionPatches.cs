@@ -1,6 +1,8 @@
 ﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
@@ -24,8 +26,6 @@ namespace GameInterface.Services.Actions.Patches;
 internal class KillCharacterActionPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KillCharacterActionPatches>();
-
-    public static Hero HeirSelectionDeathBeingFinalized { get; set; }
 
     [HarmonyPatch(nameof(KillCharacterAction.ApplyInternal))]
     [HarmonyPrefix]
@@ -51,10 +51,10 @@ internal class KillCharacterActionPatches
             return false;
         }
 
-        if (victim.IsPlayerHero() && victim != HeirSelectionDeathBeingFinalized)
+        bool isPlayerHero = victim.IsPlayerHero();
+        if (isPlayerHero)
         {
             CampaignEventDispatcher.Instance.OnBeforeMainCharacterDied(victim, killer, actionDetail, showNotification);
-            return false;
         }
 
         CampaignEventDispatcher.Instance.OnBeforeHeroKilled(victim, killer, actionDetail, showNotification);
@@ -68,7 +68,7 @@ internal class KillCharacterActionPatches
                 {
                     ChangeClanLeaderAction.ApplyWithoutSelectedNewLeader(victim.Clan);
                 }
-                if (victim.Clan.Kingdom != null && victim.Clan.Kingdom.RulingClan == victim.Clan)
+                if (!isPlayerHero && victim.Clan.Kingdom != null && victim.Clan.Kingdom.RulingClan == victim.Clan)
                 {
                     List<Clan> list = (from t in victim.Clan.Kingdom.Clans
                                        where !t.IsEliminated && t.Leader != victim && !t.IsUnderMercenaryService
@@ -127,7 +127,15 @@ internal class KillCharacterActionPatches
                 }
             }
         }
-        KillCharacterAction.MakeDead(victim, victim != HeirSelectionDeathBeingFinalized);
+        // Preserve party in an inactive state until heir selection is confirmed
+        // This also prevents other parties interacting with a player's party
+        // who still needs to select an heir
+        if (isPlayerHero && partyBelongedTo != null)
+        {
+            partyBelongedTo.IsActive = false;
+        }
+
+        KillCharacterAction.MakeDead(victim, !isPlayerHero);
         if (victim.GovernorOf != null)
         {
             ChangeGovernorAction.RemoveGovernorOf(victim);
@@ -171,7 +179,11 @@ internal class KillCharacterActionPatches
                 victim.StayingInSettlement = null;
             }
         }
-        if (!victim.IsPlayerHero())
+        if (isPlayerHero)
+        {
+            MessageBroker.Instance.Publish(victim, new PlayerHeirSelectionRequested(victim));
+        }
+        else
         {
             victim.OnDeath();
         }

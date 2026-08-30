@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.UI.LogEntries.Messages;
@@ -77,19 +76,6 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
             TextObject textObject = new TextObject("{=0MTzaxau}{?CHARACTER.GENDER}She{?}He{\\?} retired from adventuring, and was last seen with a group of mountain hermits living a life of quiet contemplation.", null);
             textObject.SetCharacterProperties("CHARACTER", originalHero.CharacterObject, false);
             originalHero.EncyclopediaText = textObject;
-        }
-        else
-        {
-            Hero previousFinalizationHero = KillCharacterActionPatches.HeirSelectionDeathBeingFinalized;
-            KillCharacterActionPatches.HeirSelectionDeathBeingFinalized = originalHero;
-            try
-            {
-                KillCharacterAction.ApplyByDeathMarkForced(originalHero, true);
-            }
-            finally
-            {
-                KillCharacterActionPatches.HeirSelectionDeathBeingFinalized = previousFinalizationHero;
-            }
         }
         if (heir.CurrentSettlement != null && heir.PartyBelongedTo != null)
         {

@@ -1,12 +1,10 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.UI.Cutscenes.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -22,24 +20,9 @@ internal class HeirSelectionCampaignBehaviorPatches
     {
         if (ModInformation.IsClient || !victim.IsPlayerHero()) return false;
 
-        victim.AddDeathMark(killer, detail);
-
+        // Rest of vanilla implementation is run from HeirSelectionHandler.Handle_PlayerHeirSelectionRequested.
+        // Re-connecting clients need to process heir selection too so only broadcast cutscene message.
         MessageBroker.Instance.Publish(__instance, new InitiateCutscenePlayerCharacterDied(victim, killer, detail));
-
-        Dictionary<Hero, int> heirApparents = victim.Clan.GetHeirApparents();
-        if (heirApparents.Count == 0) // No heirs, client should be sent to game over screen
-        {
-            MessageBroker.Instance.Publish(__instance, new ClientGameOver(victim, killer, detail));
-        }
-        else // Client needs to select heirs and publish new character to control
-        {
-            if (victim.IsPrisoner)
-            {
-                EndCaptivityAction.ApplyByDeath(victim);
-            }
-
-            MessageBroker.Instance.Publish(__instance, new ClientSelectHeir(victim, heirApparents));
-        }
 
         return false;
     }
