@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Players.Data;
 using ProtoBuf;
 
 namespace GameInterface.Services.Heroes.HeirSelection.Messages;
@@ -7,10 +8,16 @@ namespace GameInterface.Services.Heroes.HeirSelection.Messages;
 internal readonly struct NetworkChangePlayerCharacterAfterHeirSelection : ICommand
 {
     [ProtoMember(1)]
-    public readonly string HeirId;
+    public readonly Player Player;
 
-    public NetworkChangePlayerCharacterAfterHeirSelection(string heirId)
+    [ProtoMember(2)]
+    public readonly string OriginalHeroId;
+
+    public NetworkChangePlayerCharacterAfterHeirSelection(
+        Player player,
+        string originalHeroId)
     {
-        HeirId = heirId;
+        Player = player;
+        OriginalHeroId = originalHeroId;
     }
 }

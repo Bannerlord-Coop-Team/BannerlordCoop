@@ -2,16 +2,19 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.HeirSelection.Handlers;
 
@@ -23,19 +26,23 @@ internal class HeirSelectionHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
+    private readonly HashSet<string> pendingHeirSelections = new();
 
     public HeirSelectionHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
+        IPlayerPartyRestorer playerPartyRestorer,
         IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.playerPartyRestorer = playerPartyRestorer;
         this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
 
         messageBroker.Subscribe<ClientSelectHeir>(Handle_ClientSelectHeir);
@@ -75,6 +82,8 @@ internal class HeirSelectionHandler : IHandler
             heirIdApparents[heirHeroId] = heirApparent.Value;
         }
 
+        if (!pendingHeirSelections.Add(playerVictimId)) return;
+
         network.Send(peer, new NetworkClientSelectHeir(heirIdApparents));
     }
 
@@ -112,13 +121,38 @@ internal class HeirSelectionHandler : IHandler
 
     private void Handle_NetworkHeirSelectionOver(MessagePayload<NetworkHeirSelectionOver> obj)
     {
+        if (obj.Who is not NetPeer peer) return;
+
         var data = obj.What;
 
         GameThread.RunSafe(() =>
         {
+            if (!pendingHeirSelections.Contains(data.OriginalHeroId))
+            {
+                Logger.Debug($"Ignoring heir selection for hero {data.OriginalHeroId} because no selection is pending");
+                return;
+            }
+
+            if (!playerManager.TryGetPlayer(peer, out var player) || player.HeroId != data.OriginalHeroId)
+            {
+                Logger.Warning($"Ignoring heir selection for hero {data.OriginalHeroId} from peer {peer.Id} because that peer no longer controls the hero");
+                return;
+            }
+
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.SelectedHeirId, out var selectedHeir)) return;
 
+            if (!originalHero.IsAlive ||
+                originalHero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None ||
+                originalHero.Clan == null ||
+                selectedHeir == originalHero ||
+                !originalHero.Clan.GetHeirApparents().ContainsKey(selectedHeir))
+            {
+                Logger.Warning($"Ignoring invalid heir {data.SelectedHeirId} for hero {data.OriginalHeroId}");
+                return;
+            }
+
+            pendingHeirSelections.Remove(data.OriginalHeroId);
             applyHeirSelectionActionInterface.ApplyByDeath(originalHero, selectedHeir);
         });
     }
@@ -128,10 +162,42 @@ internal class HeirSelectionHandler : IHandler
         var data = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(data.OriginalHero, out var originalHeroId)) return;
-        if (!TryGetPeerForHero(originalHeroId, out var peer)) return;
         if (!objectManager.TryGetIdWithLogging(data.Heir, out var heirId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.Heir.Clan, out var clanId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.Heir.CharacterObject, out var characterObjectId)) return;
+        if (!TryGetPlayerForHero(originalHeroId, out var registeredPlayer)) return;
 
-        network.Send(peer, new NetworkChangePlayerCharacterAfterHeirSelection(heirId));
+        objectManager.TryGetObject(registeredPlayer.MobilePartyId, out MobileParty originalParty);
+
+        var replacementSeed = new Player(
+            registeredPlayer.ControllerId,
+            heirId,
+            registeredPlayer.MobilePartyId,
+            clanId,
+            characterObjectId);
+
+        if (!playerPartyRestorer.TryRestore(replacementSeed, out var replacementPlayer))
+        {
+            Logger.Error($"Could not prepare heir {heirId} as the new player for controller {registeredPlayer.ControllerId}");
+            return;
+        }
+
+        if (!playerManager.ReplacePlayer(registeredPlayer, replacementPlayer))
+        {
+            Logger.Error($"Could not replace player registration for controller {registeredPlayer.ControllerId} after heir selection");
+            return;
+        }
+
+        Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
+
+        network.SendAll(new NetworkChangePlayerCharacterAfterHeirSelection(replacementPlayer, originalHeroId));
+
+        if (originalParty != null &&
+            originalParty.IsActive &&
+            replacementPlayer.MobilePartyId != registeredPlayer.MobilePartyId)
+        {
+            DisbandPartyAction.StartDisband(originalParty);
+        }
     }
 
     private void Handle_NetworkChangePlayerCharacterAfterHeirSelection(MessagePayload<NetworkChangePlayerCharacterAfterHeirSelection> obj)
@@ -140,7 +206,35 @@ internal class HeirSelectionHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeirId, out var heir)) return;
+            var replacementPlayer = data.Player;
+            if (replacementPlayer == null) return;
+
+            if (!objectManager.TryGetObjectWithLogging<Hero>(replacementPlayer.HeroId, out var heir)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(replacementPlayer.MobilePartyId, out var heirParty)) return;
+
+            if (!playerManager.TryGetPlayer(replacementPlayer.ControllerId, out var registeredPlayer))
+            {
+                Logger.Error($"Could not find player registration for controller {replacementPlayer.ControllerId} after heir selection");
+                return;
+            }
+
+            if (registeredPlayer.HeroId == replacementPlayer.HeroId) return;
+            if (registeredPlayer.HeroId != data.OriginalHeroId)
+            {
+                Logger.Warning($"Ignoring heir registration for {replacementPlayer.ControllerId} because it expected hero {data.OriginalHeroId} but found {registeredPlayer.HeroId}");
+                return;
+            }
+
+            if (!playerManager.ReplacePlayer(registeredPlayer, replacementPlayer))
+            {
+                Logger.Error("Could not replace player registration for controller {ControllerId} after heir selection", replacementPlayer.ControllerId);
+                return;
+            }
+
+            if (!heir.IsControlledByThisInstance()) return;
+
+            // Migrate CoopSession data before changed player action
+            // TODO
 
             ChangePlayerCharacterAction.Apply(heir);
         });
@@ -150,11 +244,21 @@ internal class HeirSelectionHandler : IHandler
     {
         peer = null;
 
-        foreach (var player in playerManager.Players)
-        {
-            if (player.HeroId != playerHeroId) continue;
+        if (!TryGetPlayerForHero(playerHeroId, out var player)) return false;
 
-            return playerManager.TryGetPeer(player.ControllerId, out peer);
+        return playerManager.TryGetPeer(player.ControllerId, out peer);
+    }
+
+    private bool TryGetPlayerForHero(string playerHeroId, out Player player)
+    {
+        player = null;
+
+        foreach (var candidate in playerManager.Players)
+        {
+            if (candidate.HeroId != playerHeroId) continue;
+
+            player = candidate;
+            return true;
         }
 
         Logger.Error($"Failed to get peer for player hero with id {playerHeroId} during heir selection");

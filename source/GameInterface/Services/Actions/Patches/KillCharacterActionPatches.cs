@@ -25,6 +25,8 @@ internal class KillCharacterActionPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KillCharacterActionPatches>();
 
+    public static Hero HeirSelectionDeathBeingFinalized { get; set; }
+
     [HarmonyPatch(nameof(KillCharacterAction.ApplyInternal))]
     [HarmonyPrefix]
     public static bool ApplyInternalPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail, bool showNotification, bool isForced = false)
@@ -49,7 +51,7 @@ internal class KillCharacterActionPatches
             return false;
         }
 
-        if (victim.IsPlayerHero())
+        if (victim.IsPlayerHero() && victim != HeirSelectionDeathBeingFinalized)
         {
             CampaignEventDispatcher.Instance.OnBeforeMainCharacterDied(victim, killer, actionDetail, showNotification);
             return false;
@@ -125,7 +127,7 @@ internal class KillCharacterActionPatches
                 }
             }
         }
-        KillCharacterAction.MakeDead(victim, true);
+        KillCharacterAction.MakeDead(victim, victim != HeirSelectionDeathBeingFinalized);
         if (victim.GovernorOf != null)
         {
             ChangeGovernorAction.RemoveGovernorOf(victim);

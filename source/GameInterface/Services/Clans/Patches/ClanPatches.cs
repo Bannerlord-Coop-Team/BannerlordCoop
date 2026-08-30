@@ -99,7 +99,7 @@ internal class ClanPatches
     [HarmonyPostfix]
     public static void GetHeirApparentsPostfix(Dictionary<Hero, int> __result)
     {
-        foreach (var heirApparent in __result.Keys)
+        foreach (var heirApparent in new List<Hero>(__result.Keys))
         {
             if (heirApparent.IsPlayerHero())
             {

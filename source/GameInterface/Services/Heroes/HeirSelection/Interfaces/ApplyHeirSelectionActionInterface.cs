@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.UI.LogEntries.Messages;
@@ -45,8 +46,6 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
     {
         var originalParty = originalHero.PartyBelongedTo;
 
-        // TODO: Custom implementation of vanilla
-        // Need to add CoopSession transfer interface call here too
         if (heir.PartyBelongedTo != null && heir.PartyBelongedTo.IsCaravan)
         {
             Settlement settlement = SettlementHelper.FindNearestSettlementToMobileParty(
@@ -81,7 +80,16 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
         }
         else
         {
-            KillCharacterAction.ApplyByDeathMarkForced(originalHero, true);
+            Hero previousFinalizationHero = KillCharacterActionPatches.HeirSelectionDeathBeingFinalized;
+            KillCharacterActionPatches.HeirSelectionDeathBeingFinalized = originalHero;
+            try
+            {
+                KillCharacterAction.ApplyByDeathMarkForced(originalHero, true);
+            }
+            finally
+            {
+                KillCharacterActionPatches.HeirSelectionDeathBeingFinalized = previousFinalizationHero;
+            }
         }
         if (heir.CurrentSettlement != null && heir.PartyBelongedTo != null)
         {
