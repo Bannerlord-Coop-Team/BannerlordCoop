@@ -1,10 +1,20 @@
 ﻿using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Conversations;
+using GameInterface.Services.Locations.Conversations.Patches;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Locations;
 
 public class SettlementTestEnvironmentTests : SettlementTestEnvironment
 {
+    private static readonly MethodInfo ReleaseConversationState =
+        typeof(LocationConversationPatches).GetMethod(
+            "ReleaseStaleLock",
+            BindingFlags.Static | BindingFlags.NonPublic)
+        ?? throw new MissingMethodException(typeof(LocationConversationPatches).FullName, "ReleaseStaleLock");
+
     public SettlementTestEnvironmentTests(ITestOutputHelper output) : base(output, numClients: 2)
     {
     }
@@ -87,6 +97,120 @@ public class SettlementTestEnvironmentTests : SettlementTestEnvironment
         {
             Assert.Equal(instanceId, clients[0].Resolve<ILocationNpcGate>().ActiveInstanceId);
             Assert.Equal(instanceId, clients[1].Resolve<ILocationNpcGate>().ActiveInstanceId);
+        });
+    }
+
+    [Fact]
+    public void LeavingOneClient_DoesNotClearOtherClientNpcGate()
+    {
+        var clients = Clients.ToArray();
+        var (instanceId, _) = CreateSettlement("A", "B");
+        SettlementClientFixture first = EnterLocation(clients[0], instanceId);
+        SettlementClientFixture second = EnterLocation(clients[1], instanceId);
+
+        clients[0].Call(() =>
+        {
+            Assert.True(LocationNpcGate.IsCoopLocationMissionActive);
+            Assert.Equal(first.InstanceId, LocationNpcGate.ActiveInstanceId);
+        });
+        clients[1].Call(() =>
+        {
+            Assert.True(LocationNpcGate.IsCoopLocationMissionActive);
+            Assert.Equal(second.InstanceId, LocationNpcGate.ActiveInstanceId);
+        });
+
+        LeaveLocation(clients[0]);
+
+        clients[0].Call(() => Assert.False(LocationNpcGate.IsCoopLocationMissionActive));
+        clients[1].Call(() =>
+        {
+            Assert.True(LocationNpcGate.IsCoopLocationMissionActive);
+            Assert.Equal(second.InstanceId, LocationNpcGate.ActiveInstanceId);
+        });
+    }
+
+    [Fact]
+    public void ConversationPatch_ClearUsesActiveClientState()
+    {
+        var clients = Clients.ToArray();
+        var (instanceId, _) = CreateSettlement("A", "B");
+        SettlementClientFixture first = EnterLocation(clients[0], instanceId);
+        SettlementClientFixture second = EnterLocation(clients[1], instanceId);
+        int secondGeneration = 0;
+
+        clients[0].Call(() =>
+        {
+            var state = clients[0].Resolve<ILocationConversationClientState>();
+            Assert.True(state.TryBeginPending(
+                first.PlayerAgent,
+                "first-location",
+                "first-character",
+                out var firstGeneration));
+            Assert.True(state.TryTakePending(firstGeneration, out var pending));
+            Assert.Equal("first-location", pending.LocationId);
+            Assert.Equal("first-character", pending.CharacterId);
+            state.Hold("first-location|first-character");
+        });
+        clients[1].Call(() =>
+        {
+            var state = clients[1].Resolve<ILocationConversationClientState>();
+            Assert.True(state.TryBeginPending(
+                second.PlayerAgent,
+                "second-location",
+                "second-character",
+                out secondGeneration));
+        });
+
+        clients[0].Call(() => ReleaseConversationState.Invoke(null, null));
+
+        clients[0].Call(() =>
+            Assert.False(clients[0].Resolve<ILocationConversationClientState>().HasPendingOrHeld));
+        clients[1].Call(() =>
+        {
+            var state = clients[1].Resolve<ILocationConversationClientState>();
+            Assert.True(state.HasPendingOrHeld);
+            Assert.Null(state.HeldNpcKey);
+            Assert.True(state.TryTakePending(secondGeneration, out var pending));
+            Assert.Equal("second-location", pending.LocationId);
+            Assert.Equal("second-character", pending.CharacterId);
+            Assert.Same(second.PlayerAgent, pending.Agent);
+            Assert.False(state.HasPendingOrHeld);
+        });
+    }
+
+    [Fact]
+    public void ClientCall_SwitchesAndRestoresCampaignMission()
+    {
+        var clients = Clients.ToArray();
+        var (instanceId, _) = CreateSettlement("A", "B");
+        SettlementClientFixture first = EnterLocation(clients[0], instanceId);
+        SettlementClientFixture second = EnterLocation(clients[1], instanceId);
+        ICampaignMission firstCampaignMission = clients[0].CampaignMissionContext;
+        ICampaignMission secondCampaignMission = clients[1].CampaignMissionContext;
+        ICampaignMission previousCampaignMission = CampaignMission.Current;
+
+        Assert.NotSame(first.Location, second.Location);
+        clients[0].Call(() =>
+        {
+            Assert.Same(firstCampaignMission, CampaignMission.Current);
+            Assert.Same(first.Location, CampaignMission.Current.Location);
+
+            clients[1].Call(() =>
+            {
+                Assert.Same(secondCampaignMission, CampaignMission.Current);
+                Assert.Same(second.Location, CampaignMission.Current.Location);
+            });
+
+            Assert.Same(firstCampaignMission, CampaignMission.Current);
+            Assert.Same(first.Location, CampaignMission.Current.Location);
+        });
+        Assert.Same(previousCampaignMission, CampaignMission.Current);
+
+        LeaveLocation(clients[0]);
+        clients[1].Call(() =>
+        {
+            Assert.Same(secondCampaignMission, CampaignMission.Current);
+            Assert.Same(second.Location, CampaignMission.Current.Location);
         });
     }
 }

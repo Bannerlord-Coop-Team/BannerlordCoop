@@ -2,9 +2,11 @@
 using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.UI.CoopOptions.Providers;
+using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
+using GameInterface.Services.UI.CoopOptions.Providers.NetworkTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.Donate;
 using System;
@@ -82,10 +84,16 @@ public class CoopOptionsVM : ViewModel
     public CoopOptionsTabVM MapTimeTab { get; set; }
 
     [DataSourceProperty]
+    public CoopOptionsTabVM BugReportTab { get; set; }
+
+    [DataSourceProperty]
     public CoopOptionsTabVM ChatTab { get; set; }
 
     [DataSourceProperty]
     public CoopOptionsTabVM PlayerNameplatesTab { get; set; }
+
+    [DataSourceProperty]
+    public CoopOptionsTabVM NetworkTab { get; set; }
 
     public void ActionApply()
     {
@@ -191,6 +199,11 @@ public class CoopOptionsVM : ViewModel
             MapTimeTab = tab;
             OnPropertyChanged(nameof(MapTimeTab));
         }
+        else if (tabId == BugReportOptionsTabProvider.TabId)
+        {
+            BugReportTab = tab;
+            OnPropertyChanged(nameof(BugReportTab));
+        }
         else if (tabId == ChatOptionsTabProvider.TabId)
         {
             ChatTab = tab;
@@ -200,6 +213,11 @@ public class CoopOptionsVM : ViewModel
         {
             PlayerNameplatesTab = tab;
             OnPropertyChanged(nameof(PlayerNameplatesTab));
+        }
+        else if (tabId == NetworkOptionsTabProvider.TabId)
+        {
+            NetworkTab = tab;
+            OnPropertyChanged(nameof(NetworkTab));
         }
     }
 

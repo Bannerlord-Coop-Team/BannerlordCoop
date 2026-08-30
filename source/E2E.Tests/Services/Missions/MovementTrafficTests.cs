@@ -1123,6 +1123,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             .Returns(new[] { unusableControllerId });
         var messageBroker = new Mock<IMessageBroker>();
         var packetManager = new Mock<IPacketManager>();
+        var messagePacketHandler = new Mock<IMessagePacketHandler>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         var steamBridge = new Mock<ISteamMissionBridge>();
 
@@ -1133,9 +1134,11 @@ public class MovementTrafficTests : MissionTestEnvironment
             serializer,
             messageBroker.Object,
             packetManager.Object,
+            messagePacketHandler.Object,
             controllerIdProvider.Object,
             steamBridge.Object,
-            compressor);
+            compressor,
+            new ReliableMessageBatcher<string>(serializer));
         client.ConnectToInstance(instanceId);
 
         Assert.Equal(0, client.GetMaxUnreliablePayloadBytes());
@@ -1203,6 +1206,7 @@ public class MovementTrafficTests : MissionTestEnvironment
         var missionContext = new Mock<IMissionContext>();
         var messageBroker = new Mock<IMessageBroker>();
         var packetManager = new Mock<IPacketManager>();
+        var messagePacketHandler = new Mock<IMessagePacketHandler>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         var steamBridge = new Mock<ISteamMissionBridge>();
 
@@ -1213,9 +1217,11 @@ public class MovementTrafficTests : MissionTestEnvironment
             serializer,
             messageBroker.Object,
             packetManager.Object,
+            messagePacketHandler.Object,
             controllerIdProvider.Object,
             steamBridge.Object,
-            compressor);
+            compressor,
+            new ReliableMessageBatcher<string>(serializer));
         client.ConnectToInstance(instanceId);
 
         client.Send(controllerId, oversizedPacket);
@@ -1341,6 +1347,11 @@ public class MovementTrafficTests : MissionTestEnvironment
             Assert.Equal(movement.IdentityScopeId, roundTripped.IdentityScopeId);
             Assert.Equal(movement.AgentIds, roundTripped.AgentIds);
             Assert.Equal(movement.Agents.Length, roundTripped.Agents.Length);
+            for (int i = 0; i < agents.Length; i++)
+            {
+                Assert.Equal(agents[i].Position, roundTripped.Agents[i].Position);
+                Assert.Equal(agents[i].LookDirection, roundTripped.Agents[i].LookDirection);
+            }
             Assert.All(
                 roundTripped.Agents,
                 agent => Assert.Equal(
@@ -1392,10 +1403,20 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var compressor = new MovementPacketCompressor(serializer);
-            AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
-                new MovementPacket("76561198000000042", ids, riders));
-            AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
-                new MountMovementPacket("76561198000000042", ids, mounts));
+            var restoredRiders = Assert.IsType<MovementPacket>(
+                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
+                    new MovementPacket("76561198000000042", ids, riders)));
+            var restoredMounts = Assert.IsType<MountMovementPacket>(
+                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
+                    new MountMovementPacket("76561198000000042", ids, mounts)));
+
+            for (int i = 0; i < ids.Length; i++)
+            {
+                Assert.Equal(riders[i].Position, restoredRiders.Agents[i].Position);
+                Assert.Equal(riders[i].LookDirection, restoredRiders.Agents[i].LookDirection);
+                Assert.Equal(mounts[i].MountPosition, restoredMounts.Mounts[i].MountPosition);
+                Assert.Equal(mounts[i].MountLookDirection, restoredMounts.Mounts[i].MountLookDirection);
+            }
         });
     }
 
@@ -1422,7 +1443,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             LiteNetP2PClient.SelectDeliveryMethod(ordinaryUnreliable, datagramCeiling - 1, 0));
     }
 
-    private static void AssertFitsAndDispatchesThroughRelay(
+    private static IPacket AssertFitsAndDispatchesThroughRelay(
         ProtoBufSerializer serializer,
         MovementPacketCompressor compressor,
         IPacketManager packetManager,
@@ -1457,6 +1478,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             Assert.Equal(1, restoredHandler.HandleCount);
             Assert.Same(sourcePeer, restoredHandler.SourcePeer);
             Assert.Equal(packet.GetType(), restoredHandler.Received.GetType());
+            return restoredHandler.Received;
         }
         finally
         {
