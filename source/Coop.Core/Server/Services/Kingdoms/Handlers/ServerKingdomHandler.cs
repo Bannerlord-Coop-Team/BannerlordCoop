@@ -326,7 +326,12 @@ public class ServerKingdomHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.RequestingKingdom, out var requestingKingdomId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.TargetKingdom, out var targetKingdomId)) return;
         AllianceOfferPendingRegistry.Set(obj.RequestingKingdom.StringId, obj.TargetKingdom.StringId, obj.IsPending);
-        network.SendAll(new NetworkAllianceOfferPendingStatusChanged(requestingKingdomId, targetKingdomId, obj.IsPending));
+        network.SendAll(new NetworkAllianceOfferPendingStatusChanged(
+            requestingKingdomId,
+            targetKingdomId,
+            obj.IsPending,
+            obj.RequestingKingdom.StringId,
+            obj.TargetKingdom.StringId));
     }
     public void Dispose()
     {

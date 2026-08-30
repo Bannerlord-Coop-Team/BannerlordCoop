@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using Coop.Core.Client.Services.Kingdoms.Handlers;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -2242,6 +2243,76 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(AllianceOfferPendingRegistry.IsPending(requestingKingdom.StringId, targetKingdom.StringId));
             AllianceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, isPending: false);
         });
+    }
+
+    [Fact]
+    public void AllianceOfferPendingStatusChanged_UnhydratedClanReferences_UseCanonicalKingdomStringIds()
+    {
+        const string requestingKingdomStringId = "pending_alliance_requesting";
+        const string targetKingdomStringId = "pending_alliance_target";
+        const string requestingKingdomWireId = "pending_alliance_requesting_clan";
+        const string targetKingdomWireId = "pending_alliance_target_clan";
+        var client = Clients.First();
+        var requestingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        EnsureKingdomRegisteredEverywhere(requestingKingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        SetKingdomStringIdEverywhere(requestingKingdomId, requestingKingdomStringId);
+        SetKingdomStringIdEverywhere(targetKingdomId, targetKingdomStringId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(requestingKingdomId, out var requestingKingdom));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            var unhydratedRequestingClan = ObjectHelper.SkipConstructor<Clan>();
+            var unhydratedTargetClan = ObjectHelper.SkipConstructor<Clan>();
+            Assert.Null(unhydratedRequestingClan.Kingdom);
+            Assert.Null(unhydratedTargetClan.Kingdom);
+            Assert.True(client.ObjectManager.AddExisting($"Clan_{requestingKingdomWireId}", unhydratedRequestingClan));
+            Assert.True(client.ObjectManager.AddExisting($"Clan_{targetKingdomWireId}", unhydratedTargetClan));
+
+            client.SimulateMessage(
+                this,
+                new NetworkAllianceOfferPendingStatusChanged(
+                    requestingKingdomWireId,
+                    targetKingdomWireId,
+                    isPending: true,
+                    requestingKingdomStringId: requestingKingdomStringId,
+                    targetKingdomStringId: targetKingdomStringId));
+
+            Assert.True(AllianceOfferPendingRegistry.IsPending(requestingKingdom.StringId, targetKingdom.StringId));
+            AllianceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, isPending: false);
+        });
+    }
+
+    [Fact]
+    public void AllianceOfferPendingStatusChanged_ServerIncludesCanonicalKingdomStringIds()
+    {
+        const string requestingKingdomStringId = "pending_alliance_requesting_server";
+        const string targetKingdomStringId = "pending_alliance_target_server";
+        var requestingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        EnsureKingdomRegisteredEverywhere(requestingKingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        SetKingdomStringIdEverywhere(requestingKingdomId, requestingKingdomStringId);
+        SetKingdomStringIdEverywhere(targetKingdomId, targetKingdomStringId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(requestingKingdomId, out var requestingKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+
+            Server.Resolve<IMessageBroker>().Publish(
+                this,
+                new AllianceOfferPendingStatusChanged(requestingKingdom, targetKingdom, isPending: true));
+        });
+
+        var message = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllianceOfferPendingStatusChanged>());
+        Assert.Equal(requestingKingdomStringId, message.RequestingKingdomStringId);
+        Assert.Equal(targetKingdomStringId, message.TargetKingdomStringId);
+        AllianceOfferPendingRegistry.Set(requestingKingdomStringId, targetKingdomStringId, isPending: false);
     }
 
     [Fact]

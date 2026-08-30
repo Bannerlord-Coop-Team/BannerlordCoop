@@ -457,8 +457,16 @@ public class ClientKingdomHandler : IHandler
         var obj = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!StartAllianceDecisionData.TryGetKingdomReference(objectManager, obj.RequestingKingdomId, out var requestingKingdom)) return;
-            if (!StartAllianceDecisionData.TryGetKingdomReference(objectManager, obj.TargetKingdomId, out var targetKingdom)) return;
+            if (!StartAllianceDecisionData.TryGetKingdomReference(
+                    objectManager,
+                    obj.RequestingKingdomId,
+                    obj.RequestingKingdomStringId,
+                    out var requestingKingdom)) return;
+            if (!StartAllianceDecisionData.TryGetKingdomReference(
+                    objectManager,
+                    obj.TargetKingdomId,
+                    obj.TargetKingdomStringId,
+                    out var targetKingdom)) return;
             AllianceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, obj.IsPending);
         });
     }

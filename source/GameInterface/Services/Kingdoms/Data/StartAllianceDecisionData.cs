@@ -58,12 +58,7 @@ namespace GameInterface.Services.Kingdoms.Data
 
         private bool TryGetDecisionKingdomReference(IObjectManager objectManager, out Kingdom kingdom)
         {
-            if (TryGetKingdomByStringId(objectManager, DecisionKingdomStringId, out kingdom))
-            {
-                return true;
-            }
-
-            return TryGetKingdomReference(objectManager, KingdomId, out kingdom);
+            return TryGetKingdomReference(objectManager, KingdomId, DecisionKingdomStringId, out kingdom);
         }
 
         private static bool TryGetKingdomByStringId(IObjectManager objectManager, string kingdomStringId, out Kingdom kingdom)
@@ -72,6 +67,10 @@ namespace GameInterface.Services.Kingdoms.Data
             if (string.IsNullOrWhiteSpace(kingdomStringId)) return false;
 
             kingdom = Kingdom.All.FirstOrDefault(candidate => candidate.StringId == kingdomStringId);
+            if (kingdom != null) return true;
+
+            kingdom = Campaign.Current?.CampaignObjectManager?.Kingdoms
+                .FirstOrDefault(candidate => candidate.StringId == kingdomStringId);
             if (kingdom != null) return true;
 
             kingdom = MBObjectManager.Instance?.GetObjectTypeList<Kingdom>()
@@ -95,6 +94,16 @@ namespace GameInterface.Services.Kingdoms.Data
             }
 
             return objectManager.TryGetObject(kingdomId, out kingdom);
+        }
+
+        public static bool TryGetKingdomReference(IObjectManager objectManager, string kingdomId, string kingdomStringId, out Kingdom kingdom)
+        {
+            if (TryGetKingdomByStringId(objectManager, kingdomStringId, out kingdom))
+            {
+                return true;
+            }
+
+            return TryGetKingdomReference(objectManager, kingdomId, out kingdom);
         }
 
         private static bool TryGetKingdomFromReference(object kingdomReference, out Kingdom kingdom)
@@ -145,12 +154,11 @@ namespace GameInterface.Services.Kingdoms.Data
 
         private bool TryGetTargetKingdomReference(IObjectManager objectManager, out Kingdom kingdom)
         {
-            if (TryGetKingdomByStringId(objectManager, KingdomToStartAllianceWithStringId, out kingdom))
-            {
-                return true;
-            }
-
-            return TryGetKingdomReference(objectManager, KingdomToStartAllianceWithId, out kingdom);
+            return TryGetKingdomReference(
+                objectManager,
+                KingdomToStartAllianceWithId,
+                KingdomToStartAllianceWithStringId,
+                out kingdom);
         }
     }
 }

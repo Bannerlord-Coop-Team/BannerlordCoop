@@ -12,11 +12,22 @@ public readonly struct NetworkAllianceOfferPendingStatusChanged : ICommand
     public readonly string TargetKingdomId;
     [ProtoMember(3)]
     public readonly bool IsPending;
+    [ProtoMember(4)]
+    public readonly string RequestingKingdomStringId;
+    [ProtoMember(5)]
+    public readonly string TargetKingdomStringId;
 
-    public NetworkAllianceOfferPendingStatusChanged(string requestingKingdomId, string targetKingdomId, bool isPending)
+    public NetworkAllianceOfferPendingStatusChanged(
+        string requestingKingdomId,
+        string targetKingdomId,
+        bool isPending,
+        string requestingKingdomStringId = null,
+        string targetKingdomStringId = null)
     {
         RequestingKingdomId = requestingKingdomId;
         TargetKingdomId = targetKingdomId;
         IsPending = isPending;
+        RequestingKingdomStringId = requestingKingdomStringId;
+        TargetKingdomStringId = targetKingdomStringId;
     }
 }
