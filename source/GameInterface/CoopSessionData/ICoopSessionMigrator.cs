@@ -64,7 +64,7 @@ public class CoopSessionMigrator : ICoopSessionMigrator
         {
             if (!TryGetPlayerDictionary(property, out var dictionary)) return false;
 
-            if (!dictionary.Contains(oldPlayerHeroId)) return false;
+            if (!dictionary.Contains(oldPlayerHeroId)) continue;
 
             var playerData = dictionary[oldPlayerHeroId];
 
