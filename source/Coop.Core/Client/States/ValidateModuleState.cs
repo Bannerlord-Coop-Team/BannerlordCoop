@@ -74,7 +74,6 @@ public class ValidateModuleState : ClientStateBase
         this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
-        messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
 
 #if DEBUG
         controllerIdProvider.SetControllerFromProgramArgs();
@@ -101,7 +100,6 @@ public class ValidateModuleState : ClientStateBase
         validationTimeoutTimer?.Dispose();
         messageBroker.Unsubscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
-        messageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
     }
 
     internal void TimeoutValidation()
@@ -169,26 +167,38 @@ public class ValidateModuleState : ClientStateBase
 
     internal void Handle_NetworkClientValidated(MessagePayload<NetworkClientValidated> obj)
     {
-        // The server's terminal validation response. Claim completion before touching Logic so a
-        // timeout firing at the same instant loses the race and no-ops, rather than tearing the
-        // container down in the window between here and the state transition below (which would leave
-        // this handler resolving the next state from a disposed container).
-        if (!TryClaimCompletion()) return;
-
         if (obj.What.HeroExists)
         {
+            // Claim before touching Logic so a concurrent timeout cannot tear down the container
+            // while this handler resolves and enters the next state.
+            if (!TryClaimCompletion()) return;
+
             Logic.Player = obj.What.Player;
             Logic.LoadSavedData();
         }
         else
         {
-            Logic.StartCharacterCreation();
+            // Leave validation before vanilla activates the intro video, otherwise its forced loading
+            // window stays over the video until the real character-creation state activates.
+            GameThread.RunSafe(BeginCharacterCreation, context: nameof(Handle_NetworkClientValidated));
         }
     }
 
-    internal void Handle_CharacterCreationStarted(MessagePayload<CharacterCreationStarted> obj)
+    private void BeginCharacterCreation()
     {
-        Logic.SetState<CharacterCreationState>();
+        if (disposed || Logic.State != this) return;
+        if (!TryClaimCompletion()) return;
+
+        try
+        {
+            Logic.SetState<CharacterCreationState>();
+            gameStateInterface.StartNewGame();
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to start character creation");
+            coopFinalizer.Finalize("Failed to start character creation.");
+        }
     }
 
     public override void EnterMainMenu()

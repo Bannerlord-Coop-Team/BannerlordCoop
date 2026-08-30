@@ -23,7 +23,7 @@ namespace Missions.Agents.Packets
         public AgentActionData[] Actions { get; }
         [ProtoMember(3)]
         public string ControllerId { get; }
-        [ProtoMember(4)]
+        [ProtoMember(4, IsPacked = true)]
         public long[] Sequences { get; }
         [ProtoMember(5)]
         public int BattleHostEpoch { get; }
