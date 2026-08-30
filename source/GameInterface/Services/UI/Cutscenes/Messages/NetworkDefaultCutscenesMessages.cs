@@ -26,3 +26,15 @@ internal readonly struct NetworkInitiateCutscenePlayerCharacterDied : ICommand
         Detail = detail;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkInitiateCutsceneHeroComesOfAge : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string HeroId;
+
+    public NetworkInitiateCutsceneHeroComesOfAge(string heroId) : this()
+    {
+        HeroId = heroId;
+    }
+}

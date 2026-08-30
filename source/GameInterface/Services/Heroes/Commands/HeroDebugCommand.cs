@@ -327,14 +327,19 @@ public class HeroDebugCommand
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_age")) return error;
 
-        if (args.Count < 2)
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
-            return "Usage: coop.debug.hero.set_age <heroName> <age>";
+            return $"Unable to get {nameof(IObjectManager)}";
         }
 
-        if (int.TryParse(args[args.Count - 1], out int age) == false)
+        if (args.Count < 2)
         {
-            return $"{args[args.Count - 1]} is not a valid integer";
+            return "Usage: coop.debug.hero.set_age <heroName|heroId> <age>";
+        }
+
+        if (float.TryParse(args[args.Count - 1], out float age) == false)
+        {
+            return $"{args[args.Count - 1]} is not a valid float";
         }
 
         // Everything before the age value is treated as the hero name (supports multi-word names)
@@ -346,12 +351,19 @@ public class HeroDebugCommand
 
         if (heroes.Count == 0)
         {
-            return $"Unable to find hero with name: {heroName}";
+            if (objectManager.TryGetObject<Hero>(heroName, out var hero))
+            {
+                heroes.Add(hero);
+            }
+            else
+            {
+                return $"Unable to find hero with id or name: {heroName}";
+            }
         }
 
         foreach (var hero in heroes)
         {
-            var ageInTicks = CampaignTime.TimeTicksPerYear * age;
+            var ageInTicks = (long)(CampaignTime.TimeTicksPerYear * age);
 
             hero.SetBirthDay(new CampaignTime(CampaignTime.CurrentTicks - ageInTicks));
         }

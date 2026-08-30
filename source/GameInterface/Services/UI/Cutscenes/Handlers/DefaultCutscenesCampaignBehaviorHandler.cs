@@ -10,9 +10,12 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.UI.Cutscenes.Handlers;
 
@@ -35,12 +38,18 @@ internal class DefaultCutscenesCampaignBehaviorHandler : IHandler
 
         messageBroker.Subscribe<InitiateCutscenePlayerCharacterDied>(Handle_InitiateCutscenePlayerCharacterDied);
         messageBroker.Subscribe<NetworkInitiateCutscenePlayerCharacterDied>(Handle_NetworkInitiateCutscenePlayerCharacterDied);
+
+        messageBroker.Subscribe<InitiateCutsceneHeroComesOfAge>(Handle_InitiateCutsceneHeroComesOfAge);
+        messageBroker.Subscribe<NetworkInitiateCutsceneHeroComesOfAge>(Handle_NetworkInitiateCutsceneHeroComesOfAge);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<InitiateCutscenePlayerCharacterDied>(Handle_InitiateCutscenePlayerCharacterDied);
         messageBroker.Unsubscribe<NetworkInitiateCutscenePlayerCharacterDied>(Handle_NetworkInitiateCutscenePlayerCharacterDied);
+
+        messageBroker.Unsubscribe<InitiateCutsceneHeroComesOfAge>(Handle_InitiateCutsceneHeroComesOfAge);
+        messageBroker.Unsubscribe<NetworkInitiateCutsceneHeroComesOfAge>(Handle_NetworkInitiateCutsceneHeroComesOfAge);
     }
 
     private void Handle_InitiateCutscenePlayerCharacterDied(MessagePayload<InitiateCutscenePlayerCharacterDied> obj)
@@ -106,6 +115,28 @@ internal class DefaultCutscenesCampaignBehaviorHandler : IHandler
             {
                 MBInformationManager.ShowSceneNotification(sceneNotificationData);
             }
+        });
+    }
+
+    private void Handle_InitiateCutsceneHeroComesOfAge(MessagePayload<InitiateCutsceneHeroComesOfAge> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+        network.SendAll(new NetworkInitiateCutsceneHeroComesOfAge(heroId));
+    }
+
+    private void Handle_NetworkInitiateCutsceneHeroComesOfAge(MessagePayload<NetworkInitiateCutsceneHeroComesOfAge> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetCutscenesBehavior(out var cutscenesBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+
+            cutscenesBehavior.OnHeroComesOfAge(hero);
         });
     }
 

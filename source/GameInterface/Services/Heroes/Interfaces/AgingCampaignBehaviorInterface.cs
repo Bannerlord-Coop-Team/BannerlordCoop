@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI.Cutscenes.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using Helpers;
 using Serilog;
@@ -26,6 +27,7 @@ public interface IAgingCampaignBehaviorInterface : IGameAbstraction
 {
     void DailyTickHero(AgingCampaignBehavior behavior, Hero hero);
     void OnHeroComesOfAge(AgingCampaignBehavior behavior, Hero hero);
+    void OnPlayerClanHeroReachesTeenAge(AgingCampaignBehavior behavior, Hero hero);
     bool GetIsPlayerIll(Hero hero);
     int GetPlayerIllDays(Hero hero);
     void AddPlayerKeys(string playerHeroId);
@@ -63,75 +65,80 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
     public void DailyTickHero(AgingCampaignBehavior behavior, Hero hero)
     {
         bool isGameStart = (int)CampaignTime.Now.ToDays == behavior._gameStartDay;
-        if (!CampaignOptions.IsLifeDeathCycleDisabled && !isGameStart && !hero.IsTemplate)
+        if (CampaignOptions.IsLifeDeathCycleDisabled || isGameStart || hero.IsTemplate) return;
+
+        if (hero.IsAlive && hero.CanDie(KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge))
         {
-            if (hero.IsAlive && hero.CanDie(KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge))
+            if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None
+                && CanApplyDeathMark(hero)
+                && (hero.PartyBelongedTo == null || (hero.PartyBelongedTo.MapEvent == null && hero.PartyBelongedTo.SiegeEvent == null)))
             {
-                if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None
-                    && CanApplyDeathMark(hero)
-                    && (hero.PartyBelongedTo == null || (hero.PartyBelongedTo.MapEvent == null && hero.PartyBelongedTo.SiegeEvent == null)))
+                KillCharacterAction.ApplyByDeathMark(hero, false);
+            }
+            else
+            {
+                IsItTimeOfDeath(behavior, hero);
+            }
+        }
+
+        if (behavior._heroesYoungerThanHeroComesOfAge.TryGetValue(hero, out int recordedAge))
+        {
+            int heroAge = (int)hero.Age;
+            if (recordedAge != heroAge)
+            {
+                if (heroAge >= Campaign.Current.Models.AgeModel.HeroComesOfAge)
                 {
-                    KillCharacterAction.ApplyByDeathMark(hero, false);
+                    behavior._heroesYoungerThanHeroComesOfAge.Remove(hero);
+                    CampaignEventDispatcher.Instance.OnHeroComesOfAge(hero);
+
+                    if (hero.Clan?.IsPlayerClan() == true)
+                    {
+                        MessageBroker.Instance.Publish(this, new InitiateCutsceneHeroComesOfAge(hero));
+                    }
                 }
                 else
                 {
-                    IsItTimeOfDeath(behavior, hero);
+                    behavior._heroesYoungerThanHeroComesOfAge[hero] = heroAge;
+                    if (heroAge == Campaign.Current.Models.AgeModel.BecomeTeenagerAge)
+                    {
+                        CampaignEventDispatcher.Instance.OnHeroReachesTeenAge(hero);
+                    }
+                    else if (heroAge == Campaign.Current.Models.AgeModel.BecomeChildAge)
+                    {
+                        CampaignEventDispatcher.Instance.OnHeroGrowsOutOfInfancy(hero);
+                    }
                 }
             }
-            if (behavior._heroesYoungerThanHeroComesOfAge.TryGetValue(hero, out int recordedAge))
+        }
+        if (hero.IsPlayerHero()
+            && GetIsPlayerIll(hero)
+            && hero.HeroState != Hero.CharacterStates.Dead
+            && CanProcessNaturalDeath(hero))
+        {
+            AddPlayerIllDays(hero, 1);
+            if (GetPlayerIllDays(hero) > 3)
             {
-                int heroAge = (int)hero.Age;
-                if (recordedAge != heroAge)
+                hero.HitPoints = MathF.Ceiling((float)hero.HitPoints * (0.05f * (float)GetPlayerIllDays(hero)));
+                if (hero.HitPoints <= 1 && hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None)
                 {
-                    if (heroAge >= Campaign.Current.Models.AgeModel.HeroComesOfAge)
+                    if (behavior._extraLivesContainer.TryGetValue(hero, out int numberOfExtraLives))
                     {
-                        behavior._heroesYoungerThanHeroComesOfAge.Remove(hero);
-                        CampaignEventDispatcher.Instance.OnHeroComesOfAge(hero);
+                        if (numberOfExtraLives == 0)
+                        {
+                            KillPlayerHeroWithIllness(hero);
+                            return;
+                        }
+                        AddPlayerIllDays(hero, -1);
+                        behavior._extraLivesContainer[hero] = numberOfExtraLives - 1;
+                        if (behavior._extraLivesContainer[hero] == 0)
+                        {
+                            behavior._extraLivesContainer.Remove(hero);
+                            return;
+                        }
                     }
                     else
                     {
-                        behavior._heroesYoungerThanHeroComesOfAge[hero] = heroAge;
-                        if (heroAge == Campaign.Current.Models.AgeModel.BecomeTeenagerAge)
-                        {
-                            CampaignEventDispatcher.Instance.OnHeroReachesTeenAge(hero);
-                        }
-                        else if (heroAge == Campaign.Current.Models.AgeModel.BecomeChildAge)
-                        {
-                            CampaignEventDispatcher.Instance.OnHeroGrowsOutOfInfancy(hero);
-                        }
-                    }
-                }
-            }
-            if (hero.IsPlayerHero()
-                && GetIsPlayerIll(hero)
-                && hero.HeroState != Hero.CharacterStates.Dead
-                && CanProcessNaturalDeath(hero))
-            {
-                AddPlayerIllDays(hero, 1);
-                if (GetPlayerIllDays(hero) > 3)
-                {
-                    hero.HitPoints = MathF.Ceiling((float)hero.HitPoints * (0.05f * (float)GetPlayerIllDays(hero)));
-                    if (hero.HitPoints <= 1 && hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None)
-                    {
-                        if (behavior._extraLivesContainer.TryGetValue(hero, out int numberOfExtraLives))
-                        {
-                            if (numberOfExtraLives == 0)
-                            {
-                                KillPlayerHeroWithIllness(hero);
-                                return;
-                            }
-                            AddPlayerIllDays(hero, -1);
-                            behavior._extraLivesContainer[hero] = numberOfExtraLives - 1;
-                            if (behavior._extraLivesContainer[hero] == 0)
-                            {
-                                behavior._extraLivesContainer.Remove(hero);
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            KillPlayerHeroWithIllness(hero);
-                        }
+                        KillPlayerHeroWithIllness(hero);
                     }
                 }
             }
@@ -164,6 +171,17 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
 
             EquipmentHelper.AssignHeroEquipmentFromEquipment(hero, battleEquipment);
             EquipmentHelper.AssignHeroEquipmentFromEquipment(hero, civilianEquipment);
+        }
+    }
+
+    public void OnPlayerClanHeroReachesTeenAge(AgingCampaignBehavior behavior, Hero hero)
+    {
+        Equipment equipmentForHeroReachesTeenAge = Campaign.Current.Models.EquipmentSelectionModel.GetEquipmentForHeroReachesTeenAge(hero);
+        if (equipmentForHeroReachesTeenAge != null)
+        {
+            EquipmentHelper.AssignHeroEquipmentFromEquipment(hero, equipmentForHeroReachesTeenAge);
+            new Equipment(Equipment.EquipmentType.Battle).FillFrom(equipmentForHeroReachesTeenAge, false);
+            EquipmentHelper.AssignHeroEquipmentFromEquipment(hero, equipmentForHeroReachesTeenAge);
         }
     }
 

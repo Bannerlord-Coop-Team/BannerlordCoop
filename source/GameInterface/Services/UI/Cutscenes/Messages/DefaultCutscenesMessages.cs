@@ -20,3 +20,13 @@ public readonly struct InitiateCutscenePlayerCharacterDied : IEvent
         Detail = detail;
     }
 }
+
+public readonly struct InitiateCutsceneHeroComesOfAge : IEvent
+{
+    public readonly Hero Hero;
+
+    public InitiateCutsceneHeroComesOfAge(Hero hero)
+    {
+        Hero = hero;
+    }
+}
