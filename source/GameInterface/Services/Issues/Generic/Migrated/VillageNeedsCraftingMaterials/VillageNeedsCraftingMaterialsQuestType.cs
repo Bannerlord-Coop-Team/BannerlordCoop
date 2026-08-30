@@ -100,6 +100,9 @@ internal static class VillageNeedsCraftingMaterialsQuestType
                 if (quest._playerAcceptedQuestLog is JournalLog log)
                 {
                     JournalLogRangeField.SetValue(log, fields.RequestedItemAmount);
+
+                    var ownedCount = owner.PartyBelongedTo?.ItemRoster.GetItemNumber(quest._requestedItem) ?? 0;
+                    log.UpdateCurrentProgress(Math.Min(ownedCount, fields.RequestedItemAmount));
                 }
             }
         }
