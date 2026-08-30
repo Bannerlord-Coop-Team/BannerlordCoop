@@ -234,4 +234,87 @@ public class ServerLaunchArgumentsTests
 
         Assert.DoesNotContain(ServerLaunchArguments.PasswordArgument, built);
     }
+
+    [Fact]
+    public void BuildDedicatedServerArguments_CarriesOnlyTheCoopSessionTokens()
+    {
+        var built = ServerLaunchArguments.BuildDedicatedServerArguments(
+            "My Save", 42, "Secret words", ServerVisibility.FriendsOnly);
+
+        Assert.Equal("/coopsave \"My Save\" /coopowner 42 /coopvisibility friends_only /cooppassword \"Secret words\"", built);
+    }
+
+    [Fact]
+    public void BuildDedicatedServerArguments_OmitsEngineTokens()
+    {
+        var built = ServerLaunchArguments.BuildDedicatedServerArguments(
+            "MP", 42, string.Empty, ServerVisibility.Public);
+
+        Assert.DoesNotContain("/server", built);
+        Assert.DoesNotContain("/singleplayer", built);
+        Assert.DoesNotContain("_MODULES_", built);
+    }
+
+    [Fact]
+    public void BuildDedicatedServerArguments_OmitsPasswordArgumentWhenUnprotected()
+    {
+        var built = ServerLaunchArguments.BuildDedicatedServerArguments(
+            "MP", 42, string.Empty, ServerVisibility.Public);
+
+        Assert.Equal("/coopsave MP /coopowner 42 /coopvisibility public", built);
+    }
+
+    [Fact]
+    public void BuildDedicatedServerArguments_RoundTripsThroughTryParse()
+    {
+        var built = ServerLaunchArguments.BuildDedicatedServerArguments(
+            "My Save", 1234, "Secret words", ServerVisibility.None);
+        var args = SplitLikeWindows(built);
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            args, out var saveName, out var ownerProcessId, out var password, out var visibility));
+        Assert.Equal("My Save", saveName);
+        Assert.Equal(1234, ownerProcessId);
+        Assert.Equal("Secret words", password);
+        Assert.Equal(ServerVisibility.None, visibility);
+    }
+
+    [Fact]
+    public void BuildDedicatedServerArguments_RejectsMissingSaveAndUndefinedVisibility()
+    {
+        Assert.Throws<System.ArgumentNullException>(() =>
+            ServerLaunchArguments.BuildDedicatedServerArguments(null, 42, "", ServerVisibility.Public));
+        Assert.Throws<System.ArgumentOutOfRangeException>(() =>
+            ServerLaunchArguments.BuildDedicatedServerArguments("MP", 42, "", (ServerVisibility)99));
+    }
+
+    /// <summary>Minimal Windows-rule splitter for round-trip tests (quotes only; the
+    /// builder never emits embedded quotes for these inputs).</summary>
+    private static string[] SplitLikeWindows(string commandLine)
+    {
+        var tokens = new System.Collections.Generic.List<string>();
+        bool inQuotes = false;
+        var current = new System.Text.StringBuilder();
+        foreach (var c in commandLine)
+        {
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (c == ' ' && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    tokens.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+        if (current.Length > 0) tokens.Add(current.ToString());
+        return tokens.ToArray();
+    }
 }
