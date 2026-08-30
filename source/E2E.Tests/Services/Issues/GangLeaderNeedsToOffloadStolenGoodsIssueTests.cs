@@ -983,4 +983,78 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             });
         }
     }
+
+    [Fact]
+    public void StayAliveConditionsFailedOnServer_GenuinelyRemovesTheIssue_NotJustTellsClientsItWasRemoved()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(owner.Issue.IsOngoingWithoutQuest);
+
+            owner.Issue.CompleteIssueWithStayAliveConditionsFailed();
+
+            Assert.Null(owner.Issue);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    [Fact]
+    public void TimedOutOnServer_GenuinelyRemovesTheIssue_NotJustTellsClientsItWasRemoved()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(owner.Issue.IsOngoingWithoutQuest);
+
+            owner.Issue.CompleteIssueWithTimedOut();
+
+            Assert.Null(owner.Issue);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    [Fact]
+    public void OnHourlyTick_OneDueOwnedIssue_SendsExactlyOneCompletionRequest()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var controllerId = "player-A-" + Guid.NewGuid();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(controllerId, fixture.HeroId, "", "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, controllerId);
+        Client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Client.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
+
+            using (new AllowedThread())
+            {
+                owner.Issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                owner.Issue.IsTriedToSolveBefore = true;
+                owner.Issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.Now - CampaignTime.Days(1f);
+            }
+
+            new IssuesCampaignBehavior().RegisterEvents();
+            new GangLeaderNeedsToOffloadStolenGoodsIssueBehavior().RegisterEvents();
+            CampaignEvents.Instance.HourlyTick();
+        });
+
+        var requests = Client.NetworkSentMessages.GetMessages<RequestAlternativeSolutionCompletion>();
+        Assert.Single(requests);
+    }
 }
