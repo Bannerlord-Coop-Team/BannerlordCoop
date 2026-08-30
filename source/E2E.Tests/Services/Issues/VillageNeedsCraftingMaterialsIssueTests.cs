@@ -376,11 +376,6 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "host-controller");
         });
 
-        // Vanilla's own QuestAcceptedConsequences reads MobileParty.MainParty, so this local seed step
-        // needs it to genuinely be the owner's party - matching what's true on the owner's own client
-        // at the moment they accept. The owner already has exactly enough for the amount their own
-        // client originally computed - this is the "already has enough items" precondition from the
-        // review.
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -389,8 +384,6 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
             using (new AllowedThread())
             {
-                // Assigning PartyBelongedTo switches Hero.CurrentSettlement to resolve through the
-                // party instead of StayingInSettlement, so the party needs its own settlement too.
                 party.CurrentSettlement = settlement;
                 owner.PartyBelongedTo = party;
                 party.ItemRoster.AddToCounts(quest._requestedItem, originalAmount);
@@ -407,10 +400,6 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.Null(explanation);
         });
 
-        // Reassign MainParty to an unrelated decoy party before mirroring, so the assertions below can
-        // only pass if the recompute uses owner.PartyBelongedTo (the real, synced party) and not
-        // MobileParty.MainParty (which is peer-local and would be wrong on any receiving peer other
-        // than the accepter's own client).
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(decoyPartyId, out var decoyParty));
@@ -420,8 +409,6 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             }
         });
 
-        // A correction arrives with a larger amount than the owner's party actually has on hand -
-        // CurrentProgress must be recomputed against the real roster, not left at the stale old cap.
         var correctedAmount = originalAmount + 5;
         Server.Call(() =>
         {
@@ -434,8 +421,6 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.NotNull(explanation);
         });
 
-        // Giving the owner's real party the rest of the corrected amount and re-mirroring the same
-        // fields must bring CurrentProgress up to what the owner's party genuinely has now.
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -1228,10 +1213,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
                 {
                     Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
                 }
-                if (instance == Server)
-                {
-                    Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
-                }
+                instance.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
             });
         }
 
@@ -1257,13 +1239,16 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         }
 
         var goldBefore = 0;
-        int honorXpBefore = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             goldBefore = owner.Gold;
-            honorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor);
         });
+
+        int serverHonorXpBefore = 0;
+        Server.Call(() => serverHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        int clientHonorXpBefore = 0;
+        Client.Call(() => clientHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
 
         Client.Call(() =>
         {
@@ -1290,7 +1275,11 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.Equal(goldBefore + 500, owner.Gold);
-            Assert.Equal(honorXpBefore + 30, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            Assert.Equal(serverHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        });
+        Client.Call(() =>
+        {
+            Assert.Equal(clientHonorXpBefore + 30, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
         });
     }
 

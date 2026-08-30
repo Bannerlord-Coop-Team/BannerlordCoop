@@ -140,14 +140,18 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         var itemRosterElement = new ItemRosterElement(quest._requestedItem, quest._requestedItemAmount, null);
         GiveItemAction.ApplyForParties(PartyBase.MainParty, quest.QuestGiver.CurrentSettlement.Party, itemRosterElement);
         GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest.RewardGold, false);
-        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
-        {
-            new Tuple<TraitObject, int>(DefaultTraits.Honor, 30)
-        });
         quest.QuestGiver.AddPower(10f);
         quest.RelationshipChangeWithQuestGiver = 5;
         quest.QuestGiver.CurrentSettlement.Village.Hearth += 30f;
         quest.CompleteQuestWithSuccess();
+    }
+
+    private static void ApplyQuestSuccessLocalOwnerConsequence(Quest quest)
+    {
+        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
+        {
+            new Tuple<TraitObject, int>(DefaultTraits.Honor, 30)
+        });
     }
 
     private static void ApplyQuestFailConsequence(Quest quest)
@@ -170,6 +174,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
+            .WithQuestSuccessLocalOwnerConsequence(ApplyQuestSuccessLocalOwnerConsequence)
             .WithQuestCancelValidation(issue => true)
             .WithQuestFailValidation(issue => true)
             .WithQuestFailConsequence(ApplyQuestFailConsequence)
