@@ -31,8 +31,7 @@ public interface ICoopSession
     AgingPlayerData AgingPlayerData { get; }
 }
 
-/// <inheritdoc cref="ICoopSession"/>
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public class CoopSession : ICoopSession
 {
     // Shared "no data yet" shape for a fresh session (before any GameSaved/GameLoaded). A property,

@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -30,6 +31,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
     private readonly IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface;
+    private readonly ICoopSessionMigrator coopSessionMigrator;
 
     public HeirSelectionHandler(
         IMessageBroker messageBroker,
@@ -38,7 +40,8 @@ internal class HeirSelectionHandler : IHandler
         IPlayerManager playerManager,
         IPlayerPartyRestorer playerPartyRestorer,
         IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface,
-        IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface)
+        IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface,
+        ICoopSessionMigrator coopSessionMigrator)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -47,6 +50,7 @@ internal class HeirSelectionHandler : IHandler
         this.playerPartyRestorer = playerPartyRestorer;
         this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
         this.heirSelectionCampaignBehaviorInterface = heirSelectionCampaignBehaviorInterface;
+        this.coopSessionMigrator = coopSessionMigrator;
 
         messageBroker.Subscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
         messageBroker.Subscribe<NetworkClientSelectHeir>(Handle_NetworkClientSelectHeir);
@@ -199,10 +203,8 @@ internal class HeirSelectionHandler : IHandler
             return;
         }
 
-        // Migrate CoopSession data before changed player action
-        // Server updates key and sends updated version to clients
-        // When ChangePlayerCharacterAction.Apply calls PlayerHeroChanged, client automatically updates data
-        //coopSessionMigrator.MigratePlayerData();
+        // Migrate CoopSession data before changed player action calls PlayerHeroChanged
+        coopSessionMigrator.MigratePlayerData(data.OriginalHero, data.Heir);
 
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
 
