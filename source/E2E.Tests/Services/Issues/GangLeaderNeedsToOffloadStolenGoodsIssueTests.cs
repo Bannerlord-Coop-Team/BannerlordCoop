@@ -22,7 +22,9 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -534,6 +536,16 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.Same(quest, owner.Issue.IssueQuest);
             Assert.True(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
             Assert.Equal(0, PartyBase.MainParty.ItemRoster.GetItemNumber(quest._stolenTradeGood));
+
+            Assert.False(quest.game_menu_approach_meeting_on_condition(new MenuCallbackArgs((MenuContext)null, null)));
+
+            quest.OnMapEventStarted(null, PartyBase.MainParty, null);
+            Assert.False(quest._isFightingForGoods);
+
+            quest.OnHideoutBattleCompleted(BattleSideEnum.Attacker, null, HideoutEventComponent.HideoutBattleEndState.None);
+            Assert.False(quest._playerHasTheGoods);
+
+            quest.GameMenuOpened(new MenuCallbackArgs((MenuContext)null, null));
         });
 
         Server.Resolve<IControllerIdProvider>().SetControllerId("host-controller");

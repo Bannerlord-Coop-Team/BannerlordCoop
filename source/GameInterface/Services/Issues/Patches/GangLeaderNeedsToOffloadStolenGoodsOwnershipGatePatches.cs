@@ -54,6 +54,36 @@ internal class GangLeaderNeedsToOffloadStolenGoodsOwnershipGatePatches
     private static bool OnSettlementOwnerChangedPrefix(
         GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
         IsLocalPeerOwner(__instance.QuestGiver);
+
+    [HarmonyPatch("GameMenuOpened")]
+    [HarmonyPrefix]
+    private static bool GameMenuOpenedPrefix(
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
+        IsLocalPeerOwner(__instance.QuestGiver);
+
+    [HarmonyPatch("game_menu_approach_meeting_on_condition")]
+    [HarmonyPrefix]
+    private static bool GameMenuApproachMeetingOnConditionPrefix(
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance,
+        ref bool __result)
+    {
+        if (IsLocalPeerOwner(__instance.QuestGiver)) return true;
+
+        __result = false;
+        return false;
+    }
+
+    [HarmonyPatch("OnMapEventStarted")]
+    [HarmonyPrefix]
+    private static bool OnMapEventStartedPrefix(
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
+        IsLocalPeerOwner(__instance.QuestGiver);
+
+    [HarmonyPatch("OnHideoutBattleCompleted")]
+    [HarmonyPrefix]
+    private static bool OnHideoutBattleCompletedPrefix(
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
+        IsLocalPeerOwner(__instance.QuestGiver);
 }
 
 [HarmonyPatch]
