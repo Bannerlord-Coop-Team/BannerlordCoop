@@ -1219,8 +1219,8 @@ public class KingdomDebugCommand
         {
             return "TradeAgreementsCampaignBehavior is not available.";
         }
-
-        if (behavior.TryGetTradeAgreement(kingdom1, kingdom2, out _))
+        
+        if (behavior.HasTradeAgreement(kingdom1, kingdom2, out _))
         {
             return $"'{kingdom1.Name}' and '{kingdom2.Name}' already have a trade agreement.";
         }
