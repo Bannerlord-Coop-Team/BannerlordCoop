@@ -57,9 +57,7 @@ public class PlayerToPlayerMapConversationRedirectPatchTests : IDisposable
             PlayerObjects.Remove(party);
         }
     }
-
-    // ---- ShouldRedirect ------------------------------------------------------
-
+    
     [Fact]
     public void ShouldRedirect_LocalPlayerToAnotherPlayer_IsTrue()
     {
