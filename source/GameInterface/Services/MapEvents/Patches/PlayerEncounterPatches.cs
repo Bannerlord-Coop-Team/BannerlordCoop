@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
@@ -466,6 +467,7 @@ internal class PlayerEncounterPatches
             (!mapEvent.IsRaid ||
              !MapEventInitializationBarrier.IsBattleResultEncounter(playerEncounter)))
             return true;
+        if (ShouldDeferAfterBattle(TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState)) return false;
         if (PlayerCaptivity.IsCaptive) return false;
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return true;
@@ -474,5 +476,11 @@ internal class PlayerEncounterPatches
         playerEncounterInterface.UpdateInternalAfterBattle(playerEncounter);
 
         return false;
+    }
+
+    internal static bool ShouldDeferAfterBattle(TaleWorlds.Core.GameState activeState)
+    {
+        // The background map tick must not advance to the next loot phase beneath the active loot screen.
+        return activeState is PartyState or InventoryState;
     }
 }
