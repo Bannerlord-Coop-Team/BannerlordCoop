@@ -165,3 +165,33 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         return false;
     }
 }
+
+[HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_hero_main_options_have_issue_on_condition")]
+internal class GateIssueDialogueEntryOptionByAllowlist
+{
+    private static void Postfix(ref bool __result)
+    {
+        if (!__result) return;
+        __result = DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(Hero.OneToOneConversationHero?.Issue);
+    }
+}
+
+[HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_lord_task_given_on_condition")]
+internal class GateIssueDialogueTaskGivenOptionByAllowlist
+{
+    private static void Postfix(ref bool __result)
+    {
+        if (!__result) return;
+        __result = DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(Hero.OneToOneConversationHero?.Issue);
+    }
+}
+
+[HarmonyPatch(typeof(LordConversationsCampaignBehavior), "conversation_lord_task_given_alternative_on_condition")]
+internal class GateIssueDialogueTaskGivenAlternativeOptionByAllowlist
+{
+    private static void Postfix(ref bool __result)
+    {
+        if (!__result) return;
+        __result = DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(Hero.OneToOneConversationHero?.Issue);
+    }
+}

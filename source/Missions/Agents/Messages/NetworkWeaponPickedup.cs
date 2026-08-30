@@ -44,6 +44,36 @@ namespace Missions.Agents.Messages
         [ProtoMember(11)]
         public short ResultingWorldItemAmount { get; }
 
+        [ProtoMember(12)]
+        public bool WorldItemConsumed { get; }
+
+        [ProtoMember(13)]
+        public string ResultingSlotItemObjectId { get; }
+
+        [ProtoMember(14)]
+        public string ResultingSlotItemModifierId { get; }
+
+        [ProtoMember(15)]
+        public Banner ResultingSlotBanner { get; }
+
+        [ProtoMember(16)]
+        public short ResultingSlotDataValue { get; }
+
+        [ProtoMember(17)]
+        public bool IsIdentityCorrection { get; }
+
+        [ProtoMember(18)]
+        public short WorldItemDataValue { get; }
+
+        [ProtoMember(19)]
+        public bool HasWorldItemDataValue { get; }
+
+        [ProtoMember(20)]
+        public string WorldItemModifierId { get; }
+
+        [ProtoMember(21)]
+        public Guid PickupId { get; }
+
         public NetworkWeaponPickedup(
             Guid agentId, 
             EquipmentIndex equipmentIndex,
@@ -55,7 +85,17 @@ namespace Missions.Agents.Messages
             short previousSlotAmount,
             short previousWorldItemAmount,
             short resultingSlotAmount,
-            short resultingWorldItemAmount)
+            short resultingWorldItemAmount,
+            bool worldItemConsumed,
+            string resultingSlotItemObjectId = null,
+            string resultingSlotItemModifierId = null,
+            Banner resultingSlotBanner = null,
+            short resultingSlotDataValue = 0,
+            bool isIdentityCorrection = false,
+            short worldItemDataValue = 0,
+            bool hasWorldItemDataValue = false,
+            string worldItemModifierId = null,
+            Guid pickupId = default)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
@@ -68,6 +108,16 @@ namespace Missions.Agents.Messages
             PreviousWorldItemAmount = previousWorldItemAmount;
             ResultingSlotAmount = resultingSlotAmount;
             ResultingWorldItemAmount = resultingWorldItemAmount;
+            WorldItemConsumed = worldItemConsumed;
+            ResultingSlotItemObjectId = resultingSlotItemObjectId;
+            ResultingSlotItemModifierId = resultingSlotItemModifierId;
+            ResultingSlotBanner = resultingSlotBanner;
+            ResultingSlotDataValue = resultingSlotDataValue;
+            IsIdentityCorrection = isIdentityCorrection;
+            WorldItemDataValue = worldItemDataValue;
+            HasWorldItemDataValue = hasWorldItemDataValue;
+            WorldItemModifierId = worldItemModifierId;
+            PickupId = pickupId;
         }
     }
 }

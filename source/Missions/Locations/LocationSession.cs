@@ -1,4 +1,4 @@
-using GameInterface.Services.Entity;
+﻿using GameInterface.Services.Entity;
 using GameInterface.Services.Locations.Hosting;
 
 namespace Missions.Locations;
@@ -23,6 +23,9 @@ public interface ILocationSession
 
     /// <summary>True if this client is the elected NPC host of this location mission. False while no instance is set.</summary>
     bool IsLocalHost { get; }
+
+    /// <summary>The current NPC host controller id, or null before assignment.</summary>
+    string HostControllerId { get; }
 
     /// <summary>
     /// The epoch of the current host assignment for this instance (SR-016): the server issues 1 at the
@@ -64,6 +67,11 @@ public class LocationSession : ILocationSession
     public bool HasInstance => InstanceId != null;
 
     public bool IsLocalHost => InstanceId != null && hostRegistry.IsHost(InstanceId);
+
+    public string HostControllerId => InstanceId != null
+        && hostRegistry.TryGet(InstanceId, out var assignment)
+            ? assignment.HostControllerId
+            : null;
 
     public int HostEpoch => InstanceId != null && hostRegistry.TryGet(InstanceId, out var assignment)
         ? assignment.Epoch

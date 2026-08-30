@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Common.Util;
+using SandBox.Missions.MissionLogics;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -20,6 +22,7 @@ public sealed class MockMission
     public Mission Shell { get; }
 
     public Agent MainAgent { get; set; }
+    public PartyBase MainParty { get; set; }
     public float DamageToPlayerMultiplier { get; set; } = 1f;
     public bool EndMissionCalled { get; set; }
     public int AgentFleeingCalls { get; set; }
@@ -27,6 +30,12 @@ public sealed class MockMission
     public bool DeploymentInProgress { get; set; }
     public DeploymentMissionController DeploymentController { get; }
         = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();
+    public bool LocationPopulationBoundaryEnabled { get; set; }
+    public MissionAgentHandler LocationAgentHandler { get; }
+        = ObjectHelper.SkipConstructor<MissionAgentHandler>();
+    public Action? NativeLocationPopulation { get; set; }
+    public int NativeLocationPopulationCalls { get; set; }
+    public int NativeLocationAnimalPopulationCalls { get; set; }
 
     /// <summary>Per-side teams, returned by the <c>Mission.AttackerTeam</c>/<c>DefenderTeam</c> shims so the
     /// reinforcement spawn (which resolves the team by side) can field troops into them headless.</summary>
@@ -91,12 +100,18 @@ public sealed class MockMission
     /// spawning a cavalry rider's mount implicitly (from its equipment) inside the same SpawnAgent call.</summary>
     public bool SpawnMounted { get; set; }
 
+    /// <summary>While true, mirrors the engine's clone of overridden equipment inside SpawnAgent.</summary>
+    public bool CloneSpawnEquipmentOnSpawn { get; set; }
+
     public bool DismountRiderOnNextBlow { get; set; }
 
     /// <summary>Headless replacement for <see cref="Mission.SpawnAgent"/>: mints a skip-ctor agent, mirrors the
     /// build data, assigns a mission-local index, and tracks it.</summary>
     public Agent SpawnAgent(AgentBuildData buildData)
     {
+        Equipment spawnEquipment = CloneSpawnEquipmentOnSpawn
+            ? buildData.AgentOverridenSpawnEquipment?.Clone()
+            : buildData.AgentOverridenSpawnEquipment;
         var agent = ObjectHelper.SkipConstructor<Agent>();
         var mirror = new MirrorAgent
         {
@@ -105,7 +120,12 @@ public sealed class MockMission
             Character = buildData.AgentCharacter,
             Team = buildData.AgentTeam,
             Position = buildData.AgentInitialPosition ?? default,
+            MovementDirection = buildData.AgentInitialDirection ?? default,
             Origin = buildData.AgentOrigin,
+            SpawnEquipment = spawnEquipment,
+            BodyProperties = buildData.BodyPropertiesOverriden ? buildData.AgentBodyProperties : default,
+            ClothingColor1 = buildData.AgentClothingColor1,
+            ClothingColor2 = buildData.AgentClothingColor2,
             Mission = Shell,
         };
         AgentMirror.Bind(agent, mirror);

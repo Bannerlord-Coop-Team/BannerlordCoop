@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.Services.MapEvents.Messages;
@@ -13,6 +14,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -44,6 +46,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
+    private readonly IConnectionCollection connectionCollection;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISiegeEventInterface siegeEventInterface;
@@ -52,18 +55,21 @@ internal class PlayerPartyVisibilityHandler : IHandler
     public PlayerPartyVisibilityHandler(
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
+        IConnectionCollection connectionCollection,
         IObjectManager objectManager,
         INetwork network,
         ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
+        this.connectionCollection = connectionCollection;
         this.objectManager = objectManager;
         this.network = network;
         this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
+        messageBroker.Subscribe<PlayerPartyReleasedFromCaptivity>(Handle_PlayerPartyReleasedFromCaptivity);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<SavedPlayerRegistrationsRestored>(Handle_SavedPlayerRegistrationsRestored);
     }
@@ -72,6 +78,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
+        messageBroker.Unsubscribe<PlayerPartyReleasedFromCaptivity>(Handle_PlayerPartyReleasedFromCaptivity);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<SavedPlayerRegistrationsRestored>(Handle_SavedPlayerRegistrationsRestored);
         deferredMapEventParking.Clear();
@@ -186,11 +193,44 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 return;
             }
 
-            party.IsActive = true;
-            CreateVisual(party, player.MobilePartyId);
-            party.Party.UpdateVisibilityAndInspected(party.Position);
+            ActivateParty(party, player.MobilePartyId);
             Logger.Information("Restored party {PartyId} for reconnected peer {Peer}", party.StringId, peer.Id);
         });
+    }
+
+    private void Handle_PlayerPartyReleasedFromCaptivity(
+        MessagePayload<PlayerPartyReleasedFromCaptivity> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var party = payload.What.PlayerParty;
+        if (party == null) return;
+
+        party.IsActive = false;
+        party.IsVisible = false;
+        RemoveVisual(party);
+
+        if (!TryGetPlayer(party, out var player) ||
+            !playerManager.IsConnected(player) ||
+            !playerManager.TryGetPeer(player.ControllerId, out var peer) ||
+            !connectionCollection.HasCompletedCampaignSynchronization(peer))
+        {
+            Logger.Information(
+                "Kept released party {PartyId} parked because its player is offline or synchronizing",
+                party.StringId);
+            return;
+        }
+
+        ActivateParty(party, player.MobilePartyId);
+        Logger.Information("Restored released party {PartyId} for peer {Peer}", party.StringId, peer.Id);
+    }
+
+    private void ActivateParty(MobileParty party, string mobilePartyId)
+    {
+        party.IsActive = true;
+        CreateVisual(party, mobilePartyId);
+        party.IsVisible = true;
+        party.IsInspected = true;
     }
 
     private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
@@ -291,5 +331,14 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         return playerManager.TryGetPlayer(peer, out player) &&
             objectManager.TryGetObjectWithLogging(player.MobilePartyId, out party);
+    }
+
+    private bool TryGetPlayer(MobileParty party, out Player player)
+    {
+        player = null;
+        if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return false;
+
+        player = playerManager.Players.FirstOrDefault(candidate => candidate.MobilePartyId == partyId);
+        return player != null;
     }
 }

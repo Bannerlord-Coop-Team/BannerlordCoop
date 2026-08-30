@@ -25,6 +25,8 @@ namespace Coop.IntegrationTests.Environment;
 /// </summary>
 public class TestEnvironment
 {
+    private static readonly object ContainerBuildLock = new object();
+
     private readonly TestNetworkRouter networkOrchestrator;
 
     public readonly ILogger Logger = LogManager.GetLogger<TestEnvironment>();
@@ -66,7 +68,7 @@ public class TestEnvironment
 
         AddSharedDependencies(builder);
 
-        var container = builder.Build();
+        var container = BuildContainer(builder);
 
         var instance = container.Resolve<ClientInstance>()!;
 
@@ -85,13 +87,20 @@ public class TestEnvironment
 
         AddSharedDependencies(builder);
 
-        var container = builder.Build();
+        var container = BuildContainer(builder);
 
         var instance = container.Resolve<ServerInstance>()!;
 
         networkOrchestrator.AddServer(instance);
 
         return instance;
+    }
+
+    private static IContainer BuildContainer(ContainerBuilder builder)
+    {
+        // TaleWorlds ViewModel metadata initialization is not thread-safe.
+        lock (ContainerBuildLock)
+            return builder.Build();
     }
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)

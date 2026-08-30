@@ -52,6 +52,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
         messageBroker.Subscribe<NetworkRequestKingdomDecisionVote>(HandleNetworkRequestKingdomDecisionVote);
         messageBroker.Subscribe<KingdomDecisionVoteChanged>(HandleLocalKingdomDecisionVoteChanged);
+        messageBroker.Subscribe<KingdomDecisionRoundStatusChanged>(HandleLocalKingdomDecisionRoundStatusChanged);
         messageBroker.Subscribe<KingdomDecisionResolved>(HandleLocalKingdomDecisionResolved);
         messageBroker.Subscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
@@ -59,6 +60,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
         messageBroker.Subscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
         messageBroker.Subscribe<PeaceOfferPendingStatusChanged>(Handle_PeaceOfferPendingStatusChanged);
+        messageBroker.Subscribe<AllianceOfferPendingStatusChanged>(Handle_AllianceOfferPendingStatusChanged);
     }
 
     private void HandleNetworkRequestCreateKingdom(MessagePayload<NetworkRequestCreateKingdom> obj)
@@ -236,6 +238,11 @@ public class ServerKingdomHandler : IHandler
         network.SendAll(message);
     }
 
+    private void HandleLocalKingdomDecisionRoundStatusChanged(MessagePayload<KingdomDecisionRoundStatusChanged> obj)
+    {
+        network.SendAll(new NetworkKingdomDecisionRoundStatus(obj.What.Status));
+    }
+
     private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
     {
         var payload = obj.What;
@@ -312,6 +319,15 @@ public class ServerKingdomHandler : IHandler
         network.SendAll(new NetworkPeaceOfferPendingStatusChanged(requestingKingdomId, targetKingdomId, obj.IsPending));
     }
 
+    private void Handle_AllianceOfferPendingStatusChanged(MessagePayload<AllianceOfferPendingStatusChanged> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.RequestingKingdom, out var requestingKingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.TargetKingdom, out var targetKingdomId)) return;
+        AllianceOfferPendingRegistry.Set(obj.RequestingKingdom.StringId, obj.TargetKingdom.StringId, obj.IsPending);
+        network.SendAll(new NetworkAllianceOfferPendingStatusChanged(requestingKingdomId, targetKingdomId, obj.IsPending));
+    }
     public void Dispose()
     {
         messageBroker.Unsubscribe<DecisionAdded>(HandleLocalDecisionAdded);
@@ -319,6 +335,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Unsubscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
         messageBroker.Unsubscribe<NetworkRequestKingdomDecisionVote>(HandleNetworkRequestKingdomDecisionVote);
         messageBroker.Unsubscribe<KingdomDecisionVoteChanged>(HandleLocalKingdomDecisionVoteChanged);
+        messageBroker.Unsubscribe<KingdomDecisionRoundStatusChanged>(HandleLocalKingdomDecisionRoundStatusChanged);
         messageBroker.Unsubscribe<KingdomDecisionResolved>(HandleLocalKingdomDecisionResolved);
         messageBroker.Unsubscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
@@ -326,6 +343,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
         messageBroker.Unsubscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
         messageBroker.Unsubscribe<PeaceOfferPendingStatusChanged>(Handle_PeaceOfferPendingStatusChanged);
+        messageBroker.Unsubscribe<AllianceOfferPendingStatusChanged>(Handle_AllianceOfferPendingStatusChanged);
     }
 
     private readonly struct PendingSettlementRestore

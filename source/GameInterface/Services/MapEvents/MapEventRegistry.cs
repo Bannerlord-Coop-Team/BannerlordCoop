@@ -8,6 +8,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -74,12 +75,20 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         if (Campaign.Current == null) return;
 
+        bool localBattleSimulationWasInvolved = PlayerEncounter.Current?.BattleSimulation?.MapEvent == obj;
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
-        var preservedParty = localPartyWasInvolved && IsBattleMissionActive()
+        var preservedParty = localPartyWasInvolved &&
+            (IsBattlePresentationActive() || localBattleSimulationWasInvolved)
             ? MobileParty.MainParty?.Party
             : null;
         initializationBarrier.DestroyGraph(obj, preservedParty);
+        if (localBattleSimulationWasInvolved)
+        {
+            initializationBarrier.CompleteDeferredEncounterCleanup();
+            return;
+        }
+
         CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
     }
 
@@ -111,7 +120,10 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         var encounter = PlayerEncounter.Current;
         var battle = GetPlayerEncounterBattle();
         var encounteredBattle = GetPlayerEncounterEncounteredBattle();
-        if (encounter?._mapEvent == mapEvent || battle == mapEvent || encounteredBattle == mapEvent)
+        if (encounter?._mapEvent == mapEvent ||
+            encounter?.BattleSimulation?.MapEvent == mapEvent ||
+            battle == mapEvent ||
+            encounteredBattle == mapEvent)
             return true;
 
         var party = mainParty.Party;
@@ -137,7 +149,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        if (IsBattleMissionActive())
+        if (IsBattlePresentationActive())
         {
             return;
         }
@@ -175,8 +187,14 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         ForceCloseCurrentEncounterMenu();
     }
 
-    private static bool IsBattleMissionActive() =>
-        MissionState.Current != null || Mission.Current != null;
+    private static bool IsBattlePresentationActive()
+    {
+        if (MissionState.Current != null || Mission.Current != null) return true;
+
+        return Game.Current?.GameStateManager?.GameStates
+            .OfType<MapState>()
+            .Any(state => state.IsSimulationActive) == true;
+    }
 
     private static bool HasEncounterMenuToClose()
     {

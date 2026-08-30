@@ -5,8 +5,8 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MBBodyProperties;
 internal class MBBodyPropertyRegistry : AutoRegistryBase<MBBodyProperty>
@@ -16,17 +16,16 @@ internal class MBBodyPropertyRegistry : AutoRegistryBase<MBBodyProperty>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(MBBodyProperty))
-    };
+    public override IEnumerable<MethodBase> Constructors =>
+        AccessTools.GetDeclaredConstructors(typeof(MBBodyProperty));
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
     public override void RegisterAllObjects()
     {
-        foreach (CharacterObject character in CharacterObject.All.DistinctBy(c => c.BodyPropertyRange))
+        foreach (var bodyProperty in MBObjectManager.Instance.GetObjectTypeList<MBBodyProperty>())
         {
-            RegisterExistingObject(character.StringId, character.BodyPropertyRange);
+            RegisterExistingObject(bodyProperty.StringId, bodyProperty);
         }
     }
 

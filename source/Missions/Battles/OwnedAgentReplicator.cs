@@ -62,6 +62,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
+    private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly List<BattleAgentSpawnData> pendingSpawns = new List<BattleAgentSpawnData>();
 
     // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
@@ -81,7 +82,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         IBattleSession session,
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
-        IBattleAgentSpawnBatchCodec spawnBatchCodec)
+        IBattleAgentSpawnBatchCodec spawnBatchCodec,
+        IMissionWeaponDataMapper missionWeaponDataMapper)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -91,6 +93,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         this.casualties = casualties;
         this.deployment = deployment;
         this.spawnBatchCodec = spawnBatchCodec;
+        this.missionWeaponDataMapper = missionWeaponDataMapper;
         movementScopeId =
             session.OwnControllerId + ":" + Guid.NewGuid().ToString("N");
 
@@ -207,7 +210,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                     mountInfo?.OriginalOwner ?? info.OriginalOwner,
                 mountMovementScopeId:
                     mountInfo?.MovementScopeId ?? info.MovementScopeId,
-                isRunningAway: agent.IsRunningAway));
+                isRunningAway: agent.IsRunningAway,
+                authorityRevision: info.AuthorityRevision,
+                mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0));
         }
         return records;
     }
@@ -312,6 +317,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         // on death (puppets, spawned with a SimpleAgentOrigin, get these from the spawn data).
         string mapEventPartyId = null;
         int troopSeed = 0;
+        bool isDebugReplicationFixture = agent.Origin is DebugReplicationFixtureAgentOrigin;
         // Our coop spawns carry a CoopAgentOrigin (the custom supplier's origin), NOT the native
         // PartyGroupAgentOrigin — read the party + descriptor seed from it. Checking for the native type here
         // left attribution null, so the death report was skipped and the map-event roster never decremented.
@@ -319,15 +325,18 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         {
             troopSeed = origin.UniqueSeed;
 
-            // The origin carries the server's MapEventParty id directly; re-deriving it from the local
-            // map-event membership missed whole parties (a garrison whose wrapper never resolved here),
-            // and an unattributed spawn record is never spawned as a puppet on the other clients.
-            mapEventPartyId = origin.MapEventPartyId;
-            if (mapEventPartyId == null && origin.Party != null)
+            if (!isDebugReplicationFixture)
             {
-                var mapEventParty = ResolveMapEventParty(origin.Party);
-                if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
-                    mapEventPartyId = mepId;
+                // The origin carries the server's MapEventParty id directly; re-deriving it from the local
+                // map-event membership missed whole parties (a garrison whose wrapper never resolved here),
+                // and an unattributed spawn record is never spawned as a puppet on the other clients.
+                mapEventPartyId = origin.MapEventPartyId;
+                if (mapEventPartyId == null && origin.Party != null)
+                {
+                    var mapEventParty = ResolveMapEventParty(origin.Party);
+                    if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
+                        mapEventPartyId = mepId;
+                }
             }
         }
         // The casualty keys on the troop's CHARACTER — exactly `characterId`, the CharacterObject's object-manager
@@ -353,6 +362,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             isRunningAway: agent.IsRunningAway);
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
+        if (!isDebugReplicationFixture)
         messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
@@ -447,18 +457,15 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
         for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
         {
-            var packedWeapon = PackMissionWeapon(equipment._weaponSlots[(int)equipmentIndex]);
+            if (!missionWeaponDataMapper.TryPack(
+                    equipment._weaponSlots[(int)equipmentIndex],
+                    out MissionWeaponData packedWeapon))
+            {
+                return null;
+            }
+
             missionEquipmentData.WeaponSlots.Add(packedWeapon);
         }
         return missionEquipmentData;
-    }
-
-    private MissionWeaponData PackMissionWeapon(MissionWeapon weapon)
-    {
-        // Items can be null
-        objectManager.TryGetId(weapon.Item, out var itemId);
-
-        var missionWeaponData = new MissionWeaponData(itemId, weapon.ItemModifier, weapon.Banner, weapon._dataValue, weapon.ReloadPhase, null);
-        return missionWeaponData;
     }
 }

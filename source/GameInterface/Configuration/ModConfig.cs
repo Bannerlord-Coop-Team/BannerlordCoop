@@ -61,7 +61,7 @@ internal sealed class ModConfig : IModConfig
             ["persuasionSuccessChance"] = "VeryEasy",
             ["clanMemberDeathChance"] = "VeryEasy",
             ["battleDeath"] = "VeryEasy",
-            ["birthAndDeath"] = true,
+            ["birthAndDeath"] = false,
             ["autoAllocateClanMemberPerks"] = false,
         };
 
@@ -384,6 +384,13 @@ internal sealed class ModConfig : IModConfig
     {
         foreach (var key in unknownKeys.Keys)
         {
+            // Existing configs may retain the retired local movement settings block.
+            if (string.IsNullOrEmpty(keyType) &&
+                string.Equals(key, "network", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             Logger.Warning("mod-config.json: unknown {keyType}key '{Key}' ignored", keyType, key);
         }
     }

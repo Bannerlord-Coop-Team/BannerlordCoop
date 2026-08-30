@@ -88,6 +88,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
         coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
+        coopMissionComponent.WeaponPickupHandler.Tick(dt);
+        coopMissionComponent.WeaponDropHandler.Tick(dt);
     }
 
     public override void OnPreDisplayMissionTick(float dt)
@@ -102,7 +104,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // Native Agent processing realizes authoritative AI and player actions after the input boundary.
         // Diff them here so peers receive the displayed action instead of retaining an earlier pose.
         // A headless mission participant would need an equivalent non-display boundary for AI action sync.
-        coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick();
+        coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick(dt);
 
         coopMissionComponent.AgentMovementHandler
             .ReplaySyntheticMountTurnAnimationsAfterNativeTick();

@@ -753,6 +753,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         var mapEvent = settlement.Party?.MapEvent;
         if (mapEvent == null || !mapEvent.IsSiegeAssault) return;
         if (MobileParty.MainParty.MapEvent == null) return;
+        if (PlayerEncounter.Battle == mapEvent) return;
 
         using (new AllowedThread())
         {
@@ -781,10 +782,9 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // client can't pause, so its encounter would otherwise roll the choice menu out to the town menu.
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
 
-        // Real-time assault capture: the prompt arrives while the battle mission is still tearing down, which is
-        // too early to touch PlayerEncounter. Park the transition and let SiegeCaptureTransitionRetryHandler
-        // re-run it on the next CampaignTick once the mission has fully popped back to the map.
-        if (TaleWorlds.MountAndBlade.MissionState.Current != null)
+        // The prompt precedes map-event teardown. Let the mission or simulation scoreboard release its view
+        // before replacing the encounter menu, otherwise its completion reopens the generic encounter.
+        if (SiegeCaptureTransitionRetryHandler.IsBattlePresentationActive())
         {
             SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
             return;

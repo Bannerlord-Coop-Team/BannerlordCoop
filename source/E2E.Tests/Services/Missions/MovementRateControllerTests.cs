@@ -7,6 +7,7 @@ using Missions.Messages;
 using Missions.Services.Network;
 using Moq;
 using System;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.Engine;
 using Xunit;
@@ -50,6 +51,10 @@ public sealed class MovementRateControllerTests
         Assert.Equal(40, state.BulkHz);
         Assert.Equal(40, state.PriorityHz);
         Assert.Equal("location-fixed", state.Reason);
+        Assert.Equal(
+            MovementNetworkSettings.DefaultBytesPerSecond,
+            Assert.Single(fixture.Advertisements)
+                .MaximumIncomingMovementBytesPerSecondPerSender);
     }
 
     [Theory]
@@ -117,14 +122,12 @@ public sealed class MovementRateControllerTests
             this,
             new NetworkMissionPeerEntered("joining-peer", "battle"));
 
-        Assert.Equal(2, fixture.Advertisements.Count);
+        Assert.Equal(3, fixture.Advertisements.Count);
         Assert.Equal(15, fixture.Advertisements[1].MaximumBulkHz);
         Assert.Equal(2, fixture.Advertisements[1].Sequence);
-
-        var directed = Assert.Single(fixture.DirectedAdvertisements);
-        Assert.Equal("joining-peer", directed.RecipientControllerId);
-        Assert.Equal(15, directed.Advertisement.MaximumBulkHz);
-        Assert.Equal(3, directed.Advertisement.Sequence);
+        Assert.Equal(15, fixture.Advertisements[2].MaximumBulkHz);
+        Assert.Equal(3, fixture.Advertisements[2].Sequence);
+        Assert.Empty(fixture.DirectedAdvertisements);
     }
 
     [Fact]
@@ -657,10 +660,81 @@ public sealed class MovementRateControllerTests
     }
 
     [Fact]
+    public void IncomingBudgetIsSplitAcrossCurrentSendersAndReadvertisedOnMembershipChanges()
+    {
+        var settings = new MovementNetworkSettings(1d, 3d);
+        using var fixture = new RateControllerFixture(networkSettings: settings);
+        fixture.Controllers.Add("first");
+        fixture.Controllers.Add("second");
+
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        Assert.Equal(
+            settings.IncomingBytesPerSecond / 2d,
+            Assert.Single(fixture.Advertisements).MaximumIncomingMovementBytesPerSecondPerSender);
+
+        fixture.Controllers.Add("third");
+        fixture.Broker.Publish(this, new NetworkMissionPeerEntered("third", "battle"));
+        Assert.Equal(
+            settings.IncomingBytesPerSecond / 3d,
+            fixture.Advertisements[fixture.Advertisements.Count - 1]
+                .MaximumIncomingMovementBytesPerSecondPerSender);
+
+        fixture.Controllers.Remove("third");
+        fixture.Broker.Publish(this, new MissionPeerLeft("third", "battle"));
+        Assert.Equal(
+            settings.IncomingBytesPerSecond / 2d,
+            fixture.Advertisements[fixture.Advertisements.Count - 1]
+                .MaximumIncomingMovementBytesPerSecondPerSender);
+    }
+
+    [Fact]
+    public void IncomingBudgetBelowSenderCountUsesFractionalPerSenderRates()
+    {
+        var settings = new MovementNetworkSettings(
+            1d,
+            1d / MovementNetworkSettings.BytesPerMiB);
+        using var fixture = new RateControllerFixture(networkSettings: settings);
+        fixture.Controllers.AddRange(new[] { "first", "second", "third", "fourth" });
+
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        double perSender = Assert.Single(fixture.Advertisements)
+            .MaximumIncomingMovementBytesPerSecondPerSender;
+        Assert.Equal(0.25d, perSender);
+        Assert.Equal(settings.IncomingBytesPerSecond, perSender * fixture.Controllers.Count);
+    }
+
+    [Fact]
+    public void FocusAgentAdvertisementIsSequencedAndAvailableToSenders()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+        Guid focusAgentId = Guid.NewGuid();
+
+        fixture.Controller.SetLocalFocusAgent(focusAgentId);
+
+        NetworkMovementReceiverCap local = fixture.Advertisements[fixture.Advertisements.Count - 1];
+        Assert.Equal(focusAgentId, local.FocusAgentId);
+        fixture.Broker.Publish(
+            this,
+            new NetworkMovementReceiverCap("remote", 40, 10, 12345, focusAgentId));
+        Assert.Equal(12345d, fixture.Controller.GetReceiverIncomingBytesPerSecond("remote"));
+        Assert.True(fixture.Controller.TryGetReceiverFocusAgentId("remote", out Guid received));
+        Assert.Equal(focusAgentId, received);
+    }
+
+    [Fact]
     public void ReceiverCapMessage_RoundTrips()
     {
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var expected = new NetworkMovementReceiverCap("player-two", 15, 42);
+        Guid focusAgentId = Guid.NewGuid();
+        var expected = new NetworkMovementReceiverCap(
+            "player-two",
+            15,
+            42,
+            123456,
+            focusAgentId);
 
         byte[] payload = serializer.Serialize(expected);
         var actual = serializer.Deserialize<NetworkMovementReceiverCap>(payload);
@@ -668,6 +742,10 @@ public sealed class MovementRateControllerTests
         Assert.Equal(expected.ControllerId, actual.ControllerId);
         Assert.Equal(expected.MaximumBulkHz, actual.MaximumBulkHz);
         Assert.Equal(expected.Sequence, actual.Sequence);
+        Assert.Equal(
+            expected.MaximumIncomingMovementBytesPerSecondPerSender,
+            actual.MaximumIncomingMovementBytesPerSecondPerSender);
+        Assert.Equal(expected.FocusAgentId, actual.FocusAgentId);
     }
 
     [Fact]
@@ -702,12 +780,15 @@ public sealed class MovementRateControllerTests
             DirectedAdvertisements { get; } =
                 new System.Collections.Generic.List<(string, NetworkMovementReceiverCap)>();
         public MovementRateController Controller { get; }
+        public System.Collections.Generic.List<string> Controllers { get; } =
+            new System.Collections.Generic.List<string>();
 
         public RateControllerFixture(
             int remoteControllers = 0,
             bool enableHeartbeat = false,
             int frameLimitHz = 60,
-            Action<IMessage> onSendAll = null)
+            Action<IMessage>? onSendAll = null,
+            IMovementNetworkSettings? networkSettings = null)
         {
             var network = new Mock<IBattleNetwork>();
             network
@@ -729,11 +810,10 @@ public sealed class MovementRateControllerTests
             controllerIdProvider.SetupGet(provider => provider.ControllerId)
                 .Returns("local");
             var missionContext = new Mock<IMissionContext>();
-            var controllers = new string[remoteControllers];
-            for (int i = 0; i < controllers.Length; i++)
-                controllers[i] = $"remote-{i}";
+            for (int i = 0; i < remoteControllers; i++)
+                Controllers.Add($"remote-{i}");
             missionContext.SetupGet(context => context.ControllersInMission)
-                .Returns(controllers);
+                .Returns(() => Controllers.ToArray());
 
             Controller = new MovementRateController(
                 network.Object,
@@ -743,7 +823,8 @@ public sealed class MovementRateControllerTests
                 () => timestamp,
                 TimestampFrequency,
                 () => frameLimitHz,
-                enableHeartbeat);
+                enableHeartbeat,
+                networkSettings);
         }
 
         public void AdvanceClock(float seconds)

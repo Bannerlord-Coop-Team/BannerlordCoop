@@ -6,6 +6,7 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
 using LiteNetLib;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -131,6 +132,34 @@ namespace Coop.Tests.Server.Connections.States
 
             connectionLogic.SetState<CampaignState>();
             Assert.Empty(connectionCollection.LoadingPeers);
+        }
+
+        [Fact]
+        public void HasCompletedCampaignSynchronization_ReadsStateOnce()
+        {
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            var missionState = connectionCollection.ConnectionStates[playerPeer].SetState<MissionState>();
+            var connection = new Mock<IConnectionLogic>();
+            connection.SetupGet(logic => logic.State).Returns(missionState);
+            connectionCollection.ConnectionStates[playerPeer] = connection.Object;
+
+            Assert.True(connectionCollection.HasCompletedCampaignSynchronization(playerPeer));
+            connection.VerifyGet(logic => logic.State, Times.Once);
+        }
+
+        [Fact]
+        public void HasCompletedCampaignSynchronization_AcceptsCampaignAndMissionStates()
+        {
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            var connection = connectionCollection.ConnectionStates[playerPeer];
+
+            connection.SetState<CampaignState>();
+            Assert.True(connectionCollection.HasCompletedCampaignSynchronization(playerPeer));
+
+            connection.SetState<MissionState>();
+            Assert.True(connectionCollection.HasCompletedCampaignSynchronization(playerPeer));
         }
 
         [Fact]
