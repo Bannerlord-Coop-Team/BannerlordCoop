@@ -1161,8 +1161,8 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     /// <summary>
     /// An attached army member is permanently at army_wait; without this the interaction dialog
-    /// (and therefore the barter screen) couldnever open for them
-    /// since CanOpenMapConversation otherwise bails on any open menu.
+    /// (and therefore the barter screen) could never open for them, since CanOpenMapConversation
+    /// otherwise bails on any open menu.
     /// </summary>
     internal static bool IsBenignConversationMenu(string menuId)
     {

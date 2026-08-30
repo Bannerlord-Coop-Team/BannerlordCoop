@@ -34,33 +34,19 @@ namespace GameInterface.Services.Settlements.Patches
         [HarmonyPrefix]
         private static bool ArmyTalkToLeaderConsequencePrefix()
         {
-            var leaderParty = ResolveEncounteredArmyLeaderParty();
-            if (leaderParty?.MobileParty?.IsPlayerParty() != true)
-            {
-                return true; // Army leader is not a player, let vanilla open the normal conversation
-            }
+            var encounteredParty = PlayerEncounter.EncounteredParty;
+            if (encounteredParty?.MobileParty?.IsPlayerParty() != true)
+                return true; // Army leader is not player, let vanilla open the normal conversation
 
-            // Route into the same player party interaction request pipeline used for regular P2P
+            // Route into the same player party interaction request pipeline used for regular P2P 
 
             MessageBroker.Instance.Publish(null, new ConversationRequested(
-                leaderParty,
+                encounteredParty,
                 PartyBase.MainParty,
                 forcePlayerOutFromSettlement: false,
                 ConversationRestartSource.PlayerEncounter,
                 true));
             return false;
-        }
-
-        /// <summary>
-        /// The army_encounter menu is built from the encountered army, so its leader party is the reliable
-        /// "talk to army leader" target (this is what game_menu_army_talk_to_other_members_on_init keys off).
-        /// PlayerEncounter.EncounteredParty alone can be left unset by PlayerEncounter.SetupFields for a party
-        /// that is itself in that army.
-        /// </summary>
-        private static PartyBase ResolveEncounteredArmyLeaderParty()
-        {
-            return PlayerEncounter.EncounteredMobileParty?.Army?.LeaderParty?.Party
-                ?? PlayerEncounter.EncounteredParty;
         }
         [HarmonyPatch("game_menu_army_talk_to_other_members_item_on_consequence")]
         [HarmonyPrefix]

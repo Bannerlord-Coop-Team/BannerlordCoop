@@ -13,11 +13,9 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
-/// Paths that reach a map conversation without an encounter, like the party-screen "Talk" or an interaction
-/// with a party while parked in army_wait, call ConversationManager.OpenMapConversation directly, so vanilla
-/// opens a purely local conversation and the resulting barter is never synced to the other player. This prefix
-/// catches the local-player-to-other-player case and re-enters the synced player-party interaction pipeline by
-/// publishing ConversationRequested; everything else passes through.
+/// an interaction with a party while parked in army_wait, calls ConversationManager.OpenMapConversation directly, so 
+/// vanilla opens a purely local conversation and the resulting barter is never synced to the other player. This prefix
+/// catches the local-player-to-other-player case and goes through the synced player-party interaction pipeline.
 /// </summary>
 [HarmonyPatch(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation))]
 internal static class PlayerToPlayerMapConversationRedirectPatch
@@ -41,7 +39,7 @@ internal static class PlayerToPlayerMapConversationRedirectPatch
 
         Logger.Debug("Redirecting a local player-to-player map conversation into the coop interaction pipeline instead of opening it locally.");
 
-        // armyTalkEncounter: true so the server treats this as a talk/trade (not an army-join) and starts the
+        // armyTalkEncounter: true so the server treats this as a talk/trade and starts the
         // player-party interaction session. Attacker = the local initiator, defender = the other player.
         MessageBroker.Instance.Publish(null, new ConversationRequested(
             other,
@@ -50,14 +48,9 @@ internal static class PlayerToPlayerMapConversationRedirectPatch
             ConversationRestartSource.PlayerEncounter,
             armyTalkEncounter: true));
 
-        return false; // block the local, unsynced vanilla conversation
+        return false;
     }
-
-    /// <summary>
-    /// True when a local player is opening a map conversation with a different player's party. Excludes coop's
-    /// own P2P dialog (it sets PlayerPartyInteractionDialogState.HasActiveState first), talking to yourself,
-    /// and any conversation whose other side is not another player's party.
-    /// </summary>
+    
     internal static bool ShouldRedirect(MobileParty self, MobileParty other)
     {
         if (PlayerPartyInteractionDialogState.HasActiveState)
