@@ -7,8 +7,6 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Villages.Commands;
 using HarmonyLib;
 using Helpers;
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
@@ -46,48 +44,6 @@ public class PlayerEncounterInterfaceTests
     public void ShouldDeferAfterBattle_WhenMapScreenIsNotTop_ReturnsTrue()
     {
         Assert.True(PlayerEncounterPatches.ShouldDeferAfterBattle(new MapState(), isMapScreenTop: false));
-    }
-
-    [Fact]
-    public void AfterBattleTransitionGate_DefersEveryCloseActivationUpdateUntilNextDrain()
-    {
-        var gate = new AfterBattleTransitionGate();
-        var encounter = new object();
-        var queuedReleases = new List<Action>();
-        int continuationCalls = 0;
-        gate.ObserveLootScreen(encounter);
-
-        Assert.True(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add, () => continuationCalls++));
-        Assert.True(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add, () => continuationCalls++));
-        Assert.Single(queuedReleases);
-        Assert.Equal(0, continuationCalls);
-
-        queuedReleases[0]();
-
-        Assert.Equal(1, continuationCalls);
-        Assert.False(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add, () => continuationCalls++));
-    }
-
-    [Fact]
-    public void AfterBattleTransitionGate_NewerLootScreenKeepsQueuedReleaseFromOpeningNextPhase()
-    {
-        var gate = new AfterBattleTransitionGate();
-        var encounter = new object();
-        var queuedReleases = new List<Action>();
-        int continuationCalls = 0;
-        gate.ObserveLootScreen(encounter);
-        Assert.True(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add, () => continuationCalls++));
-
-        gate.ObserveLootScreen(encounter);
-        queuedReleases[0]();
-
-        Assert.Equal(0, continuationCalls);
-        Assert.True(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add, () => continuationCalls++));
-        Assert.Equal(2, queuedReleases.Count);
-
-        queuedReleases[1]();
-
-        Assert.Equal(1, continuationCalls);
     }
 
     [Fact]

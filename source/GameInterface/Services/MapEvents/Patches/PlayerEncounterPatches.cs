@@ -35,7 +35,6 @@ internal class PlayerEncounterPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterPatches>();
     private static readonly object rejectedEncounterRecoveryLock = new object();
-    private static readonly AfterBattleTransitionGate afterBattleTransitionGate = new AfterBattleTransitionGate();
     private static readonly HashSet<PlayerEncounter> pendingRejectedEncounterRecoveries =
         new HashSet<PlayerEncounter>();
 
@@ -472,22 +471,10 @@ internal class PlayerEncounterPatches
 
         var activeState = TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState;
         if (activeState is PartyState or InventoryState)
-        {
-            afterBattleTransitionGate.ObserveLootScreen(playerEncounter);
             return false;
-        }
         if (ShouldDeferAfterBattle(
                 activeState,
                 TaleWorlds.ScreenSystem.ScreenManager.TopScreen == MapScreen.Instance))
-            return false;
-        if (afterBattleTransitionGate.ShouldDeferMapUpdate(
-                playerEncounter,
-                release => GameThread.EnqueueSafe(release, nameof(UpdatePrefix)),
-                () =>
-                {
-                    if (ReferenceEquals(PlayerEncounter.Current, playerEncounter))
-                        PlayerEncounter.Update();
-                }))
             return false;
         if (PlayerCaptivity.IsCaptive) return false;
 
@@ -496,10 +483,6 @@ internal class PlayerEncounterPatches
         var playerEncounterInterface = container.Resolve<IPlayerEncounterInterface>();
         playerEncounterInterface.UpdateInternalAfterBattle(playerEncounter);
 
-        activeState = TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState;
-        if (activeState is PartyState or InventoryState)
-            afterBattleTransitionGate.ObserveLootScreen(playerEncounter);
-
         return false;
     }
 
@@ -507,45 +490,5 @@ internal class PlayerEncounterPatches
     {
         // Wait for the previous loot screen to finish leaving before opening the next one.
         return activeState is PartyState or InventoryState || !isMapScreenTop;
-    }
-}
-
-internal sealed class AfterBattleTransitionGate
-{
-    private object pendingEncounter;
-    private int generation;
-    private bool releaseQueued;
-
-    public void ObserveLootScreen(object encounter)
-    {
-        pendingEncounter = encounter;
-        generation++;
-        releaseQueued = false;
-    }
-
-    public bool ShouldDeferMapUpdate(
-        object encounter,
-        Action<Action> enqueueRelease,
-        Action continueEncounter)
-    {
-        if (!ReferenceEquals(pendingEncounter, encounter)) return false;
-
-        if (!releaseQueued)
-        {
-            releaseQueued = true;
-            int observedGeneration = generation;
-            enqueueRelease(() => ReleaseAndContinue(encounter, observedGeneration, continueEncounter));
-        }
-
-        return true;
-    }
-
-    private void ReleaseAndContinue(object encounter, int observedGeneration, Action continueEncounter)
-    {
-        if (!ReferenceEquals(pendingEncounter, encounter) || generation != observedGeneration) return;
-
-        pendingEncounter = null;
-        releaseQueued = false;
-        continueEncounter();
     }
 }
