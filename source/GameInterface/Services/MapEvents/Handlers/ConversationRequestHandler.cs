@@ -145,7 +145,6 @@ internal class ConversationRequestHandler : IHandler
         pendingConversationRequestId = requestId;
 
         Logger.Debug("Requesting conversation from server. AttackerId={AttackerId}, DefenderId={DefenderId}", attackerId, defenderId);
-        Logger.Information("{Trace}", DescribeArmyBarterState(request.AttackerParty, request.DefenderParty, "client-request", request.ArmyTalkEncounter));
 
         // On a client, SendAll targets the server (its only connected peer).
         network.SendAll(new NetworkRequestConversation(
@@ -350,13 +349,7 @@ internal class ConversationRequestHandler : IHandler
             return false;
         }
 
-        var isArmyJoin = IsArmyJoinRequest(request, attacker, defender);
-        Logger.Information(
-            "{Trace} isArmyJoinRequest={IsArmyJoin}",
-            DescribeArmyBarterState(attacker, defender, "server-attacker-vs-defender", request.ArmyTalkEncounter),
-            isArmyJoin);
-
-        if (isArmyJoin)
+        if (IsArmyJoinRequest(request, attacker, defender))
         {
             Logger.Debug(
                 "Allowing army join. AttackerId={AttackerId}, DefenderId={DefenderId}",
@@ -396,44 +389,6 @@ internal class ConversationRequestHandler : IHandler
             && defender.MobileParty?.Army?.LeaderParty == defender.MobileParty
             && defender.MobileParty.Army.LeaderParty.AttachedParties.Contains(attacker.MobileParty) == false
             && !request.ArmyTalkEncounter;
-    }
-
-    // TODO(#3388): temporary diagnostic for member->leader barter. Remove once the root cause is fixed.
-    // Dumps the army/attach/encounter/menu state of both sides so one clean repro shows which branch fires.
-    internal static string DescribeArmyBarterState(PartyBase self, PartyBase other, string role, bool armyTalkEncounter)
-    {
-        try
-        {
-            var selfMp = self?.MobileParty;
-            var otherMp = other?.MobileParty;
-            var selfArmy = selfMp?.Army;
-            var otherArmy = otherMp?.Army;
-            var otherLeader = otherArmy?.LeaderParty;
-
-            string N(PartyBase p) => p?.LeaderHero?.Name?.ToString() ?? p?.Name?.ToString() ?? "<null>";
-            string M(MobileParty m) => m?.LeaderHero?.Name?.ToString() ?? m?.Name?.ToString() ?? "<null>";
-            string A(Army a) => a == null ? "<null>" : (a.Name?.ToString() ?? "<army>");
-
-            return "[ArmyBarterTrace] " + role
-                + " armyTalkEncounter=" + armyTalkEncounter
-                + " | self=" + N(self) + " other=" + N(other)
-                + " | selfArmy=" + A(selfArmy) + " otherArmy=" + A(otherArmy)
-                + " sameArmy=" + (selfArmy != null && selfArmy == otherArmy)
-                + " | otherLeadsArmy=" + (otherLeader != null && otherLeader == otherMp)
-                + " otherLeaderParty=" + M(otherLeader)
-                + " | selfAttachedTo=" + M(selfMp?.AttachedTo)
-                + " selfInOtherLeaderAttachedParties=" + (otherLeader?.AttachedParties?.Contains(selfMp) == true)
-                + " selfInOtherArmyParties=" + (otherArmy?.Parties?.Contains(selfMp) == true)
-                + " | menu=" + (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>")
-                + " playerEncounter=" + (PlayerEncounter.Current != null)
-                + " encounteredParty=" + N(PlayerEncounter.EncounteredParty)
-                + " encounteredArmy=" + A(PlayerEncounter.EncounteredMobileParty?.Army)
-                + " mainPartyMapEvent=" + (MobileParty.MainParty?.MapEvent != null);
-        }
-        catch (Exception ex)
-        {
-            return "[ArmyBarterTrace] " + role + " <failed: " + ex.Message + ">";
-        }
     }
 
     /// <summary>
