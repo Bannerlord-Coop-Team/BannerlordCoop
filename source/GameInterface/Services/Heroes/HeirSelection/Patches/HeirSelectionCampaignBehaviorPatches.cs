@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.UI.Cutscenes.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System.Collections.Generic;
@@ -22,6 +23,8 @@ internal class HeirSelectionCampaignBehaviorPatches
         if (ModInformation.IsClient || !victim.IsPlayerHero()) return false;
 
         victim.AddDeathMark(killer, detail);
+
+        MessageBroker.Instance.Publish(__instance, new InitiateCutscenePlayerCharacterDied(victim, killer, detail));
 
         Dictionary<Hero, int> heirApparents = victim.Clan.GetHeirApparents();
         if (heirApparents.Count == 0) // No heirs, client should be sent to game over screen

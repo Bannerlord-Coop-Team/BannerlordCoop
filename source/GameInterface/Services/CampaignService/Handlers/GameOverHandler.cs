@@ -58,9 +58,6 @@ internal class GameOverHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.PlayerHero, out var playerHeroId)) return;
         if (!gameOverHeroes.Add(obj.What.PlayerHero)) return;
 
-        var message = new InitiateCutscenePlayerCharacterDied(obj.What.PlayerHero, obj.What.Killer, obj.What.Detail);
-        messageBroker.Publish(this, message);
-
         network.SendAll(new NetworkClientGameOver(playerHeroId));
     }
 
