@@ -47,6 +47,17 @@ internal class PlayerPartyInteractionHandler : IHandler
     private static readonly FieldInfo PrisonerCharacterField =
         typeof(TransferPrisonerBarterable).GetField("_prisonerCharacter", BindingFlags.Instance | BindingFlags.NonPublic);
 
+    // Parked, non-interactive campaign-map menus a player-party map conversation may safely open over: vanilla's
+    // "Talk to the army leader" opens a map conversation straight from army_encounter. army_dispersed and
+    // settlement menus (town/village) are deliberately excluded - they are handled elsewhere and out of scope here.
+    private static readonly HashSet<string> BenignConversationMenuIds = new HashSet<string>
+    {
+        "army_wait",
+        "army_wait_at_settlement",
+        "army_encounter",
+        "game_menu_army_talk_to_other_members",
+    };
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -1148,18 +1159,43 @@ internal class PlayerPartyInteractionHandler : IHandler
         TryOpenMapConversation(sessionId, PlayerPartyInteractionDialogState.PartyId, PlayerPartyInteractionDialogState.OtherPartyId);
     }
 
+    /// <summary>
+    /// True for parked, non-interactive army menus a player-party map conversation may open over, exactly as
+    /// vanilla's "Talk to the army leader" opens one straight from <c>army_encounter</c>. An attached army
+    /// member is permanently at <c>army_wait</c>, so without this the interaction dialog (and therefore the
+    /// barter screen) could never open for them - see issue #3388.
+    /// </summary>
+    internal static bool IsBenignConversationMenu(string menuId)
+    {
+        return menuId != null && BenignConversationMenuIds.Contains(menuId);
+    }
+
+    // Pure decision, split out from the ambient-state collector below so it can be unit-tested without a campaign.
+    internal static bool CanOpenMapConversation(bool atMenu, string currentMenuId, bool topScreenIsMapScreen)
+    {
+        if (atMenu && !IsBenignConversationMenu(currentMenuId))
+            return false;
+
+        return topScreenIsMapScreen;
+    }
+
     private static bool CanOpenMapConversation()
     {
-        if (!(GameStateManager.Current?.ActiveState is MapState mapState) || mapState.AtMenu)
+        if (!(GameStateManager.Current?.ActiveState is MapState mapState))
             return false;
 
         var mapScreen = MapScreen.Instance;
-        return mapScreen != null && ScreenManager.TopScreen == mapScreen;
+        return CanOpenMapConversation(
+            mapState.AtMenu,
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
+            mapScreen != null && ScreenManager.TopScreen == mapScreen);
     }
 
     private static void CloseLocalPlayerPartyEncounter(MobileParty localParty)
     {
-        if (PlayerEncounter.Current != null)
+        var hadPlayerEncounter = PlayerEncounter.Current != null;
+
+        if (hadPlayerEncounter)
         {
             PlayerEncounter.LeaveEncounter = true;
             try
@@ -1170,6 +1206,15 @@ internal class PlayerPartyInteractionHandler : IHandler
             {
                 Campaign.Current.PlayerEncounter = null;
             }
+        }
+
+        // A party that was only parked in a benign army wait menu (no encounter of its own) stays in that
+        // menu: Campaign.Tick re-activates it regardless, and exiting here just causes a one-frame flicker.
+        if (!hadPlayerEncounter &&
+            IsBenignConversationMenu(Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId))
+        {
+            ClearLocalPartyEngageOrder(localParty);
+            return;
         }
 
         if (Campaign.Current?.CurrentMenuContext != null)
