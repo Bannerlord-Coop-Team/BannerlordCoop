@@ -14,6 +14,7 @@ using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
+using Helpers;
 using Newtonsoft.Json;
 using SandBox.GauntletUI;
 using SandBox.GauntletUI.Map;
@@ -287,6 +288,8 @@ public class RaidDebugCommands
 
         var inventoryScreen = ScreenManager.TopScreen as GauntletInventoryScreen;
         var inventoryVm = inventoryScreen?._dataSource;
+        var partyScreen = ScreenManager.TopScreen as GauntletPartyScreen;
+        var activeState = Game.Current?.GameStateManager?.ActiveState;
         var otherItemCount = inventoryVm?._inventoryLogic?.GetElementCountOnSide(
             InventoryLogic.InventorySide.OtherInventory) ?? 0;
         var mapScreen = ScreenManager.TopScreen as MapScreen;
@@ -300,7 +303,9 @@ public class RaidDebugCommands
         return LiveTestJson(new
         {
             success = true,
-            inventoryActive = Game.Current?.GameStateManager?.ActiveState is InventoryState,
+            partyActive = IsRaidLootPartyState(activeState),
+            topScreenIsParty = partyScreen != null,
+            inventoryActive = activeState is InventoryState,
             topScreenIsInventory = inventoryScreen != null,
             otherItemCount,
             simulationActive = simulationVm?.IsSimulation == true,
@@ -313,6 +318,32 @@ public class RaidDebugCommands
             menuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? string.Empty,
             settlementId = Settlement.CurrentSettlement?.StringId ?? string.Empty
         });
+    }
+
+    [CommandLineArgumentFunction("raid_loot_warning_complete_party", "coop.debug.mapevent")]
+    public static string CompleteRaidLootWarningPartyScreen(List<string> args)
+    {
+        if (ModInformation.IsServer) return "Run this command on the client.";
+        if (args.Count != 0) return "Usage: coop.debug.mapevent.raid_loot_warning_complete_party";
+        if (!IsRaidLootPartyState(Game.Current?.GameStateManager?.ActiveState))
+            return "The raid aftermath Party screen is not active.";
+        if (!(ScreenManager.TopScreen is GauntletPartyScreen))
+            return "The raid aftermath Party screen is not the top screen.";
+
+        PartyScreenHelper.CloseScreen(isForced: false);
+        return LiveTestJson(new
+        {
+            success = true,
+            partyActive = IsRaidLootPartyState(Game.Current?.GameStateManager?.ActiveState)
+        });
+    }
+
+    internal static bool IsRaidLootPartyState(TaleWorlds.Core.GameState activeState)
+    {
+        return activeState is PartyState
+        {
+            PartyScreenMode: PartyScreenHelper.PartyScreenMode.Loot
+        };
     }
 
     [CommandLineArgumentFunction("raid_loot_warning_complete_simulation", "coop.debug.mapevent")]
