@@ -2,8 +2,11 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Commands;
@@ -13,6 +16,7 @@ using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using HarmonyLib;
 using Newtonsoft.Json;
 using SandBox.View.Map;
 using Serilog;
@@ -24,9 +28,12 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
@@ -39,6 +46,763 @@ namespace GameInterface.Services.SiegeEvents.Commands;
 public class SiegeDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeDebugCommand>();
+    private static PrisonerPromptFixture prisonerPromptFixture;
+
+    private sealed class PrisonerPromptFixture
+    {
+        public string ControllerId;
+        public Settlement Settlement;
+        public Hero OriginalOwner;
+        public MobileParty PlayerParty;
+        public MobileParty ArmyLeader;
+        public PartyBehaviorUpdateData PlayerBehavior;
+        public PartyBehaviorUpdateData LeaderBehavior;
+        public IFaction AttackerFaction;
+        public IFaction DefenderFaction;
+        public bool WasAtWar;
+        public Army Army;
+        public PrisonerPromptPartySnapshot[] PartySnapshots;
+        public PrisonerPromptHeroSnapshot[] HeroSnapshots;
+        public PrisonerPromptClanSnapshot[] ClanSnapshots;
+        public Hero Governor;
+        public Clan LastCapturedBy;
+        public bool HadGarrison;
+        public float Prosperity;
+        public float Loyalty;
+        public float Security;
+        public float FoodStocks;
+    }
+
+    private sealed class PrisonerPromptPartySnapshot
+    {
+        public PartyBase Party;
+        public TroopRosterElement[] MemberRoster;
+        public TroopRosterElement[] PrisonRoster;
+        public ItemRosterElement[] Items;
+        public Hero LeaderHero;
+        public bool WasActive;
+        public float RecentEventsMorale;
+        public int PartyTradeGold;
+        public CampaignVec2 Position;
+        public bool IsSettlementGarrison;
+        public bool IsSettlementMilitia;
+        public string StringId;
+    }
+
+    private sealed class PrisonerPromptHeroSnapshot
+    {
+        public Hero Hero;
+        public Hero.CharacterStates State;
+        public MobileParty Party;
+        public PartyBase PrisonerParty;
+        public int HitPoints;
+        public int Gold;
+        public KillCharacterAction.KillCharacterActionDetail DeathMark;
+        public Hero DeathMarkKillerHero;
+        public Dictionary<SkillObject, int> SkillLevels;
+        public Dictionary<SkillObject, float> SkillXps;
+        public int TotalXp;
+        public int UnspentFocusPoints;
+        public int UnspentAttributePoints;
+    }
+
+    private sealed class PrisonerPromptClanSnapshot
+    {
+        public Clan Clan;
+        public float Influence;
+        public float Renown;
+        public int Tier;
+    }
+
+    [CommandLineArgumentFunction("prisoner_prompt_fixture_start", "coop.debug.siege")]
+    public static string StartPrisonerPromptFixture(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.siege.prisoner_prompt_fixture_start <controllerId> <settlementId>";
+        if (!ModInformation.IsServer) return "This command can only be used by the server";
+        if (args.Count != 2) return usage;
+        if (prisonerPromptFixture != null) return "A prisoner-prompt siege fixture is already active.";
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface) ||
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            return "Unable to resolve prisoner-prompt fixture services.";
+
+        if (!playerManager.TryGetPlayer(args[0], out var player) || !playerManager.IsConnected(player) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+            return $"No connected player has controller id {args[0]}.";
+        if (!objectManager.TryGetObject<Settlement>(args[1], out var settlement))
+            return $"Settlement with id {args[1]} not found.";
+        if (!settlement.IsFortification || settlement.OwnerClan?.Leader == null)
+            return $"{settlement.Name} must be an owned fortification.";
+        if (playerParty.MapFaction is not Kingdom attackerKingdom ||
+            settlement.MapFaction == null || settlement.MapFaction == attackerKingdom)
+            return "The player party must belong to a kingdom hostile to the target owner.";
+        if (playerParty.MapEvent != null || playerParty.BesiegerCamp != null ||
+            playerParty.CurrentSettlement != null || playerParty.Army != null || settlement.SiegeEvent != null)
+            return "The player party and target must be outside an army, settlement, siege, and map event.";
+
+        var armyLeader = MobileParty.AllLordParties
+            .Where(party => party.IsActive && !party.IsPlayerParty() && party.MapFaction == attackerKingdom &&
+                party.LeaderHero != null && party.MapEvent == null && party.CurrentSettlement == null &&
+                party.BesiegerCamp == null && party.Army == null && party.MemberRoster.TotalHealthyCount > 0)
+            .OrderByDescending(party => party.Party.CalculateCurrentStrength())
+            .FirstOrDefault();
+        if (armyLeader == null)
+            return $"No available {attackerKingdom.Name} lord party can lead the fixture army.";
+        if (!behaviorSnapshot.TryCreate(playerParty, out var playerBehavior) ||
+            !behaviorSnapshot.TryCreate(armyLeader, out var leaderBehavior))
+            return "Unable to capture the original party behavior.";
+
+        PrisonerPromptPartySnapshot[] partySnapshots;
+        PrisonerPromptHeroSnapshot[] heroSnapshots;
+        PrisonerPromptClanSnapshot[] clanSnapshots;
+        try
+        {
+            partySnapshots = CapturePrisonerPromptParties(playerParty, armyLeader, settlement);
+            heroSnapshots = CapturePrisonerPromptHeroes(partySnapshots, settlement);
+            clanSnapshots = CapturePrisonerPromptClans(heroSnapshots);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to capture prisoner-prompt siege fixture");
+            return "Unable to capture the original combat state: " + ex.Message;
+        }
+
+        var fixture = new PrisonerPromptFixture
+        {
+            ControllerId = args[0],
+            Settlement = settlement,
+            OriginalOwner = settlement.OwnerClan.Leader,
+            PlayerParty = playerParty,
+            ArmyLeader = armyLeader,
+            PlayerBehavior = playerBehavior,
+            LeaderBehavior = leaderBehavior,
+            AttackerFaction = attackerKingdom,
+            DefenderFaction = settlement.MapFaction,
+            WasAtWar = attackerKingdom.IsAtWarWith(settlement.MapFaction),
+            PartySnapshots = partySnapshots,
+            HeroSnapshots = heroSnapshots,
+            ClanSnapshots = clanSnapshots,
+            Governor = settlement.Town.Governor,
+            LastCapturedBy = settlement.Town.LastCapturedBy,
+            HadGarrison = settlement.Town.GarrisonParty != null,
+            Prosperity = settlement.Town.Prosperity,
+            Loyalty = settlement.Town.Loyalty,
+            Security = settlement.Town.Security,
+            FoodStocks = settlement.Town.FoodStocks,
+        };
+        prisonerPromptFixture = fixture;
+
+        try
+        {
+            if (!fixture.WasAtWar)
+                DeclareWarAction.ApplyByDefault(fixture.AttackerFaction, fixture.DefenderFaction);
+
+            armyLeader.Position = settlement.GatePosition;
+            playerParty.Position = settlement.GatePosition;
+            attackerKingdom.CreateArmy(armyLeader.LeaderHero, settlement, ArmyTypes.Besieger);
+            fixture.Army = armyLeader.Army;
+            if (fixture.Army == null)
+                throw new InvalidOperationException("Vanilla did not create the fixture army.");
+
+            playerParty.Army = fixture.Army;
+            fixture.Army.AddPartyToMergedParties(playerParty);
+            armyLeader.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
+            siegeEventInterface.StartSiegeEvent(armyLeader, settlement);
+            if (playerParty.BesiegerCamp == null)
+                siegeEventInterface.JoinSiegeCamp(playerParty, settlement);
+
+            if (settlement.SiegeEvent == null || playerParty.Army != fixture.Army ||
+                fixture.Army.LeaderParty == playerParty)
+                throw new InvalidOperationException("The army siege fixture did not reach its required state.");
+
+            objectManager.TryGetId(fixture.Army, out string armyId);
+            return "Prisoner-prompt army siege fixture started." + Environment.NewLine +
+                "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+                {
+                    success = true,
+                    controllerId = fixture.ControllerId,
+                    settlementId = settlement.StringId,
+                    armyId,
+                    leaderPartyId = armyLeader.StringId,
+                    playerPartyId = playerParty.StringId,
+                    playerIsArmyMember = playerParty.Army == fixture.Army,
+                    playerIsNonLeaderMember = fixture.Army.LeaderParty != playerParty,
+                    siegeActive = settlement.SiegeEvent != null,
+                    warDeclaredByFixture = !fixture.WasAtWar,
+                });
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to start prisoner-prompt siege fixture");
+            bool restored = TryRestorePrisonerPromptFixture(
+                fixture,
+                behaviorSnapshot,
+                siegeEventInterface,
+                out var restoreError);
+            if (restored)
+                prisonerPromptFixture = null;
+
+            return "Failed to start prisoner-prompt siege fixture: " + ex.Message +
+                (restored ? string.Empty : ". Restore is still required: " + restoreError);
+        }
+    }
+
+    [CommandLineArgumentFunction("prisoner_prompt_fixture_state", "coop.debug.siege")]
+    public static string PrisonerPromptFixtureState(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.siege.prisoner_prompt_fixture_state <controllerId> <settlementId>";
+        if (!ModInformation.IsServer) return "This command can only be used by the server";
+        if (args.Count != 2) return usage;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPlayer(args[0], out var player) ||
+            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) ||
+            !objectManager.TryGetObject<Settlement>(args[1], out var settlement))
+            return "Unable to resolve prisoner-prompt fixture state.";
+
+        var army = playerParty.Army;
+        string armyId = null;
+        if (army != null)
+            objectManager.TryGetId(army, out armyId);
+        return "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            success = true,
+            fixtureActive = prisonerPromptFixture != null,
+            controllerId = args[0],
+            settlementId = settlement.StringId,
+            settlementOwnerId = settlement.OwnerClan?.StringId,
+            playerPartyId = playerParty.StringId,
+            playerMapEventActive = playerParty.MapEvent != null,
+            playerBesieger = settlement.SiegeEvent != null &&
+                playerParty.BesiegerCamp == settlement.SiegeEvent.BesiegerCamp,
+            armyId,
+            playerIsArmyMember = army != null,
+            playerIsNonLeaderMember = army != null && army.LeaderParty != playerParty,
+            armyLeaderPartyId = army?.LeaderParty?.StringId,
+            siegeActive = settlement.SiegeEvent != null,
+            atWar = playerParty.MapFaction?.IsAtWarWith(settlement.MapFaction) == true,
+            playerX = playerParty.Position.X,
+            playerY = playerParty.Position.Y,
+        });
+    }
+
+    [CommandLineArgumentFunction("prisoner_prompt_fixture_restore", "coop.debug.siege")]
+    public static string RestorePrisonerPromptFixture(List<string> args)
+    {
+        if (!ModInformation.IsServer) return "This command can only be used by the server";
+        if (args.Count != 0) return "Usage: coop.debug.siege.prisoner_prompt_fixture_restore";
+        var fixture = prisonerPromptFixture;
+        if (fixture == null) return "No prisoner-prompt siege fixture is active.";
+        if (fixture.PlayerParty.MapEvent != null || fixture.ArmyLeader.MapEvent != null)
+            return "The fixture battle must finish before restoration.";
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+            !ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+            return "Unable to resolve prisoner-prompt fixture restore services.";
+
+        if (!TryRestorePrisonerPromptFixture(fixture, behaviorSnapshot, siegeEventInterface, out var error))
+            return "Failed to restore prisoner-prompt siege fixture: " + error;
+
+        prisonerPromptFixture = null;
+        return "Prisoner-prompt army siege fixture restored." + Environment.NewLine +
+            "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+            {
+                success = true,
+                restored = true,
+                controllerId = fixture.ControllerId,
+                settlementId = fixture.Settlement.StringId,
+                armyRemoved = fixture.PlayerParty.Army == null && fixture.ArmyLeader.Army == null,
+                siegeRemoved = fixture.Settlement.SiegeEvent == null,
+                ownerRestored = fixture.Settlement.OwnerClan == fixture.OriginalOwner.Clan,
+                warRestored = fixture.WasAtWar ||
+                    !fixture.AttackerFaction.IsAtWarWith(fixture.DefenderFaction),
+                combatStateRestored = IsPrisonerPromptCombatStateRestored(fixture),
+            });
+    }
+
+    private static PrisonerPromptPartySnapshot[] CapturePrisonerPromptParties(
+        MobileParty playerParty,
+        MobileParty armyLeader,
+        Settlement settlement)
+    {
+        return new[]
+            {
+                playerParty.Party,
+                armyLeader.Party,
+                settlement.Party,
+                settlement.Town.GarrisonParty?.Party,
+            }
+            .Concat(settlement.Parties.Select(party => party.Party))
+            .Where(party => party != null)
+            .Distinct()
+            .Select(party => new PrisonerPromptPartySnapshot
+            {
+                Party = party,
+                MemberRoster = party.MemberRoster.GetTroopRoster().ToArray(),
+                PrisonRoster = party.PrisonRoster.GetTroopRoster().ToArray(),
+                Items = party.ItemRoster.ToArray(),
+                LeaderHero = party.LeaderHero,
+                WasActive = party.MobileParty?.IsActive == true,
+                RecentEventsMorale = party.MobileParty?.RecentEventsMorale ?? 0f,
+                PartyTradeGold = party.MobileParty?.PartyTradeGold ?? 0,
+                Position = party.MobileParty?.Position ?? default,
+                IsSettlementGarrison = settlement.Town.GarrisonParty != null &&
+                    party.MobileParty == settlement.Town.GarrisonParty,
+                IsSettlementMilitia = settlement.MilitiaPartyComponent?.MobileParty != null &&
+                    party.MobileParty == settlement.MilitiaPartyComponent.MobileParty,
+                StringId = party.MobileParty?.StringId,
+            })
+            .ToArray();
+    }
+
+    private static PrisonerPromptHeroSnapshot[] CapturePrisonerPromptHeroes(
+        PrisonerPromptPartySnapshot[] partySnapshots,
+        Settlement settlement)
+    {
+        return partySnapshots
+            .SelectMany(snapshot => snapshot.MemberRoster
+                .Concat(snapshot.PrisonRoster)
+                .Select(element => element.Character.HeroObject)
+                .Concat(new[] { snapshot.LeaderHero }))
+            .Concat(new[] { settlement.Town.Governor })
+            .Where(hero => hero != null)
+            .Distinct()
+            .Select(hero => new PrisonerPromptHeroSnapshot
+            {
+                Hero = hero,
+                State = hero.HeroState,
+                Party = hero.PartyBelongedTo,
+                PrisonerParty = hero.PartyBelongedToAsPrisoner,
+                HitPoints = hero.HitPoints,
+                Gold = hero.Gold,
+                DeathMark = hero.DeathMark,
+                DeathMarkKillerHero = hero.DeathMarkKillerHero,
+                SkillLevels = Skills.All.ToDictionary(skill => skill, hero.GetSkillValue),
+                SkillXps = hero.HeroDeveloper == null
+                    ? null
+                    : Skills.All.ToDictionary(skill => skill, hero.HeroDeveloper.GetSkillXp),
+                TotalXp = hero.HeroDeveloper?._totalXp ?? 0,
+                UnspentFocusPoints = hero.HeroDeveloper?.UnspentFocusPoints ?? 0,
+                UnspentAttributePoints = hero.HeroDeveloper?.UnspentAttributePoints ?? 0,
+            })
+            .ToArray();
+    }
+
+    private static PrisonerPromptClanSnapshot[] CapturePrisonerPromptClans(
+        PrisonerPromptHeroSnapshot[] heroSnapshots)
+    {
+        return heroSnapshots
+            .Select(snapshot => snapshot.Hero.Clan)
+            .Where(clan => clan != null)
+            .Distinct()
+            .Select(clan => new PrisonerPromptClanSnapshot
+            {
+                Clan = clan,
+                Influence = clan._influence,
+                Renown = clan.Renown,
+                Tier = clan._tier,
+            })
+            .ToArray();
+    }
+
+    private static bool TryRestorePrisonerPromptFixture(
+        PrisonerPromptFixture fixture,
+        IMobilePartyBehaviorSnapshot behaviorSnapshot,
+        ISiegeEventInterface siegeEventInterface,
+        out string error)
+    {
+        error = string.Empty;
+        try
+        {
+            var camp = fixture.Settlement.SiegeEvent?.BesiegerCamp;
+            if (camp != null)
+            {
+                foreach (var party in camp._besiegerParties.ToArray())
+                    siegeEventInterface.BreakSiege(party);
+            }
+
+            if (fixture.Army != null && fixture.PlayerParty.Army == fixture.Army)
+                ArmyPatches.RemoveMobilePartyInArmyImmediate(
+                    fixture.PlayerParty,
+                    fixture.Army,
+                    null);
+            if (fixture.Army != null && fixture.ArmyLeader.Army == fixture.Army)
+                DisbandArmyAction.ApplyByObjectiveFinished(fixture.Army);
+
+            if (fixture.Settlement.OwnerClan != fixture.OriginalOwner.Clan)
+                ChangeOwnerOfSettlementAction.ApplyByGift(fixture.Settlement, fixture.OriginalOwner);
+            if (!fixture.WasAtWar && fixture.AttackerFaction.IsAtWarWith(fixture.DefenderFaction))
+                MakePeaceAction.Apply(fixture.AttackerFaction, fixture.DefenderFaction);
+
+            RestorePrisonerPromptGarrison(fixture);
+            RestorePrisonerPromptMilitia(fixture);
+
+            fixture.Settlement.Town.Prosperity = fixture.Prosperity;
+            fixture.Settlement.Town.Loyalty = fixture.Loyalty;
+            fixture.Settlement.Town.Security = fixture.Security;
+            fixture.Settlement.Town.FoodStocks = fixture.FoodStocks;
+
+            foreach (var hero in fixture.HeroSnapshots)
+                RestorePrisonerPromptHeroProgression(hero);
+            foreach (var party in fixture.PartySnapshots)
+                RestorePrisonerPromptParty(fixture, party);
+            foreach (var hero in fixture.HeroSnapshots)
+                RestorePrisonerPromptHeroMembership(fixture, hero);
+            foreach (var clan in fixture.ClanSnapshots)
+                RestorePrisonerPromptClan(clan);
+
+            fixture.Settlement.Town.Governor = fixture.Governor;
+            fixture.Settlement.Town.LastCapturedBy = fixture.LastCapturedBy;
+
+            fixture.PlayerParty.Position = fixture.PlayerBehavior.PartyPosition;
+            fixture.ArmyLeader.Position = fixture.LeaderBehavior.PartyPosition;
+            bool playerRestored = behaviorSnapshot.TryApply(
+                fixture.PlayerParty,
+                fixture.PlayerBehavior,
+                out _);
+            bool leaderRestored = behaviorSnapshot.TryApply(
+                fixture.ArmyLeader,
+                fixture.LeaderBehavior,
+                out _);
+            foreach (var party in fixture.PartySnapshots
+                .Select(snapshot => ResolvePrisonerPromptParty(fixture, snapshot)?.MobileParty)
+                .Where(party => party?.IsActive == true))
+            {
+                PublishPrisonerPromptForcedPosition(party);
+            }
+            var restoreFailures = GetPrisonerPromptFixtureRestoreFailures(
+                fixture,
+                playerRestored,
+                leaderRestored);
+            if (restoreFailures.Count != 0)
+            {
+                error = "fixture invariants not restored: " + string.Join(", ", restoreFailures);
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to restore prisoner-prompt siege fixture");
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static void RestorePrisonerPromptHeroProgression(PrisonerPromptHeroSnapshot snapshot)
+    {
+        if (snapshot.Hero.IsPrisoner)
+            EndCaptivityAction.ApplyByPeace(snapshot.Hero);
+
+        snapshot.Hero.DeathMark = snapshot.DeathMark;
+        snapshot.Hero.DeathMarkKillerHero = snapshot.DeathMarkKillerHero;
+        snapshot.Hero.HitPoints = snapshot.HitPoints;
+        snapshot.Hero.Gold = snapshot.Gold;
+        snapshot.Hero.ChangeState(snapshot.State);
+        foreach (var skill in snapshot.SkillLevels)
+            snapshot.Hero.SetSkillValue(skill.Key, skill.Value);
+
+        if (snapshot.Hero.HeroDeveloper == null || snapshot.SkillXps == null)
+            return;
+
+        foreach (var skillXp in snapshot.SkillXps)
+            snapshot.Hero.HeroDeveloper.SetSkillXp(skillXp.Key, skillXp.Value);
+        snapshot.Hero.HeroDeveloper._totalXp = snapshot.TotalXp;
+        snapshot.Hero.HeroDeveloper.UnspentFocusPoints = snapshot.UnspentFocusPoints;
+        snapshot.Hero.HeroDeveloper.UnspentAttributePoints = snapshot.UnspentAttributePoints;
+    }
+
+    private static void RestorePrisonerPromptGarrison(PrisonerPromptFixture fixture)
+    {
+        var snapshot = fixture.PartySnapshots.SingleOrDefault(party => party.IsSettlementGarrison);
+        if (snapshot == null)
+        {
+            if (fixture.Settlement.Town.GarrisonParty != null)
+                DestroyPartyAction.Apply(null, fixture.Settlement.Town.GarrisonParty);
+            return;
+        }
+
+        var currentGarrison = fixture.Settlement.Town.GarrisonParty;
+        if (currentGarrison == null)
+            fixture.Settlement.AddGarrisonParty();
+
+        if (fixture.Settlement.Town.GarrisonParty == null)
+            throw new InvalidOperationException("Unable to recreate the settlement garrison.");
+    }
+
+    private static void RestorePrisonerPromptMilitia(PrisonerPromptFixture fixture)
+    {
+        var snapshot = fixture.PartySnapshots.SingleOrDefault(party => party.IsSettlementMilitia);
+        var currentMilitia = fixture.Settlement.MilitiaPartyComponent?.MobileParty;
+        if (snapshot == null)
+        {
+            if (currentMilitia != null)
+                DestroyPartyAction.Apply(null, currentMilitia);
+            return;
+        }
+
+        if (currentMilitia == null)
+        {
+            MilitiaPartyComponent.CreateMilitiaParty(
+                "militias_of_" + fixture.Settlement.StringId + "_aaa1",
+                fixture.Settlement);
+        }
+
+        if (fixture.Settlement.MilitiaPartyComponent?.MobileParty == null)
+            throw new InvalidOperationException("Unable to recreate the settlement militia.");
+    }
+
+    private static PartyBase ResolvePrisonerPromptParty(
+        PrisonerPromptFixture fixture,
+        PrisonerPromptPartySnapshot snapshot)
+    {
+        if (snapshot.IsSettlementGarrison)
+            return fixture.Settlement.Town.GarrisonParty?.Party;
+        if (snapshot.IsSettlementMilitia)
+            return fixture.Settlement.MilitiaPartyComponent?.MobileParty?.Party;
+        return snapshot.Party;
+    }
+
+    private static PartyBase ResolvePrisonerPromptParty(
+        PrisonerPromptFixture fixture,
+        PartyBase originalParty)
+    {
+        var snapshot = fixture.PartySnapshots.FirstOrDefault(party => party.Party == originalParty);
+        return snapshot == null ? originalParty : ResolvePrisonerPromptParty(fixture, snapshot);
+    }
+
+    private static void RestorePrisonerPromptParty(
+        PrisonerPromptFixture fixture,
+        PrisonerPromptPartySnapshot snapshot)
+    {
+        var party = ResolvePrisonerPromptParty(fixture, snapshot);
+        if (party == null)
+            throw new InvalidOperationException($"Unable to resolve restored party {snapshot.StringId}.");
+
+        RestorePrisonerPromptRoster(party.MemberRoster, snapshot.MemberRoster);
+        RestorePrisonerPromptRoster(party.PrisonRoster, snapshot.PrisonRoster);
+        party.ItemRoster.Clear();
+        foreach (var item in snapshot.Items)
+            party.ItemRoster.AddToCounts(item.EquipmentElement, item.Amount);
+
+        var mobileParty = party.MobileParty;
+        if (mobileParty == null)
+            return;
+
+        if (!snapshot.IsSettlementGarrison && !snapshot.IsSettlementMilitia)
+            mobileParty.IsActive = snapshot.WasActive;
+        mobileParty.RecentEventsMorale = snapshot.RecentEventsMorale;
+        mobileParty.PartyTradeGold = snapshot.PartyTradeGold;
+        mobileParty.Position = snapshot.Position;
+        mobileParty.ChangePartyLeader(snapshot.LeaderHero);
+    }
+
+    private static void RestorePrisonerPromptRoster(
+        TroopRoster roster,
+        TroopRosterElement[] baseline)
+    {
+        for (int index = roster.Count - 1; index >= 0; index--)
+        {
+            var element = roster.GetElementCopyAtIndex(index);
+            roster.AddToCountsAtIndex(
+                index,
+                -element.Number,
+                -element.WoundedNumber,
+                0,
+                false);
+        }
+        roster.RemoveZeroCounts();
+
+        foreach (var element in baseline)
+        {
+            roster.AddToCounts(
+                element.Character,
+                element.Number,
+                false,
+                element.WoundedNumber,
+                element.Xp,
+                true);
+        }
+    }
+
+    private static void RestorePrisonerPromptHeroMembership(
+        PrisonerPromptFixture fixture,
+        PrisonerPromptHeroSnapshot snapshot)
+    {
+        var prisonerParty = ResolvePrisonerPromptParty(fixture, snapshot.PrisonerParty);
+        var party = ResolvePrisonerPromptParty(fixture, snapshot.Party?.Party)?.MobileParty;
+        if (snapshot.Hero.PartyBelongedToAsPrisoner != prisonerParty)
+        {
+            if (snapshot.Hero.PartyBelongedToAsPrisoner != null)
+                snapshot.Hero.OnRemovedFromPartyAsPrisoner(snapshot.Hero.PartyBelongedToAsPrisoner);
+            if (prisonerParty != null)
+                snapshot.Hero.OnAddedToPartyAsPrisoner(prisonerParty);
+        }
+
+        if (snapshot.Hero.PartyBelongedTo != party)
+        {
+            if (snapshot.Hero.PartyBelongedTo != null)
+                snapshot.Hero.OnRemovedFromParty(snapshot.Hero.PartyBelongedTo);
+            if (party != null)
+                snapshot.Hero.OnAddedToParty(party);
+        }
+    }
+
+    private static void RestorePrisonerPromptClan(PrisonerPromptClanSnapshot snapshot)
+    {
+        snapshot.Clan._influence = snapshot.Influence;
+        if (snapshot.Clan.Renown > snapshot.Renown)
+            snapshot.Clan.ResetClanRenown();
+        if (snapshot.Clan.Renown < snapshot.Renown)
+            snapshot.Clan.AddRenown(snapshot.Renown - snapshot.Clan.Renown);
+        snapshot.Clan._tier = snapshot.Tier;
+    }
+
+    private static bool IsPrisonerPromptCombatStateRestored(PrisonerPromptFixture fixture)
+    {
+        return GetPrisonerPromptCombatStateRestoreFailures(fixture).Count == 0;
+    }
+
+    private static List<string> GetPrisonerPromptFixtureRestoreFailures(
+        PrisonerPromptFixture fixture,
+        bool playerBehaviorRestored,
+        bool leaderBehaviorRestored)
+    {
+        var failures = new List<string>();
+        if (!playerBehaviorRestored)
+            failures.Add("player party behavior");
+        if (!leaderBehaviorRestored)
+            failures.Add("army leader behavior");
+        if (fixture.Settlement.SiegeEvent != null)
+            failures.Add("settlement siege");
+        if (fixture.PlayerParty.Army != null)
+            failures.Add("player party army");
+        if (fixture.ArmyLeader.Army != null)
+            failures.Add("army leader army");
+
+        failures.AddRange(GetPrisonerPromptCombatStateRestoreFailures(fixture));
+        return failures;
+    }
+
+    private static List<string> GetPrisonerPromptCombatStateRestoreFailures(
+        PrisonerPromptFixture fixture)
+    {
+        var failures = new List<string>();
+        bool townRestored = fixture.Settlement.Town.Prosperity == fixture.Prosperity &&
+            fixture.Settlement.Town.Loyalty == fixture.Loyalty &&
+            fixture.Settlement.Town.Security == fixture.Security &&
+            fixture.Settlement.Town.FoodStocks == fixture.FoodStocks &&
+            fixture.Settlement.Town.Governor == fixture.Governor &&
+            fixture.Settlement.Town.LastCapturedBy == fixture.LastCapturedBy &&
+            (fixture.HadGarrison
+                ? fixture.Settlement.Town.GarrisonParty?.IsActive == true
+                : fixture.Settlement.Town.GarrisonParty == null) &&
+            (fixture.PartySnapshots.Any(snapshot => snapshot.IsSettlementMilitia)
+                ? fixture.Settlement.MilitiaPartyComponent?.MobileParty?.IsActive == true
+                : fixture.Settlement.MilitiaPartyComponent == null);
+        if (!townRestored)
+            failures.Add("settlement town state");
+
+        foreach (var snapshot in fixture.PartySnapshots
+            .Where(snapshot => !IsPrisonerPromptPartyRestored(fixture, snapshot)))
+        {
+            failures.Add("party " + (snapshot.StringId ?? fixture.Settlement.StringId));
+        }
+
+        foreach (var snapshot in fixture.HeroSnapshots
+            .Where(snapshot => !IsPrisonerPromptHeroRestored(fixture, snapshot)))
+        {
+            failures.Add("hero " + snapshot.Hero.StringId);
+        }
+
+        foreach (var snapshot in fixture.ClanSnapshots.Where(snapshot =>
+            snapshot.Clan._influence != snapshot.Influence ||
+            snapshot.Clan.Renown != snapshot.Renown ||
+            snapshot.Clan._tier != snapshot.Tier))
+        {
+            failures.Add("clan " + snapshot.Clan.StringId);
+        }
+
+        return failures;
+    }
+
+    private static bool IsPrisonerPromptPartyRestored(
+        PrisonerPromptFixture fixture,
+        PrisonerPromptPartySnapshot snapshot)
+    {
+        var party = ResolvePrisonerPromptParty(fixture, snapshot);
+        if (party == null ||
+            !IsPrisonerPromptRosterRestored(party.MemberRoster, snapshot.MemberRoster) ||
+            !IsPrisonerPromptRosterRestored(party.PrisonRoster, snapshot.PrisonRoster))
+            return false;
+
+        var items = party.ItemRoster.ToArray();
+        if (items.Length != snapshot.Items.Length || snapshot.Items.Any(expected =>
+            !items.Any(actual => actual.EquipmentElement.Equals(expected.EquipmentElement) &&
+                actual.Amount == expected.Amount)))
+            return false;
+
+        var mobileParty = party.MobileParty;
+        return mobileParty == null ||
+            (((snapshot.IsSettlementGarrison || snapshot.IsSettlementMilitia)
+                ? mobileParty.IsActive
+                : mobileParty.IsActive == snapshot.WasActive) &&
+             mobileParty.RecentEventsMorale == snapshot.RecentEventsMorale &&
+             mobileParty.PartyTradeGold == snapshot.PartyTradeGold &&
+             mobileParty.Position == snapshot.Position &&
+             mobileParty.LeaderHero == snapshot.LeaderHero);
+    }
+
+    private static bool IsPrisonerPromptRosterRestored(
+        TroopRoster roster,
+        TroopRosterElement[] baseline)
+    {
+        var current = roster.GetTroopRoster().ToArray();
+        return current.Length == baseline.Length && baseline.All(expected =>
+            current.Any(actual => actual.Character == expected.Character &&
+                actual.Number == expected.Number &&
+                actual.WoundedNumber == expected.WoundedNumber &&
+                actual.Xp == expected.Xp));
+    }
+
+    private static bool IsPrisonerPromptHeroRestored(
+        PrisonerPromptFixture fixture,
+        PrisonerPromptHeroSnapshot snapshot)
+    {
+        var party = ResolvePrisonerPromptParty(fixture, snapshot.Party?.Party)?.MobileParty;
+        var prisonerParty = ResolvePrisonerPromptParty(fixture, snapshot.PrisonerParty);
+        bool progressionRestored = snapshot.Hero.HeroState == snapshot.State &&
+            snapshot.Hero.PartyBelongedTo == party &&
+            snapshot.Hero.PartyBelongedToAsPrisoner == prisonerParty &&
+            snapshot.Hero.HitPoints == snapshot.HitPoints &&
+            snapshot.Hero.Gold == snapshot.Gold &&
+            snapshot.Hero.DeathMark == snapshot.DeathMark &&
+            snapshot.Hero.DeathMarkKillerHero == snapshot.DeathMarkKillerHero &&
+            snapshot.SkillLevels.All(skill => snapshot.Hero.GetSkillValue(skill.Key) == skill.Value);
+        if (!progressionRestored || snapshot.SkillXps == null)
+            return progressionRestored;
+
+        return snapshot.Hero.HeroDeveloper != null &&
+            snapshot.SkillXps.All(skill => snapshot.Hero.HeroDeveloper.GetSkillXp(skill.Key) == skill.Value) &&
+            snapshot.Hero.HeroDeveloper._totalXp == snapshot.TotalXp &&
+            snapshot.Hero.HeroDeveloper.UnspentFocusPoints == snapshot.UnspentFocusPoints &&
+            snapshot.Hero.HeroDeveloper.UnspentAttributePoints == snapshot.UnspentAttributePoints;
+    }
+
+    private static void PublishPrisonerPromptForcedPosition(MobileParty party)
+    {
+        MessageBroker.Instance.Publish(
+            typeof(SiegeDebugCommand),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea));
+    }
+
+    internal static bool IsPrisonerPromptFixtureHero(Hero hero) =>
+        prisonerPromptFixture?.HeroSnapshots.Any(snapshot => snapshot.Hero == hero) == true;
 
     /// <summary>
     /// Creates a player-led siege and sends a multi-party defending army to interrupt it. Server only.
@@ -245,7 +1009,6 @@ public class SiegeDebugCommand
         }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-            || !ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface)
             || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
         {
             return $"Unable to resolve the settlement encounter for {args[0]}";
@@ -257,21 +1020,44 @@ public class SiegeDebugCommand
             return $"{settlement.Name} does not have an active siege assault";
         }
 
-        if (!mapEvent.CanPartyJoinBattle(PartyBase.MainParty, BattleSideEnum.Attacker))
+        bool alreadyInAssault = PartyBase.MainParty?.MapEvent == mapEvent;
+        if (!alreadyInAssault && !mapEvent.CanPartyJoinBattle(PartyBase.MainParty, BattleSideEnum.Attacker))
         {
             return $"The local player party cannot join the assault at {settlement.Name}";
         }
 
-        settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        if (alreadyInAssault)
+        {
+            if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+            {
+                return "Unable to resolve SiegeEventInterface";
+            }
+
+            siegeEventInterface.PromptSiegeAssault(MobileParty.MainParty, settlement);
+        }
+        else
+        {
+            if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
+            {
+                return "Unable to resolve SettlementInterface";
+            }
+
+            settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        }
+
         if (PlayerEncounter.Current == null)
         {
             return $"Unable to start the local encounter at {settlement.Name}";
         }
 
-        PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
-        GameMenu.SwitchToMenu("menu_siege_strategies");
+        if (!alreadyInAssault)
+            PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
+        else
+            GameMenu.SwitchToMenu("encounter");
         MobileParty.MainParty.SetMoveModeHold();
-        return $"Joined the active siege assault at {settlement.Name}";
+        return alreadyInAssault
+            ? $"Opened the active siege assault at {settlement.Name} for an involved player party"
+            : $"Joined the active siege assault at {settlement.Name}";
     }
 
     [CommandLineArgumentFunction("assault_entry_state", "coop.debug.siege")]
@@ -292,21 +1078,76 @@ public class SiegeDebugCommand
             return "The local player encounter is unavailable";
         }
 
-        var callbackArgs = new MenuCallbackArgs((MenuContext)null, null);
-        bool conditionShown = new EncounterGameMenuBehavior()
-            .game_menu_encounter_attack_on_condition(callbackArgs);
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        var behavior = new EncounterGameMenuBehavior();
+        var attackArgs = new MenuCallbackArgs((MenuContext)null, null);
+        bool attackShown = behavior.game_menu_encounter_attack_on_condition(attackArgs);
+        var simulationArgs = new MenuCallbackArgs((MenuContext)null, null);
+        bool simulationShown = behavior.game_menu_encounter_order_attack_on_condition(simulationArgs);
         var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
-        var renderedOption = menu?.MenuOptions
+        var renderedAttack = menu?.MenuOptions
             .FirstOrDefault(option => option.IdString == "attack");
+        var renderedSimulation = menu?.MenuOptions
+            .FirstOrDefault(option => option.IdString == "str_order_attack");
         var settlement = MobileParty.MainParty?.BesiegedSettlement;
         var leader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        var mapEvent = PartyBase.MainParty?.MapEvent;
+        var tracker = mapEvent?.TroopUpgradeTracker;
+        var mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out string resolvedMapEventId)
+            ? resolvedMapEventId
+            : "none";
+        var trackerId = tracker != null && objectManager.TryGetId(tracker, out string resolvedTrackerId)
+            ? resolvedTrackerId
+            : "none";
+        var involvedPartyCount = mapEvent?._sides?
+            .Where(side => side?.Parties != null)
+            .Sum(side => side.Parties.Count) ?? 0;
+        bool mainPartyAttached = PartyBase.MainParty?.MapEventSide?.MapEvent == mapEvent && mapEvent != null;
+        bool mainPartyTracked = tracker?._mapEventParties
+            .Any(party => party?.Party == PartyBase.MainParty) == true;
+
+        var structuredResult = JsonConvert.SerializeObject(new
+        {
+            menu = menu?.StringId ?? "none",
+            settlementId = settlement?.StringId ?? "none",
+            mapEventId,
+            trackerId,
+            trackerPresent = tracker != null,
+            trackedPartyCount = tracker?._mapEventParties.Count ?? 0,
+            involvedPartyCount,
+            mainPartyAttached,
+            mainPartyTracked,
+            attack = new
+            {
+                shown = attackShown,
+                enabled = attackArgs.IsEnabled,
+                rendered = renderedAttack != null,
+                renderedEnabled = renderedAttack?.IsEnabled ?? false,
+                tooltip = attackArgs.Tooltip?.ToString() ?? "none",
+            },
+            simulation = new
+            {
+                shown = simulationShown,
+                enabled = simulationArgs.IsEnabled,
+                rendered = renderedSimulation != null,
+                renderedEnabled = renderedSimulation?.IsEnabled ?? false,
+                tooltip = simulationArgs.Tooltip?.ToString() ?? "none",
+            },
+        });
 
         return $"menu={menu?.StringId ?? "none"} settlement={settlement?.StringId ?? "none"} " +
             $"leader={leader?.StringId ?? "none"} localLeader={leader == MobileParty.MainParty} " +
-            $"conditionShown={conditionShown} conditionEnabled={callbackArgs.IsEnabled} " +
-            $"conditionTooltip={callbackArgs.Tooltip?.ToString() ?? "none"} " +
-            $"renderedRegistered={renderedOption != null} renderedEnabled={renderedOption?.IsEnabled ?? false} " +
-            $"renderedTooltip={renderedOption?.Tooltip?.ToString() ?? "none"}";
+            $"mapEvent={mapEventId} tracker={trackerId} tracked={tracker?._mapEventParties.Count ?? 0}/{involvedPartyCount} " +
+            $"mainPartyAttached={mainPartyAttached} mainPartyTracked={mainPartyTracked} " +
+            $"attackShown={attackShown} attackEnabled={attackArgs.IsEnabled} " +
+            $"attackRendered={renderedAttack != null} attackRenderedEnabled={renderedAttack?.IsEnabled ?? false} " +
+            $"simulationShown={simulationShown} simulationEnabled={simulationArgs.IsEnabled} " +
+            $"simulationRendered={renderedSimulation != null} simulationRenderedEnabled={renderedSimulation?.IsEnabled ?? false}" +
+            Environment.NewLine + "LIVE_TEST_JSON=" + structuredResult;
     }
 
     [CommandLineArgumentFunction("leave", "coop.debug.siege")]
@@ -504,6 +1345,22 @@ public class SiegeDebugCommand
         if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
         {
             return "Unable to resolve SiegeEventInterface";
+        }
+
+        var activeAssault = settlement.Party.MapEvent ?? leader.MapEvent;
+        if (activeAssault != null && !activeAssault.IsFinalized)
+            activeAssault.FinalizeEvent();
+
+        if (settlement.SiegeEvent == null)
+        {
+            var finalizedRestoreResult = PartyCommands.RestorePositionCommand(new List<string>
+            {
+                leader.StringId,
+                args[1],
+                args[2],
+                args[3],
+            });
+            return $"Finalized the assault and stopped the siege of {settlement.Name}\n" + finalizedRestoreResult;
         }
 
         var siegeParties = camp._besiegerParties.ToArray();
@@ -1033,15 +1890,36 @@ public class SiegeDebugCommand
         var siegeEvent = settlement.SiegeEvent;
         if (siegeEvent == null)
         {
-            return $"{settlement.Name} ({settlement.StringId}): siege=False graphComplete=False";
+            var cleanResult = JsonConvert.SerializeObject(new
+            {
+                success = true,
+                settlementId = settlement.StringId,
+                siege = false,
+                graphComplete = false,
+            });
+            return $"{settlement.Name} ({settlement.StringId}): siege=False graphComplete=False" +
+                Environment.NewLine + "LIVE_TEST_JSON=" + cleanResult;
         }
 
         var camp = siegeEvent.BesiegerCamp;
+        bool graphComplete = SiegeContainerLookup.IsGraphComplete(siegeEvent);
+        var structuredResult = JsonConvert.SerializeObject(new
+        {
+            success = true,
+            settlementId = settlement.StringId,
+            siege = true,
+            campPresent = camp != null,
+            leaderPresent = camp?.LeaderParty != null,
+            attackerContainerPresent = camp?.SiegeEngines != null,
+            defenderContainerPresent = settlement.SiegeEngines != null,
+            graphComplete,
+        });
         return $"{settlement.Name} ({settlement.StringId}): siege=True " +
             $"camp={camp != null} leader={camp?.LeaderParty != null} " +
             $"attackerContainer={camp?.SiegeEngines != null} " +
             $"defenderContainer={settlement.SiegeEngines != null} " +
-            $"graphComplete={SiegeContainerLookup.IsGraphComplete(siegeEvent)}";
+            $"graphComplete={graphComplete}" + Environment.NewLine +
+            "LIVE_TEST_JSON=" + structuredResult;
     }
 
     /// <summary>
@@ -1293,5 +2171,23 @@ public class SiegeDebugCommand
 
         return $" ladderState={ladder.State} ladderAnimation={ladder._animationState}" +
             $" ladderAnimationIndex={animationIndex} ladderProgress={animationProgress:0.000}";
+    }
+}
+
+[HarmonyPatch(typeof(Hero), nameof(Hero.CanDie))]
+internal static class PrisonerPromptFixtureHeroDeathPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(
+        Hero __instance,
+        KillCharacterAction.KillCharacterActionDetail causeOfDeath,
+        ref bool __result)
+    {
+        if (causeOfDeath != KillCharacterAction.KillCharacterActionDetail.DiedInBattle ||
+            !SiegeDebugCommand.IsPrisonerPromptFixtureHero(__instance))
+            return true;
+
+        __result = false;
+        return false;
     }
 }

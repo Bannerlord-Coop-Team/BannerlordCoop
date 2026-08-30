@@ -36,7 +36,7 @@ internal sealed class PeaceBarterHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
-    private readonly LocationConversationTracker locationConversationTracker;
+    private readonly ILocationConversationTracker locationConversationTracker;
     private readonly IBarterClientPresentation barterClientPresentation;
     private readonly ISendCoalescer sendCoalescer;
 
@@ -46,7 +46,7 @@ internal sealed class PeaceBarterHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         ConversationPartyTracker conversationPartyTracker,
-        LocationConversationTracker locationConversationTracker,
+        ILocationConversationTracker locationConversationTracker,
         IBarterClientPresentation barterClientPresentation,
         ISendCoalescer sendCoalescer = null)
     {

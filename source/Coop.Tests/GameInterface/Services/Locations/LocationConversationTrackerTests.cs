@@ -127,6 +127,41 @@ public class LocationConversationTrackerTests
     }
 
     [Fact]
+    public void PlayerTarget_CannotBeginAnotherConversation()
+    {
+        Assert.True(tracker.TryBeginEngagement(
+            firstPlayer,
+            secondPlayer,
+            FirstPlayerCharacter,
+            SecondPlayerCharacter));
+
+        var began = tracker.TryBeginEngagement(
+            secondPlayer,
+            SecondPlayerCharacter,
+            OtherNotable);
+
+        Assert.False(began);
+    }
+
+    [Fact]
+    public void PlayerTarget_CanEndSharedConversation()
+    {
+        Assert.True(tracker.TryBeginEngagement(
+            firstPlayer,
+            secondPlayer,
+            FirstPlayerCharacter,
+            SecondPlayerCharacter));
+
+        var ended = tracker.TryEndEngagement(secondPlayer, out var npcKey, out var engagerKey);
+
+        Assert.True(ended);
+        Assert.Equal(SecondPlayerCharacter, npcKey);
+        Assert.Same(firstPlayer, engagerKey);
+        Assert.True(tracker.IsEmpty);
+        Assert.False(tracker.TryGetEngagement(firstPlayer, out _));
+    }
+
+    [Fact]
     public void ReciprocalPlayerInteraction_AfterFirstEnds_Succeeds()
     {
         tracker.TryBeginEngagement(firstPlayer, FirstPlayerCharacter, SecondPlayerCharacter);

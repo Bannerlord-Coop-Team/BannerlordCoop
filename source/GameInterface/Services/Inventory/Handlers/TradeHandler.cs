@@ -7,7 +7,6 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using Helpers;
@@ -31,20 +30,17 @@ internal class TradeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly ITroopRosterInterface troopRosterInterface;
 
     public TradeHandler(
         IInventoryLogicInterface inventoryLogicInterface,
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        ITroopRosterInterface troopRosterInterface)
+        INetwork network)
     {
         this.inventoryLogicInterface = inventoryLogicInterface;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.troopRosterInterface = troopRosterInterface;
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
@@ -74,7 +70,6 @@ internal class TradeHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
         if (!objectManager.TryGetIdWithLogging(what.OwnerParty, out var ownerPartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.TroopRoster, out var troopRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
 
         // CurrentMobileParty can be already destroyed when this logic runs. Attempt to get an id without logging
@@ -93,8 +88,6 @@ internal class TradeHandler : IHandler
         }
 
         var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.OwnerParty, what.InitialCharacterEquipment);
-
-        var troopRosterData = troopRosterInterface.PackTroopRosterData(what.TroopRoster);
 
         var message = new CompleteTrade(
             fromRosterId,
@@ -115,9 +108,7 @@ internal class TradeHandler : IHandler
             currentSettlementComponentId is null,
             currentSettlementComponentId,
             boughtItems,
-            soldItems,
-            troopRosterId,
-            troopRosterData
+            soldItems
         );
 
         network.SendAll(message);
@@ -136,7 +127,6 @@ internal class TradeHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
-            if (!objectManager.TryGetObjectWithLogging<TroopRoster>(message.TroopRosterId, out var troopRoster)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
 
             SettlementComponent currentSettlementComponent = null;
@@ -189,9 +179,6 @@ internal class TradeHandler : IHandler
             // Update hero equipment with new data
             inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
             network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
-
-            // Update troop roster for if items were donated
-            troopRosterInterface.UpdateWithData(troopRoster, message.TroopRosterData, hero);
 
             inventoryLogicInterface.ApplyDoneLogic(
                 fromRoster,

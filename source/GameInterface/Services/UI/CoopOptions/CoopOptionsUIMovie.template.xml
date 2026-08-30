@@ -6,7 +6,7 @@
 
         <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
 
-        <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="840" HeightSizePolicy="CoverChildren"
+        <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="1050" HeightSizePolicy="CoverChildren"
                    HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-80"
                    LayoutImp.LayoutMethod="VerticalTopToBottom">
           <Children>
@@ -14,7 +14,7 @@
                        HorizontalAlignment="Center" MarginBottom="24" StackLayout.LayoutMethod="HorizontalLeftToRight">
               <ItemTemplate>
                 <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
-                              SuggestedWidth="210" SuggestedHeight="58" Brush="Header.Tab.Center"
+                              SuggestedWidth="168" SuggestedHeight="58" Brush="Header.Tab.Center"
                               Command.Click="ExecuteSelection" IsSelected="@IsSelected" UpdateChildrenStates="true">
                   <Children>
                     <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
@@ -27,8 +27,10 @@
 
             <!-- COOP_OPTIONS_PROVIDER:Providers/KillFeedTab/KillFeedTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/MapTimeTab/MapTimeTab.xml -->
+			<!-- COOP_OPTIONS_PROVIDER:Providers/BugReportTab/BugReportTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/ChatTab/ChatTab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/PlayerNameplatesTab/PlayerNameplatesTab.xml -->
+			<!-- COOP_OPTIONS_PROVIDER:Providers/NetworkTab/NetworkTab.xml -->
 
             <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
                        HorizontalAlignment="Center" MarginTop="36"
