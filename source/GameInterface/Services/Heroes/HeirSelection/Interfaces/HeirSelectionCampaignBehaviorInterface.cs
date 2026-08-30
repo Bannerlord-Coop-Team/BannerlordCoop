@@ -8,7 +8,7 @@ namespace GameInterface.Services.Heroes.HeirSelection.Interfaces;
 
 public interface IHeirSelectionCampaignBehaviorInterface : IGameAbstraction
 {
-    void OnBeforePlayerCharacterChanged(Hero oldPlayerHero, Hero newPlayerHero);
+    void OnBeforePlayerCharacterChanged(Hero oldPlayerHero, MobileParty originalParty);
     void OnPlayerCharacterChanged(Hero oldPlayerHero, Hero newPlayerHero, MobileParty newPlayerParty, bool isPartyChanged);
 }
 
@@ -24,14 +24,17 @@ public class HeirSelectionCampaignBehaviorInterface : IHeirSelectionCampaignBeha
         playerHeroEquipmentsThatWillBeInherited = new();
     }
 
-    public void OnBeforePlayerCharacterChanged(Hero oldPlayerHero, Hero newPlayerHero)
+    public void OnBeforePlayerCharacterChanged(Hero oldPlayerHero, MobileParty originalParty)
     {
         playerHeroItemsThatWillBeInherited[oldPlayerHero] = new();
         playerHeroEquipmentsThatWillBeInherited[oldPlayerHero] = new();
 
-        foreach (ItemRosterElement itemRosterElement in MobileParty.MainParty.ItemRoster)
+        if (originalParty != null)
         {
-            playerHeroItemsThatWillBeInherited[oldPlayerHero].Add(itemRosterElement);
+            foreach (ItemRosterElement itemRosterElement in originalParty.ItemRoster)
+            {
+                playerHeroItemsThatWillBeInherited[oldPlayerHero].Add(itemRosterElement);
+            }
         }
         for (int i = 0; i < 12; i++)
         {

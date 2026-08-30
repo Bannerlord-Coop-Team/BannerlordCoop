@@ -204,7 +204,7 @@ internal class HeirSelectionHandler : IHandler
         // When ChangePlayerCharacterAction.Apply calls PlayerHeroChanged, client automatically updates data
         //coopSessionMigrator.MigratePlayerData();
 
-        heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, data.Heir);
+        heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 
