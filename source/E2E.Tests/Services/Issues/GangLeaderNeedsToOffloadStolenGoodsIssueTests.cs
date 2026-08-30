@@ -664,10 +664,17 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var registeredParty));
             var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
 
             SetResolvedMainHero(owner);
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = registeredParty;
+            }
             quest.FailQuestByKeepingTheGoods();
+
+            Assert.Equal(0, registeredParty.ItemRoster.GetItemNumber(quest._stolenTradeGood));
         });
 
         var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
@@ -682,12 +689,6 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.Null(owner.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
             Assert.Equal(stolenTradeGoodAmount, party.ItemRoster.GetItemNumber(stolenGood));
-        });
-
-        Client.Call(() =>
-        {
-            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var registeredParty));
-            Assert.Equal(0, registeredParty.ItemRoster.GetItemNumber(stolenGood));
         });
     }
 

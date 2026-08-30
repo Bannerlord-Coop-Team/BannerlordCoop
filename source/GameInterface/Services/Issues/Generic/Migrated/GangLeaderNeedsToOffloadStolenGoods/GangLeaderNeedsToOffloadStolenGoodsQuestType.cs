@@ -1,6 +1,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
@@ -291,6 +292,22 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         ObservedFailProof.Add(quest, proof);
     }
 
+    internal static bool BlockAndReportTerminalOutcome(Quest quest, IssueFinalizeReason reason)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        var owner = quest.QuestGiver;
+        if (owner != null &&
+            ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) &&
+            ownershipRegistry.IsLocalPeerOwner(owner) &&
+            ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider))
+        {
+            MessageBroker.Instance.Publish(owner, new QuestTerminalOutcomeTriggered(owner, controllerIdProvider.ControllerId, reason));
+        }
+
+        return false;
+    }
+
     private static void ApplySucceedByPayingAndKeepingTheGoods(Quest quest)
     {
         GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
@@ -430,31 +447,46 @@ internal class GangLeaderNeedsToOffloadStolenGoodsQuestBranchObserverPatches
 {
     [HarmonyPatch("SucceedQuestByPayingAndKeepingTheGoods")]
     [HarmonyPrefix]
-    private static void SucceedQuestByPayingAndKeepingTheGoodsPrefix(Quest __instance) =>
+    private static bool SucceedQuestByPayingAndKeepingTheGoodsPrefix(Quest __instance)
+    {
         GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestSuccess(
             __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofSucceedByPayingAndKeepingTheGoods);
+        return GangLeaderNeedsToOffloadStolenGoodsQuestType.BlockAndReportTerminalOutcome(__instance, IssueFinalizeReason.QuestSuccess);
+    }
 
     [HarmonyPatch("SucceedQuestByPayingAndGivingTheGoodsBack")]
     [HarmonyPrefix]
-    private static void SucceedQuestByPayingAndGivingTheGoodsBackPrefix(Quest __instance) =>
+    private static bool SucceedQuestByPayingAndGivingTheGoodsBackPrefix(Quest __instance)
+    {
         GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestSuccess(
             __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofSucceedByPayingAndGivingTheGoodsBack);
+        return GangLeaderNeedsToOffloadStolenGoodsQuestType.BlockAndReportTerminalOutcome(__instance, IssueFinalizeReason.QuestSuccess);
+    }
 
     [HarmonyPatch("FailQuestByKeepingTheGoods")]
     [HarmonyPrefix]
-    private static void FailQuestByKeepingTheGoodsPrefix(Quest __instance) =>
+    private static bool FailQuestByKeepingTheGoodsPrefix(Quest __instance)
+    {
         GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestBetrayal(
             __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofBetrayByKeepingTheGoods);
+        return GangLeaderNeedsToOffloadStolenGoodsQuestType.BlockAndReportTerminalOutcome(__instance, IssueFinalizeReason.QuestBetrayal);
+    }
 
     [HarmonyPatch("FailQuestByGivingBackTheGoods")]
     [HarmonyPrefix]
-    private static void FailQuestByGivingBackTheGoodsPrefix(Quest __instance) =>
+    private static bool FailQuestByGivingBackTheGoodsPrefix(Quest __instance)
+    {
         GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestBetrayal(
             __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofBetrayByGivingTheGoodsBack);
+        return GangLeaderNeedsToOffloadStolenGoodsQuestType.BlockAndReportTerminalOutcome(__instance, IssueFinalizeReason.QuestBetrayal);
+    }
 
     [HarmonyPatch("FailQuestByLosingHideoutBattle")]
     [HarmonyPrefix]
-    private static void FailQuestByLosingHideoutBattlePrefix(Quest __instance) =>
+    private static bool FailQuestByLosingHideoutBattlePrefix(Quest __instance)
+    {
         GangLeaderNeedsToOffloadStolenGoodsQuestType.ObserveQuestFail(
             __instance, GangLeaderNeedsToOffloadStolenGoodsQuestType.ProofFailByLosingHideoutBattle);
+        return GangLeaderNeedsToOffloadStolenGoodsQuestType.BlockAndReportTerminalOutcome(__instance, IssueFinalizeReason.QuestFail);
+    }
 }
