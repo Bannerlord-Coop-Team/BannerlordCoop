@@ -29,6 +29,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
+    private readonly IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface;
 
     public HeirSelectionHandler(
         IMessageBroker messageBroker,
@@ -36,7 +37,8 @@ internal class HeirSelectionHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IPlayerPartyRestorer playerPartyRestorer,
-        IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface)
+        IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface,
+        IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -44,6 +46,7 @@ internal class HeirSelectionHandler : IHandler
         this.playerManager = playerManager;
         this.playerPartyRestorer = playerPartyRestorer;
         this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
+        this.heirSelectionCampaignBehaviorInterface = heirSelectionCampaignBehaviorInterface;
 
         messageBroker.Subscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
         messageBroker.Subscribe<NetworkClientSelectHeir>(Handle_NetworkClientSelectHeir);
@@ -53,6 +56,9 @@ internal class HeirSelectionHandler : IHandler
 
         messageBroker.Subscribe<ChangePlayerCharacterAfterHeirSelection>(Handle_ChangePlayerCharacterAfterHeirSelection);
         messageBroker.Subscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
+
+        messageBroker.Subscribe<PlayerCharacterChangedAfterHeirSelection>(Handle_PlayerCharacterChangedAfterHeirSelection);
+        messageBroker.Subscribe<NetworkPlayerCharacterChangedAfterHeirSelection>(Handle_NetworkPlayerCharacterChangedAfterHeirSelection);
     }
 
     public void Dispose()
@@ -65,6 +71,9 @@ internal class HeirSelectionHandler : IHandler
 
         messageBroker.Unsubscribe<ChangePlayerCharacterAfterHeirSelection>(Handle_ChangePlayerCharacterAfterHeirSelection);
         messageBroker.Unsubscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
+
+        messageBroker.Unsubscribe<PlayerCharacterChangedAfterHeirSelection>(Handle_PlayerCharacterChangedAfterHeirSelection);
+        messageBroker.Unsubscribe<NetworkPlayerCharacterChangedAfterHeirSelection>(Handle_NetworkPlayerCharacterChangedAfterHeirSelection);
     }
 
     private void Handle_PlayerHeirSelectionRequested(MessagePayload<PlayerHeirSelectionRequested> obj)
@@ -190,6 +199,13 @@ internal class HeirSelectionHandler : IHandler
             return;
         }
 
+        // Migrate CoopSession data before changed player action
+        // Server updates key and sends updated version to clients
+        // When ChangePlayerCharacterAction.Apply calls PlayerHeroChanged, client automatically updates data
+        //coopSessionMigrator.MigratePlayerData();
+
+        heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, data.Heir);
+
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 
         messageBroker.Publish(this, new PlayerHeirSelectionCompleted(data.Heir));
@@ -242,10 +258,32 @@ internal class HeirSelectionHandler : IHandler
 
             if (!heir.IsControlledByThisInstance()) return;
 
-            // Migrate CoopSession data before changed player action
-            // TODO
-
             ChangePlayerCharacterAction.Apply(heir);
+        });
+    }
+
+    private void Handle_PlayerCharacterChangedAfterHeirSelection(MessagePayload<PlayerCharacterChangedAfterHeirSelection> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.OldPlayer, out var oldPlayerId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.NewPlayer, out var newPlayerId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.NewMainParty, out var newMainPartyId)) return;
+
+        network.SendAll(new NetworkPlayerCharacterChangedAfterHeirSelection(oldPlayerId, newPlayerId, newMainPartyId, data.IsMainPartyChanged));
+    }
+
+    private void Handle_NetworkPlayerCharacterChangedAfterHeirSelection(MessagePayload<NetworkPlayerCharacterChangedAfterHeirSelection> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OldPlayerId, out var oldPlayerHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewPlayerId, out var newPlayerHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.NewMainPartyId, out var newMainParty)) return;
+
+            heirSelectionCampaignBehaviorInterface.OnPlayerCharacterChanged(oldPlayerHero, newPlayerHero, newMainParty, data.IsMainPartyChanged);
         });
     }
 

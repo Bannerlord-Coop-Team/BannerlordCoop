@@ -3,6 +3,7 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.UI.LogEntries.Messages;
 using Helpers;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Extensions;
@@ -86,6 +87,10 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
         {
             ChangeOwnerOfWorkshopAction.ApplyByDeath(originalHero.OwnedWorkshops[i], heir);
         }
+        foreach (Alley alley in originalHero.OwnedAlleys.ToList<Alley>())
+        {
+            alley.SetOwner(heir);
+        }
         if (originalParty != null && heir.PartyBelongedTo != originalParty)
         {
             for (int j = originalParty.MemberRoster.Count - 1; j >= 0; j--)
@@ -102,7 +107,6 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
             DisbandArmyAction.ApplyByUnknownReason(originalParty.Army);
         }
 
-        // Run change character action on client
         messageBroker.Publish(this, new ChangePlayerCharacterAfterHeirSelection(originalHero, heir));
     }
 

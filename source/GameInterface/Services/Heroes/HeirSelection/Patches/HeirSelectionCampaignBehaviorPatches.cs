@@ -29,17 +29,19 @@ internal class HeirSelectionCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(HeirSelectionCampaignBehavior.OnBeforePlayerCharacterChanged))]
     [HarmonyPrefix]
-    public static bool OnBeforePlayerCharacterChangedPrefix(Hero oldPlayer, Hero newPlayer)
+    public static bool OnBeforePlayerCharacterChangedPrefix()
     {
-        // TODO: Implement for coop
+        // Implemented by HeirSelectionCampaignBehaviorInterface on server
         return false;
     }
 
     [HarmonyPatch(nameof(HeirSelectionCampaignBehavior.OnPlayerCharacterChanged))]
     [HarmonyPrefix]
-    public static bool OnPlayerCharacterChangedPrefix(Hero oldPlayer, Hero newPlayer, MobileParty newMainParty, bool isMainPartyChanged)
+    public static bool OnPlayerCharacterChangedPrefix(HeirSelectionCampaignBehavior __instance, Hero oldPlayer, Hero newPlayer, MobileParty newMainParty, bool isMainPartyChanged)
     {
-        // TODO: Implement for coop
+        var message = new PlayerCharacterChangedAfterHeirSelection(oldPlayer, newPlayer, newMainParty, isMainPartyChanged);
+        MessageBroker.Instance.Publish(__instance, message);
+
         return false;
     }
 
