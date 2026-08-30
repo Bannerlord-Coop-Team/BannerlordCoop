@@ -17,7 +17,8 @@ namespace E2E.Tests.Services.Heroes;
 /// <c>conversation_lord_from_ruling_clan_on_condition</c>, which refuses on
 /// <c>Any(a => a.PersuadedHero == OneToOneConversationHero)</c> - a predicate that checks neither age
 /// nor success - and returns before the gate is consulted. So AlwaysRetry only works if this lord's
-/// records are gone.
+/// records are gone. The active persuasion still needs <c>CanAttemptToPersuade</c> to recognize a fresh
+/// failure and populate its final refusal line.
 /// </remarks>
 public class LordDefectionRetryTests : IDisposable
 {
@@ -92,6 +93,46 @@ public class LordDefectionRetryTests : IDisposable
 
             // Vanilla needs its own week/year rules to decide; NeverExpire needs the refusal to stand.
             Assert.Single(behavior._previousDefectionPersuasionAttempts);
+        });
+    }
+
+    [Fact]
+    public void AlwaysRetry_FreshFailureLetsVanillaSelectItsFailureLine()
+    {
+        var server = TestEnvironment.Server;
+
+        server.Call(() =>
+        {
+            var previousOptions = ModConfigProvider.ModOptions;
+            try
+            {
+                ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
+                {
+                    LordDefectionRetries = LordDefectionRetryMode.AlwaysRetry,
+                });
+
+                var lord = GameObjectCreator.CreateInitializedObject<Hero>();
+                var behavior = new LordDefectionCampaignBehavior
+                {
+                    _previousDefectionPersuasionAttempts = new List<PersuasionAttempt>
+                    {
+                        Attempt(lord, PersuasionOptionResult.Failure),
+                    },
+                };
+                var result = false;
+
+                // Vanilla reuses this retry check to choose FAILED_PERSUASION_LINE. AlwaysRetry must
+                // run the original for a fresh failure instead of forcing a successful retry result.
+                var runOriginal = LordDefectionRetryPatches.CanAttemptToPersuadePatch.Prefix(
+                    behavior, lord, 0, ref result);
+
+                Assert.True(runOriginal);
+                Assert.False(result);
+            }
+            finally
+            {
+                ModConfigProvider.ModOptions = previousOptions;
+            }
         });
     }
 
