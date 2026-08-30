@@ -1,4 +1,4 @@
-using GameInterface.Services.Kingdoms.Commands;
+﻿using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.ObjectManager;
 using Moq;
@@ -16,7 +16,9 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
         [Fact]
         public void SerializeStartAllianceDecision()
         {
-            StartAllianceDecisionData startAllianceDecisionData = new StartAllianceDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "TargetKingdom", true);
+            StartAllianceDecisionData startAllianceDecisionData = new StartAllianceDecisionData(
+                "ProposerClan", "Kingdom", 10, true, true, true, "TargetKingdom", true,
+                "decision_kingdom", "target_kingdom");
             KingdomDecisionData kingdomDecisionDerivedData = startAllianceDecisionData;
             MemoryStream memoryStream = new MemoryStream();
             Serializer.Serialize(memoryStream, kingdomDecisionDerivedData);
@@ -31,6 +33,8 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(startAllianceDecisionData.NotifyPlayer, deserializedObj.NotifyPlayer);
             Assert.Equal(startAllianceDecisionData.IsEnforced, deserializedObj.IsEnforced);
             Assert.Equal(startAllianceDecisionData.KingdomToStartAllianceWithId, deserializedObj.KingdomToStartAllianceWithId);
+            Assert.Equal(startAllianceDecisionData.DecisionKingdomStringId, deserializedObj.DecisionKingdomStringId);
+            Assert.Equal(startAllianceDecisionData.KingdomToStartAllianceWithStringId, deserializedObj.KingdomToStartAllianceWithStringId);
             Assert.True(deserializedObj.IsProposedByOpponent);
         }
 

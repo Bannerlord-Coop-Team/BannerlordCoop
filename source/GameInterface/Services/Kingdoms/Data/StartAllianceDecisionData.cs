@@ -24,10 +24,18 @@ namespace GameInterface.Services.Kingdoms.Data
         [ProtoMember(2)]
         public bool IsProposedByOpponent { get; }
 
-        public StartAllianceDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string kingdomToStartAllianceWithId, bool isProposedByOpponent = false) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
+        [ProtoMember(3)]
+        public string DecisionKingdomStringId { get; }
+
+        [ProtoMember(4)]
+        public string KingdomToStartAllianceWithStringId { get; }
+
+        public StartAllianceDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string kingdomToStartAllianceWithId, bool isProposedByOpponent = false, string decisionKingdomStringId = null, string kingdomToStartAllianceWithStringId = null) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
         {
             KingdomToStartAllianceWithId = kingdomToStartAllianceWithId;
             IsProposedByOpponent = isProposedByOpponent;
+            DecisionKingdomStringId = decisionKingdomStringId;
+            KingdomToStartAllianceWithStringId = kingdomToStartAllianceWithStringId;
         }
 
         public bool TryGetProposerClanAndDecisionKingdom(IObjectManager objectManager, out Clan proposerClan, out Kingdom kingdom)
@@ -50,7 +58,27 @@ namespace GameInterface.Services.Kingdoms.Data
 
         private bool TryGetDecisionKingdomReference(IObjectManager objectManager, out Kingdom kingdom)
         {
+            if (TryGetKingdomByStringId(objectManager, DecisionKingdomStringId, out kingdom))
+            {
+                return true;
+            }
+
             return TryGetKingdomReference(objectManager, KingdomId, out kingdom);
+        }
+
+        private static bool TryGetKingdomByStringId(IObjectManager objectManager, string kingdomStringId, out Kingdom kingdom)
+        {
+            kingdom = null;
+            if (string.IsNullOrWhiteSpace(kingdomStringId)) return false;
+
+            kingdom = Kingdom.All.FirstOrDefault(candidate => candidate.StringId == kingdomStringId);
+            if (kingdom != null) return true;
+
+            kingdom = MBObjectManager.Instance?.GetObjectTypeList<Kingdom>()
+                .FirstOrDefault(candidate => candidate.StringId == kingdomStringId);
+            if (kingdom != null) return true;
+
+            return objectManager.TryGetObject(kingdomStringId, out kingdom);
         }
 
         public static bool TryGetKingdomReference(IObjectManager objectManager, string kingdomId, out Kingdom kingdom)
@@ -117,6 +145,11 @@ namespace GameInterface.Services.Kingdoms.Data
 
         private bool TryGetTargetKingdomReference(IObjectManager objectManager, out Kingdom kingdom)
         {
+            if (TryGetKingdomByStringId(objectManager, KingdomToStartAllianceWithStringId, out kingdom))
+            {
+                return true;
+            }
+
             return TryGetKingdomReference(objectManager, KingdomToStartAllianceWithId, out kingdom);
         }
     }

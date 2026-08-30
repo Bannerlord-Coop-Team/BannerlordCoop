@@ -165,7 +165,8 @@ namespace GameInterface.Services.Kingdoms
             {
                 return new StartAllianceDecisionData(GetId(startAllianceDecision.ProposerClan), GetId(startAllianceDecision.Kingdom),
                     startAllianceDecision.TriggerTime._numTicks, startAllianceDecision.IsEnforced, startAllianceDecision.NotifyPlayer, startAllianceDecision.PlayerExamined,
-                    GetId(startAllianceDecision.KingdomToStartAllianceWith), CoopKingdomElection.IsTrackedPlayerAllianceOffer(startAllianceDecision));
+                    GetId(startAllianceDecision.KingdomToStartAllianceWith), CoopKingdomElection.IsTrackedPlayerAllianceOffer(startAllianceDecision),
+                    startAllianceDecision.Kingdom.StringId, startAllianceDecision.KingdomToStartAllianceWith.StringId);
             }
             else
             {
