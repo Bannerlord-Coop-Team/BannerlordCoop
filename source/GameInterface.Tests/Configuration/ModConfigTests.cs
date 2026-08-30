@@ -47,7 +47,7 @@ public class ModConfigTests : IDisposable
         Assert.True(File.Exists(ConfigPath), "first load should create mod-config.json");
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
     }
 
     [Fact]
@@ -66,10 +66,29 @@ public class ModConfigTests : IDisposable
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PersuasionSuccessChance);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.ClanMemberDeathChance);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
         Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
+        Assert.Equal(1000, config.ModOptions.BattleSize);
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
+        Assert.True(config.ModOptions.UnknownKeys == null || config.ModOptions.UnknownKeys.Count == 0);
+    }
+
+    [Fact]
+    public void LegacyNetworkBlock_IsIgnoredWithoutBreakingOtherSettings()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""network"": {
+    ""movementOutgoingMiBPerSecond"": 1.0,
+    ""movementIncomingMiBPerSecond"": 1.0,
+  },
+  ""modOptions"": { ""autoPauseEnabled"": false },
+}");
+
+        var config = NewModConfig().Data;
+
+        Assert.False(config.ModOptions.AutoPauseEnabled);
+        Assert.True(config.UnknownKeys.ContainsKey("network"));
     }
 
     [Fact]
@@ -137,7 +156,7 @@ public class ModConfigTests : IDisposable
         _ = NewModConfig().Data;
 
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
@@ -157,7 +176,7 @@ public class ModConfigTests : IDisposable
         _ = NewModConfig().Data;
 
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
@@ -283,6 +302,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(0.1f, options.SmithingStaminaRecoveryMultiplier);
         Assert.Equal(1f, options.MaximumLootersMultiplier);
         Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
+        Assert.True(options.ShowPlayerNameplates);
     }
 
     /// <summary>

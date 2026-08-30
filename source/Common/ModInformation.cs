@@ -19,6 +19,9 @@ public static class ModInformation
     /// <summary>The semantic portion of <see cref="BuildVersion"/>, used by Steam server metadata.</summary>
     public static Version Version { get; } = ParseVersion(BuildVersion);
 
+    /// <summary>The source commit appended to <see cref="BuildVersion"/> by the build.</summary>
+    public static string Commit { get; } = ParseCommit(BuildVersion);
+
     /// <summary>Whether an advertised lobby was built with this exact mod build.</summary>
     public static bool MatchesBuildVersion(string version)
     {
@@ -29,5 +32,13 @@ public static class ModInformation
     {
         var semanticVersion = buildVersion.Split('-', '+')[0];
         return System.Version.TryParse(semanticVersion, out var version) ? version : new Version(0, 0, 0);
+    }
+
+    private static string ParseCommit(string buildVersion)
+    {
+        var separator = buildVersion.IndexOf('+');
+        return separator >= 0 && separator < buildVersion.Length - 1
+            ? buildVersion.Substring(separator + 1)
+            : "unknown";
     }
 }

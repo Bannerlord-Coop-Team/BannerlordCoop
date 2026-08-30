@@ -2,13 +2,18 @@
 using Common.Util;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.Library;
 using Xunit;
+using CampaignKingdomDecision = TaleWorlds.CampaignSystem.Election.KingdomDecision;
 
 namespace GameInterface.Tests.Services.Kingdoms;
 
@@ -128,6 +133,104 @@ public class KingdomHandlerTests
         Assert.Null(reason);
     }
 
+    [Fact]
+    public void RemoveDecision_ClearsStateBeforeClosingAndRemovingDecision()
+    {
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        var decision = ObjectHelper.SkipConstructor<DeclareWarDecision>();
+        kingdom._unresolvedDecisions = new MBList<CampaignKingdomDecision> { decision };
+        var objectManager = new Mock<IObjectManager>();
+        Kingdom resolvedKingdom = kingdom;
+        objectManager.Setup(manager => manager.TryGetObject("kingdom-id", out resolvedKingdom)).Returns(true);
+        var voteManager = new Mock<IKingdomDecisionVoteManager>();
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        var calls = new List<string>();
+        voteManager.Setup(manager => manager.ClearDecisionState("kingdom-id", 0))
+            .Callback(() => calls.Add("clear"));
+        voteManager.Setup(manager => manager.CloseDecision("kingdom-id", 0))
+            .Callback(() => calls.Add("close"));
+        kingdomInterface.Setup(manager => manager.RemoveDecision(kingdom, decision))
+            .Callback(() => calls.Add("remove"));
+        Action<MessagePayload<RemoveDecision>> handler = CreateRemoveDecisionHandler(
+            objectManager.Object,
+            voteManager.Object,
+            kingdomInterface.Object);
+
+        handler(new MessagePayload<RemoveDecision>(this, new RemoveDecision("kingdom-id", 0)));
+
+        Assert.Equal(new[] { "clear", "close", "remove" }, calls);
+        voteManager.Verify(manager => manager.ClearDecisionState("kingdom-id", 0), Times.Once);
+        voteManager.Verify(manager => manager.CloseDecision("kingdom-id", 0), Times.Once);
+        kingdomInterface.Verify(manager => manager.RemoveDecision(kingdom, decision), Times.Once);
+    }
+
+    [Fact]
+    public void RemoveDecision_MissingKingdom_ClearsStateOnce()
+    {
+        var objectManager = new Mock<IObjectManager>();
+        Kingdom missingKingdom = null!;
+        objectManager.Setup(manager => manager.TryGetObject("kingdom-id", out missingKingdom)).Returns(false);
+        var voteManager = new Mock<IKingdomDecisionVoteManager>();
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        Action<MessagePayload<RemoveDecision>> handler = CreateRemoveDecisionHandler(
+            objectManager.Object,
+            voteManager.Object,
+            kingdomInterface.Object);
+
+        handler(new MessagePayload<RemoveDecision>(this, new RemoveDecision("kingdom-id", 0)));
+
+        voteManager.Verify(manager => manager.ClearDecisionState("kingdom-id", 0), Times.Once);
+        kingdomInterface.Verify(
+            manager => manager.RemoveDecision(It.IsAny<Kingdom>(), It.IsAny<CampaignKingdomDecision>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void RemoveDecision_NullDecisionList_ClearsStateOnce()
+    {
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        kingdom._unresolvedDecisions = null;
+        var objectManager = new Mock<IObjectManager>();
+        Kingdom resolvedKingdom = kingdom;
+        objectManager.Setup(manager => manager.TryGetObject("kingdom-id", out resolvedKingdom)).Returns(true);
+        var voteManager = new Mock<IKingdomDecisionVoteManager>();
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        Action<MessagePayload<RemoveDecision>> handler = CreateRemoveDecisionHandler(
+            objectManager.Object,
+            voteManager.Object,
+            kingdomInterface.Object);
+
+        handler(new MessagePayload<RemoveDecision>(this, new RemoveDecision("kingdom-id", 0)));
+
+        voteManager.Verify(manager => manager.ClearDecisionState("kingdom-id", 0), Times.Once);
+        kingdomInterface.Verify(
+            manager => manager.RemoveDecision(It.IsAny<Kingdom>(), It.IsAny<CampaignKingdomDecision>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void RemoveDecision_OutOfRange_ClearsStateOnce()
+    {
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        kingdom._unresolvedDecisions = new MBList<CampaignKingdomDecision>();
+        var objectManager = new Mock<IObjectManager>();
+        Kingdom resolvedKingdom = kingdom;
+        objectManager.Setup(manager => manager.TryGetObject("kingdom-id", out resolvedKingdom)).Returns(true);
+        var voteManager = new Mock<IKingdomDecisionVoteManager>();
+        var kingdomInterface = new Mock<IKingdomInterface>();
+        Action<MessagePayload<RemoveDecision>> handler = CreateRemoveDecisionHandler(
+            objectManager.Object,
+            voteManager.Object,
+            kingdomInterface.Object);
+
+        handler(new MessagePayload<RemoveDecision>(this, new RemoveDecision("kingdom-id", 1)));
+
+        voteManager.Verify(manager => manager.ClearDecisionState("kingdom-id", 1), Times.Once);
+        kingdomInterface.Verify(
+            manager => manager.RemoveDecision(It.IsAny<Kingdom>(), It.IsAny<CampaignKingdomDecision>()),
+            Times.Never);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -160,6 +263,27 @@ public class KingdomHandlerTests
             new Mock<IKingdomMembershipState>().Object,
             new Mock<IKingdomInterface>().Object,
             new Mock<IKingdomCreator>().Object);
+    }
+
+    private static Action<MessagePayload<RemoveDecision>> CreateRemoveDecisionHandler(
+        IObjectManager objectManager,
+        IKingdomDecisionVoteManager voteManager,
+        IKingdomInterface kingdomInterface)
+    {
+        Action<MessagePayload<RemoveDecision>> removeDecisionHandler = null!;
+        var messageBroker = new Mock<IMessageBroker>();
+        messageBroker
+            .Setup(broker => broker.Subscribe(It.IsAny<Action<MessagePayload<RemoveDecision>>>()!))
+            .Callback<Action<MessagePayload<RemoveDecision>>>(handler => removeDecisionHandler = handler);
+        _ = new KingdomHandler(
+            messageBroker.Object,
+            objectManager,
+            new Mock<IPlayerManager>().Object,
+            voteManager,
+            new Mock<IKingdomMembershipState>().Object,
+            kingdomInterface,
+            new Mock<IKingdomCreator>().Object);
+        return removeDecisionHandler;
     }
 
     private static bool TryGetCulture(KingdomHandler handler, string cultureId, out CultureObject culture)

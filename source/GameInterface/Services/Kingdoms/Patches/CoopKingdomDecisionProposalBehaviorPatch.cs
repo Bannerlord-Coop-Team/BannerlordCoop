@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface;
@@ -213,8 +213,9 @@ namespace GameInterface.Services.Kingdoms.Patches
                             }
 
                             if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
-                                voteManager.TryResolveDecision(decision, force: true))
+                                voteManager.HasEligiblePlayerClan(decision))
                             {
+                                voteManager.TryResolveDecision(decision);
                                 continue;
                             }
 

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Messages;
@@ -25,6 +26,7 @@ public class CreateCharacterState : ConnectionStateBase
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerManager;
+    private readonly IPlayerCreationRollback playerCreationRollback;
     private readonly IExistingPlayerSender existingPlayerSender;
 
     public CreateCharacterState(
@@ -34,6 +36,7 @@ public class CreateCharacterState : ConnectionStateBase
         INetwork network,
         IHeroInterface heroInterface,
         IPlayerManager playerManager,
+        IPlayerCreationRollback playerCreationRollback,
         IExistingPlayerSender existingPlayerSender)
         : base(connectionLogic)
     {
@@ -42,6 +45,7 @@ public class CreateCharacterState : ConnectionStateBase
         this.network = network;
         this.heroInterface = heroInterface;
         this.playerManager = playerManager;
+        this.playerCreationRollback = playerCreationRollback;
         this.existingPlayerSender = existingPlayerSender;
         messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
     }
@@ -90,6 +94,36 @@ public class CreateCharacterState : ConnectionStateBase
         // Send created to all other clients
         var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
         network.SendAllBut(netPeer, message);
+
+        // Run authoritative setup only after existing clients can create the referenced hero graph. Follow-up
+        // messages use the same reliable-ordered channel; the joining peer is still dropping pre-snapshot deltas.
+        try
+        {
+            heroInterface.SetupServerHero(hero);
+        }
+        catch (System.Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Failed to set up hero for {ControllerId}; disconnecting the joining peer",
+                controllerId);
+
+            var registrationIds = System.Array.Empty<string>();
+            GameThread.RunSafe(() =>
+            {
+                if (!playerManager.RemovePlayer(player))
+                    Logger.Error("Failed to roll back player registration for {ControllerId}", controllerId);
+
+                registrationIds = playerCreationRollback.CaptureRegistrationIds(player);
+                playerCreationRollback.Rollback(player, registrationIds);
+            }, blocking: true, context: "CreateCharacterState.PlayerCreationRollback");
+
+            // Existing clients created this graph before setup ran. This final ordered message removes their
+            // player registration and every imported graph object after any setup-side cleanup broadcasts.
+            network.SendAllBut(netPeer, new NetworkPlayerCreationRolledBack(player, registrationIds));
+            ConnectionLogic.Peer.Disconnect();
+            return;
+        }
 
         // Respond with ids for the creating client
         network.SendImmediate(netPeer, new NetworkHeroRecieved(player));

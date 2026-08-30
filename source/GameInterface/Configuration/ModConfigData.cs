@@ -6,10 +6,10 @@ namespace GameInterface.Configuration;
 
 /// <summary>
 /// THE mod-config.json schema: one explicit property per key — the class IS the
-/// schema, adding a property adds the key. Gameplay/mod settings only; how the
-/// server process runs (ports, saves, passwords) is the dedicated server's
-/// server-config.json and never appears here. Nullable properties mean "absent =
-/// leave the loaded world's value alone". Keys the file has that the schema
+/// schema, adding a property adds the key. Gameplay/mod settings only; process
+/// settings (ports, saves, passwords) live in the dedicated server's
+/// server-config.json. Nullable means the owning consumer uses
+/// its documented default or leaves the loaded world's value alone. Keys the file has that the schema
 /// doesn't land in <see cref="UnknownKeys"/> for the load warning.
 /// </summary>
 public sealed class ModConfigData
@@ -66,6 +66,8 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
+    public int? BattleSize { get; set; }
+
     public bool? FastForwardEnabled { get; set; }
 
     public bool? AutoPauseEnabled { get; set; }
@@ -101,6 +103,10 @@ public sealed class ModOptionsData
     public bool? EnableHeroExecutions { get; set; }
 
     public bool? EnablePlayerClanMemberExecutions { get; set; }
+    
+    public bool? PlayerWoundedBattleEntry { get; set; }
+
+    public bool? ShowPlayerNameplates { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }

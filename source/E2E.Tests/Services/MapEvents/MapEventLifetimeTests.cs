@@ -1,9 +1,11 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -117,11 +119,7 @@ public class MapEventLifetimeTests : MapEventTestBase
             attacker = GameObjectCreator.CreateInitializedObject<MobileParty>();
             mainPartyStandIn = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var siegeEvent = new SiegeEvent(settlement, attacker);
-
-            siegeEvent.BesiegerCamp._besiegerParties.Add(attacker);
-            siegeEvent.BesiegerCamp._leaderParty = attacker;
-            siegeEvent.BesiegerCamp._faction = attacker.MapFaction;
+            CreateReplicableSiegeEvent(settlement, attacker);
 
             mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
@@ -203,10 +201,7 @@ public class MapEventLifetimeTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(sallyingMobilePartyId, out var sallyingParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
-            var siegeEvent = new SiegeEvent(settlement, besieger);
-            siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
-            siegeEvent.BesiegerCamp._leaderParty = besieger;
-            siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
+            CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
@@ -308,10 +303,7 @@ public class MapEventLifetimeTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(sallyingMobilePartyId, out var sallyingParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
-            var siegeEvent = new SiegeEvent(settlement, besieger);
-            siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
-            siegeEvent.BesiegerCamp._leaderParty = besieger;
-            siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
+            CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
@@ -381,10 +373,96 @@ public class MapEventLifetimeTests : MapEventTestBase
         }
     }
 
+    [Fact]
+    public void SiegeCaptureLeader_StaleAtFinalization_IsRestoredBeforeCloseExclusion()
+    {
+        var (besiegerHeroId, besiegerMobilePartyId) = CreatePlayerHeroParty("siege-capture-leader");
+        var replacementMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        string? besiegerPartyId = null;
+        string[]? partiesToClose = null;
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
+            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
+            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Append(AccessTools.Method(typeof(MapEvent), "ControlAndUpdateDefeatedPartiesAfterBattle"))
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CaptureDefeatedPartyMembers"))
+            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .Append(AccessTools.Method(typeof(MapEventRegistry), "CloseDestroyedMapEventEncounterIfNeeded"))
+            .Append(AccessTools.Method(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.AfterSiegeCompleted)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(besiegerHeroId, out var besiegerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(besiegerMobilePartyId, out var besieger));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(replacementMobilePartyId, out var replacement));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            besiegerHero.PartyBelongedTo = besieger;
+            besieger.LordPartyComponent._leader = besiegerHero;
+
+            CreateReplicableSiegeEvent(settlement, besieger);
+
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+            mapEvent.MapEventSettlement = settlement;
+            var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
+            var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, besieger.Party);
+            mapEvent._sides[(int)BattleSideEnum.Defender] = defenderSide;
+            mapEvent._sides[(int)BattleSideEnum.Attacker] = attackerSide;
+            MessageBroker.Instance.Publish(mapEvent,
+                new MapEventSideAssigned(mapEvent, defenderSide, BattleSideEnum.Defender));
+            MessageBroker.Instance.Publish(mapEvent,
+                new MapEventSideAssigned(mapEvent, attackerSide, BattleSideEnum.Attacker));
+
+            besieger.Party.MapEventSide = attackerSide;
+            settlement.Party.MapEventSide = defenderSide;
+            replacement.Party.MapEventSide = attackerSide;
+            attackerSide.LeaderParty = replacement.Party;
+            attackerSide._mapFaction = replacement.MapFaction;
+            attackerSide.CacheLeaderSimulationModifier();
+            mapEvent._battleState = BattleState.AttackerVictory;
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+
+            Assert.True(Server.ObjectManager.TryGetId(besieger.Party, out besiegerPartyId));
+            Assert.Same(replacement.Party, attackerSide.LeaderParty);
+
+            var handler = Server.Resolve<BattleFinalizeHandler>();
+            partiesToClose = (string[])AccessTools.Method(
+                typeof(BattleFinalizeHandler),
+                "FinalizeAndCollectPlayers").Invoke(handler, new object?[] { mapEvent, null })!;
+        }, disabledMethods);
+
+        Assert.NotNull(besiegerPartyId);
+        Assert.NotNull(partiesToClose);
+        Assert.DoesNotContain(besiegerPartyId!, partiesToClose!);
+    }
+
     private static bool RecordSiegeCompleted(MobileParty attackerParty)
     {
         dispatchedSiegeLeader = attackerParty;
         return false;
+    }
+
+    private static void CreateReplicableSiegeEvent(Settlement settlement, MobileParty besieger)
+    {
+        var siegeEvent = new SiegeEvent(settlement, besieger);
+        siegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Attacker, null);
+        settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Defender, null);
+        siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
+        siegeEvent.BesiegerCamp._leaderParty = besieger;
+        siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
     }
 
     [Fact]

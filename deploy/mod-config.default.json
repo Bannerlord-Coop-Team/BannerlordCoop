@@ -12,21 +12,72 @@
   // Levels: "VeryEasy" | "Easy" | "Realistic".
   "difficulty": {
     // Damage players take. VeryEasy is Bannerlord's new-campaign default.
+    // VeryEasy: -75% Damage
+    // Easy: -50% Damage
+    // Realistic: No change
     "playerReceivedDamage": "VeryEasy",
 
+    // Determine the damage received by your troops.
+    // VeryEasy: -50% Damage
+    // Easy: -25% Damage
+    // Realistic: No change
     "playerTroopsReceivedDamage": "VeryEasy",
+
+    // Determine the difficulty of the combat AI.
+    // VeryEasy: Normal
+    // Easy: Veteran
+    // Realistic: Challenging
     "combatAIDifficulty": "VeryEasy",
+
+    // Determine the amount of troops available from notables.
+    // VeryEasy: +2 Troops
+    // Easy: +1 Troops
+    // Realistic: No change
     "recruitmentDifficulty": "VeryEasy",
+
+    // Determine player party movement speed while travelling.
+    // VeryEasy: +10% Speed
+    // Easy: +5% Speed
+    // Realistic: No change
     "playerMapMovementSpeed": "VeryEasy",
+
+    // Determine the difficulty of stealth and disguise gameplay.
+    // VeryEasy: Normal
+    // Easy: Veteran
+    // Realistic: Challenging
     "stealthAndDisguiseDifficulty": "VeryEasy",
+
+    // Determine persuasion success chance.
+    // VeryEasy: +10% Success chance
+    // Easy: +5% Success chance
+    // Realistic: No change
     "persuasionSuccessChance": "VeryEasy",
+
+    // Determine the possibility of player clan members dying in battle.
+    // VeryEasy: Disabled battle death for clan members
+    // Easy: Reduced by 50%
+    // Realistic: No change
     "clanMemberDeathChance": "VeryEasy",
+
+    // Determine if players and/or other heroes can die in battle.
+    // VeryEasy: Disable battle death for all heroes
+    // Easy: Disable battle death for player heroes
+    // Realistic: Enable battle death for all heroes
     "battleDeath": "VeryEasy",
 
-    "birthAndDeath": true,                 // aging, births, natural deaths
-    "autoAllocateClanMemberPerks": false,
+    // (Not currently supported) Toggle aging, births and natural deaths.
+    // NOTE: Having this off doesn't necessarily disable battle deaths
+    // To disable battle deaths change "battleDeath" and "clanMemberDeathChance" instead
+    "birthAndDeath": false,
+
+    // Toggle auto allocation of perks for members of player clans.
+    "autoAllocateClanMemberPerks": false
   },
   "modOptions": {
+    // Total human troops initially allocated across both sides of a battle.
+    // Valid range: 200-1000. Default is 1000.
+    "battleSize": 1000,
+
     // Toggle fast forward (2x speed) being enabled
     // (Default) true: Fast forward is allowed.
     // false: Fast forward is completely disabled.
@@ -127,6 +178,15 @@
     // Toggle players being able to execute each others' clan members.
     // This includes player companions and family members.
     // Default is false and won't have any effect if enableHeroExecutions is false.
-    "enablePlayerClanMemberExecutions": false
+    "enablePlayerClanMemberExecutions": false,
+
+    // Toggle player nameplates in co-op missions.
+    // (Default) true: Clients may show nameplates above allied remote players.
+    // false: Player nameplates are disabled and the client option is hidden.
+    "showPlayerNameplates": true,
+
+    // Toggle players being allowed to join battles when wounded
+    // Default is true
+    "playerWoundedBattleEntry": true,
   }
 }

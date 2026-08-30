@@ -1,4 +1,5 @@
 ﻿using Missions.Battles;
+using Missions.Data;
 using Missions.Messages;
 using GameInterface.Surrogates;
 using System;
@@ -40,6 +41,8 @@ public sealed class BattleAgentSpawnBatchCodecTests
             .ToArray();
         Assert.Equal(records.Select(record => record.AgentId), decoded.Select(record => record.AgentId));
         Assert.Equal(records.Select(record => record.CharacterId), decoded.Select(record => record.CharacterId));
+        Assert.Equal(records.Select(record => record.AuthorityRevision), decoded.Select(record => record.AuthorityRevision));
+        Assert.Equal(records.Select(record => record.MountAuthorityRevision), decoded.Select(record => record.MountAuthorityRevision));
     }
 
     [Fact]
@@ -63,6 +66,28 @@ public sealed class BattleAgentSpawnBatchCodecTests
         Assert.Equal(encoded.PayloadSha256, wire.PayloadSha256);
         Assert.True(codec.TryDecode(wire, out BattleAgentSpawnData[] decoded));
         Assert.Equal(encoded.RecordCount, decoded.Length);
+    }
+
+    [Theory]
+    [InlineData(SpawnBatchPurpose.Initial)]
+    [InlineData(SpawnBatchPurpose.Deployment)]
+    [InlineData(SpawnBatchPurpose.CatchUp)]
+    public void SpawnPurposes_RoundTripModifiedAndUnmodifiedWeaponRecords(
+        SpawnBatchPurpose purpose)
+    {
+        var codec = new BattleAgentSpawnBatchCodec();
+        var initialRecord = CreateWeaponRecord("ItemModifier_fine");
+        var reinforcementRecord = CreateWeaponRecord(null);
+
+        NetworkSpawnBattleAgents encoded = codec
+            .Encode(new[] { initialRecord, reinforcementRecord }, purpose)
+            .Single();
+        BattleAgentSpawnData[] decoded = DecodeWireMessage(codec, encoded);
+
+        Assert.Equal(
+            "ItemModifier_fine",
+            decoded[0].MissionEquipmentData.WeaponSlots[0].ItemModifierId);
+        Assert.Null(decoded[1].MissionEquipmentData.WeaponSlots[0].ItemModifierId);
     }
 
     [Fact]
@@ -152,8 +177,38 @@ public sealed class BattleAgentSpawnBatchCodecTests
                 default(BodyProperties),
                 missionEquipmentData: null,
                 movementId: (ushort)(i + 1),
-                movementScopeId: "owner:scope");
+                movementScopeId: "owner:scope",
+                authorityRevision: i + 4,
+                mountAuthorityRevision: i + 8);
         }
         return records;
+    }
+
+    private static BattleAgentSpawnData CreateWeaponRecord(string modifierId)
+    {
+        var weaponSlots = new List<MissionWeaponData>();
+        for (int i = 0; i < (int)EquipmentIndex.NumAllWeaponSlots; i++)
+        {
+            weaponSlots.Add(new MissionWeaponData(
+                "ItemObject_test_sword",
+                i == 0 ? modifierId : null,
+                null,
+                0,
+                0,
+                null));
+        }
+
+        return new BattleAgentSpawnData(
+            Guid.NewGuid(),
+            "imperial_infantry",
+            default,
+            BattleSideEnum.Attacker,
+            100f,
+            "owner",
+            "map_event_party",
+            1,
+            default,
+            default,
+            new MissionEquipmentData(weaponSlots));
     }
 }

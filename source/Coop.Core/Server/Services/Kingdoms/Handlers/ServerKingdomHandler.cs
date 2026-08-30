@@ -52,6 +52,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
         messageBroker.Subscribe<NetworkRequestKingdomDecisionVote>(HandleNetworkRequestKingdomDecisionVote);
         messageBroker.Subscribe<KingdomDecisionVoteChanged>(HandleLocalKingdomDecisionVoteChanged);
+        messageBroker.Subscribe<KingdomDecisionRoundStatusChanged>(HandleLocalKingdomDecisionRoundStatusChanged);
         messageBroker.Subscribe<KingdomDecisionResolved>(HandleLocalKingdomDecisionResolved);
         messageBroker.Subscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
@@ -237,6 +238,11 @@ public class ServerKingdomHandler : IHandler
         network.SendAll(message);
     }
 
+    private void HandleLocalKingdomDecisionRoundStatusChanged(MessagePayload<KingdomDecisionRoundStatusChanged> obj)
+    {
+        network.SendAll(new NetworkKingdomDecisionRoundStatus(obj.What.Status));
+    }
+
     private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
     {
         var payload = obj.What;
@@ -329,6 +335,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Unsubscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
         messageBroker.Unsubscribe<NetworkRequestKingdomDecisionVote>(HandleNetworkRequestKingdomDecisionVote);
         messageBroker.Unsubscribe<KingdomDecisionVoteChanged>(HandleLocalKingdomDecisionVoteChanged);
+        messageBroker.Unsubscribe<KingdomDecisionRoundStatusChanged>(HandleLocalKingdomDecisionRoundStatusChanged);
         messageBroker.Unsubscribe<KingdomDecisionResolved>(HandleLocalKingdomDecisionResolved);
         messageBroker.Unsubscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);

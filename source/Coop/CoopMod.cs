@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Serialization;
 using Coop.Core;
 using Coop.Core.Common.Session;
+using Coop.Core.Diagnostics;
 using Coop.CrashReporting;
 using Coop.Lib.NoHarmony;
 #if DEBUG
@@ -17,6 +18,7 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
+using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CrashReporting;
 using GameInterface.Utils;
@@ -62,6 +64,8 @@ namespace Coop
         private string activeLogFilePath;
         private string informationalVersion = "unknown";
         private CrashReportingConsentCoordinator crashReportingConsent;
+        private BugReportConsentCoordinator bugReportConsent;
+        private IBugReportOverlay bugReportOverlay;
         private UnsupportedModuleWarningHandler unsupportedModuleWarning;
         private bool startupModuleWarningReady;
         private bool automaticCrashReportsRequested;
@@ -119,10 +123,20 @@ namespace Coop
             }
             ManagedServerConfig.Password = serverPassword;
             ManagedServerConfig.Visibility = serverVisibility;
-
-            SetupLogging();
-            InitializeCrashReporting();
             
+            SetupLogging();
+            var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
+            StartupDiagnosticsSequence.Run(version =>
+                {
+                    informationalVersion = version;
+                    CoopLogHeader(moduleInfoProvider);
+                },
+                version => InitializeCrashReporting());
+
+            Logger.Verbose("Coop Mod Module Started");
+            
+            Updateables.Add(new FpsLogger());
+
 #if DEBUG
             isDeferredClientJoin = args.Any(a =>
                                        a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase)) &&
@@ -134,7 +148,7 @@ namespace Coop
             if (!isServer)
             {
                 unsupportedModuleWarning = new UnsupportedModuleWarningHandler(
-                    new TaleWorldsModuleInfoProvider(),
+                    moduleInfoProvider,
                     new CoopOptionsStore(),
                     exception => Logger.Warning(
                         exception,
@@ -257,21 +271,42 @@ namespace Coop
 #else
                 .MinimumLevel.Information();
 #endif
-
             Logger = LogManager.GetLogger<CoopMod>();
+        }
 
-            informationalVersion = typeof(ModInformation).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion ?? "unknown";
-            Logger.Information("BannerlordCoop build {Build}", informationalVersion);
+        private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
+        {
+            var modules = moduleInfoProvider.GetModuleInfos().ToArray();
+            var native = modules.FirstOrDefault(m => m.IsOfficial && m.Id.Equals("Native",  StringComparison.OrdinalIgnoreCase));
+
+            if (native.Id == null)
+            {
+                // ModuleInfo was not initialized (not found).
+                native.Id = "Unknown";
+                native.IsDlc = false;
+                native.IsOfficial = false;
+                native.Version = ApplicationVersion.Empty;
+            }
+            
+            Logger.Information("========================================================");
+            Logger.Information("Bannerlord Coop - {client}", isServer ? "Server" : "Client");
+            Logger.Information("Game Version: {major}.{minor}.{revision}", native.Version.Major, native.Version.Minor, native.Version.Revision);
+            Logger.Information("Coop Build {version}", informationalVersion);
             Logger.Information(
                 "[Protobuf] MonoRuntime={MonoRuntime} AutoCompile={AutoCompile} StructFactoryWorkaround={StructFactoryWorkaround} CLRVersion={ClrVersion}",
                 ProtoBufSerializer.IsMonoRuntime,
                 ProtoBufSerializer.AutoCompileEnabled,
                 ProtoBufSerializer.StructFactoryWorkaroundEnabled,
                 Environment.Version);
+            Logger.Information("Current modules:" );
 
-            Logger.Verbose("Coop Mod Module Started");
+            foreach (var module in modules)
+            {
+                string official = module.IsOfficial ? "Official" : "Unofficial";
+                Logger.Information("{official} {version} {name}", official, module.Version.ToString(), module.Id);
+            }
+            
+            Logger.Information("========================================================");
         }
 
         private void InitializeCrashReporting()
@@ -289,6 +324,9 @@ namespace Coop
                 },
                 exception => Logger.Warning(exception, "Crash reporting preference could not be saved"));
             crashReportingConsent.ApplyStoredDecision();
+            bugReportConsent = new BugReportConsentCoordinator(
+                new CoopOptionsStore(),
+                exception => Logger.Warning(exception, "Diagnostic bug-report log-sharing preference could not be saved"));
             TryStartCrashReporter(role);
         }
 
@@ -440,7 +478,10 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
-            Coop = new CoopartiveMultiplayerExperience(isServer, CrashDiagnostics.SetPhase);
+            Coop = new CoopartiveMultiplayerExperience(
+                isServer,
+                CrashDiagnostics.SetPhase,
+                activeLogFilePath);
 
             Updateables.Add(GameThread.Instance);
 
@@ -592,6 +633,8 @@ namespace Coop
             TryApplyAutomaticCrashReports();
             TryShowUnsupportedModuleWarning(isAtMainMenu);
             TryShowCrashReportingConsent(isAtMainMenu);
+            TryShowBugReportConsent(isAtMainMenu);
+            TryInitializeBugReportOverlay();
 
             // Boot Steam services once the main menu is up, so a +connect_lobby launch resolves while joining is possible.
             if (!steamBootAttempted && isAtMainMenu)
@@ -634,7 +677,41 @@ namespace Coop
                 isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
                 inquiry => InformationManager.ShowInquiry(inquiry));
         }
-        
+
+        private void TryShowBugReportConsent(bool isAtMainMenu)
+        {
+            if (bugReportConsent == null || isServer || isAutoConnect ||
+                ManagedServerConfig.IsManagedServer)
+            {
+                return;
+            }
+
+            bugReportConsent.TryShowPrompt(
+                isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
+                inquiry => InformationManager.ShowInquiry(inquiry));
+        }
+
+        private void TryInitializeBugReportOverlay()
+        {
+            if (isServer || Game.Current == null ||
+                !ContainerProvider.TryResolve(out IBugReportOverlay overlay) ||
+                ReferenceEquals(bugReportOverlay, overlay))
+            {
+                return;
+            }
+
+            try
+            {
+                overlay.Initialize();
+                bugReportOverlay = overlay;
+                Logger.Debug("Initialized the bug-report overlay");
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Could not initialize the bug-report overlay");
+            }
+        }
+
         // Show the one-time unsupported module warning when the client startup UI is available.
         private void TryShowUnsupportedModuleWarning(bool isAtMainMenu)
         {

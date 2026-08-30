@@ -1,4 +1,12 @@
-﻿using E2E.Tests.Util;
+﻿using Autofac;
+using Common.Logging;
+using E2E.Tests.Util;
+using GameInterface;
+using GameInterface.Policies;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -103,6 +111,135 @@ namespace E2E.Tests.Services.Heroes
             assertHelper.AssertPropertyOwnerField<Hero, CharacterAttribute>(nameof(Hero._characterAttributes));
 
             TestEnvironment.AssertField<Hero, int>(nameof(Hero.Level), 10, defaultValue: hero.Level);
+        }
+
+        [Fact]
+        public void Server_UpdateHomeSettlement_ReplicatesBackingCache()
+        {
+            string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+                hero._clan = null;
+                hero._companionOf = null;
+                hero._governorOf = null;
+                hero._stayingInSettlement = null;
+                hero._bornSettlement = settlement;
+                hero._homeSettlement = null;
+
+                hero.UpdateHomeSettlement();
+
+                Assert.Same(settlement, hero._homeSettlement);
+            });
+
+            foreach (var client in Clients)
+            {
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                    Assert.True(client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+                    Assert.Same(settlement, hero._homeSettlement);
+                });
+            }
+        }
+
+        [Fact]
+        public void Client_HomeSettlementGetter_RebuildsCacheWithoutMutationDiagnostic()
+        {
+            string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+            int diagnosticCount = 0;
+            Action<string> captureDiagnostic = message =>
+            {
+                if (message.Contains("Client updated managed") && message.Contains("HomeSettlement"))
+                    Interlocked.Increment(ref diagnosticCount);
+            };
+            OutputSinkManager.AddLogCallback(captureDiagnostic);
+
+            try
+            {
+                foreach (var client in Clients)
+                {
+                    client.Call(() =>
+                    {
+                        Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                        Assert.True(client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+                        hero._clan = null;
+                        hero._companionOf = null;
+                        hero._governorOf = null;
+                        hero._stayingInSettlement = null;
+                        hero._bornSettlement = settlement;
+                        hero._homeSettlement = null;
+
+                        Settlement resolved = Task.Run(() => hero.HomeSettlement).GetAwaiter().GetResult();
+
+                        Assert.Same(settlement, resolved);
+                        Assert.Same(settlement, hero._homeSettlement);
+                    });
+                }
+
+                Assert.Equal(0, Volatile.Read(ref diagnosticCount));
+            }
+            finally
+            {
+                OutputSinkManager.RemoveLogCallback(captureDiagnostic);
+            }
+        }
+
+        [Fact]
+        public void Client_UpdateHomeSettlementOutsideGetter_RetainsMutationDiagnostic()
+        {
+            string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+            int diagnosticCount = 0;
+            Action<string> captureDiagnostic = message =>
+            {
+                if (message.Contains("Client updated managed") && message.Contains("HomeSettlement"))
+                    Interlocked.Increment(ref diagnosticCount);
+            };
+            OutputSinkManager.AddLogCallback(captureDiagnostic);
+
+            try
+            {
+                foreach (var client in Clients)
+                {
+                    client.Call(() =>
+                    {
+                        Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                        Assert.True(client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+                        hero._clan = null;
+                        hero._companionOf = null;
+                        hero._governorOf = null;
+                        hero._stayingInSettlement = null;
+                        hero._bornSettlement = settlement;
+                        hero._homeSettlement = null;
+
+                        var builder = new ContainerBuilder();
+                        builder.RegisterInstance(new DenyOriginalSyncPolicy()).As<ISyncPolicy>();
+                        using var container = builder.Build();
+                        using (ContainerProvider.UseContainerThreadSafe(container))
+                        {
+                            Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+                            hero.UpdateHomeSettlement();
+                        }
+
+                        Assert.Same(settlement, hero._homeSettlement);
+                    });
+                }
+
+                Assert.Equal(Clients.Count(), Volatile.Read(ref diagnosticCount));
+            }
+            finally
+            {
+                OutputSinkManager.RemoveLogCallback(captureDiagnostic);
+            }
+        }
+
+        private sealed class DenyOriginalSyncPolicy : ISyncPolicy
+        {
+            public bool AllowOriginal() => false;
         }
 
         // Calls the REAL patched game method (not a reflection-invoked intercept), so this covers the

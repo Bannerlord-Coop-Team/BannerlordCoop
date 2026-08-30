@@ -8,6 +8,7 @@ using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Helpers;
@@ -22,6 +23,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.SiegeEvents.Patches;
 
@@ -85,12 +87,30 @@ internal class SiegeEntryFlowPatches
     {
         if (ModInformation.IsServer) return true;
 
-        // With a live assault the vanilla branch joins the MapEvent, which the existing map-event
-        // join intercepts already round-trip; only the camp join during preparation needs routing.
-        if (Settlement.CurrentSettlement?.Party?.MapEvent != null) return true;
+        var mapEvent = Settlement.CurrentSettlement?.Party?.MapEvent;
+        if (mapEvent != null)
+        {
+            PlayerEncounter.JoinBattle(!mapEvent.IsSallyOut ? BattleSideEnum.Attacker : BattleSideEnum.Defender);
+
+            // A fresh join completes asynchronously and opens after its involved-party snapshot.
+            // An already-involved party has no snapshot to wait for, so preserve vanilla's switch.
+            if (MobileParty.MainParty?.MapEvent == mapEvent)
+                GameMenu.SwitchToMenu("encounter");
+            return false;
+        }
 
         MessageBroker.Instance.Publish(null, new JoinSiegeCampAttempted(MobileParty.MainParty, Settlement.CurrentSettlement));
         return false;
+    }
+
+    [HarmonyPatch(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) })]
+    [HarmonyPrefix]
+    private static bool ActivateJoinSiegeMenuPrefix(string menuId)
+    {
+        if (ModInformation.IsServer || menuId != "join_siege_event") return true;
+        if (!ContainerProvider.TryResolve<ISiegeJoinMenuActivationGate>(out var activationGate)) return true;
+
+        return !activationGate.TryDeferActivation();
     }
 
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_leave_on_consequence))]
