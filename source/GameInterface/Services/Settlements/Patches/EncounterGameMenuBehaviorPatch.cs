@@ -36,7 +36,9 @@ namespace GameInterface.Services.Settlements.Patches
         {
             var leaderParty = ResolveEncounteredArmyLeaderParty();
             if (leaderParty?.MobileParty?.IsPlayerParty() != true)
+            {
                 return true; // Army leader is not a player, let vanilla open the normal conversation
+            }
 
             // Route into the same player party interaction request pipeline used for regular P2P
 
@@ -52,8 +54,8 @@ namespace GameInterface.Services.Settlements.Patches
         /// <summary>
         /// The army_encounter menu is built from the encountered army, so its leader party is the reliable
         /// "talk to army leader" target (this is what game_menu_army_talk_to_other_members_on_init keys off).
-        /// <see cref="PlayerEncounter.EncounteredParty"/> alone can be left unset by
-        /// <c>PlayerEncounter.SetupFields</c> for a party that is itself in that army.
+        /// PlayerEncounter.EncounteredParty alone can be left unset by PlayerEncounter.SetupFields for a party
+        /// that is itself in that army.
         /// </summary>
         private static PartyBase ResolveEncounteredArmyLeaderParty()
         {

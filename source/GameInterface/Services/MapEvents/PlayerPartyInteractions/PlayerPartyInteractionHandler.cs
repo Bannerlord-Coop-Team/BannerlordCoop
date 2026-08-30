@@ -1160,10 +1160,9 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
 
     /// <summary>
-    /// True for parked, non-interactive army menus a player-party map conversation may open over, exactly as
-    /// vanilla's "Talk to the army leader" opens one straight from <c>army_encounter</c>. An attached army
-    /// member is permanently at <c>army_wait</c>, so without this the interaction dialog (and therefore the
-    /// barter screen) could never open for them - see issue #3388.
+    /// An attached army member is permanently at army_wait; without this the interaction dialog
+    /// (and therefore the barter screen) couldnever open for them
+    /// since CanOpenMapConversation otherwise bails on any open menu.
     /// </summary>
     internal static bool IsBenignConversationMenu(string menuId)
     {
@@ -1174,7 +1173,9 @@ internal class PlayerPartyInteractionHandler : IHandler
     internal static bool CanOpenMapConversation(bool atMenu, string currentMenuId, bool topScreenIsMapScreen)
     {
         if (atMenu && !IsBenignConversationMenu(currentMenuId))
+        {
             return false;
+        }
 
         return topScreenIsMapScreen;
     }
@@ -1182,7 +1183,9 @@ internal class PlayerPartyInteractionHandler : IHandler
     private static bool CanOpenMapConversation()
     {
         if (!(GameStateManager.Current?.ActiveState is MapState mapState))
+        {
             return false;
+        }
 
         var mapScreen = MapScreen.Instance;
         return CanOpenMapConversation(
@@ -1218,7 +1221,9 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         if (Campaign.Current?.CurrentMenuContext != null)
+        {
             GameMenu.ExitToLast();
+        }
 
         ClearLocalPartyEngageOrder(localParty);
     }

@@ -4,8 +4,9 @@ using Xunit;
 namespace GameInterface.Tests.Services.MapEvents;
 
 /// <summary>
-/// Guards the fix for issue #3388: an attached army member is permanently at the <c>army_wait</c> menu, so the
-/// player-party interaction dialog (and therefore the barter screen) must still be allowed to open there.
+/// An attached army member is permanently at the army_wait menu, so the player-party interaction dialog (and
+/// therefore the barter screen) must still be allowed to open there rather than being deferred like a
+/// transient menu.
 /// </summary>
 public class PlayerPartyMapConversationGateTests
 {
@@ -43,7 +44,7 @@ public class PlayerPartyMapConversationGateTests
     [Fact]
     public void CanOpenMapConversation_AtArmyWaitMenu_IsAllowed()
     {
-        // The #3388 regression: army members sit at army_wait, and the blanket AtMenu bail soft-locked them.
+        // Army members sit at army_wait; a blanket AtMenu bail would soft-lock their interaction dialog.
         Assert.True(PlayerPartyInteractionHandler.CanOpenMapConversation(
             atMenu: true, currentMenuId: "army_wait", topScreenIsMapScreen: true));
     }
