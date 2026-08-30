@@ -15,6 +15,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Helpers;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -467,7 +468,10 @@ internal class PlayerEncounterPatches
             (!mapEvent.IsRaid ||
              !MapEventInitializationBarrier.IsBattleResultEncounter(playerEncounter)))
             return true;
-        if (ShouldDeferAfterBattle(TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState)) return false;
+        if (ShouldDeferAfterBattle(
+                TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState,
+                TaleWorlds.ScreenSystem.ScreenManager.TopScreen == MapScreen.Instance))
+            return false;
         if (PlayerCaptivity.IsCaptive) return false;
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return true;
@@ -478,9 +482,9 @@ internal class PlayerEncounterPatches
         return false;
     }
 
-    internal static bool ShouldDeferAfterBattle(TaleWorlds.Core.GameState activeState)
+    internal static bool ShouldDeferAfterBattle(TaleWorlds.Core.GameState activeState, bool isMapScreenTop)
     {
-        // The background map tick must not advance to the next loot phase beneath the active loot screen.
-        return activeState is PartyState or InventoryState;
+        // Wait for the previous loot screen to finish leaving before opening the next one.
+        return activeState is PartyState or InventoryState || !isMapScreenTop;
     }
 }

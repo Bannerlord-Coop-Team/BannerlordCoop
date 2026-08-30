@@ -25,7 +25,7 @@ public class PlayerEncounterInterfaceTests
     [MemberData(nameof(ActiveLootScreens))]
     public void ShouldDeferAfterBattle_WhileLootScreenIsActive_ReturnsTrue(TaleWorlds.Core.GameState activeState)
     {
-        Assert.True(PlayerEncounterPatches.ShouldDeferAfterBattle(activeState));
+        Assert.True(PlayerEncounterPatches.ShouldDeferAfterBattle(activeState, isMapScreenTop: true));
     }
 
     public static TheoryData<TaleWorlds.Core.GameState> ActiveLootScreens => new()
@@ -37,7 +37,13 @@ public class PlayerEncounterInterfaceTests
     [Fact]
     public void ShouldDeferAfterBattle_WhenMapIsActive_ReturnsFalse()
     {
-        Assert.False(PlayerEncounterPatches.ShouldDeferAfterBattle(new MapState()));
+        Assert.False(PlayerEncounterPatches.ShouldDeferAfterBattle(new MapState(), isMapScreenTop: true));
+    }
+
+    [Fact]
+    public void ShouldDeferAfterBattle_WhilePreviousScreenIsStillTop_ReturnsTrue()
+    {
+        Assert.True(PlayerEncounterPatches.ShouldDeferAfterBattle(new MapState(), isMapScreenTop: false));
     }
 
     [Fact]
