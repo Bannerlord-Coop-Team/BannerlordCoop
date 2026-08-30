@@ -482,7 +482,12 @@ internal class PlayerEncounterPatches
             return false;
         if (afterBattleTransitionGate.ShouldDeferMapUpdate(
                 playerEncounter,
-                release => GameThread.EnqueueSafe(release, nameof(UpdatePrefix))))
+                release => GameThread.EnqueueSafe(release, nameof(UpdatePrefix)),
+                () =>
+                {
+                    if (ReferenceEquals(PlayerEncounter.Current, playerEncounter))
+                        PlayerEncounter.Update();
+                }))
             return false;
         if (PlayerCaptivity.IsCaptive) return false;
 
@@ -490,6 +495,10 @@ internal class PlayerEncounterPatches
 
         var playerEncounterInterface = container.Resolve<IPlayerEncounterInterface>();
         playerEncounterInterface.UpdateInternalAfterBattle(playerEncounter);
+
+        activeState = TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState;
+        if (activeState is PartyState or InventoryState)
+            afterBattleTransitionGate.ObserveLootScreen(playerEncounter);
 
         return false;
     }
@@ -514,7 +523,10 @@ internal sealed class AfterBattleTransitionGate
         releaseQueued = false;
     }
 
-    public bool ShouldDeferMapUpdate(object encounter, Action<Action> enqueueRelease)
+    public bool ShouldDeferMapUpdate(
+        object encounter,
+        Action<Action> enqueueRelease,
+        Action continueEncounter)
     {
         if (!ReferenceEquals(pendingEncounter, encounter)) return false;
 
@@ -522,17 +534,18 @@ internal sealed class AfterBattleTransitionGate
         {
             releaseQueued = true;
             int observedGeneration = generation;
-            enqueueRelease(() => Release(encounter, observedGeneration));
+            enqueueRelease(() => ReleaseAndContinue(encounter, observedGeneration, continueEncounter));
         }
 
         return true;
     }
 
-    private void Release(object encounter, int observedGeneration)
+    private void ReleaseAndContinue(object encounter, int observedGeneration, Action continueEncounter)
     {
         if (!ReferenceEquals(pendingEncounter, encounter) || generation != observedGeneration) return;
 
         pendingEncounter = null;
         releaseQueued = false;
+        continueEncounter();
     }
 }
