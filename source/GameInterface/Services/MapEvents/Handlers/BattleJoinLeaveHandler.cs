@@ -11,6 +11,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -45,6 +46,7 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
+    private readonly ISiegeJoinMenuActivationGate siegeJoinMenuActivationGate;
     private readonly ConcurrentDictionary<string, string> pendingJoinRequests = new ConcurrentDictionary<string, string>();
 
     public BattleJoinLeaveHandler(
@@ -55,7 +57,8 @@ internal class BattleJoinLeaveHandler : IHandler
         IMapEventLogger mapEventLogger,
         IMapEventInitializationBarrier initializationBarrier,
         ISiegeEventInterface siegeEventInterface,
-        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
+        ISiegeJoinMenuActivationGate siegeJoinMenuActivationGate)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -65,6 +68,7 @@ internal class BattleJoinLeaveHandler : IHandler
         this.initializationBarrier = initializationBarrier;
         this.siegeEventInterface = siegeEventInterface;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
+        this.siegeJoinMenuActivationGate = siegeJoinMenuActivationGate;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
@@ -89,6 +93,9 @@ internal class BattleJoinLeaveHandler : IHandler
 
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
     {
+        if (ModInformation.IsServer)
+            return;
+
         var message = payload.What;
 
         GameThread.RunSafe(() =>
@@ -106,30 +113,66 @@ internal class BattleJoinLeaveHandler : IHandler
 
                 mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
 
-                var positions = message.Positions;
-
                 var trackParties = !initializationBarrier.IsPending(mapEvent);
-                using (new AllowedThread())
-                {
-                    for (int i = 0; i < message.MapEventPartyIds.Length; i++)
-                    {
-                        var mapEventPartyId = message.MapEventPartyIds[i];
-                        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
-                            continue;
-
-                        if (trackParties)
-                            mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
-                        var mobileParty = mapEventParty.Party.MobileParty;
-                        if (mobileParty != null && positions != null && i < positions.Length)
-                            mobileParty.Position = positions[i];
-                    }
-                }
+                initializationBarrier.RunAfterCommit(mapEvent,
+                    () => ApplyInvolvedParties(mapEvent, message, trackParties));
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
         });
+    }
+
+    private void ApplyInvolvedParties(MapEvent mapEvent, NetworkAddInvolvedParties message, bool trackParties)
+    {
+        try
+        {
+            var positions = message.Positions;
+            using (new AllowedThread())
+            {
+                if (trackParties)
+                    mapEvent.TroopUpgradeTracker._mapEventParties.Clear();
+
+                for (int i = 0; i < message.MapEventPartyIds.Length; i++)
+                {
+                    var mapEventPartyId = message.MapEventPartyIds[i];
+                    if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+                        continue;
+
+                    if (trackParties)
+                        mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+                    var mobileParty = mapEventParty.Party.MobileParty;
+                    if (mobileParty != null && positions != null && i < positions.Length)
+                        mobileParty.Position = positions[i];
+                }
+            }
+
+            if (!siegeJoinMenuActivationGate.ResumeAfterSnapshot(mapEvent))
+                SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
+        }
+    }
+
+    private static void SwitchSiegeJoinerToEncounterIfNeeded(MapEvent mapEvent)
+    {
+        if (!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut)
+            return;
+
+        if (MobileParty.MainParty?.MapEvent != mapEvent)
+            return;
+
+        var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.EncounteredBattle ?? MapEvent.PlayerMapEvent;
+        if (encounterMapEvent != mapEvent)
+            return;
+
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "join_siege_event")
+            return;
+
+        GameMenu.SwitchToMenu("encounter");
     }
 
     /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
@@ -148,6 +191,8 @@ internal class BattleJoinLeaveHandler : IHandler
             mapEventLogger.DebugMapEvent(data.MapEvent, "Battle join is already pending for PartyId={PartyId}", partyId);
             return;
         }
+
+        siegeJoinMenuActivationGate.ArmJoinRequest(data.MapEvent, data.JoiningParty);
 
         mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
 
@@ -170,6 +215,8 @@ internal class BattleJoinLeaveHandler : IHandler
 
             pendingJoinRequests.TryRemove(reply.PartyId, out _);
             if (reply.Accepted) return;
+
+            siegeJoinMenuActivationGate.CancelDeferredActivation();
 
             Logger.Warning("Server rejected battle join for party {PartyId} and map event {MapEventId}",
                 reply.PartyId, reply.MapEventId);
@@ -423,9 +470,17 @@ internal class BattleJoinLeaveHandler : IHandler
             var siegeSettlement = mapEvent?.MapEventSettlement;
             bool isMainParty = party == PartyBase.MainParty;
             var mobileParty = party.MobileParty;
+            var tracker = isMainParty ? mapEvent?.TroopUpgradeTracker : null;
 
             if (party.MapEventSide != null)
                 party.MapEventSide = null;
+
+            // Vanilla discards the client's tracker when its MainParty leaves, but the server's registered tracker stays live.
+            if (tracker != null && mapEvent?.IsFinalized == false && mapEvent.TroopUpgradeTracker == null)
+            {
+                mapEvent.TroopUpgradeTracker = tracker;
+                tracker._mapEventParties.Clear();
+            }
 
             if (leaveSiege && mobileParty?.BesiegerCamp != null)
                 mobileParty.BesiegerCamp = null;

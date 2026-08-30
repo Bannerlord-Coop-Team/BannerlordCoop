@@ -12,13 +12,21 @@ public class CallOriginalPolicy
 
     private static int _allThreadsAllowedCount;
 
+    [ThreadStatic]
+    private static int _currentOperationAllowedCount;
+
     internal static bool AreOriginalsAllowedOnAllThreads =>
         Volatile.Read(ref _allThreadsAllowedCount) > 0;
+
+    internal static bool AreOriginalsAllowedForCurrentOperation =>
+        _currentOperationAllowedCount > 0;
 
     public static bool IsOriginalAllowed()
     {
         // While using an allowed thread or operation, allow original call
-        if (AllowedThread.IsThisThreadAllowed() || AreOriginalsAllowedOnAllThreads) return true;
+        if (AllowedThread.IsThisThreadAllowed() ||
+            AreOriginalsAllowedOnAllThreads ||
+            AreOriginalsAllowedForCurrentOperation) return true;
 
         if (ContainerProvider.TryResolve<ISyncPolicy>(out var syncPolicy) == false)
         {
@@ -37,6 +45,29 @@ public class CallOriginalPolicy
     /// engine-owned threads and wait for all of it to finish before the scope is disposed.
     /// </summary>
     public static IDisposable AllowOriginalsOnAllThreads() => new AllThreadsScope();
+
+    /// <summary>
+    /// Allows original calls made synchronously by the current operation on this thread.
+    /// </summary>
+    internal static IDisposable AllowOriginalsForCurrentOperation() => new CurrentOperationScope();
+
+    private sealed class CurrentOperationScope : IDisposable
+    {
+        private int _disposed;
+
+        public CurrentOperationScope()
+        {
+            _currentOperationAllowedCount++;
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                _currentOperationAllowedCount--;
+            }
+        }
+    }
 
     private sealed class AllThreadsScope : IDisposable
     {

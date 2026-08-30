@@ -26,6 +26,7 @@ public class UnstuckCommand
         MessageBroker.Instance.Publish(mainParty, new PlayerUnstuckRequested(mainParty));
 
         return "Unstuck request sent to the server. Captivity, map event, army, siege camp, and " +
-               "settlement exits apply on the server; the local encounter and menu state clear when its reply arrives.";
+               "settlement exits apply on the server; the local encounter and menu state clear when its reply arrives. " +
+               "Consenting clients may also send their current co-op log for a diagnostic report.";
     }
 }

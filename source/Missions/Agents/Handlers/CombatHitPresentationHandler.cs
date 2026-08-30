@@ -197,7 +197,7 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
 
         Agent victim = presentation.IsMount ? info.Agent?.MountAgent : info.Agent;
         Mission mission = Mission.Current;
-        if (mission == null || victim == null || victim.Mission != mission)
+        if (mission == null || victim == null || victim.Mission != mission || !victim.IsActive())
             return;
 
         switch (presentation.Kind)
@@ -206,14 +206,15 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
                 PlayBlood(victim, presentation.CollisionBoneIndex, presentation.Strength);
                 break;
             case MeleeHitPresentationKind.ShieldImpact:
-                if (victim.IsActive())
-                    PlayShieldImpact(mission, victim, presentation);
+                PlayShieldImpact(mission, victim, presentation);
                 break;
         }
     }
 
-    private static void PlayBlood(Agent victim, int collisionBoneIndex, float strength)
+    internal static void PlayBlood(Agent victim, int collisionBoneIndex, float strength)
     {
+        if (!victim.IsActive()) return;
+
         sbyte boneIndex = collisionBoneIndex >= sbyte.MinValue && collisionBoneIndex <= sbyte.MaxValue
             ? (sbyte)collisionBoneIndex
             : (sbyte)-1;

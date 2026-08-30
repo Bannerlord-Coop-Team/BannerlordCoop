@@ -153,8 +153,10 @@ internal static class ConversationPartyHold
 
     /// <summary>True when the party is held in a player's conversation (and not already in a battle).</summary>
     public static bool IsInPlayerConversation(MobileParty party)
+        => IsInPlayerConversation(ConversationPartyTracker.Instance, party);
+
+    internal static bool IsInPlayerConversation(ConversationPartyTracker tracker, MobileParty party)
     {
-        var tracker = ConversationPartyTracker.Instance;
         if (tracker == null || tracker.IsEmpty) return false;
 
         if (party?.Party == null || party.MapEvent != null) return false;

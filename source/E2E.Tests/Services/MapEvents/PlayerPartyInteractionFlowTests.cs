@@ -2588,6 +2588,69 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             AssertPeaceMade(environmentClient, playerClanId, targetClanId);
     }
 
+    [Fact]
+    public void NpcPeaceBarter_BesiegerWithQueuedAssault_DoesNotLoseEncounterBeforeSubmission()
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int offeredGold = 500_000;
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var (targetHeroId, targetMobilePartyId, targetPartyId) = CreateAiPartyWithRegisteredLeader();
+        var siege = CreateSyncedSiege(targetMobilePartyId);
+        MakePartiesHostile(playerPartyId, targetPartyId);
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(targetMobilePartyId, out var targetParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(siege.SettlementId, out var settlement));
+
+            playerHero.Gold = initialPlayerGold;
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
+            targetParty.SetShortTermBehavior(AiBehavior.AssaultSettlement, settlement.Party);
+            Assert.True(ConversationPartyHold.TryEngage(
+                Server.Resolve<ConversationPartyTracker>(),
+                client.NetPeer,
+                playerPartyId,
+                targetParty,
+                targetPartyId,
+                engagerIsDefender: true));
+
+            Assert.Equal(AiBehavior.AssaultSettlement, targetParty.ShortTermBehavior);
+            Assert.False(InvokeEncounterPrefix("Prefix", targetParty, settlement));
+            Assert.Null(targetParty.MapEvent);
+            Assert.Null(settlement.Party.MapEvent);
+        });
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestPeaceBarter(
+            targetHeroId,
+            PeaceConversationContext.MapParty,
+            targetPartyId,
+            new[]
+            {
+                new PeaceBarterTerm(
+                    PeaceBarterTermType.Gold,
+                    playerHeroId,
+                    objectId: null,
+                    itemModifierId: null,
+                    itemModifierNull: true,
+                    amount: offeredGold),
+            },
+            requestId: "besieger-peace-success")));
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>());
+        Assert.True(result.Accepted, result.Reason);
+        Assert.Equal("besieger-peace-success", result.RequestId);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -3468,7 +3531,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    private (string SiegeEventId, string SettlementId, string LeaderPartyId) CreateSyncedSiege()
+    private (string SiegeEventId, string SettlementId, string LeaderPartyId) CreateSyncedSiege(
+        string? leaderMobilePartyId = null)
     {
         var siegeCreationDisabledMethods = new[]
         {
@@ -3477,7 +3541,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
         };
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        var leaderMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        leaderMobilePartyId ??= TestEnvironment.CreateRegisteredObject<MobileParty>();
         var leaderPartyId = GetPartyBaseId(Server, leaderMobilePartyId);
 
         string? siegeEventId = null;

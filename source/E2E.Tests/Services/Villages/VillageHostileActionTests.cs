@@ -85,6 +85,34 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Equal(VillageHostileActionDeniedReason.Invalid, result.Reason);
     }
 
+    [Fact]
+    public void ApplyHostileAction_WhileAtPeace_DeclaresWarOnAllInstances()
+    {
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.False(FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction));
+
+            Server.Resolve<IVillageHostileActionInterface>().ApplyHostileAction(mobileParty, settlement, VillageHostileAction.Raid);
+        }, new[] { AccessTools.Method(typeof(BeHostileAction), nameof(BeHostileAction.ApplyEncounterHostileAction)) });
+
+        var warDeclared = Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>().Single();
+        Assert.Equal(GetMobilePartyMapFactionId(Server, mobilePartyId), warDeclared.Faction1Id);
+        Assert.Equal(target.OwnerFactionId, warDeclared.Faction2Id);
+
+        AssertWarDeclared(Server, mobilePartyId, target.OwnerFactionId);
+        foreach (var client in Clients)
+        {
+            AssertWarDeclared(client, mobilePartyId, target.OwnerFactionId);
+        }
+    }
+
     [Theory]
     [InlineData(VillageHostileAction.ForceVolunteers)]
     [InlineData(VillageHostileAction.ForceSupplies)]
@@ -1278,6 +1306,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
                 defenderParty.MemberRoster.AddToCounts(defenderTroop, 1);
                 AddSyntheticMapEventParty(mapEvent.DefenderSide, defenderParty.Party);
+                mapEvent.DefenderSide.LeaderParty = defenderParty.Party;
 
                 Assert.True(mapEvent.IsActiveSlowVillageRaid());
                 Assert.True(mapEvent.DefenderSide.TroopCount > 0);
@@ -1285,6 +1314,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
                 Assert.Null(defenderParty.Party.MapEventSide);
                 Assert.DoesNotContain(mapEvent.DefenderSide.Parties, party => party.Party == defenderParty.Party);
+                Assert.Same(settlement.Party, mapEvent.DefenderSide.LeaderParty);
                 Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
 
                 var wasFinished = false;
