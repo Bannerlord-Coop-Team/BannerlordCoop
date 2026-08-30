@@ -2,6 +2,7 @@
 using GameInterface.Configuration;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers;
+using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
@@ -22,6 +23,7 @@ internal static class CoopOptionsVMTestFactory
         {
             new KillFeedOptionsTabProvider(),
             new MapTimeOptionsTabProvider(),
+            new BugReportOptionsTabProvider(),
             new ChatOptionsTabProvider(),
             new PlayerNameplatesOptionsTabProvider(),
             new NetworkOptionsTabProvider(),

@@ -706,9 +706,9 @@ internal class BugReportService : IBugReportService, IDisposable
         if (!upload.EndpointConfigured)
         {
             Logger.Information(
-                "Diagnostic bug report {RequestId} was not uploaded because authorization is not configured",
+                "Diagnostic bug report {RequestId} was not uploaded because the endpoint is not configured",
                 contents.RequestId);
-            SendResult(finalized, "The bug report was saved on the server; upload authorization is not configured.");
+            SendResult(finalized, "The bug report was saved on the server; the upload endpoint is not configured.");
         }
         else
         {
