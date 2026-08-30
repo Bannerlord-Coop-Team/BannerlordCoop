@@ -1159,19 +1159,9 @@ public class KingdomDebugCommand
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Kingdom kingdom1) == false)
+        if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
         {
-            return $"Kingdom not found with id: {args[0]}";
-        }
-
-        if (objectManager.TryGetObject(args[1], out Kingdom kingdom2) == false)
-        {
-            return $"Kingdom not found with id: {args[1]}";
-        }
-
-        if (kingdom1 == kingdom2)
-        {
-            return "A kingdom cannot ally with itself.";
+            return pairError;
         }
 
         var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
@@ -1219,19 +1209,9 @@ public class KingdomDebugCommand
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Kingdom kingdom1) == false)
+        if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
         {
-            return $"Kingdom not found with id: {args[0]}";
-        }
-
-        if (objectManager.TryGetObject(args[1], out Kingdom kingdom2) == false)
-        {
-            return $"Kingdom not found with id: {args[1]}";
-        }
-
-        if (kingdom1 == kingdom2)
-        {
-            return "A kingdom cannot form a trade agreement with itself.";
+            return pairError;
         }
 
         var behavior = Campaign.Current.GetCampaignBehavior<TradeAgreementsCampaignBehavior>();
@@ -1256,6 +1236,44 @@ public class KingdomDebugCommand
             Campaign.Current.Models.TradeAgreementModel.GetTradeAgreementDurationInYears(kingdom1, kingdom2));
 
         return $"Forced trade agreement between '{kingdom1.Name}' and '{kingdom2.Name}'.";
+    }
+    
+    internal static bool TryGetKingdomPair(IObjectManager objectManager, List<string> args, out Kingdom kingdom1, out Kingdom kingdom2, out string error)
+    {
+        kingdom2 = null;
+        error = null;
+
+        if (objectManager.TryGetObject(args[0], out kingdom1) == false)
+        {
+            error = $"Kingdom not found with id: {args[0]}";
+            return false;
+        }
+
+        if (objectManager.TryGetObject(args[1], out kingdom2) == false)
+        {
+            error = $"Kingdom not found with id: {args[1]}";
+            return false;
+        }
+
+        if (kingdom1 == kingdom2)
+        {
+            error = "The two kingdom ids must refer to different kingdoms.";
+            return false;
+        }
+
+        if (kingdom1.IsEliminated)
+        {
+            error = $"Kingdom '{kingdom1.Name}' has been eliminated.";
+            return false;
+        }
+
+        if (kingdom2.IsEliminated)
+        {
+            error = $"Kingdom '{kingdom2.Name}' has been eliminated.";
+            return false;
+        }
+
+        return true;
     }
 
     private static string ChangeKingdomCollection(List<string> args, CollectionOperation operation)
