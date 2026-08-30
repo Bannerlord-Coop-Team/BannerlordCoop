@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.LogEntries.Messages;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.CommentBehaviors;
 using TaleWorlds.CampaignSystem.LogEntries;
@@ -33,6 +34,9 @@ internal class LogEntriesHandler : IHandler
 
         messageBroker.Subscribe<CommentHeroKilled>(Handle_CommentHeroKilled);
         messageBroker.Subscribe<NetworkCommentHeroKilled>(Handle_NetworkCommentHeroKilled);
+
+        messageBroker.Subscribe<CommentGivenBirth>(Handle_CommentGivenBirth);
+        messageBroker.Subscribe<NetworkCommentGivenBirth>(Handle_NetworkCommentGivenBirth);
     }
 
     public void Dispose()
@@ -42,6 +46,9 @@ internal class LogEntriesHandler : IHandler
 
         messageBroker.Unsubscribe<CommentHeroKilled>(Handle_CommentHeroKilled);
         messageBroker.Unsubscribe<NetworkCommentHeroKilled>(Handle_NetworkCommentHeroKilled);
+
+        messageBroker.Unsubscribe<CommentGivenBirth>(Handle_CommentGivenBirth);
+        messageBroker.Unsubscribe<NetworkCommentGivenBirth>(Handle_NetworkCommentGivenBirth);
     }
 
     private void Handle_LogPlayerRetired(MessagePayload<LogPlayerRetired> obj)
@@ -90,6 +97,46 @@ internal class LogEntriesHandler : IHandler
 
             var commentOnKilledBehavior = Campaign.Current?.GetCampaignBehavior<CommentOnCharacterKilledBehavior>();
             commentOnKilledBehavior?.OnBeforeHeroKilled(victim, killer, obj.What.Detail, true);
+        });
+    }
+
+    private void Handle_CommentGivenBirth(MessagePayload<CommentGivenBirth> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Mother, out var motherId)) return;
+
+            var aliveChildrenIds = new List<string>();
+            foreach (var aliveChild in obj.What.AliveChildren)
+            {
+                if (!objectManager.TryGetIdWithLogging(aliveChild, out var aliveChildId)) continue;
+
+                aliveChildrenIds.Add(aliveChildId);
+            }
+
+            var message = new NetworkCommentGivenBirth(motherId, aliveChildrenIds, obj.What.StillbornCount);
+            network.SendAll(message);
+        });
+    }
+
+    private void Handle_NetworkCommentGivenBirth(MessagePayload<NetworkCommentGivenBirth> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MotherId, out var mother)) return;
+
+            if (obj.What.AliveChildrenIds == null) return;
+
+            var aliveChildren = new List<Hero>();
+            foreach (var aliveChildId in obj.What.AliveChildrenIds)
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(aliveChildId, out var aliveChild)) return;
+
+                aliveChildren.Add(aliveChild);
+            }
+
+            var commentChildbirthBehavior = Campaign.Current?.GetCampaignBehavior<CommentChildbirthBehavior>();
+            commentChildbirthBehavior?.OnGivenBirthEvent(mother, aliveChildren, obj.What.StillbornCount);
         });
     }
 }
