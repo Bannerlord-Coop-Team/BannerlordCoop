@@ -738,7 +738,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     private static readonly MethodInfo OnHourlyTickMethod =
-        AccessTools.Method(typeof(VillageNeedsToolsAlternativeSolutionCompletionPatches), "OnHourlyTick");
+        AccessTools.Method(typeof(NewIssueTypesAlternativeSolutionCompletionPatches), "OnHourlyTick");
 
     [Fact]
     public void OwnedAlternativeSolutionPastDue_HourlyTickReachesGenuineCompletionTriggerForTheRecordedOwner()

@@ -149,6 +149,7 @@ public class AlternativeSolutionHourlyTickDedupTests : IDisposable
             }
 
             new IssuesCampaignBehavior().RegisterEvents();
+            new VillageNeedsToolsIssueBehavior().RegisterEvents();
             CampaignEvents.Instance.HourlyTick();
         });
 
