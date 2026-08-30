@@ -35,6 +35,7 @@ internal class PlayerEncounterPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterPatches>();
     private static readonly object rejectedEncounterRecoveryLock = new object();
+    private static readonly AfterBattleTransitionGate afterBattleTransitionGate = new AfterBattleTransitionGate();
     private static readonly HashSet<PlayerEncounter> pendingRejectedEncounterRecoveries =
         new HashSet<PlayerEncounter>();
 
@@ -468,9 +469,20 @@ internal class PlayerEncounterPatches
             (!mapEvent.IsRaid ||
              !MapEventInitializationBarrier.IsBattleResultEncounter(playerEncounter)))
             return true;
+
+        var activeState = TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState;
+        if (activeState is PartyState or InventoryState)
+        {
+            afterBattleTransitionGate.ObserveLootScreen(playerEncounter);
+            return false;
+        }
         if (ShouldDeferAfterBattle(
-                TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState,
+                activeState,
                 TaleWorlds.ScreenSystem.ScreenManager.TopScreen == MapScreen.Instance))
+            return false;
+        if (afterBattleTransitionGate.ShouldDeferMapUpdate(
+                playerEncounter,
+                release => GameThread.EnqueueSafe(release, nameof(UpdatePrefix))))
             return false;
         if (PlayerCaptivity.IsCaptive) return false;
 
@@ -486,5 +498,41 @@ internal class PlayerEncounterPatches
     {
         // Wait for the previous loot screen to finish leaving before opening the next one.
         return activeState is PartyState or InventoryState || !isMapScreenTop;
+    }
+}
+
+internal sealed class AfterBattleTransitionGate
+{
+    private object pendingEncounter;
+    private int generation;
+    private bool releaseQueued;
+
+    public void ObserveLootScreen(object encounter)
+    {
+        pendingEncounter = encounter;
+        generation++;
+        releaseQueued = false;
+    }
+
+    public bool ShouldDeferMapUpdate(object encounter, Action<Action> enqueueRelease)
+    {
+        if (!ReferenceEquals(pendingEncounter, encounter)) return false;
+
+        if (!releaseQueued)
+        {
+            releaseQueued = true;
+            int observedGeneration = generation;
+            enqueueRelease(() => Release(encounter, observedGeneration));
+        }
+
+        return true;
+    }
+
+    private void Release(object encounter, int observedGeneration)
+    {
+        if (!ReferenceEquals(pendingEncounter, encounter) || generation != observedGeneration) return;
+
+        pendingEncounter = null;
+        releaseQueued = false;
     }
 }

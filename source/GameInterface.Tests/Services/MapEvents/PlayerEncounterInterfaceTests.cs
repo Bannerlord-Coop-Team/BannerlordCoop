@@ -7,6 +7,8 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Villages.Commands;
 using HarmonyLib;
 using Helpers;
+using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
@@ -41,9 +43,42 @@ public class PlayerEncounterInterfaceTests
     }
 
     [Fact]
-    public void ShouldDeferAfterBattle_WhilePreviousScreenIsStillTop_ReturnsTrue()
+    public void ShouldDeferAfterBattle_WhenMapScreenIsNotTop_ReturnsTrue()
     {
         Assert.True(PlayerEncounterPatches.ShouldDeferAfterBattle(new MapState(), isMapScreenTop: false));
+    }
+
+    [Fact]
+    public void AfterBattleTransitionGate_DefersEveryCloseActivationUpdateUntilNextDrain()
+    {
+        var gate = new AfterBattleTransitionGate();
+        var encounter = new object();
+        var queuedReleases = new List<Action>();
+        gate.ObserveLootScreen(encounter);
+
+        Assert.True(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add));
+        Assert.True(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add));
+        Assert.Single(queuedReleases);
+
+        queuedReleases[0]();
+
+        Assert.False(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add));
+    }
+
+    [Fact]
+    public void AfterBattleTransitionGate_NewerLootScreenKeepsQueuedReleaseFromOpeningNextPhase()
+    {
+        var gate = new AfterBattleTransitionGate();
+        var encounter = new object();
+        var queuedReleases = new List<Action>();
+        gate.ObserveLootScreen(encounter);
+        Assert.True(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add));
+
+        gate.ObserveLootScreen(encounter);
+        queuedReleases[0]();
+
+        Assert.True(gate.ShouldDeferMapUpdate(encounter, queuedReleases.Add));
+        Assert.Equal(2, queuedReleases.Count);
     }
 
     [Fact]
