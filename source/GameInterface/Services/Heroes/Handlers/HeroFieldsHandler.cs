@@ -150,7 +150,15 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            MarshalApply(data.HeroId, nameof(ChangeHeroState), instance => instance._heroState = (Hero.CharacterStates)data.HeroState);
+            MarshalApply(data.HeroId, nameof(ChangeHeroState), instance =>
+            {
+                var oldState = instance._heroState;
+                var newState = (Hero.CharacterStates)data.HeroState;
+                instance._heroState = newState;
+
+                // Update caches
+                instance.Clan?.OnHeroChangedState(instance, oldState);
+            });
         }
 
         private void Handle(MessagePayload<ChangeName> payload)
