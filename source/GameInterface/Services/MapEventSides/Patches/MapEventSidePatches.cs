@@ -15,6 +15,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEventSides.Patches;
@@ -55,11 +56,17 @@ internal class MapEventSidePatches
         if (party?.MobileParty?.IsPlayerParty() == true && __instance.MapEvent != null)
         {
             var mapEvent = __instance.MapEvent;
-            var side = __instance.MissionSide;
 
             if (mapEvent.FindMapEventParty(party, out var existingSide) != null)
             {
                 party._mapEventSide = existingSide;
+                return false;
+            }
+
+            if (!TryGetCanonicalSide(mapEvent, __instance, out var side))
+            {
+                party._mapEventSide = null;
+                Logger.Error("Player attempted to join a map event side that is not assigned to its map event");
                 return false;
             }
 
@@ -71,6 +78,24 @@ internal class MapEventSidePatches
         }
 
         return true;
+    }
+
+    private static bool TryGetCanonicalSide(MapEvent mapEvent, MapEventSide mapEventSide, out BattleSideEnum side)
+    {
+        if (ReferenceEquals(mapEvent.DefenderSide, mapEventSide))
+        {
+            side = BattleSideEnum.Defender;
+            return true;
+        }
+
+        if (ReferenceEquals(mapEvent.AttackerSide, mapEventSide))
+        {
+            side = BattleSideEnum.Attacker;
+            return true;
+        }
+
+        side = BattleSideEnum.None;
+        return false;
     }
 
     private static bool ShouldBlockRaidAiIntervention(MapEventSide side, PartyBase party)

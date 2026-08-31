@@ -269,6 +269,52 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void ForcePlayerJoinKingdom_RestoresKingdomlessClanThroughDirectMembershipState()
+    {
+        var player = CreateSyncedPlayerContext();
+        var fiefId = CreateSyncedClanFief(player.ClanId);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        Server.Call(() =>
+        {
+            var joinResult = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, kingdomId });
+
+            Assert.Contains("Forced player", joinResult);
+        });
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            var restoreResult = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, "none" });
+
+            Assert.Contains("Restored player", restoreResult);
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+            Assert.True(Server.ObjectManager.TryGetObject<Town>(fiefId, out var fief));
+
+            Assert.Null(clan.Kingdom);
+            Assert.DoesNotContain(clan, kingdom.Clans);
+            Assert.DoesNotContain(fief, kingdom.Fiefs);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkOnClanChangedKingdom>());
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                Assert.True(client.ObjectManager.TryGetObject<Town>(fiefId, out var fief));
+
+                Assert.Null(clan.Kingdom);
+                Assert.DoesNotContain(clan, kingdom.Clans);
+                Assert.DoesNotContain(fief, kingdom.Fiefs);
+            });
+        }
+    }
+
+    [Fact]
     public void VassalServiceAccepted_JoinsPlayerClanAuthoritativelyAndRejectsReplay()
     {
         var client = Clients.First();
