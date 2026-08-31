@@ -27,7 +27,7 @@ internal class CraftingResultPatches
             if (GameStateManager.Current.ActiveState is CraftingState)
             {
                 // CompleteOrder and refreshing handled elsewhere
-                if (__instance.IsInOrderMode)
+                if (IsFinalizingOrder(__instance))
                 {
                     __instance.CraftedItemObject = null;
                 }
@@ -52,5 +52,11 @@ internal class CraftingResultPatches
 
         // Replace original
         return false;
+    }
+
+    internal static bool IsFinalizingOrder(WeaponDesignVM weaponDesignVM)
+    {
+        // Completing an order can switch the screen back to free-build mode before the popup is closed.
+        return weaponDesignVM?.CraftingResultPopup?.IsInOrderMode == true;
     }
 }
