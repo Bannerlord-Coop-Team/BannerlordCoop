@@ -1208,8 +1208,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
 
     // True when the local player is in a PlayerEncounter whose other side is not the party this interaction
-    // session is against. The in-army initiator legitimately reaches TryOpenMapConversation while still in an
-    // army_encounter with the session's other party (EncounteredParty == sessionOtherParty) - that is allowed.
+    // session is against.
     private static bool HasUnrelatedLiveEncounter(PartyBase sessionOtherParty)
     {
         if (PlayerEncounter.Current == null)
