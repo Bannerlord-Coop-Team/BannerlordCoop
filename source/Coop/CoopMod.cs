@@ -25,9 +25,6 @@ using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
-#if DEBUG
-using System.Collections.Generic;
-#endif
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -42,9 +39,6 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.ScreenSystem;
-#if DEBUG
-using static TaleWorlds.Library.CommandLineFunctionality;
-#endif
 using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop
@@ -483,6 +477,11 @@ namespace Coop
                 CrashDiagnostics.SetPhase,
                 activeLogFilePath);
 
+#if DEBUG
+            global::Coop.Core.Common.Commands.ProcessLifetimeClientSessionStarter.Configure(
+                () => Coop.StartAsClient());
+#endif
+
             Updateables.Add(GameThread.Instance);
 
 #if DEBUG
@@ -801,39 +800,4 @@ namespace Coop
         }
     }
 
-#if DEBUG
-    /// <summary>
-    /// Starts a deferred live-test client through the normal connection path.
-    /// </summary>
-    internal static class JoinFixtureCommands
-    {
-        // This command must be available before the session registrar exists so start can create a session.
-        [CommandLineArgumentFunction(
-            Coop.Core.Common.Commands.LegacyConnectionCommandExceptions.StartName,
-            Coop.Core.Common.Commands.LegacyConnectionCommandExceptions.Prefix)]
-        public static string Start(List<string> args)
-        {
-            if (args.Count != 0)
-            {
-                return "Usage: coop.debug.connection.start";
-            }
-
-            if (ModInformation.IsServer)
-            {
-                return "start must be run on a client.";
-            }
-
-            if (ContainerProvider.TryResolve<Common.LogicStates.ILogic>(out _))
-            {
-                return "Client co-op connection is already starting or running.";
-            }
-
-            if (!CoopMod.Coop.StartAsClient())
-            {
-                throw new InvalidOperationException("Client co-op connection start was refused.");
-            }
-            return "Client co-op connection started.";
-        }
-    }
-#endif
 }

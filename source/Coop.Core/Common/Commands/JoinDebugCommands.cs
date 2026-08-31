@@ -11,7 +11,6 @@ using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using ServerLoadingState = Coop.Core.Server.Connections.States.LoadingState;
 
 namespace Coop.Core.Common.Commands;
@@ -162,29 +161,6 @@ internal static class JoinDebugCommands
 
         clientLogic.Disconnect();
         return "Client session is returning to the main menu.";
-    }
-
-    // This command must be available before the session registrar exists so reconnect can create a session.
-    [CommandLineArgumentFunction(
-        LegacyConnectionCommandExceptions.ReconnectName,
-        LegacyConnectionCommandExceptions.Prefix)]
-    public static string Reconnect(List<string> args)
-    {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.connection.reconnect";
-        }
-        if (ModInformation.IsServer)
-        {
-            return "reconnect must be run on a client.";
-        }
-        if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
-        {
-            return "No client session was found.";
-        }
-
-        clientLogic.Connect();
-        return "Client session is reconnecting to the configured server.";
     }
 
     internal static void ForceArmedInactivePartyDeficit()

@@ -6,16 +6,21 @@ namespace GameInterface.Services.SystemDeveloper.Commands;
 
 internal static class SystemDeveloperLegacyCommandResult
 {
-    public static CoopCommandResult FromOutput(string output)
+    public static CoopCommandResult FromOutput(
+        string output,
+        params string[] commandFailurePrefixes)
     {
         if (output == null) return new CoopCommandResult(false, "Command returned no output.", "command_failed");
 
-        bool succeeded = !LooksLikeFailure(output);
+        bool succeeded = !LooksLikeFailure(output, commandFailurePrefixes);
         return new CoopCommandResult(succeeded, output, succeeded ? null : "command_rejected");
     }
 
-    private static bool LooksLikeFailure(string output)
+    private static bool LooksLikeFailure(
+        string output,
+        string[] commandFailurePrefixes)
     {
+        // Backing commands preserve string APIs, so every scoped rejection prefix is listed here.
         string[] failurePrefixes =
         {
             "Usage:",
@@ -33,9 +38,42 @@ internal static class SystemDeveloperLegacyCommandResult
             "This function ",
             "Could not ",
             "Cannot ",
+            "Managing campaign options ",
+            "An integer amount ",
+            "Close the current prompt ",
+            "Campaign map camera is unavailable",
+            "Campaign map screen is unavailable",
+            "Seconds must ",
+            "Leave the active ",
+            "Active state is already ",
+            "Saving overlay: UNAVAILABLE",
+            "Cheats are currently disabled ",
+            "Hero name argument required",
+            "Hero not found",
+            "Hero '",
+            "Item object not found",
+            "Town name argument required",
+            "Town not found",
+            "Unknown ",
+            "Quest type ",
+            "A client AI-lord ",
+            "An AI-lord ",
+            "A visual test fixture ",
+            "A save is already ",
+            "Captor ",
+            "PartyScreenLogic ",
+            "The active ",
+            "The evidence hold ",
+            "Autosaves are disabled",
+            "Not advertising",
+            "Tactical unit symbols configuration is unavailable",
         };
 
         foreach (string prefix in failurePrefixes)
+        {
+            if (output.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        foreach (string prefix in commandFailurePrefixes)
         {
             if (output.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
         }
@@ -43,7 +81,11 @@ internal static class SystemDeveloperLegacyCommandResult
         return output.IndexOf(" not found", StringComparison.OrdinalIgnoreCase) >= 0 ||
                output.IndexOf(" was not found", StringComparison.OrdinalIgnoreCase) >= 0 ||
                output.IndexOf(" can only be ", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               output.IndexOf(" must be run ", StringComparison.OrdinalIgnoreCase) >= 0;
+               output.IndexOf(" must be run ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" failed.", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" cannot ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" did not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" does not ", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
 
@@ -2445,7 +2487,9 @@ public sealed class SteamHostLobbyCommand : ISteamHostLobbyCommand
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         string output = global::GameInterface.Services.UI.Commands.SteamDebugCommand.HostLobby(new List<string>(args));
-        return SystemDeveloperLegacyCommandResult.FromOutput(output);
+        return SystemDeveloperLegacyCommandResult.FromOutput(
+            output,
+            "Steam integration inactive");
     }
 }
 
@@ -2490,7 +2534,9 @@ public sealed class SteamJoinCommand : ISteamJoinCommand
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         string output = global::GameInterface.Services.UI.Commands.SteamDebugCommand.Join(new List<string>(args));
-        return SystemDeveloperLegacyCommandResult.FromOutput(output);
+        return SystemDeveloperLegacyCommandResult.FromOutput(
+            output,
+            "Steam integration inactive");
     }
 }
 

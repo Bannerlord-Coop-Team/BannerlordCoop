@@ -1,4 +1,5 @@
-﻿using Common.Commands;
+﻿using Common;
+using Common.Commands;
 using GameInterface.Services.SystemDeveloper.Commands;
 using Serilog;
 using System;
@@ -8,6 +9,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Utils.Commands;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class SystemDeveloperCommandTests
 {
     [Fact]
@@ -55,9 +57,43 @@ public class SystemDeveloperCommandTests
         Assert.Equal("invalid_arguments", result.ErrorCode);
     }
 
+    [Fact]
+    public void CampaignOptionRoleFailure_ReturnsFailedResultThroughRegistry()
+    {
+        bool wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = false;
+        try
+        {
+            var command = new CampaignOptionsAutoAllocateClanMemberPerksCommand();
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
+            var argsFactory = new CoopCommandArgsFactory();
+
+            CoopCommandResult result = registry.ProcessCommand(
+                "coop.debug.campaign_options.auto_allocate_clan_member_perks",
+                argsFactory.FromValues(new[] { "true" }));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("command_rejected", result.ErrorCode);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
     [Theory]
     [InlineData("Failed: no active campaign.", false)]
     [InlineData("Command can only be run on the server.", false)]
+    [InlineData("Managing campaign options is disabled on clients; the host does this.", false)]
+    [InlineData("An integer amount of xp is required.", false)]
+    [InlineData("Hero not found.", false)]
+    [InlineData("A save is already queued.", false)]
+    [InlineData("Unknown quest type key 'missing'.", false)]
+    [InlineData("Tactical unit symbols configuration is unavailable.", false)]
+    [InlineData("Close screen failed.\nException: InvalidOperationException", false)]
+    [InlineData("Diagnostic bug-report log sharing is disabled.", true)]
     [InlineData("Advanced campaign time forward by 2 days.", true)]
     public void LegacyResult_MapsSuccessAndFailure(string output, bool succeeded)
     {
@@ -66,6 +102,20 @@ public class SystemDeveloperCommandTests
         Assert.Equal(succeeded, result.Succeeded);
         Assert.Equal(succeeded ? null : "command_rejected", result.ErrorCode);
         Assert.Equal(output, result.Output);
+    }
+
+    [Fact]
+    public void LegacyResult_CommandSpecificFailure_DoesNotChangeStatusResult()
+    {
+        const string output = "Steam integration inactive";
+
+        CoopCommandResult hostResult = SystemDeveloperLegacyCommandResult.FromOutput(
+            output,
+            "Steam integration inactive");
+        CoopCommandResult statusResult = SystemDeveloperLegacyCommandResult.FromOutput(output);
+
+        Assert.False(hostResult.Succeeded);
+        Assert.True(statusResult.Succeeded);
     }
 
     private static ICoopCommand[] CreateCommands()
