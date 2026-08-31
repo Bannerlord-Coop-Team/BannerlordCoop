@@ -7,15 +7,23 @@ namespace GameInterface.Services.Party.Commands;
 public interface IPartyLegacyCommandResult
 {
     CoopCommandResult FromOutput(string output);
+
+    CoopCommandResult FromOutput(string output, string failurePrefix);
 }
 
 public sealed class PartyLegacyCommandResult : IPartyLegacyCommandResult
 {
     public CoopCommandResult FromOutput(string output)
     {
+        return FromOutput(output, null);
+    }
+
+    public CoopCommandResult FromOutput(string output, string failurePrefix)
+    {
         if (output == null) return new CoopCommandResult(false, "Command returned no output.", "command_failed");
 
-        bool succeeded = !LooksLikeFailure(output);
+        bool isKnownFailure = failurePrefix != null && output.StartsWith(failurePrefix, StringComparison.Ordinal);
+        bool succeeded = !isKnownFailure && !LooksLikeFailure(output);
         return new CoopCommandResult(succeeded, output, succeeded ? null : "command_failed");
     }
 
@@ -1036,7 +1044,7 @@ public sealed class AddTroopXpCommand : IAddTroopXpCommand
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         string output = global::GameInterface.Services.Party.Commands.PartyCommands.AddTroopXpCommand(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return resultFactory.FromOutput(output, "Please enter an integer");
     }
 }
 

@@ -1,4 +1,5 @@
-﻿using Common.Commands;
+﻿using Common;
+using Common.Commands;
 using GameInterface.Services.MapEvents.Commands;
 using GameInterface.Services.Party.Commands;
 using GameInterface.Services.PartyVisuals.Commands;
@@ -10,6 +11,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Utils.Commands;
 
+[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class MigratedAttributedCommandTests
 {
     private static readonly string[] CommandNamespaces =
@@ -82,6 +84,41 @@ public class MigratedAttributedCommandTests
         Assert.Equal(succeeded, result.Succeeded);
         Assert.Equal(succeeded ? null : "command_failed", result.ErrorCode);
         Assert.Equal(output, result.Output);
+    }
+
+    [Fact]
+    public void GetEventResult_MapEventSummary_IsSuccessful()
+    {
+        const string output = "Map event id: map_event_42\r\n\r\nSummary:";
+
+        CoopCommandResult result = new MapEventLegacyCommandResult().FromOutput(output, "Map event id:");
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.ErrorCode);
+        Assert.Equal(output, result.Output);
+    }
+
+    [Fact]
+    public void AddTroopXpResult_InvalidXp_IsFailure()
+    {
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            var command = new AddTroopXpCommand(new PartyLegacyCommandResult());
+            var argsFactory = new CoopCommandArgsFactory();
+
+            CoopCommandResult result = command.ProcessCommand(
+                argsFactory.FromValues(new[] { "Hero One", "not-an-integer" }));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("command_failed", result.ErrorCode);
+            Assert.Equal("Please enter an integer for xp amount", result.Output);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
     }
 
     private static ICoopCommand[] CreateCommands()

@@ -7,15 +7,23 @@ namespace GameInterface.Services.MapEvents.Commands;
 public interface IMapEventLegacyCommandResult
 {
     CoopCommandResult FromOutput(string output);
+
+    CoopCommandResult FromOutput(string output, string successfulPrefix);
 }
 
 public sealed class MapEventLegacyCommandResult : IMapEventLegacyCommandResult
 {
     public CoopCommandResult FromOutput(string output)
     {
+        return FromOutput(output, null);
+    }
+
+    public CoopCommandResult FromOutput(string output, string successfulPrefix)
+    {
         if (output == null) return new CoopCommandResult(false, "Command returned no output.", "command_failed");
 
-        bool succeeded = !LooksLikeFailure(output);
+        bool isKnownSuccess = successfulPrefix != null && output.StartsWith(successfulPrefix, StringComparison.Ordinal);
+        bool succeeded = isKnownSuccess || !LooksLikeFailure(output);
         return new CoopCommandResult(succeeded, output, succeeded ? null : "command_failed");
     }
 
@@ -2069,7 +2077,7 @@ public sealed class GetEventCommand : IGetEventCommand
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         string output = global::GameInterface.Services.Villages.Commands.MapEventDebugCommands.GetEvent(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return resultFactory.FromOutput(output, "Map event id:");
     }
 }
 
