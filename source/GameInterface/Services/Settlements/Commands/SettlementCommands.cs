@@ -15,9 +15,8 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.Template.Commands;
+namespace GameInterface.Services.Settlements.Commands;
 
 internal class SettlementCommands
 {
@@ -38,14 +37,10 @@ internal class SettlementCommands
         }
     }
 #endif
-
-    [CommandLineArgumentFunction("enter_random_castle", "coop.debug.settlements")]
     public static string EnterRandomCastle(List<string> strings)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
-        if (strings.Count > 1)
-            return "Usage: coop.debug.settlements.enter_random_castle [castleId]";
 
         var castles = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsCastle).ToArray();
         var castle = strings.Count == 0
@@ -60,13 +55,10 @@ internal class SettlementCommands
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("teleport_main_party_to_castle", "coop.debug.settlements")]
     public static string TeleportMainPartyToCastle(List<string> strings)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
-        if (strings.Count != 1)
-            return "Usage: coop.debug.settlements.teleport_main_party_to_castle <castleId>";
 
         var castle = Campaign.Current.CampaignObjectManager.Settlements
             .FirstOrDefault(settlement => settlement.IsCastle && settlement.StringId == strings[0]);
@@ -104,14 +96,10 @@ internal class SettlementCommands
             $"Requested authoritative teleport to {castle.Name} ({castle.StringId}) gate " +
             $"at {castle.GatePosition.X:R},{castle.GatePosition.Y:R}.";
     }
-
-    [CommandLineArgumentFunction("restore_main_party_castle_teleport", "coop.debug.settlements")]
     public static string RestoreMainPartyCastleTeleport(List<string> strings)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
-        if (strings.Count != 0)
-            return "Usage: coop.debug.settlements.restore_main_party_castle_teleport";
 
         var mainParty = MobileParty.MainParty;
         if (mainParty == null)
@@ -162,11 +150,8 @@ internal class SettlementCommands
         return false;
     }
 #endif
-
-    [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
     public static string GetTownName(List<string> strings)
     {
-        if (strings.Count != 1) return "Invalid usage, expected \"get_town_name <settlment id>\"";
 
         string settlementId = strings.Single();
 
@@ -188,12 +173,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlement and float value</param>
     /// <returns>info that is was succesfull</returns>
-    [CommandLineArgumentFunction("set_enemies_spotted", "coop.debug.settlements")]
     public static string SetEnemiesSpotted(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_enemies_spotted <settlment id> <float_value>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -222,12 +205,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlement and float value</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_allies_spotted", "coop.debug.settlements")]
     public static string SetAlliesSpotted(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_enemies_spotted <settlment id> <float_value>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -253,12 +234,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlement and int value</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_bribe_paid", "coop.debug.settlements")]
     public static string SetBribePaid(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_bribe_paid <settlment id> <int_value>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -284,12 +263,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlement and float value</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_hit_points", "coop.debug.settlements")]
     public static string SetHitPoints(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_bribe_paid <settlment id> <int_value>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -315,12 +292,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid and last_attacker</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("last_attacker", "coop.debug.settlements")]
     public static string SetLastAttackerParty(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"last_attacker <settlementId> <last_attacker_id>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -348,7 +323,6 @@ internal class SettlementCommands
     // Lists all the possible siege states
     /// </summary>
     /// <returns>all the siegeStates</returns>
-    [CommandLineArgumentFunction("list_siege_state", "coop.debug.settlements")]
     public static string ListSiegeStates(List<string> args)
     {
 
@@ -366,12 +340,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid and SiegeState</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_siege_state", "coop.debug.settlements")]
     public static string SetSiegeState(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <siege_state>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -401,12 +373,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid and float of how many troops (negative or pos)</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_militia", "coop.debug.settlements")]
     public static string SetMiltiia(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <militia_float>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -435,12 +405,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid and float of how many troops (negative or pos)</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_garrison_pay_limit", "coop.debug.settlements")]
     public static string SetGarrisonWageLimit(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <militia_float>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -469,12 +437,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid </param>
     /// <returns>info that is was successful</returns>
-    [CommandLineArgumentFunction("collect_cache_notables", "coop.debug.settlements")]
     public static string CollectCacheNotables(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 1) return "Invalid usage, expected \"collect_cache_notables <settlementId>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -502,11 +468,9 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">settlement name</param>
     /// <returns>info about the settlement</returns>
-    [CommandLineArgumentFunction("info", "coop.debug.settlements")]
     public static string Info(List<string> args)
     {
 
-        if (args.Count != 1) return "Invalid usage, expected \"info <settlment id>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
 
@@ -547,12 +511,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args"><see cref="SettlementComponent"/> id, <see cref="MobileParty"/> or <see cref="Settlement"/> id</param>
     /// <returns>info that is was successful</returns>
-    [CommandLineArgumentFunction("set_owner", "coop.debug.settlementComponent")]
     public static string SetOwner(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Mobile party id>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
         var objectManager = container.Resolve<IObjectManager>();
@@ -587,13 +549,10 @@ internal class SettlementCommands
     // real siege. Server only. Settlement is resolved by name or id; the capturer (used as the new
     // owner and the garrison's destroyer) defaults to an enemy-kingdom clan leader with a party, so
     // the resulting fief owner is in a kingdom and the post-siege claimant decision is well-formed.
-    [CommandLineArgumentFunction("capture_by_siege", "coop.debug.settlements")]
     public static string CaptureBySiege(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count < 1)
-            return "Usage: coop.debug.settlements.capture_by_siege <Settlement name or id> [CapturerHero id]";
 
         var settlement = Campaign.Current.CampaignObjectManager.Settlements
             .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
@@ -636,12 +595,8 @@ internal class SettlementCommands
         return $"Captured {settlement.Name} by siege; new owner {capturer.Name} ({capturer.MapFaction?.Name})" +
                Environment.NewLine + FormatOwnerState(settlement);
     }
-
-    [CommandLineArgumentFunction("owner_state", "coop.debug.settlements")]
     public static string OwnerState(List<string> args)
     {
-        if (args.Count != 1)
-            return "Usage: coop.debug.settlements.owner_state <Settlement name or id>";
 
         var settlement = Campaign.Current.CampaignObjectManager.Settlements
             .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
@@ -675,12 +630,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args"><see cref="SettlementComponent"/> id, amount of gold</param>
     /// <returns>info that is was successful</returns>
-    [CommandLineArgumentFunction("set_gold", "coop.debug.settlementComponent")]
     public static string SetGold(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Gold>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
         var objectManager = container.Resolve<IObjectManager>();
@@ -704,12 +657,10 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args"><see cref="SettlementComponent"/> id, new <see cref="SettlementComponent.IsOwnerUnassigned"/> value></param>
     /// <returns>info that is was successful</returns>
-    [CommandLineArgumentFunction("set_is_owner_unassigned", "coop.debug.settlementComponent")]
     public static string SetIsOwnerUnassigned(List<string> args)
     {
         if (ModInformation.IsClient) return "This function can only be used by the server";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <boolean>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
         var objectManager = container.Resolve<IObjectManager>();
@@ -731,12 +682,10 @@ internal class SettlementCommands
     /// <summary>
     /// Set OwnerClan of a settlement from Hero Id
     /// </summary>
-    [CommandLineArgumentFunction("set_ownerclan", "coop.debug.settlements")]
     public static string SetOwnerClan(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
 
-        if (strings.Count != 2) return "Invalid usage, expected \"set_ownerclan <settlementId|settlementName> <heroId>\"";
 
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var settlement in Settlement.All)

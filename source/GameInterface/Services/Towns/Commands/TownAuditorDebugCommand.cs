@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
@@ -9,7 +9,6 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Towns.Commands;
 
@@ -34,7 +33,6 @@ public class TownAuditorDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the towns</returns>
-    [CommandLineArgumentFunction("auditor", "coop.debug.town")]
     public static string Auditor(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();

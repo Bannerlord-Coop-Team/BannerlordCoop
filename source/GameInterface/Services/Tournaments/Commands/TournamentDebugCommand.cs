@@ -15,7 +15,6 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Tournaments.Commands;
 
@@ -32,15 +31,11 @@ public class TournamentDebugCommand
         public TournamentGame CreatedGame;
     }
 #endif
-
-    [CommandLineArgumentFunction("add_tournament_to_town", "coop.debug.tournaments")]
     public static string AddTournamentToTown(List<string> args)
     {
         if (ModInformation.IsClient)
             return "This function can only be used by the server";
 
-        if (args.Count != 1)
-            return "Usage: coop.debug.tournaments.add_tournament_to_town <town name or id>";
 
         if (Campaign.Current?.TournamentManager is not TournamentManager tournamentManager)
             return "No campaign is currently loaded";
@@ -67,13 +62,10 @@ public class TournamentDebugCommand
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("danustica_fixture_begin", "coop.debug.tournaments")]
     public static string BeginDanusticaFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.tournaments.danustica_fixture_begin";
         if (fixture != null)
             return "A Danustica tournament fixture is already pending restoration.";
         if (!TryResolveDanusticaContext(out var town, out var townId, out var error))
@@ -115,12 +107,8 @@ public class TournamentDebugCommand
             $"DANUSTICA_TOURNAMENT_FIXTURE_STARTED townId={townId}|" +
             $"nativeType={tournamentGame.GetType().Name}|created={createdGame != null}";
     }
-
-    [CommandLineArgumentFunction("danustica_fixture_state", "coop.debug.tournaments")]
     public static string DanusticaFixtureState(List<string> args)
     {
-        if (args.Count != 0)
-            return "Usage: coop.debug.tournaments.danustica_fixture_state";
 
         string fixtureState;
         if (fixture == null)
@@ -142,14 +130,10 @@ public class TournamentDebugCommand
 
         return $"DANUSTICA_TOURNAMENT_FIXTURE state={fixtureState}\n" + ObserveDanustica();
     }
-
-    [CommandLineArgumentFunction("danustica_fixture_restore", "coop.debug.tournaments")]
     public static string RestoreDanusticaFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.tournaments.danustica_fixture_restore";
         if (fixture == null)
             return "No Danustica tournament fixture is pending restoration.";
 
@@ -182,14 +166,10 @@ public class TournamentDebugCommand
         return
             $"DANUSTICA_TOURNAMENT_FIXTURE_RESTORED removedCreatedTournament={createdGame != null}";
     }
-
-    [CommandLineArgumentFunction("danustica_fixture_abort", "coop.debug.tournaments")]
     public static string AbortDanusticaFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.tournaments.danustica_fixture_abort";
         if (fixture == null)
             return "No Danustica tournament fixture is pending restoration.";
         if (fixture.Campaign != Campaign.Current)
@@ -222,14 +202,10 @@ public class TournamentDebugCommand
             $"DANUSTICA_TOURNAMENT_FIXTURE_ABORTED sessionId={session.SessionId}|" +
             $"phase={session.Phase}|createdTournamentPreservedForRestore=True";
     }
-
-    [CommandLineArgumentFunction("danustica_request_join", "coop.debug.tournaments")]
     public static string RequestDanusticaJoin(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.tournaments.danustica_request_join";
         if (!TryResolveDanusticaController(out var controller, out _, out var townId, out var error))
             return error;
 
@@ -249,14 +225,10 @@ public class TournamentDebugCommand
             $"DANUSTICA_TOURNAMENT_JOIN_REQUESTED townId={townId}|" +
             $"sessionId={snapshot.SessionId}|revision={snapshot.Revision}";
     }
-
-    [CommandLineArgumentFunction("danustica_request_start", "coop.debug.tournaments")]
     public static string RequestDanusticaStart(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.tournaments.danustica_request_start";
         if (!TryResolveDanusticaController(out var controller, out _, out var townId, out var error))
             return error;
         if (!controller.TryGetTownSession(townId, out var snapshot))
@@ -268,14 +240,11 @@ public class TournamentDebugCommand
         return
             $"DANUSTICA_TOURNAMENT_START_REQUESTED sessionId={snapshot.SessionId}|revision={snapshot.Revision}";
     }
-
-    [CommandLineArgumentFunction("danustica_request_choice", "coop.debug.tournaments")]
     public static string RequestDanusticaChoice(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
-        if (args.Count != 1 ||
-            !Enum.TryParse(args[0], true, out TournamentPlayerChoice choice) ||
+        if (!Enum.TryParse(args[0], true, out TournamentPlayerChoice choice) ||
             choice == TournamentPlayerChoice.None)
         {
             return "Usage: coop.debug.tournaments.danustica_request_choice <Join|Watch|Skip>";
@@ -297,14 +266,10 @@ public class TournamentDebugCommand
             $"DANUSTICA_TOURNAMENT_CHOICE_REQUESTED sessionId={snapshot.SessionId}|" +
             $"revision={snapshot.Revision}|matchId={snapshot.CurrentMatchId}|choice={choice}";
     }
-
-    [CommandLineArgumentFunction("danustica_request_leave", "coop.debug.tournaments")]
     public static string RequestDanusticaLeave(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.tournaments.danustica_request_leave";
         if (!TryResolveDanusticaController(out var controller, out _, out var townId, out var error))
             return error;
         if (!controller.TryGetTownSession(townId, out var snapshot))
@@ -315,12 +280,8 @@ public class TournamentDebugCommand
             $"DANUSTICA_TOURNAMENT_LEAVE_REQUESTED sessionId={snapshot.SessionId}|" +
             $"revision={snapshot.Revision}|phase={snapshot.Phase}";
     }
-
-    [CommandLineArgumentFunction("danustica_observe", "coop.debug.tournaments")]
     public static string ObserveDanusticaCommand(List<string> args)
     {
-        if (args.Count != 0)
-            return "Usage: coop.debug.tournaments.danustica_observe";
 
         return ObserveDanustica();
     }

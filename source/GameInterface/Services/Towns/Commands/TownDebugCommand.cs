@@ -13,9 +13,8 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.Villages.Commands;
+namespace GameInterface.Services.Towns.Commands;
 
 public class TownDebugCommand
 {
@@ -38,7 +37,6 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the towns</returns>
-    [CommandLineArgumentFunction("list_towns", "coop.debug.town")]
     public static string ListTowns(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -61,7 +59,6 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the items</returns>
-    [CommandLineArgumentFunction("list_items", "coop.debug.town")]
     public static string ListItems(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -81,13 +78,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">town ID to lookup</param>
     /// <returns>Information regarding the town.</returns>
-    [CommandLineArgumentFunction("info", "coop.debug.town")]
     public static string Info(List<string> args)
     {
-        if (args.Count < 1)
-        {
-            return "Usage: coop.debug.town.info <townId>";
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -126,14 +118,8 @@ public class TownDebugCommand
         }
         return sb.ToString();
     }
-
-    [CommandLineArgumentFunction("garrison_backlink", "coop.debug.town")]
     public static string GarrisonBacklink(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.town.garrison_backlink <townId>";
-        }
 
         if (!TryGetObjectManager(out var objectManager))
         {
@@ -165,14 +151,8 @@ public class TownDebugCommand
                $"activeGarrisonCount={activeGarrisons.Count} activeGarrisonParties={activeParties} " +
                $"backlinkMatchesActive={backlinkMatchesActive}";
     }
-
-    [CommandLineArgumentFunction("focus_garrison", "coop.debug.town")]
     public static string FocusGarrison(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.town.focus_garrison <townId>";
-        }
 
         if (!TryGetObjectManager(out var objectManager))
         {
@@ -203,8 +183,6 @@ public class TownDebugCommand
         mapScreen.MapCameraView.SetCameraMode(MapCameraView.CameraFollowMode.FollowParty);
         return $"Following {garrison.StringId} at {town.Name} on the campaign map";
     }
-
-    [CommandLineArgumentFunction("apply_garrison_lifecycle", "coop.debug.town")]
     public static string ApplyGarrisonLifecycle(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -212,10 +190,6 @@ public class TownDebugCommand
             return "This function can only be used by the server";
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.apply_garrison_lifecycle <townId> <initialize|finalize>";
-        }
 
         if (!TryGetObjectManager(out var objectManager))
         {
@@ -274,10 +248,8 @@ public class TownDebugCommand
     /// building's level/progress, so server and client screenshots can be compared to confirm the building
     /// collection still replicates.
     /// </summary>
-    [CommandLineArgumentFunction("list_buildings", "coop.debug.town")]
     public static string ListBuildings(List<string> args)
     {
-        if (args.Count != 1) return "Usage: coop.debug.town.list_buildings <townId>";
         if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
         if (objectManager.TryGetObject(args[0], out Town town) == false) return $"ID: '{args[0]}' not found";
 
@@ -296,10 +268,8 @@ public class TownDebugCommand
     /// Lists a town's Workshops (the synced collection-PROPERTY array) with each workshop's type and owner,
     /// so server and client screenshots can be compared to confirm the workshop collection still replicates.
     /// </summary>
-    [CommandLineArgumentFunction("list_workshops", "coop.debug.town")]
     public static string ListWorkshops(List<string> args)
     {
-        if (args.Count != 1) return "Usage: coop.debug.town.list_workshops <townId>";
         if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
         if (objectManager.TryGetObject(args[0], out Town town) == false) return $"ID: '{args[0]}' not found";
 
@@ -316,13 +286,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">first arg : townId ; second arg : stock value</param>
     /// <returns></returns>
-    [CommandLineArgumentFunction("set_foodStocks", "coop.debug.town")]
     public static string SetFoodStocks(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_foodStocks <townId> <foodStocks> ";
-        }
 
         string townId = args[0];
         string foodStocksString = args[1];
@@ -354,13 +319,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the heroID to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_governor", "coop.debug.town")]
     public static string SetTownGovernor(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_governor <townId> <heroId> ";
-        }
 
         string townId = args[0];
         string heroId = args[1];
@@ -391,13 +351,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the clanID to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_last_captured_by", "coop.debug.town")]
     public static string SetTownLastCapturedBy(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_last_captured_by <townId> <clanId> ";
-        }
 
         string townId = args[0];
         string clanId = args[1];
@@ -428,13 +383,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the itemID to add and a number to add.</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("add_item_to_sold_items", "coop.debug.town")]
     public static string AddToTownSoldItems(List<string> args)
     {
-        if (args.Count != 3)
-        {
-            return "Usage: coop.debug.town.add_item_to_sold_items <townId> <itemId> <numberOfItems>";
-        }
 
         string townId = args[0];
         string itemId = args[1];
@@ -490,13 +440,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the prosperity to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_prosperity", "coop.debug.town")]
     public static string SetTownProsperity(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_prosperity <townId> <prosperity> ";
-        }
 
         string townId = args[0];
         string prosperityValue = args[1];
@@ -526,13 +471,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the loyalty to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_loyalty", "coop.debug.town")]
     public static string SetTownLoyalty(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_loyalty <townId> <loyalty> ";
-        }
 
         string townId = args[0];
         string loyaltyValue = args[1];
@@ -562,13 +502,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the security to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_security", "coop.debug.town")]
     public static string SetTownSecurity(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_loyalty <townId> <security> ";
-        }
 
         string townId = args[0];
         string securityValue = args[1];
@@ -599,13 +534,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the rebellious state to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_in_rebellious_state", "coop.debug.town")]
     public static string SetTownInRebelliousState(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_in_rebellious_state <townId> <in_rebellious_state> ";
-        }
 
         string townId = args[0];
         string rebellionStateValue = args[1];
@@ -628,12 +558,9 @@ public class TownDebugCommand
         RebellionsCampaignBehaviorPatches.PublishTownInRebelliousStateChanged(town, inRebelliousState);
         return $"Town InRebelliousState has changed to: {town.InRebelliousState}.";
     }
-
-    [CommandLineArgumentFunction("start_rebellion", "coop.debug.town")]
     public static string StartRebellion(List<string> args)
     {
         if (ModInformation.IsClient) return "Run coop.debug.town.start_rebellion on the server.";
-        if (args.Count != 1) return "Usage: coop.debug.town.start_rebellion <townId>";
         if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
         if (objectManager.TryGetObject(args[0], out Town town) == false)
             return $"{nameof(Town)} with ID: '{args[0]}' not found";
@@ -654,13 +581,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the GarrisonAutoRecruitmentIsEnabled property value to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_garrison_auto_recruitment", "coop.debug.town")]
     public static string SetTownGarrisonAutoRecruitmentIsEnabled(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_garrison_auto_recruitment <townId> <garrison_auto_recruitment_enabled> ";
-        }
 
         string townId = args[0];
         string garrisonRecruitmentValue = args[1];
@@ -690,13 +612,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">the town and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("set_trade_tax_acc", "coop.debug.town")]
     public static string SetTradeTaxAccumulated(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.set_trade_tax_acc <townId> <0.0> ";
-        }
 
         string townId = args[0];
         string tradeTaxAccumulatedValue = args[1];
@@ -726,13 +643,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">the town and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("change_current_building", "coop.debug.town")]
     public static string ChangeCurrentBuilding(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.town.change_current_building <townId>";
-        }
         string townId = args[0];
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -753,13 +665,8 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">the town and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("change_current_building_queue", "coop.debug.town")]
     public static string ChangeCurrentBuildingQueue(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.town.change_current_building_queue <townId>";
-        }
         string townId = args[0];
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -777,10 +684,8 @@ public class TownDebugCommand
     /// <summary>
     /// View town management data of a specified town
     /// </summary>
-    [CommandLineArgumentFunction("managementdata", "coop.debug.town")]
     public static string ViewManagementData(List<string> strings)
     {
-        if (strings.Count == 0) return "Town name argument required.";
 
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var town in Town.AllTowns)

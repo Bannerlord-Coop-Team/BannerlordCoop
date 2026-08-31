@@ -79,6 +79,22 @@ public abstract class LegacyCoopCommand : ICoopCommand
         ExpectedArgs = expectedArgs;
     }
 
+    protected LegacyCoopCommand(
+        string prefix,
+        string name,
+        string description,
+        IExpectedArgs[] expectedArgs,
+        Func<List<string>, string> command)
+    {
+        if (command == null) throw new ArgumentNullException(nameof(command));
+
+        this.command = command;
+        Prefix = prefix;
+        Name = name;
+        Description = description;
+        ExpectedArgs = expectedArgs;
+    }
+
     public string Prefix { get; }
 
     public string Name { get; }
@@ -89,6 +105,84 @@ public abstract class LegacyCoopCommand : ICoopCommand
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        return executor.Execute(args, command);
+        if (executor != null) return executor.Execute(args, command);
+
+        var values = new List<string>(args.Count);
+        foreach (string value in args)
+        {
+            values.Add(value);
+        }
+
+        string output = command(values);
+        return LegacyCommandSucceeded(output)
+            ? new CoopCommandResult(true, output)
+            : new CoopCommandResult(false, output, "command_rejected");
+    }
+
+    internal static bool LegacyCommandSucceeded(string output)
+    {
+        if (output == null) return false;
+        if (output == "No characters" || output == "No special items") return true;
+
+        string[] failurePrefixes =
+        {
+            "Usage:",
+            "Invalid usage",
+            "Invalid ",
+            "Unable ",
+            "Error ",
+            "Failed ",
+            "No ",
+            "Run ",
+            "Argument",
+            "Expected ",
+            "Refusing ",
+            "Cannot ",
+            "Leave ",
+            "Restore the previous ",
+            "Only found ",
+            "Both parties ",
+            "A mission is already ",
+            "A player encounter with another ",
+            "A prisoner-prompt siege fixture is already ",
+            "A Danustica tournament fixture is already ",
+            "Follow fixture is already ",
+            "The client has no ",
+            "The fixture has no ",
+            "The fixture-created ",
+            "The local player party cannot ",
+            "The local player party is not ",
+            "The player party must ",
+            "The parties must ",
+            "Player ",
+            "Party ",
+            "armyPartyCount ",
+            "Command can ",
+            "Command is ",
+            "The command ",
+            "The '",
+            "This command ",
+            "This function ",
+            "Create party ",
+            "Destroy all ",
+            "spawn_test_parties ",
+            "verify_ai_authority ",
+        };
+        foreach (string prefix in failurePrefixes)
+        {
+            if (output.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+        }
+
+        return output.IndexOf(" not found", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" was not found", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" is not active", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" is not a ", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" is not under ", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" is already ", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" already has ", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" does not ", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" was not a valid ", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" must be ", StringComparison.OrdinalIgnoreCase) < 0 &&
+               output.IndexOf(" can only be ", StringComparison.OrdinalIgnoreCase) < 0;
     }
 }

@@ -1,23 +1,17 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using System.Collections.Generic;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
 
 public class RaidDebugCommands
 {
-    [CommandLineArgumentFunction("allow_raid_ai_intervention", "coop.debug.mapevent")]
     public static string AllowRaidAiIntervention(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mapevent.allow_raid_ai_intervention <on|off|toggle|status>";
-        }
 
         var value = args[0].ToLowerInvariant();
         switch (value)

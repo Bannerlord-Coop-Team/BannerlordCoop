@@ -11,7 +11,6 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Localization;
 using TaleWorlds.SaveSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Workshops.Commands
 {
@@ -56,14 +55,8 @@ namespace GameInterface.Services.Workshops.Commands
                 1000,
                 0);
         }
-
-        [CommandLineArgumentFunction("set_workshop_custom_name", "coop.debug.workshop")]
         public static string SetWorkshopCustomName(List<string> args)
         {
-            if (args.Count != 3)
-            {
-                return "Usage: coop.debug.workshop.set_custom_name <settlementName> <workshopType> <newCustomName>";
-            }
 
             string settlementName = args[0];
             string workshopType = args[1];
@@ -92,15 +85,9 @@ namespace GameInterface.Services.Workshops.Commands
 
             return $"Workshop custom name has been changed to: {workshop._customName}";
         }
-
-        [CommandLineArgumentFunction("set_workshop_owner", "coop.debug.workshop")]
         public static string SetWorkshopOwner(List<string> args)
         {
             // Expect three arguments: settlement name, workshop type, and new owner (hero ID or name)
-            if (args.Count != 3)
-            {
-                return "Usage: coop.debug.workshop.set_workshop_owner <settlementName> <workshopType> <newOwnerId>";
-            }
 
             string settlementName = args[0];
             string workshopType = args[1];
@@ -149,10 +136,8 @@ namespace GameInterface.Services.Workshops.Commands
         /// <summary>
         /// View workshop owners in a settlement
         /// </summary>
-        [CommandLineArgumentFunction("owners_in_settlement", "coop.debug.workshop")]
         public static string OwnersInSettlementCommand(List<string> strings)
         {
-            if (strings.Count == 0) return "Usage: coop.debug.workshop.owners_in_settlement <settlementId>";
 
             StringBuilder stringBuilder = new StringBuilder();
             Settlement settlement = Settlement.Find(strings[0]);
@@ -178,10 +163,8 @@ namespace GameInterface.Services.Workshops.Commands
         /// <summary>
         /// View workshops a hero owns
         /// </summary>
-        [CommandLineArgumentFunction("hero_owned_workshops", "coop.debug.workshop")]
         public static string HeroOwnedWorkshopsCommand(List<string> strings)
         {
-            if (strings.Count == 0) return "Usage: coop.debug.workshop.hero_owned_workshops <heroId>";
 
             StringBuilder stringBuilder = new StringBuilder();
             Hero hero = Hero.Find(strings[0]);
@@ -207,7 +190,6 @@ namespace GameInterface.Services.Workshops.Commands
         /// <summary>
         /// View warehouse rosters for all players on server and for current player on client
         /// </summary>
-        [CommandLineArgumentFunction("view_warehouse_rosters", "coop.debug.workshop")]
         public static string ViewWarehouseRostersCommand(List<string> strings)
         {
             StringBuilder stringBuilder = new StringBuilder();
@@ -259,10 +241,8 @@ namespace GameInterface.Services.Workshops.Commands
         /// <summary>
         /// View information about workshops in a settlement
         /// </summary>
-        [CommandLineArgumentFunction("workshop_info", "coop.debug.workshop")]
         public static string ViewWorkshopInfoCommand(List<string> strings)
         {
-            if (strings.Count == 0) return "Usage: coop.debug.workshop.workshop_info <settlementId>";
 
             StringBuilder stringBuilder = new StringBuilder();
             Settlement settlement = Settlement.Find(strings[0]);

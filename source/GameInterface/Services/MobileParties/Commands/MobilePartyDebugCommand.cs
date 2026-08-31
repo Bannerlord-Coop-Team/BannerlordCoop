@@ -15,21 +15,14 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MobileParties.Commands;
 
 internal class MobilePartyDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyDebugCommand>();
-
-    [CommandLineArgumentFunction("info", "coop.debug.mobileparty")]
     public static string Info(List<string> args)
     {
-        if (args.Count < 1)
-        {
-            return "Usage: coop.debug.mobileparty.info <PartyStringID>";
-        }
 
         MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
 
@@ -66,13 +59,8 @@ internal class MobilePartyDebugCommand
     // coop.debug.mobileparty.component_info <PartyStringID>
     // Dumps the party's _partyComponent fields (LordPartyComponent/Caravan/Garrison/etc.), which the plain
     // info cheat does NOT show (it dumps MobileParty + PartyBase only). e.g. LordPartyComponent._wagePaymentLimit.
-    [CommandLineArgumentFunction("component_info", "coop.debug.mobileparty")]
     public static string ComponentInfo(List<string> args)
     {
-        if (args.Count < 1)
-        {
-            return "Usage: coop.debug.mobileparty.component_info <PartyStringID>";
-        }
 
         MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
         if (mobileParty == null)
@@ -91,13 +79,8 @@ internal class MobilePartyDebugCommand
     // attachments. Run on the server and on each client and compare: a party the client got via live create
     // matches the server's runtime "Created_N"/concrete-type ids, while a party re-derived at join carries
     // "{Type}_{StringId}" ids that never reconcile with the server's, so its synced updates fail to resolve.
-    [CommandLineArgumentFunction("attachment_ids", "coop.debug.mobileparty")]
     public static string AttachmentIds(List<string> args)
     {
-        if (args.Count < 1)
-        {
-            return "Usage: coop.debug.mobileparty.attachment_ids <PartyStringID>";
-        }
 
         MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
         if (mobileParty == null)
@@ -125,8 +108,6 @@ internal class MobilePartyDebugCommand
         Logger.Debug("{AttachmentIds}", result);
         return result;
     }
-
-    [CommandLineArgumentFunction("verify_ai_authority", "coop.debug.mobileparty")]
     public static string VerifyAiAuthority(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -134,10 +115,6 @@ internal class MobilePartyDebugCommand
             return "verify_ai_authority is server-only";
         }
 
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mobileparty.verify_ai_authority <MobilePartyId>";
-        }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
         {
@@ -309,7 +286,6 @@ internal class MobilePartyDebugCommand
     }
 
     // coop.debug.mobileparty.createParty lord_1_1 town_V1
-    [CommandLineArgumentFunction("createParty", "coop.debug.mobileparty")]
     public static string CreateNewParty(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -317,10 +293,6 @@ internal class MobilePartyDebugCommand
             return "Create party is only to be called on the server";
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.mobileParty.createParty <Hero.StringId> <Settlment.StringId>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -348,7 +320,6 @@ internal class MobilePartyDebugCommand
     // coop.debug.mobileparty.spawn_test_parties [count] [settlementId]
     // Server-only. Spawns N lord parties from currently party-less lords near the settlement
     // (default Danustica, town_ES1) to exercise mid-session party creation/replication to clients.
-    [CommandLineArgumentFunction("spawn_test_parties", "coop.debug.mobileparty")]
     public static string SpawnTestParties(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -402,16 +373,11 @@ internal class MobilePartyDebugCommand
     }
 
     // coop.debug.mobileParty.destroyParty tbd
-    [CommandLineArgumentFunction("destroyParty", "coop.debug.mobileparty")]
     public static string DestroyParty(List<string> args)
     {
         if (ModInformation.IsClient)
         {
             return "Create party is only to be called on the server";
-        }
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mobileParty.destroyParty <MobileParty.StringId>";
         }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
@@ -434,7 +400,6 @@ internal class MobilePartyDebugCommand
     }
 
     // coop.debug.mobileparty.destroyAllBanditParties
-    [CommandLineArgumentFunction("destroyAllBanditParties", "coop.debug.mobileparty")]
     public static string DestroyAllBanditParties(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -463,8 +428,6 @@ internal class MobilePartyDebugCommand
 
         return $"Destroyed {destroyed} bandit parties, skipped {skipped} in active map events";
     }
-
-    [CommandLineArgumentFunction("list", "coop.debug.mobileparty")]
     public static string ListMobileParties(List<string> args)
     {
     	StringBuilder stringBuilder = new StringBuilder();
@@ -485,13 +448,8 @@ internal class MobilePartyDebugCommand
     /// </summary>
     /// <param name="args">mobile party and value</param>
     /// <returns>success message</returns>
-    [CommandLineArgumentFunction("set_wage_limit_updated", "coop.debug.mobileparty")]
     public static string SetWagePaymentLimit(List<string> args)
     {
-    	if (args.Count < 2)
-        {
-        	return "Usage: coop.debug.mobileparty.set_wage_limit <PartyStringID> <value>";
-        }
 
         int newValue = 0;
         try
@@ -525,13 +483,8 @@ internal class MobilePartyDebugCommand
     /// </summary>
     /// <param name="args">mobile party and value</param>
     /// <returns>success message</returns>
-	[CommandLineArgumentFunction("set_wage_unlimited", "coop.debug.mobileparty")]
 	public static string SetUnlimitedWageToggle(List<string> args)
     {
-    	if (args.Count < 2)
-        {
-        	return "Usage: coop.debug.mobileparty.set_wage_limit <PartyStringID> <value>";
-        }
 
         bool newValue = false;
         try
@@ -559,7 +512,6 @@ internal class MobilePartyDebugCommand
     }
 
     // coop.debug.mobileParty.audit
-    [CommandLineArgumentFunction("audit", "coop.debug.mobileparty")]
     public static string AuditParties(List<string> args)
     {
         if (ContainerProvider.TryResolve<MobilePartyAuditor>(out var auditor) == false)

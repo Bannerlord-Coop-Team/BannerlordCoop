@@ -5,9 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.Villages.Commands;
+namespace GameInterface.Services.BesiegerCamps.Commands;
 
 public class BesiegerCampDebugCommand
 {
@@ -30,13 +29,8 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">first arg : besiegerCampId ; second arg : value</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("set_number_of_troops_killed_on_side", "coop.debug.besiegercamp")]
     public static string SetBesiegerCampNumberOfTroopsKilledOnSide(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.besiegercamp.set_number_of_troops_killed_on_side <besiegerCampId> <value> ";
-        }
 
         string besiegerCampId = args[0];
         string troopsValueString = args[1];
@@ -67,13 +61,8 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">first arg : besiegerCampId ; second arg : value</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("coop.debug.besiegercamp.set_progress", "coop.debug.besiegercamp")]
     public static string SetBesiegerCampPreparationsProgress(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.besiegercamp.set_progress <besiegerCampId> <progress> ";
-        }
 
         string besiegerCampId = args[0];
         string percentageValueString = args[1];
@@ -104,16 +93,11 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">first arg: besiegerCampId; second arg: strategyId</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("set_siege_strategy", "coop.debug.besiegercamp")]
     public static string SetBesiegerCampSiegeStrategy(List<string> args)
     {
         string getPossibleStragegyIds() => string.Join(Environment.NewLine, SiegeStrategy.All.Select(x => x.StringId));
         string idTipMsg = $"{Environment.NewLine}SiegeStrategy Id must be one of the following:{getPossibleStragegyIds()}";
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.besiegercamp.set_siege_strategy <besiegerCampId> <strategyId>" + idTipMsg;
-        }
 
         string besiegerCampId = args[0];
         string strategyId = args[1];
@@ -147,13 +131,8 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">besiegerCampId and the partyId to set</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("set_leader_party", "coop.debug.besiegercamp")]
     public static string SetBesiegerCampLeaderParty(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.besiegercamp.set_leader_party <besiegerCampId> <partyId> ";
-        }
 
         string besiegerCampId = args[0];
         string partyId = args[1];
@@ -184,13 +163,8 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">besiegerCampId and the partyId to add</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("add_besiegerparty", "coop.debug.besiegercamp")]
     public static string AddPartyToBesiegerCamp(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.besiegercamp.add_party <besiegerCampId> <partyId>";
-        }
 
         string besiegerCampId = args[0];
         string partyId = args[1];
@@ -221,13 +195,8 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">besiegerCampId and the partyId to remove</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("remove_party", "coop.debug.besiegercamp")]
     public static string RemovePartyFromBesiegerCamp(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.besiegercamp.remove_party <besiegerCampId> <partyId>";
-        }
 
         string besiegerCampId = args[0];
         string partyId = args[1];

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Network;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages;
@@ -13,7 +13,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MobileParties.Commands;
 
@@ -21,14 +20,12 @@ internal class MercenaryStockDebugCommand
 {
     private const string RefreshCommand = "coop.debug.town.refresh_mercenary_stocks";
     private const string RequestCommand = "coop.debug.town.request_mercenary_stock";
-    private const string RefreshUsage = "Usage: coop.debug.town.refresh_mercenary_stocks <townName|ALL>";
-    private const string RequestUsage = "Usage: coop.debug.town.request_mercenary_stock <townName>";
+    private const string RefreshUsage = "Usage: coop.debug.town.refresh_mercenary_stocks \"<townName|ALL>\"";
+    private const string RequestUsage = "Usage: coop.debug.town.request_mercenary_stock \"<townName>\"";
     private const string AllTowns = "ALL";
 
     private static readonly MethodInfo UpdateCurrentMercenaryTroopAndCount =
         AccessTools.Method(typeof(RecruitmentCampaignBehavior), "UpdateCurrentMercenaryTroopAndCount", new[] { typeof(Town), typeof(bool) });
-
-    [CommandLineArgumentFunction("refresh_mercenary_stocks", "coop.debug.town")]
     public static string RefreshMercenaryStocks(List<string> args)
     {
         var context = new CommandContext(RefreshCommand, RefreshUsage, args);
@@ -70,8 +67,6 @@ internal class MercenaryStockDebugCommand
 
         return $"Refreshed mercenary stock for {towns[0].Name}.";
     }
-
-    [CommandLineArgumentFunction("request_mercenary_stock", "coop.debug.town")]
     public static string RequestMercenaryStock(List<string> args)
     {
         var context = new CommandContext(RequestCommand, RequestUsage, args);
@@ -99,20 +94,9 @@ internal class MercenaryStockDebugCommand
 
     private static bool TryGetTownName(CommandContext context, out string townName, out string error)
     {
-        townName = null;
+        townName = context.Args[0];
         error = null;
-
-        if (context.Args == null || context.Args.Count == 0)
-        {
-            error = context.Usage;
-            return false;
-        }
-
-        townName = string.Join(" ", context.Args);
-        if (!string.IsNullOrWhiteSpace(townName)) return true;
-
-        error = $"Missing required argument: townName.\n\n{context.Usage}";
-        return false;
+        return true;
     }
 
     private static string FormatServerStock(Town town, IObjectManager objectManager)

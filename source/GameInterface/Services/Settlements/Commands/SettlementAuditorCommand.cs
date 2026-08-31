@@ -1,14 +1,10 @@
 ﻿using Common;
 using GameInterface.Services.Settlements.Audit;
 using System.Collections.Generic;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Settlements.Commands;
 internal class SettlementAuditorCommand
 {
-
-
-    [CommandLineArgumentFunction("audit", "coop.debug.settlements")]
     public static string Audit(List<string> args)
     {
 

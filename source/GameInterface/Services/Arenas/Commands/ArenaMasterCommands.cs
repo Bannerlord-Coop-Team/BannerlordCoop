@@ -4,7 +4,6 @@ using SandBox.CampaignBehaviors;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Arenas.Commands;
 
@@ -13,7 +12,6 @@ internal class ArenaMasterCommands
     /// <summary>
     /// View arena master interactions data for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("list_interactions", "coop.debug.arenas")]
     public static string ViewArenaMasterInteractionsCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();

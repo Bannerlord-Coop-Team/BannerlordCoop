@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
 
@@ -30,7 +29,6 @@ internal class VillageDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the villages</returns>
-    [CommandLineArgumentFunction("list", "coop.debug.village")]
     public static string ListVillages(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -54,13 +52,8 @@ internal class VillageDebugCommand
     /// </summary>
     /// <param name="args">vilage ID to lookup</param>
     /// <returns>Information regarding the village.</returns>
-    [CommandLineArgumentFunction("info", "coop.debug.village")]
     public static string Info(List<string> args)
     {
-        if (args.Count < 1)
-        {
-            return "Usage: coop.debug.village.info <villageId>";
-        }
 
         Village village = findVillage(args[0]);
 
@@ -89,16 +82,11 @@ internal class VillageDebugCommand
     /// </summary>
     /// <param name="args">villageID and the state to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_state", "coop.debug.village")]
     public static string SetVillageState(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Usage: This command can only be used by the server for debugging purposes.";
 
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.village.set_state <villageId> <BeingRaided | ForcedForVolunteers | ForcedForSupplies | Looted> ";
-        }
 
         Village village = findVillage(args[0]);
 
@@ -124,16 +112,11 @@ internal class VillageDebugCommand
     /// </summary>
     /// <param name="args">the village and hearth value float</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("set_hearth", "coop.debug.village")]
     public static string SetVillageHearth(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Usage: This command can only be used by the server for debugging purposes.";
 
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.village.set_hearth <villageId> <0.0> ";
-        }
 
         Village village = findVillage(args[0]);
 
@@ -162,16 +145,11 @@ internal class VillageDebugCommand
     /// </summary>
     /// <param name="args">the village and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("set_trade_tax_acc", "coop.debug.village")]
     public static string SetTradeTaxAccumulated(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Usage: This command can only be used by the server for debugging purposes.";
 
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.village.set_trade_tax_acc <villageId> <0.0> ";
-        }
 
         Village village = findVillage(args[0]);
 
@@ -202,16 +180,11 @@ internal class VillageDebugCommand
     /// </summary>
     /// <param name="args">the village and village last demand time value</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("set_demand_time", "coop.debug.village")]
     public static string SetLastDemandTimeSatisified(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Usage: This command can only be used by the server for debugging purposes.";
 
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.village.set_demand_time <villageId> <0.0> ";
-        }
 
         Village village = findVillage(args[0]);
 

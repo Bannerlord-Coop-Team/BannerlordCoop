@@ -10,21 +10,16 @@ using System.Globalization;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MobileParties.Commands;
 
 internal static class FollowPartyFixtureCommands
 {
     private static FixtureState fixture;
-
-    [CommandLineArgumentFunction("follow_fixture_setup", "coop.debug.mobileparty")]
     public static string Setup(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Command can only be run on the server.";
-        if (args.Count != 1)
-            return "Usage: coop.debug.mobileparty.follow_fixture_setup <playerPartyId>";
         if (fixture != null)
             return "Follow fixture is already active; restore it before starting another.";
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
@@ -75,14 +70,10 @@ internal static class FollowPartyFixtureCommands
         return $"Follow fixture ready|player={playerParty.StringId}|target={targetParty.StringId}|" +
             $"distance={Distance(playerParty, targetParty).ToString("R", CultureInfo.InvariantCulture)}";
     }
-
-    [CommandLineArgumentFunction("follow_fixture_follow", "coop.debug.mobileparty")]
     public static string Follow(List<string> args)
     {
         if (!ModInformation.IsClient)
             return "Command can only be run on a client.";
-        if (args.Count != 1)
-            return "Usage: coop.debug.mobileparty.follow_fixture_follow <targetPartyId>";
         if (!TryFindParty(args[0], out MobileParty targetParty))
             return $"Target party '{args[0]}' was not found.";
 
@@ -99,14 +90,10 @@ internal static class FollowPartyFixtureCommands
 
         return $"Follow command submitted|player={playerParty.StringId}|target={targetParty.StringId}";
     }
-
-    [CommandLineArgumentFunction("follow_fixture_move_target", "coop.debug.mobileparty")]
     public static string MoveTarget(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Command can only be run on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.mobileparty.follow_fixture_move_target";
         if (fixture == null)
             return "Follow fixture is not active.";
 
@@ -127,12 +114,8 @@ internal static class FollowPartyFixtureCommands
             $"x={targetPoint.X.ToString("R", CultureInfo.InvariantCulture)}|" +
             $"y={targetPoint.Y.ToString("R", CultureInfo.InvariantCulture)}";
     }
-
-    [CommandLineArgumentFunction("follow_fixture_state", "coop.debug.mobileparty")]
     public static string State(List<string> args)
     {
-        if (args.Count != 2)
-            return "Usage: coop.debug.mobileparty.follow_fixture_state <playerPartyId> <targetPartyId>";
         if (!TryFindParty(args[0], out MobileParty playerParty))
             return $"Player party '{args[0]}' was not found.";
         if (!TryFindParty(args[1], out MobileParty targetParty))
@@ -150,14 +133,10 @@ internal static class FollowPartyFixtureCommands
             $"targetX={targetParty.Position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
             $"targetY={targetParty.Position.Y.ToString("R", CultureInfo.InvariantCulture)}";
     }
-
-    [CommandLineArgumentFunction("follow_fixture_restore", "coop.debug.mobileparty")]
     public static string Restore(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Command can only be run on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.mobileparty.follow_fixture_restore";
         if (fixture == null)
             return "Follow fixture is not active.";
         if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))

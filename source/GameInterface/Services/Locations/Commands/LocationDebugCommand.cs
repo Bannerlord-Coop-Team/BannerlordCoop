@@ -12,7 +12,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Locations.Commands;
 
@@ -21,14 +20,11 @@ namespace GameInterface.Services.Locations.Commands;
 /// </summary>
 public class LocationDebugCommand
 {
-    [CommandLineArgumentFunction("enter", "coop.debug.location")]
     public static string EnterLocation(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
 
-        if (args.Count != 1)
-            return "Usage: coop.debug.location.enter <LocationId>. Warning: this starts a client-local encounter and can desync from the server.";
 
         if (TryResolveLocation(args[0], out var location, out var error) == false)
             return error;
@@ -64,15 +60,11 @@ public class LocationDebugCommand
             ? $"Unable to open location '{args[0]}'."
             : $"Opening location '{args[0]}'.";
     }
-
-    [CommandLineArgumentFunction("leave", "coop.debug.location")]
     public static string LeaveLocation(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
 
-        if (args.Count != 0)
-            return "Usage: coop.debug.location.leave";
 
         if (Mission.Current == null)
             return "No mission is active.";
@@ -85,7 +77,6 @@ public class LocationDebugCommand
     /// <summary>
     /// Lists all registered locations
     /// </summary>
-    [CommandLineArgumentFunction("list", "coop.debug.location")]
     public static string ListLocations(List<string> args)
     {
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
@@ -114,13 +105,8 @@ public class LocationDebugCommand
     /// <summary>
     /// Shows the state of a single location
     /// </summary>
-    [CommandLineArgumentFunction("info", "coop.debug.location")]
     public static string Info(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.location.info <LocationId>";
-        }
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
 
@@ -136,13 +122,8 @@ public class LocationDebugCommand
     /// <summary>
     /// Lists the characters currently in a location
     /// </summary>
-    [CommandLineArgumentFunction("list_characters", "coop.debug.location")]
     public static string ListCharacters(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.location.list_characters <LocationId>";
-        }
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
 
@@ -160,13 +141,8 @@ public class LocationDebugCommand
     /// <summary>
     /// Lists a location's special items
     /// </summary>
-    [CommandLineArgumentFunction("list_special_items", "coop.debug.location")]
     public static string ListSpecialItems(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.location.list_special_items <LocationId>";
-        }
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
 
@@ -184,7 +160,6 @@ public class LocationDebugCommand
     /// <summary>
     /// Adds a character to a location on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("add_character", "coop.debug.location")]
     public static string AddCharacter(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -192,10 +167,6 @@ public class LocationDebugCommand
             return "Command is only available to run on the server";
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.location.add_character <LocationId> <CharacterObjectId>";
-        }
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
         if (TryResolveObject<CharacterObject>(args[1], out var character, out error) == false) return error;
@@ -221,7 +192,6 @@ public class LocationDebugCommand
     /// <summary>
     /// Removes a character from a location on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("remove_character", "coop.debug.location")]
     public static string RemoveCharacter(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -229,10 +199,6 @@ public class LocationDebugCommand
             return "Command is only available to run on the server";
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.location.remove_character <LocationId> <CharacterObjectId>";
-        }
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
         if (TryResolveObject<CharacterObject>(args[1], out var character, out error) == false) return error;
@@ -252,7 +218,6 @@ public class LocationDebugCommand
     /// <summary>
     /// Clears a location's character list on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("remove_all_characters", "coop.debug.location")]
     public static string RemoveAllCharacters(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -260,10 +225,6 @@ public class LocationDebugCommand
             return "Command is only available to run on the server";
         }
 
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.location.remove_all_characters <LocationId>";
-        }
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
 
@@ -276,7 +237,6 @@ public class LocationDebugCommand
     /// <summary>
     /// Adds a special item to a location on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("add_special_item", "coop.debug.location")]
     public static string AddSpecialItem(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -284,10 +244,6 @@ public class LocationDebugCommand
             return "Command is only available to run on the server";
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.location.add_special_item <LocationId> <ItemObjectId>";
-        }
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
         if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return error;
@@ -302,7 +258,6 @@ public class LocationDebugCommand
     /// Removes a special item from a location on the server and clients. Vanilla only removes
     /// special items from inside a mission scene, so the command publishes the removal directly.
     /// </summary>
-    [CommandLineArgumentFunction("remove_special_item", "coop.debug.location")]
     public static string RemoveSpecialItem(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -310,10 +265,6 @@ public class LocationDebugCommand
             return "Command is only available to run on the server";
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.location.remove_special_item <LocationId> <ItemObjectId>";
-        }
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
         if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return error;
@@ -337,7 +288,6 @@ public class LocationDebugCommand
     /// Populates a settlement's locations and broadcasts the roster snapshot, as if a player
     /// party had entered
     /// </summary>
-    [CommandLineArgumentFunction("populate", "coop.debug.location")]
     public static string Populate(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -345,10 +295,6 @@ public class LocationDebugCommand
             return "Command is only available to run on the server";
         }
 
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.location.populate <SettlementStringId>";
-        }
 
         if (ContainerProvider.TryResolve<SettlementPopulationTracker>(out var tracker) == false)
         {

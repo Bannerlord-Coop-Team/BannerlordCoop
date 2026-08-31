@@ -39,7 +39,6 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.SiegeEvents.Commands;
 
@@ -113,13 +112,9 @@ public class SiegeDebugCommand
         public float Renown;
         public int Tier;
     }
-
-    [CommandLineArgumentFunction("prisoner_prompt_fixture_start", "coop.debug.siege")]
     public static string StartPrisonerPromptFixture(List<string> args)
     {
-        const string usage = "Usage: coop.debug.siege.prisoner_prompt_fixture_start <controllerId> <settlementId>";
         if (!ModInformation.IsServer) return "This command can only be used by the server";
-        if (args.Count != 2) return usage;
         if (prisonerPromptFixture != null) return "A prisoner-prompt siege fixture is already active.";
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
@@ -248,13 +243,9 @@ public class SiegeDebugCommand
                 (restored ? string.Empty : ". Restore is still required: " + restoreError);
         }
     }
-
-    [CommandLineArgumentFunction("prisoner_prompt_fixture_state", "coop.debug.siege")]
     public static string PrisonerPromptFixtureState(List<string> args)
     {
-        const string usage = "Usage: coop.debug.siege.prisoner_prompt_fixture_state <controllerId> <settlementId>";
         if (!ModInformation.IsServer) return "This command can only be used by the server";
-        if (args.Count != 2) return usage;
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
             !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
             !playerManager.TryGetPlayer(args[0], out var player) ||
@@ -287,12 +278,9 @@ public class SiegeDebugCommand
             playerY = playerParty.Position.Y,
         });
     }
-
-    [CommandLineArgumentFunction("prisoner_prompt_fixture_restore", "coop.debug.siege")]
     public static string RestorePrisonerPromptFixture(List<string> args)
     {
         if (!ModInformation.IsServer) return "This command can only be used by the server";
-        if (args.Count != 0) return "Usage: coop.debug.siege.prisoner_prompt_fixture_restore";
         var fixture = prisonerPromptFixture;
         if (fixture == null) return "No prisoner-prompt siege fixture is active.";
         if (fixture.PlayerParty.MapEvent != null || fixture.ArmyLeader.MapEvent != null)
@@ -807,7 +795,6 @@ public class SiegeDebugCommand
     /// <summary>
     /// Creates a player-led siege and sends a multi-party defending army to interrupt it. Server only.
     /// </summary>
-    [CommandLineArgumentFunction("start_army_relief", "coop.debug.siege")]
     public static string StartArmyRelief(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -815,10 +802,6 @@ public class SiegeDebugCommand
             return "This command can only be used by the server";
         }
 
-        if (args.Count < 2 || args.Count > 3)
-        {
-            return "Usage: coop.debug.siege.start_army_relief <controllerId> <settlementId> [armyPartyCount]";
-        }
 
         int armyPartyCount = 3;
         if (args.Count == 3 && (!int.TryParse(args[2], out armyPartyCount) || armyPartyCount < 2))
@@ -915,14 +898,8 @@ public class SiegeDebugCommand
         return $"Started {settlement.Name} siege relief: {army.Name} with {army.Parties.Count} parties is attacking " +
             $"{playerParty.Name}; connected friendly player parties joined the siege";
     }
-
-    [CommandLineArgumentFunction("army_relief_state", "coop.debug.siege")]
     public static string ArmyReliefState(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.siege.army_relief_state <controllerId> <settlementId>";
-        }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
             || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)
@@ -948,14 +925,8 @@ public class SiegeDebugCommand
             $"reliefEncounter={reliefEncounterActive} " +
             $"playerMapEvent={mapEvent != null}";
     }
-
-    [CommandLineArgumentFunction("request_besiege", "coop.debug.siege")]
     public static string RequestBesiege(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.request_besiege <settlementId>";
-        }
 
         if (ModInformation.IsServer)
         {
@@ -971,14 +942,8 @@ public class SiegeDebugCommand
         MessageBroker.Instance.Publish(null, new BesiegeSettlementAttempted(MobileParty.MainParty, settlement));
         return $"Requested that the local player party besiege {settlement.Name}";
     }
-
-    [CommandLineArgumentFunction("request_assault", "coop.debug.siege")]
     public static string RequestAssault(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.request_assault <settlementId>";
-        }
 
         if (ModInformation.IsServer)
         {
@@ -994,14 +959,8 @@ public class SiegeDebugCommand
         MessageBroker.Instance.Publish(null, new AssaultSiegeAttempted(MobileParty.MainParty, settlement));
         return $"Requested that the local player party assault {settlement.Name}";
     }
-
-    [CommandLineArgumentFunction("join_active_assault", "coop.debug.siege")]
     public static string JoinActiveAssault(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.join_active_assault <settlementId>";
-        }
 
         if (ModInformation.IsServer)
         {
@@ -1059,14 +1018,8 @@ public class SiegeDebugCommand
             ? $"Opened the active siege assault at {settlement.Name} for an involved player party"
             : $"Joined the active siege assault at {settlement.Name}";
     }
-
-    [CommandLineArgumentFunction("assault_entry_state", "coop.debug.siege")]
     public static string AssaultEntryState(List<string> args)
     {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.siege.assault_entry_state";
-        }
 
         if (ModInformation.IsServer)
         {
@@ -1149,14 +1102,8 @@ public class SiegeDebugCommand
             $"simulationRendered={renderedSimulation != null} simulationRenderedEnabled={renderedSimulation?.IsEnabled ?? false}" +
             Environment.NewLine + "LIVE_TEST_JSON=" + structuredResult;
     }
-
-    [CommandLineArgumentFunction("leave", "coop.debug.siege")]
     public static string Leave(List<string> args)
     {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.siege.leave";
-        }
 
         if (ModInformation.IsServer)
         {
@@ -1171,14 +1118,8 @@ public class SiegeDebugCommand
         MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
         return "Requested that the local player party leave its siege";
     }
-
-    [CommandLineArgumentFunction("leave_settlement", "coop.debug.siege")]
     public static string LeaveSettlement(List<string> args)
     {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.siege.leave_settlement";
-        }
 
         if (ModInformation.IsServer)
         {
@@ -1208,13 +1149,8 @@ public class SiegeDebugCommand
     /// </summary>
     /// <param name="args">first arg : settlementId ; optional second arg : besieger partyId</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("start", "coop.debug.siege")]
     public static string StartSiege(List<string> args)
     {
-        if (args.Count < 1 || args.Count > 2)
-        {
-            return "Usage: coop.debug.siege.start <settlementId> [besiegerPartyId]";
-        }
 
         if (ModInformation.IsClient)
         {
@@ -1312,13 +1248,8 @@ public class SiegeDebugCommand
     /// <summary>
     /// Ends an AI-led siege through the normal authoritative leave path. Server only.
     /// </summary>
-    [CommandLineArgumentFunction("stop", "coop.debug.siege")]
     public static string StopSiege(List<string> args)
     {
-        if (args.Count != 4)
-        {
-            return "Usage: coop.debug.siege.stop <settlementId> <originalX> <originalY> <originalIsOnLand>";
-        }
 
         if (ModInformation.IsClient)
         {
@@ -1393,10 +1324,9 @@ public class SiegeDebugCommand
     /// <summary>
     /// Joins every connected player party to an active siege on the authoritative server.
     /// </summary>
-    [CommandLineArgumentFunction("join_players", "coop.debug.siege")]
     public static string JoinPlayers(List<string> args)
     {
-        if (args.Count != 2 || !int.TryParse(args[1], out int expectedPlayerCount) || expectedPlayerCount < 1)
+        if (!int.TryParse(args[1], out int expectedPlayerCount) || expectedPlayerCount < 1)
         {
             return "Usage: coop.debug.siege.join_players <settlementId> <expectedPlayerCount>";
         }
@@ -1479,14 +1409,8 @@ public class SiegeDebugCommand
         return $"Joined {joined.Count} connected player parties to the siege of {settlement.Name}:\n" +
             string.Join(Environment.NewLine, joined);
     }
-
-    [CommandLineArgumentFunction("player_state", "coop.debug.siege")]
     public static string PlayerState(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.player_state <partyId>";
-        }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
         {
@@ -1510,14 +1434,8 @@ public class SiegeDebugCommand
             $"side={party.Party.Side} besiegerCamp={camp} army={army} settlement={settlement} heroHitPoints={heroHitPoints} " +
             $"playerSiege={isMainParty && PlayerSiege.PlayerSiegeEvent != null} encounter={isMainParty && PlayerEncounter.Current != null}";
     }
-
-    [CommandLineArgumentFunction("prepare_ladders_only", "coop.debug.siege")]
     public static string PrepareLaddersOnly(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.prepare_ladders_only <settlementId>";
-        }
 
         if (ModInformation.IsClient)
         {
@@ -1590,14 +1508,8 @@ public class SiegeDebugCommand
             }
         }
     }
-
-    [CommandLineArgumentFunction("stage_machines", "coop.debug.siege")]
     public static string StageMachines(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.stage_machines <settlementId>";
-        }
 
         if (ModInformation.IsClient)
         {
@@ -1677,13 +1589,8 @@ public class SiegeDebugCommand
     /// Starts the wall assault for an existing AI-led siege. Server only; the resulting map event uses the
     /// same authoritative action as campaign AI.
     /// </summary>
-    [CommandLineArgumentFunction("assault", "coop.debug.siege")]
     public static string StartAssault(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.assault <settlementId>";
-        }
 
         if (ModInformation.IsClient)
         {
@@ -1741,13 +1648,8 @@ public class SiegeDebugCommand
     /// <summary>
     /// Reports the exact vanilla readiness inputs and the starvation terminal decision. Read-only.
     /// </summary>
-    [CommandLineArgumentFunction("terminal_status", "coop.debug.siege")]
     public static string TerminalStatus(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.terminal_status town_ES1";
-        }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
             || !ContainerProvider.TryResolve<IAiSiegeAssaultReadiness>(out var readiness)
@@ -1801,13 +1703,8 @@ public class SiegeDebugCommand
     /// <summary>
     /// Simulates the vanilla food-problem terminal event for an AI siege. Server only.
     /// </summary>
-    [CommandLineArgumentFunction("resolve_starvation", "coop.debug.siege")]
     public static string ResolveStarvation(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.resolve_starvation town_ES1";
-        }
 
         if (ModInformation.IsClient)
         {
@@ -1843,7 +1740,6 @@ public class SiegeDebugCommand
     /// </summary>
     /// <param name="args">no args</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("list", "coop.debug.siege")]
     public static string ListSieges(List<string> args)
     {
         var siegeEvents = SiegeContainerLookup.ActiveSieges().ToList();
@@ -1869,13 +1765,8 @@ public class SiegeDebugCommand
     /// <summary>
     /// Reports whether a settlement's replicated siege graph is ready for map visuals. Read-only.
     /// </summary>
-    [CommandLineArgumentFunction("graph", "coop.debug.siege")]
     public static string GraphState(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.graph <settlementId>";
-        }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
         {
@@ -1925,7 +1816,6 @@ public class SiegeDebugCommand
     /// <summary>
     /// Centers the client campaign camera on a settlement for visual inspection.
     /// </summary>
-    [CommandLineArgumentFunction("focus", "coop.debug.siege")]
     public static string FocusSettlement(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -1933,10 +1823,6 @@ public class SiegeDebugCommand
             return "This command can only be used by a client";
         }
 
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.focus <settlementId>";
-        }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
         {
@@ -1967,13 +1853,8 @@ public class SiegeDebugCommand
     /// </summary>
     /// <param name="args">first arg: heroName | main | partyId</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("dump_party", "coop.debug.siege")]
     public static string DumpParty(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.dump_party <heroName|main|partyId>";
-        }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
         {
@@ -2027,7 +1908,6 @@ public class SiegeDebugCommand
     /// </summary>
     /// <param name="args">no args</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("dump_engines", "coop.debug.siege")]
     public static string DumpEngines(List<string> args)
     {
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
@@ -2100,7 +1980,6 @@ public class SiegeDebugCommand
     /// prompt and the AI read — sorted so two clients' dumps diff line by line, and written to the Coop
     /// log for post-run comparison. Pass "all" to include every usable machine. Read-only.
     /// </summary>
-    [CommandLineArgumentFunction("dump_machines", "coop.debug.siege")]
     public static string DumpMachines(List<string> args)
     {
         var mission = TaleWorlds.MountAndBlade.Mission.Current;
