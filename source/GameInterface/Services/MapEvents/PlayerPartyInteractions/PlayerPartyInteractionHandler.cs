@@ -1170,8 +1170,14 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
 
     // Pure decision, split out from the ambient-state collector below so it can be unit-tested without a campaign.
-    internal static bool CanOpenMapConversation(bool atMenu, string currentMenuId, bool topScreenIsMapScreen)
+    internal static bool CanOpenMapConversation(
+        bool atMenu, string currentMenuId, bool topScreenIsMapScreen, bool hasUnrelatedLiveEncounter)
     {
+        if (hasUnrelatedLiveEncounter)
+        {
+            return false;
+        }
+
         if (atMenu && !IsBenignConversationMenu(currentMenuId))
         {
             return false;
@@ -1180,7 +1186,13 @@ internal class PlayerPartyInteractionHandler : IHandler
         return topScreenIsMapScreen;
     }
 
-    private static bool CanOpenMapConversation()
+    // Convenience overload for callers/tests with no live encounter in play.
+    internal static bool CanOpenMapConversation(bool atMenu, string currentMenuId, bool topScreenIsMapScreen)
+    {
+        return CanOpenMapConversation(atMenu, currentMenuId, topScreenIsMapScreen, hasUnrelatedLiveEncounter: false);
+    }
+
+    private static bool CanOpenMapConversation(PartyBase sessionOtherParty)
     {
         if (!(GameStateManager.Current?.ActiveState is MapState mapState))
         {
@@ -1191,7 +1203,21 @@ internal class PlayerPartyInteractionHandler : IHandler
         return CanOpenMapConversation(
             mapState.AtMenu,
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
-            mapScreen != null && ScreenManager.TopScreen == mapScreen);
+            mapScreen != null && ScreenManager.TopScreen == mapScreen,
+            HasUnrelatedLiveEncounter(sessionOtherParty));
+    }
+
+    // True when the local player is in a PlayerEncounter whose other side is not the party this interaction
+    // session is against. The in-army initiator legitimately reaches TryOpenMapConversation while still in an
+    // army_encounter with the session's other party (EncounteredParty == sessionOtherParty) - that is allowed.
+    private static bool HasUnrelatedLiveEncounter(PartyBase sessionOtherParty)
+    {
+        if (PlayerEncounter.Current == null)
+        {
+            return false;
+        }
+
+        return !ReferenceEquals(PlayerEncounter.EncounteredParty, sessionOtherParty);
     }
 
     private static void CloseLocalPlayerPartyEncounter(MobileParty localParty)
@@ -1247,10 +1273,11 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         if (openedConversationSessionIds.Contains(sessionId)) return;
         if (endedInteractionSessionIds.Contains(sessionId)) return;
-        if (!CanOpenMapConversation()) return;
 
         if (!objectManager.TryGetObject<PartyBase>(myPartyId, out var myParty)) return;
         if (!objectManager.TryGetObject<PartyBase>(otherPartyId, out var otherParty)) return;
+
+        if (!CanOpenMapConversation(otherParty)) return;
 
         var myCharacter = myParty.LeaderHero?.CharacterObject;
         var otherCharacter = otherParty.LeaderHero?.CharacterObject;
