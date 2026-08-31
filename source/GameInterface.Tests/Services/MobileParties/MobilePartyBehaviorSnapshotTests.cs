@@ -186,7 +186,7 @@ public class MobilePartyBehaviorSnapshotTests
     }
 
     [Fact]
-    public void TryCreateJoinState_UnregisteredReferences_ResetsPartyToHold()
+    public void TryCreateJoinState_UnregisteredReferences_UsesPointSnapshotWithoutMutatingParty()
     {
         var party = CreateParty();
         var removedTarget = CreatePartyWithPartyBase();
@@ -212,11 +212,15 @@ public class MobilePartyBehaviorSnapshotTests
 
         Assert.True(created, failure);
         Assert.Null(failure);
-        AssertHeldWithoutTargets(party, state);
+        AssertPartyTargetsUnchanged(party, removedTarget);
+        AssertPointSnapshotWithoutTargets(
+            state,
+            removedTarget.Position,
+            MobileParty.NavigationType.Default);
     }
 
     [Fact]
-    public void TryCreateJoinState_RegisteredNonLiveReferences_ResetsPartyToHold()
+    public void TryCreateJoinState_RegisteredNonLiveReferences_UsesPointSnapshotWithoutMutatingParty()
     {
         var party = CreateParty();
         var removedTarget = CreatePartyWithPartyBase();
@@ -242,11 +246,15 @@ public class MobilePartyBehaviorSnapshotTests
 
         Assert.True(created, failure);
         Assert.Null(failure);
-        AssertHeldWithoutTargets(party, state);
+        AssertPartyTargetsUnchanged(party, removedTarget);
+        AssertPointSnapshotWithoutTargets(
+            state,
+            removedTarget.Position,
+            MobileParty.NavigationType.Default);
     }
 
     [Fact]
-    public void TryCreateJoinState_RegisteredNonLiveSettlement_ResetsPartyToHold()
+    public void TryCreateJoinState_RegisteredNonLiveSettlement_UsesPointSnapshotWithoutMutatingParty()
     {
         var party = CreateParty();
         var removedSettlement = ObjectHelper.SkipConstructor<Settlement>();
@@ -272,7 +280,52 @@ public class MobilePartyBehaviorSnapshotTests
 
         Assert.True(created, failure);
         Assert.Null(failure);
-        AssertHeldWithoutTargets(party, state);
+        Assert.Equal(AiBehavior.GoToSettlement, party.DefaultBehavior);
+        Assert.Equal(AiBehavior.GoToSettlement, party.ShortTermBehavior);
+        Assert.Same(removedSettlement, party.TargetSettlement);
+        Assert.Equal(MoveModeType.Party, party.PartyMoveMode);
+        AssertPointSnapshotWithoutTargets(
+            state,
+            party.MoveTargetPoint,
+            party.DesiredAiNavigationType);
+    }
+
+    [Fact]
+    public void TryCreateJoinState_StaleReferencesOnHeldParty_HoldsSnapshotWithoutMutatingParty()
+    {
+        var party = CreateParty();
+        var removedTarget = CreatePartyWithPartyBase();
+        SetPartyTargets(party, removedTarget);
+        party._defaultBehavior = AiBehavior.Hold;
+        party.ShortTermBehavior = AiBehavior.Hold;
+        party.PartyMoveMode = MoveModeType.Hold;
+
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        string missingPartyId = null!;
+        string missingPartyBaseId = null!;
+        objectManager.Setup(m => m.TryGetId(party, out partyId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(removedTarget, out missingPartyId)).Returns(false);
+        objectManager.Setup(m => m.TryGetId(removedTarget.Party, out missingPartyBaseId)).Returns(false);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        bool created = snapshot.TryCreateJoinState(
+            party,
+            LiveParties(party),
+            LiveSettlements(),
+            out MobilePartyJoinState state,
+            out string failure);
+
+        Assert.True(created, failure);
+        Assert.Null(failure);
+        Assert.Equal(AiBehavior.Hold, party.DefaultBehavior);
+        Assert.Equal(AiBehavior.Hold, party.ShortTermBehavior);
+        Assert.Equal(MoveModeType.Hold, party.PartyMoveMode);
+        Assert.Same(removedTarget.Party, party.Ai.AiBehaviorInteractable);
+        Assert.Same(removedTarget, party.TargetParty);
+        Assert.Same(removedTarget, party.MoveTargetParty);
+        AssertHeldSnapshotWithoutTargets(state, party.MoveTargetPoint);
     }
 
     [Fact]
@@ -573,22 +626,51 @@ public class MobilePartyBehaviorSnapshotTests
 
     private static void SetPartyTargets(MobileParty party, MobileParty target)
     {
+        target._position = new CampaignVec2(new Vec2(30f, 40f), isOnLand: true);
         party._defaultBehavior = AiBehavior.EngageParty;
         party.ShortTermBehavior = AiBehavior.EngageParty;
         party.Ai.AiBehaviorInteractable = target.Party;
+        party.Ai.BehaviorTarget = new CampaignVec2(new Vec2(25f, 35f), isOnLand: true);
         party.TargetParty = target;
         party.MoveTargetParty = target;
+        party.DesiredAiNavigationType = MobileParty.NavigationType.Default;
     }
 
-    private static void AssertHeldWithoutTargets(MobileParty party, MobilePartyJoinState state)
+    private static void AssertPartyTargetsUnchanged(MobileParty party, MobileParty target)
     {
-        Assert.Equal(AiBehavior.Hold, party.DefaultBehavior);
-        Assert.Equal(AiBehavior.Hold, party.ShortTermBehavior);
-        Assert.Null(party.Ai.AiBehaviorInteractable);
-        Assert.Null(party.TargetParty);
-        Assert.Null(party.TargetSettlement);
-        Assert.Null(party.MoveTargetParty);
-        Assert.Equal(MoveModeType.Hold, party.PartyMoveMode);
+        Assert.Equal(AiBehavior.EngageParty, party.DefaultBehavior);
+        Assert.Equal(AiBehavior.EngageParty, party.ShortTermBehavior);
+        Assert.Same(target.Party, party.Ai.AiBehaviorInteractable);
+        Assert.Equal(new CampaignVec2(new Vec2(25f, 35f), isOnLand: true), party.Ai.BehaviorTarget);
+        Assert.Same(target, party.TargetParty);
+        Assert.Same(target, party.MoveTargetParty);
+        Assert.Equal(MoveModeType.Party, party.PartyMoveMode);
+        Assert.Equal(new CampaignVec2(new Vec2(10f, 20f), isOnLand: true), party.MoveTargetPoint);
+        Assert.Equal(MobileParty.NavigationType.Default, party.DesiredAiNavigationType);
+    }
+
+    private static void AssertPointSnapshotWithoutTargets(
+        MobilePartyJoinState state,
+        CampaignVec2 expectedMoveTargetPoint,
+        MobileParty.NavigationType expectedNavigationType)
+    {
+        Assert.Equal(AiBehavior.GoToPoint, state.Behavior.DefaultBehavior);
+        Assert.Equal(AiBehavior.GoToPoint, state.Behavior.NewAiBehavior);
+        Assert.Null(state.Behavior.InteractablePointId);
+        Assert.Null(state.Behavior.TargetPartyId);
+        Assert.Null(state.Behavior.TargetSettlementId);
+        Assert.Null(state.Behavior.MoveTargetPartyId);
+        Assert.Equal(MoveModeType.Point, state.Behavior.PartyMoveMode);
+        Assert.Equal(expectedMoveTargetPoint, state.Behavior.MoveTargetPoint);
+        Assert.Equal(expectedMoveTargetPoint, state.Behavior.BestTargetPoint);
+        Assert.Equal(expectedMoveTargetPoint, state.Behavior.TargetPosition);
+        Assert.Equal(expectedNavigationType, state.Behavior.DesiredAiNavigationType);
+    }
+
+    private static void AssertHeldSnapshotWithoutTargets(
+        MobilePartyJoinState state,
+        CampaignVec2 expectedMoveTargetPoint)
+    {
         Assert.Equal(AiBehavior.Hold, state.Behavior.DefaultBehavior);
         Assert.Equal(AiBehavior.Hold, state.Behavior.NewAiBehavior);
         Assert.Null(state.Behavior.InteractablePointId);
@@ -596,6 +678,8 @@ public class MobilePartyBehaviorSnapshotTests
         Assert.Null(state.Behavior.TargetSettlementId);
         Assert.Null(state.Behavior.MoveTargetPartyId);
         Assert.Equal(MoveModeType.Hold, state.Behavior.PartyMoveMode);
+        Assert.Equal(expectedMoveTargetPoint, state.Behavior.MoveTargetPoint);
+        Assert.Equal(MobileParty.NavigationType.None, state.Behavior.DesiredAiNavigationType);
     }
 
     private static bool TryCreateJoinStateWithCampaign(
