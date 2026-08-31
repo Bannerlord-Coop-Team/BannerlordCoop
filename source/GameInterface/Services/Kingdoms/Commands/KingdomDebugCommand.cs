@@ -61,7 +61,7 @@ public class KingdomDebugCommand
     }
 
     private static readonly string RemoveUsage = "Usage: coop.debug.kingdom.remove_decision <kingdomId> <Index>";
-    private static readonly string AddBasicUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
+    private static readonly string AddBasicUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> [decisionArg1] [decisionArg2] [decisionArg3]";
     private static readonly string AddDeclareWarDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> DeclareWarDecision <factionId>";
     private static readonly string AddExpelClanFromKingdomDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> ExpelClanFromKingdomDecision <clanToExpelId>";
     private static readonly string AddKingSelectionKingdomDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> KingSelectionKingdomDecision <clanToExcludeId>";
@@ -433,12 +433,12 @@ public class KingdomDebugCommand
         }
     }
 
-    // coop.debug.kingdom.create Derthert Vlandia_Reborn
+    // coop.debug.kingdom.create Derthert "Vlandia Reborn"
     /// <summary>
     /// Creates a kingdom ruled by the named hero's clan and replicates it to every client through the
     /// same notification the governor "create kingdom" dialog uses. Server only.
     /// </summary>
-    /// <param name="args">leader hero (coop id, game StringId, or name with '_' for spaces), then the kingdom name</param>
+    /// <param name="args">Leader hero id or quoted display name, then the quoted kingdom name.</param>
     /// <returns>result message</returns>
 
     public static string CreateKingdomCommand(List<string> args)
@@ -482,8 +482,8 @@ public class KingdomDebugCommand
     }
 
     /// <summary>
-    /// Resolves the leader from a coop object manager id, a game StringId, or a hero name ('_' stands in
-    /// for a space because the console splits arguments on spaces).
+    /// Resolves the leader from a coop object manager id, a game StringId, or a display name. Quote a
+    /// multi-word display name so it arrives in this fixed argument slot.
     /// </summary>
     private static bool TryGetLeaderHero(IObjectManager objectManager, string nameOrId, out Hero hero, out string error)
     {
@@ -495,7 +495,7 @@ public class KingdomDebugCommand
             ?? Hero.AllAliveHeroes.FirstOrDefault(candidate => string.Equals(candidate.Name?.ToString(), heroName, StringComparison.OrdinalIgnoreCase));
         if (hero != null) return true;
 
-        error = $"No hero '{nameOrId}' found by coop id, game StringId, or name. Run coop.debug.hero.id <hero name> to look one up.";
+        error = $"No hero '{nameOrId}' found by coop id, game StringId, or name. Run coop.debug.hero.id \"<hero name>\" to look one up.";
         return false;
     }
 

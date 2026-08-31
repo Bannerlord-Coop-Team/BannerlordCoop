@@ -78,6 +78,18 @@ public class CharacterFactionCoopCommandTests
     }
 
     [Fact]
+    public void KingdomAddDecisionUsage_DescribesFixedDecisionSlots()
+    {
+        var command = new KingdomAddDecisionUsageCommand(executor);
+
+        CoopCommandResult result = command.ProcessCommand(new TestArgs(Array.Empty<string>()));
+
+        Assert.True(result.Succeeded);
+        Assert.Contains("[decisionArg1] [decisionArg2] [decisionArg3]", result.Output);
+        Assert.DoesNotContain("decisionTypeArgs", result.Output);
+    }
+
+    [Fact]
     public void LegacyExecutor_ReturnsStructuredSuccessAndFailureResults()
     {
         CoopCommandResult success = executor.Execute(new TestArgs(Array.Empty<string>()), _ => "done");
