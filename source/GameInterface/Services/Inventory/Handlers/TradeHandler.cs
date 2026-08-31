@@ -148,23 +148,7 @@ internal class TradeHandler : IHandler
             // When looting, taken items are treated as bought items. Don't need to manage changed rosters in these cases
             if (fromRoster != null)
             {
-                foreach (var boughtItem in boughtItems)
-                {
-                    int difference = fromRoster.GetItemNumber(boughtItem.Item1.EquipmentElement.Item) - boughtItem.Item1.Amount;
-
-                    if (difference < 0)
-                    {
-                        int fromRosterDataIndex = fromItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                        if (fromRosterDataIndex >= 0) fromItemRosterData[fromRosterDataIndex].Amount -= difference;
-                        else fromItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
-
-                        int toRosterDataIndex = toItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                        if (toRosterDataIndex >= 0) toItemRosterData[toRosterDataIndex].Amount += difference;
-                        else toItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
-
-                        totalAmount -= boughtItem.Item2;
-                    }
-                }
+                totalAmount = ReconcilePurchases(fromRoster, fromItemRosterData, toItemRosterData, boughtItems, totalAmount);
             }
 
             // Update rosters with new data
@@ -209,6 +193,41 @@ internal class TradeHandler : IHandler
                 inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
             }
         });
+    }
+
+    /// <summary>
+    /// Removes any purchased quantity the merchant can no longer supply from the party roster data and
+    /// refunds the prorated cost.
+    /// </summary>
+    internal static int ReconcilePurchases(
+        ItemRoster merchantRoster,
+        ItemRosterElement[] merchantRosterData,
+        ItemRosterElement[] partyRosterData,
+        List<(ItemRosterElement, int)> boughtItems,
+        int totalAmount)
+    {
+        foreach (var boughtItem in boughtItems)
+        {
+            int amount = boughtItem.Item1.Amount;
+            int elementIndex = merchantRoster.FindIndexOfElement(boughtItem.Item1.EquipmentElement);
+            int available = elementIndex >= 0 ? merchantRoster.GetElementNumber(elementIndex) : 0;
+            int difference = available - amount;
+
+            if (difference < 0)
+            {
+                int fromRosterDataIndex = merchantRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
+                if (fromRosterDataIndex >= 0) merchantRosterData[fromRosterDataIndex].Amount -= difference;
+                else merchantRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
+
+                int toRosterDataIndex = partyRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
+                if (toRosterDataIndex >= 0) partyRosterData[toRosterDataIndex].Amount += difference;
+                else partyRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
+
+                totalAmount -= amount > 0 ? (boughtItem.Item2 / amount) * -difference : boughtItem.Item2;
+            }
+        }
+
+        return totalAmount;
     }
 
     private (ItemRosterElementData, int)[] ResolveTradeItemIds(
