@@ -76,4 +76,38 @@ public class PlayerPartyMapConversationGateTests
         Assert.False(PlayerPartyInteractionHandler.CanOpenMapConversation(
             atMenu: false, currentMenuId: null, topScreenIsMapScreen: false));
     }
+
+    [Fact]
+    public void CanOpenMapConversation_LiveEncounterWithSomeoneElse_IsDeferred()
+    {
+        // Player is parked at army_encounter for an unrelated army when another player initiates an interaction.
+        // Opening the dialog here would let session teardown tear that encounter down.
+        Assert.False(PlayerPartyInteractionHandler.CanOpenMapConversation(
+            atMenu: true,
+            currentMenuId: "army_encounter",
+            topScreenIsMapScreen: true,
+            hasUnrelatedLiveEncounter: true));
+    }
+
+    [Fact]
+    public void CanOpenMapConversation_LiveEncounterWithSessionPartner_IsAllowed()
+    {
+        // The in-army/outsider initiator legitimately reaches this point still in an army_encounter with the
+        // session's other party - that is not "unrelated" and must still open.
+        Assert.True(PlayerPartyInteractionHandler.CanOpenMapConversation(
+            atMenu: true,
+            currentMenuId: "army_encounter",
+            topScreenIsMapScreen: true,
+            hasUnrelatedLiveEncounter: false));
+    }
+
+    [Fact]
+    public void CanOpenMapConversation_UnrelatedEncounterOutranksBenignMenuAndMapScreen()
+    {
+        Assert.False(PlayerPartyInteractionHandler.CanOpenMapConversation(
+            atMenu: false,
+            currentMenuId: null,
+            topScreenIsMapScreen: true,
+            hasUnrelatedLiveEncounter: true));
+    }
 }
