@@ -1209,7 +1209,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     // True when the local player is in a PlayerEncounter whose other side is not the party this interaction
     // session is against.
-    private static bool HasUnrelatedLiveEncounter(PartyBase sessionOtherParty)
+    internal static bool HasUnrelatedLiveEncounter(PartyBase sessionOtherParty)
     {
         if (PlayerEncounter.Current == null)
         {
