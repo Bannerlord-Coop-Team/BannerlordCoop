@@ -15,12 +15,14 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Helpers;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
@@ -459,15 +461,34 @@ internal class PlayerEncounterPatches
         if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var initializationBarrier))
             initializationBarrier.CompleteDeferredEncounterCleanup();
 
-        if (PlayerEncounter.Current == null) return false;
-        if (MapEvent.PlayerMapEvent != null) return true;
+        var playerEncounter = PlayerEncounter.Current;
+        if (playerEncounter == null) return false;
+        var mapEvent = MapEvent.PlayerMapEvent;
+        if (mapEvent != null &&
+            (!mapEvent.IsRaid ||
+             !MapEventInitializationBarrier.IsBattleResultEncounter(playerEncounter)))
+            return true;
+
+        var activeState = TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState;
+        if (activeState is PartyState or InventoryState)
+            return false;
+        if (ShouldDeferAfterBattle(
+                activeState,
+                TaleWorlds.ScreenSystem.ScreenManager.TopScreen == MapScreen.Instance))
+            return false;
         if (PlayerCaptivity.IsCaptive) return false;
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return true;
 
         var playerEncounterInterface = container.Resolve<IPlayerEncounterInterface>();
-        playerEncounterInterface.UpdateInternalAfterBattle(PlayerEncounter.Current);
+        playerEncounterInterface.UpdateInternalAfterBattle(playerEncounter);
 
         return false;
+    }
+
+    internal static bool ShouldDeferAfterBattle(TaleWorlds.Core.GameState activeState, bool isMapScreenTop)
+    {
+        // Wait for the previous loot screen to finish leaving before opening the next one.
+        return activeState is PartyState or InventoryState || !isMapScreenTop;
     }
 }

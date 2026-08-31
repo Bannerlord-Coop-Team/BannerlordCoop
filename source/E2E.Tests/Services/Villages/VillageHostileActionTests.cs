@@ -22,6 +22,7 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -917,6 +918,130 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             AssertRaidFinalizedOutcome(client, mapEventId!, target.SettlementId, target.VillageId, expectedVillageState, settlementHitPoints);
         }
+    }
+
+    [Fact]
+    public void RaidSimulationResult_WithLiveMapEvent_UsesCoopEncounterFinish()
+    {
+        var client = Clients.First();
+        var (heroId, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var defenderTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(defenderTroopId, out var defenderTroop));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+
+            using (new AllowedThread())
+            {
+                mobileParty.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+                hero.PartyBelongedTo = mobileParty;
+                settlement.Party.MemberRoster.AddToCounts(defenderTroop, 1);
+                settlement.SettlementHitPoints = 0.5f;
+            }
+
+            var mapEvent = CreateHostileActionMapEvent(mobileParty.Party, settlement.Party, VillageHostileAction.Raid);
+            mapEvent._battleState = BattleState.AttackerVictory;
+
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventId);
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: mapEventId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = mobileParty;
+            }
+
+            encounter.ForceRaid = true;
+            encounter.EncounterState = PlayerEncounterState.Wait;
+
+            Assert.Same(mapEvent, MapEvent.PlayerMapEvent);
+            Assert.True(PlayerEncounterPatches.UpdatePrefix());
+
+            encounter.EncounterState = PlayerEncounterState.End;
+        }, MapEventDisabledMethods);
+
+        Server.NetworkSentMessages.Clear();
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)))
+            .ToList();
+
+        client.Call(() => PlayerEncounter.Update(), disabledMethods);
+
+        var reset = Server.NetworkSentMessages.GetMessages<NetworkRaidBattleResetToVillage>().Single();
+        Assert.Equal(target.SettlementId, reset.SettlementId);
+
+        Server.Call(() =>
+        {
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out _));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+
+            Assert.Null(mobileParty.MapEvent);
+            Assert.Same(settlement, mobileParty.CurrentSettlement);
+            Assert.Equal(Village.VillageStates.Normal, settlement.Village.VillageState);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void ForceSuppliesSimulationResult_WithLiveMapEvent_UsesVanillaEncounterEnd()
+    {
+        var client = Clients.First();
+        var (heroId, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+
+            using (new AllowedThread())
+            {
+                mobileParty.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+                hero.PartyBelongedTo = mobileParty;
+            }
+
+            var mapEvent = CreateHostileActionMapEvent(
+                mobileParty.Party,
+                settlement.Party,
+                VillageHostileAction.ForceSupplies);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventId);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: mapEventId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = mobileParty;
+            }
+
+            encounter.ForceSupplies = true;
+            encounter.EncounterState = PlayerEncounterState.End;
+
+            Assert.Same(mapEvent, MapEvent.PlayerMapEvent);
+            Assert.True(PlayerEncounterPatches.UpdatePrefix());
+        }, MapEventDisabledMethods);
     }
 
     [Fact]
