@@ -4,7 +4,6 @@ using GameInterface.Services.MobileParties.Messages.Unstuck;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
 
@@ -14,7 +13,6 @@ public class UnstuckCommand
     /// <summary>
     /// Requests a server-authoritative unstuck of the local player party. Client only.
     /// </summary>
-    [CommandLineArgumentFunction("unstuck", "coop")]
     public static string Unstuck(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";

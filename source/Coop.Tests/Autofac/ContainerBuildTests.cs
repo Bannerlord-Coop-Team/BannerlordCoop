@@ -32,6 +32,15 @@ namespace Coop.Tests.Autofac
             var commandRegistry = container.Resolve<ICoopCommandRegistry>();
             Assert.True(commandRegistry.Contains("coop.debug.map_event.click_deployment_ready"));
             Assert.True(commandRegistry.Contains("coop.debug.battle.state"));
+            Assert.True(commandRegistry.Contains("coop.debug.hero.id"));
+            Assert.True(commandRegistry.Contains("coop.debug.campaign_options.list"));
+            Assert.True(commandRegistry.Contains("coop.debug.player_captivity.capture_player"));
+#if DEBUG
+            Assert.True(commandRegistry.Contains("coop.debug.connection.join_state"));
+            Assert.True(commandRegistry.Contains("coop.debug.connection.arm_inactive_party_deficit"));
+            Assert.True(commandRegistry.Contains("coop.debug.connection.disconnect"));
+            Assert.False(commandRegistry.Contains("coop.debug.connection.stage_inactive_party"));
+#endif
         }
 
         [Fact]
@@ -53,6 +62,15 @@ namespace Coop.Tests.Autofac
             var commandRegistry = container.Resolve<ICoopCommandRegistry>();
             Assert.True(commandRegistry.Contains("coop.debug.map_event.click_deployment_ready"));
             Assert.True(commandRegistry.Contains("coop.debug.battle.state"));
+            Assert.True(commandRegistry.Contains("coop.debug.hero.id"));
+            Assert.True(commandRegistry.Contains("coop.debug.campaign_options.list"));
+            Assert.True(commandRegistry.Contains("coop.debug.player_captivity.capture_player"));
+#if DEBUG
+            Assert.True(commandRegistry.Contains("coop.debug.connection.join_state"));
+            Assert.True(commandRegistry.Contains("coop.debug.connection.stage_inactive_party"));
+            Assert.True(commandRegistry.Contains("coop.debug.connection.restore_inactive_party"));
+            Assert.False(commandRegistry.Contains("coop.debug.connection.disconnect"));
+#endif
         }
 
         [Theory]

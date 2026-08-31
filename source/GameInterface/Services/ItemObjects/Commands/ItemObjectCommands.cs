@@ -3,7 +3,6 @@ using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.Core;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.ItemObjects.Commands
 {
@@ -20,7 +19,6 @@ namespace GameInterface.Services.ItemObjects.Commands
         /// <summary>
         /// View select properties of an item object retrieved by string id
         /// </summary>
-        [CommandLineArgumentFunction("data", "coop.debug.itemobject")]
         public static string ViewCraftedItemData(List<string> strings)
         {
             if (strings.Count == 0)

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Inventory.TradeSkills.Commands;
 
@@ -13,7 +12,6 @@ internal class TradeSkillCommands
     /// <summary>
     /// View trade data for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_player_trade_data", "coop.debug.inventory")]
     public static string ViewPlayerTradeDataCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -52,7 +50,6 @@ internal class TradeSkillCommands
     /// <summary>
     /// View trade rumors for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_player_trade_rumors", "coop.debug.inventory")]
     public static string ViewPlayerTradeRumorsCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -95,7 +92,6 @@ internal class TradeSkillCommands
     /// <summary>
     /// View entered settlements trade data for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_entered_settlements", "coop.debug.inventory")]
     public static string ViewPlayerEnteredSettlementsCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();

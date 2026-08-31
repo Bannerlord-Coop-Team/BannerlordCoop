@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
 
@@ -13,7 +12,6 @@ namespace GameInterface.Services.GameDebug.Commands;
 public class BugReportLogSharingCommand
 {
     // coop.bug_report_log_sharing status|enable|disable
-    [CommandLineArgumentFunction("bug_report_log_sharing", "coop")]
     public static string Configure(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";

@@ -45,21 +45,4 @@
 //        messageBroker.Unsubscribe<HideLoadingScreen>(Handle);
 //    }
 
-//    /*The part below is to test the show and hide mechanics in console, can be used as follows in console:
-//     * tutorial.testShow
-//     * tutorial.testHide                                                                       */
-
-//    [CommandLineFunctionality.CommandLineArgumentFunction("ShowLoadingScreen", "Coop.Debug")]
-//    public static string testShow(List<string> strings)
-//    {
-//        MessageBroker.Instance.Publish(null, new ShowLoadingScreen());
-//        return "Command Executed!";
-//    }
-
-//    [CommandLineFunctionality.CommandLineArgumentFunction("HideLoadingScreen", "Coop.Debug")]
-//    public static string testHide(List<string> strings)
-//    {
-//        MessageBroker.Instance.Publish(null, new HideLoadingScreen());
-//        return "Command Executed!";
-//    }
 //}

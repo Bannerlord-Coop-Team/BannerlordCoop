@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Save.Commands
 {
@@ -15,7 +14,6 @@ namespace GameInterface.Services.Save.Commands
         private static int evidenceHoldMilliseconds;
 #endif
 
-        [CommandLineArgumentFunction("save_as", "coop.debug.save")]
         public static string SaveAs(List<string> args)
         {
             if (!ModInformation.IsServer)
@@ -33,7 +31,6 @@ namespace GameInterface.Services.Save.Commands
             return $"Enqueued save as {args[0]} on the server.";
         }
 
-        [CommandLineArgumentFunction("state", "coop.debug.save")]
         public static string State(List<string> args)
         {
             if (args.Count != 0)
@@ -50,7 +47,6 @@ namespace GameInterface.Services.Save.Commands
         /// client save block can be exercised on demand. On a client SetSaveArgs is blocked, so
         /// nothing is enqueued and no file is written; on the host a save file appears.
         /// </summary>
-        [CommandLineArgumentFunction("force_autosave", "coop.debug.save")]
         public static string ForceAutoSave(List<string> args)
         {
             if (Campaign.Current?.SaveHandler == null) return "No active campaign / SaveHandler.";

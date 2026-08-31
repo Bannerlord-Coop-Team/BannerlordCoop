@@ -12,7 +12,6 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Smithing.Commands;
 
@@ -34,7 +33,6 @@ internal class SmithingCommands
     /// <summary>
     /// Give debug crafting materials to heroes with a given name
     /// </summary>
-    [CommandLineArgumentFunction("givesupplies", "coop.debug.crafting")]
     public static string SmithingSuppliesCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -96,7 +94,6 @@ internal class SmithingCommands
     /// Unlock all crafting pieces on a client
     /// OpenPart is patched to already update CoopSession and persist across sessions
     /// </summary>
-    [CommandLineArgumentFunction("unlockallcraftingpieces", "coop.debug.crafting")]
     public static string UnlockAllCraftingPiecesCommand(List<string> strings)
     {
         if (ModInformation.IsServer)
@@ -124,7 +121,6 @@ internal class SmithingCommands
     /// <summary>
     /// View town orders for a specified town
     /// </summary>
-    [CommandLineArgumentFunction("townorders", "coop.debug.crafting")]
     public static string ViewTownOrdersCommand(List<string> strings)
     {
         if (strings.Count == 0) return "Town name argument required.";
@@ -156,7 +152,6 @@ internal class SmithingCommands
     /// <summary>
     /// Add orders to a town by a hero in that town
     /// </summary>
-    [CommandLineArgumentFunction("addtownorder", "coop.debug.crafting")]
     public static string AddTestingTownOrderCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -190,7 +185,6 @@ internal class SmithingCommands
     /// <summary>
     /// Add all existing crafted items to a given hero
     /// </summary>
-    [CommandLineArgumentFunction("addcrafteditems", "coop.debug.crafting")]
     public static string AddCraftedItemCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -235,7 +229,6 @@ internal class SmithingCommands
     /// <summary>
     /// View crafting stamina of all heroes in party on client and all heroes on server
     /// </summary>
-    [CommandLineArgumentFunction("stamina", "coop.debug.crafting")]
     public static string ViewCraftingStaminaCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -260,7 +253,6 @@ internal class SmithingCommands
     /// <summary>
     /// View crafted item history, showing all players on server and current player on client
     /// </summary>
-    [CommandLineArgumentFunction("crafteditemhistory", "coop.debug.crafting")]
     public static string ViewCraftedItemHistoryCommand(List<string> strings)
     {
         if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
@@ -297,7 +289,6 @@ internal class SmithingCommands
     /// <summary>
     /// View crafted pieces xp, showing all players on server and current player on client
     /// </summary>
-    [CommandLineArgumentFunction("craftingpiecesxp", "coop.debug.crafting")]
     public static string ViewPartsXpCommand(List<string> strings)
     {
         if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
@@ -334,7 +325,6 @@ internal class SmithingCommands
     /// <summary>
     /// View unlocked crafted pieces, showing all players on server and current player on client
     /// </summary>
-    [CommandLineArgumentFunction("unlockedcraftingpieces", "coop.debug.crafting")]
     public static string ViewUnlockedCraftingPieces(List<string> strings)
     {
         if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";

@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using static TaleWorlds.CampaignSystem.CampaignOptions;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using static TaleWorlds.MountAndBlade.BannerlordConfig;
 
 namespace GameInterface.Services.CampaignService.Commands;
@@ -17,7 +16,6 @@ namespace GameInterface.Services.CampaignService.Commands;
 /// </summary>
 internal class CampaignOptionsCommands
 {
-    [CommandLineArgumentFunction("list", "coop.debug.campaignoptions")]
     public static string ListOptionsCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new();
@@ -39,7 +37,6 @@ internal class CampaignOptionsCommands
         return stringBuilder.ToString();
     }
 
-    [CommandLineArgumentFunction("AutoAllocateClanMemberPerks", "coop.debug.campaignoptions")]
     public static string AutoAllocateClanMemberPerksCommand(List<string> strings)
     {
         return HandleBooleanOptionCommand(
@@ -49,7 +46,6 @@ internal class CampaignOptionsCommands
             value => AutoAllocateClanMemberPerks = value);
     }
 
-    [CommandLineArgumentFunction("PlayerTroopsReceivedDamage", "coop.debug.campaignoptions")]
     public static string PlayerTroopsReceivedDamageCommand(List<string> strings)
     {
         return HandleDifficultyOptionCommand(
@@ -59,7 +55,6 @@ internal class CampaignOptionsCommands
             value => PlayerTroopsReceivedDamage = value);
     }
 
-    [CommandLineArgumentFunction("RecruitmentDifficulty", "coop.debug.campaignoptions")]
     public static string RecruitmentDifficultyCommand(List<string> strings)
     {
         return HandleDifficultyOptionCommand(
@@ -69,7 +64,6 @@ internal class CampaignOptionsCommands
             value => RecruitmentDifficulty = value);
     }
 
-    [CommandLineArgumentFunction("PlayerMapMovementSpeed", "coop.debug.campaignoptions")]
     public static string PlayerMapMovementSpeedCommand(List<string> strings)
     {
         return HandleDifficultyOptionCommand(
@@ -79,7 +73,6 @@ internal class CampaignOptionsCommands
             value => PlayerMapMovementSpeed = value);
     }
 
-    [CommandLineArgumentFunction("StealthAndDisguiseDifficulty", "coop.debug.campaignoptions")]
     public static string StealthAndDisguiseDifficultyCommand(List<string> strings)
     {
         return HandleDifficultyOptionCommand(
@@ -89,7 +82,6 @@ internal class CampaignOptionsCommands
             value => StealthAndDisguiseDifficulty = value);
     }
 
-    [CommandLineArgumentFunction("CombatAIDifficulty", "coop.debug.campaignoptions")]
     public static string CombatAIDifficultyCommand(List<string> strings)
     {
         return HandleDifficultyOptionCommand(
@@ -99,7 +91,6 @@ internal class CampaignOptionsCommands
             value => CombatAIDifficulty = value);
     }
 
-    [CommandLineArgumentFunction("IsLifeDeathCycleDisabled", "coop.debug.campaignoptions")]
     public static string IsLifeDeathCycleDisabledCommand(List<string> strings)
     {
         return HandleBooleanOptionCommand(
@@ -109,7 +100,6 @@ internal class CampaignOptionsCommands
             value => IsLifeDeathCycleDisabled = value);
     }
 
-    [CommandLineArgumentFunction("PersuasionSuccessChance", "coop.debug.campaignoptions")]
     public static string PersuasionSuccessChanceCommand(List<string> strings)
     {
         return HandleDifficultyOptionCommand(
@@ -119,7 +109,6 @@ internal class CampaignOptionsCommands
             value => PersuasionSuccessChance = value);
     }
 
-    [CommandLineArgumentFunction("ClanMemberDeathChance", "coop.debug.campaignoptions")]
     public static string ClanMemberDeathChanceCommand(List<string> strings)
     {
         return HandleDifficultyOptionCommand(
@@ -129,7 +118,6 @@ internal class CampaignOptionsCommands
             value => ClanMemberDeathChance = value);
     }
 
-    [CommandLineArgumentFunction("IsIronmanMode", "coop.debug.campaignoptions")]
     public static string IsIronmanModeCommand(List<string> strings)
     {
         if (strings.Count == 0)
@@ -141,7 +129,6 @@ internal class CampaignOptionsCommands
         return "This option can only be set at game start.";
     }
 
-    [CommandLineArgumentFunction("BattleDeath", "coop.debug.campaignoptions")]
     public static string BattleDeathCommand(List<string> strings)
     {
         return HandleDifficultyOptionCommand(
@@ -151,7 +138,6 @@ internal class CampaignOptionsCommands
             value => BattleDeath = value);
     }
 
-    [CommandLineArgumentFunction("PlayerReceivedDamageDifficulty", "coop.debug.campaignoptions")]
     public static string SetPlayerReceivedDamageDifficulty(List<string> strings)
     {
         Difficulty oldValue = (Difficulty)PlayerReceivedDamageDifficulty;

@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Inventory.Commands;
 
@@ -29,7 +28,6 @@ internal class InventoryCommands
     /// <summary>
     /// View item ids in player inventories
     /// </summary>
-    [CommandLineArgumentFunction("itemids", "coop.debug.inventory")]
     public static string ViewItemIdsCommand(List<string> strings)
     {
         if (strings.Count == 0)
@@ -61,7 +59,6 @@ internal class InventoryCommands
     /// <summary>
     /// View item values in player inventories
     /// </summary>
-    [CommandLineArgumentFunction("itemvalues", "coop.debug.inventory")]
     public static string ViewItemValuesCommand(List<string> strings)
     {
         if (strings.Count == 0)
@@ -93,7 +90,6 @@ internal class InventoryCommands
     /// <summary>
     /// Output equipment ids of battle, civilian and stealth equipment for a specific hero
     /// </summary>
-    [CommandLineArgumentFunction("heroequipment", "coop.debug.inventory")]
     public static string HeroEquipmentCommand(List<string> strings)
     {
         if (strings.Count == 0)
@@ -130,7 +126,6 @@ internal class InventoryCommands
     /// <summary>
     /// Give debug animals to a hero with a given name
     /// </summary>
-    [CommandLineArgumentFunction("giveanimals", "coop.debug.inventory")]
     public static string GiveAnimalsCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -186,7 +181,6 @@ internal class InventoryCommands
     /// <summary>
     /// Give war horses to a hero with a given name
     /// </summary>
-    [CommandLineArgumentFunction("givewarhorses", "coop.debug.inventory")]
     public static string GiveWarhorsesCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";

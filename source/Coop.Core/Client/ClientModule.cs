@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -10,6 +11,7 @@ using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Client.Services.Session;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
+using Coop.Core.Common.Commands;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Session;
 using Coop.Steam;
@@ -30,6 +32,21 @@ public class ClientModule : CommonModule
         base.Load(builder);
 
         builder.RegisterModule<MissionModule>();
+
+#if DEBUG
+        builder.RegisterType<JoinStateCommand>()
+            .As<IJoinStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<ArmInactivePartyDeficitCommand>()
+            .As<IArmInactivePartyDeficitCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<DisconnectCommand>()
+            .As<IDisconnectCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
 
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();

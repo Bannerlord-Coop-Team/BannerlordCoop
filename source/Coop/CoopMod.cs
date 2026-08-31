@@ -807,7 +807,10 @@ namespace Coop
     /// </summary>
     internal static class JoinFixtureCommands
     {
-        [CommandLineArgumentFunction("start", "coop.debug.connection")]
+        // This command must be available before the session registrar exists so start can create a session.
+        [CommandLineArgumentFunction(
+            Coop.Core.Common.Commands.LegacyConnectionCommandExceptions.StartName,
+            Coop.Core.Common.Commands.LegacyConnectionCommandExceptions.Prefix)]
         public static string Start(List<string> args)
         {
             if (args.Count != 0)

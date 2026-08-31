@@ -1,7 +1,6 @@
 ﻿using Common;
 using System.Collections.Generic;
 using System.Threading;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
 
@@ -17,7 +16,6 @@ public class GameThreadDebugCommand
     /// Turns the game-thread drain instrumentation on or off, or reports its current state. With no
     /// argument it flips the current setting.
     /// </summary>
-    [CommandLineArgumentFunction("instrument", "coop.debug.gamethread")]
     public static string Instrument(List<string> args)
     {
         var arg = args.Count > 0 ? args[0].ToLowerInvariant() : "toggle";
@@ -47,7 +45,6 @@ public class GameThreadDebugCommand
                "When ON, a per-second [GameThread] summary (drain ms, worst frame, backlog, top handlers) is written to the log.";
     }
 
-    [CommandLineArgumentFunction("stall", "coop.debug.gamethread")]
     public static string Stall(List<string> args)
     {
         if (ModInformation.IsClient)
