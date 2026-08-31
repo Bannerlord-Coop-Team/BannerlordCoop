@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Alleys.Commands;
 
@@ -45,10 +44,8 @@ public class AlleyDebugCommand
         return true;
     }
 
-    [CommandLineArgumentFunction("list", "coop.debug.alley")]
     public static string List(List<string> args)
     {
-        if (args.Count != 1) return "Usage: coop.debug.alley.list <settlementId>";
 
         Settlement settlement = Settlement.Find(args[0]);
         if (settlement == null) return $"Settlement with id '{args[0]}' not found";
@@ -65,7 +62,6 @@ public class AlleyDebugCommand
         return sb.ToString();
     }
 
-    [CommandLineArgumentFunction("my_hero_id", "coop.debug.alley")]
     public static string MyHeroId(List<string> args)
     {
         var hero = Hero.MainHero;
@@ -75,11 +71,9 @@ public class AlleyDebugCommand
         return $"{hero.Name} registry id: {id}  (pass this to the host's coop.debug.alley.set_owner)";
     }
 
-    [CommandLineArgumentFunction("set_owner", "coop.debug.alley")]
     public static string SetOwner(List<string> args)
     {
         if (ModInformation.IsClient) return "Run coop.debug.alley.set_owner on the server (host) only";
-        if (args.Count != 3) return "Usage: coop.debug.alley.set_owner <settlementId> <alleyIndex> <heroRegistryId>";
 
         if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return error;
 
@@ -106,11 +100,9 @@ public class AlleyDebugCommand
         return $"Set alley [{args[1]}] in {alley.Settlement.Name} to {hero.Name}";
     }
 
-    [CommandLineArgumentFunction("abandon", "coop.debug.alley")]
     public static string Abandon(List<string> args)
     {
         if (ModInformation.IsClient) return "Run coop.debug.alley.abandon on the server (host) only";
-        if (args.Count != 2) return "Usage: coop.debug.alley.abandon <settlementId> <alleyIndex>";
 
         if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return error;
         if (alley.Owner == null) return "Alley is not owned";
@@ -124,7 +116,6 @@ public class AlleyDebugCommand
         return $"Abandoned alley [{args[1]}] in {alley.Settlement.Name}";
     }
 
-    [CommandLineArgumentFunction("daily_tick", "coop.debug.alley")]
     public static string DailyTick(List<string> args)
     {
         if (ModInformation.IsClient) return "Run coop.debug.alley.daily_tick on the server (host) only";
@@ -135,11 +126,9 @@ public class AlleyDebugCommand
         return "Ran the server alley daily tick once";
     }
 
-    [CommandLineArgumentFunction("attack", "coop.debug.alley")]
     public static string Attack(List<string> args)
     {
         if (ModInformation.IsClient) return "Run coop.debug.alley.attack on the server (host) only";
-        if (args.Count != 2) return "Usage: coop.debug.alley.attack <settlementId> <alleyIndex>";
 
         if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return error;
         if (alley.Owner == null || alley.Owner.IsGangLeader) return "Alley is not player-owned; only a player alley can be attacked";
@@ -150,10 +139,8 @@ public class AlleyDebugCommand
         return $"Started an AI attack on alley [{args[1]}] in {alley.Settlement.Name}; the owner must go defend it";
     }
 
-    [CommandLineArgumentFunction("info", "coop.debug.alley")]
     public static string Info(List<string> args)
     {
-        if (args.Count != 2) return "Usage: coop.debug.alley.info <settlementId> <alleyIndex>";
 
         if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return error;
 

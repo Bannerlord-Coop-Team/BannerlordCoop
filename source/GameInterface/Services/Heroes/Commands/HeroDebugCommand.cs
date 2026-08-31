@@ -17,7 +17,6 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Heroes.Commands;
 
@@ -31,7 +30,7 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">Optional case-insensitive hero name prefix</param>
     /// <returns>Strings of the matching heroes</returns>
-    [CommandLineArgumentFunction("list", "coop.debug.hero")]
+
     public static string ListHeroes(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -41,7 +40,7 @@ public class HeroDebugCommand
             return $"Unable to get {nameof(IObjectManager)}";
         }
 
-        string namePrefix = args == null ? string.Empty : string.Join(" ", args).Trim();
+        string namePrefix = args.Count == 0 ? string.Empty : args[0];
         foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes()
                      .Where(hero => NameStartsWithPrefix(hero.Name?.ToString(), namePrefix)))
         {
@@ -67,10 +66,9 @@ public class HeroDebugCommand
                heroName?.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) == true;
     }
 
-    [CommandLineArgumentFunction("home_settlement_snapshot", "coop.debug.hero")]
     public static string HomeSettlementSnapshot(List<string> args)
     {
-        if (args.Count != 1 || !bool.TryParse(args[0], out bool resolveMissing))
+        if (!bool.TryParse(args[0], out bool resolveMissing))
             return "Usage: coop.debug.hero.home_settlement_snapshot <true|false>";
 
         if (Campaign.Current == null)
@@ -127,13 +125,9 @@ public class HeroDebugCommand
     }
 
     // coop.debug.hero.info
-    [CommandLineArgumentFunction("info", "coop.debug.hero")]
+
     public static string Info(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.hero.info <heroId>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -161,8 +155,8 @@ public class HeroDebugCommand
         return results;
     }
 
-    // coop.debug.hero.createHero lord_2_7
-    [CommandLineArgumentFunction("createHero", "coop.debug.hero")]
+    // coop.debug.hero.create_hero lord_2_7
+
     public static string CreateNewHero(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -170,10 +164,6 @@ public class HeroDebugCommand
             return "Create hero is only to be called on the server";
         }
 
-        if (args.Count < 1 || args.Count > 2)
-        {
-            return "Usage: coop.debug.hero.createHero <CharacterObject.StringId> <optional age>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -199,7 +189,7 @@ public class HeroDebugCommand
     }
 
     // coop.debug.hero.audit
-    [CommandLineArgumentFunction("audit", "coop.debug.hero")]
+
     public static string AuditHeroes(List<string> args)
     {
         if (ContainerProvider.TryResolve<HeroAuditor>(out var auditor) == false)
@@ -210,7 +200,6 @@ public class HeroDebugCommand
         return auditor.Audit();
     }
 
-    [CommandLineArgumentFunction("add_power", "coop.debug.hero")]
     public static string AddPower(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.add_power"))
@@ -218,10 +207,6 @@ public class HeroDebugCommand
             return error;
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.hero.add_power <heroId> <power>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -243,23 +228,17 @@ public class HeroDebugCommand
         return $"Hero power changed to: {hero.Power}";
     }
 
-    [CommandLineArgumentFunction("SetGold", "coop.debug.hero")]
     public static string SetGold(List<string> args)
     {
-        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.SetGold")) return error;
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_gold")) return error;
 
-        if (args.Count < 2)
+
+        if (int.TryParse(args[1], out int gold) == false)
         {
-            return "Usage: coop.debug.hero.SetGold <heroName> <gold>";
+            return $"{args[1]} is not a valid integer";
         }
 
-        if (int.TryParse(args[args.Count - 1], out int gold) == false)
-        {
-            return $"{args[args.Count - 1]} is not a valid integer";
-        }
-
-        // Everything before the gold value is treated as the hero name (supports multi-word names)
-        string heroName = string.Join(" ", args.Take(args.Count - 1));
+        string heroName = args[0];
 
         var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
             .Where(h => h.Name?.ToString() == heroName)
@@ -278,10 +257,8 @@ public class HeroDebugCommand
         return $"Set gold to {gold} for {heroes.Count} hero(es) named '{heroName}'";
     }
 
-    [CommandLineArgumentFunction("gold_state", "coop.debug.hero")]
     public static string GoldState(List<string> args)
     {
-        if (args.Count != 1) return "Usage: coop.debug.hero.gold_state <hero id>";
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(args[0], out Hero hero))
@@ -290,12 +267,11 @@ public class HeroDebugCommand
         return $"HERO_GOLD_STATE hero={args[0]} gold={hero.Gold}";
     }
 
-    [CommandLineArgumentFunction("set_gold_state", "coop.debug.hero")]
     public static string SetGoldState(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_gold_state"))
             return error;
-        if (args.Count != 2 || !int.TryParse(args[1], out int gold) || gold < 0)
+        if (!int.TryParse(args[1], out int gold) || gold < 0)
             return "Usage: coop.debug.hero.set_gold_state <hero id> <non-negative gold>";
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "Unable to resolve ObjectManager.";
@@ -313,7 +289,7 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">heroId and hitPoints value to set </param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_hitpoints", "coop.debug.hero")]
+
     public static string SetHeroHitPoints(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_hitpoints"))
@@ -321,10 +297,6 @@ public class HeroDebugCommand
             return error;
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.hero.set_hitpoints <heroId> <hitPoints>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -351,7 +323,7 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">heroId and BannerItem value to set </param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_banneritem", "coop.debug.hero")]
+
     public static string SetHeroBannerItem(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_banneritem"))
@@ -359,10 +331,6 @@ public class HeroDebugCommand
             return error;
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.hero.set_banneritem <heroId> <bannerItem>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -389,7 +357,7 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">none are used</param>
     /// <returns>returns all banneritems </returns>
-    [CommandLineArgumentFunction("list_banneritems", "coop.debug.hero")]
+
     public static string ListBannerItems(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -407,13 +375,9 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">HeroId</param>
     /// <returns>returns banneritem info from hero </returns>
-    [CommandLineArgumentFunction("get_banneritem", "coop.debug.hero")]
+
     public static string GetHeroBannerItem(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.hero.get_banneritem <heroId>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -433,7 +397,7 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">none are used</param>
     /// <returns>returns all issues available </returns>
-    [CommandLineArgumentFunction("issues", "coop.debug.hero")]
+
     public static string ListIssues(List<string> args)
     {
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
@@ -458,7 +422,7 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">heroId and issue value to set </param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_issue", "coop.debug.hero")]
+
     public static string SetHeroIssue(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_issue"))
@@ -466,10 +430,6 @@ public class HeroDebugCommand
             return error;
         } 
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.hero.set_issue <heroId> <issueId>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -498,13 +458,9 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">HeroId</param>
     /// <returns>returns Issue info from hero </returns>
-    [CommandLineArgumentFunction("get_issue", "coop.debug.hero")]
+
     public static string GetHeroIssue(List<string> args)
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.hero.get_issue <heroId>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -522,10 +478,9 @@ public class HeroDebugCommand
     /// <summary>
     /// View available volunteers for a target hero
     /// </summary>
-    [CommandLineArgumentFunction("volunteers", "coop.debug.hero")]
+
     public static string ViewVolunteersCommand(List<string> strings)
     {
-        if (strings.Count == 0) return "Hero id required";
 
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in Hero.AllAliveHeroes)
@@ -556,11 +511,10 @@ public class HeroDebugCommand
     /// <summary>
     /// Runs the authoritative volunteer refresh for one settlement.
     /// </summary>
-    [CommandLineArgumentFunction("refresh_volunteers", "coop.debug.hero")]
+
     public static string RefreshVolunteersCommand(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.refresh_volunteers")) return error;
-        if (args.Count > 1) return "Usage: coop.debug.hero.refresh_volunteers [settlementId]";
 
         string settlementId = args.Count == 0 ? "town_ES1" : args[0];
         var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == settlementId);
@@ -574,7 +528,7 @@ public class HeroDebugCommand
     }
 
     // coop.debug.hero.set_relation
-    [CommandLineArgumentFunction("set_relation", "coop.debug.hero")]
+
     public static string SetRelation(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -582,10 +536,6 @@ public class HeroDebugCommand
             return "Set relation is only to be called on the server";
         }
 
-        if (args.Count != 3)
-        {
-            return "Usage: coop.debug.hero.set_relation <hero1Id> <hero2Id> <value>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -618,13 +568,9 @@ public class HeroDebugCommand
     }
 
     // coop.debug.hero.get_relation
-    [CommandLineArgumentFunction("get_relation", "coop.debug.hero")]
+
     public static string GetRelation(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.hero.get_relation <hero1Id> <hero2Id>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -644,13 +590,8 @@ public class HeroDebugCommand
         return $"Relation between '{hero1.Name}' and '{hero2.Name}': {CharacterRelationManager.GetHeroRelation(hero1, hero2)}";
     }
 
-    [CommandLineArgumentFunction("get_effective_relation", "coop.debug.hero")]
     public static string GetEffectiveRelation(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.hero.get_effective_relation <hero1Id> <hero2Id>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -687,7 +628,6 @@ public class HeroDebugCommand
             CharacterRelationManager.GetHeroRelation(effectiveHero1, effectiveHero2);
     }
 
-    [CommandLineArgumentFunction("set_effective_relation", "coop.debug.hero")]
     public static string SetEffectiveRelation(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -695,10 +635,6 @@ public class HeroDebugCommand
             return "Set effective relation is only to be called on the server";
         }
 
-        if (args.Count != 3)
-        {
-            return "Usage: coop.debug.hero.set_effective_relation <hero1Id> <hero2Id> <value>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {

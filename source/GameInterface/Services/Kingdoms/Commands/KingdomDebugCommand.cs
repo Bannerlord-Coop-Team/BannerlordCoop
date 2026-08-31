@@ -30,7 +30,6 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Kingdoms.Commands;
 
@@ -61,9 +60,6 @@ public class KingdomDebugCommand
         Remove,
     }
 
-    private static readonly string CreateUsage = "Usage: coop.debug.kingdom.create <leaderHeroName> <kingdomName> (run on the server; use '_' for spaces in the hero name)";
-    private static readonly string CollectionAddUsage = "Usage: coop.debug.kingdom.collection_add <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
-    private static readonly string CollectionRemoveUsage = "Usage: coop.debug.kingdom.collection_remove <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <index>";
     private static readonly string RemoveUsage = "Usage: coop.debug.kingdom.remove_decision <kingdomId> <Index>";
     private static readonly string AddBasicUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
     private static readonly string AddDeclareWarDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> DeclareWarDecision <factionId>";
@@ -131,11 +127,9 @@ public class KingdomDebugCommand
         return container.TryResolve(out voteManager);
     }
 
-    [CommandLineArgumentFunction("open", "coop.debug.kingdom")]
     public static string OpenKingdomScreen(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.open";
         if (Clan.PlayerClan?.Kingdom == null) return "The player clan is not in a kingdom.";
         if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
         if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
@@ -146,11 +140,9 @@ public class KingdomDebugCommand
         return "KINGDOM_SCREEN_OPENED";
     }
 
-    [CommandLineArgumentFunction("open_decision", "coop.debug.kingdom")]
     public static string OpenKingdomDecisionScreen(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count < 2) return "Usage: <kingdomId> <decisionIndex>";
 
         KingdomDecision decision;
         Kingdom playerKingdom = Clan.PlayerClan?.Kingdom;
@@ -198,11 +190,9 @@ public class KingdomDebugCommand
         return "KINGDOM_DECISION_SCREEN_OPENED";
     }
 
-    [CommandLineArgumentFunction("close", "coop.debug.kingdom")]
     public static string CloseKingdomScreen(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.close";
         if (!(Game.Current?.GameStateManager?.ActiveState is KingdomState))
             return "No active Kingdom screen.";
 
@@ -210,11 +200,9 @@ public class KingdomDebugCommand
         return "KINGDOM_SCREEN_CLOSED";
     }
 
-    [CommandLineArgumentFunction("screen_state", "coop.debug.kingdom")]
     public static string KingdomScreenState(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.screen_state";
 
         var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
         return $"KINGDOM_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is KingdomState} " +
@@ -225,11 +213,9 @@ public class KingdomDebugCommand
             $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}";
     }
 
-    [CommandLineArgumentFunction("policy_timeout_capture", "coop.debug.kingdom")]
     public static string CapturePolicyTimeoutFixture(List<string> args)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.policy_timeout_capture";
         if (pendingPolicyTimeoutFixture != null) return "A policy-timeout fixture lifecycle is already active.";
         if (!TryGetObjectManager(out var objectManager) || !TryGetPlayerManager(out var playerManager))
             return "Unable to resolve policy-timeout fixture services.";
@@ -266,12 +252,11 @@ public class KingdomDebugCommand
         });
     }
 
-    [CommandLineArgumentFunction("policy_timeout_stage", "coop.debug.kingdom")]
     public static string StagePolicyTimeoutFixture(List<string> args)
     {
         const string usage = "Usage: coop.debug.kingdom.policy_timeout_stage <kingdomId> <proposerClanId> <policyId> <policyWasActive>";
         if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (args.Count != 4 || !bool.TryParse(args[3], out bool policyWasActive)) return usage;
+        if (!bool.TryParse(args[3], out bool policyWasActive)) return usage;
         if (pendingPolicyTimeoutFixture != null) return "A policy-timeout fixture lifecycle is already active.";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
         if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
@@ -309,11 +294,9 @@ public class KingdomDebugCommand
         });
     }
 
-    [CommandLineArgumentFunction("policy_timeout_state", "coop.debug.kingdom")]
     public static string GetPolicyTimeoutState(List<string> args)
     {
         if (ModInformation.IsServer) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.policy_timeout_state";
 
         var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
         DecisionItemBaseVM decision = kingdomScreen?.DataSource?.Decision?.CurrentDecision;
@@ -331,12 +314,11 @@ public class KingdomDebugCommand
         });
     }
 
-    [CommandLineArgumentFunction("policy_timeout_restore", "coop.debug.kingdom")]
     public static string RestorePolicyTimeoutFixture(List<string> args)
     {
         const string usage = "Usage: coop.debug.kingdom.policy_timeout_restore <kingdomId> <proposerClanId> <policyId> <policyWasActive>";
         if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (args.Count != 4 || !bool.TryParse(args[3], out bool policyWasActive)) return usage;
+        if (!bool.TryParse(args[3], out bool policyWasActive)) return usage;
         if (!TryMatchPendingPolicyTimeoutFixture(args[0], args[1], args[2], policyWasActive, out var fixture, out string error))
             return error;
 
@@ -366,12 +348,11 @@ public class KingdomDebugCommand
         });
     }
 
-    [CommandLineArgumentFunction("policy_timeout_verify", "coop.debug.kingdom")]
     public static string VerifyPolicyTimeoutFixture(List<string> args)
     {
         const string usage = "Usage: coop.debug.kingdom.policy_timeout_verify <kingdomId> <policyId> <policyWasActive>";
         if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (args.Count != 3 || !bool.TryParse(args[2], out bool policyWasActive)) return usage;
+        if (!bool.TryParse(args[2], out bool policyWasActive)) return usage;
         if (pendingPolicyTimeoutFixture != null) return "The policy-timeout fixture lifecycle is still active.";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
         if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
@@ -459,11 +440,10 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">leader hero (coop id, game StringId, or name with '_' for spaces), then the kingdom name</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("create", "coop.debug.kingdom")]
+
     public static string CreateKingdomCommand(List<string> args)
     {
         if (!ModInformation.IsServer) return "This command can only be run on the server.";
-        if (args.Count < 2) return CreateUsage;
         if (Campaign.Current == null) return "No campaign is loaded.";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
         if (!ContainerProvider.TryResolve<IKingdomCreator>(out var kingdomCreator)) return "Unable to resolve KingdomCreator";
@@ -478,8 +458,7 @@ public class KingdomDebugCommand
         // so reject rather than silently create a kingdom ruled by a different hero.
         if (clan.Leader != leader) return $"{leader.Name} does not lead clan {clan.StringId}. Pass the clan leader instead.";
 
-        // The console splits arguments on spaces, so everything after the hero is the kingdom name.
-        string kingdomName = string.Join(" ", args.Skip(1)).Trim();
+        string kingdomName = args[1];
         if (!KingdomHandler.CanCreateKingdomForClan(clan, kingdomName, out string reason))
         {
             return $"Unable to create kingdom {kingdomName}: {reason}.";
@@ -526,7 +505,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the kingdoms</returns>
-    [CommandLineArgumentFunction("list", "coop.debug.kingdom")]
+
     public static string ListKingdoms(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -544,10 +523,9 @@ public class KingdomDebugCommand
     /// Reflection-dumps every field of a Kingdom so a server screenshot and a client screenshot can be
     /// compared field-for-field to confirm Kingdom field syncs still replicate.
     /// </summary>
-    [CommandLineArgumentFunction("info", "coop.debug.kingdom")]
+
     public static string Info(List<string> args)
     {
-        if (args.Count != 1) return "Usage: coop.debug.kingdom.info <kingdomId>";
         if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
         if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false) return $"Unable to find kingdom with id: {args[0]}";
 
@@ -565,7 +543,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">controller id, kingdom id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("force_player_join_kingdom", "coop.debug.kingdom")]
+
     public static string ForcePlayerJoinKingdom(List<string> args)
     {
         if (!ModInformation.IsServer)
@@ -573,10 +551,6 @@ public class KingdomDebugCommand
             return "This command can only be run on the server.";
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.kingdom.force_player_join_kingdom <controllerId> <kingdomId>";
-        }
 
         if (TryGetPlayerManager(out var playerManager) == false)
         {
@@ -641,7 +615,7 @@ public class KingdomDebugCommand
     }
 
     // coop.debug.kingdom.force_player_vassalage Player khuzait true
-    [CommandLineArgumentFunction("force_player_vassalage", "coop.debug.kingdom")]
+
     public static string ForcePlayerVassalage(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -649,10 +623,6 @@ public class KingdomDebugCommand
             return "This command can only be run on the server.";
         }
 
-        if (args.Count < 2 || args.Count > 3)
-        {
-            return "Usage: coop.debug.kingdom.force_player_vassalage <controllerId> <kingdomId> [grantRewards]";
-        }
 
         if (!TryGetPlayerManager(out var playerManager))
         {
@@ -691,7 +661,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the usages</returns>
-    [CommandLineArgumentFunction("add_decision_usage", "coop.debug.kingdom")]
+
     public static string AddDecisionUsage(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -718,7 +688,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of usage.</returns>
-    [CommandLineArgumentFunction("remove_decision_usage", "coop.debug.kingdom")]
+
     public static string RemoveDecisionUsage(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -734,13 +704,9 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the decisions of a specific kingdom</returns>
-    [CommandLineArgumentFunction("list_kingdom_decisions", "coop.debug.kingdom")]
+
     public static string ListKingdomDecisions(List<string> args)
     {
-        if (args.Count < 1)
-        {
-            return "Usage: coop.debug.kingdom.list_kingdom_decisions <kingdomId>";
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -771,13 +737,9 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId</param>
     /// <returns>strings of all active kingdom decisions with client votes</returns>
-    [CommandLineArgumentFunction("decisions", "coop.debug.kingdom")]
+
     public static string ListKingdomDecisionVotes(List<string> args)
     {
-        if (args.Count < 1)
-        {
-            return "Usage: coop.debug.kingdom.decisions <kingdomId>";
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -849,7 +811,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : 1-based decision index</param>
     /// <returns>strings of all outcomes of a decision</returns>
-    [CommandLineArgumentFunction("list_decision_outcomes", "coop.debug.kingdom")]
+
     public static string ListKingdomDecisionOutcomes(List<string> args)
     {
         if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int _, out string message))
@@ -881,7 +843,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index, 1-based outcome index or abstain, support weight</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("vote_decision", "coop.debug.kingdom")]
+
     public static string VoteKingdomDecision(List<string> args)
     {
         if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int decisionIndex, out string message))
@@ -889,10 +851,6 @@ public class KingdomDebugCommand
             return message;
         }
 
-        if (args.Count < 4 || args.Count > 5)
-        {
-            return "Usage: coop.debug.kingdom.vote_decision <kingdomId> <decisionIndex> <outcomeIndex|abstain> <supportWeight> [isFinal]";
-        }
 
         bool isAbstain = args[2].Equals("abstain", StringComparison.OrdinalIgnoreCase);
         int outcomeIndex = -1;
@@ -937,7 +895,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("resolve_decision", "coop.debug.kingdom")]
+
     public static string ResolveKingdomDecision(List<string> args)
     {
         if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
@@ -962,13 +920,9 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId</param>
     /// <returns>strings of all the active policies of a specific kingdom</returns>
-    [CommandLineArgumentFunction("list_policies", "coop.debug.kingdom")]
+
     public static string ListKingdomPolicies(List<string> args)
     {
-        if (args.Count < 1)
-        {
-            return "Usage: coop.debug.kingdom.list_policies <kingdomId>";
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -1004,13 +958,9 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name and kingdom id</param>
     /// <returns>IDs currently present in the selected collection</returns>
-    [CommandLineArgumentFunction("collection_list", "coop.debug.kingdom")]
+
     public static string ListKingdomCollection(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.kingdom.collection_list <collection> <kingdomId>";
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -1047,7 +997,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name, kingdom id, and value id</param>
     /// <returns>Result of the collection add</returns>
-    [CommandLineArgumentFunction("collection_add", "coop.debug.kingdom")]
+
     public static string AddKingdomCollectionItem(List<string> args)
     {
         return ChangeKingdomCollection(args, CollectionOperation.Add);
@@ -1059,7 +1009,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name, kingdom id, and value id</param>
     /// <returns>Result of the collection remove</returns>
-    [CommandLineArgumentFunction("collection_remove", "coop.debug.kingdom")]
+
     public static string RemoveKingdomCollectionItem(List<string> args)
     {
         return ChangeKingdomCollection(args, CollectionOperation.Remove);
@@ -1072,13 +1022,9 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("declare_war", "coop.debug.kingdom")]
+
     public static string DeclareWar(List<string> args)
     {
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.kingdom.declare_war <faction1Id> <faction2Id> (run on the server)";
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -1105,13 +1051,9 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("make_peace", "coop.debug.kingdom")]
+
     public static string MakePeace(List<string> args)
     {
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.kingdom.make_peace <faction1Id> <faction2Id> (run on the server)";
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -1137,11 +1079,6 @@ public class KingdomDebugCommand
         if (ModInformation.IsClient)
         {
             return "Command is only available to run on the server";
-        }
-
-        if (args.Count < 3)
-        {
-            return operation == CollectionOperation.Add ? CollectionAddUsage : CollectionRemoveUsage;
         }
 
         var collectionName = NormalizeCollectionName(args[0]);
@@ -1504,11 +1441,6 @@ public class KingdomDebugCommand
         decision = null;
         zeroBasedIndex = -1;
 
-        if (args.Count < 2)
-        {
-            message = "Usage: <kingdomId> <decisionIndex>";
-            return false;
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -1555,13 +1487,9 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : decision to add</param>
     /// <returns></returns>
-    [CommandLineArgumentFunction("add_decision", "coop.debug.kingdom")]
+
     public static string AddDecision(List<string> args)
     {
-        if (args.Count < 4)
-        {
-            return AddBasicUsage;
-        }
 
         string kingdomId = args[0];
         string clanId = args[1];
@@ -1607,13 +1535,9 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : index of decision to remove</param>
     /// <returns></returns>
-    [CommandLineArgumentFunction("remove_decision", "coop.debug.kingdom")]
+
     public static string RemoveDecision(List<string> args)
     {
-        if (args.Count != 2)
-        {
-            return RemoveUsage;
-        }
 
         string kingdomId = args[0];
         string index = args[1];
