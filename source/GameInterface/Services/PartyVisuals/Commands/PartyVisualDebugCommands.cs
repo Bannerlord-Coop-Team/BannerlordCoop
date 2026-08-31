@@ -10,7 +10,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.PartyVisuals.Commands;
 
@@ -22,14 +21,13 @@ internal class PartyVisualDebugCommands
     private static int fixtureBaselineEligiblePartyCount = -1;
 #endif
 
-    [CommandLineArgumentFunction("buffer_state", "coop.debug.partyvisuals")]
     public static string BufferState(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.partyvisuals.buffer_state";
+            return "Usage: coop.debug.party_visuals.buffer_state";
 
         var manager = MobilePartyVisualManager.Current;
         if (manager == null)
@@ -63,16 +61,14 @@ internal class PartyVisualDebugCommands
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("fixture_state", "coop.debug.partyvisuals")]
     public static string FixtureState(List<string> args)
     {
         if (args.Count != 0)
-            return "Usage: coop.debug.partyvisuals.fixture_state";
+            return "Usage: coop.debug.party_visuals.fixture_state";
 
         return GetFixtureState(includeBaseline: true);
     }
 
-    [CommandLineArgumentFunction("stage_over_limit_fixture", "coop.debug.partyvisuals")]
     public static string StageOverLimitFixture(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -82,7 +78,7 @@ internal class PartyVisualDebugCommands
             !int.TryParse(args[0], out int targetEligiblePartyCount) ||
             targetEligiblePartyCount < 2500)
         {
-            return "Usage: coop.debug.partyvisuals.stage_over_limit_fixture <targetEligiblePartyCount>=2500+ <settlementId>";
+            return "Usage: coop.debug.party_visuals.stage_over_limit_fixture <targetEligiblePartyCount>=2500+ <settlementId>";
         }
 
         if (stagedParties.Count != 0 || GetLiveFixturePartyCount() != 0)
@@ -127,14 +123,13 @@ internal class PartyVisualDebugCommands
         return GetFixtureState(includeBaseline: true);
     }
 
-    [CommandLineArgumentFunction("restore_over_limit_fixture", "coop.debug.partyvisuals")]
     public static string RestoreOverLimitFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "restore_over_limit_fixture must be run on the server.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.partyvisuals.restore_over_limit_fixture";
+            return "Usage: coop.debug.party_visuals.restore_over_limit_fixture";
 
         int removedPartyCount = RestoreFixtureParties();
         string state = GetFixtureState(includeBaseline: false);

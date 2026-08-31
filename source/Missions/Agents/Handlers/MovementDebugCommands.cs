@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace Missions.Agents.Handlers;
 
 internal static class MovementDebugCommands
 {
-    [CommandLineArgumentFunction("state", "coop.debug.movement")]
     public static string State(List<string> args)
     {
         if (args.Count != 0)
@@ -64,7 +62,6 @@ internal static class MovementDebugCommands
         });
     }
 
-    [CommandLineArgumentFunction("force_rate", "coop.debug.movement")]
     public static string ForceRate(List<string> args)
     {
         if (!TryParseRate(
@@ -84,7 +81,6 @@ internal static class MovementDebugCommands
             : "MOVEMENT_RATE_AUTOMATIC";
     }
 
-    [CommandLineArgumentFunction("force_receiver_cap", "coop.debug.movement")]
     public static string ForceReceiverCap(List<string> args)
     {
         if (!TryParseRate(
@@ -106,7 +102,6 @@ internal static class MovementDebugCommands
             : "MOVEMENT_RECEIVER_CAP_AUTOMATIC";
     }
 
-    [CommandLineArgumentFunction("simulate_receive_pressure", "coop.debug.movement")]
     public static string SimulateReceivePressure(List<string> args)
     {
         if (args.Count != 4 ||
@@ -140,7 +135,6 @@ internal static class MovementDebugCommands
         });
     }
 
-    [CommandLineArgumentFunction("clear_receive_pressure", "coop.debug.movement")]
     public static string ClearReceivePressure(List<string> args)
     {
         if (args.Count != 0)

@@ -15,7 +15,6 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Scoreboard;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
 
@@ -23,7 +22,7 @@ namespace GameInterface.Services.MapEvents.Commands;
 /// Battle fixture commands for deployment, scoreboard inspection, mission exit, and combat outcomes. Run the
 /// direct kill commands on the battle-authority client because it owns the AI/enemy
 /// agents, so each kill goes through the coop death path: <c>Agent.Die</c>, the mission death callback,
-/// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.mapevent.kms</c>.
+/// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.map_event.kms</c>.
 /// </summary>
 internal class BattleTeamKillCommands
 {
@@ -35,11 +34,10 @@ internal class BattleTeamKillCommands
 
     private const string ClickDeploymentReadyUsage =
 @"Usage:
-  coop.debug.mapevent.click_deployment_ready
+  coop.debug.map_event.click_deployment_ready
 
 Activates the deployment Ready button's native UI callback.";
 
-    [CommandLineArgumentFunction("click_deployment_ready", "coop.debug.mapevent")]
     public static string ClickDeploymentReady(List<string> args)
     {
         var ctx = new CommandContext("click_deployment_ready", ClickDeploymentReadyUsage, args);
@@ -66,14 +64,13 @@ Activates the deployment Ready button's native UI callback.";
 
     private const string FinishDeploymentUsage =
 @"Usage:
-  coop.debug.mapevent.finish_deployment
+  coop.debug.map_event.finish_deployment
 
 Finishes the current battle deployment through the native deployment handler.";
 
-    [CommandLineArgumentFunction("deployment_state", "coop.debug.mapevent")]
     public static string DeploymentState(List<string> args)
     {
-        var ctx = new CommandContext("deployment_state", "Usage: coop.debug.mapevent.deployment_state", args);
+        var ctx = new CommandContext("deployment_state", "Usage: coop.debug.map_event.deployment_state", args);
         if (!ctx.RequireArgCount(0, out var error))
             return error;
 
@@ -87,7 +84,6 @@ Finishes the current battle deployment through the native deployment handler.";
                $"teamSetupOver={controller?.TeamSetupOver ?? false}, handler={handler != null}.";
     }
 
-    [CommandLineArgumentFunction("finish_deployment", "coop.debug.mapevent")]
     public static string FinishDeployment(List<string> args)
     {
         var ctx = new CommandContext("finish_deployment", FinishDeploymentUsage, args);
@@ -114,11 +110,10 @@ Finishes the current battle deployment through the native deployment handler.";
 
     private const string ToggleScoreboardUsage =
 @"Usage:
-  coop.debug.mapevent.toggle_scoreboard
+  coop.debug.map_event.toggle_scoreboard
 
 Holds or releases the native scoreboard input without requiring window focus.";
 
-    [CommandLineArgumentFunction("toggle_scoreboard", "coop.debug.mapevent")]
     public static string ToggleScoreboard(List<string> args)
     {
         var ctx = new CommandContext("toggle_scoreboard", ToggleScoreboardUsage, args);
@@ -147,11 +142,10 @@ Holds or releases the native scoreboard input without requiring window focus.";
 
     private const string CollapseScoreboardPartiesUsage =
 @"Usage:
-  coop.debug.mapevent.collapse_scoreboard_parties
+  coop.debug.map_event.collapse_scoreboard_parties
 
 Collapses every native scoreboard party roster and returns the scroll position to the top.";
 
-    [CommandLineArgumentFunction("collapse_scoreboard_parties", "coop.debug.mapevent")]
     public static string CollapseScoreboardParties(List<string> args)
     {
         var ctx = new CommandContext("collapse_scoreboard_parties", CollapseScoreboardPartiesUsage, args);
@@ -184,11 +178,10 @@ Collapses every native scoreboard party roster and returns the scroll position t
 
     private const string ScoreboardStateUsage =
 @"Usage:
-  coop.debug.mapevent.scoreboard_state
+  coop.debug.map_event.scoreboard_state
 
 Lists the map-event parties and party rows currently loaded by the battle scoreboard.";
 
-    [CommandLineArgumentFunction("scoreboard_state", "coop.debug.mapevent")]
     public static string ScoreboardState(List<string> args)
     {
         var ctx = new CommandContext("scoreboard_state", ScoreboardStateUsage, args);
@@ -331,11 +324,10 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
 
     private const string LeaveBattleUsage =
 @"Usage:
-  coop.debug.mapevent.leave_battle
+  coop.debug.map_event.leave_battle
 
 Leaves the current battle through the native mission lifecycle.";
 
-    [CommandLineArgumentFunction("leave_battle", "coop.debug.mapevent")]
     public static string LeaveBattle(List<string> args)
     {
         if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
@@ -355,11 +347,10 @@ Leaves the current battle through the native mission lifecycle.";
 
     private const string KillEnemyUsage =
 @"Usage:
-  coop.debug.mapevent.kill_enemy
+  coop.debug.map_event.kill_enemy
 
 Kills one live enemy-team agent in the current battle (battle-authority side).";
 
-    [CommandLineArgumentFunction("kill_enemy", "coop.debug.mapevent")]
     public static string KillOneEnemy(List<string> args)
     {
         if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
@@ -390,11 +381,10 @@ Kills one live enemy-team agent in the current battle (battle-authority side).";
 
     private const string KillEnemyTeamUsage =
 @"Usage:
-  coop.debug.mapevent.kill_enemy_team
+  coop.debug.map_event.kill_enemy_team
 
 Kills every live enemy-team agent in the current battle (battle-authority side). Useful for testing a coop battle WIN.";
 
-    [CommandLineArgumentFunction("kill_enemy_team", "coop.debug.mapevent")]
     public static string KillEnemyTeam(List<string> args)
     {
         if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
@@ -416,12 +406,11 @@ Kills every live enemy-team agent in the current battle (battle-authority side).
 
     private const string KillOwnTeamUsage =
 @"Usage:
-  coop.debug.mapevent.kill_own_team
+  coop.debug.map_event.kill_own_team
 
 Kills every live agent on the local player team in the current battle (battle-authority side). Useful for testing a
 coop battle LOSS.";
 
-    [CommandLineArgumentFunction("kill_own_team", "coop.debug.mapevent")]
     public static string KillOwnTeam(List<string> args)
     {
         if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)

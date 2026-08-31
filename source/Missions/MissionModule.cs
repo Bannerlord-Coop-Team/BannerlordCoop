@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
@@ -44,6 +45,139 @@ public class MissionModule : Module
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
             builder.RegisterInstance(registration);
+
+        builder.RegisterType<Missions.Agents.Handlers.MovementLegacyCommandResult>()
+            .As<Missions.Agents.Handlers.IMovementLegacyCommandResult>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.BattleLegacyCommandResult>()
+            .As<Missions.Battles.IBattleLegacyCommandResult>()
+            .InstancePerDependency();
+#if DEBUG
+        builder.RegisterType<Missions.Agents.Handlers.StateCommand>()
+            .As<Missions.Agents.Handlers.IStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Agents.Handlers.ForceRateCommand>()
+            .As<Missions.Agents.Handlers.IForceRateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Agents.Handlers.ForceReceiverCapCommand>()
+            .As<Missions.Agents.Handlers.IForceReceiverCapCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Agents.Handlers.SimulateReceivePressureCommand>()
+            .As<Missions.Agents.Handlers.ISimulateReceivePressureCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Agents.Handlers.ClearReceivePressureCommand>()
+            .As<Missions.Agents.Handlers.IClearReceivePressureCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Battles.ReplicationFixtureCommand>()
+            .As<Missions.Battles.IReplicationFixtureCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Battles.ColumnReinforcementFixtureCommand>()
+            .As<Missions.Battles.IColumnReinforcementFixtureCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Battles.ActionPerformanceCommand>()
+            .As<Missions.Battles.IActionPerformanceCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Battles.AnimationTraceCommand>()
+            .As<Missions.Battles.IAnimationTraceCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Battles.WieldTestCommand>()
+            .As<Missions.Battles.IWieldTestCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+#if DEBUG
+        builder.RegisterType<Missions.Battles.ItemModifierStateCommand>()
+            .As<Missions.Battles.IItemModifierStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
+        builder.RegisterType<Missions.Battles.StateCommand>()
+            .As<Missions.Battles.IStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.SizeStateCommand>()
+            .As<Missions.Battles.ISizeStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.ChargeOwnedFormationsCommand>()
+            .As<Missions.Battles.IChargeOwnedFormationsCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.MountStateCommand>()
+            .As<Missions.Battles.IMountStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.CaptureMountPoseCommand>()
+            .As<Missions.Battles.ICaptureMountPoseCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.MountPoseSamplesCommand>()
+            .As<Missions.Battles.IMountPoseSamplesCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.MoveCavalryCommand>()
+            .As<Missions.Battles.IMoveCavalryCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.HoldCavalryCommand>()
+            .As<Missions.Battles.IHoldCavalryCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.TurnCavalryCommand>()
+            .As<Missions.Battles.ITurnCavalryCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.FocusMountCommand>()
+            .As<Missions.Battles.IFocusMountCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.MountCameraStateCommand>()
+            .As<Missions.Battles.IMountCameraStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.ReleaseMountCameraCommand>()
+            .As<Missions.Battles.IReleaseMountCameraCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.LadderStateCommand>()
+            .As<Missions.Battles.ILadderStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.FocusLadderCommand>()
+            .As<Missions.Battles.IFocusLadderCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<Missions.Battles.ReleaseLadderCameraCommand>()
+            .As<Missions.Battles.IReleaseLadderCameraCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
         builder.RegisterType<MovementPacketCompressor>()

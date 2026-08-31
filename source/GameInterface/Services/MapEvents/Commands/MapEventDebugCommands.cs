@@ -50,7 +50,6 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
 
@@ -60,20 +59,18 @@ public class MapEventDebugCommands
     private static LateJoinModeFixture lateJoinModeFixture;
     private static InquiryData pendingPrisonerPromptInquiry;
 
-    [CommandLineArgumentFunction("prisoner_prompt_state", "coop.debug.mapevent")]
     public static string PrisonerPromptState(List<string> args)
     {
         if (!ModInformation.IsClient) return "Run this command on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.mapevent.prisoner_prompt_state";
+        if (args.Count != 0) return "Usage: coop.debug.map_event.prisoner_prompt_state";
         return CreatePrisonerPromptStateResult();
     }
 
-    [CommandLineArgumentFunction("prisoner_prompt", "coop.debug.mapevent")]
     public static string PrisonerPrompt(List<string> args)
     {
         if (!ModInformation.IsClient) return "Run this command on a client.";
         if (args.Count != 1 || (args[0] != "commit" && args[0] != "accept"))
-            return "Usage: coop.debug.mapevent.prisoner_prompt <commit|accept>";
+            return "Usage: coop.debug.map_event.prisoner_prompt <commit|accept>";
 
         if (args[0] == "commit")
         {
@@ -256,14 +253,13 @@ public class MapEventDebugCommands
                partyBaseId == id;
     }
 
-    [CommandLineArgumentFunction("start_player_field_battle", "coop.debug.mapevent")]
     public static string StartPlayerFieldBattle(List<string> args)
     {
         if (!ModInformation.IsServer)
             return "Run this command on the server.";
 
         if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.start_player_field_battle <attackerMobilePartyId> <defenderMobilePartyId>";
+            return "Usage: coop.debug.map_event.start_player_field_battle <attackerMobilePartyId> <defenderMobilePartyId>";
 
         if (playerFieldBattleFixture != null)
             return "A player field-battle fixture is already pending restoration.";
@@ -358,14 +354,13 @@ public class MapEventDebugCommands
             $"OriginalWarState: {fixture.WasAtWar}";
     }
 
-    [CommandLineArgumentFunction("restore_player_field_battle", "coop.debug.mapevent")]
     public static string RestorePlayerFieldBattle(List<string> args)
     {
         if (!ModInformation.IsServer)
             return "Run this command on the server.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.restore_player_field_battle";
+            return "Usage: coop.debug.map_event.restore_player_field_battle";
 
         var fixture = playerFieldBattleFixture;
         if (fixture == null)
@@ -389,14 +384,13 @@ public class MapEventDebugCommands
         return true;
     }
 
-    [CommandLineArgumentFunction("request_player_field_battle", "coop.debug.mapevent")]
     public static string RequestPlayerFieldBattle(List<string> args)
     {
         if (!ModInformation.IsClient)
             return "Run this command on the attacking client.";
 
         if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.request_player_field_battle <defenderMobilePartyId>";
+            return "Usage: coop.debug.map_event.request_player_field_battle <defenderMobilePartyId>";
 
         var attacker = MobileParty.MainParty;
         if (attacker?.Party == null || !attacker.IsActive || attacker.MapEvent != null)
@@ -446,11 +440,10 @@ public class MapEventDebugCommands
             $"DefenderPartyId: {defender.StringId}";
     }
 
-    [CommandLineArgumentFunction("player_interaction_state", "coop.debug.mapevent")]
     public static string PlayerInteractionState(List<string> args)
     {
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.player_interaction_state";
+            return "Usage: coop.debug.map_event.player_interaction_state";
 
         return
             $"Active: {PlayerPartyInteractionDialogState.HasActiveState}\n" +
@@ -461,7 +454,6 @@ public class MapEventDebugCommands
             $"Proposal: {PlayerPartyInteractionDialogState.Proposal}";
     }
 
-    [CommandLineArgumentFunction("submit_player_interaction", "coop.debug.mapevent")]
     public static string SubmitPlayerInteraction(List<string> args)
     {
         if (!ModInformation.IsClient)
@@ -470,7 +462,7 @@ public class MapEventDebugCommands
         if (args.Count != 1 ||
             !Enum.TryParse(args[0], ignoreCase: true, out PlayerPartyInteractionOption option) ||
             option == PlayerPartyInteractionOption.None)
-            return "Usage: coop.debug.mapevent.submit_player_interaction <option>";
+            return "Usage: coop.debug.map_event.submit_player_interaction <option>";
 
         if (!PlayerPartyInteractionDialogState.HasActiveState)
             return "No player-party interaction is active.";
@@ -498,7 +490,6 @@ public class MapEventDebugCommands
     /// <summary>
     /// Starts the current battle through the normal client/server mission-start gate.
     /// </summary>
-    [CommandLineArgumentFunction("start_attack_mission", "coop.debug.mapevent")]
     public static string StartAttackMission(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -508,7 +499,7 @@ public class MapEventDebugCommands
 
         if (args.Count != 0)
         {
-            return "Usage: coop.debug.mapevent.start_attack_mission";
+            return "Usage: coop.debug.map_event.start_attack_mission";
         }
 
         var mainParty = MobileParty.MainParty;
@@ -536,11 +527,10 @@ public class MapEventDebugCommands
             : $"Server rejected attack mission for {mapEventId}";
     }
 
-    // coop.debug.mapevent.start_looter
+    // coop.debug.map_event.start_looter
     /// <summary>
     /// Starts combat with looter
     /// </summary>
-    [CommandLineArgumentFunction("start_looter", "coop.debug.mapevent")]
     public static string StartRandomLooterMapEvent(List<string> args)
     {
         //if (args.Count != 2)
@@ -564,14 +554,13 @@ public class MapEventDebugCommands
         return $"MapEvent Started";
     }
 
-    // coop.debug.mapevent.start_nearest_looter
+    // coop.debug.map_event.start_nearest_looter
     /// <summary>
     /// Forces an encounter between the player's party and the nearest active bandit/looter party, so
     /// the bandit surrender/recruit dialogue can be reached without chasing one down. Run on a client
     /// (uses the player's main party). Bring a much larger party than the bandits so they offer to
     /// surrender or join.
     /// </summary>
-    [CommandLineArgumentFunction("start_nearest_looter", "coop.debug.mapevent")]
     public static string StartNearestLooterMapEvent(List<string> args)
     {
         if (!TryGetObjectManager(out var objectManager))
@@ -605,11 +594,10 @@ public class MapEventDebugCommands
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
     }
 
-    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne [excludedPartyId]
+    // coop.debug.map_event.start_nearest_bandit_attack PlayerOne [excludedPartyId]
     /// <summary>
     /// Starts a server-authoritative bandit attack encounter against a connected player.
     /// </summary>
-    [CommandLineArgumentFunction("start_nearest_bandit_attack", "coop.debug.mapevent")]
     public static string StartNearestBanditAttack(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -619,7 +607,7 @@ public class MapEventDebugCommands
 
         if (args.Count < 1 || args.Count > 2)
         {
-            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId> [excludedPartyId]";
+            return "Usage: coop.debug.map_event.start_nearest_bandit_attack <controllerId> [excludedPartyId]";
         }
 
         if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
@@ -684,16 +672,15 @@ public class MapEventDebugCommands
                $"against player {args[0]} after removing {removedTroops} excess fixture troops.";
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_prepare PlayerOne mountain_bandits_24
+    // coop.debug.map_event.bandit_attack_fixture_prepare PlayerOne mountain_bandits_24
     /// <summary>Prepares a reversible exact-bandit attack fixture for evidence capture.</summary>
-    [CommandLineArgumentFunction("bandit_attack_fixture_prepare", "coop.debug.mapevent")]
     public static string PrepareBanditAttackFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.bandit_attack_fixture_prepare <controllerId> <banditPartyId>";
+            return "Usage: coop.debug.map_event.bandit_attack_fixture_prepare <controllerId> <banditPartyId>";
 
         if (banditAttackFixture != null)
             return "A bandit attack fixture is already active.";
@@ -810,16 +797,15 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_start PlayerOne mountain_bandits_24
+    // coop.debug.map_event.bandit_attack_fixture_start PlayerOne mountain_bandits_24
     /// <summary>Starts the prepared server-authoritative attack by the exact bandit party.</summary>
-    [CommandLineArgumentFunction("bandit_attack_fixture_start", "coop.debug.mapevent")]
     public static string StartBanditAttackFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.bandit_attack_fixture_start <controllerId> <banditPartyId>";
+            return "Usage: coop.debug.map_event.bandit_attack_fixture_start <controllerId> <banditPartyId>";
 
         if (!TryGetObjectManager(out var objectManager))
             return "Unable to resolve ObjectManager";
@@ -880,13 +866,12 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_state PlayerOne mountain_bandits_24
+    // coop.debug.map_event.bandit_attack_fixture_state PlayerOne mountain_bandits_24
     /// <summary>Reports the exact bandit attack state on the server or a client.</summary>
-    [CommandLineArgumentFunction("bandit_attack_fixture_state", "coop.debug.mapevent")]
     public static string GetBanditAttackFixtureState(List<string> args)
     {
         if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.bandit_attack_fixture_state <controllerId> <banditPartyId>";
+            return "Usage: coop.debug.map_event.bandit_attack_fixture_state <controllerId> <banditPartyId>";
 
         if (!TryGetPlayerParty(
                 args[0],
@@ -922,16 +907,15 @@ public class MapEventDebugCommands
                $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "none"}.";
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_restore PlayerOne
+    // coop.debug.map_event.bandit_attack_fixture_restore PlayerOne
     /// <summary>Finalizes the bandit attack and restores both parties' original behavior.</summary>
-    [CommandLineArgumentFunction("bandit_attack_fixture_restore", "coop.debug.mapevent")]
     public static string RestoreBanditAttackFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.bandit_attack_fixture_restore <controllerId>";
+            return "Usage: coop.debug.map_event.bandit_attack_fixture_restore <controllerId>";
 
         if (banditAttackFixture == null || banditAttackFixture.ControllerId != args[0])
             return $"No active bandit attack fixture exists for {args[0]}.";
@@ -996,14 +980,13 @@ public class MapEventDebugCommands
         }
     }
 
-    [CommandLineArgumentFunction("finish_non_battle_encounter", "coop.debug.mapevent")]
     public static string FinishNonBattleEncounter(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.finish_non_battle_encounter";
+            return "Usage: coop.debug.map_event.finish_non_battle_encounter";
 
         if (PlayerEncounter.Current == null)
             return "No player encounter is active.";
@@ -1014,7 +997,6 @@ public class MapEventDebugCommands
         return "Finished the current non-battle encounter.";
     }
 
-    [CommandLineArgumentFunction("join_existing", "coop.debug.mapevent")]
     public static string JoinExistingBattle(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -1024,7 +1006,7 @@ public class MapEventDebugCommands
             !Enum.TryParse(args[1], true, out BattleSideEnum side) ||
             (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender))
         {
-            return "Usage: coop.debug.mapevent.join_existing <mapEventId> <Attacker|Defender>";
+            return "Usage: coop.debug.map_event.join_existing <mapEventId> <Attacker|Defender>";
         }
 
         if (!TryGetObjectManager(out var objectManager))
@@ -1065,16 +1047,15 @@ public class MapEventDebugCommands
         return $"Started the {side} join encounter for map event {args[0]}.";
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_prepare testclient testclient2
+    // coop.debug.map_event.battle_reward_fixture_prepare testclient testclient2
     /// <summary>Closes the unfinished idle player encounter loaded by the #2308 live-test save.</summary>
-    [CommandLineArgumentFunction("battle_reward_fixture_prepare", "coop.debug.mapevent")]
     public static string PrepareBattleRewardFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_prepare <initiatorControllerId> <lateJoinerControllerId>";
+            return "Usage: coop.debug.map_event.battle_reward_fixture_prepare <initiatorControllerId> <lateJoinerControllerId>";
 
         if (args[0] == args[1])
             return "The initiator and late joiner must be different players.";
@@ -1119,9 +1100,8 @@ public class MapEventDebugCommands
         return $"Battle reward fixture preflight prepared: finalized={mapEventId}, battleState=None.";
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_start testclient testclient2 army
+    // coop.debug.map_event.battle_reward_fixture_start testclient testclient2 army
     /// <summary>Creates the two-player late-join field battle from #2308.</summary>
-    [CommandLineArgumentFunction("battle_reward_fixture_start", "coop.debug.mapevent")]
     public static string StartBattleRewardFixture(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -1129,7 +1109,7 @@ public class MapEventDebugCommands
 
         var createArmy = args.Count == 3 && string.Equals(args[2], "army", StringComparison.OrdinalIgnoreCase);
         if (args.Count != 2 && !createArmy)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_start <initiatorControllerId> <lateJoinerControllerId> [army]";
+            return "Usage: coop.debug.map_event.battle_reward_fixture_start <initiatorControllerId> <lateJoinerControllerId> [army]";
 
         if (args[0] == args[1])
             return "The initiator and late joiner must be different players.";
@@ -1315,14 +1295,13 @@ public class MapEventDebugCommands
         }
     }
 
-    [CommandLineArgumentFunction("battle_reward_fixture_reinforce", "coop.debug.mapevent")]
     public static string ReinforceBattleRewardFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_reinforce";
+            return "Usage: coop.debug.map_event.battle_reward_fixture_reinforce";
 
         var fixture = battleRewardFixture;
         if (fixture == null)
@@ -1356,16 +1335,15 @@ public class MapEventDebugCommands
                $"enemyParties={banditSide.Parties.Count}.";
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_join
+    // coop.debug.map_event.battle_reward_fixture_join
     /// <summary>Adds the second player to the active #2308 battle and opens its encounter.</summary>
-    [CommandLineArgumentFunction("battle_reward_fixture_join", "coop.debug.mapevent")]
     public static string JoinBattleRewardFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_join";
+            return "Usage: coop.debug.map_event.battle_reward_fixture_join";
 
         var fixture = battleRewardFixture;
         if (fixture == null)
@@ -1411,14 +1389,13 @@ public class MapEventDebugCommands
                $"controller={fixture.LateJoiner.ControllerId}, party={fixture.LateJoiner.Party.StringId}.";
     }
 
-    [CommandLineArgumentFunction("battle_reward_fixture_begin_rout", "coop.debug.mapevent")]
     public static string BeginBattleRewardFixtureRout(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_begin_rout";
+            return "Usage: coop.debug.map_event.battle_reward_fixture_begin_rout";
 
         var fixture = battleRewardFixture;
         if (fixture == null)
@@ -1443,14 +1420,13 @@ public class MapEventDebugCommands
         return $"Ordered fixture enemies to retreat while leaving up to 20 fighting: mapEvent={mapEventId}.";
     }
 
-    [CommandLineArgumentFunction("battle_reward_fixture_route_enemies", "coop.debug.mapevent")]
     public static string RouteBattleRewardFixtureEnemies(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_route_enemies";
+            return "Usage: coop.debug.map_event.battle_reward_fixture_route_enemies";
 
         var fixture = battleRewardFixture;
         if (fixture == null)
@@ -1473,16 +1449,15 @@ public class MapEventDebugCommands
         return $"Ordered the battle authority to route fixture enemies: mapEvent={mapEventId}.";
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_state
+    // coop.debug.map_event.battle_reward_fixture_state
     /// <summary>Reports contributions and roster reward deltas for the active #2308 fixture.</summary>
-    [CommandLineArgumentFunction("battle_reward_fixture_state", "coop.debug.mapevent")]
     public static string GetBattleRewardFixtureState(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_state";
+            return "Usage: coop.debug.map_event.battle_reward_fixture_state";
 
         var fixture = battleRewardFixture;
         if (fixture == null)
@@ -1505,16 +1480,15 @@ public class MapEventDebugCommands
                FormatBattleRewardPlayerState("lateJoiner", fixture.LateJoiner, fixture.LateJoinerMapEventParty) + ".";
     }
 
-    // coop.debug.mapevent.battle_reward_client_state
+    // coop.debug.map_event.battle_reward_client_state
     /// <summary>Reports the local player's staged or already-applied native battle rewards.</summary>
-    [CommandLineArgumentFunction("battle_reward_client_state", "coop.debug.mapevent")]
     public static string GetBattleRewardClientState(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.battle_reward_client_state";
+            return "Usage: coop.debug.map_event.battle_reward_client_state";
 
         var encounter = PlayerEncounter.Current;
         var mainParty = PartyBase.MainParty;
@@ -1535,16 +1509,15 @@ public class MapEventDebugCommands
                $"isArmyLeader={army != null && army.LeaderParty == mainMobileParty}.";
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_restore
+    // coop.debug.map_event.battle_reward_fixture_restore
     /// <summary>Finalizes the #2308 battle, removes its bandits, and restores both players.</summary>
-    [CommandLineArgumentFunction("battle_reward_fixture_restore", "coop.debug.mapevent")]
     public static string RestoreBattleRewardFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.battle_reward_fixture_restore";
+            return "Usage: coop.debug.map_event.battle_reward_fixture_restore";
 
         var fixture = battleRewardFixture;
         if (fixture == null)
@@ -1763,16 +1736,15 @@ public class MapEventDebugCommands
             roster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, true);
     }
 
-    // coop.debug.mapevent.wounded_allied_fixture_start PlayerOne
+    // coop.debug.map_event.wounded_allied_fixture_start PlayerOne
     /// <summary>Creates the wounded, troop-less player plus healthy allied force field encounter from #2097.</summary>
-    [CommandLineArgumentFunction("wounded_allied_fixture_start", "coop.debug.mapevent")]
     public static string StartWoundedAlliedFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.wounded_allied_fixture_start <controllerId>";
+            return "Usage: coop.debug.map_event.wounded_allied_fixture_start <controllerId>";
 
         if (woundedAlliedFixture != null)
             return $"Fixture already active for {woundedAlliedFixture.ControllerId}.";
@@ -1872,13 +1844,12 @@ public class MapEventDebugCommands
                $"alliedHealthy={alliedParty.Party.NumberOfHealthyMembers}, banditParty={banditParty.StringId}.";
     }
 
-    // coop.debug.mapevent.wounded_allied_fixture_state PlayerOne
+    // coop.debug.map_event.wounded_allied_fixture_state PlayerOne
     /// <summary>Reports the #2097 fixture state and the local patched order-attack option when applicable.</summary>
-    [CommandLineArgumentFunction("wounded_allied_fixture_state", "coop.debug.mapevent")]
     public static string GetWoundedAlliedFixtureState(List<string> args)
     {
         if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.wounded_allied_fixture_state <controllerId>";
+            return "Usage: coop.debug.map_event.wounded_allied_fixture_state <controllerId>";
 
         if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var playerParty, out var error))
             return error;
@@ -1919,16 +1890,15 @@ public class MapEventDebugCommands
                $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "none"}, option={option}.";
     }
 
-    // coop.debug.mapevent.wounded_allied_fixture_restore PlayerOne
+    // coop.debug.map_event.wounded_allied_fixture_restore PlayerOne
     /// <summary>Finalizes the #2097 fixture and restores the player's original hero, morale, and roster state.</summary>
-    [CommandLineArgumentFunction("wounded_allied_fixture_restore", "coop.debug.mapevent")]
     public static string RestoreWoundedAlliedFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.wounded_allied_fixture_restore <controllerId>";
+            return "Usage: coop.debug.map_event.wounded_allied_fixture_restore <controllerId>";
 
         if (woundedAlliedFixture == null || woundedAlliedFixture.ControllerId != args[0])
             return $"No active fixture exists for {args[0]}.";
@@ -2049,14 +2019,13 @@ public class MapEventDebugCommands
         }
     }
 
-    [CommandLineArgumentFunction("leave_settlement", "coop.debug.mapevent")]
     public static string LeaveSettlement(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.leave_settlement <controllerId>";
+            return "Usage: coop.debug.map_event.leave_settlement <controllerId>";
 
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
             return "Unable to resolve PlayerManager";
@@ -2079,14 +2048,13 @@ public class MapEventDebugCommands
         return $"Moved player {args[0]} out of {settlement.Name}.";
     }
 
-    [CommandLineArgumentFunction("finish_current_encounter", "coop.debug.mapevent")]
     public static string FinishCurrentEncounter(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.finish_current_encounter";
+            return "Usage: coop.debug.map_event.finish_current_encounter";
 
         if (PlayerEncounter.Current == null)
             return "No active encounter.";
@@ -2095,14 +2063,13 @@ public class MapEventDebugCommands
         return "Finished the current local encounter.";
     }
 
-    [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
     public static string EnterCurrentBattle(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.enter_current_battle";
+            return "Usage: coop.debug.map_event.enter_current_battle";
 
         if (PlayerEncounter.Current == null)
             return "No active encounter.";
@@ -2122,11 +2089,10 @@ public class MapEventDebugCommands
         return "Requested entry into the current battle.";
     }
 
-    // coop.debug.mapevent.finish_player_encounter PlayerOne
+    // coop.debug.map_event.finish_player_encounter PlayerOne
     /// <summary>
     /// Closes the connected player's encounter through the existing authoritative leave path.
     /// </summary>
-    [CommandLineArgumentFunction("finish_player_encounter", "coop.debug.mapevent")]
     public static string FinishPlayerEncounter(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -2136,7 +2102,7 @@ public class MapEventDebugCommands
 
         if (args.Count != 1)
         {
-            return "Usage: coop.debug.mapevent.finish_player_encounter <controllerId>";
+            return "Usage: coop.debug.map_event.finish_player_encounter <controllerId>";
         }
 
         if (!TryGetPlayerParty(
@@ -2161,11 +2127,10 @@ public class MapEventDebugCommands
         return $"Requested encounter finish for player {args[0]} (PartyBase id {partyBaseId}).";
     }
 
-    // coop.debug.mapevent.conversation_hold_state <partyBaseId>
+    // coop.debug.map_event.conversation_hold_state <partyBaseId>
     /// <summary>
     /// Reports whether the server currently holds an AI PartyBase for a conversation.
     /// </summary>
-    [CommandLineArgumentFunction("conversation_hold_state", "coop.debug.mapevent")]
     public static string ConversationHoldState(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -2175,19 +2140,18 @@ public class MapEventDebugCommands
 
         if (args.Count != 1)
         {
-            return "Usage: coop.debug.mapevent.conversation_hold_state <partyBaseId>";
+            return "Usage: coop.debug.map_event.conversation_hold_state <partyBaseId>";
         }
 
         var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
         return $"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.";
     }
 
-    // coop.debug.mapevent.late_join_mode_fixture PlayerOne PlayerTwo
+    // coop.debug.map_event.late_join_mode_fixture PlayerOne PlayerTwo
     /// <summary>
     /// Creates a server-authoritative battle, claims mission mode before the second player joins, then routes the
     /// second player's join through the real request handler.
     /// </summary>
-    [CommandLineArgumentFunction("late_join_mode_fixture", "coop.debug.mapevent")]
     public static string StartLateJoinModeFixture(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -2197,7 +2161,7 @@ public class MapEventDebugCommands
 
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.mapevent.late_join_mode_fixture <firstControllerId> <joiningControllerId>";
+            return "Usage: coop.debug.map_event.late_join_mode_fixture <firstControllerId> <joiningControllerId>";
         }
 
         if (lateJoinModeFixture != null)
@@ -2324,15 +2288,14 @@ public class MapEventDebugCommands
                $"firstPlayer={args[0]}, joiningPlayer={args[1]}, firstSide=Attacker.";
     }
 
-    // coop.debug.mapevent.late_join_mode_join
+    // coop.debug.map_event.late_join_mode_join
     /// <summary>Routes the waiting player's attacker-side join after the first player has entered the mission.</summary>
-    [CommandLineArgumentFunction("late_join_mode_join", "coop.debug.mapevent")]
     public static string JoinLateJoinModeFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.late_join_mode_join";
+            return "Usage: coop.debug.map_event.late_join_mode_join";
 
         var fixture = lateJoinModeFixture;
         if (fixture == null)
@@ -2378,15 +2341,14 @@ public class MapEventDebugCommands
                "side=Attacker, replayedMode=Mission, firstPlayerInMission=True, joiningPlayerInMission=False.";
     }
 
-    // coop.debug.mapevent.late_join_mode_enter
+    // coop.debug.map_event.late_join_mode_enter
     /// <summary>Routes the late joiner's Attack request through the real mission-start handler.</summary>
-    [CommandLineArgumentFunction("late_join_mode_enter", "coop.debug.mapevent")]
     public static string EnterLateJoinModeFixtureMission(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.late_join_mode_enter";
+            return "Usage: coop.debug.map_event.late_join_mode_enter";
 
         var fixture = lateJoinModeFixture;
         if (fixture == null)
@@ -2418,15 +2380,14 @@ public class MapEventDebugCommands
     }
 
 #if DEBUG
-    // coop.debug.mapevent.late_join_mode_begin_field_battle
+    // coop.debug.map_event.late_join_mode_begin_field_battle
     /// <summary>Finishes the local deployment phase so live evidence shows the active field battle.</summary>
-    [CommandLineArgumentFunction("late_join_mode_begin_field_battle", "coop.debug.mapevent")]
     public static string BeginLateJoinModeFixtureFieldBattle(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.late_join_mode_begin_field_battle";
+            return "Usage: coop.debug.map_event.late_join_mode_begin_field_battle";
 
         var mission = Mission.Current;
         if (mission == null)
@@ -2448,15 +2409,14 @@ public class MapEventDebugCommands
         return "Local deployment finished; the field battle is active and the local player is protected.";
     }
 
-    // coop.debug.mapevent.late_join_mode_disable_dying
+    // coop.debug.map_event.late_join_mode_disable_dying
     /// <summary>Prevents the live-test battle from resolving before both client views are captured.</summary>
-    [CommandLineArgumentFunction("late_join_mode_disable_dying", "coop.debug.mapevent")]
     public static string DisableLateJoinModeFixtureDying(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.late_join_mode_disable_dying";
+            return "Usage: coop.debug.map_event.late_join_mode_disable_dying";
 
         var mission = Mission.Current;
         if (mission == null)
@@ -2480,15 +2440,14 @@ public class MapEventDebugCommands
         return true;
     }
 
-    // coop.debug.mapevent.late_join_mode_exit_missions
+    // coop.debug.map_event.late_join_mode_exit_missions
     /// <summary>Asks every fixture mission member to return to campaign before authoritative cleanup.</summary>
-    [CommandLineArgumentFunction("late_join_mode_exit_missions", "coop.debug.mapevent")]
     public static string ExitLateJoinModeFixtureMissions(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.late_join_mode_exit_missions";
+            return "Usage: coop.debug.map_event.late_join_mode_exit_missions";
 
         var fixture = lateJoinModeFixture;
         if (fixture == null)
@@ -2516,13 +2475,12 @@ public class MapEventDebugCommands
     }
 
     /// <summary>Returns both fixture clients to campaign and restores the server-side battle state.</summary>
-    [CommandLineArgumentFunction("late_join_mode_restore", "coop.debug.mapevent")]
     public static string RestoreLateJoinModeFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.late_join_mode_restore";
+            return "Usage: coop.debug.map_event.late_join_mode_restore";
 
         string exitResult = ExitLateJoinModeFixtureMissions(args);
         if (lateJoinModeFixture == null)
@@ -2533,14 +2491,13 @@ public class MapEventDebugCommands
     }
 #endif
 
-    // coop.debug.mapevent.late_join_mode_state PlayerTwo
+    // coop.debug.map_event.late_join_mode_state PlayerTwo
     /// <summary>Reports a player's map-event membership and known authoritative battle mode.</summary>
-    [CommandLineArgumentFunction("late_join_mode_state", "coop.debug.mapevent")]
     public static string GetLateJoinModeState(List<string> args)
     {
         if (args.Count != 1)
         {
-            return "Usage: coop.debug.mapevent.late_join_mode_state <controllerId>";
+            return "Usage: coop.debug.map_event.late_join_mode_state <controllerId>";
         }
 
         if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var playerParty, out var error))
@@ -2583,9 +2540,8 @@ public class MapEventDebugCommands
                $"missionActive={missionActive}, missionAgents={missionAgents}, deploymentActive={deploymentActive}.";
     }
 
-    // coop.debug.mapevent.late_join_mode_cleanup
+    // coop.debug.map_event.late_join_mode_cleanup
     /// <summary>Removes the fixture field battle and restores each party's movement state.</summary>
-    [CommandLineArgumentFunction("late_join_mode_cleanup", "coop.debug.mapevent")]
     public static string CleanupLateJoinModeFixture(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -2595,7 +2551,7 @@ public class MapEventDebugCommands
 
         if (args.Count != 0)
         {
-            return "Usage: coop.debug.mapevent.late_join_mode_cleanup";
+            return "Usage: coop.debug.map_event.late_join_mode_cleanup";
         }
 
         if (lateJoinModeFixture == null)
@@ -2672,11 +2628,10 @@ public class MapEventDebugCommands
         return behaviorSnapshot.TryApply(mobileParty, behavior, out _);
     }
 
-    // coop.debug.mapevent.peace_pursuit_fixture PlayerOne
+    // coop.debug.map_event.peace_pursuit_fixture PlayerOne
     /// <summary>
     /// Finds a neutral AI party that can be used without changing its original movement state.
     /// </summary>
-    [CommandLineArgumentFunction("peace_pursuit_fixture", "coop.debug.mapevent")]
     public static string GetPeacePursuitFixture(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -2686,7 +2641,7 @@ public class MapEventDebugCommands
 
         if (args.Count != 1)
         {
-            return "Usage: coop.debug.mapevent.peace_pursuit_fixture <controllerId>";
+            return "Usage: coop.debug.map_event.peace_pursuit_fixture <controllerId>";
         }
 
         if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
@@ -2703,16 +2658,15 @@ public class MapEventDebugCommands
         return FormatPeacePursuitState("Peace pursuit fixture", objectManager, neutralParty, playerParty);
     }
 
-    // coop.debug.mapevent.peace_pursuit_state PlayerOne mobileParty_1
+    // coop.debug.map_event.peace_pursuit_state PlayerOne mobileParty_1
     /// <summary>
     /// Reports the pursuit-test party state on the current machine.
     /// </summary>
-    [CommandLineArgumentFunction("peace_pursuit_state", "coop.debug.mapevent")]
     public static string GetPeacePursuitState(List<string> args)
     {
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.mapevent.peace_pursuit_state <controllerId> <partyStringId>";
+            return "Usage: coop.debug.map_event.peace_pursuit_state <controllerId> <partyStringId>";
         }
 
         if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var playerParty, out var error))
@@ -2729,11 +2683,10 @@ public class MapEventDebugCommands
         return FormatPeacePursuitState("Peace pursuit state", objectManager, neutralParty, playerParty);
     }
 
-    // coop.debug.mapevent.test_peace_stops_pursuit PlayerOne mobileParty_1
+    // coop.debug.map_event.test_peace_stops_pursuit PlayerOne mobileParty_1
     /// <summary>
     /// Makes a selected neutral AI party pursue a connected player, then makes peace.
     /// </summary>
-    [CommandLineArgumentFunction("test_peace_stops_pursuit", "coop.debug.mapevent")]
     public static string TestPeaceStopsPursuit(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -2743,7 +2696,7 @@ public class MapEventDebugCommands
 
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.mapevent.test_peace_stops_pursuit <controllerId> <partyStringId>";
+            return "Usage: coop.debug.map_event.test_peace_stops_pursuit <controllerId> <partyStringId>";
         }
 
         if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
@@ -2883,7 +2836,6 @@ public class MapEventDebugCommands
     /// <summary>
     /// Kills a random troop from the enemy side of the current map event.
     /// </summary>
-    [CommandLineArgumentFunction("kill_random_troop", "coop.debug.mapevent")]
     public static string KillRandomTroop(List<string> args)
     {
         var mapEvent = MobileParty.MainParty.MapEvent;
@@ -2945,7 +2897,6 @@ public class MapEventDebugCommands
     /// <summary>
     /// Kills all but one troop from the enemy side of the current map event.
     /// </summary>
-    [CommandLineArgumentFunction("kill_all_but_one", "coop.debug.mapevent")]
     public static string KillAllButOneTroop(List<string> args)
     {
         var mapEvent = MobileParty.MainParty.MapEvent;
@@ -3026,7 +2977,6 @@ public class MapEventDebugCommands
     /// <summary>
     /// Lists the fields and properties of the current PlayerEncounter.
     /// </summary>
-    [CommandLineArgumentFunction("list_player_encounter", "coop.debug.mapevent")]
     public static string ListPlayerEncounter(List<string> args)
     {
         var playerEncounter = PlayerEncounter.Current;
@@ -3053,7 +3003,6 @@ public class MapEventDebugCommands
     /// e.g. PlayerEncounter.Current still PRESENT, or MainParty.MapEvent lingering on an already-finalized event.
     /// Unlike <c>list_player_encounter</c> (full reflection dump) this is short enough to diff across clients.
     /// </summary>
-    [CommandLineArgumentFunction("encounter_state", "coop.debug.mapevent")]
     public static string EncounterState(List<string> args)
     {
         TryGetObjectManager(out var objectManager);
@@ -3090,14 +3039,13 @@ public class MapEventDebugCommands
     }
 
     /// <summary>Shows, closes, or reports the live retreat confirmation for automated battle-exit testing.</summary>
-    [CommandLineArgumentFunction("retreat_confirmation", "coop.debug.mapevent")]
     public static string RetreatConfirmation(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client in a battle mission.";
 
         if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.retreat_confirmation <show|accept|cancel|state>";
+            return "Usage: coop.debug.map_event.retreat_confirmation <show|accept|cancel|state>";
 
         var handler = Mission.Current?.GetMissionBehavior<BasicMissionHandler>();
         if (handler == null)
@@ -3128,19 +3076,18 @@ public class MapEventDebugCommands
             case "state":
                 return $"Retreat confirmation open: {handler.IsWarningWidgetOpened}";
             default:
-                return "Usage: coop.debug.mapevent.retreat_confirmation <show|accept|cancel|state>";
+                return "Usage: coop.debug.map_event.retreat_confirmation <show|accept|cancel|state>";
         }
     }
 
     /// <summary>Closes the current encounter conversation so vanilla can advance to battle choices.</summary>
-    [CommandLineArgumentFunction("complete_encounter_meeting", "coop.debug.mapevent")]
     public static string CompleteEncounterMeeting(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client at the encounter meeting.";
 
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.complete_encounter_meeting";
+            return "Usage: coop.debug.map_event.complete_encounter_meeting";
 
         if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "encounter_meeting")
             return "The encounter meeting is not active.";
@@ -3154,14 +3101,13 @@ public class MapEventDebugCommands
     }
 
     /// <summary>Runs the encounter menu's mission or simulation consequence for automated battle testing.</summary>
-    [CommandLineArgumentFunction("choose_battle_mode", "coop.debug.mapevent")]
     public static string ChooseBattleMode(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on a client at the encounter menu.";
 
         if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.choose_battle_mode <mission|simulation>";
+            return "Usage: coop.debug.map_event.choose_battle_mode <mission|simulation>";
 
         if (PlayerEncounter.Current == null)
             return "No active player encounter.";
@@ -3179,7 +3125,7 @@ public class MapEventDebugCommands
                 behavior.game_menu_encounter_order_attack_on_consequence(null);
                 return "Battle simulation requested.";
             default:
-                return "Usage: coop.debug.mapevent.choose_battle_mode <mission|simulation>";
+                return "Usage: coop.debug.map_event.choose_battle_mode <mission|simulation>";
         }
     }
 
@@ -3194,7 +3140,6 @@ public class MapEventDebugCommands
         return $"id={id} finalized={mapEvent.IsFinalized} state={mapEvent.BattleState} winner={mapEvent.WinningSide}";
     }
 
-    [CommandLineArgumentFunction("get_events", "coop.debug.mapevent")]
     public static string GetEvents(List<string> args)
     {
         var sb = new StringBuilder();
@@ -3231,12 +3176,11 @@ public class MapEventDebugCommands
             .ToArray() ?? Array.Empty<string>();
     }
 
-    [CommandLineArgumentFunction("get_event", "coop.debug.mapevent")]
     public static string GetEvent(List<string> args)
     {
         if (args.Count != 1)
         {
-            return "Usage: coop.debug.mapevent.get_event <mapEventId>";
+            return "Usage: coop.debug.map_event.get_event <mapEventId>";
         }
 
         if (!TryGetObjectManager(out var objectManager))

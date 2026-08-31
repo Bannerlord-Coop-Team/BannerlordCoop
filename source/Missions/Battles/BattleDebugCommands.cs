@@ -23,7 +23,6 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace Missions.Battles;
 
@@ -126,7 +125,6 @@ internal static class BattleDebugCommands
         public Agent[] Agents { get; set; }
     }
 
-    [CommandLineArgumentFunction("replication_fixture", "coop.debug.battle")]
     public static string ReplicationFixture(List<string> args)
     {
         if (args.Count < 1 || args.Count > 2)
@@ -260,7 +258,6 @@ internal static class BattleDebugCommands
         replicationFixtureInitialAgentIndex = -1;
     }
 
-    [CommandLineArgumentFunction("column_reinforcement_fixture", "coop.debug.battle")]
     public static string ColumnReinforcementFixture(List<string> args)
     {
         if (args.Count != 1)
@@ -467,7 +464,6 @@ internal static class BattleDebugCommands
         columnReinforcementFixtureKilled = 0;
     }
 
-    [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)
     {
         if (args.Count != 1)
@@ -500,7 +496,6 @@ internal static class BattleDebugCommands
         }
     }
 
-    [CommandLineArgumentFunction("animation_trace", "coop.debug.battle")]
     public static string AnimationTrace(List<string> args)
     {
         if (args.Count != 1)
@@ -533,7 +528,6 @@ internal static class BattleDebugCommands
         }
     }
 
-    [CommandLineArgumentFunction("wield_test", "coop.debug.battle")]
     public static string WieldTest(List<string> args)
     {
         if (args.Count != 1)
@@ -640,7 +634,6 @@ internal static class BattleDebugCommands
 #endif
 
 #if DEBUG
-    [CommandLineArgumentFunction("item_modifier_state", "coop.debug.battle")]
     public static string ItemModifierState(List<string> args)
     {
         if (args.Count != 0)
@@ -726,7 +719,6 @@ internal static class BattleDebugCommands
     }
 #endif
 
-    [CommandLineArgumentFunction("state", "coop.debug.battle")]
     public static string State(List<string> args)
     {
         if (args.Count != 0)
@@ -792,7 +784,6 @@ internal static class BattleDebugCommands
             $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
     }
 
-    [CommandLineArgumentFunction("size_state", "coop.debug.battle")]
     public static string SizeState(List<string> args)
     {
         if (args.Count != 0)
@@ -833,7 +824,6 @@ internal static class BattleDebugCommands
             $"LIVE_TEST_JSON={structuredState}";
     }
 
-    [CommandLineArgumentFunction("charge_owned_formations", "coop.debug.battle")]
     public static string ChargeOwnedFormations(List<string> args)
     {
         if (args.Count != 0)
@@ -867,7 +857,6 @@ internal static class BattleDebugCommands
         return $"Charged {formations.Length} locally owned formation(s) with {ownedAgents.Length} active agent(s)";
     }
 
-    [CommandLineArgumentFunction("mount_state", "coop.debug.battle")]
     public static string MountState(List<string> args)
     {
         if (args.Count > 1)
@@ -958,7 +947,6 @@ internal static class BattleDebugCommands
         return output.ToString().TrimEnd();
     }
 
-    [CommandLineArgumentFunction("capture_mount_pose", "coop.debug.battle")]
     public static string CaptureMountPose(List<string> args)
     {
         if (args.Count != 1 || !Guid.TryParseExact(args[0], "N", out Guid mountId))
@@ -990,7 +978,6 @@ internal static class BattleDebugCommands
         return $"Capturing rendered horse-head pose for mount {mountId:N}";
     }
 
-    [CommandLineArgumentFunction("mount_pose_samples", "coop.debug.battle")]
     public static string MountPoseSamplesState(List<string> args)
     {
         if (args.Count != 1 || !Guid.TryParseExact(args[0], "N", out Guid mountId))
@@ -1081,7 +1068,6 @@ internal static class BattleDebugCommands
         });
     }
 
-    [CommandLineArgumentFunction("move_cavalry", "coop.debug.battle")]
     public static string MoveCavalry(List<string> args)
     {
         if (args.Count != 1
@@ -1144,7 +1130,6 @@ internal static class BattleDebugCommands
         return $"Moved {formations.Length} battle-host cavalry formations {distance:0.0} meters";
     }
 
-    [CommandLineArgumentFunction("hold_cavalry", "coop.debug.battle")]
     public static string HoldCavalry(List<string> args)
     {
         if (args.Count != 0)
@@ -1190,7 +1175,6 @@ internal static class BattleDebugCommands
         return $"Stopped {formations.Length} battle-host cavalry formations";
     }
 
-    [CommandLineArgumentFunction("turn_cavalry", "coop.debug.battle")]
     public static string TurnCavalry(List<string> args)
     {
         if (args.Count != 1
@@ -1350,7 +1334,6 @@ internal static class BattleDebugCommands
         return info.CurrentAuthority == filter;
     }
 
-    [CommandLineArgumentFunction("focus_mount", "coop.debug.battle")]
     public static string FocusMount(List<string> args)
     {
         if (args.Count != 1 || !Guid.TryParseExact(args[0], "N", out Guid mountId))
@@ -1408,7 +1391,6 @@ internal static class BattleDebugCommands
         return $"Focused the mission camera on mount {mountId:N}";
     }
 
-    [CommandLineArgumentFunction("mount_camera_state", "coop.debug.battle")]
     public static string MountCameraState(List<string> args)
     {
         if (args.Count != 0)
@@ -1467,7 +1449,6 @@ internal static class BattleDebugCommands
         return true;
     }
 
-    [CommandLineArgumentFunction("release_mount_camera", "coop.debug.battle")]
     public static string ReleaseMountCameraCommand(List<string> args)
     {
         if (args.Count != 0)
@@ -1497,7 +1478,6 @@ internal static class BattleDebugCommands
         return true;
     }
 
-    [CommandLineArgumentFunction("ladder_state", "coop.debug.battle")]
     public static string LadderState(List<string> args)
     {
         if (args.Count > 1 || (args.Count == 1 && !int.TryParse(args[0], out _)))
@@ -1567,7 +1547,6 @@ internal static class BattleDebugCommands
         return output.ToString();
     }
 
-    [CommandLineArgumentFunction("focus_ladder", "coop.debug.battle")]
     public static string FocusLadder(List<string> args)
     {
         if (args.Count != 1 || !int.TryParse(args[0], out int machineId))
@@ -1603,7 +1582,6 @@ internal static class BattleDebugCommands
         return $"Focused the mission camera on siege ladder {machineId}";
     }
 
-    [CommandLineArgumentFunction("release_ladder_camera", "coop.debug.battle")]
     public static string ReleaseLadderCameraCommand(List<string> args)
     {
         if (args.Count != 0)

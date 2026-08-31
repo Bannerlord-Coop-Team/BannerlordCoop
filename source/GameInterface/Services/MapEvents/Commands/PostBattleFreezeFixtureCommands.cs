@@ -28,7 +28,6 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
 
@@ -41,13 +40,12 @@ internal class PostBattleFreezeFixtureCommands
 
     private static PostBattleFreezeFixture fixture;
 
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_start", "coop.debug.mapevent")]
     public static string StartFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
         if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_start <firstControllerId> <secondControllerId>";
+            return "Usage: coop.debug.map_event.post_battle_freeze_fixture_start <firstControllerId> <secondControllerId>";
         if (fixture != null)
             return "The post-battle freeze fixture is already active.";
 
@@ -189,13 +187,12 @@ internal class PostBattleFreezeFixtureCommands
         }
     }
 
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_open", "coop.debug.mapevent")]
     public static string OpenFixtureEncounters(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_open";
+            return "Usage: coop.debug.map_event.post_battle_freeze_fixture_open";
         if (fixture == null)
             return "The post-battle freeze fixture is not active.";
         if (fixture.EncountersOpened)
@@ -225,13 +222,12 @@ internal class PostBattleFreezeFixtureCommands
                $"{fixture.FirstControllerId} and {fixture.SecondControllerId}.";
     }
 
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_state", "coop.debug.mapevent")]
     public static string GetFixtureState(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server. Use the existing client observation commands on each client.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_state";
+            return "Usage: coop.debug.map_event.post_battle_freeze_fixture_state";
         if (fixture == null)
             return "The post-battle freeze fixture is not active.";
         if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
@@ -240,13 +236,12 @@ internal class PostBattleFreezeFixtureCommands
         return FormatState("Post-battle freeze fixture state", fixture, timeControl);
     }
 
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_unpause", "coop.debug.mapevent")]
     public static string UnpauseFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_unpause";
+            return "Usage: coop.debug.map_event.post_battle_freeze_fixture_unpause";
         if (fixture == null)
             return "The post-battle freeze fixture is not active.";
         if (fixture.FirstPlayer.Party.MapEvent != null || fixture.SecondPlayer.Party.MapEvent != null)
@@ -257,16 +252,15 @@ internal class PostBattleFreezeFixtureCommands
         fixture.ProbeStartedAt = CampaignTime.Now;
         timeControl.ServerSetTimeControl(TimeControlEnum.Play_1x);
         return $"Post-battle unpause requested at {fixture.ProbeStartedAt.NumTicks} ticks. " +
-               "Submit coop.debug.mobileparty.move_offset 0.5 0 on both clients, then check fixture state.";
+               "Submit coop.debug.mobile_party.move_offset 0.5 0 on both clients, then check fixture state.";
     }
 
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_restore", "coop.debug.mapevent")]
     public static string RestoreFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_restore";
+            return "Usage: coop.debug.map_event.post_battle_freeze_fixture_restore";
         if (fixture == null)
             return "The post-battle freeze fixture is not active.";
         if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||

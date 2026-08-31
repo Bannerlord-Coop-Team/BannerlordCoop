@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.LogicStates;
 using Common.Network;
 using Common.Network.Session;
@@ -27,6 +28,10 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+
+            var commandRegistry = container.Resolve<ICoopCommandRegistry>();
+            Assert.True(commandRegistry.Contains("coop.debug.map_event.click_deployment_ready"));
+            Assert.True(commandRegistry.Contains("coop.debug.battle.state"));
         }
 
         [Fact]
@@ -44,6 +49,10 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+
+            var commandRegistry = container.Resolve<ICoopCommandRegistry>();
+            Assert.True(commandRegistry.Contains("coop.debug.map_event.click_deployment_ready"));
+            Assert.True(commandRegistry.Contains("coop.debug.battle.state"));
         }
 
         [Theory]

@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
 
@@ -15,12 +14,11 @@ internal class KillPlayerAgentCommands
 
     private const string KillPlayerAgentUsage =
 @"Usage:
-  coop.debug.mapevent.kms
+  coop.debug.map_event.kms
 
 Kills the main agent (the player) in the current battle mission.
 Useful for testing player captivity without waiting to die.";
 
-    [CommandLineArgumentFunction("kms", "coop.debug.mapevent")]
     public static string KillPlayerAgent(List<string> args)
     {
         var ctx = new CommandContext(

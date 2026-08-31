@@ -15,7 +15,6 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
 
@@ -45,7 +44,6 @@ internal static class LargeBattleRosterFixtureCommands
         public PartyBehaviorUpdateData Behavior;
     }
 
-    [CommandLineArgumentFunction("large_battle_roster_begin", "coop.debug.mobileparty")]
     public static string Begin(List<string> args)
     {
         if (!ModInformation.IsServer)
@@ -55,7 +53,7 @@ internal static class LargeBattleRosterFixtureCommands
             || addedPerParty < 1
             || addedPerParty > 500)
         {
-            return "Usage: coop.debug.mobileparty.large_battle_roster_begin " +
+            return "Usage: coop.debug.mobile_party.large_battle_roster_begin " +
                    "<firstPartyOrControllerId> <secondPartyOrControllerId> <troopsPerParty:1-500>";
         }
         if (fixture != null)
@@ -107,7 +105,6 @@ internal static class LargeBattleRosterFixtureCommands
             FormatState("active", firstParty, secondParty, null, null);
     }
 
-    [CommandLineArgumentFunction("exact_battle_roster_begin", "coop.debug.mobileparty")]
     public static string BeginExact(List<string> args)
     {
         if (!ModInformation.IsServer)
@@ -116,14 +113,13 @@ internal static class LargeBattleRosterFixtureCommands
             || !int.TryParse(args[2], out int healthyPerParty)
             || (healthyPerParty != 5 && healthyPerParty != 900))
         {
-            return "Usage: coop.debug.mobileparty.exact_battle_roster_begin " +
+            return "Usage: coop.debug.mobile_party.exact_battle_roster_begin " +
                    "<firstPartyOrControllerId> <secondPartyOrControllerId> <healthyPerParty:5|900>";
         }
 
         return BeginExact(args[0], args[1], healthyPerParty, healthyPerParty);
     }
 
-    [CommandLineArgumentFunction("battle_size_roster_begin", "coop.debug.mobileparty")]
     public static string BeginBattleSize(List<string> args)
     {
         if (!ModInformation.IsServer)
@@ -136,7 +132,7 @@ internal static class LargeBattleRosterFixtureCommands
             || secondHealthyCount < 1
             || secondHealthyCount > 1000)
         {
-            return "Usage: coop.debug.mobileparty.battle_size_roster_begin " +
+            return "Usage: coop.debug.mobile_party.battle_size_roster_begin " +
                    "<firstPartyOrControllerId> <secondPartyOrControllerId> <firstHealthy:1-1000> <secondHealthy:1-1000>";
         }
 
@@ -247,9 +243,8 @@ internal static class LargeBattleRosterFixtureCommands
                FormatState("active", firstParty, secondParty, firstHealthyCount, secondHealthyCount);
     }
 
-    [CommandLineArgumentFunction("large_battle_roster_status", "coop.debug.mobileparty")]
     public static string Status(List<string> args) =>
-        Status(args, "coop.debug.mobileparty.large_battle_roster_status");
+        Status(args, "coop.debug.mobile_party.large_battle_roster_status");
 
     private static string Status(List<string> args, string commandName)
     {
@@ -286,13 +281,11 @@ internal static class LargeBattleRosterFixtureCommands
             fixture?.SecondExactHealthyCount);
     }
 
-    [CommandLineArgumentFunction("exact_battle_roster_status", "coop.debug.mobileparty")]
     public static string ExactStatus(List<string> args) =>
-        Status(args, "coop.debug.mobileparty.exact_battle_roster_status");
+        Status(args, "coop.debug.mobile_party.exact_battle_roster_status");
 
-    [CommandLineArgumentFunction("large_battle_roster_restore", "coop.debug.mobileparty")]
     public static string Restore(List<string> args) =>
-        Restore(args, "coop.debug.mobileparty.large_battle_roster_restore");
+        Restore(args, "coop.debug.mobile_party.large_battle_roster_restore");
 
     private static string Restore(List<string> args, string commandName)
     {
@@ -365,9 +358,8 @@ internal static class LargeBattleRosterFixtureCommands
                 null);
     }
 
-    [CommandLineArgumentFunction("exact_battle_roster_restore", "coop.debug.mobileparty")]
     public static string RestoreExact(List<string> args) =>
-        Restore(args, "coop.debug.mobileparty.exact_battle_roster_restore");
+        Restore(args, "coop.debug.mobile_party.exact_battle_roster_restore");
 
     private static bool TryGetObjectManager(
         out IObjectManager objectManager)

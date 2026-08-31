@@ -19,7 +19,6 @@ using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
 
@@ -37,10 +36,9 @@ internal static class GarrisonTroopXpFixtureCommands
     private static GarrisonFixture restoredFixture;
     private static string pendingNoopRestorationControllerId;
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_capture", "coop.debug.mobileparty")]
     public static string Capture(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_capture <controllerId>";
+        const string usage = "Usage: coop.debug.mobile_party.garrison_xp_fixture_capture <controllerId>";
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
         if (args.Count != 1) return usage;
         if (fixture != null || restoredFixture != null || pendingNoopRestorationControllerId != null)
@@ -104,10 +102,9 @@ internal static class GarrisonTroopXpFixtureCommands
         return FormatCapture(pendingCapture);
     }
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_setup", "coop.debug.mobileparty")]
     public static string Setup(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_setup " +
+        const string usage = "Usage: coop.debug.mobile_party.garrison_xp_fixture_setup " +
             "<controllerId> <playerPartyId> <garrisonPartyId> <originalOwnerHeroId> <originalSettlementId|none> " +
             "<originalPositionX> <originalPositionY> <originalPositionIsOnLand> " +
             "<garrisonExists> <garrisonCount> <garrisonWounded> <garrisonXp> " +
@@ -212,10 +209,9 @@ internal static class GarrisonTroopXpFixtureCommands
         }
     }
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_state", "coop.debug.mobileparty")]
     public static string State(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_state " +
+        const string usage = "Usage: coop.debug.mobile_party.garrison_xp_fixture_state " +
             "<playerPartyId> <garrisonPartyId> <characterId>";
         if (args.Count != 3) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
@@ -257,10 +253,9 @@ internal static class GarrisonTroopXpFixtureCommands
         });
     }
 
-    [CommandLineArgumentFunction("open_garrison_xp_fixture", "coop.debug.mobileparty")]
     public static string OpenGarrison(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.open_garrison_xp_fixture <garrisonPartyId>";
+        const string usage = "Usage: coop.debug.mobile_party.open_garrison_xp_fixture <garrisonPartyId>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 1) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
@@ -278,10 +273,9 @@ internal static class GarrisonTroopXpFixtureCommands
         return "GARRISON_XP_FIXTURE_SCREEN_OPENED";
     }
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_screen_state", "coop.debug.mobileparty")]
     public static string ScreenState(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_screen_state " +
+        const string usage = "Usage: coop.debug.mobile_party.garrison_xp_fixture_screen_state " +
             "<garrisonPartyId> <characterId> <baseline|staged|committed>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 3 ||
@@ -341,10 +335,9 @@ internal static class GarrisonTroopXpFixtureCommands
         });
     }
 
-    [CommandLineArgumentFunction("stage_garrison_xp_withdrawal", "coop.debug.mobileparty")]
     public static string StageWithdrawal(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.stage_garrison_xp_withdrawal " +
+        const string usage = "Usage: coop.debug.mobile_party.stage_garrison_xp_withdrawal " +
             "<garrisonPartyId> <characterId>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 2) return usage;
@@ -368,10 +361,9 @@ internal static class GarrisonTroopXpFixtureCommands
             : "GARRISON_XP_WITHDRAWAL_REJECTED";
     }
 
-    [CommandLineArgumentFunction("commit_garrison_xp_withdrawal", "coop.debug.mobileparty")]
     public static string CommitWithdrawal(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.commit_garrison_xp_withdrawal";
+        const string usage = "Usage: coop.debug.mobile_party.commit_garrison_xp_withdrawal";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 0) return usage;
         if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
@@ -386,10 +378,9 @@ internal static class GarrisonTroopXpFixtureCommands
             : "GARRISON_XP_WITHDRAWAL_COMMITTED";
     }
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_restore", "coop.debug.mobileparty")]
     public static string Restore(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_restore <controllerId>";
+        const string usage = "Usage: coop.debug.mobile_party.garrison_xp_fixture_restore <controllerId>";
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
         if (args.Count != 1) return usage;
         if (fixture == null && pendingCapture?.ControllerId == args[0])
@@ -435,10 +426,9 @@ internal static class GarrisonTroopXpFixtureCommands
         });
     }
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_verify_restore", "coop.debug.mobileparty")]
     public static string VerifyRestore(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_verify_restore <controllerId>";
+        const string usage = "Usage: coop.debug.mobile_party.garrison_xp_fixture_verify_restore <controllerId>";
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
         if (args.Count != 1) return usage;
         if (restoredFixture == null || restoredFixture.ControllerId != args[0])

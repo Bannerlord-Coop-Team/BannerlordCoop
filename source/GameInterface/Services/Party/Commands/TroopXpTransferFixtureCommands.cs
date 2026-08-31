@@ -17,7 +17,6 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
 
@@ -35,10 +34,9 @@ internal static class TroopXpTransferFixtureCommands
     private static TroopXpTransferRestoration pendingRestorationVerification;
     private static string pendingNoopRestorationControllerId;
 
-    [CommandLineArgumentFunction("clan_party_xp_fixture_capture", "coop.debug.mobileparty")]
     public static string Capture(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.clan_party_xp_fixture_capture <controllerId>";
+        const string usage = "Usage: coop.debug.mobile_party.clan_party_xp_fixture_capture <controllerId>";
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
         if (args.Count != 1) return usage;
         if (pendingSetupCapture != null || pendingFixture != null ||
@@ -70,10 +68,9 @@ internal static class TroopXpTransferFixtureCommands
         });
     }
 
-    [CommandLineArgumentFunction("clan_party_xp_fixture_setup", "coop.debug.mobileparty")]
     public static string Setup(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.clan_party_xp_fixture_setup " +
+        const string usage = "Usage: coop.debug.mobile_party.clan_party_xp_fixture_setup " +
             "<controllerId> <playerPartyId> <characterId> <playerCount> <playerWounded> <playerXp> <companionCount>";
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
         if (args.Count != 7 ||
@@ -186,10 +183,9 @@ internal static class TroopXpTransferFixtureCommands
         }
     }
 
-    [CommandLineArgumentFunction("clan_party_xp_fixture_state", "coop.debug.mobileparty")]
     public static string State(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.clan_party_xp_fixture_state <playerPartyId> <clanPartyId> <characterId>";
+        const string usage = "Usage: coop.debug.mobile_party.clan_party_xp_fixture_state <playerPartyId> <clanPartyId> <characterId>";
         if (args.Count != 3) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(args[0], out MobileParty playerParty))
@@ -222,10 +218,9 @@ internal static class TroopXpTransferFixtureCommands
         });
     }
 
-    [CommandLineArgumentFunction("open_clan_party_transfer", "coop.debug.mobileparty")]
     public static string OpenPartyScreen(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.open_clan_party_transfer <clanPartyId>";
+        const string usage = "Usage: coop.debug.mobile_party.open_clan_party_transfer <clanPartyId>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 1) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
@@ -241,10 +236,9 @@ internal static class TroopXpTransferFixtureCommands
         return "CLAN_PARTY_TRANSFER_SCREEN_OPENED";
     }
 
-    [CommandLineArgumentFunction("stage_clan_party_transfer", "coop.debug.mobileparty")]
     public static string StageTransfer(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.stage_clan_party_transfer <clanPartyId> <characterId>";
+        const string usage = "Usage: coop.debug.mobile_party.stage_clan_party_transfer <clanPartyId> <characterId>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 2) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
@@ -267,10 +261,9 @@ internal static class TroopXpTransferFixtureCommands
         return "CLAN_PARTY_TRANSFER_STAGED";
     }
 
-    [CommandLineArgumentFunction("clan_party_transfer_screen_state", "coop.debug.mobileparty")]
     public static string TransferScreenState(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.clan_party_transfer_screen_state " +
+        const string usage = "Usage: coop.debug.mobile_party.clan_party_transfer_screen_state " +
             "<clanPartyId> <characterId> <baseline|staged>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 3 || (args[2] != "baseline" && args[2] != "staged")) return usage;
@@ -320,10 +313,9 @@ internal static class TroopXpTransferFixtureCommands
         });
     }
 
-    [CommandLineArgumentFunction("commit_clan_party_transfer", "coop.debug.mobileparty")]
     public static string CommitTransfer(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.commit_clan_party_transfer";
+        const string usage = "Usage: coop.debug.mobile_party.commit_clan_party_transfer";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (args.Count != 0) return usage;
         if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
@@ -340,10 +332,9 @@ internal static class TroopXpTransferFixtureCommands
             : "CLAN_PARTY_TRANSFER_COMMITTED";
     }
 
-    [CommandLineArgumentFunction("clan_party_xp_fixture_restore", "coop.debug.mobileparty")]
     public static string Restore(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.clan_party_xp_fixture_restore <controllerId>";
+        const string usage = "Usage: coop.debug.mobile_party.clan_party_xp_fixture_restore <controllerId>";
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
         if (args.Count != 1) return usage;
         if (pendingFixture == null && pendingSetupCapture != null && pendingSetupCapture.ControllerId == args[0])
@@ -419,10 +410,9 @@ internal static class TroopXpTransferFixtureCommands
         });
     }
 
-    [CommandLineArgumentFunction("clan_party_xp_fixture_verify_restore", "coop.debug.mobileparty")]
     public static string VerifyRestore(List<string> args)
     {
-        const string usage = "Usage: coop.debug.mobileparty.clan_party_xp_fixture_verify_restore <controllerId>";
+        const string usage = "Usage: coop.debug.mobile_party.clan_party_xp_fixture_verify_restore <controllerId>";
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
         if (args.Count != 1) return usage;
         if (pendingRestorationVerification == null ||

@@ -23,7 +23,6 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
 
@@ -73,7 +72,6 @@ internal class PartyCommands
     /// then pass that to imprison_companion / snapshot_prison to target your exact party when several share the
     /// "RandomPlayer" name.
     /// </summary>
-    [CommandLineArgumentFunction("whoami", "coop.debug.mobileparty")]
     public static string WhoAmICommand(List<string> strings)
     {
         if(!ModInformation.IsClient) return "Command can only be run on a client.";
@@ -89,11 +87,10 @@ internal class PartyCommands
     /// <summary>
     /// Reports an exact party position and movement mode for cross-client live-test comparisons.
     /// </summary>
-    [CommandLineArgumentFunction("position", "coop.debug.mobileparty")]
     public static string PositionCommand(List<string> strings)
     {
         if (strings.Count != 1)
-            return "Usage: coop.debug.mobileparty.position <partyId>";
+            return "Usage: coop.debug.mobile_party.position <partyId>";
 
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out MobileParty party))
@@ -116,14 +113,13 @@ internal class PartyCommands
     /// Issues a local player-party point movement order so automated live tests can verify that a restored
     /// party accepts client control and sends the normal behavior update to the server.
     /// </summary>
-    [CommandLineArgumentFunction("move_offset", "coop.debug.mobileparty")]
     public static string MoveOffsetCommand(List<string> strings)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
         if (strings.Count != 2 ||
             !float.TryParse(strings[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetX) ||
             !float.TryParse(strings[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetY))
-            return "Usage: coop.debug.mobileparty.move_offset <offsetX> <offsetY>";
+            return "Usage: coop.debug.mobile_party.move_offset <offsetX> <offsetY>";
 
         var party = Hero.MainHero?.PartyBelongedTo;
         if (party == null) return "The local player hero has no party.";
@@ -144,7 +140,6 @@ internal class PartyCommands
     /// <summary>
     /// Restores a party to an exact campaign-map position and hold state after an automated live test.
     /// </summary>
-    [CommandLineArgumentFunction("restore_position", "coop.debug.mobileparty")]
     public static string RestorePositionCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -152,7 +147,7 @@ internal class PartyCommands
             !float.TryParse(strings[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionX) ||
             !float.TryParse(strings[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionY) ||
             !bool.TryParse(strings[3], out var isOnLand))
-            return "Usage: coop.debug.mobileparty.restore_position <partyId> <x> <y> <isOnLand>";
+            return "Usage: coop.debug.mobile_party.restore_position <partyId> <x> <y> <isOnLand>";
 
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out MobileParty party))
@@ -172,14 +167,13 @@ internal class PartyCommands
         return $"Restored {party.StringId} to {party.Position.X:R},{party.Position.Y:R} in Hold mode.";
     }
 
-    [CommandLineArgumentFunction("move_to_settlement", "coop.debug.mobileparty")]
     public static string MoveToSettlementCommand(List<string> strings)
     {
         if (!ModInformation.IsServer)
             return "Command can only be run on the server.";
 
         if (strings.Count != 2)
-            return "Usage: coop.debug.mobileparty.move_to_settlement <partyId> <settlementId>";
+            return "Usage: coop.debug.mobile_party.move_to_settlement <partyId> <settlementId>";
 
         if (!TryGetObjectManager(out var objectManager))
             return "Unable to resolve ObjectManager.";
@@ -211,7 +205,6 @@ internal class PartyCommands
     /// <summary>
     /// View character ids in a hero's party by full name or hero id.
     /// </summary>
-    [CommandLineArgumentFunction("characterids", "coop.debug.mobileparty")]
     public static string ViewItemIdsCommand(List<string> strings)
     {
         if (strings.Count == 0) return "Hero name argument required.";
@@ -266,12 +259,11 @@ internal class PartyCommands
     /// <summary>
     /// Sets one member-roster troop's wounded count for live synchronization tests.
     /// </summary>
-    [CommandLineArgumentFunction("set_troop_wounded", "coop.debug.mobileparty")]
     public static string SetTroopWoundedCommand(List<string> strings)
     {
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
         if (strings.Count != 3)
-            return "Usage: coop.debug.mobileparty.set_troop_wounded <party id> <character id> <wounded count>";
+            return "Usage: coop.debug.mobile_party.set_troop_wounded <party id> <character id> <wounded count>";
 
         if (!int.TryParse(strings[2], out var woundedCount))
             return "Please enter an integer for wounded count.";
@@ -298,7 +290,6 @@ internal class PartyCommands
     /// <summary>
     /// Sets one member-roster troop's exact state and reports the state it replaced.
     /// </summary>
-    [CommandLineArgumentFunction("set_troop_state", "coop.debug.mobileparty")]
     public static string SetTroopStateCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -359,7 +350,7 @@ internal class PartyCommands
         woundedCount = 0;
         xp = 0;
         if (strings.Count != 6)
-            return "Usage: coop.debug.mobileparty.set_troop_state <party id> <character id> <exists> <number> <wounded count> <xp>";
+            return "Usage: coop.debug.mobile_party.set_troop_state <party id> <character id> <exists> <number> <wounded count> <xp>";
 
         if (!bool.TryParse(strings[2], out shouldExist) ||
             !int.TryParse(strings[3], out number) ||
@@ -376,12 +367,11 @@ internal class PartyCommands
     /// <summary>
     /// Selects a real right-member row so live tests can observe its inline upgrade choices.
     /// </summary>
-    [CommandLineArgumentFunction("select_party_screen_troop", "coop.debug.mobileparty")]
     public static string SelectPartyScreenTroopCommand(List<string> strings)
     {
         if (ModInformation.IsServer) return "Command can only be run on a client.";
         if (strings.Count != 1)
-            return "Usage: coop.debug.mobileparty.select_party_screen_troop <character id>";
+            return "Usage: coop.debug.mobile_party.select_party_screen_troop <character id>";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
             return $"Character with id {strings[0]} not found.";
@@ -403,12 +393,11 @@ internal class PartyCommands
     /// <summary>
     /// Applies the same upgrade command created by the Party-screen row.
     /// </summary>
-    [CommandLineArgumentFunction("upgrade_party_screen_troop", "coop.debug.mobileparty")]
     public static string UpgradePartyScreenTroopCommand(List<string> strings)
     {
         if (ModInformation.IsServer) return "Command can only be run on a client.";
         if (strings.Count < 1 || strings.Count > 2)
-            return "Usage: coop.debug.mobileparty.upgrade_party_screen_troop <character id> [upgrade target index]";
+            return "Usage: coop.debug.mobile_party.upgrade_party_screen_troop <character id> [upgrade target index]";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
             return $"Character with id {strings[0]} not found.";
@@ -451,12 +440,11 @@ internal class PartyCommands
     /// <summary>
     /// Creates a real pending Party-screen transfer for live synchronization tests.
     /// </summary>
-    [CommandLineArgumentFunction("stage_party_screen_transfer", "coop.debug.mobileparty")]
     public static string StagePartyScreenTransferCommand(List<string> strings)
     {
         if (ModInformation.IsServer) return "Command can only be run on a client.";
         if (strings.Count != 1)
-            return "Usage: coop.debug.mobileparty.stage_party_screen_transfer <character id>";
+            return "Usage: coop.debug.mobile_party.stage_party_screen_transfer <character id>";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
             return $"Character with id {strings[0]} not found.";
@@ -478,12 +466,11 @@ internal class PartyCommands
     /// <summary>
     /// Reports the visible roster, Done baseline, and rendered VM state for one open Party-screen row.
     /// </summary>
-    [CommandLineArgumentFunction("party_screen_troop_state", "coop.debug.mobileparty")]
     public static string PartyScreenTroopStateCommand(List<string> strings)
     {
         if (ModInformation.IsServer) return "Command can only be run on a client.";
         if (strings.Count != 1)
-            return "Usage: coop.debug.mobileparty.party_screen_troop_state <character id>";
+            return "Usage: coop.debug.mobile_party.party_screen_troop_state <character id>";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
             return $"Character with id {strings[0]} not found.";
@@ -522,7 +509,6 @@ internal class PartyCommands
     /// <summary>
     /// Add xp to all troops in a hero's party
     /// </summary>
-    [CommandLineArgumentFunction("addtroopxp", "coop.debug.mobileparty")]
     public static string AddTroopXpCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -551,7 +537,6 @@ internal class PartyCommands
     /// <summary>
     /// Add troops to a hero's party
     /// </summary>
-    [CommandLineArgumentFunction("addtroops", "coop.debug.mobileparty")]
     public static string AddRecruitsCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -594,17 +579,16 @@ internal class PartyCommands
         return stringBuilder.ToString();
     }
 
-    // coop.debug.mobileparty.siege_buff
+    // coop.debug.mobile_party.siege_buff
     /// <summary>
     /// Fills a party to 2000 troops, maxes its morale, forces a high map speed, and stocks it with food so it
     /// can march to and win a siege for testing without starving. Server only; the troop and item adds replicate
-    /// via the roster sync. Get the party id from coop.debug.mobileparty.whoami on the client that owns the party.
+    /// via the roster sync. Get the party id from coop.debug.mobile_party.who_am_i on the client that owns the party.
     /// </summary>
-    [CommandLineArgumentFunction("siege_buff", "coop.debug.mobileparty")]
     public static string SiegeBuffCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (strings.Count != 1) return "Usage: coop.debug.mobileparty.siege_buff <partyId>";
+        if (strings.Count != 1) return "Usage: coop.debug.mobile_party.siege_buff <partyId>";
         if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out MobileParty party)) return $"Party with id {strings[0]} not found";
 
@@ -630,16 +614,15 @@ internal class PartyCommands
         return $"Buffed {party.Name} ({party.StringId}): {party.MemberRoster.TotalManCount} troops, max morale, boosted speed and party-size limit, {foodTypes} food type(s) x500";
     }
 
-    // coop.debug.mobileparty.declare_war
+    // coop.debug.mobile_party.declare_war
     /// <summary>
     /// Declares war between a party's faction and a settlement's faction, so the party can besiege that
     /// settlement. Works for an independent clan (no kingdom needed). Server only; the war replicates.
     /// </summary>
-    [CommandLineArgumentFunction("declare_war", "coop.debug.mobileparty")]
     public static string DeclareWarCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (strings.Count != 2) return "Usage: coop.debug.mobileparty.declare_war <partyId> <settlementId>";
+        if (strings.Count != 2) return "Usage: coop.debug.mobile_party.declare_war <partyId> <settlementId>";
         if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out MobileParty party)) return $"Party with id {strings[0]} not found";
         if (!objectManager.TryGetObject(strings[1], out Settlement settlement)) return $"Settlement with id {strings[1]} not found";
@@ -657,7 +640,6 @@ internal class PartyCommands
     /// <summary>
     /// Add prisoners to a hero's party
     /// </summary>
-    [CommandLineArgumentFunction("addprisoners", "coop.debug.mobileparty")]
     public static string AddPrisonersCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -703,7 +685,6 @@ internal class PartyCommands
     /// <summary>
     /// Remove all prisoners from a hero's party
     /// </summary>
-    [CommandLineArgumentFunction("removeprisoners", "coop.debug.mobileparty")]
     public static string RemovePrisonersCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -737,7 +718,6 @@ internal class PartyCommands
     /// Put a hero (e.g. a player companion) into a hero's party prison roster, to set up the
     /// companion-preserve test. Args: captor hero name, prisoner hero name.
     /// </summary>
-    [CommandLineArgumentFunction("imprison_companion", "coop.debug.mobileparty")]
     public static string ImprisonCompanionCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -773,7 +753,6 @@ internal class PartyCommands
     /// if the server freed them. Drives TroopRosterInterface.UpdateWithData on a prison roster: hero prisoners
     /// (player companions included) must be removed, not preserved, and the removal replicates to clients.
     /// </summary>
-    [CommandLineArgumentFunction("snapshot_prison", "coop.debug.mobileparty")]
     public static string SnapshotPrisonCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
