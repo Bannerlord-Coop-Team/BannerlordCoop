@@ -1,17 +1,23 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Common;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Modules;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
 using Moq;
 using System;
 using System.Linq;
+using System.Threading;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -128,21 +134,110 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void NetworkClientValidated_Publishes_StartCharacterCreation()
+        public void NetworkClientValidated_NewPlayer_EntersCharacterCreationBeforeStartingNewGame()
         {
-            // Arrange
             var validateState = clientLogic.SetState<ValidateModuleState>();
+            var gameStateInterface = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
+            IClientState? stateWhenGameStarted = null;
+            int startThreadId = 0;
+            int gameThreadId = 0;
 
-            var heroExists = false;
+            gameStateInterface
+                .Setup(x => x.StartNewGame())
+                .Callback(() =>
+                {
+                    stateWhenGameStarted = clientLogic.State;
+                    startThreadId = Environment.CurrentManagedThreadId;
+                });
+            GameThread.Run(() => gameThreadId = Environment.CurrentManagedThreadId, blocking: true);
+
             var payload = new MessagePayload<NetworkClientValidated>(
-                this, new NetworkClientValidated(heroExists, new Player("12345", "111", "12345", "12345", "12345")));
+                this, new NetworkClientValidated(
+                    false,
+                    new Player("12345", "111", "12345", "12345", "12345")));
 
-            // Act
             validateState.Handle_NetworkClientValidated(payload);
+            GameThread.Run(() => { }, blocking: true);
 
-            // Assert
-            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
-            Assert.IsType<StartCharacterCreation>(message);
+            Assert.IsType<CharacterCreationState>(stateWhenGameStarted);
+            Assert.IsType<CharacterCreationState>(clientLogic.State);
+            Assert.Equal(gameThreadId, startThreadId);
+            gameStateInterface.Verify(x => x.StartNewGame(), Times.Once);
+            clientComponent.Container
+                .Resolve<Mock<ILoadingInterface>>()
+                .Verify(x => x.HideLoadingScreen(), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkClientValidated_NewPlayer_DisconnectBeforeGameThreadApply_CancelsCharacterCreation()
+        {
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var gameStateInterface = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
+            var validateState = new ValidateModuleState(
+                clientLogic,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                clientComponent.Container.Resolve<IControllerIdProvider>(),
+                coopFinalizer.Object,
+                gameStateInterface.Object,
+                clientComponent.Container.Resolve<IModuleInfoProvider>());
+            ((ClientLogic)clientLogic).State = validateState;
+
+            using var gameThreadBlocked = new ManualResetEventSlim(false);
+            using var releaseGameThread = new ManualResetEventSlim(false);
+
+            try
+            {
+                GameThread.Run(() =>
+                {
+                    gameThreadBlocked.Set();
+                    releaseGameThread.Wait();
+                });
+                Assert.True(gameThreadBlocked.Wait(TimeSpan.FromSeconds(5)));
+
+                var payload = new MessagePayload<NetworkClientValidated>(
+                    this,
+                    new NetworkClientValidated(
+                        false,
+                        new Player("12345", "111", "12345", "12345", "12345")));
+
+                validateState.Handle_NetworkClientValidated(payload);
+                clientLogic.Disconnect();
+
+                releaseGameThread.Set();
+                GameThread.Run(() => { }, blocking: true);
+
+                coopFinalizer.Verify(x => x.Finalize("Client has been stopped"), Times.Once);
+                Assert.Same(validateState, clientLogic.State);
+                gameStateInterface.Verify(x => x.StartNewGame(), Times.Never);
+            }
+            finally
+            {
+                releaseGameThread.Set();
+            }
+        }
+
+        [Fact]
+        public void NetworkClientValidated_StartNewGameFailure_StopsCoop()
+        {
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            clientComponent.Container
+                .Resolve<Mock<IGameStateInterface>>()
+                .Setup(x => x.StartNewGame())
+                .Throws<InvalidOperationException>();
+
+            var payload = new MessagePayload<NetworkClientValidated>(
+                this, new NetworkClientValidated(
+                    false,
+                    new Player("12345", "111", "12345", "12345", "12345")));
+
+            validateState.Handle_NetworkClientValidated(payload);
+            GameThread.Run(() => { }, blocking: true);
+
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+            var popup = Assert.Single(
+                clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Equal("Failed to start character creation.", popup.Text);
         }
 
         [Fact]
@@ -316,19 +411,13 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void CharacterCreationStarted_Transitions_CharacterCreationState()
+        public void CharacterCreationStarted_WithoutServerApproval_DoesNotLeaveValidation()
         {
-            // Arrange
-            var validateState = clientLogic.SetState<ValidateModuleState>();
+            clientLogic.SetState<ValidateModuleState>();
 
-            var payload = new MessagePayload<CharacterCreationStarted>(
-                this, new CharacterCreationStarted());
+            clientComponent.TestMessageBroker.Publish(this, new CharacterCreationStarted());
 
-            // Act
-            validateState.Handle_CharacterCreationStarted(payload);
-
-            // Assert
-            Assert.IsType<CharacterCreationState>(clientLogic.State);
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
 
         [Fact]
