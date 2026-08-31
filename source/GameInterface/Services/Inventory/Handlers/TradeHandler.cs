@@ -223,7 +223,7 @@ internal class TradeHandler : IHandler
                 if (toRosterDataIndex >= 0) partyRosterData[toRosterDataIndex].Amount += difference;
                 else partyRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
 
-                totalAmount -= amount > 0 ? (boughtItem.Item2 / amount) * -difference : boughtItem.Item2;
+                totalAmount -= amount > 0 ? (boughtItem.Item2 * -difference) / amount : boughtItem.Item2;
             }
         }
 
