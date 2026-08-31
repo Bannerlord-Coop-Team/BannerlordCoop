@@ -87,6 +87,15 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LegacyCoopCommandExecutor>()
             .As<ILegacyCoopCommandExecutor>()
             .InstancePerDependency();
+        builder.RegisterType<Services.MapEvents.Commands.MapEventLegacyCommandResult>()
+            .As<Services.MapEvents.Commands.IMapEventLegacyCommandResult>()
+            .InstancePerDependency();
+        builder.RegisterType<Services.Party.Commands.PartyLegacyCommandResult>()
+            .As<Services.Party.Commands.IPartyLegacyCommandResult>()
+            .InstancePerDependency();
+        builder.RegisterType<Services.PartyVisuals.Commands.PartyVisualLegacyCommandResult>()
+            .As<Services.PartyVisuals.Commands.IPartyVisualLegacyCommandResult>()
+            .InstancePerDependency();
         builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
             .Where(type => type.IsClass &&
                            !type.IsAbstract &&
