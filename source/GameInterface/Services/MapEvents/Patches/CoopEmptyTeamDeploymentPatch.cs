@@ -1,8 +1,10 @@
-using System;
+﻿using System;
+#if DEBUG
 using System.Collections.Generic;
-using Common.Logging;
+using Newtonsoft.Json;
+using static TaleWorlds.Library.CommandLineFunctionality;
+#endif
 using HarmonyLib;
-using Serilog;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -27,15 +29,16 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch] // bare class-level marker so PatchAll discovers this multi-target (MakeTeamPlans + IsPlanMade) class
 internal class CoopEmptyTeamDeploymentPatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CoopEmptyTeamDeploymentPatch>();
-
     // True while the engine is building a team's deployment plan — see the class remarks for why the override must
     // stand down here. Game-thread only; ThreadStatic is belt-and-suspenders.
     [ThreadStatic] private static bool _inMakeTeamPlans;
 
-    // TEMP diagnostic: log each distinct team we treat as planned, once, so a live run confirms this build is active
-    // and the override is firing on the foreign (puppet) team. Remove once the non-host spawn is confirmed solid.
-    private static readonly HashSet<Team> _loggedOverrides = new HashSet<Team>();
+#if DEBUG
+    private static readonly List<WeakReference> observedTeams = new List<WeakReference>();
+    private static readonly List<WeakReference> observedMissions = new List<WeakReference>();
+    private static int observedTeamCount;
+    private static int observedMissionCount;
+#endif
 
     [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
     [HarmonyPrefix]
@@ -55,11 +58,80 @@ internal class CoopEmptyTeamDeploymentPatch
             && IsForeignTeam(team))
         {
             __result = true;
-            if (_loggedOverrides.Add(team))
-                Logger.Information("[BattleDiag] Treating foreign team side={Side} (activeAgents={Count}) as deployment-planned so it doesn't stall the local spawn gate",
-                    team.Side, team.ActiveAgents.Count);
+#if DEBUG
+            TrackOverride(team);
+#endif
         }
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("deployment_retention_state", "coop.debug.mapevent")]
+    public static string DeploymentRetentionState(List<string> args)
+    {
+        if (args.Count > 1 ||
+            (args.Count == 1 && !string.Equals(args[0], "collect", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Usage: coop.debug.mapevent.deployment_retention_state [collect]";
+        }
+
+        if (args.Count == 1)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+
+        RemoveCollectedReferences(observedTeams);
+        RemoveCollectedReferences(observedMissions);
+        return "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            totalObservedTeams = observedTeamCount,
+            aliveTeams = observedTeams.Count,
+            totalObservedMissions = observedMissionCount,
+            aliveMissions = observedMissions.Count,
+            currentMissionActive = Mission.Current != null,
+        });
+    }
+
+    private static void TrackOverride(Team team)
+    {
+        RemoveCollectedReferences(observedTeams);
+        RemoveCollectedReferences(observedMissions);
+
+        if (!ContainsTarget(observedTeams, team))
+        {
+            observedTeams.Add(new WeakReference(team));
+            observedTeamCount++;
+        }
+
+        var mission = Mission.Current;
+        if (mission != null && !ContainsTarget(observedMissions, mission))
+        {
+            observedMissions.Add(new WeakReference(mission));
+            observedMissionCount++;
+        }
+    }
+
+    private static bool ContainsTarget(List<WeakReference> references, object target)
+    {
+        foreach (var reference in references)
+        {
+            if (ReferenceEquals(reference.Target, target))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void RemoveCollectedReferences(List<WeakReference> references)
+    {
+        for (int index = references.Count - 1; index >= 0; index--)
+        {
+            if (!references[index].IsAlive)
+                references.RemoveAt(index);
+        }
+    }
+#endif
 
     // A team the LOCAL client does not field — anything but its own PlayerTeam. The local client only spawns its
     // OWN party (into PlayerTeam, which gets a real plan via MakeTeamPlans); every OTHER team on its side is filled
