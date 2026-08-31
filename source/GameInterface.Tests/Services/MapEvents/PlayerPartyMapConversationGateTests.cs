@@ -1,4 +1,9 @@
+using Common.Util;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Tests.Services.SiegeEvents;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -8,6 +13,7 @@ namespace GameInterface.Tests.Services.MapEvents;
 /// therefore the barter screen) must still be allowed to open there rather than being deferred like a
 /// transient menu.
 /// </summary>
+[Collection(nameof(CampaignCurrentCollection))]
 public class PlayerPartyMapConversationGateTests
 {
     [Theory]
@@ -109,5 +115,66 @@ public class PlayerPartyMapConversationGateTests
             currentMenuId: null,
             topScreenIsMapScreen: true,
             hasUnrelatedLiveEncounter: true));
+    }
+
+    [Fact]
+    public void HasUnrelatedLiveEncounter_NoEncounter_IsFalse()
+    {
+        WithCampaign(playerEncounter: null, encounteredParty: null, () =>
+        {
+            var sessionOtherParty = ObjectHelper.SkipConstructor<PartyBase>();
+            Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(sessionOtherParty));
+        });
+    }
+
+    [Fact]
+    public void HasUnrelatedLiveEncounter_EncounterAgainstAThirdParty_IsTrue()
+    {
+        var thirdParty = ObjectHelper.SkipConstructor<PartyBase>();
+        var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+
+        WithCampaign(encounter, thirdParty, () =>
+        {
+            // The session is against a different party than the one this client is already encountering.
+            var sessionOtherParty = ObjectHelper.SkipConstructor<PartyBase>();
+            Assert.True(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(sessionOtherParty));
+        });
+    }
+
+    [Fact]
+    public void HasUnrelatedLiveEncounter_EncounterAgainstTheSessionParty_IsFalse()
+    {
+        // The in-army / outsider initiator legitimately reaches the gate still inside an army_encounter whose
+        // encountered party IS the session counterpart - that must not be treated as unrelated.
+        var sessionOtherParty = ObjectHelper.SkipConstructor<PartyBase>();
+        var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+
+        WithCampaign(encounter, sessionOtherParty, () =>
+        {
+            Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(sessionOtherParty));
+        });
+    }
+
+    private static void WithCampaign(
+        PlayerEncounter playerEncounter, PartyBase encounteredParty, System.Action body)
+    {
+        var previousCampaign = Campaign.Current;
+        var campaign = ObjectHelper.SkipConstructor<Campaign>();
+        campaign.PlayerEncounter = playerEncounter;
+
+        if (playerEncounter != null)
+        {
+            playerEncounter._encounteredParty = encounteredParty;
+        }
+
+        try
+        {
+            Campaign.Current = campaign;
+            body();
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
     }
 }
