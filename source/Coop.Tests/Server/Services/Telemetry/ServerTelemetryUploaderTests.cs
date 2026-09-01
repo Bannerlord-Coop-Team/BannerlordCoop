@@ -42,28 +42,31 @@ public class ServerTelemetryUploaderTests
         using var json = JsonDocument.Parse(handler.Body ?? string.Empty);
         var root = json.RootElement;
         Assert.Equal(
-            new[] { "sessionId", "modVersion", "commit", "startedAt", "playerCount" },
+            new[] { "p_session_id", "p_mod_version", "p_commit_hash", "p_started_at", "p_player_count" },
             root.EnumerateObject().Select(property => property.Name).ToArray());
-        Assert.Equal("41fa0000000000000000000000000000", root.GetProperty("sessionId").GetString());
-        Assert.Equal("0.1.4", root.GetProperty("modVersion").GetString());
-        Assert.Equal("abc123", root.GetProperty("commit").GetString());
-        Assert.Equal("2026-08-29T22:15:00Z", root.GetProperty("startedAt").GetString());
-        Assert.Equal(5, root.GetProperty("playerCount").GetInt32());
+        Assert.Equal("41fa0000000000000000000000000000", root.GetProperty("p_session_id").GetString());
+        Assert.Equal("0.1.4", root.GetProperty("p_mod_version").GetString());
+        Assert.Equal("abc123", root.GetProperty("p_commit_hash").GetString());
+        Assert.Equal("2026-08-29T22:15:00Z", root.GetProperty("p_started_at").GetString());
+        Assert.Equal(5, root.GetProperty("p_player_count").GetInt32());
     }
 
     [Fact]
-    public async Task RecordBattleStartedAsync_PostsToBattlesFoughtEdgeFunction()
+    public async Task RecordBattleStartedAsync_PostsToBattlesFoughtRpc()
     {
+        const string testEndpoint = "https://telemetry.example.test/api/v1/battles-fought";
         var handler = new RecordingHttpHandler();
         using var httpClient = new HttpClient(handler);
-        using var uploader = new ServerTelemetryUploader(httpClient);
+        using var uploader = new ServerTelemetryUploader(
+            httpClient,
+            battlesFoughtEndpoint: testEndpoint);
 
         var result = await uploader.RecordBattleStartedAsync(CancellationToken.None);
 
         Assert.True(result.Uploaded);
         Assert.Equal(1, handler.RequestCount);
         Assert.Equal(HttpMethod.Post, handler.Method);
-        Assert.Equal(ServerTelemetryUploader.BattlesFoughtEndpoint, handler.RequestUri?.ToString());
+        Assert.Equal(testEndpoint, handler.RequestUri?.ToString());
         Assert.Equal("application/json; charset=utf-8", handler.ContentType);
         Assert.Equal("Bearer " + ServerTelemetryUploader.PublishableKey, handler.Authorization);
         Assert.Equal(ServerTelemetryUploader.PublishableKey, handler.ApiKey);
@@ -71,7 +74,7 @@ public class ServerTelemetryUploaderTests
     }
 
     [Fact]
-    public async Task DefaultConfigurationUsesPublicEdgeFunction()
+    public async Task DefaultConfigurationUsesPublicRpcEndpoints()
     {
         var handler = new RecordingHttpHandler();
         using var httpClient = new HttpClient(handler);
@@ -90,14 +93,14 @@ public class ServerTelemetryUploaderTests
         Assert.True(result.EndpointConfigured);
         Assert.Equal(1, handler.RequestCount);
         Assert.Equal(
-            "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/upsert-platform-statistics",
+            "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_statistics",
             ServerTelemetryUploader.Endpoint);
         Assert.Equal(ServerTelemetryUploader.Endpoint, handler.RequestUri?.ToString());
         Assert.Equal(
             "sb_publishable_tseZMeJ-RYeSHI0KwU2p0g_PE4GVtN6",
             ServerTelemetryUploader.PublishableKey);
         Assert.Equal(
-            "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/battles-fought-upsert",
+            "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/increment_battles_fought",
             ServerTelemetryUploader.BattlesFoughtEndpoint);
     }
 

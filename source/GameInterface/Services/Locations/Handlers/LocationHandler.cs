@@ -4,9 +4,12 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.Locations.Patches;
 using GameInterface.Services.ObjectManager;
+using SandBox.GauntletUI.Menu;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -15,6 +18,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Overlay;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Locations.Handlers;
@@ -30,7 +34,10 @@ public class LocationHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
 
-    public LocationHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public LocationHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -48,6 +55,8 @@ public class LocationHandler : IHandler
         messageBroker.Subscribe<NetworkAddLocationSpecialItem>(Handle_NetworkAddLocationSpecialItem);
         messageBroker.Subscribe<NetworkRemoveLocationSpecialItem>(Handle_NetworkRemoveLocationSpecialItem);
         messageBroker.Subscribe<NetworkLocationRosterSnapshot>(Handle_NetworkLocationRosterSnapshot);
+
+        messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
     }
 
     public void Dispose()
@@ -64,6 +73,8 @@ public class LocationHandler : IHandler
         messageBroker.Unsubscribe<NetworkAddLocationSpecialItem>(Handle_NetworkAddLocationSpecialItem);
         messageBroker.Unsubscribe<NetworkRemoveLocationSpecialItem>(Handle_NetworkRemoveLocationSpecialItem);
         messageBroker.Unsubscribe<NetworkLocationRosterSnapshot>(Handle_NetworkLocationRosterSnapshot);
+
+        messageBroker.Unsubscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
     }
 
     private void Handle_LocationCharacterAdded(MessagePayload<LocationCharacterAdded> payload)
@@ -197,19 +208,48 @@ public class LocationHandler : IHandler
 
         var obj = payload.What;
 
-        if (objectManager.TryGetObjectWithLogging(obj.SettlementId, out Settlement settlement) == false) return;
-
-        var locationComplex = settlement.LocationComplex;
-        if (locationComplex == null) return;
-
-        var entries = obj.Entries ?? Array.Empty<LocationCharacterData>();
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            var locationComplex = settlement.LocationComplex;
+            if (locationComplex == null) return;
+
             using (new AllowedThread())
             {
-                ReconcileSettlementRosters(locationComplex, entries);
+                ReconcileSettlementRosters(locationComplex, obj.Entries ?? Array.Empty<LocationCharacterData>());
             }
+
+            if (Settlement.CurrentSettlement != settlement) return;
+
+            // Update settlement overlay if relevant to this client
+            var overlay = MapScreen.Instance?._menuViewContext?.GetMenuView<GauntletMenuOverlayBaseView>()?._overlayDataSource as SettlementMenuOverlayVM;
+            if (overlay?._settlement == settlement)
+            {
+                overlay.Refresh();
+            }
+
+            // Update menu options. Certain options can remain unavailable like entering a keep
+            var menuContext = Campaign.Current?.CurrentMenuContext;
+            if (menuContext?.GameMenu != null)
+            {
+                Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menuContext);
+            }
+        });
+    }
+
+    private void Handle_PlayerHeroChanged(MessagePayload<PlayerHeroChanged> obj)
+    {
+        if (ModInformation.IsServer) return;
+
+        GameThread.RunSafe(() =>
+        {
+            var settlement = Settlement.CurrentSettlement;
+            if (Hero.MainHero.IsPrisoner || settlement == null || settlement.IsUnderSiege) return;
+
+            if (!objectManager.TryGetIdWithLogging(settlement, out var currentSettlementId)) return;
+
+            network.SendAll(new NetworkRequestLocationRosterSnapshot(currentSettlementId));
         });
     }
 
