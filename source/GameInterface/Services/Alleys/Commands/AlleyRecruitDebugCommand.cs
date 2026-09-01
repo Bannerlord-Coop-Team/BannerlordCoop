@@ -23,7 +23,6 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using static GameInterface.Services.ObjectManager.ObjectManager;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Alleys.Commands;
 
@@ -35,12 +34,9 @@ public class AlleyRecruitDebugCommand
 
     private static AlleyRecruitFixture fixture;
 
-    [CommandLineArgumentFunction("recruit_fixture_start", "coop.debug.alley")]
     public static string StartFixture(List<string> args)
     {
         if (ModInformation.IsClient) return "Run this command on the server.";
-        if (args.Count != 3)
-            return "Usage: coop.debug.alley.recruit_fixture_start <settlementId> <alleyIndex> <heroRegistryId>";
         if (fixture != null) return "The alley recruit fixture is already active.";
 
         if (!TryGetAlley(args[0], args[1], out var alley, out var error)) return error;
@@ -95,10 +91,8 @@ public class AlleyRecruitDebugCommand
         }
     }
 
-    [CommandLineArgumentFunction("recruit_fixture_state", "coop.debug.alley")]
     public static string FixtureState(List<string> args)
     {
-        if (args.Count != 0) return "Usage: coop.debug.alley.recruit_fixture_state";
         if (fixture == null) return "The alley recruit fixture is not active.";
 
         var party = fixture.PlayerParty;
@@ -107,10 +101,8 @@ public class AlleyRecruitDebugCommand
                $"mapEvent={(party.MapEvent == null ? "none" : "active")}";
     }
 
-    [CommandLineArgumentFunction("recruit_roster", "coop.debug.alley")]
     public static string RecruitRoster(List<string> args)
     {
-        if (args.Count != 1) return "Usage: coop.debug.alley.recruit_roster <heroRegistryId>";
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "Unable to resolve IObjectManager.";
         if (!objectManager.TryGetObjectWithLogging<Hero>(args[0], out var hero))
@@ -132,7 +124,6 @@ public class AlleyRecruitDebugCommand
         return result.ToString();
     }
 
-    [CommandLineArgumentFunction("recruit_fixture_restore", "coop.debug.alley")]
     public static string RestoreFixture(List<string> args)
     {
         if (ModInformation.IsClient) return "Run this command on the server.";
@@ -242,12 +233,9 @@ public class AlleyRecruitDebugCommand
         }
     }
 
-    [CommandLineArgumentFunction("recruit_overseer_state", "coop.debug.alley")]
     public static string RecruitOverseerState(List<string> args)
     {
         if (ModInformation.IsServer) return "Run this command on the owning client.";
-        if (args.Count != 2)
-            return "Usage: coop.debug.alley.recruit_overseer_state <settlementId> <alleyIndex>";
         if (!TryGetAlley(args[0], args[1], out var alley, out var error)) return error;
         if (Mission.Current == null) return "ALLEY_RECRUIT_OVERSEER_STATE mission=False present=False";
 
@@ -262,12 +250,9 @@ public class AlleyRecruitDebugCommand
                $"owner=True overseer={playerAlleyData.AssignedClanMember.StringId}";
     }
 
-    [CommandLineArgumentFunction("recruit_conversation_start", "coop.debug.alley")]
     public static string StartRecruitConversation(List<string> args)
     {
         if (ModInformation.IsServer) return "Run this command on the owning client.";
-        if (args.Count != 2)
-            return "Usage: coop.debug.alley.recruit_conversation_start <settlementId> <alleyIndex>";
         if (!TryGetAlley(args[0], args[1], out var alley, out var error)) return error;
         if (Mission.Current == null) return "Enter the alley location before starting the conversation.";
 
@@ -289,11 +274,9 @@ public class AlleyRecruitDebugCommand
         return $"ALLEY_RECRUIT_CONVERSATION_STARTED overseer={playerAlleyData.AssignedClanMember.StringId}";
     }
 
-    [CommandLineArgumentFunction("recruit_conversation", "coop.debug.alley")]
     public static string RecruitConversation(List<string> args)
     {
         if (ModInformation.IsServer) return "Run this command on the owning client.";
-        if (args.Count != 1) return "Usage: coop.debug.alley.recruit_conversation <state|ask|accept>";
 
         var manager = Campaign.Current?.ConversationManager;
         if (manager?.IsConversationInProgress != true) return "No alley conversation is active.";
@@ -318,11 +301,9 @@ public class AlleyRecruitDebugCommand
         }
     }
 
-    [CommandLineArgumentFunction("recruit_inventory", "coop.debug.alley")]
     public static string RecruitInventory(List<string> args)
     {
         if (ModInformation.IsServer) return "Run this command on the owning client.";
-        if (args.Count != 1) return "Usage: coop.debug.alley.recruit_inventory <open|trade|complete|state>";
 
         switch (args[0].ToLowerInvariant())
         {
@@ -354,12 +335,9 @@ public class AlleyRecruitDebugCommand
         }
     }
 
-    [CommandLineArgumentFunction("recruit_start_looter_battle", "coop.debug.alley")]
     public static string StartLooterBattle(List<string> args)
     {
         if (ModInformation.IsClient) return "Run this command on the server.";
-        if (args.Count != 1)
-            return "Usage: coop.debug.alley.recruit_start_looter_battle <heroRegistryId>";
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "Unable to resolve IObjectManager.";
         if (!objectManager.TryGetObjectWithLogging<Hero>(args[0], out var owner))

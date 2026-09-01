@@ -16,7 +16,6 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands
 {
@@ -35,11 +34,9 @@ namespace GameInterface.Services.GameDebug.Commands
             return container.TryResolve(out objectManager);
         }
 
-        [CommandLineArgumentFunction("open", "coop.debug.clan")]
         public static string OpenClanScreen(List<string> args)
         {
             if (!ModInformation.IsClient) return "Command can only be run on a client.";
-            if (args.Count != 0) return "Usage: coop.debug.clan.open";
             if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
             if (Game.Current.GameStateManager.ActiveState is ClanState) return "CLAN_SCREEN_ALREADY_OPEN";
             if (Hero.MainHero == null || Hero.MainHero.IsDead)
@@ -50,11 +47,9 @@ namespace GameInterface.Services.GameDebug.Commands
             return "CLAN_SCREEN_OPENED";
         }
 
-        [CommandLineArgumentFunction("close", "coop.debug.clan")]
         public static string CloseClanScreen(List<string> args)
         {
             if (!ModInformation.IsClient) return "Command can only be run on a client.";
-            if (args.Count != 0) return "Usage: coop.debug.clan.close";
             if (!(Game.Current?.GameStateManager?.ActiveState is ClanState))
                 return "No active Clan screen.";
 
@@ -62,11 +57,9 @@ namespace GameInterface.Services.GameDebug.Commands
             return "CLAN_SCREEN_CLOSED";
         }
 
-        [CommandLineArgumentFunction("screen_state", "coop.debug.clan")]
         public static string ClanScreenState(List<string> args)
         {
             if (!ModInformation.IsClient) return "Command can only be run on a client.";
-            if (args.Count != 0) return "Usage: coop.debug.clan.screen_state";
 
             var clanScreen = ScreenManager.TopScreen as GauntletClanScreen;
             return $"CLAN_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is ClanState} " +
@@ -76,11 +69,9 @@ namespace GameInterface.Services.GameDebug.Commands
                 $"mainHero={Hero.MainHero?.StringId ?? "none"}";
         }
 
-        [CommandLineArgumentFunction("select_parties", "coop.debug.clan")]
         public static string SelectParties(List<string> args)
         {
             if (!ModInformation.IsClient) return "Command can only be run on a client.";
-            if (args.Count != 0) return "Usage: coop.debug.clan.select_parties";
 
             var clanScreen = ScreenManager.TopScreen as GauntletClanScreen;
             if (clanScreen?._dataSource == null) return "The Clan screen is unavailable.";
@@ -89,11 +80,9 @@ namespace GameInterface.Services.GameDebug.Commands
             return $"CLAN_PARTIES_SELECTED parties={clanScreen._dataSource.ClanParties?._parties?.Count ?? -1}";
         }
 
-        [CommandLineArgumentFunction("wage_state", "coop.debug.clan")]
         public static string WageState(List<string> args)
         {
             if (!ModInformation.IsClient) return "Command can only be run on a client.";
-            if (args.Count > 1) return "Usage: coop.debug.clan.wage_state [clanId]";
             if (Campaign.Current?.Models?.PartyWageModel == null) return "The party wage model is unavailable.";
             if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
 
@@ -185,11 +174,10 @@ namespace GameInterface.Services.GameDebug.Commands
                 $"roster={roster?.Count ?? -1} wage={wage} issues={(issues.Count == 0 ? "none" : string.Join(",", issues))}");
         }
 
-        [CommandLineArgumentFunction("refresh_burst", "coop.debug.clan")]
         public static string RefreshBurst(List<string> args)
         {
             if (!ModInformation.IsServer) return "Command can only be run on the server.";
-            if (args.Count != 2 || !int.TryParse(args[1], out var count) || count < 1 || count > 500)
+            if (!int.TryParse(args[1], out var count) || count < 1 || count > 500)
                 return "Usage: coop.debug.clan.refresh_burst <party id> <count 1-500>";
             if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
             if (!objectManager.TryGetObject(args[0], out MobileParty _))
@@ -211,7 +199,7 @@ namespace GameInterface.Services.GameDebug.Commands
         /// </summary>
         /// <param name="args">actually none are being used..</param>
         /// <returns>strings of all the clans</returns>
-        [CommandLineArgumentFunction("list", "coop.debug.clan")]
+
         public static string ListClans(List<string> args)
         {
             StringBuilder stringBuilder = new StringBuilder();
@@ -226,15 +214,14 @@ namespace GameInterface.Services.GameDebug.Commands
             return stringBuilder.ToString();
         }
 
-        // coop.debug.clan.info <clanId>
+        // coop.debug.clan.field_dump <clanId>
         /// <summary>
         /// Reflection-dumps every field of a Clan so a server screenshot and a client screenshot can be
         /// compared field-for-field to confirm Clan field syncs still replicate.
         /// </summary>
-        [CommandLineArgumentFunction("info", "coop.debug.clan")]
+
         public static string Info(List<string> args)
         {
-            if (args.Count != 1) return "Usage: coop.debug.clan.info <clanId>";
             if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
             if (!objectManager.TryGetObject(args[0], out Clan clan)) return $"Unable to find clan with id: {args[0]}";
 
@@ -251,13 +238,12 @@ namespace GameInterface.Services.GameDebug.Commands
         /// Authoritatively changes a clan's influence by the given amount via ChangeClanInfluenceAction so
         /// the _influence scalar-field store replicates; verify on both sides with coop.debug.clan.info.
         /// </summary>
-        [CommandLineArgumentFunction("add_influence", "coop.debug.clan")]
+
         public static string AddClanInfluence(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
 
-            if (args.Count != 2) return "Usage: coop.debug.clan.add_influence <clanId> <amount>";
             if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
             if (!objectManager.TryGetObject(args[0], out Clan clan)) return $"Unable to find clan with id: {args[0]}";
             if (!float.TryParse(args[1], out float amount)) return $"'{args[1]}' is not a valid number";
@@ -266,17 +252,11 @@ namespace GameInterface.Services.GameDebug.Commands
             return $"Applied {amount} influence to '{clan.Name}'; clan is now at {clan.Influence} influence";
         }
 
-
-        [CommandLineArgumentFunction("change_clan_leader", "coop.debug.clan")]
         public static string ChangeClanLeader(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
 
-            if (args.Count < 2)
-            {
-                return "Usage: coop.debug.clan.change_clan_leader <clanId> <heroId>";
-            }
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
             {
@@ -301,16 +281,11 @@ namespace GameInterface.Services.GameDebug.Commands
             return clan.Name.ToString() + " has a new leader: " + newLeader.Name.ToString();
         }
 
-        [CommandLineArgumentFunction("change_clan_kingdom", "coop.debug.clan")]
         public static string ChangeClanKingdom(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
 
-            if (args.Count < 2)
-            {
-                return "Usage: coop.debug.clan.change_clan_kingdom <clanId> <kingdomId>";
-            }
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
             {
@@ -335,16 +310,11 @@ namespace GameInterface.Services.GameDebug.Commands
             return clan.Name.ToString() + " has join the kingdom : " + newKingdom.Name.ToString();
         }
 
-        [CommandLineArgumentFunction("destroy_clan", "coop.debug.clan")]
         public static string DestroyClan(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
 
-            if (args.Count < 1)
-            {
-                return "Usage: coop.debug.clan.destroy_clan <clanId>";
-            }
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
             {
@@ -363,16 +333,11 @@ namespace GameInterface.Services.GameDebug.Commands
             return clan.Name.ToString() + " has been destroyed";
         }
 
-        [CommandLineArgumentFunction("add_companion", "coop.debug.clan")]
         public static string AddCompanion(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
 
-            if (args.Count < 2)
-            {
-                return "Usage: coop.debug.clan.add_companion <clanId> <heroId>";
-            }
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
             {
@@ -397,16 +362,11 @@ namespace GameInterface.Services.GameDebug.Commands
             return companion.Name.ToString() + " has joined " + clan.Name.ToString();
         }
 
-        [CommandLineArgumentFunction("remove_companion", "coop.debug.clan")]
         public static string RemoveCompanion(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
 
-            if (args.Count < 1)
-            {
-                return "Usage: coop.debug.clan.remove_companion <heroId>";
-            }
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
             {
@@ -428,16 +388,11 @@ namespace GameInterface.Services.GameDebug.Commands
             return companion.Name.ToString() + " has left " + clanName.ToString();
         }
 
-        [CommandLineArgumentFunction("add_renown", "coop.debug.clan")]
         public static string AddRenown(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
 
-            if (args.Count < 2)
-            {
-                return "Usage: coop.debug.clan.add_renown <clanId> <renown>";
-            }
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
             {
@@ -467,7 +422,7 @@ namespace GameInterface.Services.GameDebug.Commands
         /// Read-only: prints a clan's battle-economy values (renown, influence, leader-party morale, and
         /// total troop xp). Run it on the host and on a client with the same clan id to compare the two.
         /// </summary>
-        [CommandLineArgumentFunction("economy", "coop.debug.clan")]
+
         public static string ClanEconomy(List<string> args)
         {
             if (!TryGetObjectManager(out IObjectManager objectManager))
@@ -478,8 +433,8 @@ namespace GameInterface.Services.GameDebug.Commands
             Clan clan;
             if (args.Count >= 1)
             {
-                // The argument can be a StringId, or a display name (which may contain spaces, so rejoin them).
-                string query = string.Join(" ", args);
+                // Quote a multi-word display name so it arrives as one command argument.
+                string query = args[0];
 
                 if (!objectManager.TryGetObject(query, out clan))
                 {
@@ -526,14 +481,11 @@ namespace GameInterface.Services.GameDebug.Commands
             return stringBuilder.ToString();
         }
         // coop.debug.clan.join_kingdom Player12 empire
-        [CommandLineArgumentFunction("join_kingdom", "coop.debug.clan")]
+
         public static string JoinKingdom(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
-
-            if (args.Count != 2)
-                return "Usage: coop.debug.clan.join_kingdom <clanId> <kingdomId>";
 
             if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
                 return $"Unable to get {nameof(IObjectManager)}";
@@ -550,14 +502,11 @@ namespace GameInterface.Services.GameDebug.Commands
         }
 
         // coop.debug.clan.leave_kingdom Player12
-        [CommandLineArgumentFunction("leave_kingdom", "coop.debug.clan")]
+
         public static string LeaveKingdom(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
-
-            if (args.Count != 1)
-                return "Usage: coop.debug.clan.leave_kingdom <clanId>";
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
                 return "Unable to resolve ObjectManager";
@@ -589,11 +538,9 @@ namespace GameInterface.Services.GameDebug.Commands
         }
 
         // coop.debug.clan.membership Player12
-        [CommandLineArgumentFunction("membership", "coop.debug.clan")]
+
         public static string Membership(List<string> args)
         {
-            if (args.Count != 1)
-                return "Usage: coop.debug.clan.membership <clanId>";
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
                 return "Unable to resolve ObjectManager";
@@ -612,14 +559,11 @@ namespace GameInterface.Services.GameDebug.Commands
         }
 
         // coop.debug.clan.give_influence Player12 500
-        [CommandLineArgumentFunction("give_influence", "coop.debug.clan")]
+
         public static string GiveInfluence(List<string> args)
         {
             if (ModInformation.IsClient)
                 return "Command is only available to run on the server";
-
-            if (args.Count != 2)
-                return "Usage: coop.debug.clan.give_influence <clanId> <amount>";
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
                 return "Unable to resolve ObjectManager";
@@ -635,11 +579,9 @@ namespace GameInterface.Services.GameDebug.Commands
             return $"Gave {amount} influence to {clan.Name}";
         }
         // coop.debug.clan.info
-        [CommandLineArgumentFunction("info", "coop.debug.clan")]
+
         public static string InfoClan(List<string> args)
         {
-            if (args.Count != 1)
-                return "Usage: coop.debug.clan.info <clanId>";
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
                 return "Unable to resolve ObjectManager";
@@ -660,11 +602,8 @@ namespace GameInterface.Services.GameDebug.Commands
             return sb.ToString();
         }
 
-        [CommandLineArgumentFunction("daily_gold_change", "coop.debug.clan")]
         public static string ViewPredicatedDailyGoldChange(List<string> args)
         {
-            if (args.Count != 1)
-                return "Usage: coop.debug.clan.daily_gold_change <clanId>";
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
                 return "Unable to resolve ObjectManager";

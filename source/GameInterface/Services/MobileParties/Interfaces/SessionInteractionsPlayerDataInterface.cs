@@ -5,9 +5,9 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Interfaces;
 
@@ -21,6 +21,11 @@ public interface ISessionInteractionsPlayerDataInterface : IGameAbstraction
     void SetKnowTournaments(string playerHeroId, bool knowTournaments);
     void UpdateWarningTime(string playerHeroId, long warningTimeNumTicks);
     void AddSettlementSneakedIn(string playerHeroId, string settlementId);
+    void UpdateDrinkThisDayInSettlement(string playerHeroId, string settlementId);
+    void UpdateHasBoughtTunToParty(string playerHeroId, bool hasBought);
+    void UpdateHasMetRandomBroker(string playerHeroId, bool hasMet);
+    bool DailyTickDrinkThisDayInSettlement();
+    bool WeeklyTickHasBoughtToTunToParty();
     void RemoveInteractedVillagersForAllPlayers(string mobilePartyId);
     void RemoveInteractedCaravanForAllPlayers(string mobilePartyId);
     void RemoveInteractedBanditsForAllPlayers(string mobilePartyId);
@@ -130,6 +135,59 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         AddToList(playerHeroId, InteractionsPlayerData.PlayerAlreadySneakedSettlements, settlementId);
     }
 
+    public void UpdateDrinkThisDayInSettlement(string playerHeroId, string settlementId)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerHeroId] = settlementId;
+    }
+
+    public void UpdateHasBoughtTunToParty(string playerHeroId, bool hasBought)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerHasBoughtTunToParty[playerHeroId] = hasBought;
+    }
+
+    public void UpdateHasMetRandomBroker(string playerHeroId, bool hasMet)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerHasMetRansomBroker[playerHeroId] = hasMet;
+    }
+
+    public bool DailyTickDrinkThisDayInSettlement()
+    {
+        var dictionary = InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement;
+        var keysToReset = dictionary
+            .Where(x => x.Value != null)
+            .Select(x => x.Key)
+            .ToList();
+
+        foreach (var key in keysToReset)
+        {
+            dictionary[key] = null;
+        }
+
+        return keysToReset.Count > 0;
+    }
+
+    public bool WeeklyTickHasBoughtToTunToParty()
+    {
+        var dictionary = InteractionsPlayerData.PlayerHasBoughtTunToParty;
+        var keysToReset = dictionary
+            .Where(x => x.Value == true)
+            .Select(x => x.Key)
+            .ToList();
+
+        foreach (var key in keysToReset)
+        {
+            dictionary[key] = false;
+        }
+
+        return keysToReset.Count > 0;
+    }
+
     private void RemoveInteractedPartyForAllPlayers(string mobilePartyId, Dictionary<string, Dictionary<string, int>> interactionDictionary)
     {
         foreach (var player in playerManager.Players)
@@ -217,6 +275,18 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         if (!InteractionsPlayerData.PlayerAlreadySneakedSettlements.ContainsKey(playerHeroId))
         {
             InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId] = new List<string>();
+        }
+        if (!InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerHeroId] = null;
+        }
+        if (!InteractionsPlayerData.PlayerHasBoughtTunToParty.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerHasBoughtTunToParty[playerHeroId] = false;
+        }
+        if (!InteractionsPlayerData.PlayerHasMetRansomBroker.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerHasMetRansomBroker[playerHeroId] = false;
         }
     }
 
