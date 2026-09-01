@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.RomanceFlow;
@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using Romance = TaleWorlds.CampaignSystem.Romance;
 
 namespace GameInterface.Services.Heroes.Commands;
@@ -19,22 +18,17 @@ internal class RomanceDebugCommand
     private const string CommandNamespace = "coop.debug.romance";
     private const string PairUsage = "<playerHeroId> <npcHeroId>";
 
-    [CommandLineArgumentFunction("list", CommandNamespace)]
     public static string List(List<string> args)
     {
         const string command = CommandNamespace + ".list";
-        var context = new CommandContext(command, $"Usage: {command}", args);
-        if (!context.RequireArgCount(0, out var error)) return error;
-
         return RunOnGameThread(command, () => ListStates());
     }
 
-    [CommandLineArgumentFunction("status", CommandNamespace)]
     public static string Status(List<string> args)
     {
         const string command = CommandNamespace + ".status";
         var context = new CommandContext(command, $"Usage: {command} {PairUsage}", args);
-        if (!context.RequireArgCount(2, out var error)) return error;
+        string error;
 
         return RunOnGameThread(command, () =>
         {
@@ -50,10 +44,8 @@ internal class RomanceDebugCommand
         });
     }
 
-    [CommandLineArgumentFunction("help", CommandNamespace)]
     public static string Help(List<string> args)
     {
-        if (args.Count != 0) return $"Usage: {CommandNamespace}.help";
 
         return $"{CommandNamespace}.list; {CommandNamespace}.status {PairUsage}; " +
                $"{CommandNamespace}.start|compatible|agree|marry|divorce {PairUsage}. " +
@@ -61,25 +53,20 @@ internal class RomanceDebugCommand
                "Divorce does not restore pre-marriage clan or party changes.";
     }
 
-    [CommandLineArgumentFunction("start", CommandNamespace)]
     public static string Start(List<string> args)
         => ChangeState(args, "start", Romance.RomanceLevelEnum.CourtshipStarted);
 
-    [CommandLineArgumentFunction("compatible", CommandNamespace)]
     public static string Compatible(List<string> args)
         => ChangeState(args, "compatible", Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible);
 
-    [CommandLineArgumentFunction("agree", CommandNamespace)]
     public static string Agree(List<string> args)
         => ChangeState(args, "agree", Romance.RomanceLevelEnum.CoupleAgreedOnMarriage);
 
-    [CommandLineArgumentFunction("marry", CommandNamespace)]
     public static string Marry(List<string> args)
     {
         const string command = CommandNamespace + ".marry";
         var context = new CommandContext(command, $"Usage: {command} {PairUsage}", args);
         if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(2, out error)) return error;
 
         return RunOnGameThread(command, () =>
         {
@@ -94,13 +81,11 @@ internal class RomanceDebugCommand
         });
     }
 
-    [CommandLineArgumentFunction("divorce", CommandNamespace)]
     public static string Divorce(List<string> args)
     {
         const string command = CommandNamespace + ".divorce";
         var context = new CommandContext(command, $"Usage: {command} {PairUsage}", args);
         if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(2, out error)) return error;
 
         return RunOnGameThread(command, () =>
         {
@@ -127,7 +112,6 @@ internal class RomanceDebugCommand
         var command = $"{CommandNamespace}.{action}";
         var context = new CommandContext(command, $"Usage: {command} {PairUsage}", args);
         if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(2, out error)) return error;
 
         return RunOnGameThread(command, () =>
         {

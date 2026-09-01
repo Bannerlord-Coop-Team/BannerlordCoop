@@ -25,7 +25,6 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Helpers;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Companions.Commands;
 
@@ -53,7 +52,7 @@ internal class CompanionsCommands
     /// <summary>
     /// View a list of all wanderers in the game
     /// </summary>
-    [CommandLineArgumentFunction("list_wanderers", "coop.debug.companions")]
+
     public static string ListWanderersCommand(List<string> strings)
     {
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
@@ -84,7 +83,7 @@ internal class CompanionsCommands
     /// <summary>
     /// Clear the wanderers from the map to roll new ones
     /// </summary>
-    [CommandLineArgumentFunction("clear_wanderers", "coop.debug.companions")]
+
     public static string ClearWanderersCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "This command can only be run on the server.";
@@ -100,13 +99,11 @@ internal class CompanionsCommands
         return "All wanderers removed.";
     }
 
-    [CommandLineArgumentFunction("role_fixture_setup", "coop.debug.companions")]
     public static string RoleFixtureSetupCommand(List<string> args)
     {
         const string usage = "Usage: coop.debug.companions.role_fixture_setup <controllerId>";
         var context = new CommandContext("role_fixture_setup", usage, args);
         if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(1, out error)) return error;
         if (pendingRoleFixture != null) return "A companion-role fixture is already active.";
 
         if (!TryResolvePlayer(args[0], out _, out var objectManager, out var player,
@@ -146,12 +143,9 @@ internal class CompanionsCommands
             $"members={playerParty.MemberRoster.TotalManCount} companions={playerClan.Companions.Count()}";
     }
 
-    [CommandLineArgumentFunction("role_fixture_open_conversation", "coop.debug.companions")]
     public static string RoleFixtureOpenConversationCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.role_fixture_open_conversation";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return usage;
         var companion = FindRoleFixtureCompanion();
         if (companion == null) return "The companion-role fixture hero was not found.";
         if (companion.Clan != Clan.PlayerClan || companion.PartyBelongedTo != MobileParty.MainParty)
@@ -182,12 +176,9 @@ internal class CompanionsCommands
         }
     }
 
-    [CommandLineArgumentFunction("role_fixture_conversation_state", "coop.debug.companions")]
     public static string RoleFixtureConversationStateCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.role_fixture_conversation_state";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return usage;
 
         var companion = FindRoleFixtureCompanion();
         var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
@@ -198,12 +189,9 @@ internal class CompanionsCommands
             $"companion={companion?.StringId ?? "none"} conversationHeroMatched={conversationHeroMatched}";
     }
 
-    [CommandLineArgumentFunction("role_fixture_prepare_client", "coop.debug.companions")]
     public static string RoleFixturePrepareClientCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.role_fixture_prepare_client";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return usage;
         var companion = FindRoleFixtureCompanion();
         if (companion == null) return "The companion-role fixture hero was not found.";
         if (Hero.MainHero == null) return "The local main hero is unavailable.";
@@ -221,12 +209,9 @@ internal class CompanionsCommands
             $"relation={relation}";
     }
 
-    [CommandLineArgumentFunction("role_fixture_assign_scout", "coop.debug.companions")]
     public static string RoleFixtureAssignScoutCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.role_fixture_assign_scout";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return usage;
         var companion = Hero.OneToOneConversationHero;
         if (!Campaign.Current.ConversationManager.IsConversationInProgress ||
             companion?.Name?.ToString() != RoleFixtureName)
@@ -249,11 +234,8 @@ internal class CompanionsCommands
         }
     }
 
-    [CommandLineArgumentFunction("role_fixture_state", "coop.debug.companions")]
     public static string RoleFixtureStateCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.role_fixture_state <partyId>";
-        if (args.Count != 1) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(args[0], out MobileParty party))
             return $"Party '{args[0]}' not found.";
@@ -271,11 +253,8 @@ internal class CompanionsCommands
             $"scout={scoutId} assigned={scout == companion} roles={roles}";
     }
 
-    [CommandLineArgumentFunction("scout_role_state", "coop.debug.companions")]
     public static string ScoutRoleStateCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.scout_role_state <partyId>";
-        if (args.Count != 1) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(args[0], out MobileParty party))
             return $"Party '{args[0]}' not found.";
@@ -288,13 +267,11 @@ internal class CompanionsCommands
         return $"SCOUT_ROLE_STATE party={args[0]} scout={scoutId}";
     }
 
-    [CommandLineArgumentFunction("role_fixture_restore", "coop.debug.companions")]
     public static string RoleFixtureRestoreCommand(List<string> args)
     {
         const string usage = "Usage: coop.debug.companions.role_fixture_restore <controllerId>";
         var context = new CommandContext("role_fixture_restore", usage, args);
         if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(1, out error)) return error;
         if (pendingRoleFixture == null) return "No companion-role fixture is active.";
         if (pendingRoleFixture.ControllerId != args[0])
             return $"The active companion-role fixture belongs to '{pendingRoleFixture.ControllerId}'.";
@@ -334,13 +311,11 @@ internal class CompanionsCommands
             $"members={memberCount} companions={companionCount}";
     }
 
-    [CommandLineArgumentFunction("dismissal_fixture_setup", "coop.debug.companions")]
     public static string DismissalFixtureSetupCommand(List<string> args)
     {
         const string usage = "Usage: coop.debug.companions.dismissal_fixture_setup <controllerId>";
         var context = new CommandContext("dismissal_fixture_setup", usage, args);
         if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(1, out error)) return error;
         if (pendingDismissalFixture != null) return "A companion-dismissal fixture is already active.";
 
         if (!TryResolvePlayer(args[0], out var playerManager, out var objectManager, out var player,
@@ -381,13 +356,11 @@ internal class CompanionsCommands
             $"dismissedCount={playerParty.MemberRoster.GetTroopCount(dismissed.CharacterObject)}";
     }
 
-    [CommandLineArgumentFunction("dismissal_fixture_prepare_dismiss", "coop.debug.companions")]
     public static string DismissalFixturePrepareDismissCommand(List<string> args)
     {
         const string usage = "Usage: coop.debug.companions.dismissal_fixture_prepare_dismiss <controllerId> <initialCopies>";
         var context = new CommandContext("dismissal_fixture_prepare_dismiss", usage, args);
         if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(2, out error)) return error;
         if (!int.TryParse(args[1], out var initialCopies) || initialCopies < 1)
             return usage;
         if (!TryGetFixture(args[0], out var fixture, out error)) return error;
@@ -406,12 +379,9 @@ internal class CompanionsCommands
             $"count={party.MemberRoster.GetTroopCount(fixture.Dismissed.CharacterObject)}";
     }
 
-    [CommandLineArgumentFunction("dismissal_fixture_trigger_consequence", "coop.debug.companions")]
     public static string DismissalFixtureTriggerConsequenceCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.dismissal_fixture_trigger_consequence <dismissedHeroId>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 1) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(args[0], out Hero dismissed)) return $"Hero '{args[0]}' not found.";
         if (PlayerEncounter.Current != null) return "A player encounter is already active.";
@@ -478,12 +448,9 @@ internal class CompanionsCommands
         }
     }
 
-    [CommandLineArgumentFunction("dismissal_fixture_completion", "coop.debug.companions")]
     public static string DismissalFixtureCompletionCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.dismissal_fixture_completion <dismissedHeroId>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 1) return usage;
         if (lastDismissalCompletion == null ||
             lastDismissalCompletion.Value.OneToOneConversationHeroId != args[0])
             return $"DISMISSAL_PENDING hero={args[0]}";
@@ -500,12 +467,9 @@ internal class CompanionsCommands
             $"leaveAtCompletion={observation?.LeaveAtCompletion}";
     }
 
-    [CommandLineArgumentFunction("dismissal_fixture_release_encounter", "coop.debug.companions")]
     public static string DismissalFixtureReleaseEncounterCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.dismissal_fixture_release_encounter <dismissedHeroId>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 1) return usage;
         if (lastDismissalCompletion == null ||
             lastDismissalCompletion.Value.OneToOneConversationHeroId != args[0])
             return $"Dismissal completion for hero '{args[0]}' has not arrived.";
@@ -517,12 +481,9 @@ internal class CompanionsCommands
         return $"DISMISSAL_ENCOUNTER_RELEASED hero={args[0]} wasActive={wasActive} leaveAcknowledged=True";
     }
 
-    [CommandLineArgumentFunction("dismissal_fixture_request_replacement", "coop.debug.companions")]
     public static string DismissalFixtureRequestReplacementCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.dismissal_fixture_request_replacement <replacementHeroId>";
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 1) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(args[0], out Hero replacement)) return $"Hero '{args[0]}' not found.";
         if (Hero.MainHero?.Clan == null || MobileParty.MainParty == null)
@@ -533,11 +494,8 @@ internal class CompanionsCommands
         return $"REPLACEMENT_REQUESTED hero={args[0]}";
     }
 
-    [CommandLineArgumentFunction("dismissal_fixture_state", "coop.debug.companions")]
     public static string DismissalFixtureStateCommand(List<string> args)
     {
-        const string usage = "Usage: coop.debug.companions.dismissal_fixture_state <partyId> <dismissedHeroId> <replacementHeroId>";
-        if (args.Count != 3) return usage;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(args[0], out MobileParty party)) return $"Party '{args[0]}' not found.";
         if (!objectManager.TryGetObject(args[1], out Hero dismissed)) return $"Hero '{args[1]}' not found.";
@@ -547,13 +505,11 @@ internal class CompanionsCommands
             FormatHeroState("replacement", party, replacement);
     }
 
-    [CommandLineArgumentFunction("dismissal_fixture_restore", "coop.debug.companions")]
     public static string DismissalFixtureRestoreCommand(List<string> args)
     {
         const string usage = "Usage: coop.debug.companions.dismissal_fixture_restore <controllerId>";
         var context = new CommandContext("dismissal_fixture_restore", usage, args);
         if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(1, out error)) return error;
         if (!TryGetFixture(args[0], out var fixture, out error)) return error;
         if (!TryResolvePlayer(args[0], out var playerManager, out var objectManager,
             out _, out _, out var clan, out var party, out error))
@@ -588,32 +544,26 @@ internal class CompanionsCommands
             $"members={memberCount} companions={companionCount}";
     }
 
-    [CommandLineArgumentFunction("open_party_screen", "coop.debug.companions")]
     public static string OpenPartyScreenCommand(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.companions.open_party_screen";
         if (Hero.MainHero?.PartyBelongedTo == null) return "The local player hero has no party.";
 
         PartyScreenHelper.OpenScreenAsNormal();
         return "PARTY_SCREEN_OPENED";
     }
 
-    [CommandLineArgumentFunction("close_party_screen", "coop.debug.companions")]
     public static string ClosePartyScreenCommand(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.companions.close_party_screen";
 
         PartyScreenHelper.CloseScreen(true, true);
         return "PARTY_SCREEN_CLOSED";
     }
 
-    [CommandLineArgumentFunction("commit_party_screen", "coop.debug.companions")]
     public static string CommitPartyScreenCommand(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.companions.commit_party_screen";
         if (!(Game.Current?.GameStateManager?.ActiveState is PartyState))
             return "No active party screen.";
 
