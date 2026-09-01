@@ -46,12 +46,32 @@ internal class SettlementEncounterDistanceValidator : ISettlementEncounterDistan
             : settlement.IsTown
                 ? encounterModel.NeededMaximumDistanceForEncounteringTown
                 : encounterModel.NeededMaximumDistanceForEncounteringVillage;
-        var targetPosition = usePort ? settlement.PortPosition : settlement.GatePosition;
-
-        if (party.Position.Distance(targetPosition) <= maximumDistance + PositionSyncDriftSlack)
+        if (IsWithinInteractionDistance(
+            party.Position,
+            settlement.Position,
+            settlement.GatePosition,
+            settlement.PortPosition,
+            usePort,
+            maximumDistance + PositionSyncDriftSlack))
             return true;
 
         rejectionReason = "your party is too far from the settlement";
         return false;
+    }
+
+    internal static bool IsWithinInteractionDistance(
+        CampaignVec2 partyPosition,
+        CampaignVec2 settlementPosition,
+        CampaignVec2 gatePosition,
+        CampaignVec2 portPosition,
+        bool usePort,
+        float maximumDistance)
+    {
+        if (usePort)
+            return partyPosition.Distance(portPosition) <= maximumDistance;
+
+        // Land movement may converge on either the settlement's center or its visual gate.
+        return partyPosition.Distance(gatePosition) <= maximumDistance ||
+               partyPosition.Distance(settlementPosition) <= maximumDistance;
     }
 }
