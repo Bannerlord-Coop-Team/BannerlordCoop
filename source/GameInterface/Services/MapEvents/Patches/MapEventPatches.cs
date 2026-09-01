@@ -278,12 +278,18 @@ internal class MapEventPatches
     private static void Prefix_CalculateMapEventResults(MapEvent __instance, out List<RemovedMapEventParty> __state)
     {
         __state = null;
-        if (!ModInformation.IsServer || !ContainerProvider.TryResolve<IRetreatedMapEventPartyTracker>(out var tracker))
-        {
-            return;
-        }
+        if (!ModInformation.IsServer || !ContainerProvider.TryResolve<IRetreatedMapEventPartyTracker>(out var tracker)) return;
 
         __state = RemoveParties(__instance, party => tracker.IsRetreated(__instance, party.Party));
+
+        if (__state.Count == 0) return;
+        
+        __instance.RecalculateStrengthOfSides();
+
+        foreach (MapEventSide side in __instance._sides)
+        {
+            side?.CalculateRenownAndInfluenceValuesOnPartyInvolved(__instance.StrengthOfSide);
+        }
     }
 
     // Restore the parties after calculating the results
