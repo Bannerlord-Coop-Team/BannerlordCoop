@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Inventory.TradeSkills.Commands;
@@ -129,5 +130,46 @@ internal class TradeSkillCommands
             return result;
         }
         return "Failed to retrieve player trade data";
+    }
+
+    /// <summary>
+    /// View settlement bribe paid data for all players on server and for current player on client
+    /// </summary>
+    [CommandLineArgumentFunction("view_bribe_paid_settlements", "coop.debug.inventory")]
+    public static string ViewBribePaidSettlements(List<string> strings)
+    {
+        StringBuilder stringBuilder = new StringBuilder();
+        if (ModInformation.IsServer)
+        {
+            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
+
+            foreach (var playerSettlementBribePaid in coopSessionProvider.CoopSession.TradePlayerData.PlayerSettlementBribePaid)
+            {
+                if (playerSettlementBribePaid.Key == null || playerSettlementBribePaid.Value == null) continue;
+
+                stringBuilder.AppendLine($"{playerSettlementBribePaid.Key}");
+                foreach (var settlementBribePaid in playerSettlementBribePaid.Value)
+                {
+                    stringBuilder.AppendLine($"{settlementBribePaid.Key} with a total BribePaid: {settlementBribePaid.Value}");
+                }
+            }
+        }
+        else
+        {
+            stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+            foreach (var settlement in Settlement.All)
+            {
+                if (settlement.BribePaid == 0) continue;
+
+                stringBuilder.AppendLine($"{settlement.StringId} with a total BribePaid: {settlement.BribePaid}");
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Failed to retrieve player settlement bribe paid data.";
     }
 }
