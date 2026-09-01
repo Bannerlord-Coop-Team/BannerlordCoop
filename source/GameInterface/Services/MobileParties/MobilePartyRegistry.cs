@@ -15,6 +15,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties;
@@ -138,8 +139,10 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
             messageBroker.Publish(this, new MobilePartyDestroyed(obj));
 
-            // Sole publisher of the PartyBase teardown: PartyBaseRegistry.DestroyMethods is empty, so
-            // a PartyBase's lifetime ends with its party's, while everything is still registered.
+            // These attachments have no destroy hooks, so their lifetime ends with their party.
+            messageBroker.Publish(this, new InstanceDestroyed<ItemRoster>(obj.ItemRoster));
+            messageBroker.Publish(this, new InstanceDestroyed<TroopRoster>(obj.MemberRoster));
+            messageBroker.Publish(this, new InstanceDestroyed<TroopRoster>(obj.PrisonRoster));
             messageBroker.Publish(this, new InstanceDestroyed<PartyBase>(obj.Party));
         }
         finally
