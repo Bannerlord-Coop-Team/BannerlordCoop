@@ -1204,13 +1204,18 @@ internal class PlayerPartyInteractionHandler : IHandler
             mapState.AtMenu,
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
             mapScreen != null && ScreenManager.TopScreen == mapScreen,
-            HasUnrelatedLiveEncounter(sessionOtherParty));
+            HasUnrelatedLiveEncounter(sessionOtherParty, PlayerPartyInteractionDialogState.IsInitiator));
     }
 
-    // True when the local player is in a PlayerEncounter whose other side is not the party this interaction
-    // session is against.
-    internal static bool HasUnrelatedLiveEncounter(PartyBase sessionOtherParty)
+    // True when the local player is idle in a PlayerEncounter whose other side is not the party this
+    // interaction session is against.
+    internal static bool HasUnrelatedLiveEncounter(PartyBase sessionOtherParty, bool localPlayerInitiated)
     {
+        if (localPlayerInitiated)
+        {
+            return false;
+        }
+
         if (PlayerEncounter.Current == null)
         {
             return false;
