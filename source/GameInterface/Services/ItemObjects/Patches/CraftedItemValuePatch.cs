@@ -14,7 +14,7 @@ internal class CraftedItemValuePatch
         if (__instance.IsCraftedByPlayer)
         {
             var multiplier = ModConfigProvider.ModOptions.SmithingCraftedItemsValueMultiplier;
-            if (multiplier < 0) multiplier = 1;
+            if (multiplier < 0 || multiplier == float.PositiveInfinity || multiplier == float.NaN) multiplier = 1;
 
             __instance.Value = (int)(__instance.Value * multiplier);
         }
