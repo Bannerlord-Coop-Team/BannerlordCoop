@@ -35,9 +35,9 @@ public class CharacterFactionCoopCommandTests
         List<ICoopCommand> commands = GetMigratedCommands();
 
 #if DEBUG
-        Assert.Equal(134, commands.Count);
+        Assert.Equal(136, commands.Count);
 #else
-        Assert.Equal(129, commands.Count);
+        Assert.Equal(131, commands.Count);
 #endif
         Assert.Equal(
             commands.Count,
