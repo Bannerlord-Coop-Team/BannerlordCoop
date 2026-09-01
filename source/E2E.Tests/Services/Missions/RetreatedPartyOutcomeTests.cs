@@ -1,18 +1,17 @@
-using Common;
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Participation;
+using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
 using Missions.Messages;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -81,6 +80,46 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
 
         AssertRetreated(mapEventId, partyIds[2], expected: false);
     }
+    
+    [Fact]
+    public void AlliedPlayerRetreats_AllyLaterWins_RemainingWinnerReceivesRewardsAndRetreaterDoesNot()
+    {
+        var setup = SetupBattle();
+        EnterBattle(Clients.ElementAt(1), setup.MapEventId);
+        EnterBattle(Clients.ElementAt(2), setup.MapEventId);
+        DepartBattle(RetreaterController, setup.MapEventId, wasRetreat: true);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.RemainingPartyId, out var remainingParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.RetreaterPartyId, out var retreaterParty));
+
+            MapEventParty remainingMapEventParty = mapEvent.DefenderSide.Parties.Single(party => ReferenceEquals(party.Party, remainingParty.Party));
+            MapEventParty retreaterMapEventParty = mapEvent.DefenderSide.Parties.Single(party => ReferenceEquals(party.Party, retreaterParty.Party));
+
+            mapEvent.BattleState = BattleState.DefenderVictory;
+            mapEvent.CalculateMapEventResults();
+
+            Assert.True(remainingMapEventParty.GainedRenown > 0f);
+            Assert.True(remainingMapEventParty.GainedInfluence > 0f);
+            Assert.Equal(0f, retreaterMapEventParty.GainedRenown);
+            Assert.Equal(0f, retreaterMapEventParty.GainedInfluence);
+
+            float remainingRenownBefore = remainingParty.LeaderHero.Clan.Renown;
+            float remainingInfluenceBefore = remainingParty.LeaderHero.Clan.Influence;
+            float retreaterRenownBefore = retreaterParty.LeaderHero.Clan.Renown;
+            float retreaterInfluenceBefore = retreaterParty.LeaderHero.Clan.Influence;
+            var tracker = Server.Resolve<IRetreatedMapEventPartyTracker>();
+
+            MapEventPatches.CommitCalculatedMapEventResults(mapEvent, party => !tracker.IsRetreated(mapEvent, party.Party));
+
+            Assert.True(remainingParty.LeaderHero.Clan.Renown > remainingRenownBefore);
+            Assert.True(remainingParty.LeaderHero.Clan.Influence > remainingInfluenceBefore);
+            Assert.Equal(retreaterRenownBefore, retreaterParty.LeaderHero.Clan.Renown);
+            Assert.Equal(retreaterInfluenceBefore, retreaterParty.LeaderHero.Clan.Influence);
+        }, MapEventDisabledMethods);
+    }
 
     private OutcomeSetup SetupBattle()
     {
@@ -91,11 +130,24 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var remainingParty));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var retreaterParty));
+
             retreaterParty.Party.MapEventSide = mapEvent.DefenderSide;
+
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            remainingParty.LeaderHero.Clan.Kingdom = kingdom;
+            retreaterParty.LeaderHero.Clan.Kingdom = kingdom;
+
+            mapEvent.RecalculateStrengthOfSides();
+
+            foreach (MapEventSide side in mapEvent._sides)
+            {
+                side?.CalculateRenownAndInfluenceValuesOnPartyInvolved(mapEvent.StrengthOfSide);
+            }
         }, MapEventDisabledMethods);
 
-        return new OutcomeSetup(mapEventId, partyIds[0], heroIds[2], heroIds[1]);
+        return new OutcomeSetup(mapEventId, partyIds[0], partyIds[1], partyIds[2], heroIds[2], heroIds[1]);
     }
 
     private void SeedHeroInParty(string heroId, string partyId)
@@ -126,12 +178,9 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
             .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize")).ToList();
 
-        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
-            new AuthoritativeBattleConclusionRequested(mapEventId, BattleState.AttackerVictory, hostEpoch: 1)), disabledMethods);
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new AuthoritativeBattleConclusionRequested(mapEventId, BattleState.AttackerVictory, hostEpoch: 1)), disabledMethods);
     }
 
     private void AssertRetreated(string mapEventId, string partyId, bool expected)
@@ -170,13 +219,17 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
     {
         public string MapEventId { get; }
         public string EnemyPartyId { get; }
+        public string RemainingPartyId { get; }
+        public string RetreaterPartyId { get; }
         public string RetreaterHeroId { get; }
         public string RemainingHeroId { get; }
 
-        public OutcomeSetup(string mapEventId, string enemyPartyId, string retreaterHeroId, string remainingHeroId)
+        public OutcomeSetup(string mapEventId, string enemyPartyId, string remainingPartyId, string retreaterPartyId, string retreaterHeroId, string remainingHeroId)
         {
             MapEventId = mapEventId;
             EnemyPartyId = enemyPartyId;
+            RemainingPartyId = remainingPartyId;
+            RetreaterPartyId = retreaterPartyId;
             RetreaterHeroId = retreaterHeroId;
             RemainingHeroId = remainingHeroId;
         }
