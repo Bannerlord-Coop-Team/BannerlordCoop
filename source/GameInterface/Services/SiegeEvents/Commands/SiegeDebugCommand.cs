@@ -1490,13 +1490,13 @@ public class SiegeDebugCommand
 
             if (settlement.SiegeEvent == null)
             {
-                var finalizedRestoreResult = PartyCommands.RestorePositionCommand(new List<string>
+                string finalizedRestoreResult = PartyCommands.RestorePartyPosition(new List<string>
                 {
                     leader.StringId,
                     args[1],
                     args[2],
                     args[3],
-                });
+                }).Output;
                 return Succeeded($"Finalized the assault and stopped the siege of {settlement.Name}\n" + finalizedRestoreResult);
             }
 
@@ -1516,16 +1516,15 @@ public class SiegeDebugCommand
                     $"{settlement.SiegeEvent.BesiegerCamp?._besiegerParties.Count ?? 0} parties remain");
             }
 
-            var restoreResult = PartyCommands.RestorePositionCommand(new List<string>
+            string restoreResult = PartyCommands.RestorePartyPosition(new List<string>
             {
                 leader.StringId,
                 args[1],
                 args[2],
                 args[3],
-            });
+            }).Output;
             return Succeeded($"Stopped the siege of {settlement.Name} led by {leader.Name} ({leader.StringId})\n" +
                 restoreResult);
-
         }
     }
 

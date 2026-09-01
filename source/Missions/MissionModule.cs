@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
@@ -44,6 +45,13 @@ public class MissionModule : Module
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
             builder.RegisterInstance(registration);
+
+        builder.RegisterAssemblyTypes(typeof(MissionModule).Assembly)
+            .Where(type => type.IsClass &&
+                           !type.IsAbstract &&
+                           typeof(ICoopCommand).IsAssignableFrom(type))
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
         builder.RegisterType<MovementPacketCompressor>()
