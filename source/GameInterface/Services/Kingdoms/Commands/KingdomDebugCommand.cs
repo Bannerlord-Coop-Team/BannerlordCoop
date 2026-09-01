@@ -441,7 +441,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">Leader hero id or quoted display name, then the quoted kingdom name.</param>
     /// <returns>result message</returns>
-
     public static string CreateKingdomCommand(List<string> args)
     {
         if (!ModInformation.IsServer) return "This command can only be run on the server.";
@@ -506,7 +505,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the kingdoms</returns>
-
     public static string ListKingdoms(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -524,7 +522,6 @@ public class KingdomDebugCommand
     /// Reflection-dumps every field of a Kingdom so a server screenshot and a client screenshot can be
     /// compared field-for-field to confirm Kingdom field syncs still replicate.
     /// </summary>
-
     public static string Info(List<string> args)
     {
         if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
@@ -544,14 +541,12 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">controller id, kingdom id</param>
     /// <returns>result message</returns>
-
     public static string ForcePlayerJoinKingdom(List<string> args)
     {
         if (!ModInformation.IsServer)
         {
             return "This command can only be run on the server.";
         }
-
 
         if (TryGetPlayerManager(out var playerManager) == false)
         {
@@ -624,7 +619,6 @@ public class KingdomDebugCommand
             return "This command can only be run on the server.";
         }
 
-
         if (!TryGetPlayerManager(out var playerManager))
         {
             return "Unable to resolve PlayerManager";
@@ -662,7 +656,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the usages</returns>
-
     public static string AddDecisionUsage(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -689,7 +682,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of usage.</returns>
-
     public static string RemoveDecisionUsage(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -705,10 +697,8 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the decisions of a specific kingdom</returns>
-
     public static string ListKingdomDecisions(List<string> args)
     {
-
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
@@ -738,10 +728,8 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId</param>
     /// <returns>strings of all active kingdom decisions with client votes</returns>
-
     public static string ListKingdomDecisionVotes(List<string> args)
     {
-
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
@@ -812,7 +800,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : 1-based decision index</param>
     /// <returns>strings of all outcomes of a decision</returns>
-
     public static string ListKingdomDecisionOutcomes(List<string> args)
     {
         if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int _, out string message))
@@ -844,14 +831,12 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index, 1-based outcome index or abstain, support weight</param>
     /// <returns>result message</returns>
-
     public static string VoteKingdomDecision(List<string> args)
     {
         if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int decisionIndex, out string message))
         {
             return message;
         }
-
 
         bool isAbstain = args[2].Equals("abstain", StringComparison.OrdinalIgnoreCase);
         int outcomeIndex = -1;
@@ -896,7 +881,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index</param>
     /// <returns>result message</returns>
-
     public static string ResolveKingdomDecision(List<string> args)
     {
         if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
@@ -921,10 +905,8 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId</param>
     /// <returns>strings of all the active policies of a specific kingdom</returns>
-
     public static string ListKingdomPolicies(List<string> args)
     {
-
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
@@ -959,10 +941,8 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name and kingdom id</param>
     /// <returns>IDs currently present in the selected collection</returns>
-
     public static string ListKingdomCollection(List<string> args)
     {
-
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
@@ -998,7 +978,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name, kingdom id, and value id</param>
     /// <returns>Result of the collection add</returns>
-
     public static string AddKingdomCollectionItem(List<string> args)
     {
         return ChangeKingdomCollection(args, CollectionOperation.Add);
@@ -1010,7 +989,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name, kingdom id, and value id</param>
     /// <returns>Result of the collection remove</returns>
-
     public static string RemoveKingdomCollectionItem(List<string> args)
     {
         return ChangeKingdomCollection(args, CollectionOperation.Remove);
@@ -1023,10 +1001,8 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
     /// <returns>result message</returns>
-
     public static string DeclareWar(List<string> args)
     {
-
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
@@ -1052,10 +1028,8 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
     /// <returns>result message</returns>
-
     public static string MakePeace(List<string> args)
     {
-
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
@@ -1583,7 +1557,6 @@ public class KingdomDebugCommand
         decision = null;
         zeroBasedIndex = -1;
 
-
         if (TryGetObjectManager(out var objectManager) == false)
         {
             message = "Unable to resolve ObjectManager";
@@ -1629,10 +1602,8 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : decision to add</param>
     /// <returns></returns>
-
     public static string AddDecision(List<string> args)
     {
-
         string kingdomId = args[0];
         string clanId = args[1];
         string ignoreInfluence = args[2];
@@ -1677,10 +1648,8 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : index of decision to remove</param>
     /// <returns></returns>
-
     public static string RemoveDecision(List<string> args)
     {
-
         string kingdomId = args[0];
         string index = args[1];
 

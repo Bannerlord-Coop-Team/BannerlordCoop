@@ -296,7 +296,8 @@ public class MissionPeerCredentialMappingTests
         fixture.MissionContext.Verify(context => context.RemovePeer(oldPeer), Times.Once);
         fixture.ConnectFromRemote(
             new ConnectionToken("direct-host", InstanceId, remoteCredential),
-            expectConnected: true);
+            expectConnected: true,
+            expectedMapInvocations: 2);
         fixture.MissionContext.Verify(
             context => context.MapPeer("direct-host", It.IsAny<NetPeer>()),
             Times.Exactly(2));
