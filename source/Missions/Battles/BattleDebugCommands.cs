@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using GameInterface;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
@@ -125,21 +126,21 @@ internal static class BattleDebugCommands
         public Agent[] Agents { get; set; }
     }
 
-    public static string ReplicationFixture(List<string> args)
+    public static CoopCommandResult ReplicationFixture(List<string> args)
     {
         if (args.Count < 1 || args.Count > 2)
         {
-            return "Usage: coop.debug.battle.replication_fixture <catchup <connectedControllerId>|initial>";
+            return Failed("Usage: coop.debug.battle.replication_fixture <catchup <connectedControllerId>|initial>");
         }
 
         Mission mission = Mission.Current;
         CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
         if (mission == null || controller == null)
-            return "BATTLE_REPLICATION_FIXTURE no active coop battle";
+            return Failed("BATTLE_REPLICATION_FIXTURE no active coop battle");
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive)
-            return "BATTLE_REPLICATION_FIXTURE coop spawn capture is not active";
+            return Failed("BATTLE_REPLICATION_FIXTURE coop spawn capture is not active");
         if (!controller.Deployment.IsActivated || !controller.Deployment.IsCommitted)
-            return "BATTLE_REPLICATION_FIXTURE finish local deployment first";
+            return Failed("BATTLE_REPLICATION_FIXTURE finish local deployment first");
 
         ResetReplicationFixtureForMission(mission);
         switch (args[0].ToLowerInvariant())
@@ -149,38 +150,38 @@ internal static class BattleDebugCommands
             case "initial":
                 return TriggerInitialReplicationFixture(controller, mission, args);
             default:
-                return "Usage: coop.debug.battle.replication_fixture <catchup <connectedControllerId>|initial>";
+                return Failed("Usage: coop.debug.battle.replication_fixture <catchup <connectedControllerId>|initial>");
         }
     }
 
-    private static string TriggerCatchUpReplicationFixture(
+    private static CoopCommandResult TriggerCatchUpReplicationFixture(
         CoopBattleController controller,
         List<string> args)
     {
         if (args.Count != 2)
-            return "Usage: coop.debug.battle.replication_fixture catchup <connectedControllerId>";
+            return Failed("Usage: coop.debug.battle.replication_fixture catchup <connectedControllerId>");
 
         string target = args[1];
         if (replicationFixtureCatchUpTargets.Contains(target))
-            return $"BATTLE_REPLICATION_FIXTURE_CATCHUP already queued peer={target}";
+            return Failed($"BATTLE_REPLICATION_FIXTURE_CATCHUP already queued peer={target}");
         if (!controller.TryDebugReplayOwnedAgentsToConnectedPeer(target, out string error))
-            return $"BATTLE_REPLICATION_FIXTURE_CATCHUP blocked reason={error}";
+            return Failed($"BATTLE_REPLICATION_FIXTURE_CATCHUP blocked reason={error}");
 
         replicationFixtureCatchUpTargets.Add(target);
-        return $"BATTLE_REPLICATION_FIXTURE_CATCHUP queued peer={target}";
+        return Succeeded($"BATTLE_REPLICATION_FIXTURE_CATCHUP queued peer={target}");
     }
 
-    private static string TriggerInitialReplicationFixture(
+    private static CoopCommandResult TriggerInitialReplicationFixture(
         CoopBattleController controller,
         Mission mission,
         List<string> args)
     {
         if (args.Count != 1)
-            return "Usage: coop.debug.battle.replication_fixture initial";
+            return Failed("Usage: coop.debug.battle.replication_fixture initial");
         if (replicationFixtureInitialAgentIndex >= 0)
-            return $"BATTLE_REPLICATION_FIXTURE_INITIAL already queued agentIndex={replicationFixtureInitialAgentIndex}";
+            return Failed($"BATTLE_REPLICATION_FIXTURE_INITIAL already queued agentIndex={replicationFixtureInitialAgentIndex}");
         if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
-            return "BATTLE_REPLICATION_FIXTURE_INITIAL network agent registry is unavailable";
+            return Failed("BATTLE_REPLICATION_FIXTURE_INITIAL network agent registry is unavailable");
 
         var ownedAgents = registry.GetAgents(controller.Session.OwnControllerId).ToArray();
         Agent source = ownedAgents
@@ -197,7 +198,7 @@ internal static class BattleDebugCommands
                 origin.Party != null &&
                 !string.IsNullOrEmpty(origin.MapEventPartyId));
         if (source == null)
-            return "BATTLE_REPLICATION_FIXTURE_INITIAL no active locally owned troop is available";
+            return Failed("BATTLE_REPLICATION_FIXTURE_INITIAL no active locally owned troop is available");
 
         var sourceOrigin = (CoopAgentOrigin)source.Origin;
         var character = (CharacterObject)source.Character;
@@ -209,7 +210,7 @@ internal static class BattleDebugCommands
         while (fixtureSeeds.Contains(fixtureSeed))
         {
             if (fixtureSeed == int.MinValue)
-                return "BATTLE_REPLICATION_FIXTURE_INITIAL no unused fixture seed is available";
+                return Failed("BATTLE_REPLICATION_FIXTURE_INITIAL no unused fixture seed is available");
             fixtureSeed--;
         }
 
@@ -221,7 +222,7 @@ internal static class BattleDebugCommands
             sourceOrigin.Banner,
             new UniqueTroopDescriptor(fixtureSeed));
         if (mission.PlayerTeam == null)
-            return "BATTLE_REPLICATION_FIXTURE_INITIAL the player team is unavailable";
+            return Failed("BATTLE_REPLICATION_FIXTURE_INITIAL the player team is unavailable");
 
         bool isPlayerSide = source.Team == mission.PlayerTeam;
         Agent fixtureAgent;
@@ -242,11 +243,11 @@ internal static class BattleDebugCommands
                 formationIndex: source.Formation.FormationIndex);
         }
         if (fixtureAgent == null)
-            return "BATTLE_REPLICATION_FIXTURE_INITIAL native spawn returned no agent";
+            return Failed("BATTLE_REPLICATION_FIXTURE_INITIAL native spawn returned no agent");
 
         replicationFixtureInitialAgentIndex = fixtureAgent.Index;
-        return "BATTLE_REPLICATION_FIXTURE_INITIAL spawned through Mission.SpawnTroop; " +
-               $"agentIndex={fixtureAgent.Index} the normal capture and next controller tick will emit Initial";
+        return Succeeded("BATTLE_REPLICATION_FIXTURE_INITIAL spawned through Mission.SpawnTroop; " +
+                         $"agentIndex={fixtureAgent.Index} the normal capture and next controller tick will emit Initial");
     }
 
     private static void ResetReplicationFixtureForMission(Mission mission)
@@ -258,10 +259,10 @@ internal static class BattleDebugCommands
         replicationFixtureInitialAgentIndex = -1;
     }
 
-    public static string ColumnReinforcementFixture(List<string> args)
+    public static CoopCommandResult ColumnReinforcementFixture(List<string> args)
     {
         if (args.Count != 1)
-            return "Usage: coop.debug.battle.column_reinforcement_fixture <start|state|restore>";
+            return Failed("Usage: coop.debug.battle.column_reinforcement_fixture <start|state|restore>");
 
         switch (args[0].ToLowerInvariant())
         {
@@ -272,11 +273,11 @@ internal static class BattleDebugCommands
             case "restore":
                 return RestoreColumnReinforcementFixture();
             default:
-                return "Usage: coop.debug.battle.column_reinforcement_fixture <start|state|restore>";
+                return Failed("Usage: coop.debug.battle.column_reinforcement_fixture <start|state|restore>");
         }
     }
 
-    private static string StartColumnReinforcementFixture()
+    private static CoopCommandResult StartColumnReinforcementFixture()
     {
         if (columnReinforcementFixtureMission != null &&
             Mission.Current != columnReinforcementFixtureMission)
@@ -284,18 +285,18 @@ internal static class BattleDebugCommands
             ClearColumnReinforcementFixture();
         }
         if (columnReinforcementFixtureMission != null)
-            return "COLUMN_REINFORCEMENT_FIXTURE already active";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE already active");
 
         Mission mission = Mission.Current;
         CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
         DefaultBattleMissionAgentSpawnLogic spawnLogic =
             mission?.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();
         if (mission == null || controller == null || spawnLogic == null)
-            return "COLUMN_REINFORCEMENT_FIXTURE no active coop battle";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE no active coop battle");
         if (!controller.Deployment.IsActivated)
-            return "COLUMN_REINFORCEMENT_FIXTURE finish deployment first";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE finish deployment first");
         if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
-            return "COLUMN_REINFORCEMENT_FIXTURE network agent registry is unavailable";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE network agent registry is unavailable");
 
         ColumnReinforcementCandidate candidate = null;
         foreach (BattleSideEnum side in new[] { BattleSideEnum.Defender, BattleSideEnum.Attacker })
@@ -343,7 +344,7 @@ internal static class BattleDebugCommands
 
         if (candidate == null)
         {
-            return "COLUMN_REINFORCEMENT_FIXTURE no reserve is assigned to an eligible locally controlled formation";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE no reserve is assigned to an eligible locally controlled formation");
         }
 
         columnReinforcementFixtureMission = mission;
@@ -358,10 +359,10 @@ internal static class BattleDebugCommands
         foreach (Agent agent in candidate.Agents)
             BattleTeamKillCommands.Kill(agent);
 
-        return "COLUMN_REINFORCEMENT_FIXTURE_STARTED " +
-               $"side={candidate.Side} formation={candidate.FormationIndex} " +
-               $"killed={candidate.Agents.Length} active=0 " +
-               $"reserved={candidate.SpawnContext.ReservedTroopsCount} arrangement=Column";
+        return Succeeded("COLUMN_REINFORCEMENT_FIXTURE_STARTED " +
+                         $"side={candidate.Side} formation={candidate.FormationIndex} " +
+                         $"killed={candidate.Agents.Length} active=0 " +
+                         $"reserved={candidate.SpawnContext.ReservedTroopsCount} arrangement=Column");
     }
 
     private static ColumnReinforcementCandidate FindColumnReinforcementCandidate(
@@ -403,18 +404,18 @@ internal static class BattleDebugCommands
         return null;
     }
 
-    private static string GetColumnReinforcementFixtureState()
+    private static CoopCommandResult GetColumnReinforcementFixtureState()
     {
         if (columnReinforcementFixtureMission == null)
-            return "COLUMN_REINFORCEMENT_FIXTURE inactive";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE inactive");
         if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
-            return "COLUMN_REINFORCEMENT_FIXTURE network agent registry is unavailable";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE network agent registry is unavailable");
         if (Mission.Current != columnReinforcementFixtureMission ||
             columnReinforcementFixtureFormation == null ||
             columnReinforcementFixtureSpawnContext == null)
         {
             ClearColumnReinforcementFixture();
-            return "COLUMN_REINFORCEMENT_FIXTURE mission ended";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE mission ended");
         }
 
         int active = Mission.Current.Agents.Count(agent => agent != null
@@ -427,21 +428,21 @@ internal static class BattleDebugCommands
             ? column.GetUnitPositionsOnVanguardFileIndex().Count
             : -1;
 
-        return "COLUMN_REINFORCEMENT_FIXTURE_STATE " +
-               $"side={columnReinforcementFixtureSide} " +
-               $"formation={columnReinforcementFixtureFormationIndex} " +
-               $"killed={columnReinforcementFixtureKilled} active={active} " +
-               $"replacementObserved={active > 0} " +
-               $"reserved={columnReinforcementFixtureSpawnContext.ReservedTroopsCount} " +
-               $"reinforcementActive={columnReinforcementFixtureSpawnContext.ReinforcementSpawnActive} " +
-               $"arrangement={columnReinforcementFixtureFormation.Arrangement.GetType().Name} " +
-               $"vanguardPositions={vanguardPositions}";
+        return Succeeded("COLUMN_REINFORCEMENT_FIXTURE_STATE " +
+                         $"side={columnReinforcementFixtureSide} " +
+                         $"formation={columnReinforcementFixtureFormationIndex} " +
+                         $"killed={columnReinforcementFixtureKilled} active={active} " +
+                         $"replacementObserved={active > 0} " +
+                         $"reserved={columnReinforcementFixtureSpawnContext.ReservedTroopsCount} " +
+                         $"reinforcementActive={columnReinforcementFixtureSpawnContext.ReinforcementSpawnActive} " +
+                         $"arrangement={columnReinforcementFixtureFormation.Arrangement.GetType().Name} " +
+                         $"vanguardPositions={vanguardPositions}");
     }
 
-    private static string RestoreColumnReinforcementFixture()
+    private static CoopCommandResult RestoreColumnReinforcementFixture()
     {
         if (columnReinforcementFixtureMission == null)
-            return "COLUMN_REINFORCEMENT_FIXTURE inactive";
+            return Failed("COLUMN_REINFORCEMENT_FIXTURE inactive");
 
         bool missionActive = Mission.Current == columnReinforcementFixtureMission;
         if (missionActive && columnReinforcementFixtureFormation != null)
@@ -449,8 +450,8 @@ internal static class BattleDebugCommands
 
         int killed = columnReinforcementFixtureKilled;
         ClearColumnReinforcementFixture();
-        return "COLUMN_REINFORCEMENT_FIXTURE_RESTORED " +
-               $"arrangementRestored={missionActive} casualtiesRemain={killed}";
+        return Succeeded("COLUMN_REINFORCEMENT_FIXTURE_RESTORED " +
+                         $"arrangementRestored={missionActive} casualtiesRemain={killed}");
     }
 
     private static void ClearColumnReinforcementFixture()
@@ -1547,11 +1548,11 @@ internal static class BattleDebugCommands
         return output.ToString();
     }
 
-    public static string FocusLadder(List<string> args)
+    public static CoopCommandResult FocusLadder(List<string> args)
     {
         if (args.Count != 1 || !int.TryParse(args[0], out int machineId))
         {
-            return "Usage: coop.debug.battle.focus_ladder <machineId>";
+            return Failed("Usage: coop.debug.battle.focus_ladder <machineId>");
         }
 
         var mission = Mission.Current;
@@ -1560,12 +1561,12 @@ internal static class BattleDebugCommands
             .FirstOrDefault(candidate => candidate.Id.Id == machineId);
         if (ladder == null)
         {
-            return $"Siege ladder {machineId} was not found";
+            return Failed($"Siege ladder {machineId} was not found");
         }
 
         if (!(ScreenManager.TopScreen is MissionScreen missionScreen) || missionScreen.CombatCamera == null)
         {
-            return "The mission screen is not active";
+            return Failed("The mission screen is not active");
         }
 
         ReleaseMountCamera();
@@ -1579,7 +1580,7 @@ internal static class BattleDebugCommands
         ladderCamera.LookAt(position, target, Vec3.Up);
         missionScreen.CustomCamera = ladderCamera;
 
-        return $"Focused the mission camera on siege ladder {machineId}";
+        return Succeeded($"Focused the mission camera on siege ladder {machineId}");
     }
 
     public static string ReleaseLadderCameraCommand(List<string> args)
@@ -1607,6 +1608,12 @@ internal static class BattleDebugCommands
         ladderCamera = null;
         return true;
     }
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
 }
 
 internal sealed class DebugReplicationFixtureAgentOrigin : CoopAgentOrigin

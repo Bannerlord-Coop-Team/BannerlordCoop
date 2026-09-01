@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using Common.Commands;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -3140,13 +3141,13 @@ public class MapEventDebugCommands
         return $"id={id} finalized={mapEvent.IsFinalized} state={mapEvent.BattleState} winner={mapEvent.WinningSide}";
     }
 
-    public static string GetEvents(List<string> args)
+    public static CoopCommandResult GetEvents(List<string> args)
     {
         var sb = new StringBuilder();
 
         if(!TryGetObjectManager(out var objectManager))
         {
-            return "Failed to get object manager";
+            return new CoopCommandResult(false, "Failed to get object manager", "command_failed");
         }
 
         foreach(var mapEvent in Campaign.Current.MapEventManager.MapEvents)
@@ -3163,7 +3164,7 @@ public class MapEventDebugCommands
             sb.AppendLine($"\tDefender: {string.Join(",", FormatSideNames(mapEvent.DefenderSide))}");
         }
 
-        return sb.ToString();
+        return new CoopCommandResult(true, sb.ToString());
     }
 
     private static string[] FormatSideNames(MapEventSide side)

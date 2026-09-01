@@ -76,6 +76,9 @@ public class MigratedAttributedCommandTests
     [Theory]
     [InlineData("Failed: no active mission.", false)]
     [InlineData("Run this command on the server.", false)]
+    [InlineData("Battle start coordinator is unavailable", false)]
+    [InlineData("Saved map event map_event_42 did not finalize cleanly.", false)]
+    [InlineData("Fixture already active for player-1.", false)]
     [InlineData("Killed 3 enemy agent(s).", true)]
     public void LegacyResult_MapsSuccessAndFailure(string output, bool succeeded)
     {
@@ -91,7 +94,58 @@ public class MigratedAttributedCommandTests
     {
         const string output = "Map event id: map_event_42\r\n\r\nSummary:";
 
-        CoopCommandResult result = new MapEventLegacyCommandResult().FromOutput(output, "Map event id:");
+        CoopCommandResult result = new MapEventLegacyCommandResult().FromOutput(output);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.ErrorCode);
+        Assert.Equal(output, result.Output);
+    }
+
+    [Theory]
+    [InlineData("CLAN_PARTY_TRANSFER_REJECTED")]
+    [InlineData("CLAN_PARTY_TRANSFER_NOT_COMMITTED")]
+    [InlineData("PARTY_SCREEN_UPGRADE_REJECTED character=aserai_recruit")]
+    [InlineData("Garrison party 'town_comp_ES1' was not found.")]
+    [InlineData("Danustica does not belong to the local player's clan.")]
+    public void ClanPartyTransferResult_Rejection_IsFailure(string output)
+    {
+        CoopCommandResult result = new PartyLegacyCommandResult().FromOutput(output);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("command_failed", result.ErrorCode);
+        Assert.Equal(output, result.Output);
+    }
+
+    [Theory]
+    [InlineData("CLAN_PARTY_TRANSFER_STAGED")]
+    [InlineData("CLAN_PARTY_TRANSFER_COMMITTED")]
+    public void ClanPartyTransferResult_Success_IsSuccessful(string output)
+    {
+        CoopCommandResult result = new PartyLegacyCommandResult().FromOutput(output);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.ErrorCode);
+        Assert.Equal(output, result.Output);
+    }
+
+    [Theory]
+    [InlineData("Mobile party visual manager is unavailable.")]
+    [InlineData("stage_over_limit_fixture must be run on the server.")]
+    public void PartyVisualResult_Rejection_IsFailure(string output)
+    {
+        CoopCommandResult result = new PartyVisualLegacyCommandResult().FromOutput(output);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("command_failed", result.ErrorCode);
+        Assert.Equal(output, result.Output);
+    }
+
+    [Fact]
+    public void PartyVisualResult_BufferState_IsSuccessful()
+    {
+        const string output = "visualCount=3 bufferCapacity=128 dirtyCount=1";
+
+        CoopCommandResult result = new PartyVisualLegacyCommandResult().FromOutput(output);
 
         Assert.True(result.Succeeded);
         Assert.Null(result.ErrorCode);

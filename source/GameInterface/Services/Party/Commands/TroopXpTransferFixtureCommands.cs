@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using Common.Commands;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -236,29 +237,30 @@ internal static class TroopXpTransferFixtureCommands
         return "CLAN_PARTY_TRANSFER_SCREEN_OPENED";
     }
 
-    public static string StageTransfer(List<string> args)
+    public static CoopCommandResult StageTransfer(List<string> args)
     {
         const string usage = "Usage: coop.debug.mobile_party.stage_clan_party_transfer <clanPartyId> <characterId>";
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 2) return usage;
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+        if (args.Count != 2) return Failed(usage);
+        if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
         if (!objectManager.TryGetObject(args[0], out MobileParty clanParty))
-            return $"Clan party '{args[0]}' was not found.";
+            return Failed($"Clan party '{args[0]}' was not found.");
         if (!objectManager.TryGetObject(args[1], out CharacterObject character))
-            return $"Character '{args[1]}' was not found.";
+            return Failed($"Character '{args[1]}' was not found.");
         if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
             partyState.PartyScreenLogic?.LeftOwnerParty?.MobileParty != clanParty)
-            return "The target clan-party transfer screen is not active.";
+            return Failed("The target clan-party transfer screen is not active.");
 
         var logic = partyState.PartyScreenLogic;
         var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
         var row = partyVm?.OtherPartyTroops.FirstOrDefault(vm => vm.Character == character);
-        if (row == null) return $"Character '{args[1]}' is not rendered in the clan party's member roster.";
+        if (row == null)
+            return Failed($"Character '{args[1]}' is not rendered in the clan party's member roster.");
 
         partyVm.OnTransferTroop(row, -1, FixtureTroopCount, row.Side);
         partyVm.ExecuteRemoveZeroCounts();
-        if (!logic.IsThereAnyChanges()) return "CLAN_PARTY_TRANSFER_REJECTED";
-        return "CLAN_PARTY_TRANSFER_STAGED";
+        if (!logic.IsThereAnyChanges()) return Failed("CLAN_PARTY_TRANSFER_REJECTED");
+        return Succeeded("CLAN_PARTY_TRANSFER_STAGED");
     }
 
     public static string TransferScreenState(List<string> args)
@@ -313,23 +315,23 @@ internal static class TroopXpTransferFixtureCommands
         });
     }
 
-    public static string CommitTransfer(List<string> args)
+    public static CoopCommandResult CommitTransfer(List<string> args)
     {
         const string usage = "Usage: coop.debug.mobile_party.commit_clan_party_transfer";
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return usage;
+        if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+        if (args.Count != 0) return Failed(usage);
         if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
             !partyState.PartyScreenLogic.IsThereAnyChanges())
-            return "No staged clan-party transfer is active.";
+            return Failed("No staged clan-party transfer is active.");
         if (!((ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource is { } partyVm))
-            return "No active Party screen view model.";
+            return Failed("No active Party screen view model.");
 
         // ExecuteDone opens a confirmation inquiry when the save's player party is over its limit.
         // CloseScreenInternal is the inquiry's affirmative action and always exercises DoneLogic.
         partyVm.CloseScreenInternal();
         return Game.Current.GameStateManager.ActiveState is PartyState
-            ? "CLAN_PARTY_TRANSFER_NOT_COMMITTED"
-            : "CLAN_PARTY_TRANSFER_COMMITTED";
+            ? Failed("CLAN_PARTY_TRANSFER_NOT_COMMITTED")
+            : Succeeded("CLAN_PARTY_TRANSFER_COMMITTED");
     }
 
     public static string Restore(List<string> args)
@@ -552,6 +554,12 @@ internal static class TroopXpTransferFixtureCommands
         objectManager = null;
         return ContainerProvider.TryResolve(out objectManager);
     }
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
 
     private static string JsonResult(object value) =>
         "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);

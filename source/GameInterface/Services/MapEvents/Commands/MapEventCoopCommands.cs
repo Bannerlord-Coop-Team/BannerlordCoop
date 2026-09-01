@@ -22,7 +22,8 @@ public sealed class MapEventLegacyCommandResult : IMapEventLegacyCommandResult
     {
         if (output == null) return new CoopCommandResult(false, "Command returned no output.", "command_failed");
 
-        bool isKnownSuccess = successfulPrefix != null && output.StartsWith(successfulPrefix, StringComparison.Ordinal);
+        bool isKnownSuccess = output.StartsWith("Map event id:", StringComparison.Ordinal) ||
+                              successfulPrefix != null && output.StartsWith(successfulPrefix, StringComparison.Ordinal);
         bool succeeded = isKnownSuccess || !LooksLikeFailure(output);
         return new CoopCommandResult(succeeded, output, succeeded ? null : "command_failed");
     }
@@ -70,7 +71,26 @@ public sealed class MapEventLegacyCommandResult : IMapEventLegacyCommandResult
             if (output.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
         }
 
-        return false;
+        return HasFailurePhrase(output);
+    }
+
+    private static bool HasFailurePhrase(string output)
+    {
+        return output.IndexOf(" not found", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" is not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" are not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" did not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" does not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" has no ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" has not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" is unavailable", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" is already ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" cannot ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" must ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" failed", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" already active", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.StartsWith("Add the ", StringComparison.OrdinalIgnoreCase) ||
+               output.StartsWith("Begin the ", StringComparison.OrdinalIgnoreCase);
     }
 }
 
@@ -2026,13 +2046,9 @@ public interface IGetEventsCommand : ICoopCommand
 
 public sealed class GetEventsCommand : IGetEventsCommand
 {
-    private readonly IMapEventLegacyCommandResult resultFactory;
-
     public GetEventsCommand(IMapEventLegacyCommandResult resultFactory)
     {
         if (resultFactory == null) throw new ArgumentNullException(nameof(resultFactory));
-
-        this.resultFactory = resultFactory;
     }
     public string Prefix => "coop.debug.map_event";
 
@@ -2044,8 +2060,7 @@ public sealed class GetEventsCommand : IGetEventsCommand
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        string output = global::GameInterface.Services.Villages.Commands.MapEventDebugCommands.GetEvents(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return global::GameInterface.Services.Villages.Commands.MapEventDebugCommands.GetEvents(new List<string>(args));
     }
 }
 

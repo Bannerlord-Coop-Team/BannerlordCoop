@@ -70,7 +70,15 @@ public sealed class PartyLegacyCommandResult : IPartyLegacyCommandResult
             if (output.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
         }
 
-        return false;
+        return output.IndexOf("_REJECTED", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf("_NOT_COMMITTED", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" not found", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" is not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" does not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" did not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" required", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" must ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" is already ", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
 
@@ -1416,13 +1424,9 @@ public interface IStageClanPartyTransferCommand : ICoopCommand
 
 public sealed class StageClanPartyTransferCommand : IStageClanPartyTransferCommand
 {
-    private readonly IPartyLegacyCommandResult resultFactory;
-
     public StageClanPartyTransferCommand(IPartyLegacyCommandResult resultFactory)
     {
         if (resultFactory == null) throw new ArgumentNullException(nameof(resultFactory));
-
-        this.resultFactory = resultFactory;
     }
     public string Prefix => "coop.debug.mobile_party";
 
@@ -1438,8 +1442,7 @@ public sealed class StageClanPartyTransferCommand : IStageClanPartyTransferComma
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        string output = global::GameInterface.Services.Party.Commands.TroopXpTransferFixtureCommands.StageTransfer(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return global::GameInterface.Services.Party.Commands.TroopXpTransferFixtureCommands.StageTransfer(new List<string>(args));
     }
 }
 
@@ -1483,13 +1486,9 @@ public interface ICommitClanPartyTransferCommand : ICoopCommand
 
 public sealed class CommitClanPartyTransferCommand : ICommitClanPartyTransferCommand
 {
-    private readonly IPartyLegacyCommandResult resultFactory;
-
     public CommitClanPartyTransferCommand(IPartyLegacyCommandResult resultFactory)
     {
         if (resultFactory == null) throw new ArgumentNullException(nameof(resultFactory));
-
-        this.resultFactory = resultFactory;
     }
     public string Prefix => "coop.debug.mobile_party";
 
@@ -1501,8 +1500,7 @@ public sealed class CommitClanPartyTransferCommand : ICommitClanPartyTransferCom
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        string output = global::GameInterface.Services.Party.Commands.TroopXpTransferFixtureCommands.CommitTransfer(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return global::GameInterface.Services.Party.Commands.TroopXpTransferFixtureCommands.CommitTransfer(new List<string>(args));
     }
 }
 

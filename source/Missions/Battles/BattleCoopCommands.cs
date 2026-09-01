@@ -62,7 +62,19 @@ public sealed class BattleLegacyCommandResult : IBattleLegacyCommandResult
             if (output.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
         }
 
-        return false;
+        return output.IndexOf(" is not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" was not found", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" has no ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" unavailable", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" already ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" inactive", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" no active ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" no reserve ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" no unused ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" blocked ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" finish ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" returned no ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" mission ended", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
 
@@ -73,13 +85,9 @@ public interface IReplicationFixtureCommand : ICoopCommand
 
 public sealed class ReplicationFixtureCommand : IReplicationFixtureCommand
 {
-    private readonly IBattleLegacyCommandResult resultFactory;
-
     public ReplicationFixtureCommand(IBattleLegacyCommandResult resultFactory)
     {
         if (resultFactory == null) throw new ArgumentNullException(nameof(resultFactory));
-
-        this.resultFactory = resultFactory;
     }
     public string Prefix => "coop.debug.battle";
 
@@ -95,8 +103,7 @@ public sealed class ReplicationFixtureCommand : IReplicationFixtureCommand
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        string output = Missions.Battles.BattleDebugCommands.ReplicationFixture(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return Missions.Battles.BattleDebugCommands.ReplicationFixture(new List<string>(args));
     }
 }
 #endif
@@ -108,13 +115,9 @@ public interface IColumnReinforcementFixtureCommand : ICoopCommand
 
 public sealed class ColumnReinforcementFixtureCommand : IColumnReinforcementFixtureCommand
 {
-    private readonly IBattleLegacyCommandResult resultFactory;
-
     public ColumnReinforcementFixtureCommand(IBattleLegacyCommandResult resultFactory)
     {
         if (resultFactory == null) throw new ArgumentNullException(nameof(resultFactory));
-
-        this.resultFactory = resultFactory;
     }
     public string Prefix => "coop.debug.battle";
 
@@ -129,8 +132,7 @@ public sealed class ColumnReinforcementFixtureCommand : IColumnReinforcementFixt
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        string output = Missions.Battles.BattleDebugCommands.ColumnReinforcementFixture(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return Missions.Battles.BattleDebugCommands.ColumnReinforcementFixture(new List<string>(args));
     }
 }
 #endif
@@ -672,13 +674,9 @@ public interface IFocusLadderCommand : ICoopCommand
 
 public sealed class FocusLadderCommand : IFocusLadderCommand
 {
-    private readonly IBattleLegacyCommandResult resultFactory;
-
     public FocusLadderCommand(IBattleLegacyCommandResult resultFactory)
     {
         if (resultFactory == null) throw new ArgumentNullException(nameof(resultFactory));
-
-        this.resultFactory = resultFactory;
     }
     public string Prefix => "coop.debug.battle";
 
@@ -693,8 +691,7 @@ public sealed class FocusLadderCommand : IFocusLadderCommand
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        string output = Missions.Battles.BattleDebugCommands.FocusLadder(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return Missions.Battles.BattleDebugCommands.FocusLadder(new List<string>(args));
     }
 }
 

@@ -62,7 +62,9 @@ public sealed class PartyVisualLegacyCommandResult : IPartyVisualLegacyCommandRe
             if (output.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
         }
 
-        return false;
+        return output.IndexOf(" is unavailable", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" must be run ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" was not found", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
 
@@ -72,13 +74,9 @@ public interface IBufferStateCommand : ICoopCommand
 
 public sealed class BufferStateCommand : IBufferStateCommand
 {
-    private readonly IPartyVisualLegacyCommandResult resultFactory;
-
     public BufferStateCommand(IPartyVisualLegacyCommandResult resultFactory)
     {
         if (resultFactory == null) throw new ArgumentNullException(nameof(resultFactory));
-
-        this.resultFactory = resultFactory;
     }
     public string Prefix => "coop.debug.party_visuals";
 
@@ -90,8 +88,7 @@ public sealed class BufferStateCommand : IBufferStateCommand
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        string output = global::GameInterface.Services.PartyVisuals.Commands.PartyVisualDebugCommands.BufferState(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return global::GameInterface.Services.PartyVisuals.Commands.PartyVisualDebugCommands.BufferState(new List<string>(args));
     }
 }
 

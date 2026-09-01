@@ -88,6 +88,38 @@ public class MigratedMissionCommandTests
         Assert.Equal(output, result.Output);
     }
 
+    [Theory]
+    [InlineData("BATTLE_REPLICATION_FIXTURE coop spawn capture is not active")]
+    [InlineData("BATTLE_REPLICATION_FIXTURE finish local deployment first")]
+    [InlineData("BATTLE_REPLICATION_FIXTURE_INITIAL network agent registry is unavailable")]
+    [InlineData("BATTLE_REPLICATION_FIXTURE_INITIAL native spawn returned no agent")]
+    [InlineData("COLUMN_REINFORCEMENT_FIXTURE already active")]
+    [InlineData("COLUMN_REINFORCEMENT_FIXTURE no reserve is assigned to an eligible locally controlled formation")]
+    [InlineData("COLUMN_REINFORCEMENT_FIXTURE mission ended")]
+    [InlineData("WIELD_TEST main agent has no weapon")]
+    [InlineData("Siege ladder 42 was not found")]
+    public void BattleResult_Rejection_IsFailure(string output)
+    {
+        CoopCommandResult result = new BattleLegacyCommandResult().FromOutput(output);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("command_failed", result.ErrorCode);
+        Assert.Equal(output, result.Output);
+    }
+
+    [Theory]
+    [InlineData("BATTLE_REPLICATION_FIXTURE_CATCHUP queued peer=player-1")]
+    [InlineData("COLUMN_REINFORCEMENT_FIXTURE_STARTED side=Defender formation=0")]
+    [InlineData("Focused the mission camera on siege ladder 42")]
+    public void BattleResult_Success_IsSuccessful(string output)
+    {
+        CoopCommandResult result = new BattleLegacyCommandResult().FromOutput(output);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.ErrorCode);
+        Assert.Equal(output, result.Output);
+    }
+
     private static ICoopCommand[] CreateCommands()
     {
         return typeof(MissionModule).Assembly.GetTypes()

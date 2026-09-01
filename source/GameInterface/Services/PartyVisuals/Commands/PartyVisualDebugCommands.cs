@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using GameInterface.Services.PartyVisuals.Patches;
 using SandBox.View.Map.Managers;
 using System;
@@ -21,17 +22,17 @@ internal class PartyVisualDebugCommands
     private static int fixtureBaselineEligiblePartyCount = -1;
 #endif
 
-    public static string BufferState(List<string> args)
+    public static CoopCommandResult BufferState(List<string> args)
     {
         if (ModInformation.IsServer)
-            return "Run this command on a client.";
+            return Failed("Run this command on a client.");
 
         if (args.Count != 0)
-            return "Usage: coop.debug.party_visuals.buffer_state";
+            return Failed("Usage: coop.debug.party_visuals.buffer_state");
 
         var manager = MobilePartyVisualManager.Current;
         if (manager == null)
-            return "Mobile party visual manager is unavailable.";
+            return Failed("Mobile party visual manager is unavailable.");
 
         int visualCount = manager._visualsFlattened.Count;
         int bufferCapacity = manager._dirtyPartiesList.Length;
@@ -53,12 +54,16 @@ internal class PartyVisualDebugCommands
             campaignPartyCount,
         });
 
-        return $"visualCount={visualCount} bufferCapacity={bufferCapacity} dirtyCount={dirtyCount} " +
-               $"navalManagerActive={navalManagerActive} navalVisualCount={navalVisualCount} " +
-               $"navalBufferCapacity={navalBufferCapacity} navalDirtyCount={navalDirtyCount} " +
-               $"campaignPartyCount={campaignPartyCount}" + Environment.NewLine +
-               $"LIVE_TEST_JSON={structuredState}";
+        string output = $"visualCount={visualCount} bufferCapacity={bufferCapacity} dirtyCount={dirtyCount} " +
+                        $"navalManagerActive={navalManagerActive} navalVisualCount={navalVisualCount} " +
+                        $"navalBufferCapacity={navalBufferCapacity} navalDirtyCount={navalDirtyCount} " +
+                        $"campaignPartyCount={campaignPartyCount}" + Environment.NewLine +
+                        $"LIVE_TEST_JSON={structuredState}";
+        return new CoopCommandResult(true, output);
     }
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
 
 #if DEBUG
     public static string FixtureState(List<string> args)
