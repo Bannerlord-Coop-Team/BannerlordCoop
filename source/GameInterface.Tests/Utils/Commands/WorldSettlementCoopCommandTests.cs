@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace GameInterface.Tests.Utils.Commands;
@@ -23,6 +24,26 @@ public class WorldSettlementCoopCommandTests
         "GameInterface.Services.Towns.Commands",
         "GameInterface.Services.Villages.Commands",
         "GameInterface.Services.Workshops.Commands",
+    };
+
+    private static readonly Type[] MigratedLegacyCommandTypes =
+    {
+        typeof(global::GameInterface.Services.Arenas.Commands.ArenaMasterCommands),
+        typeof(global::GameInterface.Services.BesiegerCamps.Commands.BesiegerCampDebugCommand),
+        typeof(global::GameInterface.Services.Locations.Commands.LocationDebugCommand),
+        typeof(global::GameInterface.Services.MobileParties.Commands.FollowPartyFixtureCommands),
+        typeof(global::GameInterface.Services.MobileParties.Commands.MercenaryStockDebugCommand),
+        typeof(global::GameInterface.Services.MobileParties.Commands.MobilePartyDebugCommand),
+        typeof(global::GameInterface.Services.Settlements.Commands.SettlementAuditorCommand),
+        typeof(global::GameInterface.Services.Settlements.Commands.SettlementCommands),
+        typeof(global::GameInterface.Services.SiegeEvents.Commands.SiegeDebugCommand),
+        typeof(global::GameInterface.Services.Tournaments.Commands.TournamentDebugCommand),
+        typeof(global::GameInterface.Services.Towns.Commands.TownAuditorDebugCommand),
+        typeof(global::GameInterface.Services.Towns.Commands.TownDebugCommand),
+        typeof(global::GameInterface.Services.Villages.Commands.RaidDebugCommands),
+        typeof(global::GameInterface.Services.Villages.Commands.VillageDebugCommand),
+        typeof(global::GameInterface.Services.Villages.Commands.VillagerPartiesCommands),
+        typeof(global::GameInterface.Services.Workshops.Commands.WorkshopDebugCommand),
     };
 
     [Fact]
@@ -73,17 +94,29 @@ public class WorldSettlementCoopCommandTests
     }
 
     [Fact]
-    public void ScopedLegacyMethods_HaveNoConsoleCommandAttributes()
+    public void MigratedLegacyCommandTypes_HaveNoConsoleCommandAttributes()
     {
-        var attributedMethods = typeof(GameInterfaceModule).Assembly
-            .GetTypes()
-            .Where(type => ScopedNamespaces.Contains(type.Namespace))
-            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
-            .Where(method => method.CustomAttributes.Any(attribute =>
-                attribute.AttributeType.Name == "CommandLineArgumentFunctionAttribute"))
+        var attributedMethods = MigratedLegacyCommandTypes
+            .SelectMany(type => type.GetMethods(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(method => method.IsDefined(
+                typeof(CommandLineFunctionality.CommandLineArgumentFunction), inherit: false))
             .ToList();
 
         Assert.Empty(attributedMethods);
+    }
+
+    [Theory]
+    [InlineData("coop.debug.workshop.set_workshop_custom_name")]
+    [InlineData("coop.debug.workshop.set_workshop_owner")]
+    public void WorkshopCommands_RequireSettlementId(string fullName)
+    {
+        ICoopCommand command = Assert.Single(GetScopedCommands(), candidate =>
+            $"{candidate.Prefix}.{candidate.Name}" == fullName);
+        IExpectedArgs settlementArg = command.ExpectedArgs[0];
+
+        Assert.Equal("settlementId", settlementArg.Name);
+        Assert.Equal("The settlement id.", settlementArg.Description);
     }
 
     [Theory]

@@ -16,7 +16,7 @@ public sealed class SetWorkshopCustomNameCoopCommand : LegacyCoopCommand, ISetWo
             "Sets workshop custom name for co-op debugging.",
             new IExpectedArgs[]
             {
-                new ExpectedArgs("settlementName", "The exact settlement name; quote values containing spaces."),
+                new ExpectedArgs("settlementId", "The settlement id."),
                 new ExpectedArgs("workshopType", "The workshop type."),
                 new ExpectedArgs("newCustomName", "The exact new custom name; quote values containing spaces."),
             },
@@ -38,7 +38,7 @@ public sealed class SetWorkshopOwnerCoopCommand : LegacyCoopCommand, ISetWorksho
             "Sets workshop owner for co-op debugging.",
             new IExpectedArgs[]
             {
-                new ExpectedArgs("settlementName", "The exact settlement name; quote values containing spaces."),
+                new ExpectedArgs("settlementId", "The settlement id."),
                 new ExpectedArgs("workshopType", "The workshop type."),
                 new ExpectedArgs("newOwnerId", "The new owner id."),
             },
