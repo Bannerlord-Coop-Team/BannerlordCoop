@@ -1,4 +1,4 @@
-using GameInterface.Services.Issues.Generic;
+﻿using GameInterface.Services.Issues.Generic;
 using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
@@ -6,13 +6,11 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Issues.Commands;
 
 public static class IssuesDebugCommand
 {
-    [CommandLineArgumentFunction("give", "coop.debug.issues")]
     public static string Give(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.issues.give")) return error;
@@ -103,7 +101,6 @@ public static class IssuesDebugCommand
             $"Issue StringId: '{hero.Issue?.StringId}'. Quest StringId: '{hero.Issue?.IssueQuest?.StringId ?? "none"}'.";
     }
 
-    [CommandLineArgumentFunction("complete", "coop.debug.issues")]
     public static string Complete(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.issues.complete")) return error;
@@ -166,7 +163,6 @@ public static class IssuesDebugCommand
         return $"Completed quest for hero '{hero.Name}' (StringId '{hero.StringId}') with outcome '{outcome}'.";
     }
 
-    [CommandLineArgumentFunction("list_types", "coop.debug.issues")]
     public static string ListTypes(List<string> args)
     {
         var sb = new StringBuilder();

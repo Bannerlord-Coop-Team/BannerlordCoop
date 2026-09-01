@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -8,6 +9,7 @@ using Common.PacketHandlers;
 using Coop.Core.Client.Services.Kingdoms;
 using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Common;
+using Coop.Core.Common.Commands;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
@@ -39,6 +41,21 @@ public class ServerModule : CommonModule
         base.Load(builder);
 
         builder.RegisterModule<ConnectionModule>();
+
+#if DEBUG
+        builder.RegisterType<JoinStateCommand>()
+            .As<IJoinStateCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<StageInactivePartyCommand>()
+            .As<IStageInactivePartyCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<RestoreInactivePartyCommand>()
+            .As<IRestoreInactivePartyCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
 
         // The mission/P2P stack is composed into the server container too (it is also in ClientModule) so the
         // server-authoritative battle classes — notably BattleHostHandler, which elects the battle host — run

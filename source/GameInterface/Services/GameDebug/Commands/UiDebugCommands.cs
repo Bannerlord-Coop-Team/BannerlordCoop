@@ -17,7 +17,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
 
@@ -35,7 +34,6 @@ internal class UiDebugCommands
 
 Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle encounter screen left open.";
 
-    [CommandLineArgumentFunction("close_screen", "coop.debug.ui")]
     public static string CloseScreen(List<string> args)
     {
         var ctx = new CommandContext("close_screen", CloseScreenUsage, args);
@@ -57,7 +55,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         return "Called GameMenu.ExitToLast().";
     }
 
-    [CommandLineArgumentFunction("prepare_evidence_map", "coop.debug.ui")]
     public static string PrepareEvidenceMap(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -88,7 +85,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         return GetEvidenceMapState(mapScreen);
     }
 
-    [CommandLineArgumentFunction("evidence_map_state", "coop.debug.ui")]
     public static string EvidenceMapState(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -128,7 +124,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
                $"loading={LoadingWindow.IsLoadingWindowActive}";
     }
 
-    [CommandLineArgumentFunction("leave_settlement_encounter", "coop.debug.ui")]
     public static string LeaveSettlementEncounter(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -167,7 +162,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("map_click_offset", "coop.debug.ui")]
     public static string MapClickOffset(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -223,7 +217,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
             $"behavior={mainParty.DefaultBehavior}; target={mainParty.TargetPosition.X:R},{mainParty.TargetPosition.Y:R}.";
     }
 
-    [CommandLineArgumentFunction("map_movement_state", "coop.debug.ui")]
     public static string MapMovementState(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -245,7 +238,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
     }
 #endif
 
-    [CommandLineArgumentFunction("switch_menu", "coop.debug.ui")]
     public static string SwitchMenu(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -269,7 +261,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         return $"Switched to game menu {args[0]}.";
     }
 
-    [CommandLineArgumentFunction("pop_state", "coop.debug.ui")]
     public static string PopState(List<string> args)
     {
         if (args.Count != 0)
@@ -286,7 +277,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         return $"Queued pop for {activeState.GetType().Name}.";
     }
 
-    [CommandLineArgumentFunction("active_state", "coop.debug.ui")]
     public static string ActiveState(List<string> args)
     {
         if (args.Count != 0)
@@ -295,7 +285,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         return Game.Current?.GameStateManager?.ActiveState?.GetType().Name ?? "none";
     }
 
-    [CommandLineArgumentFunction("loading_window_state", "coop.debug.ui")]
     public static string LoadingWindowState(List<string> args)
     {
         if (args.Count != 0)
@@ -304,7 +293,6 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         return $"Loading window: {(LoadingWindow.IsLoadingWindowActive ? "ACTIVE" : "INACTIVE")}.";
     }
 
-    [CommandLineArgumentFunction("saving_overlay_state", "coop.debug.ui")]
     public static string SavingOverlayState(List<string> args)
     {
         if (args.Count != 0)

@@ -1,8 +1,7 @@
-using Autofac;
+﻿using Autofac;
 using GameInterface.Services.UI.Handlers;
 using GameInterface.Utils.Commands;
 using System.Collections.Generic;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.UI.Commands;
 
@@ -11,7 +10,6 @@ public class TacticalUnitSymbolsDebugCommand
     private const string CommandName = "coop.debug.ui.tactical_symbols";
     private const string Usage = "Usage: coop.debug.ui.tactical_symbols <on|off|toggle|status>";
 
-    [CommandLineArgumentFunction("tactical_symbols", "coop.debug.ui")]
     public static string TacticalSymbols(List<string> args)
     {
         if (!CommandHelpers.IsServerOnlyCommand(out var error, CommandName)) return error;

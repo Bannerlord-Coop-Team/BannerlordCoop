@@ -5,7 +5,6 @@ using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.CharacterObjects.Commands;
 internal class CharacterObjectCommands
@@ -16,7 +15,6 @@ internal class CharacterObjectCommands
     /// the synced _characterTraits / _occupation / _persona fields live) so a server screenshot and a client
     /// screenshot can be compared field-for-field to confirm CharacterObject syncs still replicate.
     /// </summary>
-    [CommandLineArgumentFunction("info", "coop.debug.characterObjects")]
     public static string Info(List<string> args)
     {
         if (args.Count != 1) return "Usage: coop.debug.characterObjects.info <charId>";
@@ -35,7 +33,6 @@ internal class CharacterObjectCommands
     }
 
     // coop.debug.characterObjects.list
-    [CommandLineArgumentFunction("list", "coop.debug.characterObjects")]
     public static string ListCharacterObjects(List<string> args)
     {
         var characters = MBObjectManager.Instance.GetObjectTypeList<CharacterObject>();

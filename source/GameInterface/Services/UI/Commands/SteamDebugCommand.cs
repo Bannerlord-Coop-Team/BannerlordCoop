@@ -3,7 +3,6 @@ using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
 using System.Collections.Generic;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.UI.Commands;
 
@@ -16,7 +15,6 @@ namespace GameInterface.Services.UI.Commands;
 /// </summary>
 public class SteamDebugCommand
 {
-    [CommandLineArgumentFunction("status", "coop.debug.steam")]
     public static string Status(List<string> args)
     {
         if (!SessionDiscovery.SteamAvailable) return "Steam integration inactive (Steam not running or not a Steam install)";
@@ -32,7 +30,6 @@ public class SteamDebugCommand
         return $"Steam integration active; advertising={advertiser.IsAdvertising}";
     }
 
-    [CommandLineArgumentFunction("host_lobby", "coop.debug.steam")]
     public static string HostLobby(List<string> args)
     {
         if (!SessionDiscovery.SteamAvailable) return "Steam integration inactive";
@@ -53,7 +50,6 @@ public class SteamDebugCommand
         return $"Advertising session (address='{info.Address}', port={info.Port}, version={info.Version})";
     }
 
-    [CommandLineArgumentFunction("invite", "coop.debug.steam")]
     public static string Invite(List<string> args)
     {
         if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return "No session advertiser; join a session first";
@@ -64,7 +60,6 @@ public class SteamDebugCommand
             : SessionInviteText.OverlayUnavailableHint;
     }
 
-    [CommandLineArgumentFunction("join", "coop.debug.steam")]
     public static string Join(List<string> args)
     {
         if (!SessionDiscovery.SteamAvailable) return "Steam integration inactive";

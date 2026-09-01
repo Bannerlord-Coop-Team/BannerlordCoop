@@ -11,7 +11,6 @@ using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using ServerLoadingState = Coop.Core.Server.Connections.States.LoadingState;
 
 namespace Coop.Core.Common.Commands;
@@ -27,7 +26,6 @@ internal static class JoinDebugCommands
     private static MobileParty stagedInactiveParty;
     private static bool stagedInactivePartyWasActive;
 
-    [CommandLineArgumentFunction("join_state", "coop.debug.connection")]
     public static string JoinState(List<string> args)
     {
         if (args.Count != 0)
@@ -65,7 +63,6 @@ internal static class JoinDebugCommands
               $"forcedInactiveParty={lastForcedPartyId}";
     }
 
-    [CommandLineArgumentFunction("arm_inactive_party_deficit", "coop.debug.connection")]
     public static string ArmInactivePartyDeficit(List<string> args)
     {
         if (args.Count != 1)
@@ -84,7 +81,6 @@ internal static class JoinDebugCommands
                "from the client campaign collection before validation.";
     }
 
-    [CommandLineArgumentFunction("stage_inactive_party", "coop.debug.connection")]
     public static string StageInactiveParty(List<string> args)
     {
         if (args.Count != 0)
@@ -125,7 +121,6 @@ internal static class JoinDebugCommands
         return GetStagedPartyResult(stagedInactiveParty);
     }
 
-    [CommandLineArgumentFunction("restore_inactive_party", "coop.debug.connection")]
     public static string RestoreInactiveParty(List<string> args)
     {
         if (args.Count != 0)
@@ -149,7 +144,6 @@ internal static class JoinDebugCommands
         return $"restoredParty={partyId} active={restoredActive}";
     }
 
-    [CommandLineArgumentFunction("disconnect", "coop.debug.connection")]
     public static string Disconnect(List<string> args)
     {
         if (args.Count != 0)
@@ -167,26 +161,6 @@ internal static class JoinDebugCommands
 
         clientLogic.Disconnect();
         return "Client session is returning to the main menu.";
-    }
-
-    [CommandLineArgumentFunction("reconnect", "coop.debug.connection")]
-    public static string Reconnect(List<string> args)
-    {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.connection.reconnect";
-        }
-        if (ModInformation.IsServer)
-        {
-            return "reconnect must be run on a client.";
-        }
-        if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
-        {
-            return "No client session was found.";
-        }
-
-        clientLogic.Connect();
-        return "Client session is reconnecting to the configured server.";
     }
 
     internal static void ForceArmedInactivePartyDeficit()

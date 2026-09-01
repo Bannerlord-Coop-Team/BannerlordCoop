@@ -17,7 +17,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.PlayerCaptivityService.Commands;
 
@@ -29,7 +28,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
     private static AiLordPeaceReleaseFixture fixture;
     private static StanceLinkSnapshot clientDiplomaticSnapshot;
 
-    [CommandLineArgumentFunction("observe_ai_lord_pair", "coop.debug.player_captivity")]
     public static string ObserveAiLordPair(List<string> args)
     {
         const string usage = "Usage: coop.debug.player_captivity.observe_ai_lord_pair <prisonerHeroId> <captorHeroId>";
@@ -71,7 +69,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
         return output.ToString();
     }
 
-    [CommandLineArgumentFunction("focus_hero_party", "coop.debug.player_captivity")]
     public static string FocusHeroParty(List<string> args)
     {
         const string usage = "Usage: coop.debug.player_captivity.focus_hero_party <heroId>";
@@ -91,7 +88,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
         return $"Following party '{party.StringId}' for hero '{hero.StringId}' on the campaign map.";
     }
 
-    [CommandLineArgumentFunction("snapshot_ai_lord_diplomacy_fixture", "coop.debug.player_captivity")]
     public static string SnapshotAiLordDiplomacyFixture(List<string> args)
     {
         const string usage = "Usage: coop.debug.player_captivity.snapshot_ai_lord_diplomacy_fixture <prisonerHeroId> <captorHeroId>";
@@ -108,7 +104,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
             clientDiplomaticSnapshot.OriginalFingerprint;
     }
 
-    [CommandLineArgumentFunction("restore_ai_lord_diplomacy_fixture", "coop.debug.player_captivity")]
     public static string RestoreAiLordDiplomacyFixture(List<string> args)
     {
         if (!ModInformation.IsClient)
@@ -128,7 +123,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
         return "Client AI-lord diplomatic fixture restored.";
     }
 
-    [CommandLineArgumentFunction("capture_ai_lord_fixture", "coop.debug.player_captivity")]
     public static string CaptureAiLordFixture(List<string> args)
     {
         const string usage = "Usage: coop.debug.player_captivity.capture_ai_lord_fixture <prisonerHeroId> <captorHeroId>";
@@ -228,7 +222,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
         }
     }
 
-    [CommandLineArgumentFunction("observe_ai_lord_fixture", "coop.debug.player_captivity")]
     public static string ObserveAiLordFixture(List<string> args)
     {
         if (args.Count != 0)
@@ -239,7 +232,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
             : Observe(fixture);
     }
 
-    [CommandLineArgumentFunction("focus_party", "coop.debug.player_captivity")]
     public static string FocusParty(List<string> args)
     {
         const string usage = "Usage: coop.debug.player_captivity.focus_party <mobilePartyId>";
@@ -256,7 +248,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
         return $"Following party '{party.StringId}' on the campaign map.";
     }
 
-    [CommandLineArgumentFunction("restore_ai_lord_fixture", "coop.debug.player_captivity")]
     public static string RestoreAiLordFixture(List<string> args)
     {
         if (ModInformation.IsClient)

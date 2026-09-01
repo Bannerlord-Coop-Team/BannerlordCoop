@@ -9,7 +9,6 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Library;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Caravans.Commands;
 
@@ -31,7 +30,6 @@ internal class CaravansCommands
     /// <summary>
     /// View prohibited kingdoms for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_prohibited_kingdoms", "coop.debug.caravans")]
     public static string ViewProhibitedKingdomsCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -70,7 +68,6 @@ internal class CaravansCommands
     /// <summary>
     /// View interacted caravans for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_interacted_caravans", "coop.debug.caravans")]
     public static string ViewInteractedCaravansCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -109,7 +106,6 @@ internal class CaravansCommands
     /// <summary>
     /// View player trade rumor taken caravans for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_taken_trade_rumors", "coop.debug.caravans")]
     public static string ViewTakenTradeRumorsCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -145,7 +141,6 @@ internal class CaravansCommands
         return "Failed to retrieve trade rumor taken caravans";
     }
 
-    [CommandLineArgumentFunction("view_trade_action_logs", "coop.debug.caravans")]
     public static string ViewTradeActionLogs(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -175,7 +170,6 @@ internal class CaravansCommands
         return "Failed to retrieve trade action logs";
     }
 
-    [CommandLineArgumentFunction("view_looted_caravans", "coop.debug.caravans")]
     public static string ViewLootedCaravans(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();

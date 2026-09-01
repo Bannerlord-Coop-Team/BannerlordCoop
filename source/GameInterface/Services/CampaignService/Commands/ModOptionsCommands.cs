@@ -2,13 +2,11 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.CampaignService.Commands;
 
 internal class ModOptionsCommands
 {
-    [CommandLineArgumentFunction("list", "coop.debug.modconfig")]
     public static string ListOptionsCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new();

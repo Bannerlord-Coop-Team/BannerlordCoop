@@ -7,7 +7,6 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.HeroDevelopers.Commands;
 
@@ -20,7 +19,6 @@ internal class HeroDeveloperCommands
     /// Examples: 
     /// coop.debug.herodeveloper.addskillxp RandomPlayer OneHanded 3000
     /// </summary>
-    [CommandLineArgumentFunction("addskillxp", "coop.debug.herodeveloper")]
     public static string AddSkillXpCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -52,7 +50,6 @@ internal class HeroDeveloperCommands
     /// Example:
     /// coop.debug.herodeveloper.addattributepoints RandomPlayer 10
     /// </summary>
-    [CommandLineArgumentFunction("addattributepoints", "coop.debug.herodeveloper")]
     public static string AddAttributePointsCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -82,7 +79,6 @@ internal class HeroDeveloperCommands
     /// Example:
     /// coop.debug.herodeveloper.addfocuspoints RandomPlayer 10
     /// </summary>
-    [CommandLineArgumentFunction("addfocuspoints", "coop.debug.herodeveloper")]
     public static string AddFocusPointsCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
@@ -112,7 +108,6 @@ internal class HeroDeveloperCommands
     /// Example:
     /// coop.debug.herodeveloper.resetskills
     /// </summary>
-    [CommandLineArgumentFunction("resetskills", "coop.debug.herodeveloper")]
     public static string ResetSkillsCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";

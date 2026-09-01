@@ -7,13 +7,11 @@ using GameInterface.Services.Time.Interfaces;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Time.Commands;
 
 internal class TimeCommands
 {
-    [CommandLineArgumentFunction("get_time_mode", "coop.debug")]
     public static string GetTimeMode(List<string> strings)
     {
         if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface))
@@ -24,7 +22,6 @@ internal class TimeCommands
         return $"{timeControlInterface.GetTimeControl()}";
     }
 
-    [CommandLineArgumentFunction("set_time_mode", "coop.debug")]
     public static string SetTimeMode(List<string> strings)
     {
         if (!ModInformation.IsServer)
@@ -63,7 +60,6 @@ internal class TimeCommands
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("request_time_mode", "coop.debug")]
     public static string RequestTimeMode(List<string> strings)
     {
         if (ModInformation.IsServer)
@@ -77,7 +73,6 @@ internal class TimeCommands
     }
 #endif
 
-    [CommandLineArgumentFunction("advance_time", "coop.debug")]
     public static string AdvanceTime(List<string> strings)
     {
         // Time is authoritative on the server; advancing it elsewhere would just be

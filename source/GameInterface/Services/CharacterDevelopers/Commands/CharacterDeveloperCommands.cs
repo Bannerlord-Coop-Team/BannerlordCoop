@@ -6,7 +6,6 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.CharacterDevelopers.Commands;
 
@@ -17,7 +16,6 @@ internal class CharacterDeveloperCommands
     /// <summary>
     /// Output attributes, focuses, skills and perks of a specific hero
     /// </summary>
-    [CommandLineArgumentFunction("stats", "coop.debug.herodeveloper")]
     public static string HeroStatsCommand(List<string> strings)
     {
         if (strings.Count == 0)

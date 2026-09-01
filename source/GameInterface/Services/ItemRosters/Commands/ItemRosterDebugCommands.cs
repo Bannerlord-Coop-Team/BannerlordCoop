@@ -11,13 +11,11 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.ItemRosters.Commands
 {
     internal class ItemRosterDebugCommands
     {
-        [CommandLineArgumentFunction("add_random_item", "coop.debug.itemrosters")]
         public static string AddRandomItem(List<string> args)
         {
             if (args.Count < 1)
@@ -41,7 +39,6 @@ namespace GameInterface.Services.ItemRosters.Commands
             return $"Added {randomItem.Name} to {settlement.Name}'s ItemRoster";
         }
 
-        [CommandLineArgumentFunction("add_item_burst", "coop.debug.itemrosters")]
         public static string AddItemBurst(List<string> args)
         {
             if (ModInformation.IsClient)
@@ -82,7 +79,6 @@ namespace GameInterface.Services.ItemRosters.Commands
             return $"Added {count}x {randomItem.Name} to {settlement.Name}'s ItemRoster in one tick";
         }
 
-        [CommandLineArgumentFunction("info", "coop.debug.itemrosters")]
         public static string Info(List<string> args)
         {
             if (args.Count < 1)
@@ -101,7 +97,6 @@ namespace GameInterface.Services.ItemRosters.Commands
                 owner, roster.Count, roster.Sum((i) => { return i.Amount; }), ItemRosterHash(roster));
         }
 
-        [CommandLineArgumentFunction("export", "coop.debug.itemrosters")]
         public static string Export(List<string> args)
         {
             if (args.Count < 1)

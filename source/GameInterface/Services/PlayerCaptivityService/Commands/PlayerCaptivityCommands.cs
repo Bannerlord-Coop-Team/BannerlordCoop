@@ -30,7 +30,6 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.PlayerCaptivityService.Commands;
 
@@ -50,7 +49,6 @@ Example:
 
 Captures the given hero and assigns a random mobile party as the captor.";
 
-    [CommandLineArgumentFunction("random_capture_player", "coop.debug.player_captivity")]
     public static string RandomCapturePlayer(List<string> args)
     {
         var ctx = new CommandContext(
@@ -89,7 +87,6 @@ Example:
 Captures the given hero and assigns the given mobile party as the captor. The party argument accepts
 a co-op registry id or a local StringId.";
 
-    [CommandLineArgumentFunction("capture_player", "coop.debug.player_captivity")]
     public static string CapturePlayer(List<string> args)
     {
         var ctx = new CommandContext(
@@ -132,7 +129,6 @@ Example:
 Captures a registered co-op player through the real captivity path and records the transferred regular
 troops for separate fixture cleanup. This is intended for automated tests.";
 
-    [CommandLineArgumentFunction("capture_player_fixture", "coop.debug.player_captivity")]
     public static string CapturePlayerFixture(List<string> args)
     {
         var ctx = new CommandContext(
@@ -218,7 +214,6 @@ Example:
 
 Restores the regular troops recorded by capture_player_fixture after the player has left captivity.";
 
-    [CommandLineArgumentFunction("restore_roster_fixture", "coop.debug.player_captivity")]
     public static string RestoreRosterFixture(List<string> args)
     {
         var ctx = new CommandContext(
@@ -304,7 +299,6 @@ Example:
 
 Releases the given player hero from captivity.";
 
-    [CommandLineArgumentFunction("release_player", "coop.debug.player_captivity")]
     public static string ReleasePlayer(List<string> args)
     {
         var ctx = new CommandContext(
@@ -355,7 +349,6 @@ Releases the given player hero from captivity.";
 
 Snapshots the player's party, removes its non-hero members, and moves it beside the captor. Server only.";
 
-    [CommandLineArgumentFunction("prepare_visual_test_fixture", "coop.debug.player_captivity")]
     public static string PrepareVisualTestFixture(List<string> args)
     {
         var ctx = new CommandContext(
@@ -443,7 +436,6 @@ Snapshots the player's party, removes its non-hero members, and moves it beside 
             $"Prepared position: {playerParty.Position.X:R},{playerParty.Position.Y:R}";
     }
 
-    [CommandLineArgumentFunction("restore_visual_test_fixture", "coop.debug.player_captivity")]
     public static string RestoreVisualTestFixture(List<string> args)
     {
         var ctx = new CommandContext(
@@ -522,7 +514,6 @@ Example:
 
 Runs the client-side rescued-prisoner liberation consequence for the given hero.";
 
-    [CommandLineArgumentFunction("liberate_prisoner", "coop.debug.player_captivity")]
     public static string LiberatePrisoner(List<string> args)
     {
         if (ModInformation.IsServer)
@@ -577,7 +568,6 @@ Example:
 
 Reports the hero's current captivity state on this process.";
 
-    [CommandLineArgumentFunction("status", "coop.debug.player_captivity")]
     public static string PrisonerStatus(List<string> args)
     {
         var ctx = new CommandContext(
@@ -611,7 +601,6 @@ Reports the hero's current captivity state on this process.";
 Moves a captured player into the active normal Party screen's left dismissal roster and presses Done.
 Run this on the client that controls the captor after opening the Party screen.";
 
-    [CommandLineArgumentFunction("discard_player_from_party_screen", "coop.debug.player_captivity")]
     public static string DiscardPlayerFromPartyScreen(List<string> args)
     {
         var ctx = new CommandContext(
@@ -724,7 +713,6 @@ Run this on the client that controls the captor after opening the Party screen."
 
 Reports captivity and registered party state without mutating it.";
 
-    [CommandLineArgumentFunction("observe_player", "coop.debug.player_captivity")]
     public static string ObservePlayer(List<string> args)
     {
         var ctx = new CommandContext("observe_player", ObservePlayerUsage, args);
@@ -790,7 +778,6 @@ Example:
 
 Ransoms the captive player hero for zero gold and releases them at a nearby neutral or allied settlement.";
 
-    [CommandLineArgumentFunction("ransom_player_at_settlement", "coop.debug.player_captivity")]
     public static string RansomPlayerAtSettlement(List<string> args)
     {
         var ctx = new CommandContext(
@@ -858,7 +845,6 @@ Ransoms the captive player hero for zero gold and releases them at a nearby neut
             $"Seller gold change: {sellerGoldAfter - sellerGoldBefore}";
     }
 
-    [CommandLineArgumentFunction("captivity_state", "coop.debug.player_captivity")]
     public static string CaptivityState(List<string> args)
     {
         if (args.Count != 1)
@@ -893,7 +879,6 @@ Ransoms the captive player hero for zero gold and releases them at a nearby neut
         return result.ToString();
     }
 
-    [CommandLineArgumentFunction("party_fixture_state", "coop.debug.player_captivity")]
     public static string PartyFixtureState(List<string> args)
     {
         if (args.Count != 1)
@@ -919,7 +904,6 @@ Ransoms the captive player hero for zero gold and releases them at a nearby neut
         return result.ToString();
     }
 
-    [CommandLineArgumentFunction("restore_party_fixture_state", "coop.debug.player_captivity")]
     public static string RestorePartyFixtureState(List<string> args)
     {
         const string usage = "Usage: coop.debug.player_captivity.restore_party_fixture_state <partyId> <settlementId|none> <x> <y> <isOnLand> <isActive>";
