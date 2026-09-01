@@ -51,9 +51,9 @@ public class SettlementMissionReconnectTests
         var replacementAInternal = Endpoint("10.0.0.3", 30003);
         var replacementAExternal = Endpoint("198.51.100.3", 40003);
         var messageBroker = new TestMessageBroker();
-        var missionManager = new MissionManager();
         var network = new TestNetwork();
         var playerManager = new Mock<IPlayerManager>();
+        var missionManager = new MissionManager(playerManager.Object);
         RegisterIdentity(playerManager, oldAPeer, "A");
         RegisterIdentity(playerManager, bPeer, "B");
         using var handler = new ServerMissionMembershipHandler(
@@ -94,6 +94,15 @@ public class SettlementMissionReconnectTests
 
             int oldPeerMessageCount = network.SentNetworkMessages[oldAPeer.Id].Count;
             messageBroker.Publish(this, new PlayerDisconnected(oldAPeer, default));
+
+            CapturedIntroductions.Clear();
+            RegisterIdentity(playerManager, replacementAPeer, "A");
+            Punch(
+                missionManager,
+                natPunchModule,
+                replacementAInternal,
+                replacementAExternal,
+                "A");
             DrainGameThread();
 
             Assert.True(missionManager.TryGetControllers(InstanceId, out var survivingControllers));
@@ -102,18 +111,20 @@ public class SettlementMissionReconnectTests
             Assert.False(missionManager.TryGetRelayTarget(bPeer, InstanceId, "A", out _));
             Assert.Single(network.GetPeerMessagesFromType<MissionPeerDisconnected>(bPeer));
 
-            CapturedIntroductions.Clear();
-            Punch(missionManager, natPunchModule, bInternal, bExternal, "B");
-            Assert.Empty(CapturedIntroductions);
+            var replacementIntroduction = Assert.Single(CapturedIntroductions);
+            Assert.Equal(bExternal, replacementIntroduction.hostExternal);
+            Assert.Equal(replacementAExternal, replacementIntroduction.clientExternal);
+            Assert.DoesNotContain(
+                CapturedIntroductions,
+                candidate => candidate.hostExternal.Equals(oldAExternal));
 
             CapturedIntroductions.Clear();
-            Punch(
-                missionManager,
-                natPunchModule,
-                replacementAInternal,
-                replacementAExternal,
-                "A");
-            RegisterIdentity(playerManager, replacementAPeer, "A");
+            Punch(missionManager, natPunchModule, bInternal, bExternal, "B");
+            var survivorRepunch = Assert.Single(CapturedIntroductions);
+            Assert.Equal(replacementAExternal, survivorRepunch.hostExternal);
+            Assert.Equal(bExternal, survivorRepunch.clientExternal);
+
+            CapturedIntroductions.Clear();
             messageBroker.Publish(
                 replacementAPeer,
                 new NetworkMissionEntered("A", InstanceId));
@@ -129,15 +140,6 @@ public class SettlementMissionReconnectTests
             Assert.Same(replacementAPeer, currentAPeer);
             Assert.False(missionManager.TryGetRelayTarget(oldAPeer, InstanceId, "B", out _));
             Assert.Equal(oldPeerMessageCount, network.SentNetworkMessages[oldAPeer.Id].Count);
-
-            var introduction = Assert.Single(CapturedIntroductions);
-            Assert.Equal(bInternal, introduction.hostInternal);
-            Assert.Equal(bExternal, introduction.hostExternal);
-            Assert.Equal(replacementAInternal, introduction.clientInternal);
-            Assert.Equal(replacementAExternal, introduction.clientExternal);
-            Assert.DoesNotContain(
-                CapturedIntroductions,
-                candidate => candidate.hostExternal.Equals(oldAExternal));
         }
         finally
         {
