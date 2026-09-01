@@ -118,7 +118,7 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
             AddPlayerIllDays(hero, 1);
             if (GetPlayerIllDays(hero) > 3)
             {
-                hero.HitPoints = MathF.Ceiling((float)hero.HitPoints * (0.05f * (float)GetPlayerIllDays(hero)));
+                hero.HitPoints -= MathF.Ceiling((float)hero.HitPoints * (0.05f * (float)GetPlayerIllDays(hero)));
                 if (hero.HitPoints <= 1 && hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None)
                 {
                     if (behavior._extraLivesContainer.TryGetValue(hero, out int numberOfExtraLives))
@@ -128,7 +128,7 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
                             KillPlayerHeroWithIllness(hero);
                             return;
                         }
-                        AddPlayerIllDays(hero, -1);
+                        SetPlayerIllDays(hero, -1);
                         behavior._extraLivesContainer[hero] = numberOfExtraLives - 1;
                         if (behavior._extraLivesContainer[hero] == 0)
                         {
@@ -208,6 +208,18 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
         if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
 
         AgingPlayerData.PlayerIsIllDays[heroId] += daysToAdd;
+
+        // Update for clients
+        network.SendAll(new NetworkUpdatePlayerIllDays(heroId, AgingPlayerData.PlayerIsIllDays[heroId]));
+    }
+
+    private void SetPlayerIllDays(Hero hero, int newDaysIll)
+    {
+        if (!hero.IsPlayerHero()) return;
+
+        if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
+
+        AgingPlayerData.PlayerIsIllDays[heroId] = newDaysIll;
 
         // Update for clients
         network.SendAll(new NetworkUpdatePlayerIllDays(heroId, AgingPlayerData.PlayerIsIllDays[heroId]));

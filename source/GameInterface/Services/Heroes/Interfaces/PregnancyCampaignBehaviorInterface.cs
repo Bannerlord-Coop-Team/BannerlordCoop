@@ -89,7 +89,7 @@ public class PregnancyCampaignBehaviorInterface : IPregnancyCampaignBehaviorInte
 
         return (heroSettlement != null && heroSettlement == spouseSettlement)
             || (heroParty != null && heroParty == spouseParty)
-            || (!hero.Clan.IsPlayerClan() && MBRandom.RandomFloat < 1f);//0.2f);
+            || (!hero.Clan.IsPlayerClan() && MBRandom.RandomFloat < 0.2f);
     }
 
     private bool IsPotentialPlayerParentOccupied(Hero hero)

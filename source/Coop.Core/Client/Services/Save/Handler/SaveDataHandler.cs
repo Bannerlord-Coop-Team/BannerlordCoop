@@ -12,7 +12,6 @@ using GameInterface.Services.ObjectManager.Messages;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Workshops.Messages;
-using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler;
 

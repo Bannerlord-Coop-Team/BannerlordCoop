@@ -158,6 +158,7 @@ namespace GameInterface.Services.Heroes.Handlers
 
                 // Update caches
                 instance.Clan?.OnHeroChangedState(instance, oldState);
+                Campaign.Current.CampaignObjectManager.HeroStateChanged(instance, oldState);
             });
         }
 
