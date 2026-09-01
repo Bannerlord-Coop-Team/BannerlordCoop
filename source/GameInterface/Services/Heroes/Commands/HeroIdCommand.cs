@@ -33,7 +33,7 @@ public sealed class HeroIdCommand : IHeroIdCommand
     {
         new ExpectedArgs(
             "heroName",
-            "The exact display name of the hero to find."),
+            "The exact display name of the hero to find. Quote multi-word values."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

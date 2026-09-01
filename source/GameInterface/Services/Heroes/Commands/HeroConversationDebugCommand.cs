@@ -8,17 +8,15 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Heroes.Commands;
 
 internal class HeroConversationDebugCommand
 {
-    [CommandLineArgumentFunction("open", "coop.debug.hero_conversation")]
+
     public static string Open(List<string> args)
     {
         if (ModInformation.IsServer) return "Run coop.debug.hero_conversation.open on a client.";
-        if (args.Count != 1) return "Usage: coop.debug.hero_conversation.open <heroId>";
         if (!TryGetHero(args[0], out var hero, out var error)) return error;
         if (Campaign.Current.ConversationManager.IsConversationInProgress)
             return "A conversation is already active.";
@@ -35,11 +33,9 @@ internal class HeroConversationDebugCommand
         return GetState(hero);
     }
 
-    [CommandLineArgumentFunction("state", "coop.debug.hero_conversation")]
     public static string State(List<string> args)
     {
         if (ModInformation.IsServer) return "Run coop.debug.hero_conversation.state on a client.";
-        if (args.Count > 1) return "Usage: coop.debug.hero_conversation.state [heroId]";
 
         Hero hero;
         if (args.Count == 1)
@@ -55,11 +51,9 @@ internal class HeroConversationDebugCommand
         return GetState(hero);
     }
 
-    [CommandLineArgumentFunction("close", "coop.debug.hero_conversation")]
     public static string Close(List<string> args)
     {
         if (ModInformation.IsServer) return "Run coop.debug.hero_conversation.close on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.hero_conversation.close";
 
         if (Campaign.Current.ConversationManager.IsConversationInProgress)
             Campaign.Current.ConversationManager.EndConversation();
@@ -68,10 +62,9 @@ internal class HeroConversationDebugCommand
         return "CONVERSATION_CLOSED";
     }
 
-    [CommandLineArgumentFunction("set_has_met", "coop.debug.hero_conversation")]
     public static string SetHasMet(List<string> args)
     {
-        if (args.Count != 2 || !bool.TryParse(args[1], out var hasMet))
+        if (!bool.TryParse(args[1], out var hasMet))
             return "Usage: coop.debug.hero_conversation.set_has_met <heroId> <true|false>";
         if (!TryGetHero(args[0], out var hero, out var error)) return error;
 
@@ -84,12 +77,9 @@ internal class HeroConversationDebugCommand
             $"heroId={args[0]} hasMet={hero.HasMet}";
     }
 
-    [CommandLineArgumentFunction("meeting_state", "coop.debug.hero_conversation")]
     public static string MeetingState(List<string> args)
     {
         if (ModInformation.IsClient) return "Run coop.debug.hero_conversation.meeting_state on the server.";
-        if (args.Count != 2)
-            return "Usage: coop.debug.hero_conversation.meeting_state <playerHeroId> <metHeroId>";
         if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var sessionProvider))
             return $"Unable to get {nameof(ICoopSessionProvider)}";
 
