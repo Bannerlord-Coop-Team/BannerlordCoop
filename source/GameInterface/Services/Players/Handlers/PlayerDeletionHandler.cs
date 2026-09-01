@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Messages;
@@ -10,6 +11,7 @@ using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -166,6 +168,12 @@ internal class PlayerDeletionHandler : IHandler
 
         network.SendAllBut(peer, new NetworkPlayerRemoved(player.ControllerId, player.HeroId));
 
+        // Only the no-heir game-over request keeps its peer connected for the statistics screen
+        if (keepConnected && hasDied && hero?.Clan != null)
+        {
+            TryStep("player game over clan cleanup", () => CleanupPlayerClanAfterGameOver(hero));
+        }
+
         if (!keepConnected) peer.Disconnect();
 
         // Keep patches live and preserve the real death cause and killer.
@@ -190,6 +198,31 @@ internal class PlayerDeletionHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out MobileParty remainingParty))
         {
             TryStep("party destroy", () => DestroyPartyAction.Apply(null, remainingParty));
+        }
+    }
+
+    private static void CleanupPlayerClanAfterGameOver(Hero playerHero)
+    {
+        Clan playerClan = playerHero.Clan;
+
+        // Player registration has already been removed, so apply the same ruler succession used
+        // when an AI kingdom leader dies before considering whether the clan itself should end
+        if (playerClan.Leader == playerHero)
+        {
+            KillCharacterActionPatches.HandleKingdomLeaderDeath(playerHero);
+        }
+
+        if (playerClan.IsEliminated ||
+            playerClan.IsBanditFaction ||
+            playerClan.AliveLords.Any(hero => hero.IsAlive)) return;
+
+        if (playerClan.Leader == playerHero)
+        {
+            DestroyClanAction.ApplyByClanLeaderDeath(playerClan);
+        }
+        else
+        {
+            DestroyClanAction.Apply(playerClan);
         }
     }
 

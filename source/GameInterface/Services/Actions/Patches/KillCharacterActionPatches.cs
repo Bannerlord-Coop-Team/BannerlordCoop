@@ -68,35 +68,9 @@ internal class KillCharacterActionPatches
                 {
                     ChangeClanLeaderAction.ApplyWithoutSelectedNewLeader(victim.Clan);
                 }
-                if (!isPlayerHero && victim.Clan.Kingdom != null && victim.Clan.Kingdom.RulingClan == victim.Clan)
+                if (!isPlayerHero)
                 {
-                    List<Clan> list = (from t in victim.Clan.Kingdom.Clans
-                                       where !t.IsEliminated && t.Leader != victim && !t.IsUnderMercenaryService
-                                       select t).ToList<Clan>();
-                    if (list.IsEmpty<Clan>())
-                    {
-                        if (!victim.Clan.Kingdom.IsEliminated)
-                        {
-                            DestroyKingdomAction.ApplyByKingdomLeaderDeath(victim.Clan.Kingdom);
-                        }
-                    }
-                    else if (!victim.Clan.Kingdom.IsEliminated)
-                    {
-                        if (list.Count > 1)
-                        {
-                            Clan clanToExclude = (victim.Clan.Leader == victim || victim.Clan.Leader == null) ? victim.Clan : null;
-                            victim.Clan.Kingdom.AddDecision(new KingSelectionKingdomDecision(victim.Clan, clanToExclude), true);
-                            if (clanToExclude != null)
-                            {
-                                Clan randomElementWithPredicate = victim.Clan.Kingdom.Clans.GetRandomElementWithPredicate((Clan t) => t != clanToExclude && Campaign.Current.Models.DiplomacyModel.IsClanEligibleToBecomeRuler(t));
-                                ChangeRulingClanAction.Apply(victim.Clan.Kingdom, randomElementWithPredicate);
-                            }
-                        }
-                        else
-                        {
-                            ChangeRulingClanAction.Apply(victim.Clan.Kingdom, list[0]);
-                        }
-                    }
+                    HandleKingdomLeaderDeath(victim);
                 }
             }
             else
@@ -189,5 +163,45 @@ internal class KillCharacterActionPatches
         }
 
         return false;
+    }
+
+    public static void HandleKingdomLeaderDeath(Hero victim)
+    {
+        Clan victimClan = victim?.Clan;
+        Kingdom kingdom = victimClan?.Kingdom;
+        if (kingdom?.RulingClan != victimClan) return;
+
+        List<Clan> eligibleClans = (from clan in kingdom.Clans
+                                    where !clan.IsEliminated && clan.Leader != victim && !clan.IsUnderMercenaryService
+                                    select clan).ToList();
+        if (eligibleClans.IsEmpty())
+        {
+            if (!kingdom.IsEliminated)
+            {
+                DestroyKingdomAction.ApplyByKingdomLeaderDeath(kingdom);
+            }
+        }
+        else if (!kingdom.IsEliminated)
+        {
+            if (eligibleClans.Count > 1)
+            {
+                Clan clanToExclude = victimClan.Leader == victim || victimClan.Leader == null ? victimClan : null;
+                Clan decisionProposerClan = victimClan;
+                if (clanToExclude != null)
+                {
+                    Clan newRulingClan = kingdom.Clans.GetRandomElementWithPredicate(
+                        clan => clan != clanToExclude && Campaign.Current.Models.DiplomacyModel.IsClanEligibleToBecomeRuler(clan));
+                    ChangeRulingClanAction.Apply(kingdom, newRulingClan);
+
+                    // Use new ruler clan as proposer. Using destroyed clan instantly resolves decision
+                    decisionProposerClan = newRulingClan;
+                }
+                kingdom.AddDecision(new KingSelectionKingdomDecision(decisionProposerClan, clanToExclude), true);
+            }
+            else
+            {
+                ChangeRulingClanAction.Apply(kingdom, eligibleClans[0]);
+            }
+        }
     }
 }

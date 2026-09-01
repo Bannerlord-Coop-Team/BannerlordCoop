@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.UI.LogEntries.Messages;
@@ -61,6 +62,10 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
         }
         TransferCaravanOwnerships(originalHero, heir);
         ChangeClanLeaderAction.ApplyWithSelectedNewLeader(originalHero.Clan, heir);
+        if (!isRetirement)
+        {
+            KillCharacterActionPatches.HandleKingdomLeaderDeath(originalHero);
+        }
         if (isRetirement)
         {
             DisableHeroAction.Apply(originalHero);
