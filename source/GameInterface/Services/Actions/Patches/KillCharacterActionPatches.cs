@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
@@ -31,6 +32,8 @@ internal class KillCharacterActionPatches
     [HarmonyPrefix]
     public static bool ApplyInternalPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail, bool showNotification, bool isForced = false)
     {
+        if (ModInformation.IsClient) return false;
+
         if (!victim.CanDie(actionDetail) && !isForced) return false;
 
         if (!victim.IsAlive) return false;
