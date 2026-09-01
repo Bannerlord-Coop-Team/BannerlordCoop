@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.Companions.Patches.Disable;
@@ -68,6 +69,61 @@ internal class CompanionsCampaignBehaviorPatches
         }
 
         __result = total;
+        return false;
+    }
+
+    /// <summary>
+    /// Replace vanilla's single-player <see cref="Hero.MainHero"/> settlement check with all player heroes
+    /// before removing an unhired wanderer on the server.
+    /// </summary>
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior.TryKillCompanion))]
+    [HarmonyPrefix]
+    public static bool TryKillCompanionPrefix(CompanionsCampaignBehavior __instance)
+    {
+        if (ModInformation.IsClient) return false;
+        if (MBRandom.RandomFloat > 0.1f || __instance._aliveCompanionTemplates.Count <= 0)
+            return false;
+
+        CharacterObject template = __instance._aliveCompanionTemplates.GetRandomElementInefficiently();
+        Hero candidate = null;
+        foreach (Hero hero in Hero.AllAliveHeroes)
+        {
+            if (hero.Template != template || !hero.IsWanderer) continue;
+            candidate = hero;
+            break;
+        }
+
+        bool sharesSettlementWithPlayer = candidate != null &&
+            IsAnyPlayerAtSettlement(
+                candidate.CurrentSettlement,
+                Campaign.Current.CampaignObjectManager.GetPlayerHeroes());
+
+        if (ShouldCullWanderer(
+                candidateExists: candidate != null,
+                isHired: candidate?.CompanionOf != null,
+                sharesSettlementWithPlayer: sharesSettlementWithPlayer))
+        {
+            KillCharacterAction.ApplyByRemove(candidate);
+        }
+
+        return false;
+    }
+
+    internal static bool ShouldCullWanderer(
+        bool candidateExists,
+        bool isHired,
+        bool sharesSettlementWithPlayer) =>
+        candidateExists && !isHired && !sharesSettlementWithPlayer;
+
+    internal static bool IsAnyPlayerAtSettlement(
+        Settlement settlement,
+        IEnumerable<Hero> playerHeroes)
+    {
+        foreach (Hero playerHero in playerHeroes)
+        {
+            if (playerHero.CurrentSettlement == settlement) return true;
+        }
+
         return false;
     }
 
