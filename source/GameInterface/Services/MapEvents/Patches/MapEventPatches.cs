@@ -281,15 +281,6 @@ internal class MapEventPatches
         if (!ModInformation.IsServer || !ContainerProvider.TryResolve<IRetreatedMapEventPartyTracker>(out var tracker)) return;
 
         __state = RemoveParties(__instance, party => tracker.IsRetreated(__instance, party.Party));
-
-        if (__state.Count == 0) return;
-        
-        __instance.RecalculateStrengthOfSides();
-
-        foreach (MapEventSide side in __instance._sides)
-        {
-            side?.CalculateRenownAndInfluenceValuesOnPartyInvolved(__instance.StrengthOfSide);
-        }
     }
 
     // Restore the parties after calculating the results
