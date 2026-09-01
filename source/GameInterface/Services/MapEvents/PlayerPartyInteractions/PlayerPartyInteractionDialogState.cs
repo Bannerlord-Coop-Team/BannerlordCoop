@@ -41,6 +41,7 @@ public static class PlayerPartyInteractionDialogState
     public static bool IsHostile => hasState && currentState.IsHostile;
     public static int MercenaryAwardMultiplier => hasState ? currentState.MercenaryAwardMultiplier : 0;
     public static bool HasActiveState => hasState;
+    internal static bool IsInitiator => hasState && currentState.IsInitiator;
     public static bool IsMarriageProposal => Proposal == PlayerPartyInteractionProposal.PatrilinealMarriage ||
         Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage;
 
