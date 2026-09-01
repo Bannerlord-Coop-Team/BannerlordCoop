@@ -139,6 +139,14 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
             messageBroker.Publish(this, new MobilePartyDestroyed(obj));
 
+            objectManager.TryGetIdWithLogging(obj.ItemRoster, out var itemRosterId);
+            objectManager.TryGetIdWithLogging(obj.MemberRoster, out var memberRosterId);
+            objectManager.TryGetIdWithLogging(obj.PrisonRoster, out var prisonerRosterId);
+
+            coalescer?.DropInstance(Compact(itemRosterId, typeof(ItemRoster)));
+            coalescer?.DropInstance(Compact(memberRosterId, typeof(TroopRoster)));
+            coalescer?.DropInstance(Compact(prisonerRosterId, typeof(TroopRoster)));
+
             // These attachments have no destroy hooks, so their lifetime ends with their party.
             messageBroker.Publish(this, new InstanceDestroyed<ItemRoster>(obj.ItemRoster));
             messageBroker.Publish(this, new InstanceDestroyed<TroopRoster>(obj.MemberRoster));
