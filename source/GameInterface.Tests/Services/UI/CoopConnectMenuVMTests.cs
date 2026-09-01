@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network.Session;
 using GameInterface.Services.UI;
+using GameInterface.Services.UI.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,63 @@ namespace GameInterface.Tests.Services.UI;
 
 public class CoopConnectMenuVMTests
 {
+    [Theory]
+    [InlineData("localhost", "localhost", 4200)]
+    [InlineData("localhost:4300", "localhost", 4300)]
+    [InlineData("127.0.0.1:4400", "127.0.0.1", 4400)]
+    [InlineData("::1", "::1", 4200)]
+    [InlineData("[::1]:4500", "::1", 4500)]
+    public void TryParseServerAddress_UsesAttachedPortOrDefault(
+        string enteredAddress,
+        string expectedHost,
+        int expectedPort)
+    {
+        bool parsed = CoopConnectMenuVM.TryParseServerAddress(
+            enteredAddress,
+            out string host,
+            out int port);
+
+        Assert.True(parsed);
+        Assert.Equal(expectedHost, host);
+        Assert.Equal(expectedPort, port);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("localhost:")]
+    [InlineData("localhost:0")]
+    [InlineData("localhost:65536")]
+    [InlineData("[::1]:invalid")]
+    public void TryParseServerAddress_RejectsInvalidAddressesAndPorts(string enteredAddress)
+    {
+        Assert.False(CoopConnectMenuVM.TryParseServerAddress(
+            enteredAddress,
+            out _,
+            out _));
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1", 4200)]
+    [InlineData("127.0.0.1:4300", 4300)]
+    public void DirectConnect_PublishesAttachedPortOrDefault(string enteredAddress, int expectedPort)
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        AttemptJoin? publishedJoin = null;
+        Action<MessagePayload<AttemptJoin>> capture = payload => publishedJoin = payload.What;
+        messageBroker.Subscribe(capture);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker)
+        {
+            Ip = enteredAddress,
+        };
+
+        viewModel.ActionConnect();
+
+        Assert.NotNull(publishedJoin);
+        Assert.Equal("127.0.0.1", publishedJoin.Address.ToString());
+        Assert.Equal(expectedPort, publishedJoin.Port);
+    }
+
     [Fact]
     public void SteamLobbyPages_SliceResultsAndStopAtBoundaries()
     {
