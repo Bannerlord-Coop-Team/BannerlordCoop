@@ -1083,7 +1083,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdom1Id, kingdom2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("force_ally", "coop.debug.kingdom")]
+    [CommandLineFunctionality.CommandLineArgumentFunction("force_ally", "coop.debug.kingdom")]
     public static string ForceAlly(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -1133,7 +1133,7 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdom1Id, kingdom2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("force_trade_agreement", "coop.debug.kingdom")]
+    [CommandLineFunctionality.CommandLineArgumentFunction("force_trade_agreement", "coop.debug.kingdom")]
     public static string ForceTradeAgreement(List<string> args)
     {
         if (ModInformation.IsClient)
