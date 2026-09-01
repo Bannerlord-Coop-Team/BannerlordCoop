@@ -10,6 +10,7 @@ using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Cutscenes.Handlers;
 using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
@@ -32,6 +33,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
     private readonly IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface;
     private readonly ICoopSessionMigrator coopSessionMigrator;
+    private readonly PlayerDeathCutsceneHandler cutscenesHandler;
 
     public HeirSelectionHandler(
         IMessageBroker messageBroker,
@@ -41,7 +43,8 @@ internal class HeirSelectionHandler : IHandler
         IPlayerPartyRestorer playerPartyRestorer,
         IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface,
         IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface,
-        ICoopSessionMigrator coopSessionMigrator)
+        ICoopSessionMigrator coopSessionMigrator,
+        PlayerDeathCutsceneHandler cutscenesHandler)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -51,6 +54,7 @@ internal class HeirSelectionHandler : IHandler
         this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
         this.heirSelectionCampaignBehaviorInterface = heirSelectionCampaignBehaviorInterface;
         this.coopSessionMigrator = coopSessionMigrator;
+        this.cutscenesHandler = cutscenesHandler;
 
         messageBroker.Subscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
         messageBroker.Subscribe<NetworkClientSelectHeir>(Handle_NetworkClientSelectHeir);
@@ -113,7 +117,7 @@ internal class HeirSelectionHandler : IHandler
     {
         var data = obj.What;
 
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => cutscenesHandler.EnqueueDeathPresentation(() =>
         {
             var heirApparents = new Dictionary<Hero, int>();
             foreach (var heirIdApparent in data.HeirIdApparents)
@@ -128,7 +132,7 @@ internal class HeirSelectionHandler : IHandler
                 PlayerEncounter.Finish(true);
             }
             CampaignEventDispatcher.Instance.OnHeirSelectionRequested(heirApparents);
-        });
+        }));
     }
 
     private void Handle_HeirSelectionOver(MessagePayload<HeirSelectionOver> obj)

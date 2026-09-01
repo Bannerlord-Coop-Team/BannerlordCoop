@@ -5,7 +5,7 @@ using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Messages;
-using GameInterface.Services.UI.Cutscenes.Messages;
+using GameInterface.Services.UI.Cutscenes.Handlers;
 using SandBox.CampaignBehaviors;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -25,13 +25,16 @@ internal class GameOverHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly PlayerDeathCutsceneHandler cutscenesHandler;
 
     public GameOverHandler(
         IMessageBroker messageBroker,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        PlayerDeathCutsceneHandler cutscenesHandler)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.cutscenesHandler = cutscenesHandler;
 
         messageBroker.Subscribe<NetworkClientGameOver>(Handle_NetworkClientGameOver);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -58,19 +61,22 @@ internal class GameOverHandler : IHandler
             GameOverState.IsGameOver = true;
             messageBroker.Publish(this, new PlayerDeleteRequested(keepConnected: true));
 
-            if (!TryGetHeirSelectionBehavior(out var heirSelectionBehavior)) return;
-
-            if (PlayerEncounter.Current != null && (PlayerEncounter.Battle == null || !PlayerEncounter.Battle.IsFinalized))
+            cutscenesHandler.EnqueueDeathPresentation(() =>
             {
-                PlayerEncounter.Finish(true);
-            }
+                if (!TryGetHeirSelectionBehavior(out var heirSelectionBehavior)) return;
 
-            heirSelectionBehavior.ShowGameStatistics(); // TODO: Track statistics
+                if (PlayerEncounter.Current != null && (PlayerEncounter.Battle == null || !PlayerEncounter.Battle.IsFinalized))
+                {
+                    PlayerEncounter.Finish(true);
+                }
 
-            if (Campaign.Current.CurrentMenuContext != null)
-            {
-                GameMenu.ExitToLast();
-            }
+                heirSelectionBehavior.ShowGameStatistics(); // TODO: Track statistics
+
+                if (Campaign.Current.CurrentMenuContext != null)
+                {
+                    GameMenu.ExitToLast();
+                }
+            });
         });
     }
 

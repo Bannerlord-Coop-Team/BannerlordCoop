@@ -1,4 +1,5 @@
-using Common.Logging;
+﻿using Common.Logging;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Utils.Commands;
 using Serilog;
 using System;
@@ -15,10 +16,10 @@ internal class KillPlayerAgentCommands
 
     private const string KillPlayerAgentUsage =
 @"Usage:
-  coop.debug.mapevent.kms
+  coop.debug.mapevent.kms [force]
 
-Kills the main agent (the player) in the current battle mission.
-Useful for testing player captivity without waiting to die.";
+Removes the main agent using the current killed/unconscious roll.
+Pass force during an active co-op battle to guarantee a killed result.";
 
     [CommandLineArgumentFunction("kms", "coop.debug.mapevent")]
     public static string KillPlayerAgent(List<string> args)
@@ -28,8 +29,8 @@ Useful for testing player captivity without waiting to die.";
             KillPlayerAgentUsage,
             args);
 
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
+        bool forceDeath = ctx.Args.Count == 1 && string.Equals(ctx.Args[0], "force", StringComparison.OrdinalIgnoreCase);
+        if (ctx.Args.Count > 1 || (ctx.Args.Count == 1 && !forceDeath)) return KillPlayerAgentUsage;
 
         if (Mission.Current is null)
             return "Failed to kill player agent: no active mission.";
@@ -41,17 +42,25 @@ Useful for testing player captivity without waiting to die.";
         if (!agent.IsActive())
             return "Failed to kill player agent: main agent is not active (already dead or removed).";
 
+        if (forceDeath && (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive))
+            return "Failed to force-kill player agent: no active co-op battle.";
+
         try
         {
             var blow = CreateFatalBlow(agent);
-            agent.Die(blow, Agent.KillInfo.Invalid);
+            if (forceDeath)
+                ForceCommandDeathPatch.RunWithForcedDeath(agent, () => agent.Die(blow, Agent.KillInfo.Invalid));
+            else
+                agent.Die(blow, Agent.KillInfo.Invalid);
         }
         catch (Exception ex)
         {
             return CommandHelpers.FormatException("Kill player agent", ex);
         }
 
-        return $"Killed player agent: {agent.Name}";
+        return forceDeath
+            ? $"Force-killed player agent: {agent.Name}"
+            : $"Removed player agent using the current survival chance: {agent.Name}";
     }
 
     private static Blow CreateFatalBlow(Agent agent)

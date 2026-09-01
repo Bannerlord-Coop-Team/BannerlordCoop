@@ -130,16 +130,16 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
     public bool TryHandleBroadcast(NetPeer peer, IPacket packet)
     {
-        if (ShouldBypassLoadingQueue(packet)) return false;
+        bool bypassLoadingQueue = ShouldBypassLoadingQueue(packet);
 
         // LiteNetLib exposes an accepted peer to SendAll before OnPeerConnected installs its channel.
-        // Fail closed during that gap so world objects cannot reach a client before its transfer save.
-        if (channels.TryGetValue(peer, out var channel) == false) return true;
+        // Fail closed for world updates during that gap, while safe bypass packets still pass through.
+        if (channels.TryGetValue(peer, out var channel) == false) return !bypassLoadingQueue;
 
         lock (channel.Gate)
         {
             if (channel.Phase == Phase.Stopped) return true;
-            if (ShouldBypassLoadingQueue(packet)) return false;
+            if (bypassLoadingQueue) return false;
 
             switch (channel.Phase)
             {

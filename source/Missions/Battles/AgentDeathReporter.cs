@@ -2,14 +2,11 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
-using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -37,7 +34,6 @@ public class AgentDeathReporter : IAgentDeathReporter
     private readonly IBattleNetwork network;
     private readonly INetwork relayNetwork;
     private readonly IMessageBroker messageBroker;
-    private readonly IObjectManager objectManager;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
@@ -46,7 +42,6 @@ public class AgentDeathReporter : IAgentDeathReporter
         IBattleNetwork network,
         INetwork relayNetwork,
         IMessageBroker messageBroker,
-        IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         ICasualtyAttributionMap casualties)
@@ -54,7 +49,6 @@ public class AgentDeathReporter : IAgentDeathReporter
         this.network = network;
         this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
-        this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
         this.casualties = casualties;
@@ -112,19 +106,10 @@ public class AgentDeathReporter : IAgentDeathReporter
 
             var attribution = casualties.GetOrDefault(info.AgentId);
 
-            // Only wound player heros
-            bool wounded = payload.What.Wounded;
-            if (attribution.TroopCharacterId != null
-                && objectManager.TryGetObject<CharacterObject>(attribution.TroopCharacterId, out var troop)
-                && troop.HeroObject?.IsPlayerHero() == true)
-            {
-                wounded = true;
-            }
-
-            Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, wounded);
+            Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, payload.What.Wounded);
             network.SendAll(new NetworkBattleAgentDied(
                 info.AgentId,
-                wounded,
+                payload.What.Wounded,
                 affectorAgentId,
                 payload.What.InflictedDamage,
                 payload.What.VictimBodyPart,
@@ -134,7 +119,7 @@ public class AgentDeathReporter : IAgentDeathReporter
             // map-event party roster. The server-side mission accounting is suppressed during a coop battle
             // (MapEventPartyPatches), so this is the single source. On a client, SendAll targets the server.
             if (attribution.MapEventPartyId != null)
-                relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.MapEventPartyId, attribution.TroopCharacterId, wounded));
+                relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.MapEventPartyId, attribution.TroopCharacterId, payload.What.Wounded));
 
             casualties.Forget(info.AgentId);
             registry.RemoveAgent(info.AgentId);

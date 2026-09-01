@@ -114,6 +114,18 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
+    public void PlayerDeletionStopsWorldAndCampaignTimeBroadcasts()
+    {
+        var peer = Connect();
+
+        messageBroker.Publish(this, new PlayerDeletionStarted(peer));
+
+        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
+        Assert.True(queue.TryHandleBroadcast(peer, new FakeCampaignTimePacket()));
+        Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
+    }
+
+    [Fact]
     public void CatchUpProgress_CombinesHeldAndReliablePacketsUntilClientAcknowledges()
     {
         var peer = Connect();

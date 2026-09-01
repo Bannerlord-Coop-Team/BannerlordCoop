@@ -7,6 +7,7 @@ using Missions.Messages;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace Missions.Battles;
@@ -104,6 +105,11 @@ internal class BattleCasualtyHandler : IHandler
                                 msg.TroopCharacterId, msg.MapEventPartyId);
                             return;
                         }
+
+                        // The server has no PartyAgentOrigin to mark hero deaths
+                        if (troop.IsHero)
+                            KillCharacterAction.ApplyByBattle(troop.HeroObject, null, false);
+
                         messageBroker.Publish(this, new OnTroopKilledAttempted(mapEventParty, element.Descriptor.UniqueSeed));
                     }
                     return;

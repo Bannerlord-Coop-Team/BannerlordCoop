@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
@@ -117,9 +118,9 @@ internal class PlayerCaptivityServerHandler : IHandler
             hero?.StringId, playerParty?.StringId, payload.What.CapturerParty?.MobileParty?.StringId);
 
         // Only player heroes need coop-specific handling; native TakePrisonerAction covers AI heroes.
-        if (playerParty?.IsPlayerParty() != true)
+        if (hero?.IsPlayerHero() != true || playerParty?.IsPlayerParty() != true)
         {
-            PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: skipping, captured party is not a player party");
+            PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: skipping, captured hero or party is not player-controlled");
             return;
         }
 
