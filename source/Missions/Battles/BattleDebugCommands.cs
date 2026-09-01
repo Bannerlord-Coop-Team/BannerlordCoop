@@ -75,16 +75,26 @@ internal static class BattleDebugCommands
                 if (!CanDriveOwnedAgent(agent, mission))
                     continue;
 
+                bool applyAiDrive = agent.Controller == AgentControllerType.AI;
+                AgentMovementLockedState movementLockedState = applyAiDrive
+                    ? agent.MovementLockedState
+                    : AgentMovementLockedState.None;
                 ownedAgentMovementDriveStates.Add(agent, new OwnedAgentMovementDriveState
                 {
                     LocomotionFlags = Missions.Agents.Packets.AgentData.GetLocomotionMovementFlags(
                         agent.MovementFlags),
                     MovementInput = agent.MovementInputVector,
-                    Controller = agent.Controller,
-                    IsAiPaused = agent.IsPaused,
-                    MaximumSpeedLimit = agent.GetMaximumSpeedLimit(),
+                    ApplyAiDrive = applyAiDrive,
+                    IsAiPaused = applyAiDrive && agent.IsPaused,
+                    MovementLockedState = movementLockedState,
+                    TargetPosition = movementLockedState == AgentMovementLockedState.None
+                        ? default
+                        : agent.GetTargetPosition(),
+                    TargetDirection = movementLockedState == AgentMovementLockedState.FrameLocked
+                        ? agent.GetTargetDirection()
+                        : default,
                 });
-                ApplyOwnedAgentMovementDrive(agent);
+                ApplyOwnedAgentMovementDrive(agent, applyAiDrive);
             }
 
             ownedAgentMovementDriveEndTime = mission.CurrentTime + durationSeconds;
@@ -98,13 +108,19 @@ internal static class BattleDebugCommands
                 if (!CanDriveOwnedAgent(entry.Key, ownedAgentMovementDriveMission))
                     continue;
 
+                bool restoreAiDrive = entry.Value.ApplyAiDrive
+                    && entry.Key.Controller == AgentControllerType.AI;
+                if (entry.Value.ApplyAiDrive && !restoreAiDrive)
+                    entry.Key.ClearTargetFrame();
                 RestoreOwnedAgentMovementDrive(
                     entry.Key,
                     entry.Value.LocomotionFlags,
                     entry.Value.MovementInput,
-                    entry.Value.Controller,
+                    restoreAiDrive,
                     entry.Value.IsAiPaused,
-                    entry.Value.MaximumSpeedLimit);
+                    entry.Value.MovementLockedState,
+                    entry.Value.TargetPosition,
+                    entry.Value.TargetDirection);
             }
 
             ownedAgentMovementDriveStates.Clear();
@@ -123,10 +139,15 @@ internal static class BattleDebugCommands
                 return;
             }
 
-            foreach (Agent agent in ownedAgentMovementDriveStates.Keys)
+            foreach (KeyValuePair<Agent, OwnedAgentMovementDriveState> entry in
+                     ownedAgentMovementDriveStates)
             {
-                if (CanDriveOwnedAgent(agent, ownedAgentMovementDriveMission))
-                    ApplyOwnedAgentMovementDrive(agent);
+                if (CanDriveOwnedAgent(entry.Key, ownedAgentMovementDriveMission))
+                {
+                    entry.Value.ApplyAiDrive = ApplyOwnedAgentMovementDrive(
+                        entry.Key,
+                        entry.Value.ApplyAiDrive);
+                }
             }
         }
 #endif
@@ -187,9 +208,11 @@ internal static class BattleDebugCommands
     {
         public Agent.MovementControlFlag LocomotionFlags { get; set; }
         public Vec2 MovementInput { get; set; }
-        public AgentControllerType Controller { get; set; }
+        public bool ApplyAiDrive { get; set; }
         public bool IsAiPaused { get; set; }
-        public float MaximumSpeedLimit { get; set; }
+        public AgentMovementLockedState MovementLockedState { get; set; }
+        public Vec2 TargetPosition { get; set; }
+        public Vec3 TargetDirection { get; set; }
     }
 #endif
 
@@ -1040,12 +1063,15 @@ internal static class BattleDebugCommands
             $"agents={driveAgents.Length}\nLIVE_TEST_JSON={structuredState}";
     }
 
-    internal static void ApplyOwnedAgentMovementDrive(Agent agent)
+    internal static bool ApplyOwnedAgentMovementDrive(Agent agent, bool applyAiDrive)
     {
-        if (agent.Controller != AgentControllerType.AI)
-            agent.Controller = AgentControllerType.AI;
-        agent.SetIsAIPaused(false);
-        agent.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+        if (applyAiDrive && agent.Controller != AgentControllerType.AI)
+        {
+            agent.ClearTargetFrame();
+            applyAiDrive = false;
+        }
+        if (applyAiDrive)
+            agent.SetIsAIPaused(false);
 
         Missions.Agents.Packets.AgentData.ApplyLocomotionMovementFlags(
             agent,
@@ -1059,31 +1085,48 @@ internal static class BattleDebugCommands
         else
             acceleration.Normalize();
 
-        Vec2 direction = acceleration.AsVec2;
-        Vec2 targetPosition = agent.Position.AsVec2 +
-            (direction * OwnedAgentMovementDriveTargetDistance);
-        agent.SetTargetPositionAndDirection(in targetPosition, in acceleration);
+        if (applyAiDrive)
+        {
+            Vec2 direction = acceleration.AsVec2;
+            Vec2 targetPosition = agent.Position.AsVec2 +
+                (direction * OwnedAgentMovementDriveTargetDistance);
+            agent.SetTargetPositionAndDirection(in targetPosition, in acceleration);
+        }
 
         acceleration = new Vec3(
             acceleration.X * OwnedAgentMovementDriveAcceleration,
             acceleration.Y * OwnedAgentMovementDriveAcceleration,
             0f);
         agent.AddAcceleration(in acceleration);
+        return applyAiDrive;
     }
 
     internal static void RestoreOwnedAgentMovementDrive(
         Agent agent,
         Agent.MovementControlFlag locomotionFlags,
         Vec2 movementInput,
-        AgentControllerType controller,
+        bool restoreAiDrive,
         bool isAiPaused,
-        float maximumSpeedLimit)
+        AgentMovementLockedState movementLockedState,
+        Vec2 targetPosition,
+        Vec3 targetDirection)
     {
-        if (agent.Controller != controller)
-            agent.Controller = controller;
-        agent.SetIsAIPaused(isAiPaused);
-        agent.SetMaximumSpeedLimit(maximumSpeedLimit, isMultiplier: false);
-        agent.ClearTargetFrame();
+        if (restoreAiDrive)
+        {
+            agent.SetIsAIPaused(isAiPaused);
+            switch (movementLockedState)
+            {
+                case AgentMovementLockedState.PositionLocked:
+                    agent.SetTargetPosition(targetPosition);
+                    break;
+                case AgentMovementLockedState.FrameLocked:
+                    agent.SetTargetPositionAndDirection(in targetPosition, in targetDirection);
+                    break;
+                default:
+                    agent.ClearTargetFrame();
+                    break;
+            }
+        }
         Missions.Agents.Packets.AgentData.ApplyLocomotionMovementFlags(agent, locomotionFlags);
         Missions.Agents.Packets.AgentData.ApplyMovementInput(agent, movementInput);
     }

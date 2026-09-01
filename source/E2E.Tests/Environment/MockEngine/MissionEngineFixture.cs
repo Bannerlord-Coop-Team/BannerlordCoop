@@ -194,6 +194,10 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetMovementDirection), nameof(Agent_GetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.TeleportToPosition), nameof(Agent_TeleportToPosition));
+        Prefix(typeof(Agent), "get_MovementLockedState", nameof(Agent_get_MovementLockedState));
+        Prefix(typeof(Agent), nameof(Agent.GetTargetPosition), nameof(Agent_GetTargetPosition));
+        Prefix(typeof(Agent), nameof(Agent.GetTargetDirection), nameof(Agent_GetTargetDirection));
+        Prefix(typeof(Agent), nameof(Agent.SetTargetPosition), nameof(Agent_SetTargetPosition));
         Prefix(typeof(Agent), nameof(Agent.SetTargetPositionAndDirection), nameof(Agent_SetTargetPositionAndDirection));
         Prefix(typeof(Agent), nameof(Agent.ClearTargetFrame), nameof(Agent_ClearTargetFrame));
         Prefix(typeof(Agent), nameof(Agent.GetRealGlobalVelocity), nameof(Agent_GetRealGlobalVelocity));
@@ -495,12 +499,6 @@ public sealed class MissionEngineFixture : IDisposable
         if (value == oldController) return false;
 
         m.Controller = value;
-        if (m.ResetMaximumSpeedLimitOnNonAiController
-            && value != AgentControllerType.AI
-            && m.IsHuman)
-        {
-            m.MaximumSpeedLimit = -1f;
-        }
         if (m.IsActive)
         {
             if (value == AgentControllerType.AI)
@@ -973,6 +971,38 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_get_MovementLockedState(
+        Agent __instance,
+        ref AgentMovementLockedState __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MovementLockedState;
+        return false;
+    }
+
+    private static bool Agent_GetTargetPosition(Agent __instance, ref Vec2 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.LastTargetPosition;
+        return false;
+    }
+
+    private static bool Agent_GetTargetDirection(Agent __instance, ref Vec3 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.LastTargetDirection;
+        return false;
+    }
+
+    private static bool Agent_SetTargetPosition(Agent __instance, Vec2 value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetTargetPositionCalls++;
+        m.MovementLockedState = AgentMovementLockedState.PositionLocked;
+        m.LastTargetPosition = value;
+        return false;
+    }
+
     private static bool Agent_SetTargetPositionAndDirection(
         Agent __instance,
         ref Vec2 targetPosition,
@@ -980,7 +1010,7 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetTargetPositionAndDirectionCalls++;
-        m.TargetFrameLocked = true;
+        m.MovementLockedState = AgentMovementLockedState.FrameLocked;
         m.LastTargetPosition = targetPosition;
         m.LastTargetDirection = targetDirection;
         return false;
@@ -990,7 +1020,7 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.ClearTargetFrameCalls++;
-        m.TargetFrameLocked = false;
+        m.MovementLockedState = AgentMovementLockedState.None;
         return false;
     }
 

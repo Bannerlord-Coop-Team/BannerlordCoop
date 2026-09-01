@@ -25,15 +25,15 @@ public sealed class MirrorAgent
     public int DeathAction { get; set; } = -1;
     public Vec3 Position { get; set; }
     public int TeleportToPositionCalls { get; set; }
+    public int SetTargetPositionCalls { get; set; }
     public int SetTargetPositionAndDirectionCalls { get; set; }
     public int ClearTargetFrameCalls { get; set; }
-    public bool TargetFrameLocked { get; set; }
+    public AgentMovementLockedState MovementLockedState { get; set; }
     public Vec2 LastTargetPosition { get; set; }
     public Vec3 LastTargetDirection { get; set; }
     public Vec3 RealGlobalVelocity { get; set; }
     public float MaximumForwardUnlimitedSpeed { get; set; } = 5f;
     public float MaximumSpeedLimit { get; set; } = -1f;
-    public bool ResetMaximumSpeedLimitOnNonAiController { get; set; }
     public int SetMaximumSpeedLimitCalls { get; set; }
     public bool LastMaximumSpeedLimitIsMultiplier { get; set; }
     public EquipmentIndex PrimaryWieldedItemIndex { get; set; } = EquipmentIndex.None;
