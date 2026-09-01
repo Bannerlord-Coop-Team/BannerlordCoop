@@ -123,35 +123,50 @@ public class PlayerPartyMapConversationGateTests
         WithCampaign(playerEncounter: null, encounteredParty: null, () =>
         {
             var sessionOtherParty = ObjectHelper.SkipConstructor<PartyBase>();
-            Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(sessionOtherParty));
+            Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
+                sessionOtherParty, localPlayerInitiated: false));
         });
     }
 
     [Fact]
-    public void HasUnrelatedLiveEncounter_EncounterAgainstAThirdParty_IsTrue()
+    public void HasUnrelatedLiveEncounter_ResponderWithEncounterAgainstAThirdParty_IsTrue()
     {
         var thirdParty = ObjectHelper.SkipConstructor<PartyBase>();
         var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
 
         WithCampaign(encounter, thirdParty, () =>
         {
-            // The session is against a different party than the one this client is already encountering.
             var sessionOtherParty = ObjectHelper.SkipConstructor<PartyBase>();
-            Assert.True(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(sessionOtherParty));
+            Assert.True(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
+                sessionOtherParty, localPlayerInitiated: false));
         });
     }
 
     [Fact]
-    public void HasUnrelatedLiveEncounter_EncounterAgainstTheSessionParty_IsFalse()
+    public void HasUnrelatedLiveEncounter_InitiatorWithEncounterAgainstAThirdParty_IsFalse()
     {
-        // The in-army / outsider initiator legitimately reaches the gate still inside an army_encounter whose
-        // encountered party IS the session counterpart - that must not be treated as unrelated.
+        var chosenMember = ObjectHelper.SkipConstructor<PartyBase>();
+        var originallyEncounteredArmy = ObjectHelper.SkipConstructor<PartyBase>();
+        var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+
+        WithCampaign(encounter, originallyEncounteredArmy, () =>
+        {
+            Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
+                chosenMember, localPlayerInitiated: true));
+        });
+    }
+
+    [Fact]
+    public void HasUnrelatedLiveEncounter_ResponderWithEncounterAgainstTheSessionParty_IsFalse()
+    {
+        // Responder side, but the encounter it is already in IS with the session counterpart - not unrelated.
         var sessionOtherParty = ObjectHelper.SkipConstructor<PartyBase>();
         var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
 
         WithCampaign(encounter, sessionOtherParty, () =>
         {
-            Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(sessionOtherParty));
+            Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
+                sessionOtherParty, localPlayerInitiated: false));
         });
     }
 
