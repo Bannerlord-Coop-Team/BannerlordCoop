@@ -120,6 +120,33 @@ public class MigratedMissionCommandTests
         Assert.Equal(output, result.Output);
     }
 
+    [Fact]
+    public void TypedBattleCommandBoundaries_ReachableRejections_AreFailures()
+    {
+        var resultFactory = new BattleLegacyCommandResult();
+        var argsFactory = new CoopCommandArgsFactory();
+
+#if DEBUG
+        CoopCommandResult replicationResult = new ReplicationFixtureCommand(resultFactory)
+            .ProcessCommand(argsFactory.FromValues(new[] { "initial" }));
+        CoopCommandResult columnResult = new ColumnReinforcementFixtureCommand(resultFactory)
+            .ProcessCommand(argsFactory.FromValues(new[] { "state" }));
+
+        Assert.False(replicationResult.Succeeded);
+        Assert.Equal("command_failed", replicationResult.ErrorCode);
+        Assert.Equal("BATTLE_REPLICATION_FIXTURE no active coop battle", replicationResult.Output);
+        Assert.False(columnResult.Succeeded);
+        Assert.Equal("command_failed", columnResult.ErrorCode);
+        Assert.Equal("COLUMN_REINFORCEMENT_FIXTURE inactive", columnResult.Output);
+#endif
+        CoopCommandResult ladderResult = new FocusLadderCommand(resultFactory)
+            .ProcessCommand(argsFactory.FromValues(new[] { int.MaxValue.ToString() }));
+
+        Assert.False(ladderResult.Succeeded);
+        Assert.Equal("command_failed", ladderResult.ErrorCode);
+        Assert.Equal($"Siege ladder {int.MaxValue} was not found", ladderResult.Output);
+    }
+
     private static ICoopCommand[] CreateCommands()
     {
         return typeof(MissionModule).Assembly.GetTypes()

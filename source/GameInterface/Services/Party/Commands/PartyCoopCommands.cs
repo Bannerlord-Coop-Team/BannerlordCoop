@@ -78,7 +78,9 @@ public sealed class PartyLegacyCommandResult : IPartyLegacyCommandResult
                output.IndexOf(" did not ", StringComparison.OrdinalIgnoreCase) >= 0 ||
                output.IndexOf(" required", StringComparison.OrdinalIgnoreCase) >= 0 ||
                output.IndexOf(" must ", StringComparison.OrdinalIgnoreCase) >= 0 ||
-               output.IndexOf(" is already ", StringComparison.OrdinalIgnoreCase) >= 0;
+               output.IndexOf(" is already ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" wrongly kept them", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.StartsWith("Please enter an integer", StringComparison.OrdinalIgnoreCase);
     }
 }
 

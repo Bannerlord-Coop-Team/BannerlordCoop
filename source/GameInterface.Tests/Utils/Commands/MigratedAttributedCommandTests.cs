@@ -77,6 +77,8 @@ public class MigratedAttributedCommandTests
     [InlineData("Failed: no active mission.", false)]
     [InlineData("Run this command on the server.", false)]
     [InlineData("Battle start coordinator is unavailable", false)]
+    [InlineData("Server rejected attack mission for map_event_42", false)]
+    [InlineData("Local deployment finished, but the local player agent was not assigned.", false)]
     [InlineData("Saved map event map_event_42 did not finalize cleanly.", false)]
     [InlineData("Fixture already active for player-1.", false)]
     [InlineData("Killed 3 enemy agent(s).", true)]
@@ -101,13 +103,27 @@ public class MigratedAttributedCommandTests
         Assert.Equal(output, result.Output);
     }
 
+    [Fact]
+    public void BattleRewardCleanPreflightResult_IsSuccessful()
+    {
+        const string output = "Battle reward fixture preflight is already clean.";
+
+        CoopCommandResult result = new MapEventLegacyCommandResult().FromOutput(output, output);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.ErrorCode);
+        Assert.Equal(output, result.Output);
+    }
+
     [Theory]
     [InlineData("CLAN_PARTY_TRANSFER_REJECTED")]
     [InlineData("CLAN_PARTY_TRANSFER_NOT_COMMITTED")]
     [InlineData("PARTY_SCREEN_UPGRADE_REJECTED character=aserai_recruit")]
     [InlineData("Garrison party 'town_comp_ES1' was not found.")]
     [InlineData("Danustica does not belong to the local player's clan.")]
-    public void ClanPartyTransferResult_Rejection_IsFailure(string output)
+    [InlineData("Please enter an integer for wounded count.")]
+    [InlineData("Applied prison snapshot to Raganvad; 1 hero prisoner(s) still present (companion-preserve wrongly kept them).")]
+    public void PartyResult_Rejection_IsFailure(string output)
     {
         CoopCommandResult result = new PartyLegacyCommandResult().FromOutput(output);
 
@@ -150,6 +166,43 @@ public class MigratedAttributedCommandTests
         Assert.True(result.Succeeded);
         Assert.Null(result.ErrorCode);
         Assert.Equal(output, result.Output);
+    }
+
+    [Fact]
+    public void TypedCommandBoundaries_RoleRejections_AreFailures()
+    {
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            var argsFactory = new CoopCommandArgsFactory();
+
+            CoopCommandResult stageResult = new StageClanPartyTransferCommand(new PartyLegacyCommandResult())
+                .ProcessCommand(argsFactory.FromValues(new[] { "clan-party", "character" }));
+            CoopCommandResult commitResult = new CommitClanPartyTransferCommand(new PartyLegacyCommandResult())
+                .ProcessCommand(argsFactory.FromValues(Array.Empty<string>()));
+            CoopCommandResult bufferResult = new BufferStateCommand(new PartyVisualLegacyCommandResult())
+                .ProcessCommand(argsFactory.FromValues(Array.Empty<string>()));
+            CoopCommandResult woundedResult = new SetTroopWoundedCommand(new PartyLegacyCommandResult())
+                .ProcessCommand(argsFactory.FromValues(new[] { "party", "character", "not-an-integer" }));
+
+            Assert.False(stageResult.Succeeded);
+            Assert.Equal("command_failed", stageResult.ErrorCode);
+            Assert.Equal("Command can only be run on a client.", stageResult.Output);
+            Assert.False(commitResult.Succeeded);
+            Assert.Equal("command_failed", commitResult.ErrorCode);
+            Assert.Equal("Command can only be run on a client.", commitResult.Output);
+            Assert.False(bufferResult.Succeeded);
+            Assert.Equal("command_failed", bufferResult.ErrorCode);
+            Assert.Equal("Run this command on a client.", bufferResult.Output);
+            Assert.False(woundedResult.Succeeded);
+            Assert.Equal("command_failed", woundedResult.ErrorCode);
+            Assert.Equal("Please enter an integer for wounded count.", woundedResult.Output);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
     }
 
     [Fact]

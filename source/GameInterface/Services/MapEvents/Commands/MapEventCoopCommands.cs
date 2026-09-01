@@ -89,8 +89,10 @@ public sealed class MapEventLegacyCommandResult : IMapEventLegacyCommandResult
                output.IndexOf(" must ", StringComparison.OrdinalIgnoreCase) >= 0 ||
                output.IndexOf(" failed", StringComparison.OrdinalIgnoreCase) >= 0 ||
                output.IndexOf(" already active", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               output.IndexOf(" was not assigned", StringComparison.OrdinalIgnoreCase) >= 0 ||
                output.StartsWith("Add the ", StringComparison.OrdinalIgnoreCase) ||
-               output.StartsWith("Begin the ", StringComparison.OrdinalIgnoreCase);
+               output.StartsWith("Begin the ", StringComparison.OrdinalIgnoreCase) ||
+               output.StartsWith("Server rejected ", StringComparison.OrdinalIgnoreCase);
     }
 }
 
@@ -971,7 +973,7 @@ public sealed class BattleRewardFixturePrepareCommand : IBattleRewardFixturePrep
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         string output = global::GameInterface.Services.Villages.Commands.MapEventDebugCommands.PrepareBattleRewardFixture(new List<string>(args));
-        return resultFactory.FromOutput(output);
+        return resultFactory.FromOutput(output, "Battle reward fixture preflight is already clean.");
     }
 }
 
