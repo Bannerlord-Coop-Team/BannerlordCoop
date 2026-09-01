@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
@@ -463,6 +464,7 @@ internal class BattleJoinLeaveHandler : IHandler
     // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
     private void ApplyNetworkLeave(PartyBase party, bool leaveSiege, bool finishLocalMenus)
     {
+        MobileParty fieldBattlePartyToDisengage = null;
         using (new AllowedThread())
         {
             var mapEvent = party.MapEvent;
@@ -496,11 +498,23 @@ internal class BattleJoinLeaveHandler : IHandler
                 else if (PlayerEncounter.Current != null)
                 {
                     PlayerEncounter.Finish(false);
+                    fieldBattlePartyToDisengage = mobileParty;
                 }
             }
 
             if (leaveSiege && isMainParty)
                 mobileParty?.SetMoveModeHold();
         }
+
+        // PlayerEncounter.Finish runs inside AllowedThread while applying the server's leave, so its normal
+        // postfix intentionally skips movement publication. Clear the stale engage order after leaving the
+        // receive-path bypass and send that change through the authoritative party-behavior channel.
+        if (fieldBattlePartyToDisengage?.Ai == null)
+            return;
+
+        fieldBattlePartyToDisengage.SetMoveModeHold();
+        messageBroker.Publish(
+            fieldBattlePartyToDisengage.Ai,
+            new PartyBehaviorChangeAttempted(fieldBattlePartyToDisengage));
     }
 }

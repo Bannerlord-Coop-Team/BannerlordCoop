@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
@@ -428,6 +428,53 @@ public class BattleSurrenderTests : MapEventTestBase
         // No side-wide conclusion went out — only the surrenderer's own removal broadcast.
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+    }
+
+    /// <summary>
+    /// A server-approved field-battle leave must also clear the leaving party's authoritative engage order,
+    /// otherwise the encounter immediately reopens after its local menu closes.
+    /// </summary>
+    [Fact]
+    public void FieldBattleLeave_WithHealthyAlly_DisengagesLeavingPartyOnAllInstances()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        JoinNewServerPartyToSide(setup.ctx.MapEventId, BattleSideEnum.Defender);
+        var leavingClient = Clients.Last();
+
+        SetMockPlayerEncounter(leavingClient, mapEventId: setup.ctx.MapEventId);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(setup.initiatorPartyId, out var target));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(setup.recipientPartyId, out var leavingParty));
+                using (new AllowedThread())
+                    leavingParty.SetMoveEngageParty(target, MobileParty.NavigationType.Default);
+
+                Assert.Equal(AiBehavior.EngageParty, leavingParty.DefaultBehavior);
+            }, MapEventDisabledMethods);
+        }
+
+        leavingClient.Call(() =>
+        {
+            Assert.True(leavingClient.ObjectManager.TryGetObject<MobileParty>(setup.recipientPartyId, out var leavingParty));
+            leavingClient.Resolve<IMessageBroker>().Publish(
+                this,
+                new PlayerLeaveBattleAttempted(leavingParty.Party));
+        }, BattleMenuSurrenderDisabledMethods());
+        TestEnvironment.FlushCoalescer();
+
+        leavingClient.Call(() => Assert.Null(PlayerEncounter.Current));
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(setup.recipientPartyId, out var leavingParty));
+                Assert.Equal(AiBehavior.Hold, leavingParty.DefaultBehavior);
+                Assert.Null(leavingParty.ShortTermTargetParty);
+                Assert.Null(leavingParty.MoveTargetParty);
+            });
+        }
     }
 
     /// <summary>
