@@ -38,7 +38,7 @@ internal class SettlementSync : IAutoSync
 
         //// Properties
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.Party)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.BribePaid)));
+        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.BribePaid))); // Unique per player
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.SiegeEvent)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsActive)));
         // Native recomputes visibility from the process-local MainParty position

@@ -47,9 +47,19 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
-            var interactionsPlayerData = new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new());
+            var interactionsPlayerData = new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new());
             interactionsPlayerData.PlayerAlreadySneakedSettlements[players[0].HeroId] = new() { "settlement1Id", "settlement2Id" };
             interactionsPlayerData.PlayerAlreadySneakedSettlements[players[1].HeroId] = new() { "settlement2Id", "settlement3Id" };
+            interactionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[players[0].HeroId] = "settlement1Id";
+            interactionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[players[1].HeroId] = "settlement2Id";
+            interactionsPlayerData.PlayerHasBoughtTunToParty[players[0].HeroId] = true;
+            interactionsPlayerData.PlayerHasBoughtTunToParty[players[1].HeroId] = false;
+            interactionsPlayerData.PlayerHasMetRansomBroker[players[0].HeroId] = false;
+            interactionsPlayerData.PlayerHasMetRansomBroker[players[1].HeroId] = true;
+
+            var tradePlayerData = new TradePlayerData(new(), new(), new(), new());
+            tradePlayerData.PlayerSettlementBribePaid[players[0].HeroId] = new() { ["settlement1Id"] = 0, ["settlement2Id"] = 1000 };
+            tradePlayerData.PlayerSettlementBribePaid[players[1].HeroId] = new() { ["settlement2Id"] = 3200, ["settlement3Id"] = 123 };
 
             ICoopSession sessionData = new CoopSession(
                 "SaveManagerTest",
@@ -59,7 +69,7 @@ namespace Coop.Tests.Server.Services.Save
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
                 interactionsPlayerData,
-                new TradePlayerData(new(), new(), new()),
+                tradePlayerData,
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(new()),
                 new AgingPlayerData(new()));
@@ -95,9 +105,19 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
-            var interactionsPlayerData = new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new());
+            var interactionsPlayerData = new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new());
             interactionsPlayerData.PlayerAlreadySneakedSettlements[players[0].HeroId] = new() { "settlement1Id", "settlement2Id" };
             interactionsPlayerData.PlayerAlreadySneakedSettlements[players[1].HeroId] = new() { "settlement2Id", "settlement3Id" };
+            interactionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[players[0].HeroId] = "settlement1Id";
+            interactionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[players[1].HeroId] = "settlement2Id";
+            interactionsPlayerData.PlayerHasBoughtTunToParty[players[0].HeroId] = true;
+            interactionsPlayerData.PlayerHasBoughtTunToParty[players[1].HeroId] = false;
+            interactionsPlayerData.PlayerHasMetRansomBroker[players[0].HeroId] = false;
+            interactionsPlayerData.PlayerHasMetRansomBroker[players[1].HeroId] = true;
+
+            var tradePlayerData = new TradePlayerData(new(), new(), new(), new());
+            tradePlayerData.PlayerSettlementBribePaid[players[0].HeroId] = new() { ["settlement1Id"] = 0, ["settlement2Id"] = 1000 };
+            tradePlayerData.PlayerSettlementBribePaid[players[1].HeroId] = new() { ["settlement2Id"] = 3200, ["settlement3Id"] = 123 };
 
             var meetingTimes = new Dictionary<string, Dictionary<string, long>>
             {
@@ -115,7 +135,7 @@ namespace Coop.Tests.Server.Services.Save
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
                 interactionsPlayerData,
-                new TradePlayerData(new(), new(), new()),
+                tradePlayerData,
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(meetingTimes),
                 new AgingPlayerData(new()));
@@ -143,6 +163,11 @@ namespace Coop.Tests.Server.Services.Save
                 var playerHeroId = sessionData.Players[i].HeroId;
 
                 Assert.Equal(sessionData.InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId], savedSession.InteractionsPlayerData.PlayerAlreadySneakedSettlements[playerHeroId]);
+                Assert.Equal(sessionData.InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerHeroId], savedSession.InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerHeroId]);
+                Assert.Equal(sessionData.InteractionsPlayerData.PlayerHasBoughtTunToParty[playerHeroId], savedSession.InteractionsPlayerData.PlayerHasBoughtTunToParty[playerHeroId]);
+                Assert.Equal(sessionData.InteractionsPlayerData.PlayerHasMetRansomBroker[playerHeroId], savedSession.InteractionsPlayerData.PlayerHasMetRansomBroker[playerHeroId]);
+
+                Assert.Equal(sessionData.TradePlayerData.PlayerSettlementBribePaid[playerHeroId], savedSession.TradePlayerData.PlayerSettlementBribePaid[playerHeroId]);
             }
             Assert.Equal(1351, savedSession.HeroMeetingData.PlayerLastMeetingTimes["MyHero1"]["lord_6_1"]);
         }

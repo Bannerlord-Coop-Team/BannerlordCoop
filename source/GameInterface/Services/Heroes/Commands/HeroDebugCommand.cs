@@ -129,47 +129,6 @@ public class HeroDebugCommand
                $"LIVE_TEST_JSON={structuredState}";
     }
 
-    [CommandLineArgumentFunction("id", "coop.debug.hero")]
-    public static string FindIds(List<string> args)
-    {
-        if (args == null || args.Count == 0)
-        {
-            return "Usage: coop.debug.hero.id <hero name>";
-        }
-
-        var heroName = string.Join(" ", args).Trim();
-        if (string.IsNullOrWhiteSpace(heroName)) return "Usage: coop.debug.hero.id <hero name>";
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            return $"Unable to get {nameof(IObjectManager)}";
-        }
-
-        var campaign = Campaign.Current;
-        if (campaign == null) return "Campaign is not loaded.";
-
-        var heroes = campaign.CampaignObjectManager.GetAllHeroes()
-            .Where(hero => string.Equals(hero.Name?.ToString(), heroName, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (heroes.Count == 0) return $"No hero named '{heroName}' was found.";
-
-        var result = new StringBuilder();
-        foreach (var hero in heroes)
-        {
-            if (objectManager.TryGetId(hero, out var id))
-            {
-                result.AppendLine($"ID: '{id}', Name: '{hero.Name}', Game StringId: {hero.StringId}");
-            }
-            else
-            {
-                result.AppendLine($"Name: '{hero.Name}' was not registered with object manager");
-            }
-        }
-
-        return result.ToString();
-    }
-
     // coop.debug.hero.info
     [CommandLineArgumentFunction("info", "coop.debug.hero")]
     public static string Info(List<string> args)
