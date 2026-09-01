@@ -133,10 +133,6 @@ public sealed class MissionEngineFixture : IDisposable
         harmony.Patch(
             AccessTools.Method(typeof(Agent), nameof(Agent.GetComponent))
                 .MakeGenericMethod(typeof(CampaignAgentComponent)),
-            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Agent_GetCampaignAgentComponent))));
-        harmony.Patch(
-            AccessTools.Method(typeof(Agent), nameof(Agent.GetComponent))
-                .MakeGenericMethod(typeof(CampaignAgentComponent)),
             prefix: new HarmonyMethod(AccessTools.Method(
                 typeof(MissionEngineFixture), nameof(Agent_GetCampaignAgentComponent))));
         harmony.Patch(
@@ -691,15 +687,6 @@ public sealed class MissionEngineFixture : IDisposable
         __result = mirror.Components.Remove(agentComponent);
         if (__result && ReferenceEquals(__instance.CommonAIComponent, agentComponent))
             __instance.CommonAIComponent = null;
-        return false;
-    }
-
-    private static bool Agent_GetCampaignAgentComponent(
-        Agent __instance,
-        ref CampaignAgentComponent __result)
-    {
-        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
-        __result = mirror.Components.OfType<CampaignAgentComponent>().FirstOrDefault();
         return false;
     }
 

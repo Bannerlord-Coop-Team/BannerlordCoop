@@ -577,6 +577,50 @@ public sealed class KingdomMakePeaceCommand : LegacyCoopCommand, IKingdomMakePea
     }
 }
 
+public interface IKingdomForceAllyCommand : ICoopCommand
+{
+}
+
+public sealed class KingdomForceAllyCommand : LegacyCoopCommand, IKingdomForceAllyCommand
+{
+    public KingdomForceAllyCommand(ILegacyCoopCommandExecutor executor)
+        : base(
+            executor,
+            "coop.debug.kingdom",
+            "force_ally",
+            "Forms an alliance between two kingdoms on the server.",
+            new IExpectedArgs[]
+            {
+                new ExpectedArgs("kingdom1Id", "The first registered kingdom id."),
+                new ExpectedArgs("kingdom2Id", "The second registered kingdom id."),
+            },
+            KingdomDebugCommand.ForceAlly)
+    {
+    }
+}
+
+public interface IKingdomForceTradeAgreementCommand : ICoopCommand
+{
+}
+
+public sealed class KingdomForceTradeAgreementCommand : LegacyCoopCommand, IKingdomForceTradeAgreementCommand
+{
+    public KingdomForceTradeAgreementCommand(ILegacyCoopCommandExecutor executor)
+        : base(
+            executor,
+            "coop.debug.kingdom",
+            "force_trade_agreement",
+            "Forms a trade agreement between two kingdoms on the server.",
+            new IExpectedArgs[]
+            {
+                new ExpectedArgs("kingdom1Id", "The first registered kingdom id."),
+                new ExpectedArgs("kingdom2Id", "The second registered kingdom id."),
+            },
+            KingdomDebugCommand.ForceTradeAgreement)
+    {
+    }
+}
+
 public interface IKingdomAddDecisionCommand : ICoopCommand
 {
 }
