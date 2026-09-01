@@ -5,6 +5,7 @@ using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using Coop.Core.Server.Services.Telemetry;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
@@ -14,6 +15,7 @@ using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
 using Xunit.Abstractions;
+using MockServerTelemetryUploader = Coop.IntegrationTests.Environment.Mock.MockServerTelemetryUploader;
 
 namespace E2E.Tests.Environment;
 
@@ -93,6 +95,10 @@ public class TestEnvironment
         builder.RegisterType<ServerInstance>().AsSelf();
 
         AddSharedDependencies(builder);
+        builder.RegisterType<MockServerTelemetryUploader>()
+            .As<IServerTelemetryUploader>()
+            .As<IBattlesFoughtUploader>()
+            .SingleInstance();
 
         container = builder.Build();
 
