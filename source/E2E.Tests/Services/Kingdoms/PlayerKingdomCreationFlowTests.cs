@@ -152,7 +152,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { player.HeroId, "Real", "Kingdom" });
+                new List<string> { player.HeroId, KingdomName });
         });
 
         Assert.StartsWith("Created kingdom", output);
@@ -186,7 +186,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() =>
         {
             output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { player.HeroId, "Real", "Kingdom" });
+                new List<string> { player.HeroId, KingdomName });
         });
 
         Assert.Equal("This command can only be run on the server.", output);
@@ -216,7 +216,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { followerId, "Real", "Kingdom" });
+                new List<string> { followerId, KingdomName });
         });
 
         Assert.Contains("does not lead clan", output);

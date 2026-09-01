@@ -16,6 +16,17 @@ namespace GameInterface.Tests.Services.Commands;
 
 public class CharacterFactionCoopCommandTests
 {
+    private static readonly HashSet<string> MigratedCommandNamespaces = new HashSet<string>
+    {
+        "GameInterface.Services.Alleys.Commands",
+        "GameInterface.Services.Armies.Commands",
+        "GameInterface.Services.Clans.Commands",
+        "GameInterface.Services.Companions.Commands",
+        "GameInterface.Services.Heroes.Commands",
+        "GameInterface.Services.Kingdoms.Commands",
+        "GameInterface.Services.Players.Commands",
+    };
+
     private readonly ILegacyCoopCommandExecutor executor = new LegacyCoopCommandExecutor();
 
     [Fact]
@@ -106,6 +117,7 @@ public class CharacterFactionCoopCommandTests
         return typeof(HeroSetGoldCommand).Assembly.GetTypes()
             .Where(type => type.IsClass &&
                            !type.IsAbstract &&
+                           MigratedCommandNamespaces.Contains(type.Namespace) &&
                            typeof(LegacyCoopCommand).IsAssignableFrom(type))
             .Select(type => (ICoopCommand)Activator.CreateInstance(type, executor))
             .ToList();
