@@ -128,14 +128,15 @@ public class BattleResultReadyLogicTests
     }
 
     [Fact]
-    public void RetreatMission_ReportsCurrentBattleRetreat()
+    public void UnresolvedRetreatMission_ReportsCurrentBattleRetreat()
     {
         var session = new Mock<IBattleSession>(MockBehavior.Strict);
         session.SetupGet(value => value.HasInstance).Returns(true);
         session.SetupGet(value => value.InstanceId).Returns("battle");
+        
         var relayNetwork = new Mock<INetwork>(MockBehavior.Strict);
-        relayNetwork.Setup(network => network.SendAll(It.Is<NetworkBattleRetreated>(message =>
-            message.InstanceId == "battle")));
+        relayNetwork.Setup(network => network.SendAll(It.Is<NetworkBattleRetreated>(message => message.InstanceId == "battle")));
+        
         var logic = new BattleResultReadyLogic(
             Mock.Of<IBattleResultCommitter>(),
             Mock.Of<ISiegeEngineStateReporter>(),
@@ -147,5 +148,29 @@ public class BattleResultReadyLogicTests
         logic.OnRetreatMission();
 
         relayNetwork.VerifyAll();
+    }
+
+    [Fact]
+    public void ResolvedResultFollowedByRetreatCallback_DoesNotReportRetreat()
+    {
+        var result = new MissionResult(BattleState.AttackerVictory, playerVictory: true, playerDefeated: false,
+            enemyRetreated: false);
+        
+        var resultCommitter = new Mock<IBattleResultCommitter>(MockBehavior.Strict);
+        resultCommitter.Setup(committer => committer.ReportResolvedResult(result));
+        
+        var siegeReporter = new Mock<ISiegeEngineStateReporter>(MockBehavior.Strict);
+        siegeReporter.Setup(reporter => reporter.ReportConcludedIfHost());
+        
+        var relayNetwork = new Mock<INetwork>(MockBehavior.Strict);
+        
+        var logic = new BattleResultReadyLogic(resultCommitter.Object, siegeReporter.Object, new MessageBroker(), Mock.Of<IBattleSession>(), Mock.Of<IBattleDeploymentCoordinator>(), relayNetwork.Object);
+        
+        logic.OnMissionResultReady(result);
+        logic.OnRetreatMission();
+        
+        resultCommitter.VerifyAll();
+        siegeReporter.VerifyAll();
+        relayNetwork.VerifyNoOtherCalls();
     }
 }

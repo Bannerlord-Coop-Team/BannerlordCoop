@@ -16,6 +16,7 @@ public class BattleResultReadyLogic : MissionLogic
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly INetwork relayNetwork;
+    private bool hasResolvedMissionResult;
 
     public BattleResultReadyLogic(
         IBattleResultCommitter resultCommitter,
@@ -39,6 +40,7 @@ public class BattleResultReadyLogic : MissionLogic
     {
         if (missionResult?.BattleResolved == true)
         {
+            hasResolvedMissionResult = true;
             siegeEngineStateReporter.ReportConcludedIfHost();
         }
 
@@ -71,7 +73,6 @@ public class BattleResultReadyLogic : MissionLogic
     // Only report retreats triggered by the retreat action
     public override void OnRetreatMission()
     {
-        if (session.HasInstance)
-            relayNetwork.SendAll(new NetworkBattleRetreated(session.InstanceId));
+        if (!hasResolvedMissionResult && session.HasInstance) relayNetwork.SendAll(new NetworkBattleRetreated(session.InstanceId));
     }
 }
