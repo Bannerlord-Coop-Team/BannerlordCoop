@@ -129,6 +129,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_RiderAgent", nameof(Agent_get_RiderAgent));
         Prefix(typeof(Agent), nameof(Agent.AddComponent), nameof(Agent_AddComponent));
         Prefix(typeof(Agent), nameof(Agent.RemoveComponent), nameof(Agent_RemoveComponent));
+        // Location puppets attach a dormant CampaignAgentComponent to the mirror after spawning.
         harmony.Patch(
             AccessTools.Method(typeof(Agent), nameof(Agent.GetComponent))
                 .MakeGenericMethod(typeof(CampaignAgentComponent)),

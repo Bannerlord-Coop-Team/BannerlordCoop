@@ -269,8 +269,8 @@ public class ServerMissionMembershipHandlerTests
     {
         var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51012), 12);
         var messageBroker = new TestMessageBroker();
-        var missionManager = new MissionManager();
         var playerManager = CreatePlayerManager(peer, "current");
+        var missionManager = new MissionManager(playerManager.Object);
         using var handler = new ServerMissionMembershipHandler(
             messageBroker, missionManager, new TestNetwork(), playerManager.Object);
 

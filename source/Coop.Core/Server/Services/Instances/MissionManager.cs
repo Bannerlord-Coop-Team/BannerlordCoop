@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Network.Data;
 using GameInterface.Services.Missions;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -20,8 +21,8 @@ public interface IMissionManager
 {
     /// <summary>
     /// Handle a NAT-introduction request: introduce the requesting peer to every other peer already
-    /// punched into the same instance. Driven purely by the request's <see cref="ConnectionToken"/>,
-    /// whose instance name is the client-derived instance id.
+    /// punched into the same instance. The request's <see cref="ConnectionToken"/> supplies the controller
+    /// and client-derived instance id; the controller must map to a current campaign connection.
     /// </summary>
     void HandleIntroductionRequest(NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token);
 
@@ -52,7 +53,7 @@ public interface IMissionManager
     bool TryLeaveMission(NetPeer peer, string controllerId, string instanceId, out MissionDeparture departure);
 
     /// <summary>
-    /// Drop every membership still tied to <paramref name="peer"/> after an ungraceful disconnect.
+    /// Drop every membership and punch endpoint still tied to <paramref name="peer"/> after a disconnect.
     /// </summary>
     IReadOnlyList<MissionDeparture> HandleDisconnect(NetPeer peer);
 
@@ -135,6 +136,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private static readonly ILogger Logger = LogManager.GetLogger<MissionManager>();
 
     private readonly object gate = new object();
+    private readonly IPlayerManager playerManager;
     private readonly Dictionary<string, MissionInstance> byInstanceId = new Dictionary<string, MissionInstance>();
     private readonly Dictionary<NetPeer, MissionMembership> byPeer = new Dictionary<NetPeer, MissionMembership>();
     private readonly Dictionary<string, MissionMembership> byController = new Dictionary<string, MissionMembership>();
@@ -143,12 +145,25 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private readonly HashSet<string> concludingInstances = new HashSet<string>();
     private readonly HashSet<string> concludedInstances = new HashSet<string>();
 
+    public MissionManager(IPlayerManager playerManager)
+    {
+        if (playerManager == null) throw new ArgumentNullException(nameof(playerManager));
+        this.playerManager = playerManager;
+    }
+
     public void HandleIntroductionRequest(
         NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
     {
         if (ConnectionToken.TryParse(token, out var connectionToken) == false)
         {
             Logger.Warning("Discarding NAT introduction with unparseable token from {Endpoint}", remoteEndPoint);
+            return;
+        }
+
+        if (!playerManager.TryGetPeer(connectionToken.ControllerId, out var campaignPeer))
+        {
+            Logger.Warning("Ignoring NAT introduction for controller {Controller} without a current campaign peer",
+                connectionToken.ControllerId);
             return;
         }
 
@@ -173,8 +188,9 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                     instanceId, remoteEndPoint);
             }
 
-            // A punch = (re)entering now. Drop any earlier slot for this endpoint first, else a re-joiner
-            // (same endpoint, since the socket persists) is mistaken for a duplicate and never reconnected.
+            // A punch = (re)entering now. Drop any earlier slot for this controller or endpoint first,
+            // so a replacement connection is not introduced to its own stale socket.
+            RemoveControllerEndpointEverywhere(connectionToken.ControllerId);
             RemoveEndpointEverywhere(remoteEndPoint);
 
             foreach (var existing in instance.PunchEndpoints)
@@ -188,7 +204,11 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                     token);
             }
 
-            instance.PunchEndpoints.Add(new MissionInstance.Endpoints(localEndPoint, remoteEndPoint));
+            instance.PunchEndpoints.Add(new MissionInstance.Endpoints(
+                connectionToken.ControllerId,
+                campaignPeer,
+                localEndPoint,
+                remoteEndPoint));
         }
     }
 
@@ -378,6 +398,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                     departure.ControllerId, departure.InstanceId);
             }
 
+            RemovePeerEndpointEverywhere(peer);
             CompleteRelayRevocation(peer);
 
             return departures;
@@ -406,17 +427,18 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    // Drop the instance record once its last member is gone (BR-017: destroying the battle instance includes
-    // the membership/relay record — previously it leaked per battle). Any stale NAT-punch endpoints go with
-    // it; a later (re-)engagement of the same instance id re-punches and recreates the record from scratch,
-    // which is exactly the fresh instance BR-054/BR-002 call for. Caller holds the lock.
-    private void PruneIfEmpty(string instanceId, int remainingMembers)
+    // Drop the instance record once both membership and punch state are empty. A NAT punch can arrive
+    // before mission entry, so its shell must survive another member leaving. Caller holds the lock.
+    private void PruneIfEmpty(MissionInstance instance)
     {
-        if (remainingMembers > 0)
+        if (instance.Memberships.Count > 0 || instance.PunchEndpoints.Count > 0)
             return;
 
-        byInstanceId.Remove(instanceId);
-        Logger.Information("Removed empty instance {Instance} after its last member left", instanceId);
+        if (!byInstanceId.TryGetValue(instance.Id, out var current) || !ReferenceEquals(current, instance))
+            return;
+
+        byInstanceId.Remove(instance.Id);
+        Logger.Information("Removed empty instance {Instance} after its last member left", instance.Id);
     }
 
     public bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers)
@@ -532,6 +554,9 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private MissionDeparture RemoveMembership(MissionMembership membership)
     {
         membership.Instance.Memberships.Remove(membership);
+        membership.Instance.PunchEndpoints.RemoveAll(e =>
+            e.ControllerId == membership.ControllerId && ReferenceEquals(e.CampaignPeer, membership.Peer));
+
         if (byPeer.TryGetValue(membership.Peer, out var peerMembership) &&
             ReferenceEquals(peerMembership, membership))
         {
@@ -544,7 +569,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
 
         var remaining = Members(membership.Instance);
-        PruneIfEmpty(membership.Instance.Id, remaining.Count);
+        PruneIfEmpty(membership.Instance);
         return new MissionDeparture(membership.ControllerId, membership.Instance.Id, remaining);
     }
 
@@ -556,10 +581,26 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             .Select(member => (member.ControllerId, member.Peer))
             .ToList();
 
-    // A peer is in at most one instance, so any prior listing for this endpoint is stale on a new punch.
+    // A controller and peer are each in at most one instance, so prior punch slots are stale on a new punch.
+    private void RemoveControllerEndpointEverywhere(string controllerId)
+    {
+        foreach (var instance in byInstanceId.Values.Concat(pendingEmptyInstances.Values))
+        {
+            instance.PunchEndpoints.RemoveAll(e => e.ControllerId == controllerId);
+        }
+    }
+
+    private void RemovePeerEndpointEverywhere(NetPeer peer)
+    {
+        foreach (var instance in byInstanceId.Values.Concat(pendingEmptyInstances.Values))
+        {
+            instance.PunchEndpoints.RemoveAll(e => ReferenceEquals(e.CampaignPeer, peer));
+        }
+    }
+
     private void RemoveEndpointEverywhere(IPEndPoint external)
     {
-        foreach (var instance in byInstanceId.Values)
+        foreach (var instance in byInstanceId.Values.Concat(pendingEmptyInstances.Values))
         {
             instance.PunchEndpoints.RemoveAll(e => e.External.Equals(external));
         }
