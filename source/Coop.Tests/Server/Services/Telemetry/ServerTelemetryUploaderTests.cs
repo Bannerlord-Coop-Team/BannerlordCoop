@@ -54,16 +54,19 @@ public class ServerTelemetryUploaderTests
     [Fact]
     public async Task RecordBattleStartedAsync_PostsToBattlesFoughtEdgeFunction()
     {
+        const string testEndpoint = "https://telemetry.example.test/api/v1/battles-fought";
         var handler = new RecordingHttpHandler();
         using var httpClient = new HttpClient(handler);
-        using var uploader = new ServerTelemetryUploader(httpClient);
+        using var uploader = new ServerTelemetryUploader(
+            httpClient,
+            battlesFoughtEndpoint: testEndpoint);
 
         var result = await uploader.RecordBattleStartedAsync(CancellationToken.None);
 
         Assert.True(result.Uploaded);
         Assert.Equal(1, handler.RequestCount);
         Assert.Equal(HttpMethod.Post, handler.Method);
-        Assert.Equal(ServerTelemetryUploader.BattlesFoughtEndpoint, handler.RequestUri?.ToString());
+        Assert.Equal(testEndpoint, handler.RequestUri?.ToString());
         Assert.Equal("application/json; charset=utf-8", handler.ContentType);
         Assert.Equal("Bearer " + ServerTelemetryUploader.PublishableKey, handler.Authorization);
         Assert.Equal(ServerTelemetryUploader.PublishableKey, handler.ApiKey);

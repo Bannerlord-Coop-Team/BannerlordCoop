@@ -5,6 +5,8 @@ using Common.Network.Session;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using Coop.Core.Server.Services.Telemetry;
+using Coop.Tests.Mocks;
 using GameInterface;
 using Xunit;
 
@@ -35,6 +37,7 @@ namespace Coop.Tests.Autofac
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
+            RegisterMockServerTelemetry(builder);
             using var container = builder.Build();
 
             Assert.NotNull(container);
@@ -56,11 +59,20 @@ namespace Coop.Tests.Autofac
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
             builder.RegisterInstance(selectedConfig).AsSelf().SingleInstance();
+            RegisterMockServerTelemetry(builder);
 
             using var container = builder.Build();
 
             Assert.Same(selectedConfig, container.Resolve<SessionAdvertisementConfig>());
             Assert.Equal(visibility, container.Resolve<SessionAdvertisementConfig>().Visibility);
+        }
+
+        private static void RegisterMockServerTelemetry(ContainerBuilder builder)
+        {
+            builder.RegisterType<MockServerTelemetryUploader>()
+                .As<IServerTelemetryUploader>()
+                .As<IBattlesFoughtUploader>()
+                .SingleInstance();
         }
     }
 }
