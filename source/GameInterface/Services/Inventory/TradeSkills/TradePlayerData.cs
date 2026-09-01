@@ -10,6 +10,7 @@ namespace GameInterface.Services.Inventory.TradeSkills;
 /// TradeSkillCampaignBehavior.ItemsTradeData
 /// TradeRumorsCampaignBehavior._tradeRumors
 /// TradeRumorsCampaignBehavior._enteredSettlements
+/// Settlement.BribePaid
 /// Need to manage separately for all players
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
@@ -27,13 +28,19 @@ public class TradePlayerData
     [ProtoMember(3)]
     public Dictionary<string, Dictionary<string, long>> PlayerEnteredSettlements { get; }
 
+    // Dictionary<PlayerHeroId, Dictionary<SettlementId, BribePaid>>
+    [ProtoMember(4)]
+    public Dictionary<string, Dictionary<string, int>> PlayerSettlementBribePaid { get; }
+
     public TradePlayerData(
         Dictionary<string, Dictionary<string, Tuple<float, int>>> playerItemsTradeData,
         Dictionary<string, List<TradeRumorData>> playerTradeRumors,
-        Dictionary<string, Dictionary<string, long>> playerEnteredSettlements)
+        Dictionary<string, Dictionary<string, long>> playerEnteredSettlements,
+        Dictionary<string, Dictionary<string, int>> playerSettlementBribePaid)
     {
         PlayerItemsTradeData = playerItemsTradeData ?? new();
         PlayerTradeRumors = playerTradeRumors ?? new();
         PlayerEnteredSettlements = playerEnteredSettlements ?? new();
+        PlayerSettlementBribePaid = playerSettlementBribePaid ?? new();
     }
 }

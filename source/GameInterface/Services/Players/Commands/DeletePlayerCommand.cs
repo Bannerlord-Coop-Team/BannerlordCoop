@@ -1,9 +1,8 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Players.Messages;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Players.Commands;
 
@@ -19,7 +18,7 @@ public class DeletePlayerCommand
     /// <summary>
     /// Requests a server-authoritative deletion of the local player. Client only.
     /// </summary>
-    [CommandLineArgumentFunction("delete_player", "coop")]
+
     public static string DeletePlayer(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";

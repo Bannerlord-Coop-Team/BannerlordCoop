@@ -20,6 +20,16 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;
 
+/// <summary>Skips unstuck bug-report tests while the feature is disabled.</summary>
+public sealed class UnstuckCommandReportingFactAttribute : FactAttribute
+{
+    public UnstuckCommandReportingFactAttribute()
+    {
+        if (!BugReportConfig.UnstuckCommandReportsEnabled)
+            Skip = "Automatic unstuck bug reports are disabled.";
+    }
+}
+
 /// <summary>
 /// Verifies the dedicated unstuck flow: coop.debug.mobileparty.unstuck forwards a
 /// <see cref="NetworkRequestPlayerUnstuck"/> to the server, the server force-applies each exit
@@ -65,7 +75,7 @@ public class UnstuckCommandTests : MapEventTestBase
         Assert.Equal(player.HeroId, request.HeroId);
     }
 
-    [Fact]
+    [UnstuckCommandReportingFact]
     public void ServerUnstuckRequest_RequestsDiagnosticLogsFromEveryConnectedClient()
     {
         var requester = SetupRegisteredMainHeroAndParty();

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Heroes.Commands;
 
@@ -15,7 +14,7 @@ namespace GameInterface.Services.Heroes.Commands;
 /// changes are server-authoritative (SetSkillXp / ChangeSkillLevelFromXpChange / CharacterDeveloper are
 /// patched) and replicate to that client, so its alley-fight character is buffed.
 /// </summary>
-public class HeroBoostFighterCommand
+public class HeroBoostFighterDebugCommand
 {
     private static readonly CharacterAttribute[] Attributes =
     {
@@ -29,11 +28,9 @@ public class HeroBoostFighterCommand
         DefaultSkills.Crossbow, DefaultSkills.Throwing, DefaultSkills.Riding, DefaultSkills.Athletics,
     };
 
-    [CommandLineArgumentFunction("boost_fighter", "coop.debug.hero")]
     public static string BoostFighter(List<string> args)
     {
         if (ModInformation.IsClient) return "Run coop.debug.hero.boost_fighter on the server (host) only";
-        if (args.Count != 1) return "Usage: coop.debug.hero.boost_fighter <heroRegistryId>";
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return "Unable to resolve IObjectManager";
         if (!objectManager.TryGetObject<Hero>(args[0], out var hero))

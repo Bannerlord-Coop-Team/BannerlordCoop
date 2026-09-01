@@ -10,7 +10,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.Army;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Armies.Commands;
 
@@ -23,7 +22,7 @@ public class ArmyDebugCommand
     /// <summary>
     /// Lists all the current Army
     /// </summary>
-    [CommandLineArgumentFunction("list", "coop.debug.army")]
+
     public static string ListArmy(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -57,7 +56,7 @@ public class ArmyDebugCommand
     /// <summary>
     /// Creates a new army on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("create", "coop.debug.army")]
+
     public static string CreateArmy(List<string> args)
     {
         var sb = new StringBuilder();
@@ -66,15 +65,6 @@ public class ArmyDebugCommand
             return "Command is only available to run on the server";
         }
 
-        if (args.Count != 4)
-        {
-            var stringBuilder = new StringBuilder();
-
-            stringBuilder.AppendLine("Usage: coop.debug.kingdom.create <kingdomId> <targetSettlmentId> <heroLeaderId> <armyType>");
-            stringBuilder.Append(GetArmyTypesUsage(stringBuilder));
-
-            return stringBuilder.ToString();
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -132,7 +122,7 @@ public class ArmyDebugCommand
     /// <summary>
     /// Deletes an army on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("destroy", "coop.debug.army")]
+
     public static string DestroyArmy(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -140,10 +130,6 @@ public class ArmyDebugCommand
             return "Command is only available to run on the server";
         }
 
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.kingdom.destroy <armyId> <disbandArmyReason>";
-        }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -189,18 +175,13 @@ public class ArmyDebugCommand
     /// Lists all the current Mobile Parties for an Army
     /// </summary>
     /// 
-    [CommandLineArgumentFunction("mobile_party_list", "coop.debug.army")]
+
     public static string GetMobilePartyList(List<string> args)
     {
 
         var stringBuilder = new StringBuilder();
 
 
-        if (args.Count != 1)
-        {
-
-            return "Usage: coop.debug.army.mobile_party_list <ArmyId>";
-        }
 
         string armyId = args[0];
 
@@ -228,18 +209,13 @@ public class ArmyDebugCommand
     /// Add a Mobile Party to an Army
     /// </summary>
     /// 
-    [CommandLineArgumentFunction("mobile_party_add", "coop.debug.army")]
+
     public static string AddMobileParty(List<string> args)
     {
 
         var stringBuilder = new StringBuilder();
 
 
-        if (args.Count != 2)
-        {
-
-            return "Usage: coop.debug.army.mobile_party_add <ArmyId> <MobilePartyId>";
-        }
 
         string armyId = args[0];
         string mobilePartyId = args[1];
@@ -273,18 +249,13 @@ public class ArmyDebugCommand
     /// Add a Mobile Party to an Army
     /// </summary>
     /// 
-    [CommandLineArgumentFunction("mobile_party_remove", "coop.debug.army")]
+
     public static string RemoveMobileParty(List<string> args)
     {
 
         var stringBuilder = new StringBuilder();
 
 
-        if (args.Count != 2)
-        {
-
-            return "Usage: coop.debug.army.mobile_party_remove <ArmyId> <MobilePartyId>";
-        }
 
         string armyId = args[0];
         string mobilePartyId = args[1];
@@ -317,15 +288,10 @@ public class ArmyDebugCommand
     /// Info about army
     /// </summary>
     /// 
-    [CommandLineArgumentFunction("info", "coop.debug.army")]
+
     public static string Info(List<string> args)
     {
         var sb = new StringBuilder();
-        if (args.Count != 1)
-        {
-
-            return "Usage: coop.debug.army.info <ArmyId>";
-        }
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
             return $"Unable to get {nameof(IObjectManager)}";

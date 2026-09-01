@@ -2,6 +2,6 @@
 
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
-internal readonly struct PlayerJoinedBattle : IEvent
+public readonly struct PlayerJoinedBattle : IEvent
 {
 }

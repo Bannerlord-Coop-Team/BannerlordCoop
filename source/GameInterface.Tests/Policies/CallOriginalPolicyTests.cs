@@ -1,4 +1,5 @@
 ﻿using GameInterface.Policies;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -60,8 +61,14 @@ public class CallOriginalPolicyTests
         {
             Assert.True(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
             Assert.True(CallOriginalPolicy.IsOriginalAllowed());
-            Assert.False(Task.Run(() => CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation)
-                .GetAwaiter().GetResult());
+
+            bool originalsAllowedOnWorkerThread = true;
+            var workerThread = new Thread(() =>
+                originalsAllowedOnWorkerThread = CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+            workerThread.Start();
+            workerThread.Join();
+
+            Assert.False(originalsAllowedOnWorkerThread);
         }
 
         Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);

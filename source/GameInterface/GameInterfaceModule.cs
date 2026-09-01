@@ -2,6 +2,7 @@
 using Autofac.Core;
 using Autofac.Core.Registration;
 using Autofac.Core.Resolving.Pipeline;
+using Common.Commands;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
@@ -17,6 +18,7 @@ using GameInterface.Services.Chat;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
@@ -32,6 +34,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobilePartyAIs;
 using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
@@ -52,6 +55,7 @@ using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.Patches;
 using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Serilog;
 using System.Linq;
@@ -78,6 +82,24 @@ public class GameInterfaceModule : Module
             .PreserveExistingDefaults();
 
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
+
+        builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
+        builder.RegisterType<CoopCommandRegistry>().As<ICoopCommandRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<LegacyCoopCommandExecutor>()
+            .As<ILegacyCoopCommandExecutor>()
+            .InstancePerDependency();
+        builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
+            .Where(type => type.IsClass &&
+                           !type.IsAbstract &&
+                           typeof(ICoopCommand).IsAssignableFrom(type))
+            .As(type => type.GetInterfaces()
+                .Where(interfaceType => interfaceType != typeof(ICoopCommand)))
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<CoopCommandLineRegistrar>()
+            .As<ICoopCommandLineRegistrar>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
 
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         // mod-config.json: one lazy read per session container (see IModConfig).
@@ -106,6 +128,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
+        builder.RegisterType<PartyAiBatchRunner>().As<IPartyAiBatchRunner>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BarterClientPresentation>().As<IBarterClientPresentation>().InstancePerDependency();
         builder.RegisterType<SafePassagePartyResolver>().AsSelf().As<ISafePassagePartyResolver>().InstancePerDependency();
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
