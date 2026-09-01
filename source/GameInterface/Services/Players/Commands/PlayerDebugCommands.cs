@@ -7,14 +7,13 @@ using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Players.Commands;
 
 internal class PlayerDebugCommands
 {
     // coop.debug.players.list
-    [CommandLineArgumentFunction("list", "coop.debug.players")]
+
     public static string List(List<string> args)
     {
         if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) == false)
@@ -50,13 +49,10 @@ internal class PlayerDebugCommands
         return sb.ToString();
     }
 
-    [CommandLineArgumentFunction("party_state", "coop.debug.players")]
     public static string PartyState(List<string> args)
     {
         if (!ModInformation.IsServer)
             return "Command can only be run on the server.";
-        if (args.Count != 1)
-            return "Usage: coop.debug.players.party_state <controllerId>";
         if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) == false)
             return $"Unable to get {nameof(IPlayerManager)}";
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)

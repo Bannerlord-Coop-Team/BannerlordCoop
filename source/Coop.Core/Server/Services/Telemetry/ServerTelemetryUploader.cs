@@ -22,13 +22,13 @@ public interface IBattlesFoughtUploader
     Task<ServerTelemetryUploadResult> RecordBattleStartedAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>Posts authenticated server statistics to the configured edge functions.</summary>
+/// <summary>Posts authenticated server statistics to the configured RPC functions.</summary>
 public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtUploader, IDisposable
 {
     public const string Endpoint =
-        "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/upsert-platform-statistics";
+        "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_statistics";
     public const string BattlesFoughtEndpoint =
-        "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/battles-fought-upsert";
+        "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/increment_battles_fought";
     internal const string PublishableKey = "sb_publishable_tseZMeJ-RYeSHI0KwU2p0g_PE4GVtN6";
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions

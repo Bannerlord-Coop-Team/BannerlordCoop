@@ -67,6 +67,7 @@ internal class InteractionsInitializationHandler : IHandler
         ArenaMasterCampaignBehavior arenaMasterCampaignBehavior = Campaign.Current.GetCampaignBehavior<ArenaMasterCampaignBehavior>();
         PerkResetCampaignBehavior perkResetCampaignBehavior = Campaign.Current.GetCampaignBehavior<PerkResetCampaignBehavior>();
         EncounterGameMenuBehavior encounterGameMenuBehavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
+        TavernEmployeesCampaignBehavior tavernEmployeesCampaignBehavior = Campaign.Current.GetCampaignBehavior<TavernEmployeesCampaignBehavior>();
 
         villagerCampaignBehavior._interactedVillagers = GetInteractedVillagers(playerHeroId);
         caravansCampaignBehavior._interactedCaravans = GetInteractedCaravans(playerHeroId);
@@ -76,6 +77,9 @@ internal class InteractionsInitializationHandler : IHandler
         arenaMasterCampaignBehavior._knowTournaments = GetKnowTournaments(playerHeroId);
         perkResetCampaignBehavior._warningTime = GetWarningTime(playerHeroId);
         encounterGameMenuBehavior._alreadySneakedSettlements = GetAlreadySneakedSettlements(playerHeroId);
+        tavernEmployeesCampaignBehavior._orderedDrinkThisDayInSettlement = GetOrderedDrinkThisDayInSettlement(playerHeroId);
+        tavernEmployeesCampaignBehavior._hasBoughtTunToParty = GetHasBoughtTunToParty(playerHeroId);
+        tavernEmployeesCampaignBehavior._hasMetWithRansomBroker = GetHasMetRansomBroker(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerInteractionsDataKeys(playerHeroId));
     }
@@ -202,5 +206,30 @@ internal class InteractionsInitializationHandler : IHandler
         }
 
         return alreadySneakedSettlements;
+    }
+
+    private Settlement GetOrderedDrinkThisDayInSettlement(string playerHeroId)
+    {
+        if (interactionsPlayerData?.PlayerOrderedDrinkThisDayInSettlement?.ContainsKey(playerHeroId) != true) return null;
+
+        // Settlement can be legitimately null, don't check or log failed lookups
+        var settlementId = interactionsPlayerData.PlayerOrderedDrinkThisDayInSettlement[playerHeroId];
+        objectManager.TryGetObject<Settlement>(settlementId, out var settlement);
+
+        return settlement;
+    }
+
+    private bool GetHasBoughtTunToParty(string playerHeroId)
+    {
+        if (interactionsPlayerData?.PlayerHasBoughtTunToParty?.ContainsKey(playerHeroId) != true) return false;
+
+        return interactionsPlayerData.PlayerHasBoughtTunToParty[playerHeroId];
+    }
+
+    private bool GetHasMetRansomBroker(string playerHeroId)
+    {
+        if (interactionsPlayerData?.PlayerHasMetRansomBroker?.ContainsKey(playerHeroId) != true) return false;
+
+        return interactionsPlayerData.PlayerHasMetRansomBroker[playerHeroId];
     }
 }
