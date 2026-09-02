@@ -569,7 +569,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">Leader hero id or quoted display name, then the quoted kingdom name.</param>
     /// <returns>result message</returns>
-
     public sealed class KingdomCreateCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -649,7 +648,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the kingdoms</returns>
-
     public sealed class KingdomListCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -712,7 +710,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">controller id, kingdom id</param>
     /// <returns>result message</returns>
-
     public sealed class KingdomForcePlayerJoinCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -798,7 +795,6 @@ public class KingdomDebugCommand
     }
 
     // coop.debug.kingdom.force_player_vassalage Player khuzait true
-
     public sealed class KingdomForcePlayerVassalageCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -859,7 +855,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the usages</returns>
-
     public sealed class KingdomAddDecisionUsageCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -897,7 +892,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of usage.</returns>
-
     public sealed class KingdomRemoveDecisionUsageCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -924,7 +918,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the decisions of a specific kingdom</returns>
-
     public sealed class KingdomListDecisionsCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -970,7 +963,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId</param>
     /// <returns>strings of all active kingdom decisions with client votes</returns>
-
     public sealed class KingdomDecisionsCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1057,7 +1049,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : 1-based decision index</param>
     /// <returns>strings of all outcomes of a decision</returns>
-
     public sealed class KingdomListDecisionOutcomesCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1104,7 +1095,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index, 1-based outcome index or abstain, support weight</param>
     /// <returns>result message</returns>
-
     public sealed class KingdomVoteDecisionCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1173,7 +1163,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index</param>
     /// <returns>result message</returns>
-
     public sealed class KingdomResolveDecisionCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1213,7 +1202,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId</param>
     /// <returns>strings of all the active policies of a specific kingdom</returns>
-
     public sealed class KingdomListPoliciesCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1264,7 +1252,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name and kingdom id</param>
     /// <returns>IDs currently present in the selected collection</returns>
-
     public sealed class KingdomCollectionListCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1327,7 +1314,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name, kingdom id, and value id</param>
     /// <returns>Result of the collection add</returns>
-
     public sealed class KingdomCollectionAddCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1418,7 +1404,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name, kingdom id, and value id</param>
     /// <returns>Result of the collection remove</returns>
-
     public sealed class KingdomCollectionRemoveCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1497,7 +1482,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
     /// <returns>result message</returns>
-
     public sealed class KingdomDeclareWarCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1540,7 +1524,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
     /// <returns>result message</returns>
-
     public sealed class KingdomMakePeaceCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -2080,7 +2063,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : decision to add</param>
     /// <returns></returns>
-
     public sealed class KingdomAddDecisionCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -2147,7 +2129,6 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : index of decision to remove</param>
     /// <returns></returns>
-
     public sealed class KingdomRemoveDecisionCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
