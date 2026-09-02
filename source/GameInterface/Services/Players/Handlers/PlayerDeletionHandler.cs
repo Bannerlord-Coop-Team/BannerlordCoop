@@ -214,7 +214,7 @@ internal class PlayerDeletionHandler : IHandler
 
         if (playerClan.IsEliminated ||
             playerClan.IsBanditFaction ||
-            playerClan.AliveLords.Any(hero => hero.IsAlive)) return;
+            playerClan.GetHeirApparents().Count > 0) return;
 
         if (playerClan.Leader == playerHero)
         {

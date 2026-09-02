@@ -1,5 +1,6 @@
 using Common;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using System;
@@ -152,13 +153,11 @@ namespace GameInterface.Services.Heroes.Handlers
 
             MarshalApply(data.HeroId, nameof(ChangeHeroState), instance =>
             {
-                var oldState = instance._heroState;
-                var newState = (Hero.CharacterStates)data.HeroState;
-                instance._heroState = newState;
-
                 // Update caches
-                instance.Clan?.OnHeroChangedState(instance, oldState);
-                Campaign.Current.CampaignObjectManager.HeroStateChanged(instance, oldState);
+                using (new AllowedThread())
+                {
+                    instance.ChangeState((Hero.CharacterStates)data.HeroState);
+                }
             });
         }
 
