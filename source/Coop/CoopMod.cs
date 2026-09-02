@@ -483,6 +483,11 @@ namespace Coop
                 CrashDiagnostics.SetPhase,
                 activeLogFilePath);
 
+#if DEBUG
+            global::Coop.Core.Common.Commands.JoinDebugCommands.ConfigureClientSessionStarter(
+                () => Coop.StartAsClient());
+#endif
+
             Updateables.Add(GameThread.Instance);
 
 #if DEBUG

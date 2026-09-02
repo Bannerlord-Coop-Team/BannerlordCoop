@@ -45,6 +45,12 @@ namespace Coop.Tests.Autofac
                 .ToArray();
 #if DEBUG
             Assert.Equal(26, missionCommands.Length);
+            Assert.Equal(
+                new[] { "arm_inactive_party_deficit", "disconnect", "join_state" },
+                registeredCommands
+                    .Where(command => command.Prefix == "coop.debug.connection")
+                    .Select(command => command.Name)
+                    .OrderBy(name => name));
 #else
             Assert.Equal(15, missionCommands.Length);
 #endif
@@ -66,6 +72,16 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+
+#if DEBUG
+            ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
+            Assert.Equal(
+                new[] { "join_state", "restore_inactive_party", "stage_inactive_party" },
+                registeredCommands
+                    .Where(command => command.Prefix == "coop.debug.connection")
+                    .Select(command => command.Name)
+                    .OrderBy(name => name));
+#endif
         }
 
         [Theory]
