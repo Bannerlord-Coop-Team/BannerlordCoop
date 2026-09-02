@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using Autofac;
 using GameInterface.Services.UI.Handlers;
 using GameInterface.Utils.Commands;
@@ -8,41 +9,57 @@ namespace GameInterface.Services.UI.Commands;
 
 public class TacticalUnitSymbolsDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private const string CommandName = "coop.debug.ui.tactical_symbols";
-    private const string Usage = "Usage: coop.debug.ui.tactical_symbols <on|off|toggle|status>";
-
-    [CommandLineArgumentFunction("tactical_symbols", "coop.debug.ui")]
-    public static string TacticalSymbols(List<string> args)
+    public sealed class UiTacticalSymbolsCoopCommand : ICoopCommand
     {
-        if (!CommandHelpers.IsServerOnlyCommand(out var error, CommandName)) return error;
-        if (args.Count != 1) return Usage;
+        public string Prefix => "coop.debug.ui";
 
-        switch (args[0].ToLowerInvariant())
+        public string Name => "tactical_symbols";
+
+        public string Description => "Runs the tactical symbols debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            case "on":
-            case "true":
-            case "1":
-                return Apply(false);
-            case "off":
-            case "false":
-            case "0":
-                return Apply(true);
-            case "toggle":
-                return Apply(!TacticalUnitSymbolsSettings.HideTacticalUnitSymbols);
-            case "status":
-                return StatusText;
-            default:
-                return Usage;
+            new ExpectedArgs("mode", "on, off, toggle, or status.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, CommandName)) return Failed(error);
+
+            switch (args[0].ToLowerInvariant())
+            {
+                case "on":
+                case "true":
+                case "1":
+                    return Apply(false);
+                case "off":
+                case "false":
+                case "0":
+                    return Apply(true);
+                case "toggle":
+                    return Apply(!TacticalUnitSymbolsSettings.HideTacticalUnitSymbols);
+                case "status":
+                    return Succeeded(StatusText);
+                default:
+                    return Failed($"Invalid mode '{args[0]}'. Expected on, off, toggle, or status.");
+            }
         }
     }
 
-    private static string Apply(bool hideTacticalUnitSymbols)
+    private static CoopCommandResult Apply(bool hideTacticalUnitSymbols)
     {
         if (!ContainerProvider.TryResolve<TacticalUnitSymbolsConfigHandler>(out var handler))
-            return "Tactical unit symbols configuration is unavailable.";
+            return Failed("Tactical unit symbols configuration is unavailable.");
 
         handler.SetAndBroadcast(hideTacticalUnitSymbols);
-        return StatusText;
+        return Succeeded(StatusText);
     }
 
     private static string StatusText =>

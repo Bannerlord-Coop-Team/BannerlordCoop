@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using GameInterface;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.RomanceFlow;
@@ -16,132 +17,279 @@ namespace GameInterface.Services.Heroes.Commands;
 internal class RomanceDebugCommand
 {
     private const string CommandNamespace = "coop.debug.romance";
-    private const string PairUsage = "<playerHeroId> <npcHeroId>";
 
-    public static string List(List<string> args)
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class RomanceListCoopCommand : ICoopCommand
     {
-        const string command = CommandNamespace + ".list";
-        return RunOnGameThread(command, () => ListStates());
-    }
+        public string Prefix => CommandNamespace;
 
-    public static string Status(List<string> args)
-    {
-        const string command = CommandNamespace + ".status";
-        var context = new CommandContext(command, $"Usage: {command} {PairUsage}", args);
-        string error;
+        public string Name => "list";
 
-        return RunOnGameThread(command, () =>
+        public string Description => "Lists current romance states.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!TryGetPlayerNpcPair(context.Args, out var playerHero, out var targetHero, out error)) return error;
+            const string command = CommandNamespace + ".list";
+            return RunOnGameThread(command, () =>
+            {
+                if (!CommandHelpers.TryGetObjectManager(out var objectManager, out string error))
+                    return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return error;
+                var states = Romance.RomanticStateList;
+                if (states == null || states.Count == 0)
+                    return Succeeded("No romance states exist.");
 
-            var state = Romance.GetRomanticState(playerHero, targetHero);
-            return state == null
-                ? $"No romance state exists between {FormatHero(playerHero, objectManager)} and {FormatHero(targetHero, objectManager)}."
-                : $"{FormatState(state, objectManager)}; " +
-                  $"spouses={playerHero.Spouse?.StringId ?? "none"}/{targetHero.Spouse?.StringId ?? "none"}";
-        });
-    }
+                var result = new StringBuilder();
+                foreach (var state in states)
+                {
+                    if (state != null) result.AppendLine(FormatState(state, objectManager));
+                }
 
-    public static string Help(List<string> args)
-    {
-
-        return $"{CommandNamespace}.list; {CommandNamespace}.status {PairUsage}; " +
-               $"{CommandNamespace}.start|compatible|agree|marry|divorce {PairUsage}. " +
-               "Only start, compatible, agree, marry, and divorce require the server console. " +
-               "Divorce does not restore pre-marriage clan or party changes.";
-    }
-
-    public static string Start(List<string> args)
-        => ChangeState(args, "start", Romance.RomanceLevelEnum.CourtshipStarted);
-
-    public static string Compatible(List<string> args)
-        => ChangeState(args, "compatible", Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible);
-
-    public static string Agree(List<string> args)
-        => ChangeState(args, "agree", Romance.RomanceLevelEnum.CoupleAgreedOnMarriage);
-
-    public static string Marry(List<string> args)
-    {
-        const string command = CommandNamespace + ".marry";
-        var context = new CommandContext(command, $"Usage: {command} {PairUsage}", args);
-        if (!context.RequireServer(out var error)) return error;
-
-        return RunOnGameThread(command, () =>
-        {
-            if (!TryGetPlayerNpcPair(context.Args, out var playerHero, out var targetHero, out error)) return error;
-            if (!TryGetRomanceAuthority(out var romanceAuthority, out error)) return error;
-            if (!romanceAuthority.TryValidateMarriage(playerHero, targetHero, out error)) return error;
-
-            MarriageAction.Apply(playerHero, targetHero);
-            return playerHero.Spouse == targetHero && targetHero.Spouse == playerHero
-                ? $"Married {playerHero.Name} to {targetHero.Name}."
-                : $"Marriage between {playerHero.Name} and {targetHero.Name} did not complete.";
-        });
-    }
-
-    public static string Divorce(List<string> args)
-    {
-        const string command = CommandNamespace + ".divorce";
-        var context = new CommandContext(command, $"Usage: {command} {PairUsage}", args);
-        if (!context.RequireServer(out var error)) return error;
-
-        return RunOnGameThread(command, () =>
-        {
-            if (!TryGetPlayerNpcPair(context.Args, out var playerHero, out var targetHero, out error)) return error;
-            if (playerHero.Spouse != targetHero || targetHero.Spouse != playerHero)
-                return $"{playerHero.Name} and {targetHero.Name} are not married to each other.";
-
-            playerHero.Spouse = null;
-            ChangeRomanticStateAction.Apply(playerHero, targetHero, Romance.RomanceLevelEnum.Ended);
-
-            return playerHero.Spouse == null &&
-                   targetHero.Spouse == null &&
-                   Romance.GetRomanticLevel(playerHero, targetHero) == Romance.RomanceLevelEnum.Ended
-                ? $"Divorced {playerHero.Name} and {targetHero.Name}."
-                : $"Divorce between {playerHero.Name} and {targetHero.Name} did not complete.";
-        });
-    }
-
-    private static string ChangeState(
-        List<string> args,
-        string action,
-        Romance.RomanceLevelEnum requestedLevel)
-    {
-        var command = $"{CommandNamespace}.{action}";
-        var context = new CommandContext(command, $"Usage: {command} {PairUsage}", args);
-        if (!context.RequireServer(out var error)) return error;
-
-        return RunOnGameThread(command, () =>
-        {
-            if (!TryGetPlayerNpcPair(context.Args, out var playerHero, out var targetHero, out error)) return error;
-            if (!TryGetRomanceAuthority(out var romanceAuthority, out error)) return error;
-            if (!romanceAuthority.TryValidateStateChange(playerHero, targetHero, requestedLevel, out error)) return error;
-
-            ChangeRomanticStateAction.Apply(playerHero, targetHero, requestedLevel);
-            return $"Changed romance between {playerHero.Name} and {targetHero.Name} to {requestedLevel}.";
-        });
-    }
-
-    private static string ListStates()
-    {
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error)) return error;
-
-        var states = Romance.RomanticStateList;
-        if (states == null || states.Count == 0) return "No romance states exist.";
-
-        var result = new StringBuilder();
-        foreach (var state in states)
-        {
-            if (state != null) result.AppendLine(FormatState(state, objectManager));
+                return Succeeded(result.Length == 0 ? "No romance states exist." : result.ToString());
+            });
         }
-
-        return result.Length == 0 ? "No romance states exist." : result.ToString();
     }
+
+    public sealed class RomanceHelpCoopCommand : ICoopCommand
+    {
+        public string Prefix => CommandNamespace;
+
+        public string Name => "help";
+
+        public string Description => "Describes the romance debug commands.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            return Succeeded($"{CommandNamespace}.list; {CommandNamespace}.status <player_hero_id> <npc_hero_id>; " +
+                $"{CommandNamespace}.start|compatible|agree|marry|divorce <player_hero_id> <npc_hero_id>. " +
+                "Only start, compatible, agree, marry, and divorce require the server console. " +
+                "Divorce does not restore pre-marriage clan or party changes.");
+        }
+    }
+
+    public sealed class RomanceStatusCoopCommand : ICoopCommand
+    {
+        public string Prefix => CommandNamespace;
+
+        public string Name => "status";
+
+        public string Description => "Reports romance state for a player and NPC.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            const string command = CommandNamespace + ".status";
+            return RunOnGameThread(command, () =>
+            {
+                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                    return Failed(error);
+                if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+                    return Failed(error);
+
+                var state = Romance.GetRomanticState(playerHero, targetHero);
+                return Succeeded(state == null
+                    ? $"No romance state exists between {FormatHero(playerHero, objectManager)} and {FormatHero(targetHero, objectManager)}."
+                    : $"{FormatState(state, objectManager)}; " +
+                      $"spouses={playerHero.Spouse?.StringId ?? "none"}/{targetHero.Spouse?.StringId ?? "none"}");
+            });
+        }
+    }
+
+    public sealed class RomanceStartCoopCommand : ICoopCommand
+    {
+        public string Prefix => CommandNamespace;
+
+        public string Name => "start";
+
+        public string Description => "Starts courtship between a player and NPC.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            const string command = CommandNamespace + ".start";
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            return RunOnGameThread(command, () =>
+            {
+                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                    return Failed(error);
+                if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
+                    return Failed(error);
+                if (!romanceAuthority.TryValidateStateChange(
+                        playerHero,
+                        targetHero,
+                        Romance.RomanceLevelEnum.CourtshipStarted,
+                        out error))
+                    return Failed(error);
+
+                ChangeRomanticStateAction.Apply(
+                    playerHero,
+                    targetHero,
+                    Romance.RomanceLevelEnum.CourtshipStarted);
+                return Succeeded($"Changed romance between {playerHero.Name} and {targetHero.Name} to {Romance.RomanceLevelEnum.CourtshipStarted}.");
+            });
+        }
+    }
+
+    public sealed class RomanceCompatibleCoopCommand : ICoopCommand
+    {
+        public string Prefix => CommandNamespace;
+
+        public string Name => "compatible";
+
+        public string Description => "Marks a romance pair as compatible.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            const string command = CommandNamespace + ".compatible";
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            return RunOnGameThread(command, () =>
+            {
+                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                    return Failed(error);
+                if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
+                    return Failed(error);
+                if (!romanceAuthority.TryValidateStateChange(
+                        playerHero,
+                        targetHero,
+                        Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible,
+                        out error))
+                    return Failed(error);
+
+                ChangeRomanticStateAction.Apply(
+                    playerHero,
+                    targetHero,
+                    Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible);
+                return Succeeded($"Changed romance between {playerHero.Name} and {targetHero.Name} to {Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible}.");
+            });
+        }
+    }
+
+    public sealed class RomanceAgreeCoopCommand : ICoopCommand
+    {
+        public string Prefix => CommandNamespace;
+
+        public string Name => "agree";
+
+        public string Description => "Marks a romance pair as agreed on marriage.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            const string command = CommandNamespace + ".agree";
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            return RunOnGameThread(command, () =>
+            {
+                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                    return Failed(error);
+                if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
+                    return Failed(error);
+                if (!romanceAuthority.TryValidateStateChange(
+                        playerHero,
+                        targetHero,
+                        Romance.RomanceLevelEnum.CoupleAgreedOnMarriage,
+                        out error))
+                    return Failed(error);
+
+                ChangeRomanticStateAction.Apply(
+                    playerHero,
+                    targetHero,
+                    Romance.RomanceLevelEnum.CoupleAgreedOnMarriage);
+                return Succeeded($"Changed romance between {playerHero.Name} and {targetHero.Name} to {Romance.RomanceLevelEnum.CoupleAgreedOnMarriage}.");
+            });
+        }
+    }
+
+    public sealed class RomanceMarryCoopCommand : ICoopCommand
+    {
+        public string Prefix => CommandNamespace;
+
+        public string Name => "marry";
+
+        public string Description => "Marries a player hero and NPC hero.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            const string command = CommandNamespace + ".marry";
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            return RunOnGameThread(command, () =>
+            {
+                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                    return Failed(error);
+                if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
+                    return Failed(error);
+                if (!romanceAuthority.TryValidateMarriage(playerHero, targetHero, out error))
+                    return Failed(error);
+
+                MarriageAction.Apply(playerHero, targetHero);
+                return playerHero.Spouse == targetHero && targetHero.Spouse == playerHero
+                    ? Succeeded($"Married {playerHero.Name} to {targetHero.Name}.")
+                    : Failed($"Marriage between {playerHero.Name} and {targetHero.Name} did not complete.");
+            });
+        }
+    }
+
+    public sealed class RomanceDivorceCoopCommand : ICoopCommand
+    {
+        public string Prefix => CommandNamespace;
+
+        public string Name => "divorce";
+
+        public string Description => "Divorces a player hero and NPC hero.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            const string command = CommandNamespace + ".divorce";
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            return RunOnGameThread(command, () =>
+            {
+                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                    return Failed(error);
+                if (playerHero.Spouse != targetHero || targetHero.Spouse != playerHero)
+                    return Failed($"{playerHero.Name} and {targetHero.Name} are not married to each other.");
+
+                playerHero.Spouse = null;
+                ChangeRomanticStateAction.Apply(playerHero, targetHero, Romance.RomanceLevelEnum.Ended);
+
+                return playerHero.Spouse == null &&
+                       targetHero.Spouse == null &&
+                       Romance.GetRomanticLevel(playerHero, targetHero) == Romance.RomanceLevelEnum.Ended
+                    ? Succeeded($"Divorced {playerHero.Name} and {targetHero.Name}.")
+                    : Failed($"Divorce between {playerHero.Name} and {targetHero.Name} did not complete.");
+            });
+        }
+    }
+
+    private static IExpectedArgs[] CreatePairArguments() => new IExpectedArgs[]
+    {
+        new ExpectedArgs("player_hero_id", "The registered player hero id."),
+        new ExpectedArgs("npc_hero_id", "The registered NPC hero id."),
+    };
 
     private static bool TryGetPlayerNpcPair(
-        List<string> args,
+        IReadOnlyList<string> args,
         out Hero playerHero,
         out Hero targetHero,
         out string error)
@@ -178,9 +326,9 @@ internal class RomanceDebugCommand
         return true;
     }
 
-    private static string RunOnGameThread(string command, Func<string> action)
+    private static CoopCommandResult RunOnGameThread(string command, Func<CoopCommandResult> action)
     {
-        var result = $"{command} did not complete.";
+        CoopCommandResult result = Failed($"{command} did not complete.");
         GameThread.RunSafe(() => result = action(), blocking: true, context: command);
         return result;
     }
@@ -197,9 +345,9 @@ internal class RomanceDebugCommand
         return false;
     }
 
-    private static string FormatState(Romance.RomanticState state, IObjectManager objectManager)
-        => $"{FormatHero(state.Person1, objectManager)} <-> {FormatHero(state.Person2, objectManager)}: " +
-           $"{state.Level}, progress={state.ProgressToNextLevel}, lastVisit={state.LastVisit}, persuasion={state.ScoreFromPersuasion}";
+    private static string FormatState(Romance.RomanticState state, IObjectManager objectManager) =>
+        $"{FormatHero(state.Person1, objectManager)} <-> {FormatHero(state.Person2, objectManager)}: " +
+        $"{state.Level}, progress={state.ProgressToNextLevel}, lastVisit={state.LastVisit}, persuasion={state.ScoreFromPersuasion}";
 
     private static string FormatHero(Hero hero, IObjectManager objectManager)
     {

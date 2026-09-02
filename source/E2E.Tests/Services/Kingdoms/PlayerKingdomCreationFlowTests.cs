@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using Common.Network;
 using Common.Messaging;
 using Common.Util;
@@ -151,8 +152,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         Server.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { player.HeroId, KingdomName });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                player.HeroId,
+                KingdomName);
         });
 
         Assert.StartsWith("Created kingdom", output);
@@ -185,8 +188,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         client.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { player.HeroId, KingdomName });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                player.HeroId,
+                KingdomName);
         });
 
         Assert.Equal("This command can only be run on the server.", output);
@@ -215,8 +220,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         Server.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { followerId, KingdomName });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                followerId,
+                KingdomName);
         });
 
         Assert.Contains("does not lead clan", output);
@@ -234,7 +241,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var result = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, kingdomId });
+            string result = ExecuteCommand(
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                ControllerId,
+                kingdomId);
 
             Assert.Contains("Forced player", result);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
@@ -580,7 +590,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var result = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, newKingdomId });
+            string result = ExecuteCommand(
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                ControllerId,
+                newKingdomId);
 
             Assert.Contains("Forced player", result);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(previousKingdomId, out var previousKingdom));
@@ -2705,7 +2718,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         client2.Call(() =>
         {
-            output = KingdomDebugCommand.ListKingdomDecisionVotes(new List<string> { kingdomId });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomDecisionsCoopCommand(),
+                kingdomId);
         });
 
         Assert.Contains("DeclareWarDecision", output);
@@ -4268,4 +4283,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string PartyId,
         string CharacterId,
         string CultureId);
+
+    private static string ExecuteCommand(ICoopCommand command, params string[] args)
+    {
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
 }

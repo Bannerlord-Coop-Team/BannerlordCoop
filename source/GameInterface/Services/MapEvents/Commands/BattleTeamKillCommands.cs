@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common.Commands;
+using Common.Logging;
 using GameInterface.Configuration;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Utils.Commands;
@@ -15,7 +16,6 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Scoreboard;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
 
@@ -27,232 +27,244 @@ namespace GameInterface.Services.MapEvents.Commands;
 /// </summary>
 internal class BattleTeamKillCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
 
     private const string ScoreboardMovieName = "SPScoreboard";
     private const string PartyScoreToggleWidgetId = "PartyScoreToggleWidget";
     private const string PartyDetailsWidgetId = "PartyDetails";
 
-    private const string ClickDeploymentReadyUsage =
-@"Usage:
-  coop.debug.mapevent.click_deployment_ready
-
-Activates the deployment Ready button's native UI callback.";
-
-    [CommandLineArgumentFunction("click_deployment_ready", "coop.debug.mapevent")]
-    public static string ClickDeploymentReady(List<string> args)
+    public sealed class ClickDeploymentReadyCoopCommand : ICoopCommand
     {
-        var ctx = new CommandContext("click_deployment_ready", ClickDeploymentReadyUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
+        public string Prefix => "coop.debug.map_event";
 
-        var mission = Mission.Current;
-        if (mission is null)
-            return "Failed: no active mission.";
+        public string Name => "click_deployment_ready";
 
-        var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
-        if (deploymentController == null)
-            return "No active deployment.";
-        if (!deploymentController.TeamSetupOver)
-            return "Failed: deployment team setup is not complete.";
+        public string Description => "Runs the click deployment ready debug operation.";
 
-        var orderUi = mission.GetMissionBehavior<MissionGauntletSingleplayerOrderUIHandler>();
-        if (orderUi == null)
-            return "Failed: no deployment order UI.";
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
-        orderUi.OnBeginMission();
-        return "Clicked deployment Ready through the native UI callback.";
-    }
-
-    private const string FinishDeploymentUsage =
-@"Usage:
-  coop.debug.mapevent.finish_deployment
-
-Finishes the current battle deployment through the native deployment handler.";
-
-    [CommandLineArgumentFunction("deployment_state", "coop.debug.mapevent")]
-    public static string DeploymentState(List<string> args)
-    {
-        var ctx = new CommandContext("deployment_state", "Usage: coop.debug.mapevent.deployment_state", args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
-
-        var mission = Mission.Current;
-        if (mission == null)
-            return "Deployment state: mission=False, controller=False, teamSetupOver=False, handler=False.";
-
-        var controller = mission.GetMissionBehavior<DeploymentMissionController>();
-        var handler = mission.GetMissionBehavior<DeploymentHandler>();
-        return $"Deployment state: mission=True, controller={controller != null}, " +
-               $"teamSetupOver={controller?.TeamSetupOver ?? false}, handler={handler != null}.";
-    }
-
-    [CommandLineArgumentFunction("finish_deployment", "coop.debug.mapevent")]
-    public static string FinishDeployment(List<string> args)
-    {
-        var ctx = new CommandContext("finish_deployment", FinishDeploymentUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
-
-        var mission = Mission.Current;
-        if (mission is null)
-            return "Failed: no active mission.";
-
-        var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
-        if (deploymentController == null)
-            return "No active deployment.";
-        if (!deploymentController.TeamSetupOver)
-            return "Failed: deployment team setup is not complete.";
-
-        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
-        if (deploymentHandler == null)
-            return "Failed: no deployment handler.";
-
-        deploymentHandler.FinishDeployment();
-        return "Finished the current deployment.";
-    }
-
-    private const string ToggleScoreboardUsage =
-@"Usage:
-  coop.debug.mapevent.toggle_scoreboard
-
-Holds or releases the native scoreboard input without requiring window focus.";
-
-    [CommandLineArgumentFunction("toggle_scoreboard", "coop.debug.mapevent")]
-    public static string ToggleScoreboard(List<string> args)
-    {
-        var ctx = new CommandContext("toggle_scoreboard", ToggleScoreboardUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
-
-        var mission = Mission.Current;
-        if (mission is null)
-            return "Failed: no active mission.";
-
-        var scoreboard = mission.GetMissionBehavior<MissionGauntletBattleScore>();
-        if (scoreboard?.DataSource == null)
-            return "Failed: no battle scoreboard UI.";
-
-        if (mission.InputManager is ScoreboardInputContext scoreboardInput)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            mission.InputManager = scoreboardInput.Inner;
-            return "Released the native scoreboard input.";
+            var mission = Mission.Current;
+            if (mission is null)
+                return Failed("Failed: no active mission.");
+
+            var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+            if (deploymentController == null)
+                return Failed("No active deployment.");
+            if (!deploymentController.TeamSetupOver)
+                return Failed("Failed: deployment team setup is not complete.");
+
+            var orderUi = mission.GetMissionBehavior<MissionGauntletSingleplayerOrderUIHandler>();
+            if (orderUi == null)
+                return Failed("Failed: no deployment order UI.");
+
+            orderUi.OnBeginMission();
+            return Succeeded("Clicked deployment Ready through the native UI callback.");
         }
-        if (mission.InputManager == null)
-            return "Failed: no mission input context.";
-
-        mission.InputManager = new ScoreboardInputContext(mission.InputManager);
-        return "Holding the native scoreboard input.";
     }
 
-    private const string CollapseScoreboardPartiesUsage =
-@"Usage:
-  coop.debug.mapevent.collapse_scoreboard_parties
-
-Collapses every native scoreboard party roster and returns the scroll position to the top.";
-
-    [CommandLineArgumentFunction("collapse_scoreboard_parties", "coop.debug.mapevent")]
-    public static string CollapseScoreboardParties(List<string> args)
+    public sealed class DeploymentStateCoopCommand : ICoopCommand
     {
-        var ctx = new CommandContext("collapse_scoreboard_parties", CollapseScoreboardPartiesUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
+        public string Prefix => "coop.debug.map_event";
 
-        var scoreboard = Mission.Current?.GetMissionBehavior<MissionGauntletBattleScore>();
-        var dataSource = scoreboard?.DataSource;
-        if (dataSource == null)
-            return "Failed: no battle scoreboard UI.";
+        public string Name => "deployment_state";
 
-        if (!TryGetScoreboardWidgets(scoreboard, out var scrollablePanel, out var partyHeaderCount, out var partyDetails))
-            return "Failed: native scoreboard widgets are not loaded.";
+        public string Description => "Reports deployment state.";
 
-        var expectedPartyCount = dataSource.Attackers.Parties.Count + dataSource.Defenders.Parties.Count;
-        if (partyHeaderCount != expectedPartyCount || partyDetails.Count != expectedPartyCount)
-            return $"Failed: found {partyHeaderCount} native party headers and {partyDetails.Count} party detail panels, " +
-                   $"expected {expectedPartyCount} each.";
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
-        var verticalScrollbar = scrollablePanel.VerticalScrollbar;
-
-        foreach (var partyDetail in partyDetails)
-            partyDetail.IsVisible = false;
-
-        scrollablePanel.ResetTweenSpeed();
-        verticalScrollbar.ValueFloat = verticalScrollbar.MinValue;
-        scrollablePanel.SetVerticalScrollTarget(verticalScrollbar.MinValue, 0f);
-        return $"Collapsed native party details: {partyHeaderCount}/{expectedPartyCount}.";
-    }
-
-    private const string ScoreboardStateUsage =
-@"Usage:
-  coop.debug.mapevent.scoreboard_state
-
-Lists the map-event parties and party rows currently loaded by the battle scoreboard.";
-
-    [CommandLineArgumentFunction("scoreboard_state", "coop.debug.mapevent")]
-    public static string ScoreboardState(List<string> args)
-    {
-        var ctx = new CommandContext("scoreboard_state", ScoreboardStateUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
-
-        var mission = Mission.Current;
-        if (mission is null)
-            return "Failed: no active mission.";
-
-        var scoreboard = mission.GetMissionBehavior<MissionGauntletBattleScore>();
-        var dataSource = scoreboard?.DataSource;
-        if (dataSource == null)
-            return "Failed: no battle scoreboard UI.";
-        if (dataSource.Attackers?.Parties == null || dataSource.Defenders?.Parties == null)
-            return "Failed: battle scoreboard parties are not loaded.";
-
-        var mapEvent = MobileParty.MainParty?.MapEvent;
-        if (mapEvent == null)
-            return "Failed: the main party has no current map event.";
-
-        var expectedParties = mapEvent.InvolvedParties
-            .Where(party => party != null)
-            .Distinct()
-            .ToArray();
-        var expectedPlayerParties = expectedParties
-            .Where(party => party.MobileParty?.IsPlayerParty() == true)
-            .ToArray();
-        if (expectedPlayerParties.Length == 0)
-            return "Failed: the current map event has no registered player parties.";
-        var scoreboardParties = dataSource.Attackers.Parties
-            .Concat(dataSource.Defenders.Parties)
-            .Select(party => party.BattleCombatant)
-            .OfType<PartyBase>()
-            .Distinct()
-            .ToArray();
-        var scoreboardPlayerParties = scoreboardParties
-            .Where(party => party.MobileParty?.IsPlayerParty() == true)
-            .ToArray();
-        var missingParties = expectedParties.Except(scoreboardParties).ToArray();
-        var missingPlayerParties = expectedPlayerParties.Except(scoreboardParties).ToArray();
-        var expandedPartyDetails = 0;
-        var scrollTop = false;
-        var nativeWidgetsLoaded = TryGetScoreboardWidgets(
-            scoreboard,
-            out var scrollablePanel,
-            out var partyHeaderCount,
-            out var partyDetails);
-        if (nativeWidgetsLoaded)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            expandedPartyDetails = partyDetails.Count(details => details.IsVisible);
-            var scrollbar = scrollablePanel.VerticalScrollbar;
-            scrollTop = Math.Abs(scrollbar.ValueFloat - scrollbar.MinValue) < 0.01f;
-        }
+            var mission = Mission.Current;
+            if (mission == null)
+                return Succeeded("Deployment state: mission=False, controller=False, teamSetupOver=False, handler=False.");
 
-        return $"Visible: {dataSource.ShowScoreboard}; " +
-               $"Expected parties ({expectedParties.Length}): {FormatPartyNames(expectedParties)}; " +
-               $"Expected player parties ({expectedPlayerParties.Length}): {FormatPartyNames(expectedPlayerParties)}; " +
-               $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
-               $"Scoreboard player parties ({scoreboardPlayerParties.Length}): {FormatPartyNames(scoreboardPlayerParties)}; " +
-               $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}; " +
-               $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}; " +
-               $"Native widgets loaded: {nativeWidgetsLoaded}; " +
-               $"Party headers ({partyHeaderCount}); Expanded party details ({expandedPartyDetails}); Scroll top: {scrollTop}";
+            var controller = mission.GetMissionBehavior<DeploymentMissionController>();
+            var handler = mission.GetMissionBehavior<DeploymentHandler>();
+            return Succeeded($"Deployment state: mission=True, controller={controller != null}, " +
+                   $"teamSetupOver={controller?.TeamSetupOver ?? false}, handler={handler != null}.");
+        }
+    }
+
+    public sealed class FinishDeploymentCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "finish_deployment";
+
+        public string Description => "Runs the finish deployment debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var mission = Mission.Current;
+            if (mission is null)
+                return Failed("Failed: no active mission.");
+
+            var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+            if (deploymentController == null)
+                return Failed("No active deployment.");
+            if (!deploymentController.TeamSetupOver)
+                return Failed("Failed: deployment team setup is not complete.");
+
+            var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+            if (deploymentHandler == null)
+                return Failed("Failed: no deployment handler.");
+
+            deploymentHandler.FinishDeployment();
+            return Succeeded("Finished the current deployment.");
+        }
+    }
+
+    public sealed class ToggleScoreboardCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "toggle_scoreboard";
+
+        public string Description => "Runs the toggle scoreboard debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var mission = Mission.Current;
+            if (mission is null)
+                return Failed("Failed: no active mission.");
+
+            var scoreboard = mission.GetMissionBehavior<MissionGauntletBattleScore>();
+            if (scoreboard?.DataSource == null)
+                return Failed("Failed: no battle scoreboard UI.");
+
+            if (mission.InputManager is ScoreboardInputContext scoreboardInput)
+            {
+                mission.InputManager = scoreboardInput.Inner;
+                return Succeeded("Released the native scoreboard input.");
+            }
+            if (mission.InputManager == null)
+                return Failed("Failed: no mission input context.");
+
+            mission.InputManager = new ScoreboardInputContext(mission.InputManager);
+            return Succeeded("Holding the native scoreboard input.");
+        }
+    }
+
+    public sealed class CollapseScoreboardPartiesCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "collapse_scoreboard_parties";
+
+        public string Description => "Runs the collapse scoreboard parties debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var scoreboard = Mission.Current?.GetMissionBehavior<MissionGauntletBattleScore>();
+            var dataSource = scoreboard?.DataSource;
+            if (dataSource == null)
+                return Failed("Failed: no battle scoreboard UI.");
+
+            if (!TryGetScoreboardWidgets(scoreboard, out var scrollablePanel, out var partyHeaderCount, out var partyDetails))
+                return Failed("Failed: native scoreboard widgets are not loaded.");
+
+            var expectedPartyCount = dataSource.Attackers.Parties.Count + dataSource.Defenders.Parties.Count;
+            if (partyHeaderCount != expectedPartyCount || partyDetails.Count != expectedPartyCount)
+                return Failed($"Failed: found {partyHeaderCount} native party headers and {partyDetails.Count} party detail panels, " +
+                       $"expected {expectedPartyCount} each.");
+
+            var verticalScrollbar = scrollablePanel.VerticalScrollbar;
+
+            foreach (var partyDetail in partyDetails)
+                partyDetail.IsVisible = false;
+
+            scrollablePanel.ResetTweenSpeed();
+            verticalScrollbar.ValueFloat = verticalScrollbar.MinValue;
+            scrollablePanel.SetVerticalScrollTarget(verticalScrollbar.MinValue, 0f);
+            return Succeeded($"Collapsed native party details: {partyHeaderCount}/{expectedPartyCount}.");
+        }
+    }
+
+    public sealed class ScoreboardStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "scoreboard_state";
+
+        public string Description => "Reports scoreboard state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var mission = Mission.Current;
+            if (mission is null)
+                return Failed("Failed: no active mission.");
+
+            var scoreboard = mission.GetMissionBehavior<MissionGauntletBattleScore>();
+            var dataSource = scoreboard?.DataSource;
+            if (dataSource == null)
+                return Failed("Failed: no battle scoreboard UI.");
+            if (dataSource.Attackers?.Parties == null || dataSource.Defenders?.Parties == null)
+                return Failed("Failed: battle scoreboard parties are not loaded.");
+
+            var mapEvent = MobileParty.MainParty?.MapEvent;
+            if (mapEvent == null)
+                return Failed("Failed: the main party has no current map event.");
+
+            var expectedParties = mapEvent.InvolvedParties
+                .Where(party => party != null)
+                .Distinct()
+                .ToArray();
+            var expectedPlayerParties = expectedParties
+                .Where(party => party.MobileParty?.IsPlayerParty() == true)
+                .ToArray();
+            if (expectedPlayerParties.Length == 0)
+                return Failed("Failed: the current map event has no registered player parties.");
+            var scoreboardParties = dataSource.Attackers.Parties
+                .Concat(dataSource.Defenders.Parties)
+                .Select(party => party.BattleCombatant)
+                .OfType<PartyBase>()
+                .Distinct()
+                .ToArray();
+            var scoreboardPlayerParties = scoreboardParties
+                .Where(party => party.MobileParty?.IsPlayerParty() == true)
+                .ToArray();
+            var missingParties = expectedParties.Except(scoreboardParties).ToArray();
+            var missingPlayerParties = expectedPlayerParties.Except(scoreboardParties).ToArray();
+            var expandedPartyDetails = 0;
+            var scrollTop = false;
+            var nativeWidgetsLoaded = TryGetScoreboardWidgets(
+                scoreboard,
+                out var scrollablePanel,
+                out var partyHeaderCount,
+                out var partyDetails);
+            if (nativeWidgetsLoaded)
+            {
+                expandedPartyDetails = partyDetails.Count(details => details.IsVisible);
+                var scrollbar = scrollablePanel.VerticalScrollbar;
+                scrollTop = Math.Abs(scrollbar.ValueFloat - scrollbar.MinValue) < 0.01f;
+            }
+
+            return Succeeded($"Visible: {dataSource.ShowScoreboard}; " +
+                   $"Expected parties ({expectedParties.Length}): {FormatPartyNames(expectedParties)}; " +
+                   $"Expected player parties ({expectedPlayerParties.Length}): {FormatPartyNames(expectedPlayerParties)}; " +
+                   $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
+                   $"Scoreboard player parties ({scoreboardPlayerParties.Length}): {FormatPartyNames(scoreboardPlayerParties)}; " +
+                   $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}; " +
+                   $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}; " +
+                   $"Native widgets loaded: {nativeWidgetsLoaded}; " +
+                   $"Party headers ({partyHeaderCount}); Expanded party details ({expandedPartyDetails}); Scroll top: {scrollTop}");
+        }
     }
 
     private static bool TryGetScoreboardWidgets(
@@ -329,120 +341,119 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
         public InputKey[] GetClickKeys() => Inner.GetClickKeys();
     }
 
-    private const string LeaveBattleUsage =
-@"Usage:
-  coop.debug.mapevent.leave_battle
-
-Leaves the current battle through the native mission lifecycle.";
-
-    [CommandLineArgumentFunction("leave_battle", "coop.debug.mapevent")]
-    public static string LeaveBattle(List<string> args)
+    public sealed class LeaveBattleCoopCommand : ICoopCommand
     {
-        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
-            return "The host has disabled cheats on clients.";
+        public string Prefix => "coop.debug.map_event";
 
-        var ctx = new CommandContext("leave_battle", LeaveBattleUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
+        public string Name => "leave_battle";
 
-        var mission = Mission.Current;
-        if (mission is null)
-            return "Failed: no active mission.";
+        public string Description => "Runs the leave battle debug operation.";
 
-        mission.EndMission();
-        return "Left the current battle mission.";
-    }
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
-    private const string KillEnemyUsage =
-@"Usage:
-  coop.debug.mapevent.kill_enemy
-
-Kills one live enemy-team agent in the current battle (battle-authority side).";
-
-    [CommandLineArgumentFunction("kill_enemy", "coop.debug.mapevent")]
-    public static string KillOneEnemy(List<string> args)
-    {
-        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
-            return "The host has disabled cheats on clients.";
-
-        var ctx = new CommandContext("kill_one_enemy", KillEnemyUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
-
-        if (!TryGetEnemyAgents(out var agents, out var failure))
-            return failure;
-
-        var agent = agents.FirstOrDefault();
-        if (agent is null)
-            return "No live enemy agents to kill.";
-
-        try
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            Kill(agent);
+            if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+                return Failed("The host has disabled cheats on clients.");
+
+            var mission = Mission.Current;
+            if (mission is null)
+                return Failed("Failed: no active mission.");
+
+            mission.EndMission();
+            return Succeeded("Left the current battle mission.");
         }
-        catch (Exception ex)
+    }
+
+    public sealed class KillEnemyCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "kill_enemy";
+
+        public string Description => "Runs the kill enemy debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return CommandHelpers.FormatException("Kill enemy", ex);
+            if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+                return Failed("The host has disabled cheats on clients.");
+
+            if (!TryGetEnemyAgents(out var agents, out var failure))
+                return Failed(failure);
+
+            var agent = agents.FirstOrDefault();
+            if (agent is null)
+                return Failed("No live enemy agents to kill.");
+
+            try
+            {
+                Kill(agent);
+            }
+            catch (Exception ex)
+            {
+                return Failed(CommandHelpers.FormatException("Kill enemy", ex));
+            }
+
+            return Succeeded($"Killed enemy agent: {agent.Name}");
         }
-
-        return $"Killed enemy agent: {agent.Name}";
     }
 
-    private const string KillEnemyTeamUsage =
-@"Usage:
-  coop.debug.mapevent.kill_enemy_team
-
-Kills every live enemy-team agent in the current battle (battle-authority side). Useful for testing a coop battle WIN.";
-
-    [CommandLineArgumentFunction("kill_enemy_team", "coop.debug.mapevent")]
-    public static string KillEnemyTeam(List<string> args)
+    public sealed class KillEnemyTeamCoopCommand : ICoopCommand
     {
-        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
-            return "The host has disabled cheats on clients.";
+        public string Prefix => "coop.debug.map_event";
 
-        var ctx = new CommandContext("kill_enemy_team", KillEnemyTeamUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
+        public string Name => "kill_enemy_team";
 
-        if (!TryGetEnemyAgents(out var agents, out var failure))
-            return failure;
+        public string Description => "Runs the kill enemy team debug operation.";
 
-        var killed = KillAll(agents, out var ex);
-        if (ex != null)
-            return CommandHelpers.FormatException("Kill enemy team", ex);
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
-        return $"Killed {killed} enemy agent(s).";
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+                return Failed("The host has disabled cheats on clients.");
+
+            if (!TryGetEnemyAgents(out var agents, out var failure))
+                return Failed(failure);
+
+            var killed = KillAll(agents, out var ex);
+            if (ex != null)
+                return Failed(CommandHelpers.FormatException("Kill enemy team", ex));
+
+            return Succeeded($"Killed {killed} enemy agent(s).");
+        }
     }
 
-    private const string KillOwnTeamUsage =
-@"Usage:
-  coop.debug.mapevent.kill_own_team
-
-Kills every live agent on the local player team in the current battle (battle-authority side). Useful for testing a
-coop battle LOSS.";
-
-    [CommandLineArgumentFunction("kill_own_team", "coop.debug.mapevent")]
-    public static string KillOwnTeam(List<string> args)
+    public sealed class KillOwnTeamCoopCommand : ICoopCommand
     {
-        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
-            return "The host has disabled cheats on clients.";
+        public string Prefix => "coop.debug.map_event";
 
-        var ctx = new CommandContext("kill_own_team", KillOwnTeamUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
+        public string Name => "kill_own_team";
 
-        var mission = Mission.Current;
-        if (mission is null)
-            return "Failed: no active mission.";
-        if (mission.PlayerTeam is null)
-            return "Failed: no player team in this mission.";
+        public string Description => "Runs the kill own team debug operation.";
 
-        var agents = mission.PlayerTeam.ActiveAgents.ToList();
-        var killed = KillAll(agents, out var ex);
-        if (ex != null)
-            return CommandHelpers.FormatException("Kill own team", ex);
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
-        return $"Killed {killed} agent(s) on the local player team.";
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+                return Failed("The host has disabled cheats on clients.");
+
+            var mission = Mission.Current;
+            if (mission is null)
+                return Failed("Failed: no active mission.");
+            if (mission.PlayerTeam is null)
+                return Failed("Failed: no player team in this mission.");
+
+            var agents = mission.PlayerTeam.ActiveAgents.ToList();
+            var killed = KillAll(agents, out var ex);
+            if (ex != null)
+                return Failed(CommandHelpers.FormatException("Kill own team", ex));
+
+            return Succeeded($"Killed {killed} agent(s) on the local player team.");
+        }
     }
 
     /// <summary>Live agents on any team hostile to the player (host) team.</summary>

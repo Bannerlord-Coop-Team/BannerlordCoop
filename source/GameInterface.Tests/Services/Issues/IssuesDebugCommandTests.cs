@@ -1,5 +1,6 @@
-using Autofac;
+﻿using Autofac;
 using Common;
+using Common.Commands;
 using Common.Util;
 using GameInterface.Services.Issues.Commands;
 using GameInterface.Services.ObjectManager;
@@ -44,7 +45,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Give(new List<string> { "some_hero", "BettingFraud" });
+            var result = Give(new List<string> { "some_hero", "BettingFraud" });
 
             Assert.Equal(
                 "The 'coop.debug.issues.give' command cannot be used on the client. It is intended for server use only.",
@@ -65,7 +66,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Give(new List<string> { "no_such_hero", "BettingFraud" });
+            var result = Give(new List<string> { "no_such_hero", "BettingFraud" });
 
             Assert.Contains("No Hero found with id", result);
         }
@@ -86,7 +87,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Give(new List<string> { "hero_1", "NotARealQuestType" });
+            var result = Give(new List<string> { "hero_1", "NotARealQuestType" });
 
             Assert.Contains("Unknown quest type key 'NotARealQuestType'", result);
             Assert.Contains("list_types", result);
@@ -108,7 +109,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Give(new List<string> { "hero_1", "ProdigalSon" });
+            var result = Give(new List<string> { "hero_1", "ProdigalSon" });
 
             Assert.Contains("is a known vanilla Issue type but is not wired for give", result);
         }
@@ -131,7 +132,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Give(new List<string> { "hero_1", "BettingFraud" });
+            var result = Give(new List<string> { "hero_1", "BettingFraud" });
 
             Assert.Contains("already has an active issue", result);
         }
@@ -149,7 +150,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Complete(new List<string> { "some_hero" });
+            var result = Complete(new List<string> { "some_hero" });
 
             Assert.Equal(
                 "The 'coop.debug.issues.complete' command cannot be used on the client. It is intended for server use only.",
@@ -170,7 +171,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Complete(new List<string> { "no_such_hero" });
+            var result = Complete(new List<string> { "no_such_hero" });
 
             Assert.Contains("No Hero found with id", result);
         }
@@ -191,7 +192,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Complete(new List<string> { "hero_1" });
+            var result = Complete(new List<string> { "hero_1" });
 
             Assert.Contains("has no active issue", result);
         }
@@ -214,7 +215,7 @@ public class IssuesDebugCommandTests : System.IDisposable
 
         try
         {
-            var result = IssuesDebugCommand.Complete(new List<string> { "hero_1" });
+            var result = Complete(new List<string> { "hero_1" });
 
             Assert.Contains("no live quest yet", result);
             Assert.Contains("coop.debug.issues.give", result);
@@ -224,4 +225,17 @@ public class IssuesDebugCommandTests : System.IDisposable
             ModInformation.IsServer = wasServer;
         }
     }
+
+    private static string Give(List<string> args)
+    {
+        var command = new IssuesDebugCommand.IssuesGiveCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
+
+    private static string Complete(List<string> args)
+    {
+        var command = new IssuesDebugCommand.IssuesCompleteCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
+
 }

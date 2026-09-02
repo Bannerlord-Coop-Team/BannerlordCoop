@@ -1,7 +1,7 @@
 ﻿using Common;
+using Common.Commands;
 using GameInterface.Services.Party.Commands;
 using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Party;
@@ -25,8 +25,11 @@ public class PartyCommandsTests : IDisposable
     {
         ModInformation.IsServer = true;
 
-        var result = PartyCommands.WhoAmICommand(new List<string>());
-        
-        Assert.Equal("Command can only be run on a client.", result);
+        var command = new PartyCommands.WhoAmICoopCommand();
+        CoopCommandResult result = command.ProcessCommand(
+            new CoopCommandArgsFactory().FromValues(Array.Empty<string>()));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Command can only be run on a client.", result.Output);
     }
 }
