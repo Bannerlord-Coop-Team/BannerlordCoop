@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Common.Commands;
+using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -13,100 +14,155 @@ namespace GameInterface.Services.Time.Commands;
 
 internal class TimeCommands
 {
-    [CommandLineArgumentFunction("get_time_mode", "coop.debug")]
-    public static string GetTimeMode(List<string> strings)
-    {
-        if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface))
-        {
-            return "Failed to get time control interface";
-        }
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
 
-        return $"{timeControlInterface.GetTimeControl()}";
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class GetTimeModeCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug";
+
+        public string Name => "get_time_mode";
+
+        public string Description => "Reports get time mode.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface))
+            {
+                return Failed("Failed to get time control interface");
+            }
+
+            return Succeeded($"{timeControlInterface.GetTimeControl()}");
+        }
     }
 
-    [CommandLineArgumentFunction("set_time_mode", "coop.debug")]
-    public static string SetTimeMode(List<string> strings)
+    public sealed class SetTimeModeCoopCommand : ICoopCommand
     {
-        if (!ModInformation.IsServer)
+            public string Prefix => "coop.debug";
+
+            public string Name => "set_time_mode";
+
+            public string Description => "Runs the set time mode debug operation.";
+
+            public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+            {
+                new ExpectedArgs("time_mode", "Pause, Play_1x, or Play_2x.", isRequired: true),
+        #if DEBUG
+                new ExpectedArgs("force_live_test", "The DEBUG live-test override token.", isRequired: false),
+        #endif
+            };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            return "set_time_mode must be run on the server/host.";
+                    if (!ModInformation.IsServer)
+                    {
+                        return Failed("set_time_mode must be run on the server/host.");
+                    }
+
+            #if DEBUG
+                    bool forceForLiveTest = strings.Count == 2 &&
+                        strings[1].Equals("force-live-test", StringComparison.OrdinalIgnoreCase);
+                    if (strings.Count == 2 && !forceForLiveTest)
+                        return Failed("The optional override token must be force-live-test.");
+            #endif
+
+                    if (!Enum.TryParse(strings[0], true, out TimeControlEnum timeMode))
+                        return Failed($"Invalid time mode '{strings[0]}'. Expected Pause, Play_1x, or Play_2x.");
+
+                    if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface))
+                    {
+                        return Failed("Failed to get time control interface");
+                    }
+
+            #if DEBUG
+                    if (forceForLiveTest)
+                    {
+                        timeControlInterface.ServerSetTimeControlForLiveTest(timeMode);
+                        return Succeeded($"Time control force-set for live testing to {timeControlInterface.GetTimeControl()}");
+                    }
+            #endif
+
+                    timeControlInterface.ServerSetTimeControl(timeMode);
+                    return Succeeded($"Time control set to {timeControlInterface.GetTimeControl()}");
         }
-
-#if DEBUG
-        bool forceForLiveTest = strings.Count == 2 &&
-            strings[1].Equals("force-live-test", StringComparison.OrdinalIgnoreCase);
-#else
-        const bool forceForLiveTest = false;
-#endif
-
-        if ((strings.Count != 1 && !forceForLiveTest) ||
-            !Enum.TryParse(strings[0], true, out TimeControlEnum timeMode))
-        {
-            return "Usage: coop.debug.set_time_mode <Pause|Play_1x|Play_2x>";
-        }
-
-        if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface))
-        {
-            return "Failed to get time control interface";
-        }
-
-#if DEBUG
-        if (forceForLiveTest)
-        {
-            timeControlInterface.ServerSetTimeControlForLiveTest(timeMode);
-            return $"Time control force-set for live testing to {timeControlInterface.GetTimeControl()}";
-        }
-#endif
-
-        timeControlInterface.ServerSetTimeControl(timeMode);
-        return $"Time control set to {timeControlInterface.GetTimeControl()}";
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("request_time_mode", "coop.debug")]
-    public static string RequestTimeMode(List<string> strings)
+    public sealed class RequestTimeModeCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-            return "request_time_mode must be run on a client.";
-        if (strings.Count != 1 ||
-            !Enum.TryParse(strings[0], true, out TimeControlEnum timeMode))
-            return "Usage: coop.debug.request_time_mode <Pause|Play_1x|Play_2x>";
+        public string Prefix => "coop.debug";
 
-        MessageBroker.Instance.Publish(typeof(TimeCommands), new TimeSpeedChangedAttempted(timeMode));
-        return $"Requested time control {timeMode}.";
+        public string Name => "request_time_mode";
+
+        public string Description => "Runs the request time mode debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("time_mode", "Pause, Play_1x, or Play_2x.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsServer)
+                return Failed("request_time_mode must be run on a client.");
+            if (!Enum.TryParse(strings[0], true, out TimeControlEnum timeMode))
+                return Failed($"Invalid time mode '{strings[0]}'. Expected Pause, Play_1x, or Play_2x.");
+
+            MessageBroker.Instance.Publish(typeof(TimeCommands), new TimeSpeedChangedAttempted(timeMode));
+            return Succeeded($"Requested time control {timeMode}.");
+        }
     }
 #endif
 
-    [CommandLineArgumentFunction("advance_time", "coop.debug")]
-    public static string AdvanceTime(List<string> strings)
+    public sealed class AdvanceTimeCoopCommand : ICoopCommand
     {
-        // Time is authoritative on the server; advancing it elsewhere would just be
-        // overwritten by the next server sync.
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug";
+
+        public string Name => "advance_time";
+
+        public string Description => "Runs the advance time debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "advance_time must be run on the server/host. The server is authoritative for campaign time.";
-        }
+            new ExpectedArgs("days", "The number of campaign days to advance.", isRequired: false),
+        };
 
-        if (Campaign.Current == null)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            return "No campaign is currently loaded.";
+            // Time is authoritative on the server; advancing it elsewhere would just be
+            // overwritten by the next server sync.
+            if (ModInformation.IsClient)
+            {
+                return Failed("advance_time must be run on the server/host. The server is authoritative for campaign time.");
+            }
+
+            if (Campaign.Current == null)
+            {
+                return Failed("No campaign is currently loaded.");
+            }
+
+            float days = 5f;
+            if (strings.Count > 0)
+            {
+                if (!float.TryParse(strings[0], out days))
+                    return Failed("Days must be a valid number.");
+            }
+
+            if (!ContainerProvider.TryResolve<IMapTimeTrackerInterface>(out var mapTimeTrackerInterface))
+            {
+                return Failed("Failed to get map time tracker interface");
+            }
+
+            long ticks = CampaignTime.Days(days).NumTicks;
+            mapTimeTrackerInterface.AdvanceTime(ticks);
+
+            return Succeeded($"Advanced campaign time forward by {days} day(s) ({ticks} ticks). " +
+                $"Connected clients should apply the jump on the next time update.");
         }
-
-        float days = 5f;
-        if (strings.Count > 0 && float.TryParse(strings[0], out var parsedDays))
-        {
-            days = parsedDays;
-        }
-
-        if (!ContainerProvider.TryResolve<IMapTimeTrackerInterface>(out var mapTimeTrackerInterface))
-        {
-            return "Failed to get map time tracker interface";
-        }
-
-        long ticks = CampaignTime.Days(days).NumTicks;
-        mapTimeTrackerInterface.AdvanceTime(ticks);
-
-        return $"Advanced campaign time forward by {days} day(s) ({ticks} ticks). " +
-            $"Connected clients should apply the jump on the next time update.";
     }
 }

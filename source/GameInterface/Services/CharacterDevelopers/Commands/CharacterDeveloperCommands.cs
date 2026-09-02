@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common.Commands;
+using Common.Logging;
 using GameInterface.Services.CharacterDevelopers.Handlers;
 using Serilog;
 using System.Collections.Generic;
@@ -12,74 +13,89 @@ namespace GameInterface.Services.CharacterDevelopers.Commands;
 
 internal class CharacterDeveloperCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private static readonly ILogger Logger = LogManager.GetLogger<CharacterDeveloperHandler>();
 
     /// <summary>
     /// Output attributes, focuses, skills and perks of a specific hero
     /// </summary>
-    [CommandLineArgumentFunction("stats", "coop.debug.herodeveloper")]
-    public static string HeroStatsCommand(List<string> strings)
+    public sealed class HeroDeveloperStatsCoopCommand : ICoopCommand
     {
-        if (strings.Count == 0)
-        {
-            return "Hero name argument required.";
-        }
+        public string Prefix => "coop.debug.hero_developer";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public string Name => "stats";
+
+        public string Description => "Reports stats.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (hero.Name.ToString() == strings[0])
+            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
             {
-                string heroData = hero.Name + ":\n";
-
-                heroData += " Level: " + hero.Level + "\n";
-
-                heroData += " Total XP: " + hero.HeroDeveloper.TotalXp + "\n";
-
-                heroData += " Unspent Focus Points: " + hero.HeroDeveloper.UnspentFocusPoints + "\n";
-
-                heroData += " Unspent Attribute Points: " + hero.HeroDeveloper.UnspentAttributePoints + "\n";
-
-                heroData += " Attributes: {";
-                foreach (CharacterAttribute attribute in hero._characterAttributes._attributes.Keys)
+                if (hero.Name.ToString() == strings[0])
                 {
-                    heroData += attribute.Name + ": " + hero.GetAttributeValue(attribute) + ",";
-                }
+                    string heroData = hero.Name + ":\n";
 
-                heroData += "\n Skill XPs: {";
-                foreach (var skillXp in hero.HeroDeveloper._skillXps)
-                {
-                    heroData += skillXp.Key.Name + ": " + skillXp.Value + ",";
-                }
+                    heroData += " Level: " + hero.Level + "\n";
 
-                heroData += "}\n Focuses: {";
-                foreach (SkillObject skill in hero._heroSkills._attributes.Keys)
-                {
-                    heroData += skill.Name + ": " + hero.HeroDeveloper.GetFocus(skill) + ",";
-                }
+                    heroData += " Total XP: " + hero.HeroDeveloper.TotalXp + "\n";
 
-                heroData += "}\n Skills: {";
-                foreach (SkillObject skill in hero._heroSkills._attributes.Keys)
-                {
-                    heroData += skill.Name + ": " + hero.GetSkillValue(skill) + ",";
-                }
+                    heroData += " Unspent Focus Points: " + hero.HeroDeveloper.UnspentFocusPoints + "\n";
 
-                heroData += "}\n Perks: {";
-                foreach (PerkObject perk in hero._heroPerks._attributes.Keys)
-                {
-                    heroData += perk.Name + ",";
-                }
-                heroData += "}";
+                    heroData += " Unspent Attribute Points: " + hero.HeroDeveloper.UnspentAttributePoints + "\n";
 
-                stringBuilder.AppendLine(heroData);
+                    heroData += " Attributes: {";
+                    foreach (CharacterAttribute attribute in hero._characterAttributes._attributes.Keys)
+                    {
+                        heroData += attribute.Name + ": " + hero.GetAttributeValue(attribute) + ",";
+                    }
+
+                    heroData += "\n Skill XPs: {";
+                    foreach (var skillXp in hero.HeroDeveloper._skillXps)
+                    {
+                        heroData += skillXp.Key.Name + ": " + skillXp.Value + ",";
+                    }
+
+                    heroData += "}\n Focuses: {";
+                    foreach (SkillObject skill in hero._heroSkills._attributes.Keys)
+                    {
+                        heroData += skill.Name + ": " + hero.HeroDeveloper.GetFocus(skill) + ",";
+                    }
+
+                    heroData += "}\n Skills: {";
+                    foreach (SkillObject skill in hero._heroSkills._attributes.Keys)
+                    {
+                        heroData += skill.Name + ": " + hero.GetSkillValue(skill) + ",";
+                    }
+
+                    heroData += "}\n Perks: {";
+                    foreach (PerkObject perk in hero._heroPerks._attributes.Keys)
+                    {
+                        heroData += perk.Name + ",";
+                    }
+                    heroData += "}";
+
+                    stringBuilder.AppendLine(heroData);
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Hero not found.");
         }
-        return "Hero not found.";
     }
 }

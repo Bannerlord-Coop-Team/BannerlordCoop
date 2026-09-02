@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using Autofac;
 using Common;
 using Common.Network;
@@ -5,37 +6,51 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using System.Collections.Generic;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
 namespace GameInterface.Services.Villages.Commands;
 
 public class RaidDebugCommands
 {
-    [CommandLineArgumentFunction("allow_raid_ai_intervention", "coop.debug.mapevent")]
-    public static string AllowRaidAiIntervention(List<string> args)
-    {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mapevent.allow_raid_ai_intervention <on|off|toggle|status>";
-        }
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
 
-        var value = args[0].ToLowerInvariant();
-        switch (value)
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class AllowRaidAiInterventionCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mapevent";
+
+        public string Name => "allow_raid_ai_intervention";
+
+        public string Description => "Controls raid ai intervention for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            case "on":
-            case "true":
-            case "1":
-                return ApplyRaidAiInterventionConfig(true);
-            case "off":
-            case "false":
-            case "0":
-                return ApplyRaidAiInterventionConfig(false);
-            case "toggle":
-                return ApplyRaidAiInterventionConfig(!MapEventConfig.AllowRaidAiIntervention);
-            case "status":
-                return RaidAiInterventionConfigHandler.StatusText;
-            default:
-                return "Usage: coop.debug.mapevent.allow_raid_ai_intervention <on|off|toggle|status>";
+            new ExpectedArgs("mode", "The mode."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            var value = args[0].ToLowerInvariant();
+            switch (value)
+            {
+                case "on":
+                case "true":
+                case "1":
+                    return Succeeded(ApplyRaidAiInterventionConfig(true));
+                case "off":
+                case "false":
+                case "0":
+                    return Succeeded(ApplyRaidAiInterventionConfig(false));
+                case "toggle":
+                    return Succeeded(ApplyRaidAiInterventionConfig(!MapEventConfig.AllowRaidAiIntervention));
+                case "status":
+                    return Succeeded(RaidAiInterventionConfigHandler.StatusText);
+                default:
+                    return Failed("Invalid action. Use on, off, toggle, or status.");
+            }
+
         }
     }
 
