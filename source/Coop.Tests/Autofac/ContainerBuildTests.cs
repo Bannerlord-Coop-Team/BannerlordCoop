@@ -9,6 +9,7 @@ using Coop.Core.Server;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
+using Missions;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -33,9 +34,26 @@ namespace Coop.Tests.Autofac
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
 
-            ICoopCommand[] commands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
-            Assert.Contains(commands, command =>
+            ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
+            Assert.Contains(registeredCommands, command =>
                 $"{command.Prefix}.{command.Name}" == "coop.debug.workshop.set_workshop_custom_name");
+            Assert.Contains(registeredCommands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.map_event.kms");
+
+            ICoopCommand[] missionCommands = registeredCommands
+                .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
+                .ToArray();
+#if DEBUG
+            Assert.Equal(26, missionCommands.Length);
+            Assert.Equal(
+                new[] { "arm_inactive_party_deficit", "disconnect", "join_state" },
+                registeredCommands
+                    .Where(command => command.Prefix == "coop.debug.connection")
+                    .Select(command => command.Name)
+                    .OrderBy(name => name));
+#else
+            Assert.Equal(15, missionCommands.Length);
+#endif
         }
 
         [Fact]
@@ -54,6 +72,16 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+
+#if DEBUG
+            ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
+            Assert.Equal(
+                new[] { "join_state", "restore_inactive_party", "stage_inactive_party" },
+                registeredCommands
+                    .Where(command => command.Prefix == "coop.debug.connection")
+                    .Select(command => command.Name)
+                    .OrderBy(name => name));
+#endif
         }
 
         [Theory]

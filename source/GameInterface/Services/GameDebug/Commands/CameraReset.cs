@@ -1,4 +1,6 @@
-﻿using SandBox.View.Map;
+﻿using System;
+using Common.Commands;
+using SandBox.View.Map;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -7,43 +9,72 @@ namespace GameInterface.Services.GameDebug.Commands;
 
 internal class CameraReset
 {
-    [CommandLineArgumentFunction("fix_camera", "coop.debug")]
-    public static string ChangeClanLeader(List<string> strings)
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class FixCameraCoopCommand : ICoopCommand
     {
-        Game.Current.GameStateManager.UnregisterActiveStateDisableRequest(MapScreen.Instance);
-        return "Camera reset";
+        public string Prefix => "coop.debug";
+
+        public string Name => "fix_camera";
+
+        public string Description => "Runs the fix camera debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            Game.Current.GameStateManager.UnregisterActiveStateDisableRequest(MapScreen.Instance);
+            return Succeeded("Camera reset");
+        }
     }
 
-    [CommandLineArgumentFunction("focus_main_party", "coop.debug.map_camera")]
-    public static string FocusMainParty(List<string> strings)
+    public sealed class MapCameraFocusMainPartyCoopCommand : ICoopCommand
     {
-        if (strings.Count != 0)
-        {
-            return "Usage: coop.debug.map_camera.focus_main_party";
-        }
+        public string Prefix => "coop.debug.map_camera";
 
-        MapCameraView cameraView = MapScreen.Instance?.MapCameraView;
-        if (cameraView == null)
-        {
-            return "Campaign map camera is unavailable";
-        }
+        public string Name => "focus_main_party";
 
-        cameraView.TeleportCameraToMainParty();
-        return GetCameraState(cameraView);
+        public string Description => "Runs the focus main party debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+
+            MapCameraView cameraView = MapScreen.Instance?.MapCameraView;
+            if (cameraView == null)
+            {
+                return Failed("Campaign map camera is unavailable");
+            }
+
+            cameraView.TeleportCameraToMainParty();
+            return Succeeded(GetCameraState(cameraView));
+        }
     }
 
-    [CommandLineArgumentFunction("state", "coop.debug.map_camera")]
-    public static string GetState(List<string> strings)
+    public sealed class MapCameraStateCoopCommand : ICoopCommand
     {
-        if (strings.Count != 0)
-        {
-            return "Usage: coop.debug.map_camera.state";
-        }
+        public string Prefix => "coop.debug.map_camera";
 
-        MapCameraView cameraView = MapScreen.Instance?.MapCameraView;
-        return cameraView == null
-            ? "Campaign map camera is unavailable"
-            : GetCameraState(cameraView);
+        public string Name => "state";
+
+        public string Description => "Reports state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+
+            MapCameraView cameraView = MapScreen.Instance?.MapCameraView;
+            if (cameraView == null)
+                return Failed("Campaign map camera is unavailable");
+
+            return Succeeded(GetCameraState(cameraView));
+        }
     }
 
     private static string GetCameraState(MapCameraView cameraView)
