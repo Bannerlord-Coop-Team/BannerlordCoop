@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Common.Commands;
+using Common;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -16,6 +17,12 @@ namespace GameInterface.Services.Heroes.Commands;
 /// </summary>
 public class HeroBoostFighterDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private static readonly CharacterAttribute[] Attributes =
     {
         DefaultCharacterAttributes.Vigor, DefaultCharacterAttributes.Control, DefaultCharacterAttributes.Endurance,
@@ -28,25 +35,39 @@ public class HeroBoostFighterDebugCommand
         DefaultSkills.Crossbow, DefaultSkills.Throwing, DefaultSkills.Riding, DefaultSkills.Athletics,
     };
 
-    public static string BoostFighter(List<string> args)
+    public sealed class HeroBoostFighterCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Run coop.debug.hero.boost_fighter on the server (host) only";
+        public string Prefix => "coop.debug.hero";
 
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return "Unable to resolve IObjectManager";
-        if (!objectManager.TryGetObject<Hero>(args[0], out var hero))
-            return $"Hero '{args[0]}' not found (use coop.debug.alley.my_hero_id on the owning client)";
+        public string Name => "boost_fighter";
 
-        var dev = hero.HeroDeveloper;
+        public string Description => "Boosts a registered hero for fighter fixture testing.";
 
-        // Raise attributes + focus first so the skill soft-cap doesn't hold the skills down, then max
-        // each combat skill. checkUnspentPoints/checkUnspentFocusPoints = false bypasses the point gates.
-        foreach (var attribute in Attributes) dev.AddAttribute(attribute, 10, false);
-        foreach (var skill in CombatSkills)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            dev.AddFocus(skill, 5, false);
-            dev.ChangeSkillLevel(skill, 300, false);
-        }
+            new ExpectedArgs("hero_registry_id", "The registered hero id to boost."),
+        };
 
-        return $"Boosted {hero.Name}: combat skills + attributes + focus maxed (replicating to the owning client)";
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Run coop.debug.hero.boost_fighter on the server (host) only");
+
+            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return Failed("Unable to resolve IObjectManager");
+            if (!objectManager.TryGetObject<Hero>(args[0], out var hero))
+                return Failed($"Hero '{args[0]}' not found (use coop.debug.alley.my_hero_id on the owning client)");
+
+            var dev = hero.HeroDeveloper;
+
+            // Raise attributes + focus first so the skill soft-cap doesn't hold the skills down, then max
+            // each combat skill. checkUnspentPoints/checkUnspentFocusPoints = false bypasses the point gates.
+            foreach (var attribute in Attributes) dev.AddAttribute(attribute, 10, false);
+            foreach (var skill in CombatSkills)
+            {
+                dev.AddFocus(skill, 5, false);
+                dev.ChangeSkillLevel(skill, 300, false);
+            }
+
+            return Succeeded($"Boosted {hero.Name}: combat skills + attributes + focus maxed (replicating to the owning client)");
+        }
     }
 }

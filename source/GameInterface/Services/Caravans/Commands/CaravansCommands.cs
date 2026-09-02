@@ -1,4 +1,6 @@
-﻿using Autofac;
+﻿using System;
+using Common.Commands;
+using Autofac;
 using Common;
 using Common.Logging;
 using GameInterface.CoopSessionData;
@@ -15,6 +17,12 @@ namespace GameInterface.Services.Caravans.Commands;
 
 internal class CaravansCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private static readonly ILogger Logger = LogManager.GetLogger<CaravansCommands>();
 
     /// <summary>
@@ -31,164 +39,214 @@ internal class CaravansCommands
     /// <summary>
     /// View prohibited kingdoms for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_prohibited_kingdoms", "coop.debug.caravans")]
-    public static string ViewProhibitedKingdomsCommand(List<string> strings)
+    public sealed class CaravansViewProhibitedKingdomsCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Prefix => "coop.debug.caravans";
+
+        public string Name => "view_prohibited_kingdoms";
+
+        public string Description => "Reports view prohibited kingdoms.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
-
-            foreach (var playerProhibitedKingdom in coopSessionProvider.CoopSession.CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans)
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                if (playerProhibitedKingdom.Key == null || playerProhibitedKingdom.Value == null) continue;
+                if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
 
-                stringBuilder.AppendLine($"{playerProhibitedKingdom.Key}");
-                foreach (var prohibitedKingdom in playerProhibitedKingdom.Value)
+                foreach (var playerProhibitedKingdom in coopSessionProvider.CoopSession.CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans)
                 {
-                    stringBuilder.AppendLine($"{prohibitedKingdom}");
+                    if (playerProhibitedKingdom.Key == null || playerProhibitedKingdom.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{playerProhibitedKingdom.Key}");
+                    foreach (var prohibitedKingdom in playerProhibitedKingdom.Value)
+                    {
+                        stringBuilder.AppendLine($"{prohibitedKingdom}");
+                    }
                 }
             }
-        }
-        else
-        {
-            stringBuilder.AppendLine($"{Hero.MainHero.Name}");
-            foreach (var prohibitedKingdom in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._prohibitedKingdomsForPlayerCaravans)
+            else
             {
-                stringBuilder.AppendLine($"{prohibitedKingdom.StringId}");
+                stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+                foreach (var prohibitedKingdom in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._prohibitedKingdomsForPlayerCaravans)
+                {
+                    stringBuilder.AppendLine($"{prohibitedKingdom.StringId}");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve prohibited kingdoms");
         }
-        return "Failed to retrieve prohibited kingdoms";
     }
 
     /// <summary>
     /// View interacted caravans for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_interacted_caravans", "coop.debug.caravans")]
-    public static string ViewInteractedCaravansCommand(List<string> strings)
+    public sealed class CaravansViewInteractedCaravansCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Prefix => "coop.debug.caravans";
+
+        public string Name => "view_interacted_caravans";
+
+        public string Description => "Reports view interacted caravans.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
-
-            foreach (var playerInteractedCaravan in coopSessionProvider.CoopSession.InteractionsPlayerData.PlayerInteractedCaravans)
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                if (playerInteractedCaravan.Key == null || playerInteractedCaravan.Value == null) continue;
+                if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
 
-                stringBuilder.AppendLine($"{playerInteractedCaravan.Key}");
-                foreach (var interactedCaravan in playerInteractedCaravan.Value)
+                foreach (var playerInteractedCaravan in coopSessionProvider.CoopSession.InteractionsPlayerData.PlayerInteractedCaravans)
                 {
-                    stringBuilder.AppendLine($"{interactedCaravan.Key} ({interactedCaravan.Value})");
+                    if (playerInteractedCaravan.Key == null || playerInteractedCaravan.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{playerInteractedCaravan.Key}");
+                    foreach (var interactedCaravan in playerInteractedCaravan.Value)
+                    {
+                        stringBuilder.AppendLine($"{interactedCaravan.Key} ({interactedCaravan.Value})");
+                    }
                 }
             }
-        }
-        else
-        {
-            stringBuilder.AppendLine($"{Hero.MainHero.Name}");
-            foreach (var interactedCaravan in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._interactedCaravans)
+            else
             {
-                stringBuilder.AppendLine($"{interactedCaravan.Key.StringId} ({(int)interactedCaravan.Value})");
+                stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+                foreach (var interactedCaravan in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._interactedCaravans)
+                {
+                    stringBuilder.AppendLine($"{interactedCaravan.Key.StringId} ({(int)interactedCaravan.Value})");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve interacted caravans");
         }
-        return "Failed to retrieve interacted caravans";
     }
 
     /// <summary>
     /// View player trade rumor taken caravans for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_taken_trade_rumors", "coop.debug.caravans")]
-    public static string ViewTakenTradeRumorsCommand(List<string> strings)
+    public sealed class CaravansViewTakenTradeRumorsCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Prefix => "coop.debug.caravans";
+
+        public string Name => "view_taken_trade_rumors";
+
+        public string Description => "Reports view taken trade rumors.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
-
-            foreach (var playerTakenTradeRumorCaravan in coopSessionProvider.CoopSession.CaravansPlayerData.PlayerTradeRumorTakenCaravans)
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                if (playerTakenTradeRumorCaravan.Key == null || playerTakenTradeRumorCaravan.Value == null) continue;
+                if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
 
-                stringBuilder.AppendLine($"{playerTakenTradeRumorCaravan.Key}");
-                foreach (var takenTradeRumorCaravan in playerTakenTradeRumorCaravan.Value)
+                foreach (var playerTakenTradeRumorCaravan in coopSessionProvider.CoopSession.CaravansPlayerData.PlayerTradeRumorTakenCaravans)
                 {
-                    stringBuilder.AppendLine($"{takenTradeRumorCaravan.Key} ({takenTradeRumorCaravan.Value})");
+                    if (playerTakenTradeRumorCaravan.Key == null || playerTakenTradeRumorCaravan.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{playerTakenTradeRumorCaravan.Key}");
+                    foreach (var takenTradeRumorCaravan in playerTakenTradeRumorCaravan.Value)
+                    {
+                        stringBuilder.AppendLine($"{takenTradeRumorCaravan.Key} ({takenTradeRumorCaravan.Value})");
+                    }
                 }
             }
-        }
-        else
-        {
-            stringBuilder.AppendLine($"{Hero.MainHero.Name}");
-            foreach (var takenTradeRumorCaravan in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._tradeRumorTakenCaravans)
+            else
             {
-                stringBuilder.AppendLine($"{takenTradeRumorCaravan.Key.StringId} ({takenTradeRumorCaravan.Value.NumTicks})");
+                stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+                foreach (var takenTradeRumorCaravan in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._tradeRumorTakenCaravans)
+                {
+                    stringBuilder.AppendLine($"{takenTradeRumorCaravan.Key.StringId} ({takenTradeRumorCaravan.Value.NumTicks})");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve trade rumor taken caravans");
         }
-        return "Failed to retrieve trade rumor taken caravans";
     }
 
-    [CommandLineArgumentFunction("view_trade_action_logs", "coop.debug.caravans")]
-    public static string ViewTradeActionLogs(List<string> strings)
+    public sealed class CaravansViewTradeActionLogsCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var caravanTradeActionLogs in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._tradeActionLogs)
-        {
-            // Do not output data for caravans in a settlement, logs only refresh for clients when caravans leave a settlement
-            if (caravanTradeActionLogs.Key.CurrentSettlement != null) continue;
+        public string Prefix => "coop.debug.caravans";
 
-            stringBuilder.AppendLine($"{caravanTradeActionLogs.Key.StringId}:");
-            foreach (var tradeActionLog in caravanTradeActionLogs.Value)
+        public string Name => "view_trade_action_logs";
+
+        public string Description => "Reports view trade action logs.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var caravanTradeActionLogs in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._tradeActionLogs)
             {
-                stringBuilder.AppendLine($"- " +
-                    $"{tradeActionLog.BoughtSettlement?.StringId}, " +
-                    $"{tradeActionLog.SoldSettlement?.StringId}, " +
-                    $"{tradeActionLog.BuyPrice}, " +
-                    $"{tradeActionLog.SellPrice}, " +
-                    $"{tradeActionLog.ItemRosterElement.EquipmentElement.Item.StringId}, " +
-                    $"{tradeActionLog.BoughtTime.NumTicks}");
-            }
-        }
+                // Do not output data for caravans in a settlement, logs only refresh for clients when caravans leave a settlement
+                if (caravanTradeActionLogs.Key.CurrentSettlement != null) continue;
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+                stringBuilder.AppendLine($"{caravanTradeActionLogs.Key.StringId}:");
+                foreach (var tradeActionLog in caravanTradeActionLogs.Value)
+                {
+                    stringBuilder.AppendLine($"- " +
+                        $"{tradeActionLog.BoughtSettlement?.StringId}, " +
+                        $"{tradeActionLog.SoldSettlement?.StringId}, " +
+                        $"{tradeActionLog.BuyPrice}, " +
+                        $"{tradeActionLog.SellPrice}, " +
+                        $"{tradeActionLog.ItemRosterElement.EquipmentElement.Item.StringId}, " +
+                        $"{tradeActionLog.BoughtTime.NumTicks}");
+                }
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve trade action logs");
         }
-        return "Failed to retrieve trade action logs";
     }
 
-    [CommandLineArgumentFunction("view_looted_caravans", "coop.debug.caravans")]
-    public static string ViewLootedCaravans(List<string> strings)
+    public sealed class CaravansViewLootedCaravansCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var lootedCaravan in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._lootedCaravans)
-        {
-            stringBuilder.AppendLine($"{lootedCaravan.Key.StringId} ({lootedCaravan.Value.NumTicks})");
-        }
+        public string Prefix => "coop.debug.caravans";
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
+        public string Name => "view_looted_caravans";
+
+        public string Description => "Reports view looted caravans.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            return result;
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var lootedCaravan in Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>()._lootedCaravans)
+            {
+                stringBuilder.AppendLine($"{lootedCaravan.Key.StringId} ({lootedCaravan.Value.NumTicks})");
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve looted caravans");
         }
-        return "Failed to retrieve looted caravans";
     }
 }
