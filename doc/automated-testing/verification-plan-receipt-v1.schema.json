@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bannerlordcoop.dev/schemas/verification-plan-receipt-v1.schema.json",
+  "title": "BannerlordCoop verification plan consumer receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "scope",
+    "includesTestEvidence",
+    "source",
+    "authoritativeBase",
+    "changedPathsDigest",
+    "planDigest",
+    "verdict",
+    "requiredProfiles",
+    "harnessOwnedProfiles",
+    "externalRuntimeProfiles"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "verification-plan-receipt.v1" },
+    "scope": { "const": "selection-and-local-harness-handoff" },
+    "includesTestEvidence": { "const": false },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head", "syntheticTree"],
+      "properties": {
+        "head": { "$ref": "#/$defs/gitObjectId" },
+        "syntheticTree": { "$ref": "#/$defs/gitObjectId" }
+      }
+    },
+    "authoritativeBase": { "$ref": "#/$defs/gitObjectId" },
+    "changedPathsDigest": { "$ref": "#/$defs/sha256" },
+    "planDigest": { "$ref": "#/$defs/sha256" },
+    "verdict": { "enum": ["validated-pending-ci", "blocked-external-runtime"] },
+    "requiredProfiles": { "$ref": "#/$defs/profiles" },
+    "harnessOwnedProfiles": { "$ref": "#/$defs/profiles" },
+    "externalRuntimeProfiles": { "$ref": "#/$defs/profiles" }
+  },
+  "$defs": {
+    "gitObjectId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "profile": {
+      "enum": [
+        "unit",
+        "deterministic-peer",
+        "process-peer",
+        "dedicated-server-synthetic",
+        "rendered-smoke",
+        "full-live"
+      ]
+    },
+    "profiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/profile" },
+      "uniqueItems": true
+    }
+  }
+}

@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Link Game Assemblies Folder
         run: ln -s /home/mb2 mb2
@@ -63,6 +65,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Link Game Assemblies Folder
         run: ln -s /home/mb2 mb2
@@ -91,6 +95,37 @@ jobs:
         working-directory: source
         run: dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly
 
+  verification-harness:
+    name: Verification plan and local harness profiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [test, e2e]
+    if: ${{ !github.event.pull_request.draft }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.300
+
+      - name: Generate plan and run repository-owned profiles
+        run: bash .github/scripts/run-verification-plan.sh '${{ github.event.pull_request.base.sha }}' artifacts/verification-plan
+
+      - name: Upload verification plan and evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: verification-plan
+          path: artifacts/verification-plan/**
+          retention-days: 14
+          if-no-files-found: error
+
   e2e:
     name: E2E Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
@@ -107,6 +142,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Link Game Assemblies Folder
         run: ln -s /home/mb2 mb2

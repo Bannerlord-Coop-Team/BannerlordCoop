@@ -133,7 +133,7 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void Mesh_PacketChannel_RemainsFifoWhenLatencyDrops()
+    public void Mesh_UnreliablePacketChannel_AllowsLaterLowLatencyPacketToOvertake()
     {
         EnvironmentInstance[] clients = Clients.ToArray();
         Connect(clients[0], "ctrl-A", "instance-1");
@@ -152,10 +152,11 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
             clients[0].Call(() => Mesh(clients[0]).SendAll(
                 new CompressedMovementPacket(1, new byte[] { 2 })));
 
-            Assert.Equal(0, receiver.HandleCount);
-            Assert.Equal(2, scheduler.AdvanceBy(TimeSpan.FromMilliseconds(100)));
+            Assert.Equal(1, receiver.HandleCount);
+            Assert.Equal(2, Assert.IsType<CompressedMovementPacket>(receiver.Packets.Single()).Payload[0]);
+            Assert.Equal(1, scheduler.AdvanceBy(TimeSpan.FromMilliseconds(100)));
             Assert.Equal(
-                new byte[] { 1, 2 },
+                new byte[] { 2, 1 },
                 receiver.Packets
                     .Select(packet => Assert.IsType<CompressedMovementPacket>(packet).Payload[0]));
         }

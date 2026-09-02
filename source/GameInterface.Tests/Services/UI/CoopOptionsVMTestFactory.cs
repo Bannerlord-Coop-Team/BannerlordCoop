@@ -9,8 +9,12 @@ using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
 using GameInterface.Services.UI.CoopOptions.Providers.NetworkTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using System;
+using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
+
+[CollectionDefinition(nameof(CoopOptionsViewModelCollection), DisableParallelization = true)]
+public sealed class CoopOptionsViewModelCollection { }
 
 internal static class CoopOptionsVMTestFactory
 {

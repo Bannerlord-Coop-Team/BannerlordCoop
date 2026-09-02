@@ -31,6 +31,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
+using CommandLineArgumentFunction = TaleWorlds.Library.CommandLineFunctionality.CommandLineArgumentFunction;
 
 namespace GameInterface.Services.Kingdoms.Commands;
 

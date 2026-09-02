@@ -2970,6 +2970,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     {
         var client1 = Clients.First();
         var client2 = Clients.Skip(1).First();
+        DecisionItemBaseVM submittedDecisionItem = null;
+        KingdomDecisionsVM retryDecisionsVm = null;
+        DecisionItemBaseVM retryDecisionItem = null;
         client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         client2.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
         var player1 = CreateSyncedPlayerContext(ControllerId, client1);
@@ -3015,6 +3018,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             decisionsVm.RefreshWith(decision);
 
             var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            submittedDecisionItem = decisionItem;
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
                 candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
                 outcome.ShouldDecisionBeEnforced);
@@ -3027,8 +3031,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(decisionItem.IsActive);
             Assert.True(decisionItem._finalSelectionDone);
             Assert.Equal(decisionDescription, decisionItem.DescriptionText);
-            Assert.Contains("Vote submitted", GetVoteManager(client2).RefreshDecisionWaitingStatus(decisionItem));
         });
+
+        client2.Call(() =>
+            Assert.Contains(
+                "Vote submitted",
+                GetVoteManager(client2).RefreshDecisionWaitingStatus(submittedDecisionItem)));
 
         client1.Call(() =>
         {
@@ -3038,6 +3046,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             decisionsVm.RefreshWith(decision);
 
             var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            retryDecisionsVm = decisionsVm;
+            retryDecisionItem = decisionItem;
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
                 candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
                 outcome.ShouldDecisionBeEnforced);
@@ -3054,9 +3064,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             RestoreReverseObjectManagerId(client1, kingdom, kingdomId);
             decisionItem.ExecuteFinalSelection();
+        });
 
-            Assert.Null(decisionsVm.CurrentDecision);
-            Assert.False(decisionItem.IsActive);
+        client1.Call(() =>
+        {
+            Assert.Null(retryDecisionsVm.CurrentDecision);
+            Assert.False(retryDecisionItem.IsActive);
         });
 
         Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
