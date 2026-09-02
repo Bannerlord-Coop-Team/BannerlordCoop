@@ -14,9 +14,18 @@ internal class CraftedItemValuePatch
         if (__instance.IsCraftedByPlayer)
         {
             var multiplier = ModConfigProvider.ModOptions.SmithingCraftedItemsValueMultiplier;
-            if (multiplier < 0 || multiplier == float.PositiveInfinity || multiplier == float.NaN) multiplier = 1;
-
-            __instance.Value = (int)(__instance.Value * multiplier);
+            __instance.Value = ApplyMultiplier(__instance.Value, multiplier);
         }
+    }
+
+    internal static int ApplyMultiplier(int value, float multiplier)
+    {
+        if (multiplier < 0 || float.IsNaN(multiplier) || float.IsInfinity(multiplier)) return value;
+
+        var scaledValue = value * (double)multiplier;
+        if (scaledValue > int.MaxValue) return int.MaxValue;
+        if (scaledValue < int.MinValue) return int.MinValue;
+
+        return (int)scaledValue;
     }
 }
