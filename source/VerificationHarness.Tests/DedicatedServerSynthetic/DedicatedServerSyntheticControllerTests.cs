@@ -8,46 +8,30 @@ namespace VerificationHarness.Tests.DedicatedServerSynthetic;
 public sealed class DedicatedServerSyntheticControllerTests
 {
     [Fact]
-    public async Task ValidPreflightStillCannotProducePassedVerdict()
+    public async Task CompletedRuntimeScenarioProducesPassedVerdict()
     {
-        string response = LiveTestProtocol.SerializeResponse(new LiveTestResponse
-        {
-            Id = "request-id",
-            Ok = true,
-            Process = new LiveTestProcessInfo
-            {
-                Pid = 1234,
-                Role = "server",
-                RunToken = "run-token"
-            },
-            Result = new
-            {
-                serving = true,
-                joinPort = 4201,
-                connectionRoster = new[]
-                {
-                    new { controllerId = "ds-synthetic-client-a", connectionInstanceId = "connection-a-1", connected = true, joinState = "ResolveCharacterState" },
-                    new { controllerId = "ds-synthetic-client-b", connectionInstanceId = "connection-b-1", connected = true, joinState = "ResolveCharacterState" }
-                }
-            }
-        });
         var controller = new DedicatedServerSyntheticController(
-            new StubControlClient(response),
+            new StubControlClient("{}"),
             new DedicatedServerControlResponseValidator(),
-            new CanonicalJsonHasher());
+            new CanonicalJsonHasher(),
+            new StubScenarioRunner(PassedScenario()),
+            new StubArtifactVerifier(VerifiedArtifacts()));
         using var output = new StringWriter();
 
         int exitCode = await controller.RunAsync(ValidArguments(), output, CancellationToken.None);
 
-        Assert.Equal(DedicatedServerSyntheticController.BlockedExitCode, exitCode);
+        Assert.Equal(0, exitCode);
         using JsonDocument document = JsonDocument.Parse(output.ToString());
         JsonElement root = document.RootElement;
-        Assert.Equal("blocked", root.GetProperty("verdict").GetString());
+        Assert.Equal("passed", root.GetProperty("verdict").GetString());
         Assert.Equal("0x0000000000000011", root.GetProperty("seed").GetString());
-        Assert.False(root.GetProperty("requiredChecks").GetProperty("runtime-scenario-executed").GetBoolean());
-        Assert.Contains(
-            root.GetProperty("failures").EnumerateArray(),
-            x => x.GetString() == "runtime-scenario-controller-not-implemented");
+        Assert.Equal(new string('a', 40), root.GetProperty("coopSource").GetProperty("head").GetString());
+        Assert.True(root.GetProperty("requiredChecks").GetProperty("runtime-artifact-manifest-match").GetBoolean());
+        Assert.Equal(
+            new string('9', 64),
+            root.GetProperty("artifactHashes").GetProperty("runtime-artifact-manifest").GetString());
+        Assert.True(root.GetProperty("requiredChecks").GetProperty("runtime-scenario-executed").GetBoolean());
+        Assert.Empty(root.GetProperty("failures").EnumerateArray());
     }
 
     [Fact]
@@ -56,7 +40,9 @@ public sealed class DedicatedServerSyntheticControllerTests
         var controller = new DedicatedServerSyntheticController(
             new StubControlClient("{}"),
             new DedicatedServerControlResponseValidator(),
-            new CanonicalJsonHasher());
+            new CanonicalJsonHasher(),
+            new StubScenarioRunner(PassedScenario()),
+            new StubArtifactVerifier(VerifiedArtifacts()));
         using var output = new StringWriter();
         string[] arguments = ValidArguments()
             .Concat(new[] { "--output", "invalid\0path" })
@@ -78,6 +64,96 @@ public sealed class DedicatedServerSyntheticControllerTests
         Assert.NotEqual(
             baselineDocument.RootElement.GetProperty("stateDigest").GetString(),
             root.GetProperty("stateDigest").GetString());
+    }
+
+    [Fact]
+    public async Task ArtifactFailureSkipsScenarioAndDoesNotEchoCallerSource()
+    {
+        var scenarioRunner = new StubScenarioRunner(PassedScenario());
+        var controller = new DedicatedServerSyntheticController(
+            new StubControlClient("{}"),
+            new DedicatedServerControlResponseValidator(),
+            new CanonicalJsonHasher(),
+            scenarioRunner,
+            new StubArtifactVerifier(new DedicatedServerSyntheticArtifactVerification
+            {
+                FailureCodes = new List<string> { "artifact-manifest-invalid" }
+            }));
+        using var output = new StringWriter();
+
+        int exitCode = await controller.RunAsync(
+            ValidArguments(),
+            output,
+            CancellationToken.None);
+
+        Assert.Equal(DedicatedServerSyntheticController.BlockedExitCode, exitCode);
+        Assert.Equal(0, scenarioRunner.RunCount);
+        using JsonDocument document = JsonDocument.Parse(output.ToString());
+        JsonElement root = document.RootElement;
+        Assert.Equal(string.Empty, root.GetProperty("coopSource").GetProperty("head").GetString());
+        Assert.False(
+            root.GetProperty("requiredChecks")
+                .GetProperty("runtime-artifact-manifest-match")
+                .GetBoolean());
+        Assert.Contains(
+            root.GetProperty("failures").EnumerateArray(),
+            item => item.GetString() == "artifact-manifest-invalid");
+    }
+
+    [Fact]
+    public async Task LifecycleWithoutControlValidationCannotPassRequiredChecks()
+    {
+        DedicatedServerSyntheticScenarioResult scenario = PassedScenario();
+        foreach (DedicatedServerSyntheticLifecycleSnapshot snapshot in scenario.Lifecycle)
+        {
+            snapshot.ControlEnvelopeValidated = false;
+            snapshot.ControlRequestIdentityValidated = false;
+            snapshot.DedicatedProcessIdentityValidated = false;
+            snapshot.FirstClassConnectionRosterValidated = false;
+        }
+        var controller = new DedicatedServerSyntheticController(
+            new StubControlClient("{}"),
+            new DedicatedServerControlResponseValidator(),
+            new CanonicalJsonHasher(),
+            new StubScenarioRunner(scenario),
+            new StubArtifactVerifier(VerifiedArtifacts()));
+        using var output = new StringWriter();
+
+        int exitCode = await controller.RunAsync(ValidArguments(), output, CancellationToken.None);
+
+        Assert.Equal(DedicatedServerSyntheticController.BlockedExitCode, exitCode);
+        using JsonDocument document = JsonDocument.Parse(output.ToString());
+        JsonElement checks = document.RootElement.GetProperty("requiredChecks");
+        Assert.False(checks.GetProperty("control-envelope").GetBoolean());
+        Assert.False(checks.GetProperty("control-request-identity").GetBoolean());
+        Assert.False(checks.GetProperty("dedicated-process-identity").GetBoolean());
+        Assert.False(checks.GetProperty("first-class-connection-roster").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ProcessRestartBetweenAttestationsFailsClosed()
+    {
+        DedicatedServerSyntheticArtifactVerification preflight = VerifiedArtifacts();
+        DedicatedServerSyntheticArtifactVerification postflight = VerifiedArtifacts(
+            preflight.ProcessStartedUtc.AddSeconds(1));
+        var controller = new DedicatedServerSyntheticController(
+            new StubControlClient("{}"),
+            new DedicatedServerControlResponseValidator(),
+            new CanonicalJsonHasher(),
+            new StubScenarioRunner(PassedScenario()),
+            new StubArtifactVerifier(preflight, postflight));
+        using var output = new StringWriter();
+
+        int exitCode = await controller.RunAsync(
+            ValidArguments(),
+            output,
+            CancellationToken.None);
+
+        Assert.Equal(DedicatedServerSyntheticController.BlockedExitCode, exitCode);
+        using JsonDocument document = JsonDocument.Parse(output.ToString());
+        Assert.Contains(
+            document.RootElement.GetProperty("failures").EnumerateArray(),
+            item => item.GetString() == "dedicated-server-process-changed");
     }
 
     [Fact]
@@ -110,7 +186,9 @@ public sealed class DedicatedServerSyntheticControllerTests
                 "--run-token", "run-token",
                 "--request-id", "request-id",
                 "--controller-id", "ds-synthetic-client-a",
-                "--password-env", variable
+                "--password-env", variable,
+                "--module-contract", DedicatedServerSyntheticNodeOptions.EncodeModuleValidationContract(
+                    DedicatedServerWireCodecTests.ModuleContract())
             });
 
             string json = JsonSerializer.Serialize(options);
@@ -139,7 +217,9 @@ public sealed class DedicatedServerSyntheticControllerTests
                 "--run-token", "run-token",
                 "--request-id", "request-id",
                 "--expected-clients", "1",
-                "--password-env", variable
+                "--password-env", variable,
+                "--module-contract", DedicatedServerSyntheticNodeOptions.EncodeModuleValidationContract(
+                    DedicatedServerWireCodecTests.ModuleContract())
             };
 
             ArgumentException exception = Assert.Throws<ArgumentException>(() =>
@@ -165,7 +245,102 @@ public sealed class DedicatedServerSyntheticControllerTests
             "--request-id", "request-id",
             "--join-port", "4201",
             "--timeout-ms", "1000",
-            "--seed", "17"
+            "--seed", "17",
+            "--artifact-manifest", "staged-artifacts.json",
+            "--artifact-manifest-sha256", new string('7', 64),
+            "--artifact-root", "staged-runtime",
+            "--password-env", SetControllerPassword()
+        };
+    }
+
+    private static string SetControllerPassword()
+    {
+        const string variable = "DS_SYNTHETIC_CONTROLLER_PASSWORD";
+        Environment.SetEnvironmentVariable(variable, "controller-test-password");
+        return variable;
+    }
+
+    private static DedicatedServerSyntheticScenarioResult PassedScenario()
+    {
+        DedicatedServerRosterEntry Client(string controllerId, string connectionId) =>
+            new(controllerId, connectionId, true, "CreateCharacterState");
+        DedicatedServerSyntheticLifecycleSnapshot Snapshot(
+            string phase,
+            params DedicatedServerRosterEntry[] roster) => new()
+            {
+                Phase = phase,
+                ControlEnvelopeValidated = true,
+                ControlRequestIdentityValidated = true,
+                DedicatedProcessIdentityValidated = true,
+                FirstClassConnectionRosterValidated = true,
+                Serving = true,
+                JoinPort = 4201,
+                ConnectionRoster = roster.ToList()
+            };
+
+        return new DedicatedServerSyntheticScenarioResult
+        {
+            Attempted = true,
+            Completed = true,
+            WrongPasswordRejected = true,
+            IncompatibleModuleRejected = true,
+            CompatibleModuleHandshakeCompleted = true,
+            ProtocolShortcut = true,
+            ModuleValidation = new DedicatedModuleValidationContract(
+                "1.2.3+test",
+                Array.Empty<DedicatedModuleInfo>()),
+            Lifecycle = new List<DedicatedServerSyntheticLifecycleSnapshot>
+            {
+                Snapshot("before-connect"),
+                Snapshot(
+                    "two-connected",
+                    Client("ds-synthetic-client-a", "connection-a-1"),
+                    Client("ds-synthetic-client-b", "connection-b-1")),
+                Snapshot(
+                    "one-disconnected",
+                    Client("ds-synthetic-client-b", "connection-b-1")),
+                Snapshot(
+                    "reconnected",
+                    Client("ds-synthetic-client-a", "connection-a-2"),
+                    Client("ds-synthetic-client-b", "connection-b-1")),
+                Snapshot("final-empty")
+            },
+            Clients = Enumerable.Range(0, 5)
+                .Select(index => new DedicatedServerSyntheticNodeResult
+                {
+                    RequestId = "client-" + index,
+                    Success = true,
+                    ProtocolShortcut = index > 0
+                })
+                .ToList(),
+            WireHashes = new List<string> { new string('e', 64) }
+        };
+    }
+
+    private static DedicatedServerSyntheticArtifactVerification VerifiedArtifacts(
+        DateTime? processStartedUtc = null)
+    {
+        return new DedicatedServerSyntheticArtifactVerification
+        {
+            RuntimeArtifactsMatch = true,
+            ManifestFileSha256 = new string('7', 64),
+            ProcessStartedUtc = processStartedUtc ??
+                new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc),
+            Manifest = new DedicatedServerSyntheticArtifactManifest
+            {
+                CoopSource = new DedicatedServerSyntheticSourceIdentity
+                {
+                    Head = new string('a', 40),
+                    Tree = new string('b', 40)
+                },
+                DedicatedServerSource = new DedicatedServerSyntheticSourceIdentity
+                {
+                    Head = new string('c', 40),
+                    Tree = new string('d', 40)
+                },
+                ArtifactSetDigest = new string('8', 64),
+                ManifestDigest = new string('9', 64)
+            }
         };
     }
 
@@ -185,6 +360,46 @@ public sealed class DedicatedServerSyntheticControllerTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class StubScenarioRunner : IDedicatedServerSyntheticScenarioRunner
+    {
+        private readonly DedicatedServerSyntheticScenarioResult result;
+
+        public StubScenarioRunner(DedicatedServerSyntheticScenarioResult result)
+        {
+            this.result = result;
+        }
+
+        public Task<DedicatedServerSyntheticScenarioResult> RunAsync(
+            DedicatedServerSyntheticOptions options,
+            CancellationToken cancellationToken)
+        {
+            RunCount++;
+            return Task.FromResult(result);
+        }
+
+        public int RunCount { get; private set; }
+    }
+
+    private sealed class StubArtifactVerifier : IDedicatedServerSyntheticArtifactVerifier
+    {
+        private readonly Queue<DedicatedServerSyntheticArtifactVerification> verifications;
+
+        public StubArtifactVerifier(params DedicatedServerSyntheticArtifactVerification[] verifications)
+        {
+            this.verifications = new Queue<DedicatedServerSyntheticArtifactVerification>(
+                verifications);
+        }
+
+        public Task<DedicatedServerSyntheticArtifactVerification> VerifyAsync(
+            DedicatedServerSyntheticOptions options,
+            CancellationToken cancellationToken)
+        {
+            DedicatedServerSyntheticArtifactVerification verification =
+                verifications.Count > 1 ? verifications.Dequeue() : verifications.Peek();
+            return Task.FromResult(verification);
         }
     }
 }

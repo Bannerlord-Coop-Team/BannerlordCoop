@@ -71,8 +71,8 @@ public sealed class VerificationPlanBuilderTests
 
     [Theory]
     [InlineData("source/ServerConsole/Program.cs")]
+    [InlineData("source/Coop.Core/Client/States/ValidateModuleState.cs")]
     [InlineData("source/Coop.Core/Common/Network/Packets/CampaignTimePacket.cs")]
-    [InlineData("source/Coop.Core/Common/Network/Packets/GameSaveDataChunkPacket.cs")]
     [InlineData("source/Coop.Core/Common/Network/CoopNetworkBase.cs")]
     [InlineData("source/Common/Network/ConnectionPassword.cs")]
     [InlineData("source/Common/Network/ReliableMessageBatcher.cs")]
@@ -99,6 +99,23 @@ public sealed class VerificationPlanBuilderTests
         Assert.Equal("full-live", plan.HighestRequiredTier);
         Assert.Equal(AllTiers, plan.RequiredTiers);
         Assert.Contains(plan.Reasons, reason => reason.RuleId == "production-client-transport");
+    }
+
+    [Theory]
+    [InlineData("source/Coop.Core/Services/Save/SaveManager.cs")]
+    [InlineData("source/Coop.Core/Common/Network/Packets/GameSaveDataChunkPacket.cs")]
+    [InlineData("source/Coop.Core/Client/States/ReceivingSavedDataState.cs")]
+    [InlineData("source/Coop.Core/Client/States/LoadingState.cs")]
+    [InlineData("source/Coop.Core/Server/Connections/States/TransferSaveState.cs")]
+    [InlineData("source/Coop.Core/Server/Connections/States/LoadingState.cs")]
+    [InlineData("source/GameInterface/Services/Save/SaveInterface.cs")]
+    public void SaveRuntimeRequiresFullLive(string path)
+    {
+        VerificationPlan plan = Build(path);
+
+        Assert.Equal("full-live", plan.HighestRequiredTier);
+        Assert.Equal(AllTiers, plan.RequiredTiers);
+        Assert.Contains(plan.Reasons, reason => reason.RuleId == "save-runtime");
     }
 
     [Theory]
@@ -265,6 +282,25 @@ public sealed class VerificationPlanBuilderTests
             Assert.Contains("{source.syntheticTree}", profile.Arguments);
             Assert.Contains("{evidence.output}", profile.Arguments);
         }
+
+        VerificationProfile dedicatedServerSynthetic = plan.Profiles.Single(
+            profile => profile.Id == "dedicated-server-synthetic");
+        Assert.Contains("--password-env", dedicatedServerSynthetic.Arguments);
+        Assert.Contains(
+            "{dedicatedServer.passwordEnvironmentVariable}",
+            dedicatedServerSynthetic.Arguments);
+        Assert.Contains("{dedicatedServer.artifactManifest}", dedicatedServerSynthetic.Arguments);
+        Assert.Contains(
+            "{dedicatedServer.artifactManifestSha256}",
+            dedicatedServerSynthetic.Arguments);
+        Assert.Contains("{dedicatedServer.artifactRoot}", dedicatedServerSynthetic.Arguments);
+
+        VerificationCheck dedicatedServerSyntheticCheck = plan.Checks.Single(
+            check => check.Id == "dedicated-server-synthetic");
+        Assert.Equal(1, dedicatedServerSyntheticCheck.Topology.ServerCount);
+        Assert.Equal(2, dedicatedServerSyntheticCheck.Topology.ClientCount);
+        Assert.Equal(2, dedicatedServerSyntheticCheck.Topology.ProcessCount);
+        Assert.False(dedicatedServerSyntheticCheck.Topology.ProcessIsolated);
     }
 
     [Fact]

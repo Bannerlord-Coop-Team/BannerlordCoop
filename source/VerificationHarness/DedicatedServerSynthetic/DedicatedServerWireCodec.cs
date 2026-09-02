@@ -9,16 +9,20 @@ public interface IDedicatedServerWireCodec
     DedicatedServerWireFrame DecodeFrame(byte[] wireBytes);
     DedicatedCampaignTime DecodeCampaignTime(byte[] wireBytes);
     DedicatedModuleValidationRequest DecodeModuleValidationRequest(byte[] wireBytes);
+    DedicatedModuleValidationContract DecodeModuleValidationContract(byte[] wireBytes);
     DedicatedModuleValidationResult DecodeModuleValidationResult(byte[] wireBytes);
     string DecodeClientValidationRequest(byte[] wireBytes);
     DedicatedClientValidationResult DecodeClientValidationResult(byte[] wireBytes);
+    ulong DecodeSessionLobbyChanged(byte[] wireBytes);
     IReadOnlyList<byte[]> DecodeAggregate(byte[] wireBytes);
     DedicatedSaveChunk DecodeSaveChunk(byte[] wireBytes);
     byte[] EncodeCampaignTime(long serverTicks, int joinPacketsRemaining);
+    byte[] EncodeModuleValidationRequest(DedicatedModuleValidationContract contract);
     byte[] EncodeModuleMismatchRequest(string clientBuildVersion);
     byte[] EncodeModuleValidationResult(bool matches, string reason, string serverBuildVersion);
     byte[] EncodeClientValidationRequest(string controllerId);
     byte[] EncodeFreshClientValidationResult();
+    byte[] EncodeSessionLobbyChanged(ulong lobbyId);
     byte[] EncodeAggregate(IEnumerable<byte[]> messages);
 }
 
@@ -71,16 +75,16 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
 
     public DedicatedModuleValidationRequest DecodeModuleValidationRequest(byte[] wireBytes)
     {
-        DedicatedServerWireFrame frame = RequireType(
-            wireBytes,
-            DedicatedServerWireManifest.NetworkModuleVersionsValidateTypeId);
-        DedicatedModuleValidationRequestPayload payload =
-            DeserializePayload<DedicatedModuleValidationRequestPayload>(frame.Payload);
-        string buildVersion = RequireBoundedText(
-            payload.CoopBuildVersion,
-            MaximumBuildVersionBytes,
-            "Client build version");
-        return new DedicatedModuleValidationRequest(payload.Modules?.Count ?? 0, buildVersion);
+        DedicatedModuleValidationRequestPayload payload = DecodeModuleValidationPayload(wireBytes);
+        return new DedicatedModuleValidationRequest(
+            payload.Modules?.Count ?? 0,
+            payload.CoopBuildVersion!);
+    }
+
+    public DedicatedModuleValidationContract DecodeModuleValidationContract(byte[] wireBytes)
+    {
+        DedicatedModuleValidationRequestPayload payload = DecodeModuleValidationPayload(wireBytes);
+        return CreateContract(payload.CoopBuildVersion, payload.Modules);
     }
 
     public DedicatedModuleValidationResult DecodeModuleValidationResult(byte[] wireBytes)
@@ -90,7 +94,9 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
             DedicatedServerWireManifest.NetworkModuleVersionsValidatedTypeId);
         DedicatedModuleValidationResultPayload payload =
             DeserializePayload<DedicatedModuleValidationResultPayload>(frame.Payload);
-        string reason = RequireBoundedText(payload.Reason, MaximumReasonBytes, "Validation reason");
+        string reason = payload.Matches
+            ? RequireOptionalBoundedText(payload.Reason, MaximumReasonBytes, "Validation reason")
+            : RequireBoundedText(payload.Reason, MaximumReasonBytes, "Validation reason");
         string serverBuildVersion = RequireBoundedText(
             payload.CoopBuildVersion,
             MaximumBuildVersionBytes,
@@ -116,6 +122,21 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
         DedicatedClientValidationResultPayload payload =
             DeserializePayload<DedicatedClientValidationResultPayload>(frame.Payload);
         return new DedicatedClientValidationResult(payload.HeroExists, payload.PlayerPayload != null);
+    }
+
+    public ulong DecodeSessionLobbyChanged(byte[] wireBytes)
+    {
+        DedicatedServerWireFrame frame = RequireType(
+            wireBytes,
+            DedicatedServerWireManifest.NetworkSessionLobbyChangedTypeId);
+        DedicatedSessionLobbyChangedPayload payload =
+            DeserializePayload<DedicatedSessionLobbyChangedPayload>(frame.Payload);
+        if (payload.LobbyId == 0)
+        {
+            throw new InvalidDataException("The session lobby id must be nonzero.");
+        }
+
+        return payload.LobbyId;
     }
 
     public IReadOnlyList<byte[]> DecodeAggregate(byte[] wireBytes)
@@ -179,6 +200,21 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
             });
     }
 
+    public byte[] EncodeModuleValidationRequest(DedicatedModuleValidationContract contract)
+    {
+        if (contract == null) throw new ArgumentNullException(nameof(contract));
+        DedicatedModuleValidationContract validated = CreateContract(
+            contract.CoopBuildVersion,
+            contract.Modules?.Select(ToPayload).ToList());
+        return Encode(
+            DedicatedServerWireManifest.NetworkModuleVersionsValidateTypeId,
+            new DedicatedModuleValidationRequestPayload
+            {
+                Modules = validated.Modules.Select(ToPayload).ToList(),
+                CoopBuildVersion = validated.CoopBuildVersion
+            });
+    }
+
     public byte[] EncodeModuleMismatchRequest(string clientBuildVersion)
     {
         clientBuildVersion = RequireBoundedText(
@@ -196,7 +232,9 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
 
     public byte[] EncodeModuleValidationResult(bool matches, string reason, string serverBuildVersion)
     {
-        reason = RequireBoundedText(reason, MaximumReasonBytes, "Validation reason");
+        reason = matches
+            ? RequireOptionalBoundedText(reason, MaximumReasonBytes, "Validation reason")
+            : RequireBoundedText(reason, MaximumReasonBytes, "Validation reason");
         serverBuildVersion = RequireBoundedText(
             serverBuildVersion,
             MaximumBuildVersionBytes,
@@ -228,6 +266,14 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
                 HeroExists = false,
                 PlayerPayload = null
             });
+    }
+
+    public byte[] EncodeSessionLobbyChanged(ulong lobbyId)
+    {
+        if (lobbyId == 0) throw new ArgumentOutOfRangeException(nameof(lobbyId));
+        return Encode(
+            DedicatedServerWireManifest.NetworkSessionLobbyChangedTypeId,
+            new DedicatedSessionLobbyChangedPayload { LobbyId = lobbyId });
     }
 
     public byte[] EncodeAggregate(IEnumerable<byte[]> messages)
@@ -289,11 +335,100 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
         return frame;
     }
 
+    private DedicatedModuleValidationRequestPayload DecodeModuleValidationPayload(byte[] wireBytes)
+    {
+        DedicatedServerWireFrame frame = RequireType(
+            wireBytes,
+            DedicatedServerWireManifest.NetworkModuleVersionsValidateTypeId);
+        DedicatedModuleValidationRequestPayload payload =
+            DeserializePayload<DedicatedModuleValidationRequestPayload>(frame.Payload);
+        payload.CoopBuildVersion = RequireBoundedText(
+            payload.CoopBuildVersion,
+            MaximumBuildVersionBytes,
+            "Client build version");
+        return payload;
+    }
+
+    private static DedicatedModuleValidationContract CreateContract(
+        string? coopBuildVersion,
+        IReadOnlyCollection<DedicatedModuleInfoPayload>? modules)
+    {
+        string buildVersion = RequireBoundedText(
+            coopBuildVersion,
+            MaximumBuildVersionBytes,
+            "Client build version");
+        if (modules == null || modules.Count == 0 || modules.Count > MaximumAggregateMessages)
+        {
+            throw new InvalidDataException(
+                $"A compatible module contract must contain between 1 and {MaximumAggregateMessages} modules.");
+        }
+
+        DedicatedModuleInfo[] parsed = modules.Select(module =>
+        {
+            if (module == null || module.Version == null)
+            {
+                throw new InvalidDataException("Every compatible module requires an id and version.");
+            }
+
+            string id = RequireBoundedText(module.Id, MaximumBuildVersionBytes, "Module id");
+            DedicatedApplicationVersionPayload version = module.Version;
+            if (version.ApplicationVersionType < 0 ||
+                version.Major < 0 ||
+                version.Minor < 0 ||
+                version.Revision < 0 ||
+                version.ChangeSet < 0)
+            {
+                throw new InvalidDataException("Module version components cannot be negative.");
+            }
+
+            return new DedicatedModuleInfo(
+                id,
+                module.IsOfficial,
+                module.IsDlc,
+                new DedicatedModuleVersion(
+                    version.ApplicationVersionType,
+                    version.Major,
+                    version.Minor,
+                    version.Revision,
+                    version.ChangeSet));
+        }).ToArray();
+        if (parsed.Select(module => module.Id).Distinct(StringComparer.Ordinal).Count() != parsed.Length)
+        {
+            throw new InvalidDataException("A compatible module contract cannot contain duplicate module ids.");
+        }
+
+        return new DedicatedModuleValidationContract(buildVersion, Array.AsReadOnly(parsed));
+    }
+
+    private static DedicatedModuleInfoPayload ToPayload(DedicatedModuleInfo module)
+    {
+        if (module == null || module.Version == null)
+        {
+            throw new InvalidDataException("Every compatible module requires an id and version.");
+        }
+
+        return new DedicatedModuleInfoPayload
+        {
+            Id = module.Id,
+            IsOfficial = module.IsOfficial,
+            IsDlc = module.IsDlc,
+            Version = new DedicatedApplicationVersionPayload
+            {
+                ApplicationVersionType = module.Version.ApplicationVersionType,
+                Major = module.Version.Major,
+                Minor = module.Version.Minor,
+                Revision = module.Version.Revision,
+                ChangeSet = module.Version.ChangeSet
+            }
+        };
+    }
+
     private static bool IsAllowedAggregateChild(int typeId) =>
         typeId == DedicatedServerWireManifest.NetworkModuleVersionsValidateTypeId ||
         typeId == DedicatedServerWireManifest.NetworkModuleVersionsValidatedTypeId ||
         typeId == DedicatedServerWireManifest.NetworkClientValidateTypeId ||
-        typeId == DedicatedServerWireManifest.NetworkClientValidatedTypeId;
+        typeId == DedicatedServerWireManifest.NetworkClientValidatedTypeId ||
+        typeId == DedicatedServerWireManifest.NetworkSessionLobbyChangedTypeId;
 
     private static T DeserializePayload<T>(byte[] payload)
     {
@@ -345,6 +480,17 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
         return value;
     }
 
+    private static string RequireOptionalBoundedText(string? value, int maximumBytes, string name)
+    {
+        string result = value ?? string.Empty;
+        if (Encoding.UTF8.GetByteCount(result) > maximumBytes)
+        {
+            throw new InvalidDataException($"{name} exceeds {maximumBytes} UTF-8 bytes.");
+        }
+
+        return result;
+    }
+
     private static void ValidateBytes(
         byte[]? bytes,
         int maximumBytes,
@@ -377,6 +523,42 @@ public sealed record DedicatedServerWireFrame(
 public sealed record DedicatedCampaignTime(long ServerTicks, int JoinPacketsRemaining);
 
 public sealed record DedicatedModuleValidationRequest(int ModuleCount, string ClientBuildVersion);
+
+public sealed record DedicatedModuleValidationContract(
+    string CoopBuildVersion,
+    IReadOnlyList<DedicatedModuleInfo> Modules);
+
+public sealed record DedicatedModuleInfo(
+    string Id,
+    bool IsOfficial,
+    bool IsDlc,
+    DedicatedModuleVersion Version);
+
+public sealed record DedicatedModuleVersion(
+    int ApplicationVersionType,
+    int Major,
+    int Minor,
+    int Revision,
+    int ChangeSet);
+
+public static class DedicatedModuleValidationContracts
+{
+    public static bool Equivalent(
+        DedicatedModuleValidationContract? left,
+        DedicatedModuleValidationContract? right)
+    {
+        if (left == null || right == null ||
+            !string.Equals(left.CoopBuildVersion, right.CoopBuildVersion, StringComparison.Ordinal) ||
+            left.Modules == null ||
+            right.Modules == null ||
+            left.Modules.Count != right.Modules.Count)
+        {
+            return false;
+        }
+
+        return left.Modules.SequenceEqual(right.Modules);
+    }
+}
 
 public sealed record DedicatedModuleValidationResult(bool Matches, string Reason, string ServerBuildVersion);
 
@@ -483,6 +665,13 @@ internal sealed class DedicatedClientValidationResultPayload
 
     [ProtoMember(2)]
     public byte[]? PlayerPayload { get; set; }
+}
+
+[ProtoContract]
+internal sealed class DedicatedSessionLobbyChangedPayload
+{
+    [ProtoMember(1)]
+    public ulong LobbyId { get; set; }
 }
 
 [ProtoContract]

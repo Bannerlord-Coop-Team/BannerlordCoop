@@ -7,28 +7,34 @@ public sealed class DedicatedServerSyntheticController
 {
     public const int BlockedExitCode = 8;
 
-    private readonly IDedicatedServerControlClient controlClient;
-    private readonly IDedicatedServerControlResponseValidator responseValidator;
+    private readonly IDedicatedServerSyntheticScenarioRunner scenarioRunner;
+    private readonly IDedicatedServerSyntheticArtifactVerifier artifactVerifier;
     private readonly ICanonicalJsonHasher hasher;
 
     public DedicatedServerSyntheticController()
         : this(
             new NamedPipeDedicatedServerControlClient(),
             new DedicatedServerControlResponseValidator(),
-            new CanonicalJsonHasher())
+            new CanonicalJsonHasher(),
+            null,
+            null)
     {
     }
 
     public DedicatedServerSyntheticController(
         IDedicatedServerControlClient controlClient,
         IDedicatedServerControlResponseValidator responseValidator,
-        ICanonicalJsonHasher hasher)
+        ICanonicalJsonHasher hasher,
+        IDedicatedServerSyntheticScenarioRunner? scenarioRunner = null,
+        IDedicatedServerSyntheticArtifactVerifier? artifactVerifier = null)
     {
         if (controlClient == null) throw new ArgumentNullException(nameof(controlClient));
         if (responseValidator == null) throw new ArgumentNullException(nameof(responseValidator));
         if (hasher == null) throw new ArgumentNullException(nameof(hasher));
-        this.controlClient = controlClient;
-        this.responseValidator = responseValidator;
+        this.scenarioRunner = scenarioRunner ??
+            new DedicatedServerSyntheticRuntimeScenario(controlClient, responseValidator);
+        this.artifactVerifier = artifactVerifier ??
+            new DedicatedServerSyntheticArtifactVerifier(controlClient);
         this.hasher = hasher;
     }
 
@@ -42,37 +48,47 @@ public sealed class DedicatedServerSyntheticController
 
         DedicatedServerSyntheticOptions options = DedicatedServerSyntheticOptions.Parse(args);
         DateTime startedAtUtc = DateTime.UtcNow;
-        DedicatedServerControlValidation validation;
+        DedicatedServerSyntheticArtifactVerification artifactVerification;
+        DedicatedServerSyntheticScenarioResult scenario;
         try
         {
-            string responseJson = await controlClient.GetStatusAsync(
-                options.ServerProcessId,
-                options.RequestId,
-                TimeSpan.FromMilliseconds(options.TimeoutMilliseconds),
-                cancellationToken);
-            validation = responseValidator.Validate(
-                responseJson,
-                new DedicatedServerControlExpectation(
-                    options.ServerProcessId,
-                    options.RunToken,
-                    options.RequestId,
-                    options.JoinPort,
-                    DedicatedServerSyntheticOptions.ExpectedControllerIds));
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            validation = FailureValidation("control-timeout");
+            DedicatedServerSyntheticArtifactVerification preflight =
+                await artifactVerifier.VerifyAsync(options, cancellationToken);
+            if (preflight.IsValid)
+            {
+                scenario = await scenarioRunner.RunAsync(options, cancellationToken);
+                DedicatedServerSyntheticArtifactVerification postflight =
+                    await artifactVerifier.VerifyAsync(options, cancellationToken);
+                artifactVerification = CombineArtifactAttestations(preflight, postflight);
+            }
+            else
+            {
+                artifactVerification = preflight;
+                scenario = new DedicatedServerSyntheticScenarioResult
+                {
+                    FailureCodes = artifactVerification.FailureCodes.ToList()
+                };
+            }
         }
         catch (Exception)
         {
             // Local paths, pipe details, and any environment-derived values stay out of evidence.
-            validation = FailureValidation("control-preflight-failed");
+            scenario = new DedicatedServerSyntheticScenarioResult
+            {
+                Attempted = true,
+                FailureCodes = new List<string> { "runtime-scenario-failed" }
+            };
+            artifactVerification = new DedicatedServerSyntheticArtifactVerification
+            {
+                FailureCodes = new List<string> { "runtime-artifact-verification-failed" }
+            };
         }
 
         DedicatedServerSyntheticEvidence evidence = BuildEvidence(
             options,
             startedAtUtc,
-            validation);
+            scenario,
+            artifactVerification);
         string json;
         if (options.OutputPath != null)
         {
@@ -93,6 +109,7 @@ public sealed class DedicatedServerSyntheticController
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(x => x, StringComparer.Ordinal)
                     .ToList();
+                evidence.Verdict = "failed";
                 SetStateDigest(evidence);
             }
         }
@@ -105,14 +122,57 @@ public sealed class DedicatedServerSyntheticController
         await output.WriteLineAsync(json);
         await output.FlushAsync();
 
-        return BlockedExitCode;
+        return evidence.Verdict == "passed" ? 0 : BlockedExitCode;
+    }
+
+    private static DedicatedServerSyntheticArtifactVerification CombineArtifactAttestations(
+        DedicatedServerSyntheticArtifactVerification preflight,
+        DedicatedServerSyntheticArtifactVerification postflight)
+    {
+        bool sameManifest =
+            preflight.Manifest != null &&
+            postflight.Manifest != null &&
+            string.Equals(
+                preflight.Manifest.ManifestDigest,
+                postflight.Manifest.ManifestDigest,
+                StringComparison.Ordinal) &&
+            string.Equals(
+                preflight.ManifestFileSha256,
+                postflight.ManifestFileSha256,
+                StringComparison.Ordinal);
+        bool sameProcess =
+            preflight.ProcessStartedUtc != default &&
+            preflight.ProcessStartedUtc == postflight.ProcessStartedUtc;
+        var failures = preflight.FailureCodes
+            .Concat(postflight.FailureCodes)
+            .ToList();
+        if (!sameManifest) failures.Add("runtime-artifact-manifest-changed");
+        if (!sameProcess) failures.Add("dedicated-server-process-changed");
+
+        return new DedicatedServerSyntheticArtifactVerification
+        {
+            Manifest = preflight.Manifest,
+            ManifestFileSha256 = preflight.ManifestFileSha256,
+            ProcessStartedUtc = preflight.ProcessStartedUtc,
+            RuntimeArtifactsMatch =
+                preflight.IsValid &&
+                postflight.IsValid &&
+                sameManifest &&
+                sameProcess,
+            FailureCodes = failures
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToList()
+        };
     }
 
     private DedicatedServerSyntheticEvidence BuildEvidence(
         DedicatedServerSyntheticOptions options,
         DateTime startedAtUtc,
-        DedicatedServerControlValidation validation)
+        DedicatedServerSyntheticScenarioResult scenario,
+        DedicatedServerSyntheticArtifactVerification artifactVerification)
     {
+        DedicatedServerSyntheticArtifactManifest? artifactManifest = artifactVerification.Manifest;
         var evidence = new DedicatedServerSyntheticEvidence
         {
             Seed = options.Seed,
@@ -120,58 +180,117 @@ public sealed class DedicatedServerSyntheticController
             CompletedAtUtc = DateTime.UtcNow,
             CoopSource = new DedicatedServerSyntheticSourceEvidence
             {
-                Head = options.Head,
-                Tree = options.Tree
+                Head = artifactManifest?.CoopSource.Head ?? string.Empty,
+                Tree = artifactManifest?.CoopSource.Tree ?? string.Empty
             },
             DedicatedServerSource = new DedicatedServerSyntheticSourceEvidence
             {
-                Head = options.ServerHead,
-                Tree = options.ServerTree
+                Head = artifactManifest?.DedicatedServerSource.Head ?? string.Empty,
+                Tree = artifactManifest?.DedicatedServerSource.Tree ?? string.Empty
             },
             Topology = new DedicatedServerSyntheticTopologyEvidence
             {
                 ServerProcessId = options.ServerProcessId,
                 JoinPort = options.JoinPort
+            },
+            Scenario = new DedicatedServerSyntheticScenarioEvidence
+            {
+                Attempted = scenario.Attempted,
+                Completed = scenario.Completed,
+                WrongPasswordRejected = scenario.WrongPasswordRejected,
+                IncompatibleModuleRejected = scenario.IncompatibleModuleRejected,
+                CompatibleModuleHandshakeCompleted = scenario.CompatibleModuleHandshakeCompleted,
+                ProtocolShortcut = scenario.ProtocolShortcut,
+                Lifecycle = scenario.Lifecycle,
+                Clients = scenario.Clients
             }
         };
 
-        evidence.RequiredChecks["control-envelope"] = validation.EnvelopeValid;
-        evidence.RequiredChecks["control-request-identity"] = validation.RequestIdentityValid;
-        evidence.RequiredChecks["dedicated-process-identity"] = validation.ProcessIdentityValid;
-        evidence.RequiredChecks["dedicated-server-serving"] = validation.ServingValid;
-        evidence.RequiredChecks["join-port"] = validation.JoinPortValid;
-        evidence.RequiredChecks["first-class-connection-roster"] = validation.RosterSurfaceValid;
-        evidence.RequiredChecks["exact-two-client-roster"] = validation.ExpectedRosterValid;
-        evidence.RequiredChecks["runtime-scenario-executed"] = false;
+        evidence.RequiredChecks["runtime-artifact-manifest-match"] = artifactVerification.IsValid;
+        bool statusValidated = scenario.Lifecycle.Count > 0;
+        evidence.RequiredChecks["control-envelope"] =
+            statusValidated && scenario.Lifecycle.All(snapshot => snapshot.ControlEnvelopeValidated);
+        evidence.RequiredChecks["control-request-identity"] =
+            statusValidated && scenario.Lifecycle.All(snapshot => snapshot.ControlRequestIdentityValidated);
+        evidence.RequiredChecks["dedicated-process-identity"] =
+            statusValidated && scenario.Lifecycle.All(snapshot => snapshot.DedicatedProcessIdentityValidated);
+        evidence.RequiredChecks["dedicated-server-serving"] =
+            statusValidated && scenario.Lifecycle.All(snapshot => snapshot.Serving);
+        evidence.RequiredChecks["join-port"] =
+            statusValidated && scenario.Lifecycle.All(snapshot => snapshot.JoinPort == options.JoinPort);
+        evidence.RequiredChecks["first-class-connection-roster"] =
+            statusValidated && scenario.Lifecycle.All(snapshot => snapshot.FirstClassConnectionRosterValidated);
+        evidence.RequiredChecks["wrong-password-rejected"] = scenario.WrongPasswordRejected;
+        evidence.RequiredChecks["incompatible-module-rejected"] = scenario.IncompatibleModuleRejected;
+        evidence.RequiredChecks["compatible-module-handshake"] =
+            scenario.CompatibleModuleHandshakeCompleted;
+        evidence.RequiredChecks["exact-two-client-roster"] =
+            HasExpectedRoster(
+                scenario.Lifecycle,
+                "two-connected",
+                DedicatedServerSyntheticOptions.ExpectedControllerIds.ToArray()) &&
+            HasExpectedRoster(
+                scenario.Lifecycle,
+                "reconnected",
+                DedicatedServerSyntheticOptions.ExpectedControllerIds.ToArray());
+        evidence.RequiredChecks["disconnect-removed-old-connection"] =
+            HasExpectedRoster(
+                scenario.Lifecycle,
+                "one-disconnected",
+                DedicatedServerSyntheticOptions.ExpectedControllerIds[1]);
+        evidence.RequiredChecks["final-empty-roster"] =
+            HasExpectedRoster(scenario.Lifecycle, "final-empty", Array.Empty<string>());
+        evidence.RequiredChecks["runtime-scenario-executed"] = scenario.Completed;
 
-        evidence.Failures.AddRange(validation.FailureCodes.Distinct(StringComparer.Ordinal));
-        if (!validation.RosterSurfaceValid)
-        {
-            evidence.Failures.Add("blocked-on-dedicated-server-roster-surface");
-        }
-
-        // This foundation intentionally cannot pass until an actual DS process has been driven
-        // through the complete scenario by the later runtime controller.
-        evidence.Failures.Add("runtime-scenario-controller-not-implemented");
+        evidence.Failures.AddRange(scenario.FailureCodes.Distinct(StringComparer.Ordinal));
+        evidence.Failures.AddRange(artifactVerification.FailureCodes.Distinct(StringComparer.Ordinal));
         evidence.Failures = evidence.Failures
             .Distinct(StringComparer.Ordinal)
             .OrderBy(x => x, StringComparer.Ordinal)
             .ToList();
 
         evidence.ArtifactHashes["wire-manifest"] = DedicatedServerWireManifest.Sha256;
+        if (artifactManifest != null)
+        {
+            evidence.ArtifactHashes["runtime-artifact-manifest"] = artifactManifest.ManifestDigest;
+            evidence.ArtifactHashes["runtime-artifact-manifest-file"] =
+                artifactVerification.ManifestFileSha256;
+            evidence.ArtifactHashes["runtime-artifact-set"] = artifactManifest.ArtifactSetDigest;
+        }
+        DedicatedModuleValidationContract moduleValidation =
+            scenario.ModuleValidation ??
+            new DedicatedModuleValidationContract(string.Empty, Array.Empty<DedicatedModuleInfo>());
+        evidence.ArtifactHashes["module-validation"] = hasher.ComputeSha256(moduleValidation);
+        evidence.ArtifactHashes["runtime-wire"] = hasher.ComputeSha256(
+            scenario.WireHashes.OrderBy(value => value, StringComparer.Ordinal).ToArray());
         evidence.ReplayIdentity = hasher.ComputeSha256(new
         {
             profile = evidence.Profile,
-            coopSource = new { options.Head, options.Tree },
-            dedicatedServerSource = new { head = options.ServerHead, tree = options.ServerTree },
+            coopSource = new
+            {
+                artifactManifest?.CoopSource.Head,
+                artifactManifest?.CoopSource.Tree
+            },
+            dedicatedServerSource = new
+            {
+                artifactManifest?.DedicatedServerSource.Head,
+                artifactManifest?.DedicatedServerSource.Tree
+            },
+            artifactManifestDigest = artifactManifest?.ManifestDigest ?? string.Empty,
+            artifactManifestFileSha256 = artifactVerification.ManifestFileSha256,
             options.Seed,
             options.TimeoutMilliseconds,
             expectedClientCount = 2,
             expectedControllerIds = DedicatedServerSyntheticOptions.ExpectedControllerIds,
             manifestVersion = DedicatedServerWireManifest.Version,
-            manifestSha256 = DedicatedServerWireManifest.Sha256
+            manifestSha256 = DedicatedServerWireManifest.Sha256,
+            moduleValidation = evidence.ArtifactHashes["module-validation"]
         });
-        evidence.Verdict = "blocked";
+        evidence.Verdict = scenario.Completed &&
+                           evidence.RequiredChecks.Values.All(value => value) &&
+                           evidence.Failures.Count == 0
+            ? "passed"
+            : "failed";
         return evidence;
     }
 
@@ -183,17 +302,46 @@ public sealed class DedicatedServerSyntheticController
             verdict = evidence.Verdict,
             evidence.RequiredChecks,
             evidence.Failures,
+            lifecycle = evidence.Scenario.Lifecycle.Select(snapshot => new
+            {
+                snapshot.Phase,
+                snapshot.Serving,
+                snapshot.JoinPort,
+                roster = snapshot.ConnectionRoster.Select(entry => new
+                {
+                    entry.ControllerId,
+                    entry.Connected,
+                    entry.JoinState
+                })
+            }),
             expectedControllerIds = DedicatedServerSyntheticOptions.ExpectedControllerIds,
+            runtimeArtifactManifest = evidence.ArtifactHashes.GetValueOrDefault(
+                "runtime-artifact-manifest",
+                string.Empty),
+            moduleValidation = evidence.ArtifactHashes["module-validation"],
             manifestSha256 = DedicatedServerWireManifest.Sha256
         });
     }
 
-    private static DedicatedServerControlValidation FailureValidation(string failureCode)
+    private static bool HasExpectedRoster(
+        IReadOnlyCollection<DedicatedServerSyntheticLifecycleSnapshot> lifecycle,
+        string phase,
+        params string[] expectedControllerIds)
     {
-        return new DedicatedServerControlValidation
-        {
-            FailureCodes = new List<string> { failureCode }
-        };
+        DedicatedServerSyntheticLifecycleSnapshot? snapshot = lifecycle.SingleOrDefault(value =>
+            string.Equals(value.Phase, phase, StringComparison.Ordinal));
+        if (snapshot == null) return false;
+
+        string[] actual = snapshot.ConnectionRoster
+            .Where(entry => entry.Connected)
+            .Select(entry => entry.ControllerId)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        string[] expected = expectedControllerIds
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        return snapshot.ConnectionRoster.Count == expected.Length &&
+               expected.SequenceEqual(actual, StringComparer.Ordinal);
     }
 }
 
@@ -213,8 +361,12 @@ public sealed class DedicatedServerSyntheticOptions
     public string RunToken { get; private set; } = string.Empty;
     public string RequestId { get; private set; } = string.Empty;
     public int JoinPort { get; private set; }
-    public int TimeoutMilliseconds { get; private set; } = 5000;
+    public int TimeoutMilliseconds { get; private set; } = 30000;
     public string Seed { get; private set; } = VerificationSeed.Default;
+    public string PasswordEnvironmentVariable { get; private set; } = string.Empty;
+    public string ArtifactManifestPath { get; private set; } = string.Empty;
+    public string ArtifactManifestSha256 { get; private set; } = string.Empty;
+    public string ArtifactRootPath { get; private set; } = string.Empty;
     public string? OutputPath { get; private set; }
 
     public static DedicatedServerSyntheticOptions Parse(string[] args)
@@ -229,7 +381,25 @@ public sealed class DedicatedServerSyntheticOptions
         string runToken = RequireToken(values, "--run-token", 64);
         string requestId = RequireToken(values, "--request-id", 128);
         int joinPort = RequireInt(values, "--join-port", 1024, 65535);
-        int timeoutMilliseconds = OptionalInt(values, "--timeout-ms", 5000, 250, 30000);
+        int timeoutMilliseconds = OptionalInt(values, "--timeout-ms", 30000, 250, 120000);
+        string passwordEnvironmentVariable = RequireToken(
+            values,
+            "--password-env",
+            128);
+        string artifactManifestPath = Required(values, "--artifact-manifest");
+        string artifactManifestSha256 = RequireSha256(values, "--artifact-manifest-sha256");
+        string artifactRootPath = Required(values, "--artifact-root");
+        string password = Environment.GetEnvironmentVariable(passwordEnvironmentVariable) ?? string.Empty;
+        if (string.IsNullOrEmpty(password))
+        {
+            throw new ArgumentException(
+                "The password environment variable must contain a non-empty dedicated-server password.");
+        }
+        if (!Common.Network.ConnectionPassword.IsValid(password))
+        {
+            throw new ArgumentException(
+                $"The password environment variable exceeds {Common.Network.ConnectionPassword.MaxLength} characters.");
+        }
         string seed = VerificationSeed.Normalize(
             values.GetValueOrDefault("--seed", "1729"),
             "dedicated-server-synthetic");
@@ -242,7 +412,9 @@ public sealed class DedicatedServerSyntheticOptions
         string[] known =
         {
             "--head", "--tree", "--server-head", "--server-tree", "--server-pid",
-            "--run-token", "--request-id", "--join-port", "--timeout-ms", "--seed", "--output"
+            "--run-token", "--request-id", "--join-port", "--timeout-ms", "--seed",
+            "--password-env", "--artifact-manifest", "--artifact-manifest-sha256",
+            "--artifact-root", "--output"
         };
         string? unknown = values.Keys.FirstOrDefault(x => !known.Contains(x, StringComparer.Ordinal));
         if (unknown != null) throw new ArgumentException($"Unknown dedicated-server-synthetic option: {unknown}.");
@@ -259,6 +431,10 @@ public sealed class DedicatedServerSyntheticOptions
             JoinPort = joinPort,
             TimeoutMilliseconds = timeoutMilliseconds,
             Seed = seed,
+            PasswordEnvironmentVariable = passwordEnvironmentVariable,
+            ArtifactManifestPath = artifactManifestPath,
+            ArtifactManifestSha256 = artifactManifestSha256,
+            ArtifactRootPath = artifactRootPath,
             OutputPath = outputPath
         };
     }
@@ -292,6 +468,21 @@ public sealed class DedicatedServerSyntheticOptions
         }
 
         return value.ToLowerInvariant();
+    }
+
+    private static string RequireSha256(
+        IReadOnlyDictionary<string, string> values,
+        string option)
+    {
+        string value = Required(values, option);
+        if (value.Length != 64 ||
+            value.Any(character => character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+        {
+            throw new ArgumentException(
+                option + " must be an exact lowercase SHA-256 digest.");
+        }
+
+        return value;
     }
 
     private static string RequireToken(

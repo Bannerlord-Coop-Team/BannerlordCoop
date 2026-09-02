@@ -69,6 +69,10 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
                 "--run-token", "{run.token}",
                 "--request-id", "{request.id}",
                 "--join-port", "{dedicatedServer.joinPort}",
+                "--password-env", "{dedicatedServer.passwordEnvironmentVariable}",
+                "--artifact-manifest", "{dedicatedServer.artifactManifest}",
+                "--artifact-manifest-sha256", "{dedicatedServer.artifactManifestSha256}",
+                "--artifact-root", "{dedicatedServer.artifactRoot}",
                 "--output", "{evidence.output}"
             },
             "Standalone dedicated server with synthetic clients."),
@@ -109,7 +113,7 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
         new("poller-game-thread", VerificationTier.DeterministicPeer, new VerificationTopology(1, 2, 1, false)),
         new("deterministic-peer", VerificationTier.DeterministicPeer, new VerificationTopology(1, 2, 1, false)),
         new("process-peer", VerificationTier.ProcessPeer, new VerificationTopology(1, 2, 3, true)),
-        new("dedicated-server-synthetic", VerificationTier.DedicatedServerSynthetic, new VerificationTopology(1, 2, 3, true)),
+        new("dedicated-server-synthetic", VerificationTier.DedicatedServerSynthetic, new VerificationTopology(1, 2, 2, false)),
         new("rendered-smoke", VerificationTier.RenderedSmoke, new VerificationTopology(1, 2, 3, true)),
         new("full-live", VerificationTier.FullLive, new VerificationTopology(1, 2, 3, true))
     };
@@ -136,6 +140,11 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
             VerificationTier.FullLive,
             "Reflection, publicizing, weaving, and runtime patches require the complete live profile.",
             IsReflectionOrPatchingPath),
+        new(
+            "save-runtime",
+            VerificationTier.FullLive,
+            "Save transfer and loading changes require the complete live profile.",
+            IsSavePath),
         new(
             "game-runtime",
             VerificationTier.FullLive,
@@ -164,7 +173,7 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
         new(
             "dedicated-server",
             VerificationTier.DedicatedServerSynthetic,
-            "Dedicated-server, join, save, and session changes require synthetic clients.",
+            "Dedicated-server, join, and session changes require synthetic clients.",
             IsDedicatedServerPath),
         new(
             "network-process-boundary",
@@ -539,6 +548,9 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
         StartsWith(path, "source/VerificationHarness/DedicatedServerSynthetic/") ||
         StartsWith(path, "source/VerificationHarness.Tests/DedicatedServerSynthetic/") ||
         path.Equals("source/VerificationHarness/Program.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals(
+            "source/Coop.Core/Client/States/ValidateModuleState.cs",
+            StringComparison.OrdinalIgnoreCase) ||
         StartsWith(path, "source/Coop.Core/Server/") ||
         StartsWith(path, "source/Coop.Core/Common/Network/") ||
         StartsWith(path, "source/Common/Network/") ||
@@ -546,9 +558,19 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
         StartsWith(path, "source/Common/PacketHandlers/") ||
         StartsWith(path, "source/Common/Serialization/") ||
         path.Equals("source/Common/Util/Poller.cs", StringComparison.OrdinalIgnoreCase) ||
-        ContainsPath(path, "/Services/Save/") ||
         ContainsPath(path, "/Common/Session/") ||
         ContainsPath(path, "/Connections/");
+
+    private static bool IsSavePath(string path) =>
+        ContainsPath(path, "/Services/Save/") ||
+        path.Equals(
+            "source/Coop.Core/Client/States/LoadingState.cs",
+            StringComparison.OrdinalIgnoreCase) ||
+        path.Equals(
+            "source/Coop.Core/Server/Connections/States/LoadingState.cs",
+            StringComparison.OrdinalIgnoreCase) ||
+        (StartsWith(path, "source/Coop.Core/") &&
+         Path.GetFileNameWithoutExtension(path).Contains("Save", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsProcessBoundaryPath(string path) =>
         StartsWith(path, "source/VerificationHarness/Transport/") ||

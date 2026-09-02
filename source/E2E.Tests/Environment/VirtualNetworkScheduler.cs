@@ -327,7 +327,7 @@ public class VirtualNetworkScheduler : IVirtualNetworkScheduler
         }
 
         if (semantics == DeliverySemantics.Sequenced)
-            SupersedePending(stream);
+            SupersedePending(stream, due);
 
         ScheduleCore(connection, channel, delivery, CurrentTime, due, stream, null);
     }
@@ -701,7 +701,7 @@ public class VirtualNetworkScheduler : IVirtualNetworkScheduler
         }
 
         if (semantics == DeliverySemantics.Sequenced)
-            SupersedePending(stream);
+            SupersedePending(stream, input.DueAt);
 
         ScheduleCore(
             connection,
@@ -1124,10 +1124,12 @@ public class VirtualNetworkScheduler : IVirtualNetworkScheduler
         return canceled.Length;
     }
 
-    private void SupersedePending(DeliveryStream stream)
+    private void SupersedePending(DeliveryStream stream, TimeSpan arrivingDue)
     {
         ScheduledDelivery[] superseded = pending
-            .Where(delivery => delivery.Stream.Equals(stream))
+            .Where(delivery =>
+                delivery.Stream.Equals(stream) &&
+                delivery.Due > arrivingDue)
             .OrderBy(delivery => delivery.Sequence)
             .ToArray();
 

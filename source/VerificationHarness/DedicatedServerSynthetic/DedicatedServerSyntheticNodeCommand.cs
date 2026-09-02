@@ -53,6 +53,7 @@ public static class DedicatedServerSyntheticNodeCommand
 public sealed class DedicatedServerSyntheticNodeOptions
 {
     public const string BaselineScenario = "baseline";
+    public const string ModuleMismatchScenario = "module-mismatch";
     public const string WrongPasswordScenario = "wrong-password";
 
     public string Role { get; private set; } = string.Empty;
@@ -64,6 +65,7 @@ public sealed class DedicatedServerSyntheticNodeOptions
     public string ControllerId { get; private set; } = string.Empty;
     public int ExpectedClients { get; private set; }
     public string PasswordEnvironmentVariable { get; private set; } = string.Empty;
+    public DedicatedModuleValidationContract? ModuleValidation { get; private set; }
     internal string Password { get; private set; } = string.Empty;
 
     public static DedicatedServerSyntheticNodeOptions Parse(string[] args)
@@ -91,9 +93,12 @@ public sealed class DedicatedServerSyntheticNodeOptions
         }
 
         string scenario = Required(values, "--scenario");
-        if (scenario is not BaselineScenario and not WrongPasswordScenario)
+        if (scenario is not BaselineScenario and
+            not ModuleMismatchScenario and
+            not WrongPasswordScenario)
         {
-            throw new ArgumentException("DS synthetic node scenario must be baseline or wrong-password.");
+            throw new ArgumentException(
+                "DS synthetic node scenario must be baseline, module-mismatch, or wrong-password.");
         }
 
         int port = RequiredInt(values, "--port", 1024, 65535);
@@ -106,6 +111,17 @@ public sealed class DedicatedServerSyntheticNodeOptions
         {
             throw new ArgumentException(
                 $"The password from --password-env exceeds {ConnectionPassword.MaxLength} characters.");
+        }
+
+        DedicatedModuleValidationContract? moduleValidation = null;
+        if (scenario is BaselineScenario or ModuleMismatchScenario)
+        {
+            moduleValidation = DecodeModuleValidationContract(
+                Required(values, "--module-contract"));
+        }
+        else if (values.ContainsKey("--module-contract"))
+        {
+            throw new ArgumentException("The wrong-password scenario does not accept --module-contract.");
         }
 
         string controllerId = values.GetValueOrDefault("--controller-id", string.Empty);
@@ -148,7 +164,7 @@ public sealed class DedicatedServerSyntheticNodeOptions
         string[] known =
         {
             "--role", "--scenario", "--port", "--timeout-ms", "--run-token", "--request-id",
-            "--controller-id", "--expected-clients", "--password-env"
+            "--controller-id", "--expected-clients", "--password-env", "--module-contract"
         };
         string? unknown = values.Keys.FirstOrDefault(x => !known.Contains(x, StringComparer.Ordinal));
         if (unknown != null) throw new ArgumentException($"Unknown DS synthetic node option: {unknown}.");
@@ -164,8 +180,45 @@ public sealed class DedicatedServerSyntheticNodeOptions
             ControllerId = controllerId,
             ExpectedClients = expectedClients,
             PasswordEnvironmentVariable = passwordEnvironmentVariable,
+            ModuleValidation = moduleValidation,
             Password = password
         };
+    }
+
+    internal static string EncodeModuleValidationContract(DedicatedModuleValidationContract contract)
+    {
+        if (contract == null) throw new ArgumentNullException(nameof(contract));
+        var codec = new DedicatedServerWireCodec();
+        DedicatedModuleValidationContract validated = codec.DecodeModuleValidationContract(
+            codec.EncodeModuleValidationRequest(contract));
+        return Convert.ToBase64String(
+            JsonSerializer.SerializeToUtf8Bytes(validated, DedicatedServerSyntheticJson.Options));
+    }
+
+    private static DedicatedModuleValidationContract DecodeModuleValidationContract(string encoded)
+    {
+        if (encoded.Length > 65536)
+        {
+            throw new ArgumentException("--module-contract exceeds the bounded command size.");
+        }
+
+        try
+        {
+            byte[] bytes = Convert.FromBase64String(encoded);
+            DedicatedModuleValidationContract? contract =
+                JsonSerializer.Deserialize<DedicatedModuleValidationContract>(
+                    bytes,
+                    DedicatedServerSyntheticJson.Options);
+            if (contract == null) throw new JsonException("The module contract is empty.");
+            var codec = new DedicatedServerWireCodec();
+            return codec.DecodeModuleValidationContract(
+                codec.EncodeModuleValidationRequest(contract));
+        }
+        catch (Exception exception) when (
+            exception is FormatException or JsonException or InvalidDataException)
+        {
+            throw new ArgumentException("--module-contract is not a valid module-validation contract.", exception);
+        }
     }
 
     private static string Required(IReadOnlyDictionary<string, string> values, string option)
@@ -351,6 +404,7 @@ internal sealed class DedicatedServerSyntheticServerNode : DedicatedServerSynthe
                    clock.ElapsedMilliseconds < Options.TimeoutMilliseconds)
             {
                 manager.PollEvents();
+                SendPendingModuleResponses();
                 if (IsLogicalOutcomeComplete())
                 {
                     completeAfterMilliseconds ??= clock.ElapsedMilliseconds + 150;
@@ -417,6 +471,9 @@ internal sealed class DedicatedServerSyntheticServerNode : DedicatedServerSynthe
         byte[] heartbeat = Codec.EncodeCampaignTime(1, -1);
         RecordWire(heartbeat);
         peer.Send(heartbeat, 0, DeliveryMethod.Sequenced);
+        byte[] lobbyChanged = Codec.EncodeSessionLobbyChanged(1);
+        RecordWire(lobbyChanged);
+        peer.Send(lobbyChanged, 0, DeliveryMethod.ReliableOrdered);
     }
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
@@ -473,25 +530,41 @@ internal sealed class DedicatedServerSyntheticServerNode : DedicatedServerSynthe
                 throw new InvalidDataException("Synthetic peer sent a duplicate or unbound module request.");
             }
 
+            DedicatedModuleValidationContract expected = Options.ModuleValidation ??
+                throw new InvalidDataException("The server has no module-validation contract.");
             DedicatedModuleValidationRequest request = Codec.DecodeModuleValidationRequest(wireBytes);
-            if (request.ModuleCount != 0 || request.ClientBuildVersion != "ds-synthetic-intentional-mismatch")
+            bool isMismatch = Options.Scenario == DedicatedServerSyntheticNodeOptions.ModuleMismatchScenario;
+            if (isMismatch &&
+                (request.ModuleCount != 0 ||
+                 string.Equals(request.ClientBuildVersion, expected.CoopBuildVersion, StringComparison.Ordinal)))
             {
                 throw new InvalidDataException("Synthetic module request is not the frozen mismatch probe.");
             }
+            if (!isMismatch)
+            {
+                DedicatedModuleValidationContract actual = Codec.DecodeModuleValidationContract(wireBytes);
+                if (!DedicatedModuleValidationContracts.Equivalent(expected, actual))
+                {
+                    throw new InvalidDataException("Synthetic module request did not match the server contract.");
+                }
+            }
 
             peerState.ModuleRequestObserved = true;
-            byte[] response = Codec.EncodeModuleValidationResult(
-                false,
-                "intentional synthetic build mismatch",
-                "ds-synthetic-server-build");
-            RecordWire(response);
-            peer.Send(response, 0, DeliveryMethod.ReliableOrdered);
+            peerState.ModuleResponse = Codec.EncodeModuleValidationResult(
+                !isMismatch,
+                isMismatch ? "intentional synthetic build mismatch" : string.Empty,
+                expected.CoopBuildVersion);
+            peerState.ModuleAccepted = !isMismatch;
+            peerState.ModuleResponseAfterMilliseconds = clock.ElapsedMilliseconds + 50;
             return;
         }
 
         if (frame.ManifestEntry.TypeId == DedicatedServerWireManifest.NetworkClientValidateTypeId)
         {
-            if (!peerStates.TryGetValue(peer, out PeerProbeState? peerState) || peerState.ControllerId != null)
+            if (!peerStates.TryGetValue(peer, out PeerProbeState? peerState) ||
+                !peerState.ModuleAccepted ||
+                !peerState.ModuleResponseSent ||
+                peerState.ControllerId != null)
             {
                 throw new InvalidDataException("Synthetic peer sent a duplicate or unbound controller request.");
             }
@@ -526,13 +599,48 @@ internal sealed class DedicatedServerSyntheticServerNode : DedicatedServerSynthe
         request.Reject(reason);
     }
 
+    private void SendPendingModuleResponses()
+    {
+        foreach ((NetPeer peer, PeerProbeState peerState) in peerStates)
+        {
+            if (peerState.ModuleResponseSent ||
+                peerState.ModuleResponse == null ||
+                clock.ElapsedMilliseconds < peerState.ModuleResponseAfterMilliseconds)
+            {
+                continue;
+            }
+
+            RecordWire(peerState.ModuleResponse);
+            peer.Send(peerState.ModuleResponse, 0, DeliveryMethod.ReliableOrdered);
+            peerState.ModuleResponseSent = true;
+        }
+    }
+
     private bool IsLogicalOutcomeComplete()
     {
-        return Options.Scenario == DedicatedServerSyntheticNodeOptions.WrongPasswordScenario
-            ? Result.RejectedPasswords >= 1 && Result.AcceptedConnections == 0
-            : Result.AcceptedConnections == Options.ExpectedClients &&
+        if (Options.Scenario == DedicatedServerSyntheticNodeOptions.WrongPasswordScenario)
+        {
+            return Result.RejectedPasswords >= 1 && Result.AcceptedConnections == 0;
+        }
+        if (Options.Scenario == DedicatedServerSyntheticNodeOptions.ModuleMismatchScenario)
+        {
+            return Result.AcceptedConnections == 1 &&
+                   peerStates.Count == 1 &&
+                   peerStates.Values.All(x =>
+                       x.ModuleRequestObserved &&
+                       x.ModuleResponseSent &&
+                       !x.ModuleAccepted &&
+                       x.ControllerId == null) &&
+                   Result.FailureCodes.Count == 0;
+        }
+
+        return Result.AcceptedConnections == Options.ExpectedClients &&
               peerStates.Count == Options.ExpectedClients &&
-              peerStates.Values.All(x => x.ModuleRequestObserved && x.ControllerId != null) &&
+              peerStates.Values.All(x =>
+                  x.ModuleRequestObserved &&
+                  x.ModuleResponseSent &&
+                  x.ModuleAccepted &&
+                  x.ControllerId != null) &&
               peerStates.Values.Select(x => x.ControllerId).ToHashSet(StringComparer.Ordinal)
                   .SetEquals(DedicatedServerSyntheticOptions.ExpectedControllerIds) &&
               Result.FailureCodes.Count == 0;
@@ -541,22 +649,38 @@ internal sealed class DedicatedServerSyntheticServerNode : DedicatedServerSynthe
     private sealed class PeerProbeState
     {
         public bool ModuleRequestObserved { get; set; }
+        public bool ModuleAccepted { get; set; }
+        public byte[]? ModuleResponse { get; set; }
+        public long ModuleResponseAfterMilliseconds { get; set; }
+        public bool ModuleResponseSent { get; set; }
         public string? ControllerId { get; set; }
     }
 }
 
-internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSyntheticNodeBase
+internal sealed class DedicatedServerSyntheticClientNode
+    : DedicatedServerSyntheticNodeBase, IDedicatedServerSyntheticClientSession
 {
     private NetPeer? serverPeer;
     private bool connected;
     private bool completionPending;
+    private readonly bool holdConnection;
+    private readonly TaskCompletionSource<bool> ready = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private int releaseRequested;
     private readonly Stopwatch clock = new();
     private long completeAfterMilliseconds;
 
-    public DedicatedServerSyntheticClientNode(DedicatedServerSyntheticNodeOptions options)
+    public DedicatedServerSyntheticClientNode(
+        DedicatedServerSyntheticNodeOptions options,
+        bool holdConnection = false)
         : base(options)
     {
+        this.holdConnection = holdConnection;
     }
+
+    public Task<bool> Ready => ready.Task;
+
+    public void Release() => Interlocked.Exchange(ref releaseRequested, 1);
 
     public override async Task<DedicatedServerSyntheticNodeResult> RunAsync(
         CancellationToken cancellationToken)
@@ -575,15 +699,36 @@ internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSynthe
                 : Options.Password;
             serverPeer = manager.Connect("127.0.0.1", Options.Port, suppliedPassword);
             clock.Restart();
-            while (!cancellationToken.IsCancellationRequested &&
-                   clock.ElapsedMilliseconds < Options.TimeoutMilliseconds)
+            while (clock.ElapsedMilliseconds < Options.TimeoutMilliseconds)
             {
+                if (Volatile.Read(ref releaseRequested) != 0)
+                {
+                    serverPeer?.Disconnect();
+                    await Task.Delay(75);
+                    return Result;
+                }
+                if (cancellationToken.IsCancellationRequested) break;
+
                 manager.PollEvents();
                 if (completionPending && clock.ElapsedMilliseconds >= completeAfterMilliseconds)
                 {
-                    serverPeer?.Disconnect();
                     Result.Success = IsExpectedOutcomeComplete();
                     if (!Result.Success) AddFailure("client-outcome-incomplete");
+                    ready.TrySetResult(Result.Success);
+                    if (!Result.Success || !holdConnection)
+                    {
+                        serverPeer?.Disconnect();
+                        return Result;
+                    }
+
+                    if (Volatile.Read(ref releaseRequested) == 0)
+                    {
+                        await PollAsync(cancellationToken);
+                        continue;
+                    }
+
+                    serverPeer?.Disconnect();
+                    await Task.Delay(75);
                     return Result;
                 }
 
@@ -592,10 +737,12 @@ internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSynthe
 
             AddFailure(
                 cancellationToken.IsCancellationRequested ? "client-cancelled" : "client-timeout");
+            ready.TrySetResult(false);
             return Result;
         }
         finally
         {
+            ready.TrySetResult(Result.Success);
             manager.Stop();
         }
     }
@@ -609,12 +756,21 @@ internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSynthe
     {
         connected = true;
         Result.AcceptedConnections++;
-        byte[] moduleRequest = Codec.EncodeModuleMismatchRequest("ds-synthetic-intentional-mismatch");
-        byte[] clientRequest = Codec.EncodeClientValidationRequest(Options.ControllerId);
+        if (Options.Scenario == DedicatedServerSyntheticNodeOptions.WrongPasswordScenario)
+        {
+            AddFailure("wrong-password-unexpectedly-accepted");
+            peer.Disconnect();
+            return;
+        }
+
+        DedicatedModuleValidationContract contract = Options.ModuleValidation ??
+            throw new InvalidDataException("The client has no module-validation contract.");
+        bool mismatch = Options.Scenario == DedicatedServerSyntheticNodeOptions.ModuleMismatchScenario;
+        byte[] moduleRequest = mismatch
+            ? Codec.EncodeModuleMismatchRequest(CreateMismatchBuild(contract.CoopBuildVersion))
+            : Codec.EncodeModuleValidationRequest(contract);
         RecordWire(moduleRequest);
-        RecordWire(clientRequest);
         peer.Send(moduleRequest, 0, DeliveryMethod.ReliableOrdered);
-        peer.Send(clientRequest, 0, DeliveryMethod.ReliableOrdered);
     }
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
@@ -676,9 +832,7 @@ internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSynthe
             completeAfterMilliseconds = clock.ElapsedMilliseconds;
         }
 
-        if (Result.HeartbeatsObserved == 1 &&
-            Result.ModuleDenialsObserved == 1 &&
-            Result.FreshControllerResultsObserved == 1)
+        if (IsExpectedOutcomeComplete())
         {
             completionPending = true;
             completeAfterMilliseconds = clock.ElapsedMilliseconds + 75;
@@ -714,18 +868,54 @@ internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSynthe
         if (frame.ManifestEntry.TypeId == DedicatedServerWireManifest.NetworkModuleVersionsValidatedTypeId)
         {
             DedicatedModuleValidationResult validation = Codec.DecodeModuleValidationResult(wireBytes);
-            if (validation.Matches) throw new InvalidDataException("Mismatch control was unexpectedly accepted.");
-            Result.ModuleDenialsObserved++;
+            DedicatedModuleValidationContract contract = Options.ModuleValidation ??
+                throw new InvalidDataException("The client has no module-validation contract.");
+            if (!string.Equals(
+                    validation.ServerBuildVersion,
+                    contract.CoopBuildVersion,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("Server module response reported a different co-op build.");
+            }
+
+            if (Options.Scenario == DedicatedServerSyntheticNodeOptions.ModuleMismatchScenario)
+            {
+                if (validation.Matches)
+                {
+                    throw new InvalidDataException("Mismatch control was unexpectedly accepted.");
+                }
+                if (Result.ModuleDenialsObserved != 0)
+                {
+                    throw new InvalidDataException("Mismatch control received a duplicate module response.");
+                }
+
+                Result.ModuleDenialsObserved++;
+                return;
+            }
+
+            if (!validation.Matches || Result.ModuleMatchesObserved != 0)
+            {
+                throw new InvalidDataException("Baseline module validation was denied or duplicated.");
+            }
+
+            Result.ModuleMatchesObserved++;
+            byte[] clientRequest = Codec.EncodeClientValidationRequest(Options.ControllerId);
+            RecordWire(clientRequest);
+            serverPeer?.Send(clientRequest, 0, DeliveryMethod.ReliableOrdered);
+            return;
+        }
+
+        if (frame.ManifestEntry.TypeId == DedicatedServerWireManifest.NetworkSessionLobbyChangedTypeId)
+        {
+            Codec.DecodeSessionLobbyChanged(wireBytes);
+            Result.SessionLobbyChangesObserved++;
             return;
         }
 
         if (frame.ManifestEntry.TypeId == DedicatedServerWireManifest.NetworkClientValidatedTypeId)
         {
             DedicatedClientValidationResult validation = Codec.DecodeClientValidationResult(wireBytes);
-            if (validation.HeroExists || validation.PlayerPayloadPresent)
-            {
-                throw new InvalidDataException("Fresh-controller shortcut returned an existing player.");
-            }
+            RequireFreshControllerShortcut(validation);
 
             Result.FreshControllerResultsObserved++;
             Result.ProtocolShortcut = true;
@@ -733,6 +923,14 @@ internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSynthe
         }
 
         throw new InvalidDataException("Server sent a type outside the safe synthetic subset.");
+    }
+
+    internal static void RequireFreshControllerShortcut(DedicatedClientValidationResult validation)
+    {
+        if (validation.HeroExists || validation.PlayerPayloadPresent)
+        {
+            throw new InvalidDataException("Fresh-controller shortcut returned an existing player.");
+        }
     }
 
     private bool IsExpectedOutcomeComplete()
@@ -744,8 +942,18 @@ internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSynthe
                    Result.FailureCodes.Count == 0;
         }
 
-        return Result.HeartbeatsObserved == 1 &&
-               Result.ModuleDenialsObserved == 1 &&
+        if (Options.Scenario == DedicatedServerSyntheticNodeOptions.ModuleMismatchScenario)
+        {
+            return connected &&
+                   Result.ModuleDenialsObserved == 1 &&
+                   Result.ModuleMatchesObserved == 0 &&
+                   Result.FreshControllerResultsObserved == 0 &&
+                   Result.FailureCodes.Count == 0;
+        }
+
+        return Result.HeartbeatsObserved >= 1 &&
+               Result.ModuleMatchesObserved == 1 &&
+               Result.ModuleDenialsObserved == 0 &&
                Result.FreshControllerResultsObserved == 1 &&
                Result.ProtocolShortcut &&
                Result.FailureCodes.Count == 0;
@@ -757,5 +965,13 @@ internal sealed class DedicatedServerSyntheticClientNode : DedicatedServerSynthe
         return string.Equals(password, knownWrongPassword, StringComparison.Ordinal)
             ? knownWrongPassword + "-x"
             : knownWrongPassword;
+    }
+
+    internal static string CreateMismatchBuild(string buildVersion)
+    {
+        const string knownMismatch = "ds-synthetic-intentional-mismatch";
+        return string.Equals(buildVersion, knownMismatch, StringComparison.Ordinal)
+            ? knownMismatch + "-x"
+            : knownMismatch;
     }
 }

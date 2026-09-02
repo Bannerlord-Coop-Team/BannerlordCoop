@@ -47,6 +47,11 @@ public sealed class DedicatedServerProductSourceShapeTests
             @"\[ProtoMember\(1\)\]\s*public\s+bool\s+HeroExists",
             @"\[ProtoMember\(2\)\]\s*public\s+Player\s+Player");
         AssertSource(
+            "source/Coop.Core/Common/Session/Messages/NetworkSessionLobbyChanged.cs",
+            @"namespace\s+Coop\.Core\.Common\.Session\.Messages",
+            @"struct\s+NetworkSessionLobbyChanged\s*:\s*IEvent",
+            @"\[ProtoMember\(1\)\]\s*public\s+readonly\s+ulong\s+LobbyId");
+        AssertSource(
             "source/Common/PacketHandlers/AggregateMessagePacketHandler.cs",
             @"namespace\s+Common\.PacketHandlers",
             @"struct\s+AggregateMessagePacket\s*:\s*IPacket",

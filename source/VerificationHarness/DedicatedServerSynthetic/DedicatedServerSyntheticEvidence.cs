@@ -41,11 +41,38 @@ public sealed class DedicatedServerSyntheticEvidence
     public DedicatedServerSyntheticSourceEvidence DedicatedServerSource { get; set; } = new();
     public DedicatedServerSyntheticTopologyEvidence Topology { get; set; } = new();
     public DedicatedServerSyntheticManifestEvidence WireManifest { get; set; } = new();
+    public DedicatedServerSyntheticScenarioEvidence Scenario { get; set; } = new();
     public SortedDictionary<string, bool> RequiredChecks { get; set; } = new(StringComparer.Ordinal);
     public string StateDigest { get; set; } = string.Empty;
     public string ReplayIdentity { get; set; } = string.Empty;
     public SortedDictionary<string, string> ArtifactHashes { get; set; } = new(StringComparer.Ordinal);
     public List<string> Failures { get; set; } = new();
+}
+
+public sealed class DedicatedServerSyntheticScenarioEvidence
+{
+    public bool Attempted { get; set; }
+    public bool Completed { get; set; }
+    public bool WrongPasswordRejected { get; set; }
+    public bool IncompatibleModuleRejected { get; set; }
+    public bool CompatibleModuleHandshakeCompleted { get; set; }
+    public bool ProtocolShortcut { get; set; }
+    public List<DedicatedServerSyntheticLifecycleSnapshot> Lifecycle { get; set; } = new();
+    public List<DedicatedServerSyntheticNodeResult> Clients { get; set; } = new();
+}
+
+public sealed class DedicatedServerSyntheticLifecycleSnapshot
+{
+    public string Phase { get; set; } = string.Empty;
+    public bool ControlEnvelopeValidated { get; set; }
+    public bool ControlRequestIdentityValidated { get; set; }
+    public bool DedicatedProcessIdentityValidated { get; set; }
+    public bool FirstClassConnectionRosterValidated { get; set; }
+    public bool Serving { get; set; }
+    public int JoinPort { get; set; }
+    public DedicatedModuleValidationContract ModuleValidation { get; set; } =
+        new(string.Empty, Array.Empty<DedicatedModuleInfo>());
+    public List<DedicatedServerRosterEntry> ConnectionRoster { get; set; } = new();
 }
 
 public sealed class DedicatedServerSyntheticNodeResult
@@ -63,6 +90,8 @@ public sealed class DedicatedServerSyntheticNodeResult
     public int RejectedPasswords { get; set; }
     public int Disconnections { get; set; }
     public int HeartbeatsObserved { get; set; }
+    public int SessionLobbyChangesObserved { get; set; }
+    public int ModuleMatchesObserved { get; set; }
     public int ModuleDenialsObserved { get; set; }
     public int FreshControllerResultsObserved { get; set; }
     public bool ProtocolShortcut { get; set; }

@@ -20,6 +20,7 @@ public static class DedicatedServerWireManifest
     public const int NetworkModuleVersionsValidatedTypeId = 1206877260;
     public const int NetworkClientValidateTypeId = 791628818;
     public const int NetworkClientValidatedTypeId = 29530214;
+    public const int NetworkSessionLobbyChangedTypeId = 1547717120;
     public const int AggregateMessagePacketTypeId = 1253361833;
     public const int GameSaveDataChunkPacketTypeId = 404232623;
 
@@ -65,6 +66,14 @@ public static class DedicatedServerWireManifest
             "ReliableOrdered",
             "server-to-client",
             false),
+        new DedicatedServerWireEntry(
+            "session-lobby-changed",
+            "Coop.Core.Common.Session.Messages.NetworkSessionLobbyChanged",
+            NetworkSessionLobbyChangedTypeId,
+            0,
+            "ReliableOrdered",
+            "server-to-client",
+            true),
         new DedicatedServerWireEntry(
             "aggregate-message",
             "Common.PacketHandlers.AggregateMessagePacket",

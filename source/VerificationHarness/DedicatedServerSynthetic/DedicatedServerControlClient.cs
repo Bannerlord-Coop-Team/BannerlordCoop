@@ -107,7 +107,8 @@ public sealed record DedicatedServerRosterEntry(
 public sealed record DedicatedServerControlSnapshot(
     bool Serving,
     int JoinPort,
-    IReadOnlyList<DedicatedServerRosterEntry> ConnectionRoster);
+    IReadOnlyList<DedicatedServerRosterEntry> ConnectionRoster,
+    DedicatedModuleValidationContract ModuleValidation);
 
 public sealed class DedicatedServerControlValidation
 {
@@ -116,6 +117,7 @@ public sealed class DedicatedServerControlValidation
     public bool ProcessIdentityValid { get; init; }
     public bool ServingValid { get; init; }
     public bool JoinPortValid { get; init; }
+    public bool ModuleValidationContractValid { get; init; }
     public bool RosterSurfaceValid { get; init; }
     public bool ExpectedRosterValid { get; init; }
     public DedicatedServerControlSnapshot? Snapshot { get; init; }
@@ -127,6 +129,7 @@ public sealed class DedicatedServerControlValidation
         ProcessIdentityValid &&
         ServingValid &&
         JoinPortValid &&
+        ModuleValidationContractValid &&
         RosterSurfaceValid &&
         ExpectedRosterValid &&
         FailureCodes.Count == 0;
@@ -211,6 +214,14 @@ public sealed class DedicatedServerControlResponseValidator : IDedicatedServerCo
             joinPort == expectation.JoinPort;
         if (!joinPortValid) failures.Add("join-port-missing-or-mismatch");
 
+        bool moduleValidationContractValid = TryReadModuleValidationContract(
+            result,
+            out DedicatedModuleValidationContract? moduleValidation);
+        if (!moduleValidationContractValid)
+        {
+            failures.Add("module-validation-contract-missing-or-invalid");
+        }
+
         bool rosterSurfaceValid =
             result.TryGetProperty("connectionRoster", out JsonElement rosterElement) &&
             rosterElement.ValueKind == JsonValueKind.Array;
@@ -269,10 +280,13 @@ public sealed class DedicatedServerControlResponseValidator : IDedicatedServerCo
         }
 
         DedicatedServerControlSnapshot? snapshot = rosterSurfaceValid
+            && moduleValidationContractValid
+            && moduleValidation != null
             ? new DedicatedServerControlSnapshot(
                 servingValid,
                 joinPortValid ? expectation.JoinPort : 0,
-                roster.AsReadOnly())
+                roster.AsReadOnly(),
+                moduleValidation)
             : null;
         return new DedicatedServerControlValidation
         {
@@ -281,11 +295,101 @@ public sealed class DedicatedServerControlResponseValidator : IDedicatedServerCo
             ProcessIdentityValid = processIdentityValid,
             ServingValid = servingValid,
             JoinPortValid = joinPortValid,
+            ModuleValidationContractValid = moduleValidationContractValid,
             RosterSurfaceValid = rosterSurfaceValid,
             ExpectedRosterValid = expectedRosterValid,
             Snapshot = snapshot,
             FailureCodes = failures
         };
+    }
+
+    private static bool TryReadModuleValidationContract(
+        JsonElement result,
+        out DedicatedModuleValidationContract? contract)
+    {
+        contract = null;
+        if (!result.TryGetProperty("moduleValidation", out JsonElement contractElement) ||
+            contractElement.ValueKind != JsonValueKind.Object ||
+            !TryReadBoundedString(
+                contractElement,
+                "coopBuildVersion",
+                DedicatedServerWireCodec.MaximumBuildVersionBytes,
+                out string coopBuildVersion) ||
+            !contractElement.TryGetProperty("modules", out JsonElement modulesElement) ||
+            modulesElement.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var modules = new List<DedicatedModuleInfo>();
+        foreach (JsonElement moduleElement in modulesElement.EnumerateArray())
+        {
+            if (modules.Count == DedicatedServerWireCodec.MaximumAggregateMessages ||
+                moduleElement.ValueKind != JsonValueKind.Object ||
+                !TryReadBoundedString(
+                    moduleElement,
+                    "id",
+                    DedicatedServerWireCodec.MaximumBuildVersionBytes,
+                    out string id) ||
+                !TryReadBoolean(moduleElement, "isOfficial", out bool isOfficial) ||
+                !TryReadBoolean(moduleElement, "isDlc", out bool isDlc) ||
+                !moduleElement.TryGetProperty("version", out JsonElement versionElement) ||
+                versionElement.ValueKind != JsonValueKind.Object ||
+                !TryReadNonNegativeInt(versionElement, "applicationVersionType", out int versionType) ||
+                !TryReadNonNegativeInt(versionElement, "major", out int major) ||
+                !TryReadNonNegativeInt(versionElement, "minor", out int minor) ||
+                !TryReadNonNegativeInt(versionElement, "revision", out int revision) ||
+                !TryReadNonNegativeInt(versionElement, "changeSet", out int changeSet))
+            {
+                return false;
+            }
+
+            modules.Add(new DedicatedModuleInfo(
+                id,
+                isOfficial,
+                isDlc,
+                new DedicatedModuleVersion(versionType, major, minor, revision, changeSet)));
+        }
+
+        if (modules.Count == 0 ||
+            modules.Any(module => module.IsDlc) ||
+            !modules.Any(module => module.IsOfficial) ||
+            modules.Select(module => module.Id).Distinct(StringComparer.Ordinal).Count() != modules.Count)
+        {
+            return false;
+        }
+
+        contract = new DedicatedModuleValidationContract(
+            coopBuildVersion,
+            modules.AsReadOnly());
+        return true;
+    }
+
+    private static bool TryReadBoolean(
+        JsonElement parent,
+        string propertyName,
+        out bool value)
+    {
+        value = false;
+        if (!parent.TryGetProperty(propertyName, out JsonElement element) ||
+            element.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+        {
+            return false;
+        }
+
+        value = element.GetBoolean();
+        return true;
+    }
+
+    private static bool TryReadNonNegativeInt(
+        JsonElement parent,
+        string propertyName,
+        out int value)
+    {
+        value = 0;
+        return parent.TryGetProperty(propertyName, out JsonElement element) &&
+               element.TryGetInt32(out value) &&
+               value >= 0;
     }
 
     private static bool TryReadBoundedString(

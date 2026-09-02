@@ -37,9 +37,46 @@ public sealed class DedicatedServerSyntheticNodeTests
             Assert.All(exitCodes, exitCode => Assert.Equal(0, exitCode));
             DedicatedServerSyntheticNodeResult clientResult = ParseLastResult(clientAOutput.ToString());
             Assert.Equal(1, clientResult.HeartbeatsObserved);
-            Assert.Equal(1, clientResult.ModuleDenialsObserved);
+            Assert.Equal(1, clientResult.SessionLobbyChangesObserved);
+            Assert.Equal(1, clientResult.ModuleMatchesObserved);
+            Assert.Equal(0, clientResult.ModuleDenialsObserved);
             Assert.Equal(1, clientResult.FreshControllerResultsObserved);
             Assert.True(clientResult.ProtocolShortcut);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, null);
+        }
+    }
+
+    [Fact]
+    public async Task ModuleMismatch_IsRejectedWithoutSendingClientValidation()
+    {
+        int port = FindAvailablePort();
+        string variable = SetPassword();
+        try
+        {
+            using var serverOutput = new StringWriter();
+            Task<int> server = DedicatedServerSyntheticNodeCommand.RunAsync(
+                ServerArguments(port, variable, "module-mismatch", expectedClients: 1),
+                serverOutput,
+                CancellationToken.None);
+            await Task.Delay(100);
+
+            using var clientOutput = new StringWriter();
+            Task<int> client = DedicatedServerSyntheticNodeCommand.RunAsync(
+                ClientArguments(port, variable, "module-mismatch", "ds-synthetic-client-a"),
+                clientOutput,
+                CancellationToken.None);
+
+            int[] exitCodes = await Task.WhenAll(server, client);
+
+            Assert.All(exitCodes, exitCode => Assert.Equal(0, exitCode));
+            DedicatedServerSyntheticNodeResult result = ParseLastResult(clientOutput.ToString());
+            Assert.Equal(1, result.ModuleDenialsObserved);
+            Assert.Equal(0, result.ModuleMatchesObserved);
+            Assert.Equal(0, result.FreshControllerResultsObserved);
+            Assert.False(result.ProtocolShortcut);
         }
         finally
         {
@@ -120,6 +157,84 @@ public sealed class DedicatedServerSyntheticNodeTests
     }
 
     [Fact]
+    public async Task HeldClientsRemainConnectedUntilTheControllerReleasesThem()
+    {
+        int port = FindAvailablePort();
+        string variable = SetPassword();
+        try
+        {
+            using var serverOutput = new StringWriter();
+            Task<int> server = DedicatedServerSyntheticNodeCommand.RunAsync(
+                ServerArguments(port, variable, "baseline", expectedClients: 2),
+                serverOutput,
+                CancellationToken.None);
+            await Task.Delay(100);
+
+            var clientA = new DedicatedServerSyntheticClientNode(
+                DedicatedServerSyntheticNodeOptions.Parse(
+                    ClientArguments(port, variable, "baseline", "ds-synthetic-client-a")),
+                holdConnection: true);
+            var clientB = new DedicatedServerSyntheticClientNode(
+                DedicatedServerSyntheticNodeOptions.Parse(
+                    ClientArguments(port, variable, "baseline", "ds-synthetic-client-b")),
+                holdConnection: true);
+            Task<DedicatedServerSyntheticNodeResult> clientATask =
+                clientA.RunAsync(CancellationToken.None);
+            Task<DedicatedServerSyntheticNodeResult> clientBTask =
+                clientB.RunAsync(CancellationToken.None);
+
+            bool[] ready = await Task.WhenAll(clientA.Ready, clientB.Ready)
+                .WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.All(ready, value => Assert.True(value));
+            Assert.False(clientATask.IsCompleted);
+            Assert.False(clientBTask.IsCompleted);
+
+            clientA.Release();
+            clientB.Release();
+            DedicatedServerSyntheticNodeResult[] clients = await Task.WhenAll(
+                clientATask,
+                clientBTask);
+            int serverExitCode = await server;
+
+            Assert.Equal(0, serverExitCode);
+            Assert.All(clients, client => Assert.True(client.Success));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, null);
+        }
+    }
+
+    [Fact]
+    public async Task Release_StopsAClientBeforeTheProtocolOutcomeCompletes()
+    {
+        int port = FindAvailablePort();
+        string variable = SetPassword();
+        try
+        {
+            var client = new DedicatedServerSyntheticClientNode(
+                DedicatedServerSyntheticNodeOptions.Parse(
+                    ClientArguments(port, variable, "baseline", "ds-synthetic-client-a")),
+                holdConnection: true);
+
+            Task<DedicatedServerSyntheticNodeResult> clientTask =
+                client.RunAsync(CancellationToken.None);
+            client.Release();
+            DedicatedServerSyntheticNodeResult result = await clientTask.WaitAsync(
+                TimeSpan.FromSeconds(2));
+
+            Assert.False(result.Success);
+            Assert.DoesNotContain("client-timeout", result.FailureCodes);
+            Assert.DoesNotContain("client-cancelled", result.FailureCodes);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, null);
+        }
+    }
+
+    [Fact]
     public async Task ReadyOutputFailureReleasesTheServerSocket()
     {
         int port = FindAvailablePort();
@@ -149,7 +264,7 @@ public sealed class DedicatedServerSyntheticNodeTests
         string scenario,
         int expectedClients)
     {
-        return new[]
+        var arguments = new List<string>
         {
             "--role", "server",
             "--scenario", scenario,
@@ -160,6 +275,8 @@ public sealed class DedicatedServerSyntheticNodeTests
             "--expected-clients", expectedClients.ToString(),
             "--password-env", passwordVariable
         };
+        AddModuleContract(arguments, scenario);
+        return arguments.ToArray();
     }
 
     private static string[] ClientArguments(
@@ -168,7 +285,7 @@ public sealed class DedicatedServerSyntheticNodeTests
         string scenario,
         string controllerId)
     {
-        return new[]
+        var arguments = new List<string>
         {
             "--role", "client",
             "--scenario", scenario,
@@ -179,6 +296,20 @@ public sealed class DedicatedServerSyntheticNodeTests
             "--controller-id", controllerId,
             "--password-env", passwordVariable
         };
+        AddModuleContract(arguments, scenario);
+        return arguments.ToArray();
+    }
+
+    private static void AddModuleContract(List<string> arguments, string scenario)
+    {
+        if (scenario == DedicatedServerSyntheticNodeOptions.WrongPasswordScenario)
+        {
+            return;
+        }
+
+        arguments.Add("--module-contract");
+        arguments.Add(DedicatedServerSyntheticNodeOptions.EncodeModuleValidationContract(
+            DedicatedServerWireCodecTests.ModuleContract()));
     }
 
     private static DedicatedServerSyntheticNodeResult ParseLastResult(string output)

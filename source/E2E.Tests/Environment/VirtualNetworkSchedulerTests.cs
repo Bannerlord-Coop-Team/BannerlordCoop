@@ -99,6 +99,28 @@ public class VirtualNetworkSchedulerTests
         Assert.Equal(new[] { 2 }, deliveries);
     }
 
+    [Theory]
+    [InlineData("Sequenced:channel-0")]
+    [InlineData("ReliableSequenced:channel-0")]
+    public void HigherLatencySequencedTraffic_DoesNotSupersedeEarlierArrival(string channel)
+    {
+        var scheduler = new VirtualNetworkScheduler();
+        var sender = new object();
+        var receiver = new object();
+        var deliveries = new List<int>();
+
+        scheduler.Schedule(sender, receiver, channel, () => deliveries.Add(1));
+        scheduler.DefaultLatency = TimeSpan.FromMilliseconds(100);
+        scheduler.Schedule(sender, receiver, channel, () => deliveries.Add(2));
+
+        Assert.Equal(2, scheduler.PendingDeliveryCount);
+        Assert.DoesNotContain(scheduler.Trace, entry => entry.Kind == VirtualNetworkTraceKind.Superseded);
+        Assert.Equal(1, scheduler.DrainReady());
+        Assert.Equal(new[] { 1 }, deliveries);
+        Assert.Equal(1, scheduler.AdvanceBy(TimeSpan.FromMilliseconds(100)));
+        Assert.Equal(new[] { 1, 2 }, deliveries);
+    }
+
     [Fact]
     public void PacketDeliveryMethods_AdvanceIndependently()
     {

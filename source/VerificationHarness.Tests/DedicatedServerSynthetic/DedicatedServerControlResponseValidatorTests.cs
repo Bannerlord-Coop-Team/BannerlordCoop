@@ -25,6 +25,7 @@ public sealed class DedicatedServerControlResponseValidatorTests
             {
                 serving = true,
                 joinPort = 4201,
+                moduleValidation = ModuleValidation(),
                 connectionRoster = new[]
                 {
                     new { controllerId = "ds-synthetic-client-a", connectionInstanceId = "connection-a-1", connected = true, joinState = "ResolveCharacterState" },
@@ -49,6 +50,7 @@ public sealed class DedicatedServerControlResponseValidatorTests
             {
                 serving = true,
                 joinPort = 4201,
+                moduleValidation = ModuleValidation(),
                 connectionRoster = new[]
                 {
                     new { controllerId = "ds-synthetic-client-a", connectionInstanceId = "reused", connected = true, joinState = "ResolveCharacterState" },
@@ -73,6 +75,7 @@ public sealed class DedicatedServerControlResponseValidatorTests
             {
                 serving = true,
                 joinPort = 4201,
+                moduleValidation = ModuleValidation(),
                 registeredPlayers = 2
             });
 
@@ -101,6 +104,7 @@ public sealed class DedicatedServerControlResponseValidatorTests
             {
                 serving = true,
                 joinPort = 4201,
+                moduleValidation = ModuleValidation(),
                 connectionRoster = Array.Empty<object>()
             });
 
@@ -108,6 +112,66 @@ public sealed class DedicatedServerControlResponseValidatorTests
 
         Assert.False(result.IsValid);
         Assert.Contains(failureCode, result.FailureCodes);
+    }
+
+    [Fact]
+    public void MissingAuthoritativeModuleContractFailsClosed()
+    {
+        string json = ResponseJson(
+            1234,
+            "run-token",
+            "request-id",
+            new
+            {
+                serving = true,
+                joinPort = 4201,
+                connectionRoster = Array.Empty<object>()
+            });
+
+        DedicatedServerControlValidation result = validator.Validate(json, Expectation);
+
+        Assert.False(result.IsValid);
+        Assert.False(result.ModuleValidationContractValid);
+        Assert.Contains("module-validation-contract-missing-or-invalid", result.FailureCodes);
+    }
+
+    private static object ModuleValidation()
+    {
+        return new
+        {
+            coopBuildVersion = "coop-build",
+            modules = new[]
+            {
+                new
+                {
+                    id = "Native",
+                    isOfficial = true,
+                    isDlc = false,
+                    version = new
+                    {
+                        applicationVersionType = 4,
+                        major = 1,
+                        minor = 2,
+                        revision = 3,
+                        changeSet = 456
+                    }
+                },
+                new
+                {
+                    id = "Coop",
+                    isOfficial = false,
+                    isDlc = false,
+                    version = new
+                    {
+                        applicationVersionType = 4,
+                        major = 1,
+                        minor = 2,
+                        revision = 3,
+                        changeSet = 789
+                    }
+                }
+            }
+        };
     }
 
     private static string ResponseJson(int processId, string runToken, string requestId, object result)
