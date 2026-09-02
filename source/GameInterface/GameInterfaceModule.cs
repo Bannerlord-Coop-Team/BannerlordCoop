@@ -85,9 +85,6 @@ public class GameInterfaceModule : Module
 
         builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
         builder.RegisterType<CoopCommandRegistry>().As<ICoopCommandRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<LegacyCoopCommandExecutor>()
-            .As<ILegacyCoopCommandExecutor>()
-            .InstancePerDependency();
         builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
             .Where(type => type.IsClass &&
                            !type.IsAbstract &&

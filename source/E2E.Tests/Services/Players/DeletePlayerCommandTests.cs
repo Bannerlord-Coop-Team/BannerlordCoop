@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
@@ -54,7 +55,9 @@ public class DeletePlayerCommandTests : IDisposable
         string output = null;
         Server.Call(() =>
         {
-            output = DeletePlayerCommand.DeletePlayer(new List<string>());
+            output = new DeletePlayerCommand.PlayerDeleteCoopCommand()
+                .ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>()))
+                .Output;
         });
 
         Assert.Equal("Command can only be run on a client.", output);
@@ -84,7 +87,9 @@ public class DeletePlayerCommandTests : IDisposable
         string output = null;
         Client.Call(() =>
         {
-            output = DeletePlayerCommand.DeletePlayer(new List<string>());
+            output = new DeletePlayerCommand.PlayerDeleteCoopCommand()
+                .ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>()))
+                .Output;
         });
 
         Assert.Contains("Delete request sent", output);
