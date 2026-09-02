@@ -327,7 +327,9 @@ namespace Coop
             bugReportConsent = new BugReportConsentCoordinator(
                 new CoopOptionsStore(),
                 exception => Logger.Warning(exception, "Diagnostic bug-report log-sharing preference could not be saved"));
+#if !DEBUG
             TryStartCrashReporter(role);
+#endif
         }
 
         private void TryStartCrashReporter(string role)
