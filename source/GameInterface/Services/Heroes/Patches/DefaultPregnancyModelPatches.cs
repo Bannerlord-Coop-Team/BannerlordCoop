@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Heroes.Patches;
 
+#if TESTER
 [HarmonyPatch(typeof(DefaultPregnancyModel))]
 internal class DefaultPregnancyModelPatches
 {
@@ -34,3 +35,4 @@ internal class DefaultPregnancyModelPatches
         return false;
     }
 }
+#endif

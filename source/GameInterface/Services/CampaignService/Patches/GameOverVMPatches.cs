@@ -5,6 +5,7 @@ using SandBox.GauntletUI;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
+#if TESTER
 [HarmonyPatch(typeof(GauntletGameOverScreen))]
 internal class GauntletGameOverScreenPatches
 {
@@ -22,3 +23,4 @@ internal class GauntletGameOverScreenPatches
         MessageBroker.Instance.Publish(null, new PlayerDisconnectRequested());
     }
 }
+#endif

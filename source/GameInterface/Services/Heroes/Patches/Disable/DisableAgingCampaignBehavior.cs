@@ -11,9 +11,14 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisableAgingCampaignBehavior
 {
     [HarmonyPatch(nameof(AgingCampaignBehavior.RegisterEvents))]
+#if TESTER
     static bool Prefix() => ModInformation.IsServer;
+#else
+    static bool Prefix() => false;
+#endif
 }
 
+#if TESTER
 [HarmonyPatch(typeof(AgingCampaignBehavior))]
 internal class AgingCampaignBehaviorPatches
 {
@@ -62,3 +67,4 @@ internal class AgingCampaignBehaviorPatches
         return true;
     }
 }
+#endif

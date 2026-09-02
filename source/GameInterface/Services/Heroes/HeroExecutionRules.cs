@@ -19,8 +19,12 @@ public static class HeroExecutionRules
             return false;
         }
 
+#if TESTER
         if (!ModConfigProvider.ModOptions.EnablePlayerExecutions
             && hero?.IsPlayerHero() == true)
+#else
+        if (hero?.IsPlayerHero() == true)
+#endif
         {
             reason = new TextObject("{=str_coop_cannot_execute_players}Executing player heroes has been disabled by the host.").ToString();
             return false;

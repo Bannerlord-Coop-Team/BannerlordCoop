@@ -95,6 +95,7 @@ internal class ClanPatches
         MessageBroker.Instance.Publish(__instance, message);
     }
 
+#if TESTER
     [HarmonyPatch(nameof(Clan.GetHeirApparents))]
     [HarmonyPostfix]
     public static void GetHeirApparentsPostfix(Dictionary<Hero, int> __result)
@@ -107,4 +108,5 @@ internal class ClanPatches
             }
         }
     }
+#endif
 }
