@@ -23,11 +23,11 @@ namespace Missions.Battles;
 public interface IBattleInstanceLifecycle : IDisposable
 {
     /// <summary>
-    /// Tear the instance down on mission end: end the spawn gate, clear this battle's troop suppliers,
+    /// Tear the instance down on mission end: optionally announce an unresolved battle retreat, end the spawn gate, clear this battle's troop suppliers,
     /// announce MissionLeft over the relay, stop the mesh socket, and clear the local mission-membership
     /// mirror so a stale roster cannot survive into a later re-entry.
     /// </summary>
-    void Leave();
+    void Leave(bool wasRetreat);
 }
 
 /// <inheritdoc cref="IBattleInstanceLifecycle"/>
@@ -107,12 +107,17 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         Logger.Information("[Relay] Announced MissionEntered for battle instance {Instance}", mapEventId);
     }
 
-    public void Leave()
+    public void Leave(bool wasRetreat)
     {
         BattleSpawnGate.EndBattle();
 
         if (session.HasInstance)
         {
+            if (wasRetreat)
+            {
+                relayNetwork.SendAll(new NetworkBattleRetreated(session.InstanceId));
+                Logger.Information("[Relay] Announced battle retreat for instance {Instance}", session.InstanceId);
+            }
             CoopTroopSupplierRegistry.ClearBattle(session.InstanceId);
             relayNetwork.SendAll(new NetworkMissionLeft(session.OwnControllerId, session.InstanceId));
             Logger.Information("[Relay] Announced MissionLeft for battle instance {Instance}", session.InstanceId);
