@@ -1,4 +1,6 @@
-﻿using Common;
+﻿using System;
+using Common.Commands;
+using Common;
 using GameInterface.CoopSessionData;
 using System.Collections.Generic;
 using System.Text;
@@ -11,125 +13,161 @@ namespace GameInterface.Services.Inventory.TradeSkills.Commands;
 
 internal class TradeSkillCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     /// <summary>
     /// View trade data for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_player_trade_data", "coop.debug.inventory")]
-    public static string ViewPlayerTradeDataCommand(List<string> strings)
+    public sealed class InventoryViewPlayerTradeDataCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Prefix => "coop.debug.inventory";
+
+        public string Name => "view_player_trade_data";
+
+        public string Description => "Reports view player trade data.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
-
-            foreach (var playerTradeData in coopSessionProvider.CoopSession.TradePlayerData.PlayerItemsTradeData)
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                if (playerTradeData.Key == null || playerTradeData.Value == null) continue;
+                if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
 
-                stringBuilder.AppendLine($"{playerTradeData.Key}");
-                foreach (var itemIdTradeData in playerTradeData.Value)
+                foreach (var playerTradeData in coopSessionProvider.CoopSession.TradePlayerData.PlayerItemsTradeData)
                 {
-                    stringBuilder.AppendLine($"{itemIdTradeData.Key} (Total Purchased: {itemIdTradeData.Value.Item2}, Average price: {itemIdTradeData.Value.Item1})");
+                    if (playerTradeData.Key == null || playerTradeData.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{playerTradeData.Key}");
+                    foreach (var itemIdTradeData in playerTradeData.Value)
+                    {
+                        stringBuilder.AppendLine($"{itemIdTradeData.Key} (Total Purchased: {itemIdTradeData.Value.Item2}, Average price: {itemIdTradeData.Value.Item1})");
+                    }
                 }
             }
-        }
-        else
-        {
-            stringBuilder.AppendLine($"{Hero.MainHero.Name}");
-            foreach (var itemTradeData in Campaign.Current.GetCampaignBehavior<TradeSkillCampaignBehavior>().ItemsTradeData)
+            else
             {
-                stringBuilder.AppendLine($"{itemTradeData.Key.StringId} (Total Purchased: {itemTradeData.Value.NumItemsPurchased}, Average price: {itemTradeData.Value.AveragePrice})");
+                stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+                foreach (var itemTradeData in Campaign.Current.GetCampaignBehavior<TradeSkillCampaignBehavior>().ItemsTradeData)
+                {
+                    stringBuilder.AppendLine($"{itemTradeData.Key.StringId} (Total Purchased: {itemTradeData.Value.NumItemsPurchased}, Average price: {itemTradeData.Value.AveragePrice})");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve player trade data");
         }
-        return "Failed to retrieve player trade data";
     }
 
     /// <summary>
     /// View trade rumors for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_player_trade_rumors", "coop.debug.inventory")]
-    public static string ViewPlayerTradeRumorsCommand(List<string> strings)
+    public sealed class InventoryViewPlayerTradeRumorsCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Prefix => "coop.debug.inventory";
+
+        public string Name => "view_player_trade_rumors";
+
+        public string Description => "Reports view player trade rumors.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
-
-            foreach (var playerTradeRumors in coopSessionProvider.CoopSession.TradePlayerData.PlayerTradeRumors)
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                if (playerTradeRumors.Key == null || playerTradeRumors.Value == null) continue;
+                if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
 
-                stringBuilder.AppendLine($"{playerTradeRumors.Key}");
-                foreach (var rumorData in playerTradeRumors.Value)
+                foreach (var playerTradeRumors in coopSessionProvider.CoopSession.TradePlayerData.PlayerTradeRumors)
                 {
-                    stringBuilder.AppendLine($"{rumorData.ItemObjectId} at {rumorData.SettlementId} (expiring in {new CampaignTime(rumorData.RumorEndTime).RemainingHoursFromNow} hours) rumored to:");
-                    stringBuilder.AppendLine($"     Buy at: {rumorData.BuyPrice}");
-                    stringBuilder.AppendLine($"     Sell at: {rumorData.SellPrice}");
+                    if (playerTradeRumors.Key == null || playerTradeRumors.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{playerTradeRumors.Key}");
+                    foreach (var rumorData in playerTradeRumors.Value)
+                    {
+                        stringBuilder.AppendLine($"{rumorData.ItemObjectId} at {rumorData.SettlementId} (expiring in {new CampaignTime(rumorData.RumorEndTime).RemainingHoursFromNow} hours) rumored to:");
+                        stringBuilder.AppendLine($"     Buy at: {rumorData.BuyPrice}");
+                        stringBuilder.AppendLine($"     Sell at: {rumorData.SellPrice}");
+                    }
                 }
             }
-        }
-        else
-        {
-            stringBuilder.AppendLine($"{Hero.MainHero.Name}");
-            foreach (var tradeRumor in Campaign.Current.GetCampaignBehavior<TradeRumorsCampaignBehavior>()._tradeRumors)
+            else
             {
-                stringBuilder.AppendLine($"{tradeRumor.ItemCategory.StringId} at {tradeRumor.Settlement.StringId} (expiring in {tradeRumor.RumorEndTime.RemainingHoursFromNow} hours) rumored to:");
-                stringBuilder.AppendLine($"     Buy at: {tradeRumor.BuyPrice}");
-                stringBuilder.AppendLine($"     Sell at: {tradeRumor.SellPrice}");
+                stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+                foreach (var tradeRumor in Campaign.Current.GetCampaignBehavior<TradeRumorsCampaignBehavior>()._tradeRumors)
+                {
+                    stringBuilder.AppendLine($"{tradeRumor.ItemCategory.StringId} at {tradeRumor.Settlement.StringId} (expiring in {tradeRumor.RumorEndTime.RemainingHoursFromNow} hours) rumored to:");
+                    stringBuilder.AppendLine($"     Buy at: {tradeRumor.BuyPrice}");
+                    stringBuilder.AppendLine($"     Sell at: {tradeRumor.SellPrice}");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve player rumors data");
         }
-        return "Failed to retrieve player rumors data";
     }
 
     /// <summary>
     /// View entered settlements trade data for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_entered_settlements", "coop.debug.inventory")]
-    public static string ViewPlayerEnteredSettlementsCommand(List<string> strings)
+    public sealed class InventoryViewEnteredSettlementsCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Prefix => "coop.debug.inventory";
+
+        public string Name => "view_entered_settlements";
+
+        public string Description => "Reports view entered settlements.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
-
-            foreach (var playerEnteredSettlement in coopSessionProvider.CoopSession.TradePlayerData.PlayerEnteredSettlements)
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                if (playerEnteredSettlement.Key == null || playerEnteredSettlement.Value == null) continue;
+                if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
 
-                stringBuilder.AppendLine($"{playerEnteredSettlement.Key}");
-                foreach (var enteredSettlementData in playerEnteredSettlement.Value)
+                foreach (var playerEnteredSettlement in coopSessionProvider.CoopSession.TradePlayerData.PlayerEnteredSettlements)
                 {
-                    stringBuilder.AppendLine($"{enteredSettlementData.Key} {new CampaignTime(enteredSettlementData.Value).ElapsedHoursUntilNow} hours ago.");
+                    if (playerEnteredSettlement.Key == null || playerEnteredSettlement.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{playerEnteredSettlement.Key}");
+                    foreach (var enteredSettlementData in playerEnteredSettlement.Value)
+                    {
+                        stringBuilder.AppendLine($"{enteredSettlementData.Key} {new CampaignTime(enteredSettlementData.Value).ElapsedHoursUntilNow} hours ago.");
+                    }
                 }
             }
-        }
-        else
-        {
-            stringBuilder.AppendLine($"{Hero.MainHero.Name}");
-            foreach (var enteredSettlement in Campaign.Current.GetCampaignBehavior<TradeRumorsCampaignBehavior>()._enteredSettlements)
+            else
             {
-                stringBuilder.AppendLine($"{enteredSettlement.Key.StringId} {enteredSettlement.Value.ElapsedHoursUntilNow} hours ago.");
+                stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+                foreach (var enteredSettlement in Campaign.Current.GetCampaignBehavior<TradeRumorsCampaignBehavior>()._enteredSettlements)
+                {
+                    stringBuilder.AppendLine($"{enteredSettlement.Key.StringId} {enteredSettlement.Value.ElapsedHoursUntilNow} hours ago.");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve player trade data");
         }
-        return "Failed to retrieve player trade data";
     }
 
     /// <summary>

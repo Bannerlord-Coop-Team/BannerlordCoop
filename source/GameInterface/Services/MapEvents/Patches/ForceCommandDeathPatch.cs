@@ -6,7 +6,7 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
-/// Used by coop.debug.mapevent.kms to force the player's agent to die
+/// Used by coop.debug.map_event.kms to force the player's agent to die
 /// Agent death normally uses survival chance but this overrides that result
 /// </summary>
 [HarmonyPatch(typeof(Mission))]

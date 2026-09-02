@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common.Commands;
+using Autofac;
 using Common;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -19,7 +20,6 @@ using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
 
@@ -28,6 +28,12 @@ namespace GameInterface.Services.Party.Commands;
 /// </summary>
 internal static class GarrisonTroopXpFixtureCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private const string SettlementId = "town_ES1";
     private const string CharacterId = "imperial_infantryman";
     private const int FixtureTroopCount = 1;
@@ -37,438 +43,548 @@ internal static class GarrisonTroopXpFixtureCommands
     private static GarrisonFixture restoredFixture;
     private static string pendingNoopRestorationControllerId;
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_capture", "coop.debug.mobileparty")]
-    public static string Capture(List<string> args)
+    public sealed class GarrisonXpFixtureCaptureCoopCommand : ICoopCommand
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_capture <controllerId>";
-        if (!ModInformation.IsServer) return "Command can only be run on the server.";
-        if (args.Count != 1) return usage;
-        if (fixture != null || restoredFixture != null || pendingNoopRestorationControllerId != null)
-            return "A garrison XP fixture lifecycle is already active.";
-        if (pendingCapture != null)
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "garrison_xp_fixture_capture";
+
+        public string Description => "Runs the garrison xp fixture capture debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (pendingCapture.ControllerId != args[0] || !IsCaptureCurrent(pendingCapture))
-                return "A different or stale garrison XP fixture capture is active.";
-            return FormatCapture(pendingCapture);
-        }
-        if (!TryResolve(args[0], out var objectManager, out var playerManager, out var player,
-            out var playerHero, out var playerClan, out var playerParty, out var settlement,
-            out var garrison, out var character, out var error))
-            return "Failed to capture garrison XP fixture: " + error;
-        if (!playerManager.TryGetPeer(player.ControllerId, out _))
-            return $"Player '{player.ControllerId}' is not connected.";
-        if (playerParty.MapEvent != null || playerParty.BesiegerCamp != null ||
-            playerParty.IsTransitionInProgress)
-            return "Failed to capture garrison XP fixture: the player party is in a map event, siege, or navigation transition.";
-        if (playerParty.Army != null || playerParty.AttachedTo != null ||
-            playerParty.AttachedParties?.Count > 0)
-            return "Failed to capture garrison XP fixture: the player party is attached to an army or has attached parties.";
-        if (settlement.Party.MapEvent != null || settlement.SiegeEvent != null)
-            return "Failed to capture garrison XP fixture: Danustica is in an active map event or siege.";
-        if (settlement.OwnerClan?.Leader == null)
-            return "Failed to capture garrison XP fixture: Danustica has no restorable owner.";
-        if (character.UpgradeTargets.Length == 0)
-            return $"Failed to capture garrison XP fixture: {CharacterId} has no upgrade target.";
-        if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId) ||
-            !objectManager.TryGetIdWithLogging(garrison, out var garrisonPartyId))
-            return "Failed to capture garrison XP fixture: a required party is not registered.";
+            new ExpectedArgs("controller_id", "The controller id.", true),
+        };
 
-        var garrisonState = ReadRosterState(garrison.MemberRoster, character);
-        var playerState = ReadRosterState(playerParty.MemberRoster, character);
-        int upgradeXp = character.GetUpgradeXpCost(garrison.Party, 0);
-        if (upgradeXp <= 0)
-            return $"Failed to capture garrison XP fixture: {CharacterId} has invalid upgrade XP {upgradeXp}.";
-
-        pendingCapture = new GarrisonFixture(
-            player.ControllerId,
-            playerPartyId,
-            garrisonPartyId,
-            playerHero,
-            playerClan,
-            playerParty,
-            settlement,
-            garrison,
-            character,
-            settlement.OwnerClan.Leader,
-            settlement.Town.Governor,
-            settlement.Town.BuildingsInProgress.ToArray(),
-            settlement.Town.BoostBuildingProcess,
-            settlement.Town.IsOwnerUnassigned,
-            playerParty.CurrentSettlement,
-            playerParty.LastVisitedSettlement,
-            playerParty.Position,
-            playerParty.Bearing,
-            garrisonState,
-            playerState,
-            upgradeXp);
-        return FormatCapture(pendingCapture);
-    }
-
-    [CommandLineArgumentFunction("garrison_xp_fixture_setup", "coop.debug.mobileparty")]
-    public static string Setup(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_setup " +
-            "<controllerId> <playerPartyId> <garrisonPartyId> <originalOwnerHeroId> <originalSettlementId|none> " +
-            "<originalPositionX> <originalPositionY> <originalPositionIsOnLand> " +
-            "<garrisonExists> <garrisonCount> <garrisonWounded> <garrisonXp> " +
-            "<playerExists> <playerCount> <playerWounded> <playerXp> <upgradeXp>";
-        if (!ModInformation.IsServer) return "Command can only be run on the server.";
-        if (args.Count != 17 ||
-            !float.TryParse(args[5], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var originalPositionX) ||
-            !float.TryParse(args[6], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var originalPositionY) ||
-            !bool.TryParse(args[7], out var originalPositionIsOnLand) ||
-            !bool.TryParse(args[8], out var expectedGarrisonExists) ||
-            !int.TryParse(args[9], out var expectedGarrisonCount) ||
-            !int.TryParse(args[10], out var expectedGarrisonWounded) ||
-            !int.TryParse(args[11], out var expectedGarrisonXp) ||
-            !bool.TryParse(args[12], out var expectedPlayerExists) ||
-            !int.TryParse(args[13], out var expectedPlayerCount) ||
-            !int.TryParse(args[14], out var expectedPlayerWounded) ||
-            !int.TryParse(args[15], out var expectedPlayerXp) ||
-            !int.TryParse(args[16], out var expectedUpgradeXp))
-            return usage;
-        if (fixture != null || restoredFixture != null)
-            return "A garrison XP fixture lifecycle is already active.";
-
-        pendingNoopRestorationControllerId = args[0];
-        if (!TryResolve(args[0], out var objectManager, out var playerManager, out var player,
-            out var playerHero, out var playerClan, out var playerParty, out var settlement,
-            out var garrison, out var character, out var error))
-            return "Failed to set up garrison XP fixture: " + error;
-        if (!playerManager.TryGetPeer(player.ControllerId, out _))
-            return $"Player '{player.ControllerId}' is not connected.";
-        if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId) ||
-            !objectManager.TryGetIdWithLogging(garrison, out var garrisonPartyId))
-            return "Failed to set up garrison XP fixture: a required party is not registered.";
-
-        var capturedFixture = pendingCapture;
-        var originalOwner = Hero.FindFirst(hero => hero.StringId == args[3]);
-        var expectedGarrisonState = new RosterState(
-            expectedGarrisonExists, expectedGarrisonCount, expectedGarrisonWounded, expectedGarrisonXp);
-        var expectedPlayerState = new RosterState(
-            expectedPlayerExists, expectedPlayerCount, expectedPlayerWounded, expectedPlayerXp);
-        int currentUpgradeXp = character.GetUpgradeXpCost(garrison.Party, 0);
-        if (capturedFixture == null || capturedFixture.ControllerId != args[0] ||
-            playerPartyId != args[1] || garrisonPartyId != args[2] || originalOwner == null ||
-            settlement.OwnerClan?.Leader != originalOwner ||
-            (playerParty.CurrentSettlement?.StringId ?? "none") != args[4] ||
-            playerParty.Position.X != originalPositionX || playerParty.Position.Y != originalPositionY ||
-            playerParty.Position.IsOnLand != originalPositionIsOnLand ||
-            !ReadRosterState(garrison.MemberRoster, character).Equals(expectedGarrisonState) ||
-            !ReadRosterState(playerParty.MemberRoster, character).Equals(expectedPlayerState) ||
-            currentUpgradeXp != expectedUpgradeXp || !IsCaptureCurrent(capturedFixture))
-            return "Failed to set up garrison XP fixture: the captured fixture state changed.";
-
-        fixture = capturedFixture;
-        pendingCapture = null;
-
-        try
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (settlement.OwnerClan != playerClan)
+            if (!ModInformation.IsServer) return Failed("Command can only be run on the server.");
+            if (fixture != null || restoredFixture != null || pendingNoopRestorationControllerId != null)
+                return Failed("A garrison XP fixture lifecycle is already active.");
+            if (pendingCapture != null)
             {
-                // Only the ownership field is needed for the XP relevance precondition. Running
-                // the ownership action would fire unrelated, irreversible campaign side effects.
-                settlement.Town.OwnerClan = playerClan;
-                settlement.Town.IsOwnerUnassigned = false;
+                if (pendingCapture.ControllerId != args[0] || !IsCaptureCurrent(pendingCapture))
+                    return Failed("A different or stale garrison XP fixture capture is active.");
+                return Succeeded(FormatCapture(pendingCapture));
             }
+            if (!TryResolve(args[0], out var objectManager, out var playerManager, out var player,
+                out var playerHero, out var playerClan, out var playerParty, out var settlement,
+                out var garrison, out var character, out var error))
+                return Failed("Failed to capture garrison XP fixture: " + error);
+            if (!playerManager.TryGetPeer(player.ControllerId, out _))
+                return Failed($"Player '{player.ControllerId}' is not connected.");
+            if (playerParty.MapEvent != null || playerParty.BesiegerCamp != null ||
+                playerParty.IsTransitionInProgress)
+                return Failed("Failed to capture garrison XP fixture: the player party is in a map event, siege, or navigation transition.");
+            if (playerParty.Army != null || playerParty.AttachedTo != null ||
+                playerParty.AttachedParties?.Count > 0)
+                return Failed("Failed to capture garrison XP fixture: the player party is attached to an army or has attached parties.");
+            if (settlement.Party.MapEvent != null || settlement.SiegeEvent != null)
+                return Failed("Failed to capture garrison XP fixture: Danustica is in an active map event or siege.");
+            if (settlement.OwnerClan?.Leader == null)
+                return Failed("Failed to capture garrison XP fixture: Danustica has no restorable owner.");
+            if (character.UpgradeTargets.Length == 0)
+                return Failed($"Failed to capture garrison XP fixture: {CharacterId} has no upgrade target.");
+            if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId) ||
+                !objectManager.TryGetIdWithLogging(garrison, out var garrisonPartyId))
+                return Failed("Failed to capture garrison XP fixture: a required party is not registered.");
 
-            if (playerParty.CurrentSettlement != settlement)
-                playerParty.CurrentSettlement = settlement;
+            var garrisonState = ReadRosterState(garrison.MemberRoster, character);
+            var playerState = ReadRosterState(playerParty.MemberRoster, character);
+            int upgradeXp = character.GetUpgradeXpCost(garrison.Party, 0);
+            if (upgradeXp <= 0)
+                return Failed($"Failed to capture garrison XP fixture: {CharacterId} has invalid upgrade XP {upgradeXp}.");
 
-            SetRosterState(
-                garrison.MemberRoster,
-                character,
-                new RosterState(true, FixtureTroopCount, 0, expectedUpgradeXp));
-            pendingNoopRestorationControllerId = null;
-
-            return JsonResult(new
-            {
-                controllerId = player.ControllerId,
+            pendingCapture = new GarrisonFixture(
+                player.ControllerId,
                 playerPartyId,
                 garrisonPartyId,
-                settlementId = SettlementId,
-                settlementName = settlement.Name.ToString(),
-                characterId = CharacterId,
-                characterName = character.Name.ToString(),
-                upgradeTargetId = character.UpgradeTargets[0].StringId,
-                upgradeXp = expectedUpgradeXp,
-                garrisonCount = FixtureTroopCount,
-                garrisonXp = expectedUpgradeXp,
-                playerCount = expectedPlayerState.Number,
-                playerXp = expectedPlayerState.Xp,
-                totalXp = expectedPlayerState.Xp + expectedUpgradeXp,
-                playerOwnsSettlement = settlement.OwnerClan == playerClan,
-                playerAtSettlement = playerParty.CurrentSettlement == settlement
-            });
-        }
-        catch (Exception exception)
-        {
-            // Keep the partially staged fixture active so the contract's finally path restores
-            // and verifies it instead of treating a failed setup as a no-op.
-            pendingNoopRestorationControllerId = null;
-            return "Failed to set up garrison XP fixture: " + exception.Message;
+                playerHero,
+                playerClan,
+                playerParty,
+                settlement,
+                garrison,
+                character,
+                settlement.OwnerClan.Leader,
+                settlement.Town.Governor,
+                settlement.Town.BuildingsInProgress.ToArray(),
+                settlement.Town.BoostBuildingProcess,
+                settlement.Town.IsOwnerUnassigned,
+                playerParty.CurrentSettlement,
+                playerParty.LastVisitedSettlement,
+                playerParty.Position,
+                playerParty.Bearing,
+                garrisonState,
+                playerState,
+                upgradeXp);
+            return Succeeded(FormatCapture(pendingCapture));
         }
     }
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_state", "coop.debug.mobileparty")]
-    public static string State(List<string> args)
+    public sealed class GarrisonXpFixtureSetupCoopCommand : ICoopCommand
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_state " +
-            "<playerPartyId> <garrisonPartyId> <characterId>";
-        if (args.Count != 3) return usage;
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
-        if (!objectManager.TryGetObject(args[0], out MobileParty playerParty))
-            return $"Player party '{args[0]}' was not found.";
-        if (!objectManager.TryGetObject(args[1], out MobileParty garrison))
-            return $"Garrison party '{args[1]}' was not found.";
-        if (!objectManager.TryGetObject(args[2], out CharacterObject character))
-            return $"Character '{args[2]}' was not found.";
+        public string Prefix => "coop.debug.mobile_party";
 
-        var settlement = Settlement.Find(SettlementId);
-        var garrisonState = ReadRosterState(garrison.MemberRoster, character);
-        var playerState = ReadRosterState(playerParty.MemberRoster, character);
-        int upgradeXp = character.GetUpgradeXpCost(garrison.Party, 0);
-        return JsonResult(new
+        public string Name => "garrison_xp_fixture_setup";
+
+        public string Description => "Runs the garrison xp fixture setup debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            role = ModInformation.IsServer ? "server" : "client",
-            playerPartyId = args[0],
-            garrisonPartyId = args[1],
-            settlementId = SettlementId,
-            settlementName = settlement?.Name.ToString(),
-            characterId = args[2],
-            characterName = character.Name.ToString(),
-            playerOwnsSettlement = settlement?.OwnerClan != null &&
-                ReferenceEquals(settlement.OwnerClan, playerParty.ActualClan),
-            playerAtSettlement = playerParty.CurrentSettlement == settlement,
-            bearingX = playerParty.Bearing.X,
-            bearingY = playerParty.Bearing.Y,
-            garrisonCount = garrisonState.Number,
-            garrisonWounded = garrisonState.Wounded,
-            garrisonXp = garrisonState.Xp,
-            garrisonUpgradeReady = garrisonState.Number > 0 && garrisonState.Xp >= upgradeXp,
-            playerCount = playerState.Number,
-            playerWounded = playerState.Wounded,
-            playerXp = playerState.Xp,
-            playerUpgradeReady = playerState.Number > 0 && playerState.Xp >= upgradeXp,
-            upgradeXp,
-            totalXp = garrisonState.Xp + playerState.Xp
-        });
-    }
+            new ExpectedArgs("controller_id", "The controller id.", true),
+            new ExpectedArgs("player_party_id", "The player party id.", true),
+            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
+            new ExpectedArgs("original_owner_hero_id", "The original owner hero id.", true),
+            new ExpectedArgs("original_settlement_id", "The original settlement id.", true),
+            new ExpectedArgs("original_position_x", "The original position x.", true),
+            new ExpectedArgs("original_position_y", "The original position y.", true),
+            new ExpectedArgs("original_position_is_on_land", "The original position is on land.", true),
+            new ExpectedArgs("garrison_exists", "The garrison exists.", true),
+            new ExpectedArgs("garrison_count", "The garrison count.", true),
+            new ExpectedArgs("garrison_wounded", "The garrison wounded.", true),
+            new ExpectedArgs("garrison_xp", "The garrison xp.", true),
+            new ExpectedArgs("player_exists", "The player exists.", true),
+            new ExpectedArgs("player_count", "The player count.", true),
+            new ExpectedArgs("player_wounded", "The player wounded.", true),
+            new ExpectedArgs("player_xp", "The player xp.", true),
+            new ExpectedArgs("upgrade_xp", "The upgrade xp.", true),
+        };
 
-    [CommandLineArgumentFunction("open_garrison_xp_fixture", "coop.debug.mobileparty")]
-    public static string OpenGarrison(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.mobileparty.open_garrison_xp_fixture <garrisonPartyId>";
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 1) return usage;
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
-        if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
-            return $"Garrison party '{args[0]}' was not found.";
-        var settlement = Settlement.Find(SettlementId);
-        if (settlement == null || garrison != settlement.Town?.GarrisonParty)
-            return "The target is not Danustica's garrison.";
-        if (Hero.MainHero?.CurrentSettlement != settlement)
-            return "The local player is not in Danustica.";
-        if (settlement.OwnerClan != Hero.MainHero.Clan)
-            return "Danustica does not belong to the local player's clan.";
-
-        PartyScreenHelper.OpenScreenAsManageTroops(garrison);
-        return "GARRISON_XP_FIXTURE_SCREEN_OPENED";
-    }
-
-    [CommandLineArgumentFunction("garrison_xp_fixture_screen_state", "coop.debug.mobileparty")]
-    public static string ScreenState(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_screen_state " +
-            "<garrisonPartyId> <characterId> <baseline|staged|committed>";
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 3 ||
-            (args[2] != "baseline" && args[2] != "staged" && args[2] != "committed"))
-            return usage;
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
-        if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
-            return $"Garrison party '{args[0]}' was not found.";
-        if (!objectManager.TryGetObject(args[1], out CharacterObject character))
-            return $"Character '{args[1]}' was not found.";
-        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
-            partyState.PartyScreenLogic?.LeftOwnerParty?.MobileParty != garrison)
-            return "Danustica's Manage Garrison screen is not active.";
-
-        var logic = partyState.PartyScreenLogic;
-        var leftState = ReadRosterState(logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left], character);
-        var rightState = ReadRosterState(logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right], character);
-        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
-        var leftRow = partyVm?.OtherPartyTroops.FirstOrDefault(vm => vm.Character == character);
-        var rightRow = partyVm?.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
-        int upgradeXp = character.GetUpgradeXpCost(garrison.Party, 0);
-        bool expectedStateReady;
-        if (args[2] == "baseline")
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            expectedStateReady = partyVm != null && !logic.IsThereAnyChanges() &&
-                leftState.Number == FixtureTroopCount && leftState.Xp == upgradeXp &&
-                leftRow?.Troop.Number == FixtureTroopCount && leftRow.Troop.Xp == upgradeXp;
-        }
-        else if (args[2] == "staged")
-        {
-            expectedStateReady = partyVm != null && logic.IsThereAnyChanges() &&
-                leftState.Number == 0 && leftRow == null &&
-                rightState.Number > 0 && rightRow?.Troop.Number == rightState.Number &&
-                rightRow.Troop.Xp == rightState.Xp && rightRow.NumOfReadyToUpgradeTroops > 0;
-        }
-        else
-        {
-            expectedStateReady = partyVm != null && !logic.IsThereAnyChanges() &&
-                leftState.Number == 0 && leftRow == null &&
-                rightState.Number > 0 && rightRow?.Troop.Number == rightState.Number &&
-                rightRow.Troop.Xp == rightState.Xp && rightRow.NumOfReadyToUpgradeTroops > 0;
-        }
-        return JsonResult(new
-        {
-            ready = expectedStateReady,
-            expectedState = args[2],
-            settlementId = SettlementId,
-            settlementName = Settlement.Find(SettlementId)?.Name.ToString(),
-            pending = logic.IsThereAnyChanges(),
-            leftCount = leftState.Number,
-            leftXp = leftState.Xp,
-            leftReady = leftRow?.NumOfReadyToUpgradeTroops ?? 0,
-            rightCount = rightState.Number,
-            rightXp = rightState.Xp,
-            rightReady = rightRow?.NumOfReadyToUpgradeTroops ?? 0,
-            upgradeXp
-        });
-    }
+            if (!ModInformation.IsServer) return Failed("Command can only be run on the server.");
+            if (!float.TryParse(args[5], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var originalPositionX) ||
+                !float.TryParse(args[6], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var originalPositionY) ||
+                !bool.TryParse(args[7], out var originalPositionIsOnLand) ||
+                !bool.TryParse(args[8], out var expectedGarrisonExists) ||
+                !int.TryParse(args[9], out var expectedGarrisonCount) ||
+                !int.TryParse(args[10], out var expectedGarrisonWounded) ||
+                !int.TryParse(args[11], out var expectedGarrisonXp) ||
+                !bool.TryParse(args[12], out var expectedPlayerExists) ||
+                !int.TryParse(args[13], out var expectedPlayerCount) ||
+                !int.TryParse(args[14], out var expectedPlayerWounded) ||
+                !int.TryParse(args[15], out var expectedPlayerXp) ||
+                !int.TryParse(args[16], out var expectedUpgradeXp))
+                return Failed("Invalid command argument value.");
+            if (fixture != null || restoredFixture != null)
+                return Failed("A garrison XP fixture lifecycle is already active.");
 
-    [CommandLineArgumentFunction("stage_garrison_xp_withdrawal", "coop.debug.mobileparty")]
-    public static string StageWithdrawal(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.mobileparty.stage_garrison_xp_withdrawal " +
-            "<garrisonPartyId> <characterId>";
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 2) return usage;
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
-        if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
-            return $"Garrison party '{args[0]}' was not found.";
-        if (!objectManager.TryGetObject(args[1], out CharacterObject character))
-            return $"Character '{args[1]}' was not found.";
-        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
-            partyState.PartyScreenLogic?.LeftOwnerParty?.MobileParty != garrison)
-            return "Danustica's Manage Garrison screen is not active.";
+            pendingNoopRestorationControllerId = args[0];
+            if (!TryResolve(args[0], out var objectManager, out var playerManager, out var player,
+                out var playerHero, out var playerClan, out var playerParty, out var settlement,
+                out var garrison, out var character, out var error))
+                return Failed("Failed to set up garrison XP fixture: " + error);
+            if (!playerManager.TryGetPeer(player.ControllerId, out _))
+                return Failed($"Player '{player.ControllerId}' is not connected.");
+            if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId) ||
+                !objectManager.TryGetIdWithLogging(garrison, out var garrisonPartyId))
+                return Failed("Failed to set up garrison XP fixture: a required party is not registered.");
 
-        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
-        var row = partyVm?.OtherPartyTroops.FirstOrDefault(vm => vm.Character == character);
-        if (row == null) return $"Character '{args[1]}' is not rendered in Danustica's garrison.";
+            var capturedFixture = pendingCapture;
+            var originalOwner = Hero.FindFirst(hero => hero.StringId == args[3]);
+            var expectedGarrisonState = new RosterState(
+                expectedGarrisonExists, expectedGarrisonCount, expectedGarrisonWounded, expectedGarrisonXp);
+            var expectedPlayerState = new RosterState(
+                expectedPlayerExists, expectedPlayerCount, expectedPlayerWounded, expectedPlayerXp);
+            int currentUpgradeXp = character.GetUpgradeXpCost(garrison.Party, 0);
+            if (capturedFixture == null || capturedFixture.ControllerId != args[0] ||
+                playerPartyId != args[1] || garrisonPartyId != args[2] || originalOwner == null ||
+                settlement.OwnerClan?.Leader != originalOwner ||
+                (playerParty.CurrentSettlement?.StringId ?? "none") != args[4] ||
+                playerParty.Position.X != originalPositionX || playerParty.Position.Y != originalPositionY ||
+                playerParty.Position.IsOnLand != originalPositionIsOnLand ||
+                !ReadRosterState(garrison.MemberRoster, character).Equals(expectedGarrisonState) ||
+                !ReadRosterState(playerParty.MemberRoster, character).Equals(expectedPlayerState) ||
+                currentUpgradeXp != expectedUpgradeXp || !IsCaptureCurrent(capturedFixture))
+                return Failed("Failed to set up garrison XP fixture: the captured fixture state changed.");
 
-        partyVm.OnTransferTroop(row, -1, FixtureTroopCount, row.Side);
-        partyVm.ExecuteRemoveZeroCounts();
-        return partyState.PartyScreenLogic.IsThereAnyChanges()
-            ? "GARRISON_XP_WITHDRAWAL_STAGED"
-            : "GARRISON_XP_WITHDRAWAL_REJECTED";
-    }
-
-    [CommandLineArgumentFunction("commit_garrison_xp_withdrawal", "coop.debug.mobileparty")]
-    public static string CommitWithdrawal(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.mobileparty.commit_garrison_xp_withdrawal";
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return usage;
-        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
-            !partyState.PartyScreenLogic.IsThereAnyChanges())
-            return "No staged garrison withdrawal is active.";
-        if (!((ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource is { } partyVm))
-            return "No active Party screen view model.";
-
-        partyVm.CloseScreenInternal();
-        return Game.Current.GameStateManager.ActiveState is PartyState
-            ? "GARRISON_XP_WITHDRAWAL_NOT_COMMITTED"
-            : "GARRISON_XP_WITHDRAWAL_COMMITTED";
-    }
-
-    [CommandLineArgumentFunction("garrison_xp_fixture_restore", "coop.debug.mobileparty")]
-    public static string Restore(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_restore <controllerId>";
-        if (!ModInformation.IsServer) return "Command can only be run on the server.";
-        if (args.Count != 1) return usage;
-        if (fixture == null && pendingCapture?.ControllerId == args[0])
-        {
+            fixture = capturedFixture;
             pendingCapture = null;
-            pendingNoopRestorationControllerId = null;
-            restoredFixture = GarrisonFixture.Noop(args[0]);
-            return JsonResult(new { restored = true, noFixtureCreated = true });
-        }
-        if (fixture == null && pendingNoopRestorationControllerId == args[0])
-        {
-            pendingNoopRestorationControllerId = null;
-            restoredFixture = GarrisonFixture.Noop(args[0]);
-            return JsonResult(new { restored = true, noFixtureCreated = true });
-        }
-        if (fixture == null) return "No garrison XP fixture is active.";
-        if (fixture.ControllerId != args[0])
-            return $"The active fixture belongs to '{fixture.ControllerId}'.";
 
-        var currentFixture = fixture;
-        RestoreFixture(currentFixture);
-        bool restored = IsRestored(currentFixture);
-        if (restored)
-        {
-            fixture = null;
-            restoredFixture = currentFixture;
-        }
+            try
+            {
+                if (settlement.OwnerClan != playerClan)
+                {
+                    // Only the ownership field is needed for the XP relevance precondition. Running
+                    // the ownership action would fire unrelated, irreversible campaign side effects.
+                    settlement.Town.OwnerClan = playerClan;
+                    settlement.Town.IsOwnerUnassigned = false;
+                }
 
-        return JsonResult(new
-        {
-            restored,
-            controllerId = currentFixture.ControllerId,
-            playerPartyId = currentFixture.PlayerPartyId,
-            garrisonPartyId = currentFixture.GarrisonPartyId,
-            settlementId = SettlementId,
-            characterId = CharacterId,
-            playerCount = ReadRosterState(currentFixture.PlayerParty.MemberRoster, currentFixture.Character).Number,
-            playerXp = ReadRosterState(currentFixture.PlayerParty.MemberRoster, currentFixture.Character).Xp,
-            garrisonCount = ReadRosterState(currentFixture.Garrison.MemberRoster, currentFixture.Character).Number,
-            garrisonXp = ReadRosterState(currentFixture.Garrison.MemberRoster, currentFixture.Character).Xp,
-            ownerHeroId = currentFixture.Settlement.OwnerClan?.Leader?.StringId,
-            playerSettlementId = currentFixture.PlayerParty.CurrentSettlement?.StringId
-        });
+                if (playerParty.CurrentSettlement != settlement)
+                    playerParty.CurrentSettlement = settlement;
+
+                SetRosterState(
+                    garrison.MemberRoster,
+                    character,
+                    new RosterState(true, FixtureTroopCount, 0, expectedUpgradeXp));
+                pendingNoopRestorationControllerId = null;
+
+                return Succeeded(JsonResult(new
+                {
+                    controllerId = player.ControllerId,
+                    playerPartyId,
+                    garrisonPartyId,
+                    settlementId = SettlementId,
+                    settlementName = settlement.Name.ToString(),
+                    characterId = CharacterId,
+                    characterName = character.Name.ToString(),
+                    upgradeTargetId = character.UpgradeTargets[0].StringId,
+                    upgradeXp = expectedUpgradeXp,
+                    garrisonCount = FixtureTroopCount,
+                    garrisonXp = expectedUpgradeXp,
+                    playerCount = expectedPlayerState.Number,
+                    playerXp = expectedPlayerState.Xp,
+                    totalXp = expectedPlayerState.Xp + expectedUpgradeXp,
+                    playerOwnsSettlement = settlement.OwnerClan == playerClan,
+                    playerAtSettlement = playerParty.CurrentSettlement == settlement
+                }));
+            }
+            catch (Exception exception)
+            {
+                // Keep the partially staged fixture active so the contract's finally path restores
+                // and verifies it instead of treating a failed setup as a no-op.
+                pendingNoopRestorationControllerId = null;
+                return Failed("Failed to set up garrison XP fixture: " + exception.Message);
+            }
+        }
     }
 
-    [CommandLineArgumentFunction("garrison_xp_fixture_verify_restore", "coop.debug.mobileparty")]
-    public static string VerifyRestore(List<string> args)
+    public sealed class GarrisonXpFixtureStateCoopCommand : ICoopCommand
     {
-        const string usage = "Usage: coop.debug.mobileparty.garrison_xp_fixture_verify_restore <controllerId>";
-        if (!ModInformation.IsServer) return "Command can only be run on the server.";
-        if (args.Count != 1) return usage;
-        if (restoredFixture == null || restoredFixture.ControllerId != args[0])
-            return $"No restored garrison XP fixture is awaiting verification for '{args[0]}'.";
-        if (restoredFixture.NoFixtureCreated)
-        {
-            restoredFixture = null;
-            return JsonResult(new { restored = true, noFixtureCreated = true });
-        }
+        public string Prefix => "coop.debug.mobile_party";
 
-        var completedFixture = restoredFixture;
-        bool restored = IsRestored(completedFixture);
-        if (restored) restoredFixture = null;
-        return JsonResult(new
+        public string Name => "garrison_xp_fixture_state";
+
+        public string Description => "Reports garrison xp fixture state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            restored,
-            controllerId = completedFixture.ControllerId,
-            settlementId = SettlementId,
-            characterId = CharacterId,
-            ownerHeroId = completedFixture.Settlement.OwnerClan?.Leader?.StringId,
-            expectedOwnerHeroId = completedFixture.OriginalOwner.StringId,
-            playerSettlementId = completedFixture.PlayerParty.CurrentSettlement?.StringId,
-            expectedPlayerSettlementId = completedFixture.OriginalPlayerSettlement?.StringId,
-            playerRosterRestored = ReadRosterState(
-                completedFixture.PlayerParty.MemberRoster, completedFixture.Character)
-                .Equals(completedFixture.OriginalPlayerState),
-            garrisonRosterRestored = ReadRosterState(
-                completedFixture.Garrison.MemberRoster, completedFixture.Character)
-                .Equals(completedFixture.OriginalGarrisonState)
-        });
+            new ExpectedArgs("player_party_id", "The player party id.", true),
+            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
+            new ExpectedArgs("character_id", "The character id.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out MobileParty playerParty))
+                return Failed($"Player party '{args[0]}' was not found.");
+            if (!objectManager.TryGetObject(args[1], out MobileParty garrison))
+                return Failed($"Garrison party '{args[1]}' was not found.");
+            if (!objectManager.TryGetObject(args[2], out CharacterObject character))
+                return Failed($"Character '{args[2]}' was not found.");
+
+            var settlement = Settlement.Find(SettlementId);
+            var garrisonState = ReadRosterState(garrison.MemberRoster, character);
+            var playerState = ReadRosterState(playerParty.MemberRoster, character);
+            int upgradeXp = character.GetUpgradeXpCost(garrison.Party, 0);
+            return Succeeded(JsonResult(new
+            {
+                role = ModInformation.IsServer ? "server" : "client",
+                playerPartyId = args[0],
+                garrisonPartyId = args[1],
+                settlementId = SettlementId,
+                settlementName = settlement?.Name.ToString(),
+                characterId = args[2],
+                characterName = character.Name.ToString(),
+                playerOwnsSettlement = settlement?.OwnerClan != null &&
+                    ReferenceEquals(settlement.OwnerClan, playerParty.ActualClan),
+                playerAtSettlement = playerParty.CurrentSettlement == settlement,
+                bearingX = playerParty.Bearing.X,
+                bearingY = playerParty.Bearing.Y,
+                garrisonCount = garrisonState.Number,
+                garrisonWounded = garrisonState.Wounded,
+                garrisonXp = garrisonState.Xp,
+                garrisonUpgradeReady = garrisonState.Number > 0 && garrisonState.Xp >= upgradeXp,
+                playerCount = playerState.Number,
+                playerWounded = playerState.Wounded,
+                playerXp = playerState.Xp,
+                playerUpgradeReady = playerState.Number > 0 && playerState.Xp >= upgradeXp,
+                upgradeXp,
+                totalXp = garrisonState.Xp + playerState.Xp
+            }));
+        }
+    }
+
+    public sealed class OpenGarrisonXpFixtureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "open_garrison_xp_fixture";
+
+        public string Description => "Runs the open garrison xp fixture debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
+                return Failed($"Garrison party '{args[0]}' was not found.");
+            var settlement = Settlement.Find(SettlementId);
+            if (settlement == null || garrison != settlement.Town?.GarrisonParty)
+                return Failed("The target is not Danustica's garrison.");
+            if (Hero.MainHero?.CurrentSettlement != settlement)
+                return Failed("The local player is not in Danustica.");
+            if (settlement.OwnerClan != Hero.MainHero.Clan)
+                return Failed("Danustica does not belong to the local player's clan.");
+
+            PartyScreenHelper.OpenScreenAsManageTroops(garrison);
+            return Succeeded("GARRISON_XP_FIXTURE_SCREEN_OPENED");
+        }
+    }
+
+    public sealed class GarrisonXpFixtureScreenStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "garrison_xp_fixture_screen_state";
+
+        public string Description => "Reports garrison xp fixture screen state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
+            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("expected_state", "The expected screen state.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if ((args[2] != "baseline" && args[2] != "staged" && args[2] != "committed"))
+                return Failed("Invalid command argument value.");
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
+                return Failed($"Garrison party '{args[0]}' was not found.");
+            if (!objectManager.TryGetObject(args[1], out CharacterObject character))
+                return Failed($"Character '{args[1]}' was not found.");
+            if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
+                partyState.PartyScreenLogic?.LeftOwnerParty?.MobileParty != garrison)
+                return Failed("Danustica's Manage Garrison screen is not active.");
+
+            var logic = partyState.PartyScreenLogic;
+            var leftState = ReadRosterState(logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left], character);
+            var rightState = ReadRosterState(logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right], character);
+            var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+            var leftRow = partyVm?.OtherPartyTroops.FirstOrDefault(vm => vm.Character == character);
+            var rightRow = partyVm?.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
+            int upgradeXp = character.GetUpgradeXpCost(garrison.Party, 0);
+            bool expectedStateReady;
+            if (args[2] == "baseline")
+            {
+                expectedStateReady = partyVm != null && !logic.IsThereAnyChanges() &&
+                    leftState.Number == FixtureTroopCount && leftState.Xp == upgradeXp &&
+                    leftRow?.Troop.Number == FixtureTroopCount && leftRow.Troop.Xp == upgradeXp;
+            }
+            else if (args[2] == "staged")
+            {
+                expectedStateReady = partyVm != null && logic.IsThereAnyChanges() &&
+                    leftState.Number == 0 && leftRow == null &&
+                    rightState.Number > 0 && rightRow?.Troop.Number == rightState.Number &&
+                    rightRow.Troop.Xp == rightState.Xp && rightRow.NumOfReadyToUpgradeTroops > 0;
+            }
+            else
+            {
+                expectedStateReady = partyVm != null && !logic.IsThereAnyChanges() &&
+                    leftState.Number == 0 && leftRow == null &&
+                    rightState.Number > 0 && rightRow?.Troop.Number == rightState.Number &&
+                    rightRow.Troop.Xp == rightState.Xp && rightRow.NumOfReadyToUpgradeTroops > 0;
+            }
+            return Succeeded(JsonResult(new
+            {
+                ready = expectedStateReady,
+                expectedState = args[2],
+                settlementId = SettlementId,
+                settlementName = Settlement.Find(SettlementId)?.Name.ToString(),
+                pending = logic.IsThereAnyChanges(),
+                leftCount = leftState.Number,
+                leftXp = leftState.Xp,
+                leftReady = leftRow?.NumOfReadyToUpgradeTroops ?? 0,
+                rightCount = rightState.Number,
+                rightXp = rightState.Xp,
+                rightReady = rightRow?.NumOfReadyToUpgradeTroops ?? 0,
+                upgradeXp
+            }));
+        }
+    }
+
+    public sealed class StageGarrisonXpWithdrawalCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "stage_garrison_xp_withdrawal";
+
+        public string Description => "Runs the stage garrison xp withdrawal debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
+            new ExpectedArgs("character_id", "The character id.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
+                return Failed($"Garrison party '{args[0]}' was not found.");
+            if (!objectManager.TryGetObject(args[1], out CharacterObject character))
+                return Failed($"Character '{args[1]}' was not found.");
+            if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
+                partyState.PartyScreenLogic?.LeftOwnerParty?.MobileParty != garrison)
+                return Failed("Danustica's Manage Garrison screen is not active.");
+
+            var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+            var row = partyVm?.OtherPartyTroops.FirstOrDefault(vm => vm.Character == character);
+            if (row == null) return Failed($"Character '{args[1]}' is not rendered in Danustica's garrison.");
+
+            partyVm.OnTransferTroop(row, -1, FixtureTroopCount, row.Side);
+            partyVm.ExecuteRemoveZeroCounts();
+            return Failed(partyState.PartyScreenLogic.IsThereAnyChanges()
+                ? "GARRISON_XP_WITHDRAWAL_STAGED"
+                : "GARRISON_XP_WITHDRAWAL_REJECTED");
+        }
+    }
+
+    public sealed class CommitGarrisonXpWithdrawalCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "commit_garrison_xp_withdrawal";
+
+        public string Description => "Runs the commit garrison xp withdrawal debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
+                !partyState.PartyScreenLogic.IsThereAnyChanges())
+                return Failed("No staged garrison withdrawal is active.");
+            if (!((ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource is { } partyVm))
+                return Failed("No active Party screen view model.");
+
+            partyVm.CloseScreenInternal();
+            return Succeeded(Game.Current.GameStateManager.ActiveState is PartyState
+                ? "GARRISON_XP_WITHDRAWAL_NOT_COMMITTED"
+                : "GARRISON_XP_WITHDRAWAL_COMMITTED");
+        }
+    }
+
+    public sealed class GarrisonXpFixtureRestoreCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "garrison_xp_fixture_restore";
+
+        public string Description => "Restores or clears garrison xp fixture restore.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The controller id.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsServer) return Failed("Command can only be run on the server.");
+            if (fixture == null && pendingCapture?.ControllerId == args[0])
+            {
+                pendingCapture = null;
+                pendingNoopRestorationControllerId = null;
+                restoredFixture = GarrisonFixture.Noop(args[0]);
+                return Succeeded(JsonResult(new { restored = true, noFixtureCreated = true }));
+            }
+            if (fixture == null && pendingNoopRestorationControllerId == args[0])
+            {
+                pendingNoopRestorationControllerId = null;
+                restoredFixture = GarrisonFixture.Noop(args[0]);
+                return Succeeded(JsonResult(new { restored = true, noFixtureCreated = true }));
+            }
+            if (fixture == null) return Failed("No garrison XP fixture is active.");
+            if (fixture.ControllerId != args[0])
+                return Failed($"The active fixture belongs to '{fixture.ControllerId}'.");
+
+            var currentFixture = fixture;
+            RestoreFixture(currentFixture);
+            bool restored = IsRestored(currentFixture);
+            if (restored)
+            {
+                fixture = null;
+                restoredFixture = currentFixture;
+            }
+
+            return Succeeded(JsonResult(new
+            {
+                restored,
+                controllerId = currentFixture.ControllerId,
+                playerPartyId = currentFixture.PlayerPartyId,
+                garrisonPartyId = currentFixture.GarrisonPartyId,
+                settlementId = SettlementId,
+                characterId = CharacterId,
+                playerCount = ReadRosterState(currentFixture.PlayerParty.MemberRoster, currentFixture.Character).Number,
+                playerXp = ReadRosterState(currentFixture.PlayerParty.MemberRoster, currentFixture.Character).Xp,
+                garrisonCount = ReadRosterState(currentFixture.Garrison.MemberRoster, currentFixture.Character).Number,
+                garrisonXp = ReadRosterState(currentFixture.Garrison.MemberRoster, currentFixture.Character).Xp,
+                ownerHeroId = currentFixture.Settlement.OwnerClan?.Leader?.StringId,
+                playerSettlementId = currentFixture.PlayerParty.CurrentSettlement?.StringId
+            }));
+        }
+    }
+
+    public sealed class GarrisonXpFixtureVerifyRestoreCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "garrison_xp_fixture_verify_restore";
+
+        public string Description => "Restores or clears garrison xp fixture verify restore.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The controller id.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsServer) return Failed("Command can only be run on the server.");
+            if (restoredFixture == null || restoredFixture.ControllerId != args[0])
+                return Failed($"No restored garrison XP fixture is awaiting verification for '{args[0]}'.");
+            if (restoredFixture.NoFixtureCreated)
+            {
+                restoredFixture = null;
+                return Succeeded(JsonResult(new { restored = true, noFixtureCreated = true }));
+            }
+
+            var completedFixture = restoredFixture;
+            bool restored = IsRestored(completedFixture);
+            if (restored) restoredFixture = null;
+            return Succeeded(JsonResult(new
+            {
+                restored,
+                controllerId = completedFixture.ControllerId,
+                settlementId = SettlementId,
+                characterId = CharacterId,
+                ownerHeroId = completedFixture.Settlement.OwnerClan?.Leader?.StringId,
+                expectedOwnerHeroId = completedFixture.OriginalOwner.StringId,
+                playerSettlementId = completedFixture.PlayerParty.CurrentSettlement?.StringId,
+                expectedPlayerSettlementId = completedFixture.OriginalPlayerSettlement?.StringId,
+                playerRosterRestored = ReadRosterState(
+                    completedFixture.PlayerParty.MemberRoster, completedFixture.Character)
+                    .Equals(completedFixture.OriginalPlayerState),
+                garrisonRosterRestored = ReadRosterState(
+                    completedFixture.Garrison.MemberRoster, completedFixture.Character)
+                    .Equals(completedFixture.OriginalGarrisonState)
+            }));
+        }
     }
 
     private static void RestoreFixture(GarrisonFixture currentFixture)

@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -1457,8 +1458,11 @@ public class VillageHostileActionTests : MapEventTestBase
 
             client.Call(() =>
             {
-                var result = RaidDebugCommands.AllowRaidAiIntervention(new List<string> { "off" });
-                Assert.Contains("server update requested", result);
+                var command = new RaidDebugCommands.AllowRaidAiInterventionCoopCommand();
+                CoopCommandResult result = command.ProcessCommand(
+                    new CoopCommandArgsFactory().FromValues(new[] { "off" }));
+                Assert.True(result.Succeeded);
+                Assert.Contains("server update requested", result.Output);
             });
 
             var request = client.NetworkSentMessages.GetMessages<NetworkRequestRaidAiInterventionConfigChange>().Single();

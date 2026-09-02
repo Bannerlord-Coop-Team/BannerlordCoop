@@ -1,5 +1,6 @@
-using Autofac;
+﻿using Autofac;
 using Common;
+using Common.Commands;
 using Common.Messaging;
 using Common.Network;
 using Coop.Tests.Mocks;
@@ -32,7 +33,7 @@ public class TacticalUnitSymbolsConfigTests
 
         try
         {
-            var result = TacticalUnitSymbolsDebugCommand.TacticalSymbols(new List<string> { "on" });
+            var result = ExecuteTacticalSymbols(new List<string> { "on" });
 
             Assert.Equal(
                 "The 'coop.debug.ui.tactical_symbols' command cannot be used on the client. It is intended for server use only.",
@@ -54,7 +55,7 @@ public class TacticalUnitSymbolsConfigTests
 
         try
         {
-            var result = TacticalUnitSymbolsDebugCommand.TacticalSymbols(new List<string> { "status" });
+            var result = ExecuteTacticalSymbols(new List<string> { "status" });
 
             Assert.Equal("Tactical unit symbols are hidden.", result);
         }
@@ -88,7 +89,7 @@ public class TacticalUnitSymbolsConfigTests
             using var container = builder.Build();
             ContainerProvider.SetContainer(container);
 
-            var result = TacticalUnitSymbolsDebugCommand.TacticalSymbols(new List<string> { "on" });
+            var result = ExecuteTacticalSymbols(new List<string> { "on" });
 
             Assert.Equal("Tactical unit symbols are visible.", result);
             Assert.False(TacticalUnitSymbolsSettings.HideTacticalUnitSymbols);
@@ -149,4 +150,11 @@ public class TacticalUnitSymbolsConfigTests
             TacticalUnitSymbolsSettings.SetHideTacticalUnitSymbols(previous);
         }
     }
+
+    private static string ExecuteTacticalSymbols(List<string> args)
+    {
+        var command = new TacticalUnitSymbolsDebugCommand.UiTacticalSymbolsCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
+
 }
