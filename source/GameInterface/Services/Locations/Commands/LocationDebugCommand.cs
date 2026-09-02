@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Common.Commands;
+using Common;
 using Common.Messaging;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
@@ -12,8 +13,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
 namespace GameInterface.Services.Locations.Commands;
 
 /// <summary>
@@ -21,280 +20,391 @@ namespace GameInterface.Services.Locations.Commands;
 /// </summary>
 public class LocationDebugCommand
 {
-    [CommandLineArgumentFunction("enter", "coop.debug.location")]
-    public static string EnterLocation(List<string> args)
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class EnterLocationCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
+        public string Prefix => "coop.debug.location";
 
-        if (args.Count != 1)
-            return "Usage: coop.debug.location.enter <LocationId>. Warning: this starts a client-local encounter and can desync from the server.";
+        public string Name => "enter";
 
-        if (TryResolveLocation(args[0], out var location, out var error) == false)
-            return error;
+        public string Description => "Enters the relevant state for co-op debugging.";
 
-        var settlement = Campaign.Current.Settlements.FirstOrDefault(
-            candidate => candidate.LocationComplex?
-                .GetListOfLocations()
-                .Contains(location) == true);
-        if (settlement == null)
-            return $"Unable to resolve the settlement for location '{args[0]}'.";
-
-        if (PlayerEncounter.Current == null)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
-                return "Unable to resolve the settlement interface.";
+            new ExpectedArgs("locationId", "The location id."),
+        };
 
-            settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
-            return PlayerEncounter.Current == null
-                ? $"Unable to start a local encounter with '{settlement.StringId}'."
-                : $"Started a local encounter with '{settlement.StringId}'.";
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+
+
+            if (TryResolveLocation(args[0], out var location, out var error) == false)
+                return Failed(error);
+
+            var settlement = Campaign.Current.Settlements.FirstOrDefault(
+                candidate => candidate.LocationComplex?
+                    .GetListOfLocations()
+                    .Contains(location) == true);
+            if (settlement == null)
+                return Failed($"Unable to resolve the settlement for location '{args[0]}'.");
+
+            if (PlayerEncounter.Current == null)
+            {
+                if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
+                    return Failed("Unable to resolve the settlement interface.");
+
+                settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+                return PlayerEncounter.Current == null
+                    ? Failed($"Unable to start a local encounter with '{settlement.StringId}'.")
+                    : Succeeded($"Started a local encounter with '{settlement.StringId}'.");
+            }
+
+            if (PlayerEncounter.EncounterSettlement != settlement)
+                return Failed($"A player encounter with another settlement is already active.");
+
+            if (Mission.Current != null)
+                return Failed("A mission is already active.");
+
+            PlayerEncounter.EnterSettlement();
+            var mission = PlayerEncounter.LocationEncounter?
+                .CreateAndOpenMissionController(location);
+            return mission == null
+                ? Failed($"Unable to open location '{args[0]}'.")
+                : Succeeded($"Opening location '{args[0]}'.");
+
         }
-
-        if (PlayerEncounter.EncounterSettlement != settlement)
-            return $"A player encounter with another settlement is already active.";
-
-        if (Mission.Current != null)
-            return "A mission is already active.";
-
-        PlayerEncounter.EnterSettlement();
-        var mission = PlayerEncounter.LocationEncounter?
-            .CreateAndOpenMissionController(location);
-        return mission == null
-            ? $"Unable to open location '{args[0]}'."
-            : $"Opening location '{args[0]}'.";
     }
 
-    [CommandLineArgumentFunction("leave", "coop.debug.location")]
-    public static string LeaveLocation(List<string> args)
+    public sealed class LeaveLocationCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
+        public string Prefix => "coop.debug.location";
 
-        if (args.Count != 0)
-            return "Usage: coop.debug.location.leave";
+        public string Name => "leave";
 
-        if (Mission.Current == null)
-            return "No mission is active.";
+        public string Description => "Leaves the relevant state for co-op debugging.";
 
-        Mission.Current.EndMission();
-        return "Ending the current location mission.";
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+
+
+            if (Mission.Current == null)
+                return Failed("No mission is active.");
+
+            Mission.Current.EndMission();
+            return Succeeded("Ending the current location mission.");
+
+        }
     }
 
     // coop.debug.location.list
     /// <summary>
     /// Lists all registered locations
     /// </summary>
-    [CommandLineArgumentFunction("list", "coop.debug.location")]
-    public static string ListLocations(List<string> args)
+    public sealed class ListLocationsCoopCommand : ICoopCommand
     {
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "list";
+
+        public string Description => "Lists the relevant state for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to resolve {nameof(IObjectManager)}";
-        }
-
-        var stringBuilder = new StringBuilder();
-
-        foreach (var settlement in Campaign.Current.Settlements)
-        {
-            if (settlement.LocationComplex == null) continue;
-
-            foreach (var location in settlement.LocationComplex.GetListOfLocations())
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
             {
-                if (objectManager.TryGetId(location, out var locationId) == false) continue;
-
-                stringBuilder.AppendLine($"Id: '{locationId}' Characters: {location.GetCharacterList()?.Count() ?? 0} SpecialItems: {location.SpecialItems?.Count ?? 0}");
+                return Failed($"Unable to resolve {nameof(IObjectManager)}");
             }
-        }
 
-        return stringBuilder.ToString();
+            var stringBuilder = new StringBuilder();
+
+            foreach (var settlement in Campaign.Current.Settlements)
+            {
+                if (settlement.LocationComplex == null) continue;
+
+                foreach (var location in settlement.LocationComplex.GetListOfLocations())
+                {
+                    if (objectManager.TryGetId(location, out var locationId) == false) continue;
+
+                    stringBuilder.AppendLine($"Id: '{locationId}' Characters: {location.GetCharacterList()?.Count() ?? 0} SpecialItems: {location.SpecialItems?.Count ?? 0}");
+                }
+            }
+
+            return Succeeded(stringBuilder.ToString());
+
+        }
     }
 
     // coop.debug.location.info Location_town_V1_tavern
     /// <summary>
     /// Shows the state of a single location
     /// </summary>
-    [CommandLineArgumentFunction("info", "coop.debug.location")]
-    public static string Info(List<string> args)
+    public sealed class InfoCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "info";
+
+        public string Description => "Shows the relevant state for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.location.info <LocationId>";
+            new ExpectedArgs("locationId", "The location id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+
+            var stringBuilder = new StringBuilder();
+            stringBuilder.AppendLine($"StringId: '{location.StringId}'");
+            stringBuilder.AppendLine($"Characters: {location.GetCharacterList()?.Count() ?? 0}");
+            stringBuilder.AppendLine($"SpecialItems: {location.SpecialItems?.Count ?? 0}");
+
+            return Succeeded(stringBuilder.ToString());
+
         }
-
-        if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
-
-        var stringBuilder = new StringBuilder();
-        stringBuilder.AppendLine($"StringId: '{location.StringId}'");
-        stringBuilder.AppendLine($"Characters: {location.GetCharacterList()?.Count() ?? 0}");
-        stringBuilder.AppendLine($"SpecialItems: {location.SpecialItems?.Count ?? 0}");
-
-        return stringBuilder.ToString();
     }
 
     // coop.debug.location.list_characters Location_town_V1_tavern
     /// <summary>
     /// Lists the characters currently in a location
     /// </summary>
-    [CommandLineArgumentFunction("list_characters", "coop.debug.location")]
-    public static string ListCharacters(List<string> args)
+    public sealed class ListCharactersCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "list_characters";
+
+        public string Description => "Lists characters for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.location.list_characters <LocationId>";
-        }
+            new ExpectedArgs("locationId", "The location id."),
+        };
 
-        if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
-
-        var stringBuilder = new StringBuilder();
-
-        foreach (var locationCharacter in location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            stringBuilder.AppendLine($"'{locationCharacter.Character?.StringId}' Hero: {locationCharacter.Character?.IsHero} Tag: '{locationCharacter.SpecialTargetTag}'");
-        }
 
-        return stringBuilder.Length == 0 ? "No characters" : stringBuilder.ToString();
+            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+
+            var stringBuilder = new StringBuilder();
+
+            foreach (var locationCharacter in location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
+            {
+                stringBuilder.AppendLine($"'{locationCharacter.Character?.StringId}' Hero: {locationCharacter.Character?.IsHero} Tag: '{locationCharacter.SpecialTargetTag}'");
+            }
+
+            return Succeeded(stringBuilder.Length == 0 ? "No characters" : stringBuilder.ToString());
+
+        }
     }
 
     // coop.debug.location.list_special_items Location_town_V1_tavern
     /// <summary>
     /// Lists a location's special items
     /// </summary>
-    [CommandLineArgumentFunction("list_special_items", "coop.debug.location")]
-    public static string ListSpecialItems(List<string> args)
+    public sealed class ListSpecialItemsCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "list_special_items";
+
+        public string Description => "Lists special items for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.location.list_special_items <LocationId>";
-        }
+            new ExpectedArgs("locationId", "The location id."),
+        };
 
-        if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
-
-        var stringBuilder = new StringBuilder();
-
-        foreach (var item in location.SpecialItems ?? Enumerable.Empty<ItemObject>().ToList())
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            stringBuilder.AppendLine($"'{item?.StringId}'");
-        }
 
-        return stringBuilder.Length == 0 ? "No special items" : stringBuilder.ToString();
+            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+
+            var stringBuilder = new StringBuilder();
+
+            foreach (var item in location.SpecialItems ?? Enumerable.Empty<ItemObject>().ToList())
+            {
+                stringBuilder.AppendLine($"'{item?.StringId}'");
+            }
+
+            return Succeeded(stringBuilder.Length == 0 ? "No special items" : stringBuilder.ToString());
+
+        }
     }
 
     // coop.debug.location.add_character Location_town_V1_tavern lord_1_1
     /// <summary>
     /// Adds a character to a location on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("add_character", "coop.debug.location")]
-    public static string AddCharacter(List<string> args)
+    public sealed class AddCharacterCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "add_character";
+
+        public string Description => "Adds character for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("characterObjectId", "The character object id."),
+        };
 
-        if (args.Count != 2)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Usage: coop.debug.location.add_character <LocationId> <CharacterObjectId>";
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
+
+
+            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+            if (TryResolveObject<CharacterObject>(args[1], out var character, out error) == false) return Failed(error);
+
+            var locationCharacter = LocationCharacterFactory.Create(
+                character,
+                originParty: null,
+                specialItem: null,
+                spawnTag: "sp_notable",
+                actionSetCode: null,
+                behaviorsMethodName: null,
+                characterRelation: (int)LocationCharacter.CharacterRelations.Neutral,
+                fixedLocation: false,
+                useCivilianEquipment: true);
+
+            // The real mutator runs so the patched chokepoint broadcasts the change.
+            GameThread.Run(() => location.AddCharacter(locationCharacter));
+
+            return Succeeded($"Added '{args[1]}' to '{args[0]}'");
+
         }
-
-        if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
-        if (TryResolveObject<CharacterObject>(args[1], out var character, out error) == false) return error;
-
-        var locationCharacter = LocationCharacterFactory.Create(
-            character,
-            originParty: null,
-            specialItem: null,
-            spawnTag: "sp_notable",
-            actionSetCode: null,
-            behaviorsMethodName: null,
-            characterRelation: (int)LocationCharacter.CharacterRelations.Neutral,
-            fixedLocation: false,
-            useCivilianEquipment: true);
-
-        // The real mutator runs so the patched chokepoint broadcasts the change.
-        GameThread.Run(() => location.AddCharacter(locationCharacter));
-
-        return $"Added '{args[1]}' to '{args[0]}'";
     }
 
     // coop.debug.location.remove_character Location_town_V1_tavern lord_1_1
     /// <summary>
     /// Removes a character from a location on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("remove_character", "coop.debug.location")]
-    public static string RemoveCharacter(List<string> args)
+    public sealed class RemoveCharacterCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "remove_character";
+
+        public string Description => "Removes character for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("characterObjectId", "The character object id."),
+        };
 
-        if (args.Count != 2)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Usage: coop.debug.location.remove_character <LocationId> <CharacterObjectId>";
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
+
+
+            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+            if (TryResolveObject<CharacterObject>(args[1], out var character, out error) == false) return Failed(error);
+
+            var entry = SyncedLocationCharacters.Find(location, character);
+            if (entry == null)
+            {
+                return Failed($"No character '{args[1]}' in '{args[0]}'");
+            }
+
+            GameThread.Run(() => location.RemoveLocationCharacter(entry));
+
+            return Succeeded($"Removed '{args[1]}' from '{args[0]}'");
+
         }
-
-        if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
-        if (TryResolveObject<CharacterObject>(args[1], out var character, out error) == false) return error;
-
-        var entry = SyncedLocationCharacters.Find(location, character);
-        if (entry == null)
-        {
-            return $"No character '{args[1]}' in '{args[0]}'";
-        }
-
-        GameThread.Run(() => location.RemoveLocationCharacter(entry));
-
-        return $"Removed '{args[1]}' from '{args[0]}'";
     }
 
     // coop.debug.location.remove_all_characters Location_town_V1_tavern
     /// <summary>
     /// Clears a location's character list on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("remove_all_characters", "coop.debug.location")]
-    public static string RemoveAllCharacters(List<string> args)
+    public sealed class RemoveAllCharactersCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "remove_all_characters";
+
+        public string Description => "Removes all characters for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("locationId", "The location id."),
+        };
 
-        if (args.Count != 1)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Usage: coop.debug.location.remove_all_characters <LocationId>";
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
+
+
+            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+
+            GameThread.Run(() => location.RemoveAllCharacters());
+
+            return Succeeded($"Cleared '{args[0]}'");
+
         }
-
-        if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
-
-        GameThread.Run(() => location.RemoveAllCharacters());
-
-        return $"Cleared '{args[0]}'";
     }
 
     // coop.debug.location.add_special_item Location_town_V1_tavern mule
     /// <summary>
     /// Adds a special item to a location on the server and clients
     /// </summary>
-    [CommandLineArgumentFunction("add_special_item", "coop.debug.location")]
-    public static string AddSpecialItem(List<string> args)
+    public sealed class AddSpecialItemCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "add_special_item";
+
+        public string Description => "Adds special item for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("itemObjectId", "The item object id."),
+        };
 
-        if (args.Count != 2)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Usage: coop.debug.location.add_special_item <LocationId> <ItemObjectId>";
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
+
+
+            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+            if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return Failed(error);
+
+            GameThread.Run(() => location.AddSpecialItem(item));
+
+            return Succeeded($"Added '{args[1]}' to '{args[0]}'");
+
         }
-
-        if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
-        if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return error;
-
-        GameThread.Run(() => location.AddSpecialItem(item));
-
-        return $"Added '{args[1]}' to '{args[0]}'";
     }
 
     // coop.debug.location.remove_special_item Location_town_V1_tavern mule
@@ -302,34 +412,45 @@ public class LocationDebugCommand
     /// Removes a special item from a location on the server and clients. Vanilla only removes
     /// special items from inside a mission scene, so the command publishes the removal directly.
     /// </summary>
-    [CommandLineArgumentFunction("remove_special_item", "coop.debug.location")]
-    public static string RemoveSpecialItem(List<string> args)
+    public sealed class RemoveSpecialItemCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "remove_special_item";
+
+        public string Description => "Removes special item for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
+            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("itemObjectId", "The item object id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
+
+
+            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+            if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return Failed(error);
+
+            if (location.SpecialItems?.Contains(item) != true)
+            {
+                return Failed($"No item '{args[1]}' in '{args[0]}'");
+            }
+
+            GameThread.Run(() =>
+            {
+                location.SpecialItems.Remove(item);
+                MessageBroker.Instance.Publish(location, new LocationSpecialItemRemoved(location, item));
+            });
+
+            return Succeeded($"Removed '{args[1]}' from '{args[0]}'");
+
         }
-
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.location.remove_special_item <LocationId> <ItemObjectId>";
-        }
-
-        if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
-        if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return error;
-
-        if (location.SpecialItems?.Contains(item) != true)
-        {
-            return $"No item '{args[1]}' in '{args[0]}'";
-        }
-
-        GameThread.Run(() =>
-        {
-            location.SpecialItems.Remove(item);
-            MessageBroker.Instance.Publish(location, new LocationSpecialItemRemoved(location, item));
-        });
-
-        return $"Removed '{args[1]}' from '{args[0]}'";
     }
 
     // coop.debug.location.populate town_V1
@@ -337,33 +458,43 @@ public class LocationDebugCommand
     /// Populates a settlement's locations and broadcasts the roster snapshot, as if a player
     /// party had entered
     /// </summary>
-    [CommandLineArgumentFunction("populate", "coop.debug.location")]
-    public static string Populate(List<string> args)
+    public sealed class PopulateCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.location";
+
+        public string Name => "populate";
+
+        public string Description => "Runs the relevant state for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("settlementStringId", "The settlement string id."),
+        };
 
-        if (args.Count != 1)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Usage: coop.debug.location.populate <SettlementStringId>";
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
+
+
+            if (ContainerProvider.TryResolve<SettlementPopulationTracker>(out var tracker) == false)
+            {
+                return Failed($"Unable to resolve {nameof(SettlementPopulationTracker)}");
+            }
+
+            var settlement = Campaign.Current.Settlements.FirstOrDefault(x => x.StringId == args[0]);
+            if (settlement == null)
+            {
+                return Failed($"Unable to find settlement '{args[0]}'");
+            }
+
+            tracker.DebugPopulate(settlement);
+
+            return Succeeded($"Populating '{args[0]}'");
+
         }
-
-        if (ContainerProvider.TryResolve<SettlementPopulationTracker>(out var tracker) == false)
-        {
-            return $"Unable to resolve {nameof(SettlementPopulationTracker)}";
-        }
-
-        var settlement = Campaign.Current.Settlements.FirstOrDefault(x => x.StringId == args[0]);
-        if (settlement == null)
-        {
-            return $"Unable to find settlement '{args[0]}'";
-        }
-
-        tracker.DebugPopulate(settlement);
-
-        return $"Populating '{args[0]}'";
     }
 
     private static bool TryResolveLocation(string locationId, out Location location, out string error)

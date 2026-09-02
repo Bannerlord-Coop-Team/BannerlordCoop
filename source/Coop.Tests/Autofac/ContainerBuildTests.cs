@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.LogicStates;
 using Common.Network;
 using Common.Network.Session;
@@ -8,6 +9,8 @@ using Coop.Core.Server;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
+using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace Coop.Tests.Autofac
@@ -29,6 +32,10 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+
+            ICoopCommand[] commands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
+            Assert.Contains(commands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.workshop.set_workshop_custom_name");
         }
 
         [Fact]
