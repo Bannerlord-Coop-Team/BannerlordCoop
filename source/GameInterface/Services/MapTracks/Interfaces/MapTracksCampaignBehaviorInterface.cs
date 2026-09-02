@@ -60,6 +60,12 @@ public interface IMapTracksCampaignBehaviorInterface : IGameAbstraction
 
     /// <summary>
     /// Server method
+    /// Save source party id per track. Used to prevent players getting xp for their tracks
+    /// </summary>
+    void SyncTrackSourceParties(MapTracksCampaignBehavior behavior, IDataStore dataStore);
+
+    /// <summary>
+    /// Server method
     /// Detect visible tracks for a single player party, granting scouting xp based on argument
     /// </summary>
     List<MapTrackData> DetectTracksForPlayerParty(MapTracksCampaignBehavior behavior, MobileParty playerParty, bool grantScoutingXp = true);
@@ -103,8 +109,11 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
     // Keep track of the faction for computing IsEnemy on clients.
     private readonly Dictionary<Track, IFaction> trackMapFactions = new();
 
+    private readonly Dictionary<Track, string> trackSourceParties = new();
+
     private const string TrackMapFactionsSaveKey = "Coop_TrackMapFactions";
     private const string PlayerDetectedTracksSaveKey = "Coop_PlayerDetectedTracks";
+    private const string TrackSourcePartiesSaveKey = "Coop_TrackSourceParties";
 
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
@@ -201,23 +210,14 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         // Store track in mapFactions data so clients can resolve IsEnemy when receiving track
         trackMapFactions[track] = party.MapFaction;
 
+        // Store track in sourceParties data so clients can compare against their own party
+        if (objectManager.TryGetIdWithLogging(party, out var partyId))
+        {
+            trackSourceParties[track] = partyId;
+        }
+
         behavior._allTracks.Add(track);
         behavior._trackLocator.UpdateLocator(track);
-
-        // Add own player party track to detected tracks early to avoid xp gain from regular detection
-        if (party.IsPlayerParty())
-        {
-            if (!objectManager.TryGetIdWithLogging(party, out var playerPartyId)) return;
-
-            AddPlayerPartyKeys(playerPartyId);
-            playerDetectedTracks[playerPartyId].Add(track);
-
-            var trackChange = new Dictionary<string, List<MapTrackData>>
-            {
-                [playerPartyId] = new() { ToMapTrackData(track) }
-            };
-            PublishUpdateClientsMapTrackData(trackChange, false);
-        }
     }
 
     public void SyncTrackMapFactions(MapTracksCampaignBehavior behavior, IDataStore dataStore)
@@ -281,6 +281,35 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         }
     }
 
+    public void SyncTrackSourceParties(MapTracksCampaignBehavior behavior, IDataStore dataStore)
+    {
+        // Loaded on clients too. Load empty data, the server tracks all player detected track data
+        var savedTrackSourceParties = ModInformation.IsClient
+            ? new List<MapTracksSourcePartySaveData>()
+            : BuildTrackSourcePartiesData();
+
+        dataStore.SyncData(TrackSourcePartiesSaveKey, ref savedTrackSourceParties);
+
+        if (!dataStore.IsLoading) return;
+
+        trackSourceParties.Clear();
+
+        // Don't load data on clients
+        // Also return early if not on a save written before this record existed
+        if (ModInformation.IsClient || savedTrackSourceParties == null) return;
+
+        // Load source party ids back into trackSourceParties
+        foreach (var saveTrackSourceParty in savedTrackSourceParties)
+        {
+            if (saveTrackSourceParty?.Track == null || saveTrackSourceParty.SourcePartyId == null) continue;
+
+            // Skip expired tracks
+            if (saveTrackSourceParty.Track.IsExpired) continue;
+
+            trackSourceParties[saveTrackSourceParty.Track] = saveTrackSourceParty.SourcePartyId;
+        }
+    }
+
     private List<TrackMapFactionSaveData> BuildTrackMapFactionSaveData(MapTracksCampaignBehavior behavior)
     {
         var savedTrackMapFactions = new List<TrackMapFactionSaveData>();
@@ -307,6 +336,18 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         return savedPlayerDetectedTracks;
     }
 
+    private List<MapTracksSourcePartySaveData> BuildTrackSourcePartiesData()
+    {
+        var savedTrackSourceParties = new List<MapTracksSourcePartySaveData>();
+
+        foreach (var trackSourceParty in trackSourceParties)
+        {
+            savedTrackSourceParties.Add(new MapTracksSourcePartySaveData(trackSourceParty.Key, trackSourceParty.Value));
+        }
+
+        return savedTrackSourceParties;
+    }
+
     public List<MapTrackData> DetectTracksForPlayerParty(MapTracksCampaignBehavior behavior, MobileParty playerParty, bool grantScoutingXp = true)
     {
         var visibleTrackChanges = new List<MapTrackData>();
@@ -326,10 +367,14 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
                 if (!detectedTracks.Contains(track) && behavior._allTracks.Contains(track) && GetTrackDetectionDifficultyForPlayerParty(playerParty, track, maxTrackSpottingDistanceForPlayerParty) < (float)effectiveScoutingSkill)
                 {
                     detectedTracks.Add(track);
-
-                    if (grantScoutingXp) GrantTrackDetectionXp(playerParty, track);
-
                     visibleTrackChanges.Add(ToMapTrackData(track));
+
+                    if (grantScoutingXp 
+                        && trackSourceParties.ContainsKey(track) 
+                        && trackSourceParties[track] != playerPartyId)
+                    {
+                        GrantTrackDetectionXp(playerParty, track);
+                    } 
                 }
             }
         }
@@ -456,6 +501,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
             behavior._trackLocator.RemoveLocatable(expiredTrack);
             behavior._trackPool.ReleaseTrack(expiredTrack);
             trackMapFactions.Remove(expiredTrack);
+            trackSourceParties.Remove(expiredTrack);
         }
     }
 
