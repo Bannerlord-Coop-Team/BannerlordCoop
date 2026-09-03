@@ -2,6 +2,7 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.TroopRosters.Data;
 using LiteNetLib;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
@@ -35,6 +36,7 @@ internal sealed class PlayerPartyInteractionSession
     public TroopRosterElementData[] ResponderOfferedTroops { get; set; } = new TroopRosterElementData[0];
     public bool InitiatorOfferedPeace { get; set; }
     public bool ResponderOfferedPeace { get; set; }
+    public Kingdom TargetKingdom { get; set; }
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();

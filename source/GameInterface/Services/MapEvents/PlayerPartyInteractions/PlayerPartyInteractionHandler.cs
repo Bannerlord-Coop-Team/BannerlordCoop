@@ -817,10 +817,6 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
     {
-        var outcome = new PlayerPartyInteractionOutcome(session, outcomeType);
-        var applied = outcomeHandler.Handle(outcome);
-        var finalOutcomeType = applied ? outcomeType : GetDeclinedOutcome(session.Proposal);
-
         lock (sessionGate)
         {
             if (!sessionsById.TryRemove(session.SessionId, out _)) return;
@@ -829,6 +825,10 @@ internal class PlayerPartyInteractionHandler : IHandler
             sessionsByPartyId.TryRemove(session.ResponderPartyId, out _);
             conversationPartyTracker.EndPvpConversation(session.InitiatorPartyId);
         }
+
+        var outcome = new PlayerPartyInteractionOutcome(session, outcomeType);
+        var applied = outcomeHandler.Handle(outcome);
+        var finalOutcomeType = applied ? outcomeType : GetDeclinedOutcome(session.Proposal);
 
         network.SendAll(new NetworkPlayerPartyInteractionEnded(
             session.SessionId,
@@ -860,6 +860,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         session.MercenaryAwardMultiplier = mercenaryAvailable
             ? GetMercenaryAwardMultiplier(initiatorParty.LeaderHero?.Clan, responderParty.LeaderHero?.Clan?.Kingdom)
             : 0;
+        session.TargetKingdom = responderParty.LeaderHero?.Clan?.Kingdom;
         AddInitiatorOption(
             session,
             PlayerPartyInteractionOption.Vassal,
@@ -872,7 +873,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
     private static int GetMercenaryAwardMultiplier(Clan mercenaryClan, Kingdom kingdom)
     {
-        int num = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(mercenaryClan, kingdom, true);
+        int num = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(mercenaryClan, kingdom, false);
         if (mercenaryClan.IsUnderMercenaryService)
         {
             num = num * 3 / 2;

@@ -34,6 +34,8 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
     public readonly bool InitiatorOfferedPeace;
     public readonly bool ResponderOfferedPeace;
+    public readonly Kingdom TargetKingdom;
+    public readonly int MercenaryAwardMultiplier;
 
     public PlayerPartyInteractionOutcome(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
     {
@@ -53,6 +55,8 @@ internal readonly struct PlayerPartyInteractionOutcome
         ResponderOfferedTroops = session.ResponderOfferedTroops ?? new TroopRosterElementData[0];
         InitiatorOfferedPeace = session.InitiatorOfferedPeace;
         ResponderOfferedPeace = session.ResponderOfferedPeace;
+        TargetKingdom = session.TargetKingdom;
+        MercenaryAwardMultiplier = session.MercenaryAwardMultiplier;
     }
 }
 
@@ -129,7 +133,8 @@ internal class PlayerPartyInteractionOutcomeHandler
             initiatorClan.Tier < Campaign.Current.Models.ClanTierModel.VassalEligibleTier ||
             responderHero?.IsKingdomLeader != true ||
             targetKingdom?.RulingClan != responderHero.Clan ||
-            (initiatorClan.Kingdom != null && !initiatorClan.IsUnderMercenaryService))
+            (initiatorClan.Kingdom != null && !initiatorClan.IsUnderMercenaryService) ||
+            targetKingdom != outcome.TargetKingdom)
         {
             Logger.Warning(
                 "Unable to apply player-party vassalage: eligibility changed before acceptance. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
@@ -312,7 +317,8 @@ internal class PlayerPartyInteractionOutcomeHandler
             || !initiatorClan.Settlements.IsEmpty<Settlement>()
             || initiatorParty.LeaderHero.GetRelation(responderHero) < (float)Campaign.Current.Models.DiplomacyModel.MinimumRelationWithConversationCharacterToJoinKingdom
             || (initiatorClan.MapFaction.IsKingdomFaction && !initiatorClan.IsUnderMercenaryService)
-            || !sameWars)
+            || !sameWars
+            || targetKingdom != outcome.TargetKingdom)
         {
             Logger.Warning(
                 "Unable to apply player-party mercenary: eligibility changed before acceptance. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
@@ -320,12 +326,7 @@ internal class PlayerPartyInteractionOutcomeHandler
             outcome.ResponderPartyId);
             return false;
         }
-        int awardMultiplier = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(initiatorClan, targetKingdom, true);
-        if (initiatorClan.MapFaction.IsKingdomFaction && initiatorClan.IsUnderMercenaryService)
-        {
-            awardMultiplier = awardMultiplier * 3 / 2;
-            ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(initiatorClan, true);
-        }
+        int awardMultiplier = outcome.MercenaryAwardMultiplier;
         ChangeKingdomAction.ApplyByJoinFactionAsMercenary(initiatorClan, targetKingdom, default, awardMultiplier, true);
         GainKingdomInfluenceAction.ApplyForJoiningFaction(initiatorClan.Leader, 5f);
         return true;
