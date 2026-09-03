@@ -2,8 +2,10 @@
 using Common.Messaging;
 using Common.Network.Session;
 using GameInterface.Services.UI;
+using GameInterface.Services.UI.CoopOptions;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Xunit;
 
@@ -12,11 +14,127 @@ namespace GameInterface.Tests.Services.UI;
 public class CoopConnectMenuVMTests
 {
     [Fact]
+    public void RememberedDirectConnection_IsRestored()
+    {
+        var options = new CoopOptionsData();
+        options.SetSection(
+            CoopConnectMenuVM.DirectTabId,
+            CoopConnectMenuVM.DirectConnectionSectionId,
+            new DirectConnectionOptions
+            {
+                RememberConnection = true,
+                Address = "203.0.113.7",
+                Port = "4300",
+                Password = "Secret",
+            });
+        var store = new TestOptionsStore(options);
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(null, messageBroker, store);
+
+        Assert.True(viewModel.RememberConnection);
+        Assert.Equal("203.0.113.7", viewModel.Ip);
+        Assert.Equal("4300", viewModel.Port);
+        Assert.Equal("Secret", viewModel.Password);
+    }
+
+    [Fact]
+    public void ActionConnect_SavesRememberedDirectConnection()
+    {
+        var store = new TestOptionsStore();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(null, messageBroker, store)
+        {
+            Ip = "203.0.113.7",
+            Port = "4300",
+            Password = "Secret",
+            RememberConnection = true,
+        };
+
+        viewModel.ActionConnect();
+
+        Assert.True(store.Options.TryGetSection(
+            CoopConnectMenuVM.DirectTabId,
+            CoopConnectMenuVM.DirectConnectionSectionId,
+            out DirectConnectionOptions saved));
+        Assert.True(saved.RememberConnection);
+        Assert.Equal("203.0.113.7", saved.Address);
+        Assert.Equal("4300", saved.Port);
+        Assert.Equal("Secret", saved.Password);
+    }
+
+    [Fact]
+    public void RememberedDirectConnection_RoundTripsThroughOptionsFile()
+    {
+        string filePath = Path.Combine(
+            Path.GetTempPath(),
+            $"BannerlordCoop-connection-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            using var messageBroker = new MessageBroker();
+            using (var firstViewModel = new CoopConnectMenuVM(
+                       null,
+                       messageBroker,
+                       new CoopOptionsStore(filePath)))
+            {
+                firstViewModel.Ip = "203.0.113.7";
+                firstViewModel.Port = "4300";
+                firstViewModel.Password = "Secret";
+                firstViewModel.RememberConnection = true;
+                firstViewModel.ActionConnect();
+            }
+
+            using var restoredViewModel = new CoopConnectMenuVM(
+                null,
+                messageBroker,
+                new CoopOptionsStore(filePath));
+
+            Assert.True(restoredViewModel.RememberConnection);
+            Assert.Equal("203.0.113.7", restoredViewModel.Ip);
+            Assert.Equal("4300", restoredViewModel.Port);
+            Assert.Equal("Secret", restoredViewModel.Password);
+        }
+        finally
+        {
+            if (File.Exists(filePath)) File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public void DisablingRememberConnection_ClearsSavedCredentials()
+    {
+        var options = new CoopOptionsData();
+        options.SetSection(
+            CoopConnectMenuVM.DirectTabId,
+            CoopConnectMenuVM.DirectConnectionSectionId,
+            new DirectConnectionOptions
+            {
+                RememberConnection = true,
+                Address = "203.0.113.7",
+                Port = "4300",
+                Password = "Secret",
+            });
+        var store = new TestOptionsStore(options);
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(null, messageBroker, store);
+
+        viewModel.RememberConnection = false;
+
+        Assert.True(store.Options.TryGetSection(
+            CoopConnectMenuVM.DirectTabId,
+            CoopConnectMenuVM.DirectConnectionSectionId,
+            out DirectConnectionOptions saved));
+        Assert.False(saved.RememberConnection);
+        Assert.Equal(string.Empty, saved.Address);
+        Assert.Equal(string.Empty, saved.Port);
+        Assert.Equal(string.Empty, saved.Password);
+    }
+    [Fact]
     public void SteamLobbyPages_SliceResultsAndStopAtBoundaries()
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
 
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(Enumerable.Range(1, 9)
@@ -53,7 +171,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
 
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(
@@ -96,7 +214,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
 
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(Enumerable.Range(1, 9)
@@ -124,7 +242,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
 
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(
@@ -147,7 +265,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
 
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(
@@ -181,7 +299,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
 
         Assert.Equal("Hosted Steam Servers (0 servers; 0 players)", viewModel.SteamLobbiesHeaderText);
 
@@ -201,7 +319,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
 
         Assert.Equal("Host Name", viewModel.HostSearchLabelText);
         Assert.Equal("Type a host name...", viewModel.HostSearchPlaceholderText);
@@ -218,7 +336,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
         int activationCount = 0;
         viewModel.SteamLobbiesTabActivated += () => activationCount++;
 
@@ -232,7 +350,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
         
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(
@@ -262,7 +380,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
         
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(
@@ -285,7 +403,7 @@ public class CoopConnectMenuVMTests
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
-        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, new TestOptionsStore());
         
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(
@@ -342,6 +460,30 @@ public class CoopConnectMenuVMTests
         {
             Assert.NotNull(onCompleted);
             onCompleted!(lobbies, string.Empty);
+        }
+    }
+
+    private sealed class TestOptionsStore : ICoopOptionsStore
+    {
+        public TestOptionsStore(CoopOptionsData options = null)
+        {
+            Options = options ?? new CoopOptionsData();
+        }
+
+        public string FilePath => string.Empty;
+        public CoopOptionsData Options { get; private set; }
+
+        public bool TryLoad(out CoopOptionsData options)
+        {
+            options = Options;
+            return true;
+        }
+
+        public CoopOptionsData LoadOrDefault() => Options;
+
+        public void Save(CoopOptionsData options)
+        {
+            Options = options;
         }
     }
 }

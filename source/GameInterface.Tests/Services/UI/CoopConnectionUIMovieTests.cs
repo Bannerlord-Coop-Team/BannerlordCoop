@@ -83,6 +83,17 @@ public class CoopConnectionUIMovieTests
         Assert.Equal("0", minimumPlayersInput.Attribute("MinInt")?.Value);
         Assert.Equal("true", minimumPlayersInput.Attribute("EnableClamp")?.Value);
     }
+
+    [Fact]
+    public void DirectConnection_BindsRememberConnectionCheckbox()
+    {
+        var document = XDocument.Load(FindMoviePath());
+        var checkbox = FindById(document, "RememberConnectionCheckbox");
+
+        Assert.Equal("Toggle", checkbox.Attribute("ButtonType")?.Value);
+        Assert.Equal("@RememberConnection", checkbox.Attribute("IsSelected")?.Value);
+        Assert.Equal("ToggleIndicator", checkbox.Attribute("ToggleIndicator")?.Value);
+    }
     
     private static XElement FindById(XDocument document, string id)
     {

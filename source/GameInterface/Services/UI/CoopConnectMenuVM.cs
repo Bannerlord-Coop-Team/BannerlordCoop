@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
+using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.Donate;
 using GameInterface.Services.UI.Messages;
 using System;
@@ -29,6 +30,7 @@ public enum SteamLobbyPasswordFilter
 public class CoopConnectMenuVM : ViewModel, IDisposable
 {
     public const string DirectTabId = "direct";
+    public const string DirectConnectionSectionId = "connection";
     public const string SteamLobbiesTabId = "steam_lobbies";
     public const int SteamLobbyPageSize = 4;
 
@@ -36,6 +38,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     private readonly ISteamLobbyBrowser steamLobbyBrowser;
     private readonly IMessageBroker messageBroker;
+    private readonly ICoopOptionsStore optionsStore;
     private readonly List<SteamLobbyListItemVM> discoveredSteamLobbies = new();
 
     private CoopConnectionTabVM selectedTab;
@@ -49,6 +52,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     private int filteredSteamLobbyCount;
     private long filteredSteamLobbyPlayerCount;
     private int steamLobbyPageIndex;
+    private bool rememberConnection;
 
     public string JoinButtonText => "Join";
     public string RefreshButtonText => "Refresh";
@@ -80,6 +84,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string IpText => "Server IP Address:";
     public string PortText => "Port:";
     public string PasswordText => "Password:";
+    public string RememberConnectionText => "Remember connection details";
 
     [DataSourceProperty]
     public HintViewModel ServerAddressHint { get; } = new HintViewModel(new TextObject(
@@ -94,6 +99,10 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         "The session password set by the host. Leave empty if the host has not set one."));
 
     [DataSourceProperty]
+    public HintViewModel RememberConnectionHint { get; } = new HintViewModel(new TextObject(
+        "Saves the server address, port, and password locally in your Bannerlord Coop options."));
+
+    [DataSourceProperty]
     public string PasswordFilterButtonText => SteamLobbyPasswordFilter switch
     {
         SteamLobbyPasswordFilter.NoPassword => "No Password",
@@ -106,14 +115,28 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string connectPassword = "";
 
     public CoopConnectMenuVM()
-        : this(SessionDiscovery.SteamLobbyBrowser, MessageBroker.Instance)
+        : this(SessionDiscovery.SteamLobbyBrowser, MessageBroker.Instance, new CoopOptionsStore())
     {
     }
 
     public CoopConnectMenuVM(ISteamLobbyBrowser steamLobbyBrowser, IMessageBroker messageBroker)
+        : this(steamLobbyBrowser, messageBroker, new CoopOptionsStore())
     {
+    }
+
+    public CoopConnectMenuVM(
+        ISteamLobbyBrowser steamLobbyBrowser,
+        IMessageBroker messageBroker,
+        ICoopOptionsStore optionsStore)
+    {
+        if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
+        if (optionsStore == null) throw new ArgumentNullException(nameof(optionsStore));
+
         this.steamLobbyBrowser = steamLobbyBrowser;
-        this.messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
+        this.messageBroker = messageBroker;
+        this.optionsStore = optionsStore;
+
+        RestoreRememberedConnection();
 
         Tabs = new MBBindingList<CoopConnectionTabVM>
         {
@@ -297,6 +320,24 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
+    [DataSourceProperty]
+    public bool RememberConnection
+    {
+        get => rememberConnection;
+        set
+        {
+            if (rememberConnection == value) return;
+
+            rememberConnection = value;
+            OnPropertyChanged(nameof(RememberConnection));
+
+            if (!rememberConnection)
+            {
+                SaveConnectionSettings(clearCredentials: true);
+            }
+        }
+    }
+
     public void ActionCycleSteamLobbyPasswordFilter()
     {
         if (disposed || IsRefreshingSteamLobbies) return;
@@ -395,6 +436,11 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                     InformationManager.DisplayMessage(new InformationMessage("ERROR: No IPv4 address found for host"));
                     return;
                 }
+            }
+
+            if (RememberConnection)
+            {
+                SaveConnectionSettings(clearCredentials: false);
             }
 
             messageBroker.Publish(this, new AttemptJoin(ip, port, connectPassword, steamInvites));
@@ -574,5 +620,47 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     {
         return string.Equals(address, "localhost", StringComparison.OrdinalIgnoreCase) ||
             (IPAddress.TryParse(address, out var ip) && IPAddress.IsLoopback(ip));
+    }
+
+    private void RestoreRememberedConnection()
+    {
+        var options = optionsStore.LoadOrDefault();
+        if (!options.TryGetSection(
+                DirectTabId,
+                DirectConnectionSectionId,
+                out DirectConnectionOptions saved) ||
+            !saved.RememberConnection)
+        {
+            return;
+        }
+
+        connectIP = string.IsNullOrWhiteSpace(saved.Address) ? "localhost" : saved.Address;
+        connectPort = string.IsNullOrWhiteSpace(saved.Port) ? "4200" : saved.Port;
+        connectPassword = saved.Password ?? string.Empty;
+        rememberConnection = true;
+    }
+
+    private void SaveConnectionSettings(bool clearCredentials)
+    {
+        try
+        {
+            var options = optionsStore.LoadOrDefault();
+            options.SetSection(
+                DirectTabId,
+                DirectConnectionSectionId,
+                new DirectConnectionOptions
+                {
+                    RememberConnection = !clearCredentials,
+                    Address = clearCredentials ? string.Empty : connectIP,
+                    Port = clearCredentials ? string.Empty : connectPort,
+                    Password = clearCredentials ? string.Empty : connectPassword,
+                });
+            optionsStore.Save(options);
+        }
+        catch
+        {
+            InformationManager.DisplayMessage(new InformationMessage(
+                "WARNING: Connection settings could not be saved"));
+        }
     }
 }
