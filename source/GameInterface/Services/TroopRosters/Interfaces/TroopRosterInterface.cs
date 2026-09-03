@@ -210,6 +210,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
                 long finalXp = current.xp + elementData.Xp;
                 if (finalNumber < 0 ||
                     finalNumber > int.MaxValue ||
+                    (character.IsHero && finalNumber > 1) ||
                     finalWounded < 0 ||
                     finalWounded > finalNumber ||
                     finalXp < 0 ||

@@ -51,7 +51,7 @@ internal class TroopRosterPatches
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
     [HarmonyPrefix]
     private static bool PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
-        int woundedCountChange, int xpChange, bool removeDepleted)
+        int woundedCountChange, int xpChange, bool removeDepleted, ref int __result)
     {
         if (index < 0 || index >= __instance.Count) return true;
 
@@ -61,6 +61,7 @@ internal class TroopRosterPatches
         if (character != null &&
             ShouldRejectHeroAddition(character.IsHero, __instance.GetTroopCount(character), countChange))
         {
+            __result = index;
             Logger.Error("Attempted to add a hero to a TroopRoster where they were already present.");
             return false;
         }
@@ -221,7 +222,7 @@ internal class TroopRosterAddToCountsPatch
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterAddToCountsPatch>();
 
     [HarmonyPrefix]
-    static bool Prefix(TroopRoster __instance, CharacterObject character, int count, out bool __state)
+    static bool Prefix(TroopRoster __instance, CharacterObject character, int count, out bool __state, ref int __result)
     {
         __state = true;
         if (character == null ||
@@ -229,6 +230,7 @@ internal class TroopRosterAddToCountsPatch
             return true;
 
         __state = false;
+        __result = __instance.FindIndexOfTroop(character);
         Logger.Error("Attempted to add a hero to a TroopRoster where they were already present.");
         return false;
     }

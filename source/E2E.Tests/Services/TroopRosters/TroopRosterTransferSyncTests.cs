@@ -100,8 +100,14 @@ public class TroopRosterTransferSyncTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
             Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out heroCharacterId));
 
-            party.MemberRoster.AddToCounts(hero.CharacterObject, 2);
+            var roster = party.MemberRoster;
+            int version = roster.VersionNo;
+            int count = roster.Count;
 
+            Assert.Equal(-1, roster.AddToCounts(hero.CharacterObject, 2));
+
+            Assert.Equal(version, roster.VersionNo);
+            Assert.Equal(count, roster.Count);
             Assert.Equal(0, party.MemberRoster.GetTroopCount(hero.CharacterObject));
             Assert.DoesNotContain(Server.InternalMessages.OfType<CountsAtIndexAdded>(),
                 message => message.TroopRoster == party.MemberRoster && message.Character == hero.CharacterObject);
@@ -109,6 +115,58 @@ public class TroopRosterTransferSyncTests : IDisposable
         TestEnvironment.FlushCoalescer();
 
         AssertTroopCountOnClients(partyId, heroCharacterId, expectedCount: 0);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerAddsExistingHeroAgain_ReturnsExistingIndexWithoutMutation(bool useIndex)
+    {
+        string partyId = null;
+        string heroCharacterId = null;
+
+        Server.Call(() =>
+        {
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var regular = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            party.MemberRoster.AddToCounts(regular, 5);
+            party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+            Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out heroCharacterId));
+        });
+        TestEnvironment.FlushCoalescer();
+        Server.InternalMessages.Clear();
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(heroCharacterId, out var character));
+            var roster = party.MemberRoster;
+            int index = roster.FindIndexOfTroop(character);
+            Assert.True(index > 0);
+            int version = roster.VersionNo;
+            int count = roster.Count;
+            int total = roster.TotalManCount;
+
+            int result = useIndex
+                ? roster.AddToCountsAtIndex(index, 1)
+                : roster.AddToCounts(character, 1);
+
+            Assert.Equal(index, result);
+            Assert.Equal(version, roster.VersionNo);
+            Assert.Equal(count, roster.Count);
+            Assert.Equal(total, roster.TotalManCount);
+            Assert.Equal(1, roster.GetTroopCount(character));
+            Assert.Same(party, character.HeroObject.PartyBelongedTo);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Empty(Server.InternalMessages.OfType<CountsAtIndexAdded>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkTroopRosterElementBatch>());
+        AssertTroopCountOnClients(partyId, heroCharacterId, expectedCount: 1);
     }
 
     [Fact]
