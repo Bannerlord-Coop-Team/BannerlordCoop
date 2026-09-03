@@ -56,16 +56,24 @@ public sealed class CollectedBugReportServerLog
     }
 }
 
-/// <summary>Contains the persistent server campaign save captured for a diagnostic report.</summary>
+/// <summary>Contains the server campaign save and paired co-op session data.</summary>
 public sealed class CollectedBugReportServerSave
 {
     public string FileName { get; }
     public byte[] Data { get; }
+    public string SidecarFileName { get; }
+    public byte[] SidecarData { get; }
 
-    public CollectedBugReportServerSave(string fileName, byte[] data)
+    public CollectedBugReportServerSave(
+        string fileName,
+        byte[] data,
+        string sidecarFileName = null,
+        byte[] sidecarData = null)
     {
         FileName = fileName;
         Data = data;
+        SidecarFileName = sidecarFileName;
+        SidecarData = sidecarData;
     }
 }
 
@@ -378,12 +386,14 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
         writer.WriteLine("Packaged: " + DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         writer.WriteLine("Player submissions: " + contents.Submissions.Count.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Server save included: " + (contents.ServerSave != null ? "yes" : "no"));
+        writer.WriteLine("Server save sidecar included: " +
+                         (contents.ServerSave?.SidecarData != null ? "yes" : "no"));
         writer.WriteLine("Expected clients: " + contents.ExpectedClients.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Logs included: " + contents.Logs.Count.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Clients declined: " + contents.DeclinedClients.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Clients failed: " + contents.FailedClients.ToString(CultureInfo.InvariantCulture));
         writer.WriteLine("Clients timed out: " + contents.TimedOutClients.ToString(CultureInfo.InvariantCulture));
-        writer.WriteLine("The current server campaign save and current BannerlordCoop logs are included; client saves, configs, and dumps are excluded.");
+        writer.WriteLine("The current server campaign save, its co-op session data, and current BannerlordCoop logs are included; client saves, configs, and dumps are excluded.");
     }
 
     private static void AddSubmissions(
@@ -413,15 +423,37 @@ public class BugReportArchiveBuilder : IBugReportArchiveBuilder
     {
         if (save.Data == null || save.Data.Length == 0)
             throw new InvalidDataException("The collected server save was empty.");
-        if (string.IsNullOrWhiteSpace(save.FileName) ||
-            !string.Equals(Path.GetFileName(save.FileName), save.FileName, StringComparison.Ordinal))
-        {
+        if (!IsValidFileName(save.FileName))
             throw new InvalidDataException("The collected server save had an invalid file name.");
-        }
 
         var entry = archive.CreateEntry("server/" + save.FileName, CompressionLevel.NoCompression);
-        using var destination = entry.Open();
-        destination.Write(save.Data, 0, save.Data.Length);
+        using (var destination = entry.Open())
+        {
+            destination.Write(save.Data, 0, save.Data.Length);
+        }
+
+        if (save.SidecarFileName == null && save.SidecarData == null) return;
+        if (!IsValidFileName(save.SidecarFileName) ||
+            !string.Equals(
+                Path.ChangeExtension(save.FileName, ".json"),
+                save.SidecarFileName,
+                StringComparison.OrdinalIgnoreCase) ||
+            save.SidecarData == null || save.SidecarData.Length == 0)
+        {
+            throw new InvalidDataException("The collected server save sidecar was invalid.");
+        }
+
+        var sidecarEntry = archive.CreateEntry(
+            "server/" + save.SidecarFileName,
+            CompressionLevel.Optimal);
+        using var sidecarDestination = sidecarEntry.Open();
+        sidecarDestination.Write(save.SidecarData, 0, save.SidecarData.Length);
+    }
+
+    private static bool IsValidFileName(string fileName)
+    {
+        return !string.IsNullOrWhiteSpace(fileName) &&
+               string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal);
     }
 
     private static void AddServerLog(ZipArchive archive, CollectedBugReportServerLog log)

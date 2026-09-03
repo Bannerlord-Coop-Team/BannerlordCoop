@@ -13,6 +13,7 @@ public interface ISaveInterface : IGameAbstraction
 {
     SaveResults SaveCurrentGame();
     SaveResults SaveCurrentGameToFile(string saveName);
+    byte[] ReadSaveFile(string fileName);
 }
 
 internal class SaveInterface : ISaveInterface
@@ -38,10 +39,18 @@ internal class SaveInterface : ISaveInterface
         var result = SaveCurrentGame(saveName, saveDriver);
         if (!result.Success) return result;
 
-        var data = FileHelper.GetFileContent(FileDriver.GetSaveFilePath(saveName + ".sav"));
+        var data = ReadSaveFile(saveName + ".sav");
         if (data == null || data.Length == 0) return ReportSaveFailure("saved game file");
 
         return new SaveResults(true, data, result.CampaignId);
+    }
+
+    public byte[] ReadSaveFile(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            throw new ArgumentException("File name cannot be empty.", nameof(fileName));
+
+        return FileHelper.GetFileContent(FileDriver.GetSaveFilePath(fileName));
     }
 
     private SaveResults SaveCurrentGame(string saveName, ISaveDriver saveDriver)
