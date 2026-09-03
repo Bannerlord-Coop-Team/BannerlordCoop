@@ -164,6 +164,11 @@ internal class PlayerDeletionHandler : IHandler
             }
         }
 
+        if (party?.CurrentSettlement != null)
+        {
+            TryStep("party settlement exit", () => LeaveSettlementAction.ApplyForParty(party));
+        }
+
         playerManager.RemovePlayer(player);
 
         network.SendAllBut(peer, new NetworkPlayerRemoved(player.ControllerId, player.HeroId));
