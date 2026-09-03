@@ -15,6 +15,7 @@ public sealed class CoopCommandLineRegistrar : ICoopCommandLineRegistrar
 {
     private readonly ICoopCommandRegistry commandRegistry;
     private readonly ICoopCommandArgsFactory argsFactory;
+    private readonly IRglCommandLineRegistry rglCommandLineRegistry;
     private readonly IDictionary gameCommands;
     private readonly Type gameCommandType;
     private readonly FieldInfo gameCommandDelegateField;
@@ -24,13 +25,16 @@ public sealed class CoopCommandLineRegistrar : ICoopCommandLineRegistrar
 
     public CoopCommandLineRegistrar(
         ICoopCommandRegistry commandRegistry,
-        ICoopCommandArgsFactory argsFactory)
+        ICoopCommandArgsFactory argsFactory,
+        IRglCommandLineRegistry rglCommandLineRegistry)
     {
         if (commandRegistry == null) throw new ArgumentNullException(nameof(commandRegistry));
         if (argsFactory == null) throw new ArgumentNullException(nameof(argsFactory));
+        if (rglCommandLineRegistry == null) throw new ArgumentNullException(nameof(rglCommandLineRegistry));
 
         this.commandRegistry = commandRegistry;
         this.argsFactory = argsFactory;
+        this.rglCommandLineRegistry = rglCommandLineRegistry;
 
         // Publicizing TaleWorlds.Library here produces duplicate InformationManager members.
         FieldInfo allFunctionsField = typeof(CommandLineFunctionality).GetField(
@@ -108,6 +112,7 @@ public sealed class CoopCommandLineRegistrar : ICoopCommandLineRegistrar
 
             gameCommands[fullName] = gameCommand;
             registrations.Add(fullName, new Registration(gameCommand, previousRegistration));
+            rglCommandLineRegistry.RegisterCommand(fullName);
         }
     }
 
