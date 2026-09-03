@@ -30,6 +30,7 @@ internal static class CoopSessionMigrationRules
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerKnowTournaments)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerWarningTime)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerHasMetRansomBroker)));
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerItemsTradeData)));
 
@@ -45,9 +46,12 @@ internal static class CoopSessionMigrationRules
         ClearWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerInteractedPatrols)));
         ClearWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerMetArenaMasters)));
         ClearWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerAlreadySneakedSettlements)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerOrderedDrinkThisDayInSettlement)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerHasBoughtTunToParty)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerTradeRumors)));
         ClearWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerEnteredSettlements)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerSettlementBribePaid)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(HeroMeetingData), nameof(HeroMeetingData.PlayerLastMeetingTimes)));
 
