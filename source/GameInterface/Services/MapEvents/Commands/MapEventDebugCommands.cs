@@ -2673,71 +2673,80 @@ public class MapEventDebugCommands
         }
     }
 
-    [CommandLineArgumentFunction("late_join_mode_fixture_state", "coop.debug.mapevent")]
-    public static string GetLateJoinModeFixtureState(List<string> args)
+    public sealed class LateJoinModeFixtureStateCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
-            return "Run this command on the server.";
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "late_join_mode_fixture_state";
+
+        public string Description => "Reports late join mode fixture state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.mapevent.late_join_mode_fixture_state " +
-                "<firstControllerId> <joiningControllerId>";
+            new ExpectedArgs("first_controller_id", "The first controller id."),
+            new ExpectedArgs("joining_controller_id", "The joining controller id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+
+            if (!TryGetPlayerParty(
+                    args[0],
+                    requireReady: false,
+                    out var objectManager,
+                    out var firstParty,
+                    out var error,
+                    allowActiveMapEvent: true))
+            {
+                return Failed(error);
+            }
+            if (!TryGetPlayerParty(
+                    args[1],
+                    requireReady: false,
+                    out _,
+                    out var joiningParty,
+                    out error,
+                    allowActiveMapEvent: true))
+            {
+                return Failed(error);
+            }
+
+            string GetMapEventId(MobileParty party) =>
+                party.MapEvent != null && objectManager.TryGetId(party.MapEvent, out string id)
+                    ? id
+                    : null;
+
+            string firstMapEventId = GetMapEventId(firstParty);
+            string joiningMapEventId = GetMapEventId(joiningParty);
+            bool fixtureActive = lateJoinModeFixture != null;
+            bool firstInMission = false;
+            bool joiningInMission = false;
+            if (ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership))
+            {
+                firstInMission = missionMembership.IsControllerInMission(args[0]);
+                joiningInMission = missionMembership.IsControllerInMission(args[1]);
+            }
+
+            bool restored = !fixtureActive && firstMapEventId == null && joiningMapEventId == null &&
+                !firstInMission && !joiningInMission;
+            string structuredState = JsonConvert.SerializeObject(new
+            {
+                success = restored,
+                fixtureActive,
+                firstControllerId = args[0],
+                joiningControllerId = args[1],
+                firstMapEventId,
+                joiningMapEventId,
+                firstInMission,
+                joiningInMission,
+                restored,
+            });
+
+            return Succeeded($"LATE_JOIN_FIXTURE_STATE active={fixtureActive}|restored={restored}\n" +
+                $"LIVE_TEST_JSON={structuredState}");
         }
-
-        if (!TryGetPlayerParty(
-                args[0],
-                requireReady: false,
-                out var objectManager,
-                out var firstParty,
-                out var error,
-                allowActiveMapEvent: true))
-        {
-            return error;
-        }
-        if (!TryGetPlayerParty(
-                args[1],
-                requireReady: false,
-                out _,
-                out var joiningParty,
-                out error,
-                allowActiveMapEvent: true))
-        {
-            return error;
-        }
-
-        string GetMapEventId(MobileParty party) =>
-            party.MapEvent != null && objectManager.TryGetId(party.MapEvent, out string id)
-                ? id
-                : null;
-
-        string firstMapEventId = GetMapEventId(firstParty);
-        string joiningMapEventId = GetMapEventId(joiningParty);
-        bool fixtureActive = lateJoinModeFixture != null;
-        bool firstInMission = false;
-        bool joiningInMission = false;
-        if (ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership))
-        {
-            firstInMission = missionMembership.IsControllerInMission(args[0]);
-            joiningInMission = missionMembership.IsControllerInMission(args[1]);
-        }
-
-        bool restored = !fixtureActive && firstMapEventId == null && joiningMapEventId == null &&
-            !firstInMission && !joiningInMission;
-        string structuredState = JsonConvert.SerializeObject(new
-        {
-            success = restored,
-            fixtureActive,
-            firstControllerId = args[0],
-            joiningControllerId = args[1],
-            firstMapEventId,
-            joiningMapEventId,
-            firstInMission,
-            joiningInMission,
-            restored,
-        });
-
-        return $"LATE_JOIN_FIXTURE_STATE active={fixtureActive}|restored={restored}\n" +
-            $"LIVE_TEST_JSON={structuredState}";
     }
 
     // coop.debug.mapevent.late_join_mode_join

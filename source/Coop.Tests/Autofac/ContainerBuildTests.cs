@@ -44,7 +44,10 @@ namespace Coop.Tests.Autofac
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
                 .ToArray();
 #if DEBUG
-            Assert.Equal(26, missionCommands.Length);
+            Assert.Equal(29, missionCommands.Length);
+            Assert.Contains(missionCommands, command => command.Name == "peer_state");
+            Assert.Contains(missionCommands, command => command.Name == "controller_agents");
+            Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
             Assert.Equal(
                 new[] { "arm_inactive_party_deficit", "disconnect", "join_state" },
                 registeredCommands
