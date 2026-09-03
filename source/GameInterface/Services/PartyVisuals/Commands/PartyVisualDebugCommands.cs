@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Common.Commands;
+using Common;
 using GameInterface.Services.PartyVisuals.Patches;
 using SandBox.View.Map.Managers;
 using System;
@@ -10,135 +11,176 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.PartyVisuals.Commands;
 
 internal class PartyVisualDebugCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
 #if DEBUG
     private const string FixturePartyIdPrefix = "issue2938_visual_fixture_";
     private static readonly List<MobileParty> stagedParties = new();
     private static int fixtureBaselineEligiblePartyCount = -1;
 #endif
 
-    [CommandLineArgumentFunction("buffer_state", "coop.debug.partyvisuals")]
-    public static string BufferState(List<string> args)
+    public sealed class BufferStateCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
+        public string Prefix => "coop.debug.party_visuals";
 
-        if (args.Count != 0)
-            return "Usage: coop.debug.partyvisuals.buffer_state";
+        public string Name => "buffer_state";
 
-        var manager = MobilePartyVisualManager.Current;
-        if (manager == null)
-            return "Mobile party visual manager is unavailable.";
+        public string Description => "Reports buffer state.";
 
-        int visualCount = manager._visualsFlattened.Count;
-        int bufferCapacity = manager._dirtyPartiesList.Length;
-        int dirtyCount = manager._dirtyPartyVisualCount;
-        bool navalManagerActive = NavalMobilePartyVisualManagerPatches.TryGetBufferState(
-            out int navalVisualCount,
-            out int navalBufferCapacity,
-            out int navalDirtyCount);
-        int campaignPartyCount = Campaign.Current?.MobileParties?.Count ?? 0;
-        string structuredState = JsonSerializer.Serialize(new
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            visualCount,
-            bufferCapacity,
-            dirtyCount,
-            navalManagerActive,
-            navalVisualCount,
-            navalBufferCapacity,
-            navalDirtyCount,
-            campaignPartyCount,
-        });
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
 
-        return $"visualCount={visualCount} bufferCapacity={bufferCapacity} dirtyCount={dirtyCount} " +
-               $"navalManagerActive={navalManagerActive} navalVisualCount={navalVisualCount} " +
-               $"navalBufferCapacity={navalBufferCapacity} navalDirtyCount={navalDirtyCount} " +
-               $"campaignPartyCount={campaignPartyCount}" + Environment.NewLine +
-               $"LIVE_TEST_JSON={structuredState}";
+
+            var manager = MobilePartyVisualManager.Current;
+            if (manager == null)
+                return Failed("Mobile party visual manager is unavailable.");
+
+            int visualCount = manager._visualsFlattened.Count;
+            int bufferCapacity = manager._dirtyPartiesList.Length;
+            int dirtyCount = manager._dirtyPartyVisualCount;
+            bool navalManagerActive = NavalMobilePartyVisualManagerPatches.TryGetBufferState(
+                out int navalVisualCount,
+                out int navalBufferCapacity,
+                out int navalDirtyCount);
+            int campaignPartyCount = Campaign.Current?.MobileParties?.Count ?? 0;
+            string structuredState = JsonSerializer.Serialize(new
+            {
+                visualCount,
+                bufferCapacity,
+                dirtyCount,
+                navalManagerActive,
+                navalVisualCount,
+                navalBufferCapacity,
+                navalDirtyCount,
+                campaignPartyCount,
+            });
+
+            return Succeeded($"visualCount={visualCount} bufferCapacity={bufferCapacity} dirtyCount={dirtyCount} " +
+                   $"navalManagerActive={navalManagerActive} navalVisualCount={navalVisualCount} " +
+                   $"navalBufferCapacity={navalBufferCapacity} navalDirtyCount={navalDirtyCount} " +
+                   $"campaignPartyCount={campaignPartyCount}" + Environment.NewLine +
+                   $"LIVE_TEST_JSON={structuredState}");
+        }
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("fixture_state", "coop.debug.partyvisuals")]
-    public static string FixtureState(List<string> args)
+    public sealed class FixtureStateCoopCommand : ICoopCommand
     {
-        if (args.Count != 0)
-            return "Usage: coop.debug.partyvisuals.fixture_state";
+        public string Prefix => "coop.debug.party_visuals";
 
-        return GetFixtureState(includeBaseline: true);
+        public string Name => "fixture_state";
+
+        public string Description => "Reports fixture state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            return Succeeded(GetFixtureState(includeBaseline: true));
+        }
     }
 
-    [CommandLineArgumentFunction("stage_over_limit_fixture", "coop.debug.partyvisuals")]
-    public static string StageOverLimitFixture(List<string> args)
+    public sealed class StageOverLimitFixtureCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
-            return "stage_over_limit_fixture must be run on the server.";
+        public string Prefix => "coop.debug.party_visuals";
 
-        if (args.Count != 2 ||
-            !int.TryParse(args[0], out int targetEligiblePartyCount) ||
-            targetEligiblePartyCount < 2500)
+        public string Name => "stage_over_limit_fixture";
+
+        public string Description => "Runs the stage over limit fixture debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.partyvisuals.stage_over_limit_fixture <targetEligiblePartyCount>=2500+ <settlementId>";
-        }
+            new ExpectedArgs("target_eligible_party_count", "The target eligible party count.", true),
+            new ExpectedArgs("settlement_id", "The settlement id.", true),
+        };
 
-        if (stagedParties.Count != 0 || GetLiveFixturePartyCount() != 0)
-            return "The party-visual fixture is already staged.";
-
-        Settlement settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == args[1]);
-        if (settlement == null)
-            return $"Settlement '{args[1]}' was not found.";
-
-        Clan looterClan = Clan.BanditFactions.FirstOrDefault(candidate => candidate.StringId == "looters");
-        if (looterClan == null)
-            return "The looter clan was not found.";
-
-        fixtureBaselineEligiblePartyCount = GetEligiblePartyCount();
-        int partiesToCreate = targetEligiblePartyCount - fixtureBaselineEligiblePartyCount;
-        if (partiesToCreate <= 0)
-            return GetFixtureState(includeBaseline: true);
-
-        try
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            for (int index = 0; index < partiesToCreate; index++)
+            if (ModInformation.IsClient)
+                return Failed("stage_over_limit_fixture must be run on the server.");
+
+            if (!int.TryParse(args[0], out int targetEligiblePartyCount) ||
+                targetEligiblePartyCount < 2500)
             {
-                MobileParty party = BanditPartyComponent.CreateLooterParty(
-                    $"{FixturePartyIdPrefix}{index + 1}",
-                    looterClan,
-                    settlement,
-                    isBossParty: false,
-                    pt: null,
-                    settlement.GatePosition);
-                stagedParties.Add(party);
-                party.IsVisible = true;
-                party.IsInspected = true;
-                party.SetMoveModeHold();
+                return Failed("Invalid command argument value.");
             }
-        }
-        catch
-        {
-            RestoreFixtureParties();
-            throw;
-        }
 
-        return GetFixtureState(includeBaseline: true);
+            if (stagedParties.Count != 0 || GetLiveFixturePartyCount() != 0)
+                return Failed("The party-visual fixture is already staged.");
+
+            Settlement settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == args[1]);
+            if (settlement == null)
+                return Failed($"Settlement '{args[1]}' was not found.");
+
+            Clan looterClan = Clan.BanditFactions.FirstOrDefault(candidate => candidate.StringId == "looters");
+            if (looterClan == null)
+                return Failed("The looter clan was not found.");
+
+            fixtureBaselineEligiblePartyCount = GetEligiblePartyCount();
+            int partiesToCreate = targetEligiblePartyCount - fixtureBaselineEligiblePartyCount;
+            if (partiesToCreate <= 0)
+                return Succeeded(GetFixtureState(includeBaseline: true));
+
+            try
+            {
+                for (int index = 0; index < partiesToCreate; index++)
+                {
+                    MobileParty party = BanditPartyComponent.CreateLooterParty(
+                        $"{FixturePartyIdPrefix}{index + 1}",
+                        looterClan,
+                        settlement,
+                        isBossParty: false,
+                        pt: null,
+                        settlement.GatePosition);
+                    stagedParties.Add(party);
+                    party.IsVisible = true;
+                    party.IsInspected = true;
+                    party.SetMoveModeHold();
+                }
+            }
+            catch
+            {
+                RestoreFixtureParties();
+                throw;
+            }
+
+            return Succeeded(GetFixtureState(includeBaseline: true));
+        }
     }
 
-    [CommandLineArgumentFunction("restore_over_limit_fixture", "coop.debug.partyvisuals")]
-    public static string RestoreOverLimitFixture(List<string> args)
+    public sealed class RestoreOverLimitFixtureCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
-            return "restore_over_limit_fixture must be run on the server.";
+        public string Prefix => "coop.debug.party_visuals";
 
-        if (args.Count != 0)
-            return "Usage: coop.debug.partyvisuals.restore_over_limit_fixture";
+        public string Name => "restore_over_limit_fixture";
 
-        int removedPartyCount = RestoreFixtureParties();
-        string state = GetFixtureState(includeBaseline: false);
-        return $"removedPartyCount={removedPartyCount}{Environment.NewLine}{state}";
+        public string Description => "Restores or clears restore over limit fixture.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("restore_over_limit_fixture must be run on the server.");
+
+
+            int removedPartyCount = RestoreFixtureParties();
+            string state = GetFixtureState(includeBaseline: false);
+            return Succeeded($"removedPartyCount={removedPartyCount}{Environment.NewLine}{state}");
+        }
     }
 
     private static int RestoreFixtureParties()

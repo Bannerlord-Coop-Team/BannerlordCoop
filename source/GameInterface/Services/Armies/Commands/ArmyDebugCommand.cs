@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Common.Commands;
+using Common;
 using Common.Extensions;
 using GameInterface.Services.ObjectManager;
 using System;
@@ -18,35 +19,50 @@ namespace GameInterface.Services.Armies.Commands;
 /// </summary>
 public class ArmyDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     // coop.debug.army.list
     /// <summary>
     /// Lists all the current Army
     /// </summary>
 
-    public static string ListArmy(List<string> args)
+    public sealed class ArmyListCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
+        public string Prefix => "coop.debug.army";
 
+        public string Name => "list";
 
+        public string Description => "Lists registered armies.";
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to resolve {nameof(ArmyRegistry)}";
-        }
+            StringBuilder stringBuilder = new StringBuilder();
 
-        foreach (var army in Kingdom.All.SelectMany(kingdom => kingdom.Armies))
-        {
-            if (!objectManager.TryGetId(army, out var armyId))
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
             {
-                stringBuilder.AppendLine($"Unable to get id for Army Name: '{army.Name}'");
-                continue;
+                return Failed($"Unable to resolve {nameof(ArmyRegistry)}");
             }
 
-            stringBuilder.AppendLine($"Name: '{army.Name}'");
-            stringBuilder.AppendLine($"StringId: '{armyId}'");
-        }
+            foreach (var army in Kingdom.All.SelectMany(kingdom => kingdom.Armies))
+            {
+                if (!objectManager.TryGetId(army, out var armyId))
+                {
+                    stringBuilder.AppendLine($"Unable to get id for Army Name: '{army.Name}'");
+                    continue;
+                }
 
-        return stringBuilder.ToString();
+                stringBuilder.AppendLine($"Name: '{army.Name}'");
+                stringBuilder.AppendLine($"StringId: '{armyId}'");
+            }
+
+            return Succeeded(stringBuilder.ToString());
+        }
     }
 
     // coop.debug.army.create empire town_EN2 lord_1_1 Raider
@@ -57,49 +73,65 @@ public class ArmyDebugCommand
     /// Creates a new army on the server and clients
     /// </summary>
 
-    public static string CreateArmy(List<string> args)
+    public sealed class ArmyCreateCoopCommand : ICoopCommand
     {
-        var sb = new StringBuilder();
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.army";
+
+        public string Name => "create";
+
+        public string Description => "Creates an army on the server.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("target_settlement_id", "The registered target settlement id."),
+            new ExpectedArgs("hero_leader_id", "The registered leader hero id."),
+            new ExpectedArgs("army_type", "The ArmyTypes name or value."),
+        };
 
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to get ObjectManager";
-        }
+            var sb = new StringBuilder();
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
 
-        var kingdomId = args[0];
-        if (objectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom) == false)
-        {
-            return $"Unable to get Kingdom with {kingdomId}";
-        }
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                return Failed("Unable to get ObjectManager");
+            }
 
-        var targetSettlmentId = args[1];
-        if (objectManager.TryGetObject<Settlement>(targetSettlmentId, out var targetSettlment) == false)
-        {
-            return $"Unable to get Settlement with {targetSettlmentId}";
-        }
+            var kingdomId = args[0];
+            if (objectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom) == false)
+            {
+                return Failed($"Unable to get Kingdom with {kingdomId}");
+            }
 
-        var heroLeaderId = args[2];
-        if (objectManager.TryGetObject<Hero>(heroLeaderId, out var armyLeader) == false)
-        {
-            return $"Unable to get Hero with {heroLeaderId}";
-        }
+            var targetSettlmentId = args[1];
+            if (objectManager.TryGetObject<Settlement>(targetSettlmentId, out var targetSettlment) == false)
+            {
+                return Failed($"Unable to get Settlement with {targetSettlmentId}");
+            }
 
-        var armyTypeInt = args[3];
-        if (Enum.TryParse(armyTypeInt, true, out ArmyTypes armyType) == false)
-        {
-            return $"Unable to cast {armyTypeInt} to {nameof(ArmyTypes)}\n" +
-                GetArmyTypesUsage();
-        }
+            var heroLeaderId = args[2];
+            if (objectManager.TryGetObject<Hero>(heroLeaderId, out var armyLeader) == false)
+            {
+                return Failed($"Unable to get Hero with {heroLeaderId}");
+            }
 
-        kingdom.CreateArmy(armyLeader, targetSettlment, armyType);
-        var army = armyLeader.PartyBelongedTo?.Army;
-        sb.AppendLine($"Created army {army.Name.ToString()}");
-        return sb.ToString();
+            var armyTypeInt = args[3];
+            if (Enum.TryParse(armyTypeInt, true, out ArmyTypes armyType) == false)
+            {
+                return Failed($"Unable to cast {armyTypeInt} to {nameof(ArmyTypes)}\n" +
+                    GetArmyTypesUsage());
+            }
+
+            kingdom.CreateArmy(armyLeader, targetSettlment, armyType);
+            var army = armyLeader.PartyBelongedTo?.Army;
+            sb.AppendLine($"Created army {army.Name.ToString()}");
+            return Succeeded(sb.ToString());
+        }
     }
 
     private static string GetArmyTypesUsage(StringBuilder stringBuilder = null)
@@ -123,35 +155,49 @@ public class ArmyDebugCommand
     /// Deletes an army on the server and clients
     /// </summary>
 
-    public static string DestroyArmy(List<string> args)
+    public sealed class ArmyDestroyCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.army";
+
+        public string Name => "destroy";
+
+        public string Description => "Destroys an army on the server.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("army_id", "The registered army id."),
+            new ExpectedArgs("disband_reason", "The ArmyDispersionReason name or value."),
+        };
 
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to get {nameof(IObjectManager)}";
-        }
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
 
-        var armyId = args[0];
-        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
-        {
-            return $"Unable to get {nameof(Army)} with {armyId}";
-        }
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                return Failed($"Unable to get {nameof(IObjectManager)}");
+            }
 
-        var disbandArmyReason = args[1];
-        if (Enum.TryParse(disbandArmyReason, true, out ArmyDispersionReason reason) == false)
-        {
-            return $"Unable to cast {disbandArmyReason} to {nameof(ArmyDispersionReason)}\n" +
-                GetArmyDispersionReasonUsage();
-        }
-        var armyName = army.Name.ToString();
-        DisbandArmyAction.ApplyInternal(army, reason);
+            var armyId = args[0];
+            if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+            {
+                return Failed($"Unable to get {nameof(Army)} with {armyId}");
+            }
 
-        return $"Destroyed army {armyName} with id {armyId}";
+            var disbandArmyReason = args[1];
+            if (Enum.TryParse(disbandArmyReason, true, out ArmyDispersionReason reason) == false)
+            {
+                return Failed($"Unable to cast {disbandArmyReason} to {nameof(ArmyDispersionReason)}\n" +
+                    GetArmyDispersionReasonUsage());
+            }
+            var armyName = army.Name.ToString();
+            DisbandArmyAction.ApplyInternal(army, reason);
+
+            return Succeeded($"Destroyed army {armyName} with id {armyId}");
+        }
     }
 
     private static string GetArmyDispersionReasonUsage(StringBuilder stringBuilder = null)
@@ -174,139 +220,183 @@ public class ArmyDebugCommand
     /// <summary>
     /// Lists all the current Mobile Parties for an Army
     /// </summary>
-    /// 
+    ///
 
-    public static string GetMobilePartyList(List<string> args)
+    public sealed class ArmyMobilePartyListCoopCommand : ICoopCommand
     {
+        public string Prefix => "coop.debug.army";
 
-        var stringBuilder = new StringBuilder();
+        public string Name => "mobile_party_list";
 
+        public string Description => "Lists parties in an army.";
 
-
-        string armyId = args[0];
-
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Unable to get {nameof(IObjectManager)}";
-        }
+            new ExpectedArgs("army_id", "The registered army id."),
+        };
 
-        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to get {nameof(Army)} with {armyId}";
-        }
+            var stringBuilder = new StringBuilder();
 
-        foreach (var mobileParty in army.Parties)
-        {
-            stringBuilder.AppendLine($"Name: {mobileParty.Name}\nStringId: {mobileParty.StringId}");
-        }
+            string armyId = args[0];
 
-        return stringBuilder.ToString();
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                return Failed($"Unable to get {nameof(IObjectManager)}");
+            }
+
+            if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+            {
+                return Failed($"Unable to get {nameof(Army)} with {armyId}");
+            }
+
+            foreach (var mobileParty in army.Parties)
+            {
+                stringBuilder.AppendLine($"Name: {mobileParty.Name}\nStringId: {mobileParty.StringId}");
+            }
+
+            return Succeeded(stringBuilder.ToString());
+        }
     }
 
     // coop.debug.army.mobile_party_add Army_Created_1 lord_1_34_party_1
     /// <summary>
     /// Add a Mobile Party to an Army
     /// </summary>
-    /// 
+    ///
 
-    public static string AddMobileParty(List<string> args)
+    public sealed class ArmyMobilePartyAddCoopCommand : ICoopCommand
     {
+        public string Prefix => "coop.debug.army";
 
-        var stringBuilder = new StringBuilder();
+        public string Name => "mobile_party_add";
 
+        public string Description => "Adds a mobile party to an army.";
 
-
-        string armyId = args[0];
-        string mobilePartyId = args[1];
-
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Unable to get {nameof(IObjectManager)}";
-        }
+            new ExpectedArgs("army_id", "The registered army id."),
+            new ExpectedArgs("mobile_party_id", "The registered mobile party id."),
+        };
 
-        if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to get {nameof(MobileParty)} with {mobilePartyId}";
+            var stringBuilder = new StringBuilder();
+
+            string armyId = args[0];
+            string mobilePartyId = args[1];
+
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                return Failed($"Unable to get {nameof(IObjectManager)}");
+            }
+
+            if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
+            {
+                return Failed($"Unable to get {nameof(MobileParty)} with {mobilePartyId}");
+            }
+
+            if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+            {
+                return Failed($"Unable to get {nameof(Army)} with {armyId}");
+            }
+
+            mobileParty.Army = army;
+
+            stringBuilder.AppendLine($"Added {mobileParty.Name} to {armyId}");
+
+            return Succeeded(stringBuilder.ToString());
         }
-
-
-        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
-        {
-            return $"Unable to get {nameof(Army)} with {armyId}";
-        }
-
-        mobileParty.Army = army;
-
-        stringBuilder.AppendLine($"Added {mobileParty.Name} to {armyId}");
-
-        return stringBuilder.ToString();
     }
 
     // coop.debug.army.mobile_party_remove Army_Created_1 lord_1_3_party_1
     /// <summary>
     /// Add a Mobile Party to an Army
     /// </summary>
-    /// 
+    ///
 
-    public static string RemoveMobileParty(List<string> args)
+    public sealed class ArmyMobilePartyRemoveCoopCommand : ICoopCommand
     {
+        public string Prefix => "coop.debug.army";
 
-        var stringBuilder = new StringBuilder();
+        public string Name => "mobile_party_remove";
 
+        public string Description => "Removes a mobile party from an army.";
 
-
-        string armyId = args[0];
-        string mobilePartyId = args[1];
-
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Unable to get {nameof(IObjectManager)}";
-        }
+            new ExpectedArgs("army_id", "The registered army id."),
+            new ExpectedArgs("mobile_party_id", "The registered mobile party id."),
+        };
 
-        if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to get {nameof(MobileParty)} with {mobilePartyId}";
+            var stringBuilder = new StringBuilder();
+
+            string armyId = args[0];
+            string mobilePartyId = args[1];
+
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                return Failed($"Unable to get {nameof(IObjectManager)}");
+            }
+
+            if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
+            {
+                return Failed($"Unable to get {nameof(MobileParty)} with {mobilePartyId}");
+            }
+
+            if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+            {
+                return Failed($"Unable to get {nameof(Army)} with {armyId}");
+            }
+
+            mobileParty.Army = null;
+
+            stringBuilder.AppendLine($"Removed {mobileParty.Name} from {armyId}");
+
+            return Succeeded(stringBuilder.ToString());
         }
-
-
-        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
-        {
-            return $"Unable to get {nameof(Army)} with {armyId}";
-        }
-
-        mobileParty.Army = null;
-
-        stringBuilder.AppendLine($"Removed {mobileParty.Name} from {armyId}");
-
-        return stringBuilder.ToString();
     }
-    // coop.debug.army.info Army_Created_1 
+    // coop.debug.army.info Army_Created_1
     /// <summary>
     /// Info about army
     /// </summary>
-    /// 
+    ///
 
-    public static string Info(List<string> args)
+    public sealed class ArmyInfoCoopCommand : ICoopCommand
     {
-        var sb = new StringBuilder();
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        public string Prefix => "coop.debug.army";
+
+        public string Name => "info";
+
+        public string Description => "Reports state for an army.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Unable to get {nameof(IObjectManager)}";
-        }
-        if (objectManager.TryGetObject<Army>(args[0], out var army) == false)
+            new ExpectedArgs("army_id", "The registered army id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to get {nameof(Army)} with {args[0]}";
+            var sb = new StringBuilder();
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                return Failed($"Unable to get {nameof(IObjectManager)}");
+            }
+            if (objectManager.TryGetObject<Army>(args[0], out var army) == false)
+            {
+                return Failed($"Unable to get {nameof(Army)} with {args[0]}");
+            }
+            sb.AppendLine($"AttachedParties count: {army?.LeaderParty.AttachedParties?.Count}");
+            sb.AppendLine($"{army._parties.Count}");
+            sb.AppendLine($"LeaderHero: {army?.LeaderParty?.LeaderHero?.Name}");
+            sb.AppendLine($"Army.name {army.Name}");
+            sb.AppendLine($"Armyowner {army.ArmyOwner.Name}");
+            sb.AppendLine($"leaderparty owner {army?.LeaderParty.Owner.Name}");
+            sb.AppendLine($"armycohesion: {army?.Cohesion}");
+            return Succeeded(sb.ToString());
         }
-        sb.AppendLine($"AttachedParties count: {army?.LeaderParty.AttachedParties?.Count}");
-        sb.AppendLine($"{army._parties.Count}");
-        sb.AppendLine($"LeaderHero: {army?.LeaderParty?.LeaderHero?.Name}");
-        sb.AppendLine($"Army.name {army.Name}");
-        sb.AppendLine($"Armyowner {army.ArmyOwner.Name}");
-        sb.AppendLine($"leaderparty owner {army?.LeaderParty.Owner.Name}");
-        sb.AppendLine($"armycohesion: {army?.Cohesion}");
-        return sb.ToString();
-        }
+    }
     }

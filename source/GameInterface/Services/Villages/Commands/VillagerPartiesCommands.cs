@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Common.Commands;
+using Common;
 using Common.Logging;
 using GameInterface.CoopSessionData;
 using Serilog;
@@ -6,67 +7,93 @@ using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
 namespace GameInterface.Services.Villages.Commands;
 
 internal class VillagerPartiesCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private static readonly ILogger Logger = LogManager.GetLogger<VillagerPartiesCommands>();
 
     /// <summary>
     /// View interacted villagers for all players on server and for current player on client
     /// </summary>
-    [CommandLineArgumentFunction("view_interacted_villagers", "coop.debug.villagers")]
-    public static string ViewInteractedVillagersCommand(List<string> strings)
+    public sealed class ViewInteractedVillagersCommandCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Prefix => "coop.debug.villagers";
+
+        public string Name => "view_interacted_villagers";
+
+        public string Description => "Shows interacted villagers for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
-
-            foreach (var playerInteractedVillager in coopSessionProvider.CoopSession.InteractionsPlayerData.PlayerInteractedVillagers)
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                if (playerInteractedVillager.Key == null || playerInteractedVillager.Value == null) continue;
+                if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
 
-                stringBuilder.AppendLine($"{playerInteractedVillager.Key}");
-                foreach (var interactedVillager in playerInteractedVillager.Value)
+                foreach (var playerInteractedVillager in coopSessionProvider.CoopSession.InteractionsPlayerData.PlayerInteractedVillagers)
                 {
-                    stringBuilder.AppendLine($"{interactedVillager.Key} ({interactedVillager.Value})");
+                    if (playerInteractedVillager.Key == null || playerInteractedVillager.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{playerInteractedVillager.Key}");
+                    foreach (var interactedVillager in playerInteractedVillager.Value)
+                    {
+                        stringBuilder.AppendLine($"{interactedVillager.Key} ({interactedVillager.Value})");
+                    }
                 }
             }
-        }
-        else
-        {
-            stringBuilder.AppendLine($"{Hero.MainHero.Name}");
-            foreach (var interactedVillager in Campaign.Current.GetCampaignBehavior<VillagerCampaignBehavior>()._interactedVillagers)
+            else
             {
-                stringBuilder.AppendLine($"{interactedVillager.Key.StringId} ({(int)interactedVillager.Value})");
+                stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+                foreach (var interactedVillager in Campaign.Current.GetCampaignBehavior<VillagerCampaignBehavior>()._interactedVillagers)
+                {
+                    stringBuilder.AppendLine($"{interactedVillager.Key.StringId} ({(int)interactedVillager.Value})");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve interacted villagers");
+
         }
-        return "Failed to retrieve interacted villagers";
     }
 
-    [CommandLineArgumentFunction("view_looted_villagers", "coop.debug.villagers")]
-    public static string ViewLootedVillagers(List<string> strings)
+    public sealed class ViewLootedVillagersCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var lootedVillager in Campaign.Current.GetCampaignBehavior<VillagerCampaignBehavior>()._lootedVillagers)
-        {
-            stringBuilder.AppendLine($"{lootedVillager.Key.StringId} ({lootedVillager.Value.NumTicks})");
-        }
+        public string Prefix => "coop.debug.villagers";
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
+        public string Name => "view_looted_villagers";
+
+        public string Description => "Shows looted villagers for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            return result;
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var lootedVillager in Campaign.Current.GetCampaignBehavior<VillagerCampaignBehavior>()._lootedVillagers)
+            {
+                stringBuilder.AppendLine($"{lootedVillager.Key.StringId} ({lootedVillager.Value.NumTicks})");
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Failed to retrieve looted villagers");
+
         }
-        return "Failed to retrieve looted villagers";
     }
 }

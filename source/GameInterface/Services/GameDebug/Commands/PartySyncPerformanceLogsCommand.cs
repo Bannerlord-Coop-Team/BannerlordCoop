@@ -1,62 +1,84 @@
+﻿using Common.Commands;
 using Common;
 using GameInterface.Services.GameDebug.Metrics;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
 
 public class PartySyncPerformanceLogsCommand
 {
-    private const string Usage = "Usage: coop.debug.metrics.party_sync_performance_logs on <seconds> <filename> | off | status";
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
 
-    [CommandLineArgumentFunction("party_sync_performance_logs", "coop.debug.metrics")]
-    public static string PartySyncPerformanceLogs(List<string> args)
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class MetricsPartySyncPerformanceLogsCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-        {
-            return "party_sync_performance_logs can only be called by a client";
-        }
+        public string Prefix => "coop.debug.metrics";
 
-        if (ContainerProvider.TryResolve<IPartySyncPerformanceLogger>(out var logger) == false)
-        {
-            return $"Unable to get {nameof(IPartySyncPerformanceLogger)}";
-        }
+        public string Name => "party_sync_performance_logs";
 
-        if (args.Count == 0)
-        {
-            return Usage;
-        }
+        public string Description => "Runs the party sync performance logs debug operation.";
 
-        var mode = args[0].ToLowerInvariant();
-
-        switch (mode)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            case "on":
-                return Enable(logger, args);
-            case "off":
-                return logger.Disable();
-            case "status":
-                return logger.Status();
-            default:
-                return Usage;
+            new ExpectedArgs("mode", "on, off, or status.", isRequired: true),
+            new ExpectedArgs("seconds", "The logging duration in seconds when enabling.", isRequired: false),
+            new ExpectedArgs("file_name", "The output file name when enabling.", isRequired: false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+            {
+                return Failed("party_sync_performance_logs can only be called by a client");
+            }
+
+            if (ContainerProvider.TryResolve<IPartySyncPerformanceLogger>(out var logger) == false)
+            {
+                return Failed($"Unable to get {nameof(IPartySyncPerformanceLogger)}");
+            }
+
+            var mode = args[0].ToLowerInvariant();
+
+            switch (mode)
+            {
+                case "on":
+                    return Enable(logger, args);
+                case "off":
+                    return Succeeded(logger.Disable());
+                case "status":
+                    return Succeeded(logger.Status());
+                default:
+                    return Failed($"Invalid mode '{args[0]}'. Expected on, off, or status.");
+            }
         }
     }
 
-    private static string Enable(IPartySyncPerformanceLogger logger, List<string> args)
+    private static CoopCommandResult Enable(IPartySyncPerformanceLogger logger, IReadOnlyList<string> args)
     {
         if (args.Count != 3)
-        {
-            return Usage;
-        }
+            return Failed("Enabling performance logs requires seconds and a file name.");
 
         if (!double.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) ||
             seconds <= 0d)
         {
-            return "Seconds must be a positive number";
+            return Failed("Seconds must be a positive number");
         }
 
-        return logger.Enable(TimeSpan.FromSeconds(seconds), args[2]);
+        string fileName = args[2];
+        if (string.IsNullOrWhiteSpace(fileName))
+            return Failed("File name must not be empty.");
+        if (Path.GetFileName(fileName) != fileName || fileName.Contains(".."))
+            return Failed("File name must not include a path.");
+        if (fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            return Failed("File name contains invalid characters.");
+
+        return Succeeded(logger.Enable(TimeSpan.FromSeconds(seconds), fileName));
     }
 }
