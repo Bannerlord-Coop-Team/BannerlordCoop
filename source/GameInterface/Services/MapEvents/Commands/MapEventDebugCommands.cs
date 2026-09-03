@@ -303,7 +303,6 @@ public class MapEventDebugCommands
             if (!ModInformation.IsServer)
                 return Failed("Run this command on the server.");
 
-
             if (playerFieldBattleFixture != null)
                 return Failed("A player field-battle fixture is already pending restoration.");
 
@@ -412,7 +411,6 @@ public class MapEventDebugCommands
             if (!ModInformation.IsServer)
                 return Failed("Run this command on the server.");
 
-
             var fixture = playerFieldBattleFixture;
             if (fixture == null)
                 return Failed("No player field-battle fixture is pending restoration.");
@@ -453,7 +451,6 @@ public class MapEventDebugCommands
         {
             if (!ModInformation.IsClient)
                 return Failed("Run this command on the attacking client.");
-
 
             var attacker = MobileParty.MainParty;
             if (attacker?.Party == null || !attacker.IsActive || attacker.MapEvent != null)
@@ -596,7 +593,6 @@ public class MapEventDebugCommands
             return Failed("Run this command on a client");
         }
 
-
         var mainParty = MobileParty.MainParty;
         var mapEvent = mainParty?.MapEvent;
         if (mapEvent == null)
@@ -621,8 +617,6 @@ public class MapEventDebugCommands
         return requested
             ? Succeeded($"Starting attack mission for {mapEventId}")
             : Failed($"Server rejected attack mission for {mapEventId}");
-
-
     }
 
     // coop.debug.mapevent.start_looter
@@ -650,7 +644,6 @@ public class MapEventDebugCommands
             }
 
             EncounterManager.StartPartyEncounter(MobileParty.MainParty.Party, partyBase);
-
 
             return Succeeded($"MapEvent Started");
         }
@@ -731,7 +724,6 @@ public class MapEventDebugCommands
             {
                 return Failed("Run this command on the server.");
             }
-
 
             if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
             {
@@ -816,7 +808,6 @@ public class MapEventDebugCommands
         {
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
-
 
             if (banditAttackFixture != null)
                 return Failed("A bandit attack fixture is already active.");
@@ -955,7 +946,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-
             if (!TryGetObjectManager(out var objectManager))
                 return Failed("Unable to resolve ObjectManager");
 
@@ -1089,7 +1079,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-
             if (banditAttackFixture == null || banditAttackFixture.ControllerId != args[0])
                 return Failed($"No active bandit attack fixture exists for {args[0]}.");
 
@@ -1168,7 +1157,6 @@ public class MapEventDebugCommands
         {
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client.");
-
 
             if (PlayerEncounter.Current == null)
                 return Failed("No player encounter is active.");
@@ -1264,7 +1252,6 @@ public class MapEventDebugCommands
         {
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
-
 
             if (args[0] == args[1])
                 return Failed("The initiator and late joiner must be different players.");
@@ -1536,7 +1523,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-
             var fixture = battleRewardFixture;
             if (fixture == null)
                 return Failed("No battle reward fixture is active.");
@@ -1586,7 +1572,6 @@ public class MapEventDebugCommands
         {
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
-
 
             var fixture = battleRewardFixture;
             if (fixture == null)
@@ -1648,7 +1633,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-
             var fixture = battleRewardFixture;
             if (fixture == null)
                 return Failed("No battle reward fixture is active.");
@@ -1687,7 +1671,6 @@ public class MapEventDebugCommands
         {
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
-
 
             var fixture = battleRewardFixture;
             if (fixture == null)
@@ -1728,7 +1711,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-
             var fixture = battleRewardFixture;
             if (fixture == null)
                 return Failed("No battle reward fixture is active.");
@@ -1768,7 +1750,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client.");
 
-
             var encounter = PlayerEncounter.Current;
             var mainParty = PartyBase.MainParty;
             var mainMobileParty = mainParty?.MobileParty;
@@ -1805,7 +1786,6 @@ public class MapEventDebugCommands
         {
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
-
 
             var fixture = battleRewardFixture;
             if (fixture == null)
@@ -2045,7 +2025,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-
             if (woundedAlliedFixture != null)
                 return Failed($"Fixture already active for {woundedAlliedFixture.ControllerId}.");
 
@@ -2222,7 +2201,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-
             if (woundedAlliedFixture == null || woundedAlliedFixture.ControllerId != args[0])
                 return Failed($"No active fixture exists for {args[0]}.");
 
@@ -2361,7 +2339,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-
             if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
                 return Failed("Unable to resolve PlayerManager");
 
@@ -2399,7 +2376,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client.");
 
-
             if (PlayerEncounter.Current == null)
                 return Failed("No active encounter.");
 
@@ -2422,7 +2398,6 @@ public class MapEventDebugCommands
         {
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client.");
-
 
             if (PlayerEncounter.Current == null)
                 return Failed("No active encounter.");
@@ -2466,7 +2441,6 @@ public class MapEventDebugCommands
             {
                 return Failed("Run this command on the server.");
             }
-
 
             if (!TryGetPlayerParty(
                     args[0],
@@ -2515,7 +2489,6 @@ public class MapEventDebugCommands
                 return Failed("Run this command on the server.");
             }
 
-
             var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
             return Succeeded($"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.");
         }
@@ -2546,7 +2519,6 @@ public class MapEventDebugCommands
             {
                 return Failed("Run this command on the server.");
             }
-
 
             if (lateJoinModeFixture != null)
             {
@@ -2983,8 +2955,6 @@ public class MapEventDebugCommands
         }
 
         return Succeeded($"Late-join fixture mission exit requested for {requested} player(s).");
-
-
     }
 
     /// <summary>Returns both fixture clients to campaign and restores the server-side battle state.</summary>
@@ -3099,7 +3069,6 @@ public class MapEventDebugCommands
             return Failed("Run this command on the server.");
         }
 
-
         if (lateJoinModeFixture == null)
         {
             return Failed("No late-join mode fixture is active.");
@@ -3117,8 +3086,6 @@ public class MapEventDebugCommands
         return Succeeded(restored
             ? $"Late-join field-battle fixture {mapEventId} cleaned up and party movement restored."
             : $"Late-join field-battle fixture {mapEventId} cleaned up, but its original state could not be fully restored.");
-
-
     }
 
     private static bool CleanupLateJoinModeFixture(
@@ -3200,7 +3167,6 @@ public class MapEventDebugCommands
                 return Failed("Run this command on the server.");
             }
 
-
             if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
             {
                 return Failed(error);
@@ -3275,7 +3241,6 @@ public class MapEventDebugCommands
             {
                 return Failed("Run this command on the server.");
             }
-
 
             if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
             {
@@ -3569,7 +3534,6 @@ public class MapEventDebugCommands
                 }
                 catch (Exception ex)
                 {
-
                 }
             }
 
@@ -3682,7 +3646,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client in a battle mission.");
 
-
             var handler = Mission.Current?.GetMissionBehavior<BasicMissionHandler>();
             if (handler == null)
                 return Failed("No active battle retreat handler.");
@@ -3733,7 +3696,6 @@ public class MapEventDebugCommands
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client at the encounter meeting.");
 
-
             if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "encounter_meeting")
                 return Failed("The encounter meeting is not active.");
 
@@ -3764,7 +3726,6 @@ public class MapEventDebugCommands
         {
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client at the encounter menu.");
-
 
             if (PlayerEncounter.Current == null)
                 return Failed("No active player encounter.");
