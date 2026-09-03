@@ -77,6 +77,9 @@ public class CoopTournamentController : CoopMissionController
     private NetworkTournamentRuntimeState latestRuntimeState;
     private bool applyingRuntimeState;
     private NetworkApplyTournamentDamage activeDamageMessage;
+    private WeaponComponentData activeDamageAttackerWeapon;
+    private float? activeDamageShotDifficulty;
+    private bool activeDamageFatal;
     private float resultReadyElapsed;
     private readonly Dictionary<Agent, TournamentAgentSpawnData> manifestAgentData = new();
     private readonly Dictionary<Guid, Agent> manifestAgentInstances = new();
@@ -90,6 +93,8 @@ public class CoopTournamentController : CoopMissionController
         public Guid AttackerId { get; }
         public Blow Blow { get; }
         public AttackCollisionData CollisionData { get; }
+        public WeaponComponentData AttackerWeapon { get; }
+        public float? ShotDifficulty { get; }
         public long ReadyEpoch { get; }
         public long GuardCandidateId { get; }
 
@@ -101,6 +106,8 @@ public class CoopTournamentController : CoopMissionController
             Guid attackerId,
             Blow blow,
             AttackCollisionData collisionData,
+            WeaponComponentData attackerWeapon,
+            float? shotDifficulty,
             long readyEpoch,
             long guardCandidateId)
         {
@@ -111,6 +118,8 @@ public class CoopTournamentController : CoopMissionController
             AttackerId = attackerId;
             Blow = blow;
             CollisionData = collisionData;
+            AttackerWeapon = attackerWeapon;
+            ShotDifficulty = shotDifficulty;
             ReadyEpoch = readyEpoch;
             GuardCandidateId = guardCandidateId;
         }
@@ -452,6 +461,13 @@ public class CoopTournamentController : CoopMissionController
 
         if (blow.InflictedDamage > 0)
         {
+            CaptureMissileProgressionData(
+                victim,
+                attacker,
+                in blow,
+                out WeaponComponentData attackerWeapon,
+                out float? shotDifficulty);
+
             long guardCandidateId =
                 guardedHitWindow.RegisterCandidate(
                     victim,
@@ -467,10 +483,36 @@ public class CoopTournamentController : CoopMissionController
                 attackerId,
                 blow,
                 collisionData,
+                attackerWeapon,
+                shotDifficulty,
                 guardedHitWindow.Epoch + 1,
                 guardCandidateId));
         }
         return false;
+    }
+
+    private void CaptureMissileProgressionData(
+        Agent victim,
+        Agent attacker,
+        in Blow blow,
+        out WeaponComponentData attackerWeapon,
+        out float? shotDifficulty)
+    {
+        attackerWeapon = null;
+        shotDifficulty = null;
+        if (!blow.IsMissile || attacker == null) return;
+
+        int missileIndex = blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+        if (Mission.Current._missilesDictionary.TryGetValue(missileIndex, out var missile))
+            attackerWeapon = missile.Weapon.CurrentUsageItem;
+        else
+            Logger.Error(
+                "Failed to resolve tournament missile weapon at source index {MissileIndex}",
+                missileIndex);
+        shotDifficulty = Mission.Current.GetShootDifficulty(
+            victim,
+            attacker,
+            blow.VictimBodyPart == BoneBodyPartType.Head);
     }
 
     private void Handle_ApplyTournamentDamage(MessagePayload<NetworkApplyTournamentDamage> payload)
@@ -481,6 +523,12 @@ public class CoopTournamentController : CoopMissionController
     }
 
     private void ApplyTournamentDamage(NetworkApplyTournamentDamage message)
+        => ApplyTournamentDamageWithProgression(message, null, null);
+
+    private void ApplyTournamentDamageWithProgression(
+        NetworkApplyTournamentDamage message,
+        WeaponComponentData originAttackerWeapon,
+        float? originShotDifficulty)
     {
         var registry = coopMissionComponent.AgentRegistry;
         if (!registry.TryGetAgentInfo(message.VictimAgentId, out var victimInfo)) return;
@@ -511,7 +559,13 @@ public class CoopTournamentController : CoopMissionController
 
         applyingDamage.Add(message.VictimAgentId);
         NetworkApplyTournamentDamage previousDamageMessage = activeDamageMessage;
+        WeaponComponentData previousDamageAttackerWeapon = activeDamageAttackerWeapon;
+        float? previousDamageShotDifficulty = activeDamageShotDifficulty;
+        bool previousDamageFatal = activeDamageFatal;
         activeDamageMessage = message;
+        activeDamageAttackerWeapon = originAttackerWeapon;
+        activeDamageShotDifficulty = originShotDifficulty;
+        activeDamageFatal = blow.InflictedDamage >= victim.Health;
         try
         {
             RegisterBlowPatch.RunOriginalRegisterBlow(victim, blow, collisionData);
@@ -519,6 +573,9 @@ public class CoopTournamentController : CoopMissionController
         finally
         {
             activeDamageMessage = previousDamageMessage;
+            activeDamageAttackerWeapon = previousDamageAttackerWeapon;
+            activeDamageShotDifficulty = previousDamageShotDifficulty;
+            activeDamageFatal = previousDamageFatal;
             applyingDamage.Remove(message.VictimAgentId);
         }
 
@@ -534,18 +591,50 @@ public class CoopTournamentController : CoopMissionController
         in AttackCollisionData collisionData,
         float shotDifficulty)
     {
+        if (!CanCaptureHitProgression(affectedAgent, affectorAgent)) return;
+
         NetworkApplyTournamentDamage damage = activeDamageMessage;
-        if (!session.IsLocalHost || damage == null ||
-            snapshot?.Phase != TournamentSessionPhase.LiveMatch ||
-            affectedAgent == null || affectorAgent == null ||
-            damage.MatchId != snapshot.CurrentMatchId) return;
-        TournamentAgentSpawnData attackerSpawn = FindManifestAgent(damage.AttackerAgentId);
-        TournamentAgentSpawnData victimSpawn = FindManifestAgent(damage.VictimAgentId);
+        if (damage == null || damage.OriginControllerId != session.OwnControllerId)
+            return;
+
+        SubmitHitProgression(
+            affectedAgent,
+            affectorAgent,
+            activeDamageAttackerWeapon ?? attackerWeapon,
+            in blow,
+            in collisionData,
+            activeDamageShotDifficulty ?? shotDifficulty,
+            damage.OriginControllerId,
+            damage.Sequence,
+            activeDamageFatal);
+    }
+
+    private bool CanCaptureHitProgression(Agent affectedAgent, Agent affectorAgent)
+        => snapshot?.Phase == TournamentSessionPhase.LiveMatch &&
+           affectedAgent != null &&
+           affectorAgent != null;
+
+    private void SubmitHitProgression(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        WeaponComponentData attackerWeapon,
+        in Blow blow,
+        in AttackCollisionData collisionData,
+        float shotDifficulty,
+        string damageOriginControllerId,
+        long damageSequence,
+        bool fatal)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(affectorAgent, out var attackerInfo) ||
+            !registry.TryGetAgentInfo(affectedAgent, out var victimInfo)) return;
+        TournamentAgentSpawnData attackerSpawn = FindManifestAgent(attackerInfo.AgentId);
+        TournamentAgentSpawnData victimSpawn = FindManifestAgent(victimInfo.AgentId);
         if (attackerSpawn == null || victimSpawn == null) return;
         TournamentContestantData attacker = snapshot.Contestants.FirstOrDefault(data =>
             data.SlotId == attackerSpawn.SlotId);
         if (attacker == null || !attacker.IsHuman || attacker.IsReplaced ||
-            attacker.ControllerId != damage.OriginControllerId) return;
+            string.IsNullOrEmpty(attacker.ControllerId)) return;
 
         float damageAmount = Math.Min(blow.InflictedDamage, affectedAgent.HealthLimit);
         if (damageAmount <= 0 || affectedAgent.HealthLimit <= 0) return;
@@ -560,10 +649,11 @@ public class CoopTournamentController : CoopMissionController
             snapshot.CurrentMatchId,
             snapshot.Revision,
             snapshot.BracketRevision,
-            damage.OriginControllerId,
-            damage.Sequence,
-            damage.AttackerAgentId,
-            damage.VictimAgentId,
+            attacker.ControllerId,
+            damageOriginControllerId,
+            damageSequence,
+            attackerInfo.AgentId,
+            victimInfo.AgentId,
             weaponItemId,
             weaponUsageIndex,
             blow.MovementSpeedDamageModifier,
@@ -573,7 +663,7 @@ public class CoopTournamentController : CoopMissionController
             (int)blow.AttackType,
             affectorAgent.MountAgent != null,
             affectorAgent.Team == affectedAgent.Team,
-            affectedAgent.Health < 1f,
+            fatal,
             affectorAgent.MountAgent != null &&
             blow.AttackType == AgentAttackType.Collision,
             collisionData.IsSneakAttack);
@@ -1102,7 +1192,10 @@ public class CoopTournamentController : CoopMissionController
                 in blow,
                 in collisionData);
             network.SendAll(message);
-            ApplyTournamentDamage(message);
+            ApplyTournamentDamageWithProgression(
+                message,
+                pending.AttackerWeapon,
+                pending.ShotDifficulty);
         }
     }
 

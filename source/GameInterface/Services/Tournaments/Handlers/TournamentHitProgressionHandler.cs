@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Tournaments.Data;
@@ -27,9 +27,9 @@ internal sealed partial class TournamentSessionHandler
             if (!IsValidProgressionData(data) ||
                 !sessionRegistry.TryGet(data.SessionId, out snapshot) ||
                 snapshot.Phase != TournamentSessionPhase.LiveMatch ||
-                snapshot.HostControllerId != player.ControllerId ||
+                data.DamageOriginControllerId != player.ControllerId ||
                 snapshot.CurrentMatchId != data.MatchId ||
-                snapshot.Revision != data.Revision ||
+                !IsAcceptedProgressionRevision(snapshot.Revision, data.Revision) ||
                 snapshot.BracketRevision != data.BracketRevision ||
                 !sessionRegistry.TryGetSpawnManifest(data.SessionId, out var manifest) ||
                 manifest.MatchId != data.MatchId ||
@@ -46,14 +46,15 @@ internal sealed partial class TournamentSessionHandler
             if (contestant == null ||
                 !contestant.IsHuman ||
                 contestant.IsReplaced ||
-                contestant.ControllerId != data.DamageOriginControllerId ||
+                contestant.ControllerId != data.AttackerControllerId ||
+                contestant.ControllerId != player.ControllerId ||
                 !TryResolveWeapon(data, out var weapon))
             {
                 SendCanonical(peer, snapshot);
                 return;
             }
 
-            string dedupeKey = $"{data.SessionId}\n{data.MatchId}\n{data.DamageOriginControllerId}\n{data.DamageSequence}";
+            string dedupeKey = GetHitProgressionDedupeKey(data);
             if (acceptedHitProgression.Contains(dedupeKey))
                 return;
 
@@ -118,11 +119,12 @@ internal sealed partial class TournamentSessionHandler
         return weapon != null;
     }
 
-    private static bool IsValidProgressionData(TournamentHitProgressionData data)
+    internal static bool IsValidProgressionData(TournamentHitProgressionData data)
     {
         return data != null &&
             !string.IsNullOrEmpty(data.SessionId) && data.SessionId.Length <= 256 &&
             !string.IsNullOrEmpty(data.MatchId) && data.MatchId.Length <= 256 &&
+            !string.IsNullOrEmpty(data.AttackerControllerId) && data.AttackerControllerId.Length <= 256 &&
             !string.IsNullOrEmpty(data.DamageOriginControllerId) && data.DamageOriginControllerId.Length <= 256 &&
             data.DamageSequence > 0 &&
             data.AttackerAgentId != Guid.Empty &&
@@ -130,7 +132,7 @@ internal sealed partial class TournamentSessionHandler
             (data.WeaponItemId?.Length ?? 0) <= 256 &&
             data.AttackType >= 0 && data.AttackType <= 16 &&
             IsFinite(data.MovementSpeedModifier) &&
-            IsFinite(data.ShotDifficulty) && data.ShotDifficulty >= 0f &&
+            IsFinite(data.ShotDifficulty) && data.ShotDifficulty >= -1f &&
             IsFinite(data.HitpointRatio) && data.HitpointRatio >= 0f && data.HitpointRatio <= 1f &&
             IsFinite(data.DamageAmount) && data.DamageAmount >= 0f;
     }
@@ -140,6 +142,12 @@ internal sealed partial class TournamentSessionHandler
         acceptedProgression.RemoveWhere(key =>
             key.StartsWith($"{sessionId}\n", StringComparison.Ordinal));
     }
+
+    internal static string GetHitProgressionDedupeKey(TournamentHitProgressionData data)
+        => $"{data.SessionId}\n{data.MatchId}\n{data.DamageOriginControllerId}\n{data.DamageSequence}";
+
+    internal static bool IsAcceptedProgressionRevision(long currentRevision, long submittedRevision)
+        => submittedRevision >= 0 && submittedRevision <= currentRevision;
 
     private static bool IsFinite(float value)
         => !float.IsNaN(value) && !float.IsInfinity(value);
