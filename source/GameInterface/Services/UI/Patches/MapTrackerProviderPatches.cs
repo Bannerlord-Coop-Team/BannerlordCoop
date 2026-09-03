@@ -2,38 +2,49 @@
 using Common.Messaging;
 using GameInterface.Services.UI.Messages;
 using HarmonyLib;
-using SandBox.ViewModelCollection.Map.Tracker;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.UI.Patches;
 
-[HarmonyPatch(typeof(MapTrackerProvider))]
-internal class MapTrackerProviderPatches
+[HarmonyPatch(typeof(CampaignEventDispatcher))]
+internal class MapTrackerProviderUpdatePatches
 {
-    [HarmonyPatch(nameof(MapTrackerProvider.OnMobilePartyCreated))]
-    [HarmonyPrefix]
-    public static void OnMobilePartyCreatedPrefix(MapTrackerProvider __instance, MobileParty mobileParty)
+    [HarmonyPatch(nameof(CampaignEventDispatcher.OnMobilePartyCreated))]
+    [HarmonyPostfix]
+    public static void OnMobilePartyCreatedPostfix(MobileParty party)
     {
         if (ModInformation.IsClient) return;
 
-        MessageBroker.Instance.Publish(__instance, new MapTrackerPartyCreated(mobileParty));
+        MessageBroker.Instance.Publish(null, new MapTrackerPartyCreated(party));
     }
 
-    [HarmonyPatch(nameof(MapTrackerProvider.OnPartyDisbanded))]
-    [HarmonyPrefix]
-    public static void OnPartyDisbandedPrefix(MapTrackerProvider __instance, MobileParty disbandedParty)
+    [HarmonyPatch(nameof(CampaignEventDispatcher.OnPartyDisbanded))]
+    [HarmonyPostfix]
+    public static void OnPartyDisbandedPostfix(MobileParty disbandParty, Settlement relatedSettlement)
     {
         if (ModInformation.IsClient) return;
 
-        MessageBroker.Instance.Publish(__instance, new MapTrackerPartyRemoved(disbandedParty));
+        MessageBroker.Instance.Publish(null, new MapTrackerPartyRemoved(disbandParty));
     }
 
-    [HarmonyPatch(nameof(MapTrackerProvider.OnPartyDestroyed))]
-    [HarmonyPrefix]
-    public static void OnPartyDestroyedPrefix(MapTrackerProvider __instance, MobileParty mobileParty)
+    [HarmonyPatch(nameof(CampaignEventDispatcher.OnMobilePartyDestroyed))]
+    [HarmonyPostfix]
+    public static void OnMobilePartyDestroyedPostfix(MobileParty mobileParty, PartyBase destroyerParty)
     {
         if (ModInformation.IsClient) return;
 
-        MessageBroker.Instance.Publish(__instance, new MapTrackerPartyRemoved(mobileParty));
+        MessageBroker.Instance.Publish(null, new MapTrackerPartyRemoved(mobileParty));
+    }
+
+    [HarmonyPatch(nameof(CampaignEventDispatcher.OnClanCreated))]
+    [HarmonyPostfix]
+    public static void OnCompanionClanCreatedPostfix(Clan clan, bool isCompanion)
+    {
+        if (ModInformation.IsClient) return;
+        if (!isCompanion || clan.Leader.PartyBelongedTo == null) return;
+
+        MessageBroker.Instance.Publish(null, new MapTrackerPartyRemoved(clan.Leader.PartyBelongedTo));
     }
 }
