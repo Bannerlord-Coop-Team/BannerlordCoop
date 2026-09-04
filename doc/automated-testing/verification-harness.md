@@ -78,17 +78,6 @@ when its producer derived the head/tree from the immutable snapshot it built.
 This tier does not execute Coop message handlers, campaign state, Bannerlord native code, rendering,
 or save loading. Those claims require a higher profile.
 
-## Peer-host protocol
-
-`peer-host --instance-id <id>` is the JSON-lines process-isolation foundation used by the transport
-lab. Requests and responses contain `protocolVersion`, a sequence starting at 1, `instanceId`, and
-`processId`. The first command is `hello`; later commands are `ping`, `put`, `get`, `snapshot`, and
-`shutdown`.
-
-Snapshots hash canonical sorted logical state. Process IDs and timestamps stay outside that digest.
-Blank, oversized, malformed, unsupported, or out-of-sequence input emits one error at the expected
-sequence and exits with code 4. EOF and an acknowledged shutdown exit cleanly.
-
 ## Evidence and rollout
 
 Plans bind the exact commit/tree, schema version, required profiles/checks, topology, seed,

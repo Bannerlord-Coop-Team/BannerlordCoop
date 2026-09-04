@@ -574,9 +574,7 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
 
     private static bool IsProcessBoundaryPath(string path) =>
         StartsWith(path, "source/VerificationHarness/Transport/") ||
-        StartsWith(path, "source/VerificationHarness/PeerHost/") ||
-        StartsWith(path, "source/VerificationHarness.Tests/Transport/") ||
-        StartsWith(path, "source/VerificationHarness.Tests/PeerHost/");
+        StartsWith(path, "source/VerificationHarness.Tests/Transport/");
 
     private static bool IsDeterministicPeerPath(string path) =>
         StartsWith(path, "source/Coop.Core/") ||

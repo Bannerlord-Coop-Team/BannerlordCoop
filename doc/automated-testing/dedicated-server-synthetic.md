@@ -53,9 +53,9 @@ VerificationHarness dedicated-server-synthetic-node \
 ```
 
 Module-mismatch and wrong-password servers use `--expected-clients 1`; wrong-password also omits
-`--module-contract`. Client nodes use `--role client`, one of the two fixed `--controller-id`
-values, and no `--expected-clients`. Baseline and module-mismatch clients require the module
-contract; wrong-password clients omit it.
+`--module-contract`. Client nodes use `--role client`, `ds-synthetic-client-a` or
+`ds-synthetic-client-b` as `--controller-id`, and no `--expected-clients`. Baseline and
+module-mismatch clients require the module contract; wrong-password clients omit it.
 
 The real-process controller attaches to the opt-in live-test pipe for an already running exact
 server PID. It does not launch Bannerlord or the server:
@@ -88,7 +88,9 @@ The source-bound build creates `dedicated-server-synthetic-artifacts.v1`; the ru
 only verifies it. The caller supplies the frozen raw manifest hash separately. The manifest binds
 both repositories' head/tree pairs, the co-op build version, stage-relative paths, hashes, assembly
 versions, and MVIDs. It contains the six managed co-op assemblies, `DedicatedServer.Core`, the active
-Windows or Linux shim, and the platform's TaleWorlds starter assembly.
+Windows or Linux shim, and the platform's TaleWorlds starter assembly. Windows uses a hashed
+`staged-executable` process host. Linux explicitly uses the image's `system-dotnet` host while the
+staged `TaleWorlds.Starter.DotNetCore.Linux` assembly remains path, hash, MVID, and version checked.
 
 Before UDP work and again after the lifecycle, the controller verifies:
 

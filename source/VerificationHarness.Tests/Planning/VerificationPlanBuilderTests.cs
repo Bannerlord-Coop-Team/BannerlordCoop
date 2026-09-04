@@ -49,7 +49,6 @@ public sealed class VerificationPlanBuilderTests
 
     [Theory]
     [InlineData("source/VerificationHarness/Transport/ProcessPeerController.cs")]
-    [InlineData("source/VerificationHarness/PeerHost/PeerHostServer.cs")]
     [InlineData("source/VerificationHarness.Tests/Transport/ProcessPeerLabTests.cs")]
     public void ProcessHarnessChangesRequireTheirOwnProcessProfile(string path)
     {

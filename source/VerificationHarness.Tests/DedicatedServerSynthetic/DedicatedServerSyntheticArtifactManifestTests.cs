@@ -143,6 +143,41 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
 
             Assert.True(loaded.DedicatedServerAssemblies.ContainsKey(
                 "TaleWorlds.Starter.DotNetCore.Linux"));
+            Assert.Equal(
+                DedicatedServerSyntheticExecutableArtifact.SystemDotnetKind,
+                loaded.ServerExecutable.Kind);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task VerifyAsync_AcceptsLinuxSystemDotnetAndHashesTheStagedStarter()
+    {
+        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest(
+            "DedicatedServer.Linux",
+            "TaleWorlds.Starter.DotNetCore.Linux");
+        string path = WriteManifest(manifest);
+        try
+        {
+            DedicatedServerSyntheticOptions options = CreateOptions(path);
+            var reader = new StubHostArtifactReader(manifest);
+            var verifier = new DedicatedServerSyntheticArtifactVerifier(
+                new StatusControlClient(manifest),
+                reader,
+                new CanonicalJsonHasher());
+
+            DedicatedServerSyntheticArtifactVerification result = await verifier.VerifyAsync(
+                options,
+                CancellationToken.None);
+
+            Assert.True(result.IsValid);
+            Assert.Contains(
+                StagedPath(manifest.DedicatedServerAssemblies["TaleWorlds.Starter.DotNetCore.Linux"].RelativePath),
+                reader.HashedPaths);
+            Assert.DoesNotContain(reader.ProcessExecutablePath, reader.HashedPaths);
         }
         finally
         {
@@ -311,6 +346,38 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
     }
 
     [Fact]
+    public async Task VerifyAsync_RejectsLinuxHostThatIsNotDotnet()
+    {
+        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest(
+            "DedicatedServer.Linux",
+            "TaleWorlds.Starter.DotNetCore.Linux");
+        string path = WriteManifest(manifest);
+        try
+        {
+            DedicatedServerSyntheticOptions options = CreateOptions(path);
+            var reader = new StubHostArtifactReader(manifest)
+            {
+                ProcessExecutablePath = Path.Combine(Path.GetTempPath(), "unexpected-host")
+            };
+            var verifier = new DedicatedServerSyntheticArtifactVerifier(
+                new StatusControlClient(manifest),
+                reader,
+                new CanonicalJsonHasher());
+
+            DedicatedServerSyntheticArtifactVerification result = await verifier.VerifyAsync(
+                options,
+                CancellationToken.None);
+
+            Assert.False(result.IsValid);
+            Assert.Contains("artifact-server-executable-mismatch", result.FailureCodes);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task VerifyAsync_RejectsDiskMvidMismatch()
     {
         DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
@@ -345,6 +412,7 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         string platformAssemblyName = "DedicatedServer.Windows",
         string starterAssemblyName = "TaleWorlds.Starter.DotNetCore")
     {
+        bool isLinux = platformAssemblyName == "DedicatedServer.Linux";
         var manifest = new DedicatedServerSyntheticArtifactManifest
         {
             CoopSource = new DedicatedServerSyntheticSourceIdentity
@@ -360,9 +428,12 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
             BuildVersion = "1.2.3+source-bound",
             ServerExecutable = new DedicatedServerSyntheticExecutableArtifact
             {
-                FileName = "dotnet.exe",
-                RelativePath = "runtime/dotnet.exe",
-                Sha256 = HashFor("runtime/dotnet.exe")
+                Kind = isLinux
+                    ? DedicatedServerSyntheticExecutableArtifact.SystemDotnetKind
+                    : DedicatedServerSyntheticExecutableArtifact.StagedExecutableKind,
+                FileName = isLinux ? "dotnet" : "dotnet.exe",
+                RelativePath = isLinux ? string.Empty : "runtime/dotnet.exe",
+                Sha256 = isLinux ? string.Empty : HashFor("runtime/dotnet.exe")
             }
         };
 
@@ -504,8 +575,15 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
 
         public StubHostArtifactReader(DedicatedServerSyntheticArtifactManifest manifest)
         {
-            ProcessExecutablePath = StagedPath(manifest.ServerExecutable.RelativePath);
-            hashes[ProcessExecutablePath] = manifest.ServerExecutable.Sha256;
+            if (manifest.ServerExecutable.Kind == DedicatedServerSyntheticExecutableArtifact.SystemDotnetKind)
+            {
+                ProcessExecutablePath = Path.Combine(Path.GetTempPath(), "system-dotnet", "dotnet");
+            }
+            else
+            {
+                ProcessExecutablePath = StagedPath(manifest.ServerExecutable.RelativePath);
+                hashes[ProcessExecutablePath] = manifest.ServerExecutable.Sha256;
+            }
             foreach ((string name, DedicatedServerSyntheticAssemblyArtifact artifact) in
                      manifest.LoadedAssemblies.Concat(manifest.DedicatedServerAssemblies))
             {

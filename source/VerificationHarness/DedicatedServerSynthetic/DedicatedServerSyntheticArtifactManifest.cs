@@ -35,6 +35,10 @@ public sealed class DedicatedServerSyntheticSourceIdentity
 
 public sealed class DedicatedServerSyntheticExecutableArtifact
 {
+    public const string StagedExecutableKind = "staged-executable";
+    public const string SystemDotnetKind = "system-dotnet";
+
+    public string Kind { get; set; } = StagedExecutableKind;
     public string FileName { get; set; } = string.Empty;
     public string RelativePath { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
@@ -160,24 +164,6 @@ public static class DedicatedServerSyntheticArtifactManifestFile
                 "The dedicated-server synthetic artifact manifest build version is invalid.");
         }
 
-        if (manifest.ServerExecutable == null ||
-            string.IsNullOrWhiteSpace(manifest.ServerExecutable.FileName) ||
-            !string.Equals(
-                Path.GetFileName(manifest.ServerExecutable.FileName),
-                manifest.ServerExecutable.FileName,
-                StringComparison.Ordinal) ||
-            Encoding.UTF8.GetByteCount(manifest.ServerExecutable.FileName) > 260 ||
-            !IsSafeRelativePath(manifest.ServerExecutable.RelativePath) ||
-            !string.Equals(
-                Path.GetFileName(manifest.ServerExecutable.RelativePath),
-                manifest.ServerExecutable.FileName,
-                StringComparison.Ordinal) ||
-            !IsSha256(manifest.ServerExecutable.Sha256))
-        {
-            throw new InvalidDataException(
-                "The dedicated-server synthetic server executable artifact is invalid.");
-        }
-
         if (manifest.LoadedAssemblies == null ||
             !manifest.LoadedAssemblies.Keys.SequenceEqual(RequiredAssemblyNames, StringComparer.Ordinal))
         {
@@ -186,6 +172,9 @@ public static class DedicatedServerSyntheticArtifactManifestFile
         }
 
         ValidateDedicatedServerAssemblySet(manifest.DedicatedServerAssemblies);
+        ValidateServerExecutable(
+            manifest.ServerExecutable,
+            manifest.DedicatedServerAssemblies.ContainsKey("DedicatedServer.Linux"));
         ValidateAssemblyArtifacts(manifest.DedicatedServerAssemblies);
         ValidateAssemblyArtifacts(manifest.LoadedAssemblies);
 
@@ -193,6 +182,42 @@ public static class DedicatedServerSyntheticArtifactManifestFile
         {
             throw new InvalidDataException(
                 "The dedicated-server synthetic artifact manifest contains an invalid digest.");
+        }
+    }
+
+    private static void ValidateServerExecutable(
+        DedicatedServerSyntheticExecutableArtifact artifact,
+        bool isLinux)
+    {
+        if (artifact == null)
+        {
+            throw new InvalidDataException(
+                "The dedicated-server synthetic server executable artifact is invalid.");
+        }
+
+        bool commonShapeValid =
+            !string.IsNullOrWhiteSpace(artifact.FileName) &&
+            string.Equals(
+                Path.GetFileName(artifact.FileName),
+                artifact.FileName,
+                StringComparison.Ordinal) &&
+            Encoding.UTF8.GetByteCount(artifact.FileName) <= 260;
+        bool platformShapeValid = isLinux
+            ? artifact.Kind == DedicatedServerSyntheticExecutableArtifact.SystemDotnetKind &&
+              artifact.FileName == "dotnet" &&
+              string.IsNullOrEmpty(artifact.RelativePath) &&
+              string.IsNullOrEmpty(artifact.Sha256)
+            : artifact.Kind == DedicatedServerSyntheticExecutableArtifact.StagedExecutableKind &&
+              IsSafeRelativePath(artifact.RelativePath) &&
+              string.Equals(
+                  Path.GetFileName(artifact.RelativePath),
+                  artifact.FileName,
+                  StringComparison.Ordinal) &&
+              IsSha256(artifact.Sha256);
+        if (!commonShapeValid || !platformShapeValid)
+        {
+            throw new InvalidDataException(
+                "The dedicated-server synthetic server executable artifact is invalid.");
         }
     }
 
@@ -531,18 +556,7 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
         }
 
         string executablePath = hostArtifactReader.GetProcessExecutablePath(options.ServerProcessId);
-        string expectedExecutablePath = ResolveStagedPath(
-            options.ArtifactRootPath,
-            manifest.ServerExecutable.RelativePath);
-        if (!PathsEqual(executablePath, expectedExecutablePath) ||
-            !string.Equals(
-                Path.GetFileName(executablePath),
-                manifest.ServerExecutable.FileName,
-                StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(
-                hostArtifactReader.ComputeSha256(executablePath),
-                manifest.ServerExecutable.Sha256,
-                StringComparison.Ordinal))
+        if (!ServerExecutableMatches(executablePath, options.ArtifactRootPath, manifest.ServerExecutable))
         {
             return Failed("artifact-server-executable-mismatch", manifest);
         }
@@ -554,6 +568,30 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
             ProcessStartedUtc = processStartedUtc,
             RuntimeArtifactsMatch = true
         };
+    }
+
+    private bool ServerExecutableMatches(
+        string executablePath,
+        string artifactRootPath,
+        DedicatedServerSyntheticExecutableArtifact expected)
+    {
+        if (!string.Equals(
+                Path.GetFileName(executablePath),
+                expected.FileName,
+                PathComparison))
+        {
+            return false;
+        }
+
+        if (expected.Kind == DedicatedServerSyntheticExecutableArtifact.SystemDotnetKind)
+            return true;
+
+        string expectedExecutablePath = ResolveStagedPath(artifactRootPath, expected.RelativePath);
+        return PathsEqual(executablePath, expectedExecutablePath) &&
+            string.Equals(
+                hostArtifactReader.ComputeSha256(executablePath),
+                expected.Sha256,
+                StringComparison.Ordinal);
     }
 
     private bool VerifyAssemblyArtifacts(

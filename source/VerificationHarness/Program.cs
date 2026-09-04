@@ -1,5 +1,4 @@
 ﻿using VerificationHarness.DedicatedServerSynthetic;
-using VerificationHarness.PeerHost;
 using VerificationHarness.Planning;
 using VerificationHarness.Transport;
 
@@ -20,11 +19,6 @@ public static class Program
             if (string.Equals(args[0], "plan", StringComparison.Ordinal))
             {
                 return await RunPlanner(args.Skip(1).ToArray());
-            }
-
-            if (string.Equals(args[0], "peer-host", StringComparison.Ordinal))
-            {
-                return await RunPeerHost(args.Skip(1).ToArray());
             }
 
             if (string.Equals(args[0], "process-peer", StringComparison.Ordinal))
@@ -198,22 +192,6 @@ public static class Program
         return 0;
     }
 
-    private static async Task<int> RunPeerHost(string[] args)
-    {
-        if (args.Length != 2 || !string.Equals(args[0], "--instance-id", StringComparison.Ordinal))
-        {
-            throw new ArgumentException("The peer-host command requires --instance-id <id>.");
-        }
-
-        IPeerHostServer server = new PeerHostServer();
-        return await server.RunAsync(
-            Console.In,
-            Console.Out,
-            args[1],
-            Environment.ProcessId,
-            CancellationToken.None);
-    }
-
     private static async Task<int> RunProcessPeerManifest(string[] args)
     {
         if (args.Length != 6)
@@ -245,11 +223,15 @@ public static class Program
         Console.Error.WriteLine("  VerificationHarness plan --head <40-hex> --tree <40-hex> <repository-path> [repository-path ...]");
         Console.Error.WriteLine("  VerificationHarness plan --head <40-hex> --tree <40-hex> --stdin");
         Console.Error.WriteLine("  VerificationHarness validate-plan --plan <json-path> --head <40-hex> --tree <40-hex> --base <40-hex> --changed-paths <newline-list-path> --output <json-path>");
-        Console.Error.WriteLine("  VerificationHarness peer-host --instance-id <id>");
         Console.Error.WriteLine("  VerificationHarness process-peer-manifest --head <40-hex> --tree <40-hex> --output <json-path>");
         Console.Error.WriteLine("  VerificationHarness process-peer --head <40-hex> --tree <40-hex> --artifact-manifest <json-path> [--scenario converge|diverge|reconnect|malformed|out-of-sequence|corrupt-acknowledgement|timeout] [--timeout-ms <milliseconds>] [--seed <non-negative-decimal|0x16-hex>] [--output <json-path>]");
         Console.Error.WriteLine("  VerificationHarness process-peer-suite --head <40-hex> --tree <40-hex> --artifact-manifest <json-path> [--timeout-ms <milliseconds>] [--seed <non-negative-decimal|0x16-hex>] [--output <json-path>]");
         Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic --head <40-hex> --tree <40-hex> --server-head <40-hex> --server-tree <40-hex> --server-pid <pid> --run-token <token> --request-id <id> --join-port <port> --password-env <name> --artifact-manifest <json-path> --artifact-manifest-sha256 <sha256> --artifact-root <staged-runtime-path> [--timeout-ms <milliseconds>] [--seed <non-negative-decimal|0x16-hex>] [--output <json-path>]");
-        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role server|client --scenario baseline|wrong-password --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name>");
+        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role server --scenario baseline --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --module-contract <base64-json-contract> --expected-clients 2");
+        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role server --scenario module-mismatch --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --module-contract <base64-json-contract> --expected-clients 1");
+        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role server --scenario wrong-password --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --expected-clients 1");
+        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role client --scenario baseline --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --controller-id <ds-synthetic-client-a|ds-synthetic-client-b> --module-contract <base64-json-contract>");
+        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role client --scenario module-mismatch --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --controller-id <ds-synthetic-client-a|ds-synthetic-client-b> --module-contract <base64-json-contract>");
+        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role client --scenario wrong-password --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --controller-id <ds-synthetic-client-a|ds-synthetic-client-b>");
     }
 }
