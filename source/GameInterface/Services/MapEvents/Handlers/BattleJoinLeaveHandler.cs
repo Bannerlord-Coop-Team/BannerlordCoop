@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -411,10 +412,24 @@ internal class BattleJoinLeaveHandler : IHandler
     }
 
     // Authoritative campaign logic runs with patches live so removal, finalization, and replication stay ordered.
-    private static void ApplyAuthoritativeLeave(PartyBase party)
+    private void ApplyAuthoritativeLeave(PartyBase party)
     {
         if (party.MapEventSide != null)
             party.MapEventSide = null;
+
+        var mobileParty = party.MobileParty;
+        if (mobileParty == null) return;
+
+        // Player-owned AI changes are normally accepted only through the client behavior channel. This
+        // leave is already server-authoritative, so clear the engage and navigation state locally first,
+        // then publish the resulting snapshot before the leave broadcast.
+        using (new AllowedThread())
+        {
+            mobileParty.SetMoveModeHold();
+            mobileParty.ResetNavigationToHold();
+        }
+
+        messageBroker.Publish(mobileParty, new PartyBehaviorChangeAttempted(mobileParty));
     }
 
     private string ReserveJoin(NetPeer requestingPeer, string mapEventId, Guid reservationId)
@@ -464,7 +479,6 @@ internal class BattleJoinLeaveHandler : IHandler
     // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
     private void ApplyNetworkLeave(PartyBase party, bool leaveSiege, bool finishLocalMenus)
     {
-        MobileParty fieldBattlePartyToDisengage = null;
         using (new AllowedThread())
         {
             var mapEvent = party.MapEvent;
@@ -498,23 +512,13 @@ internal class BattleJoinLeaveHandler : IHandler
                 else if (PlayerEncounter.Current != null)
                 {
                     PlayerEncounter.Finish(false);
-                    fieldBattlePartyToDisengage = mobileParty;
+                    mobileParty?.SetMoveModeHold();
+                    mobileParty?.ResetNavigationToHold();
                 }
             }
 
             if (leaveSiege && isMainParty)
                 mobileParty?.SetMoveModeHold();
         }
-
-        // PlayerEncounter.Finish runs inside AllowedThread while applying the server's leave, so its normal
-        // postfix intentionally skips movement publication. Clear the stale engage order after leaving the
-        // receive-path bypass and send that change through the authoritative party-behavior channel.
-        if (fieldBattlePartyToDisengage?.Ai == null)
-            return;
-
-        fieldBattlePartyToDisengage.SetMoveModeHold();
-        messageBroker.Publish(
-            fieldBattlePartyToDisengage.Ai,
-            new PartyBehaviorChangeAttempted(fieldBattlePartyToDisengage));
     }
 }
