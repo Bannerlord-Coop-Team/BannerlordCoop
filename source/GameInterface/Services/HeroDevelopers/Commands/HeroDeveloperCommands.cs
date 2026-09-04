@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Common.Commands;
+using Common;
 using Common.Logging;
 using Serilog;
 using System.Collections.Generic;
@@ -13,38 +14,58 @@ namespace GameInterface.Services.HeroDevelopers.Commands;
 
 internal class HeroDeveloperCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private static readonly ILogger Logger = LogManager.GetLogger<HeroDeveloperCommands>();
 
     /// <summary>
     /// Add skill xp to a hero with a skill object name.
-    /// Examples: 
+    /// Examples:
     /// coop.debug.herodeveloper.addskillxp RandomPlayer OneHanded 3000
     /// </summary>
-    [CommandLineArgumentFunction("addskillxp", "coop.debug.herodeveloper")]
-    public static string AddSkillXpCommand(List<string> strings)
+    public sealed class HeroDeveloperAddSkillXpCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        public string Prefix => "coop.debug.hero_developer";
 
-        if (strings.Count != 3) return "Usage: addskillxp heroName skillName xp";
+        public string Name => "add_skill_xp";
 
-        SkillObject skillObject = GetSkillByName(strings[1]);
-        if (skillObject == null) return "Unable to find SkillObject by provided name.";
+        public string Description => "Runs the add skill xp debug operation.";
 
-        if (!int.TryParse(strings[2], out int xpGain)) return "An integer amount of xp is required.";
-
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+            new ExpectedArgs("hero_name_or_id", "The hero display name or StringId.", isRequired: true),
+            new ExpectedArgs("skill_name", "The skill object name.", isRequired: true),
+            new ExpectedArgs("xp_amount", "The amount of skill experience.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+
+            SkillObject skillObject = GetSkillByName(strings[1]);
+            if (skillObject == null) return Failed("Unable to find SkillObject by provided name.");
+
+            if (!int.TryParse(strings[2], out int xpGain)) return Failed("An integer amount of xp is required.");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
             {
-                hero.AddSkillXp(skillObject, xpGain);
+                if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+                {
+                    hero.AddSkillXp(skillObject, xpGain);
 
-                stringBuilder.AppendLine($"{strings[0]} was given {xpGain} xp for {skillObject.Name}");
+                    stringBuilder.AppendLine($"{strings[0]} was given {xpGain} xp for {skillObject.Name}");
+                }
             }
-        }
 
-        if (stringBuilder.Length > 0) return stringBuilder.ToString();
-        else return $"Unable to find hero with name or id of {strings[0]}";
+            if (stringBuilder.Length > 0) return Succeeded(stringBuilder.ToString());
+            else return Failed($"Unable to find hero with name or id of {strings[0]}");
+        }
     }
 
     /// <summary>
@@ -52,29 +73,42 @@ internal class HeroDeveloperCommands
     /// Example:
     /// coop.debug.herodeveloper.addattributepoints RandomPlayer 10
     /// </summary>
-    [CommandLineArgumentFunction("addattributepoints", "coop.debug.herodeveloper")]
-    public static string AddAttributePointsCommand(List<string> strings)
+    public sealed class HeroDeveloperAddAttributePointsCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        public string Prefix => "coop.debug.hero_developer";
 
-        if (strings.Count != 2) return "Usage: addattributepoints heroName numPoints";
+        public string Name => "add_attribute_points";
 
-        if (!int.TryParse(strings[1], out int numPoints)) return "An integer amount of attribute points is required.";
+        public string Description => "Runs the add attribute points debug operation.";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+            new ExpectedArgs("hero_name_or_id", "The hero display name or StringId.", isRequired: true),
+            new ExpectedArgs("point_count", "The number of attribute points.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+
+            if (!int.TryParse(strings[1], out int numPoints)) return Failed("An integer amount of attribute points is required.");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
             {
-                // Use same implementation as vanilla command
-                hero.HeroDeveloper.UnspentAttributePoints = MBMath.ClampInt(hero.HeroDeveloper.UnspentAttributePoints + numPoints, 0, 10000);
+                if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+                {
+                    // Use same implementation as vanilla command
+                    hero.HeroDeveloper.UnspentAttributePoints = MBMath.ClampInt(hero.HeroDeveloper.UnspentAttributePoints + numPoints, 0, 10000);
 
-                stringBuilder.AppendLine($"{strings[0]} was given {numPoints} attribute points.");
+                    stringBuilder.AppendLine($"{strings[0]} was given {numPoints} attribute points.");
+                }
             }
-        }
 
-        if (stringBuilder.Length > 0) return stringBuilder.ToString();
-        else return $"Unable to find hero with name or id of {strings[0]}";
+            if (stringBuilder.Length > 0) return Succeeded(stringBuilder.ToString());
+            else return Failed($"Unable to find hero with name or id of {strings[0]}");
+        }
     }
 
     /// <summary>
@@ -82,29 +116,42 @@ internal class HeroDeveloperCommands
     /// Example:
     /// coop.debug.herodeveloper.addfocuspoints RandomPlayer 10
     /// </summary>
-    [CommandLineArgumentFunction("addfocuspoints", "coop.debug.herodeveloper")]
-    public static string AddFocusPointsCommand(List<string> strings)
+    public sealed class HeroDeveloperAddFocusPointsCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        public string Prefix => "coop.debug.hero_developer";
 
-        if (strings.Count != 2) return "Usage: addfocuspoints heroName numPoints";
+        public string Name => "add_focus_points";
 
-        if (!int.TryParse(strings[1], out int numPoints)) return "An integer amount of focus points is required.";
+        public string Description => "Runs the add focus points debug operation.";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+            new ExpectedArgs("hero_name_or_id", "The hero display name or StringId.", isRequired: true),
+            new ExpectedArgs("point_count", "The number of focus points.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+
+            if (!int.TryParse(strings[1], out int numPoints)) return Failed("An integer amount of focus points is required.");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
             {
-                // Use same implementation as vanilla command
-                hero.HeroDeveloper.UnspentFocusPoints = MBMath.ClampInt(hero.HeroDeveloper.UnspentFocusPoints + numPoints, 0, 10000);
+                if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+                {
+                    // Use same implementation as vanilla command
+                    hero.HeroDeveloper.UnspentFocusPoints = MBMath.ClampInt(hero.HeroDeveloper.UnspentFocusPoints + numPoints, 0, 10000);
 
-                stringBuilder.AppendLine($"{strings[0]} was given {numPoints} focus points.");
+                    stringBuilder.AppendLine($"{strings[0]} was given {numPoints} focus points.");
+                }
             }
-        }
 
-        if (stringBuilder.Length > 0) return stringBuilder.ToString();
-        else return $"Unable to find hero with name or id of {strings[0]}";
+            if (stringBuilder.Length > 0) return Succeeded(stringBuilder.ToString());
+            else return Failed($"Unable to find hero with name or id of {strings[0]}");
+        }
     }
 
     /// <summary>
@@ -112,26 +159,38 @@ internal class HeroDeveloperCommands
     /// Example:
     /// coop.debug.herodeveloper.resetskills
     /// </summary>
-    [CommandLineArgumentFunction("resetskills", "coop.debug.herodeveloper")]
-    public static string ResetSkillsCommand(List<string> strings)
+    public sealed class HeroDeveloperResetSkillsCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        public string Prefix => "coop.debug.hero_developer";
 
-        if (strings.Count != 1) return "Usage: resetskills heroName";
+        public string Name => "reset_skills";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public string Description => "Runs the reset skills debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+            new ExpectedArgs("hero_name_or_id", "The hero display name or StringId.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
             {
-                hero.HeroDeveloper.ResetCharacterStats();
+                if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+                {
+                    hero.HeroDeveloper.ResetCharacterStats();
 
-                stringBuilder.AppendLine($"{strings[0]}'s skills were reset.");
+                    stringBuilder.AppendLine($"{strings[0]}'s skills were reset.");
+                }
             }
-        }
 
-        if (stringBuilder.Length > 0) return stringBuilder.ToString();
-        else return $"Unable to find hero with name or id of {strings[0]}";
+            if (stringBuilder.Length > 0) return Succeeded(stringBuilder.ToString());
+            else return Failed($"Unable to find hero with name or id of {strings[0]}");
+        }
     }
 
     private static SkillObject GetSkillByName(string skillName)

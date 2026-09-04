@@ -2,6 +2,7 @@
 using Autofac.Core;
 using Autofac.Core.Registration;
 using Autofac.Core.Resolving.Pipeline;
+using Common.Commands;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
@@ -17,6 +18,7 @@ using GameInterface.Services.Chat;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
@@ -53,6 +55,7 @@ using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.Patches;
 using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Serilog;
 using System.Linq;
@@ -79,6 +82,22 @@ public class GameInterfaceModule : Module
             .PreserveExistingDefaults();
 
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
+
+        builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
+        builder.RegisterType<RglCommandLineRegistry>().As<IRglCommandLineRegistry>().InstancePerDependency();
+        builder.RegisterType<CoopCommandRegistry>().As<ICoopCommandRegistry>().InstancePerLifetimeScope();
+        builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
+            .Where(type => type.IsClass &&
+                           !type.IsAbstract &&
+                           typeof(ICoopCommand).IsAssignableFrom(type))
+            .As(type => type.GetInterfaces()
+                .Where(interfaceType => interfaceType != typeof(ICoopCommand)))
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<CoopCommandLineRegistrar>()
+            .As<ICoopCommandLineRegistrar>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
 
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         // mod-config.json: one lazy read per session container (see IModConfig).

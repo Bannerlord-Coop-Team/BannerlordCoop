@@ -4,6 +4,7 @@ using Common.LiveTesting;
 using Common.Logging;
 using Common.LogicStates;
 using Coop.Core.Client;
+using Coop.Core.Common.Commands;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.Services.LiveTesting;
@@ -190,9 +191,18 @@ namespace Coop.LiveTesting
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
+                    string output = null;
                     if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
                     {
-                        string output = Coop.JoinFixtureCommands.Start(arguments);
+                        output = Coop.JoinFixtureCommands.Start(arguments);
+                    }
+                    else if (string.Equals(command, "coop.debug.connection.reconnect", StringComparison.Ordinal))
+                    {
+                        output = JoinDebugCommands.Reconnect(arguments);
+                    }
+
+                    if (output != null)
+                    {
                         bool hasFallbackStructuredResult = TryParseStructuredResult(
                             output,
                             out var fallbackStructuredResult);
