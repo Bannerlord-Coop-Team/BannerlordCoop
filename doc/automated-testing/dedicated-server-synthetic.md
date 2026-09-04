@@ -1,282 +1,124 @@
 # Dedicated-server synthetic verification
 
-The `dedicated-server-synthetic` tier is a bounded functional check between
-BannerlordCoop and the native dedicated-server host. It is intended to cover the
-real process, real UDP transport, connection lifecycle, and the small pre-save
-join protocol without launching rendered clients.
+The `dedicated-server-synthetic` profile is a bounded check between BannerlordCoop and the real
+standalone dedicated-server process. It exercises UDP transport, password and module validation,
+fresh-controller validation, disconnect/reconnect generations, and cleanup without starting
+rendered clients.
 
-The real-process controller drives the opt-in dedicated-server build over UDP
-and validates its token-scoped control pipe. It remains fail-closed when the
-server does not expose the authoritative serving, join-port, and connection
-roster fields described below.
+It is not a campaign-join or save-apply test. The controller fails closed unless the server exposes
+authoritative serving state, its resolved join port, module contract, loaded artifact identities,
+and the current connection roster.
 
 ## Safe protocol boundary
 
-`bannerlord-coop.ds-synthetic-wire.v1` freezes the following Common protobuf
-envelope IDs and LiteNetLib lanes:
+The permitted wire surface is the versioned `bannerlord-coop.ds-synthetic-wire.v1` manifest in
+`DedicatedServerWireManifest`. Its tests pin the exact Common protobuf type IDs, channel/delivery
+selection, directions, wrapper shape, and manifest digest. Keep that executable manifest and its
+production round-trip tests as the source of truth; do not duplicate its numeric IDs here.
 
-| Payload | Type ID | Channel | Delivery | Direction |
-| --- | ---: | ---: | --- | --- |
-| `CampaignTimePacket` | `488231864` | 0 | Sequenced | server to client |
-| `NetworkModuleVersionsValidate` | `1457133576` | 0 | ReliableOrdered | client to server |
-| `NetworkModuleVersionsValidated` | `1206877260` | 0 | ReliableOrdered | server to client |
-| `NetworkClientValidate` | `791628818` | 0 | ReliableOrdered | client to server |
-| `NetworkClientValidated` | `29530214` | 0 | ReliableOrdered | server to client |
-| `AggregateMessagePacket` | `1253361833` | 0 | ReliableOrdered | both |
-| `GameSaveDataChunkPacket` | `404232623` | 1 | ReliableOrdered | server to client, optional |
+The scenario uses this boundary:
 
-The wrapper remains the production Common shape: protobuf field 1 is the stable
-type ID and field 2 is the serialized payload. The harness uses independent
-surrogate contracts rather than loading Coop.Core product types into the test
-process. Golden IDs and the manifest hash therefore detect a real protocol
-change instead of inheriting one silently from the product assembly.
+1. Prove the machine-readable wrong-password rejection.
+2. Prove an intentional co-op build mismatch is denied before controller validation.
+3. Read the server's authoritative provider-order module contract.
+4. Connect two peers, validate that exact contract, then send distinct fresh controller IDs.
+5. Observe the campaign-time heartbeat and fresh-controller response.
+6. Disconnect and reconnect one peer, proving a new connection identity and no stale roster entry.
+7. Disconnect both peers and prove final cleanup.
 
-`DedicatedServerProductionWireContractTests` separately round-trips the actual
-product packet and message types through `ProtoBufSerializer` and a fresh
-`SerializableTypeMapper`, including aggregate-message decoding and the real
-channel/delivery selector. The harness source-shape regex test is only a
-supplemental drift hint; it is not the production wire oracle.
+The result is marked `protocolShortcut=true`: it proves only the pre-character validation response.
+Synthetic peers must never send `NetworkTransferNewHero`, `NetworkPlayerCampaignEntered`,
+`NetworkJoinSync`, or `NetworkPlayerMissionEntered`. Those messages enter real campaign, save, or
+mission state and require rendered clients.
 
-The permitted scenario is deliberately short:
+The optional save collector assembles only bounded compressed bytes. It accepts at most 4,096
+chunks, 64 KiB per chunk, 64 MiB compressed, and 256 MiB declared uncompressed. It never
+decompresses or loads a campaign, and save receipt is not required for this profile.
 
-1. Connect with the configured LiteNetLib password and verify wrong-password
-   rejection code `1` as a negative control.
-2. Connect a separate negative-control peer, send an intentional co-op build
-   mismatch, observe an explicit denial, and disconnect without sending
-   `NetworkClientValidate`.
-3. Read the authoritative provider-order module contract from dedicated-server
-   status, then connect two distinct synthetic peers.
-4. Each baseline peer sends that exact `NetworkModuleVersionsValidate` request,
-   waits for `Matches=true` with the exact server build, and only then sends its
-   fresh deterministic controller ID.
-5. Observe a channel-0 Sequenced campaign-time heartbeat and
-   `NetworkClientValidated(HeroExists=false, Player=null)`.
-6. Mark that result `protocolShortcut=true`; it proves only the pre-character
-   validation response.
-7. Disconnect and reconnect through the real-process controller, then
-   verify the authoritative connection roster has removed the old connection.
+## Commands
 
-The synthetic peer must never send `NetworkTransferNewHero`,
-`NetworkPlayerCampaignEntered`, `NetworkJoinSync`, or
-`NetworkPlayerMissionEntered`. Those messages cross into real campaign object,
-save-apply, or mission state and still require game clients. A fresh-controller
-response is not evidence that a player entered the campaign.
-
-## Bounded optional save collection
-
-The optional save collector parses only fields 1-6 of
-`GameSaveDataChunkPacket` and ignores later product metadata. It accepts at most
-4,096 chunks, 64 KiB per chunk, 64 MiB compressed, and 256 MiB declared
-uncompressed. Duplicate chunks, inconsistent transfer metadata, missing chunks,
-and sizes beyond those limits fail before assembly. It never decompresses or
-loads a campaign. Receipt of a save is not part of the required first version of
-this tier.
-
-## Offline process-node command
-
-The offline node command uses LiteNetLib 1.3.1 with two channels, a 60-second
-disconnect timeout, a 15 ms network update interval, and a 10 ms poll interval.
-It is a protocol compatibility lab, not dedicated-server evidence.
+The offline node is a protocol lab, not dedicated-server evidence:
 
 ```text
 VerificationHarness dedicated-server-synthetic-node \
-  --role server|client \
-  --scenario baseline|module-mismatch|wrong-password \
+  --role server \
+  --scenario baseline \
   --port 4201 \
   --timeout-ms 5000 \
   --run-token ds-synthetic-run \
   --request-id ds-synthetic-request \
   --password-env BANNERLORD_COOP_TEST_PASSWORD \
-  [--module-contract <base64-json-contract>] \
-  [--controller-id ds-synthetic-client-a] \
+  --module-contract <base64-json-contract> \
   --expected-clients 2
 ```
 
-`--expected-clients` belongs to the server node. The baseline server requires
-exactly 2; each isolated negative-control server requires exactly 1. Baseline
-and module-mismatch nodes require `--module-contract`; wrong-password nodes
-reject it. Client nodes require one of the two fixed controller IDs and reject
-`--expected-clients`.
+Module-mismatch and wrong-password servers use `--expected-clients 1`; wrong-password also omits
+`--module-contract`. Client nodes use `--role client`, one of the two fixed `--controller-id`
+values, and no `--expected-clients`. Baseline and module-mismatch clients require the module
+contract; wrong-password clients omit it.
 
-The password is read only from the named environment variable. It is never put
-in process arguments, node JSON, evidence JSON, error text, hashes, or replay
-identity. The wrong-password probe derives a bounded non-secret wrong value and
-does not print it.
-
-## Real-process scenario command
-
-The controller connects to the existing opt-in live-test pipe for the exact
-dedicated-server PID, then creates the synthetic peers inside the harness
-process. It does not start Bannerlord or the dedicated server.
+The real-process controller attaches to the opt-in live-test pipe for an already running exact
+server PID. It does not launch Bannerlord or the server:
 
 ```text
 VerificationHarness dedicated-server-synthetic \
-  --head <exact BannerlordCoop commit> \
-  --tree <exact BannerlordCoop synthetic tree> \
-  --server-head <exact dedicated-server commit> \
-  --server-tree <exact dedicated-server synthetic tree> \
+  --head <exact-coop-commit> \
+  --tree <exact-coop-tree> \
+  --server-head <exact-server-commit> \
+  --server-tree <exact-server-tree> \
   --server-pid <pid> \
   --run-token <token> \
   --request-id <id> \
-  --join-port 4201 \
+  --join-port <port> \
   --password-env BANNERLORD_COOP_TEST_PASSWORD \
-  --artifact-manifest C:\stage\dedicated-server-synthetic-artifacts.json \
-  --artifact-manifest-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  --artifact-root C:\stage \
+  --artifact-manifest <manifest.json> \
+  --artifact-manifest-sha256 <64-hex> \
+  --artifact-root <staged-root> \
   [--timeout-ms 30000] \
   [--seed 0] \
   [--output evidence.json]
 ```
 
-The named environment variable must contain the same non-empty password used by
-the server. The value is never copied into arguments or evidence. The controller
-first proves the machine-readable wrong-password rejection and the separate
-module-mismatch denial. It then retains two peers that completed compatible
-module validation before controller validation while it records
-`before-connect`, `two-connected`,
-`one-disconnected`, `reconnected`, and `final-empty` status snapshots. A
-`registeredPlayers` count is explicitly rejected because it cannot prove which
-network connections are current. The command exits zero only when the complete
-lifecycle and every control identity check pass.
+Passwords are read only from the named environment variable. They are never written to arguments,
+evidence, errors, hashes, or replay identity.
 
-## Staged artifact receipt
+## Artifact and status contract
 
-`dedicated-server-synthetic-artifacts.v1` is created by the source-bound build
-and staging step, not by the runtime controller. The orchestrator freezes the
-SHA-256 of the exact manifest file and supplies it separately through
-`--artifact-manifest-sha256`. Changing source labels or any manifest content
-therefore invalidates that receipt.
+The source-bound build creates `dedicated-server-synthetic-artifacts.v1`; the runtime controller
+only verifies it. The caller supplies the frozen raw manifest hash separately. The manifest binds
+both repositories' head/tree pairs, the co-op build version, stage-relative paths, hashes, assembly
+versions, and MVIDs. It contains the six managed co-op assemblies, `DedicatedServer.Core`, the active
+Windows or Linux shim, and the platform's TaleWorlds starter assembly.
 
-The manifest records both repositories' head/tree pairs, the co-op build
-version, stage-relative paths and SHA-256 values, and each managed assembly's
-version and MVID. It must contain exactly the six co-op assemblies reported by
-the status contract plus `DedicatedServer.Core`, the active
-`DedicatedServer.Windows` or `DedicatedServer.Linux` shim, and
-the platform's actual starter identity: `TaleWorlds.Starter.DotNetCore` on
-Windows or `TaleWorlds.Starter.DotNetCore.Linux` on Linux. The serving child
-process is commonly
-`dotnet.exe`; its hash is runtime identity only and is never accepted as the
-DedicatedServer source binding.
+Before UDP work and again after the lifecycle, the controller verifies:
 
-Before any UDP work and again after the lifecycle completes, the controller:
+- the raw and canonical manifest digests plus both requested source identities;
+- status PID, role, run token, and process start time against the OS process;
+- every loaded assembly's allowlisted path, SHA-256, MVID, and version;
+- unchanged manifest and process identities at postflight.
 
-1. Verifies the frozen raw manifest hash, its canonical digests, and both
-   requested source identities.
-2. Matches the status PID, role, run token, and `processStartedUtc` to the OS
-   process.
-3. Resolves every status assembly location to its exact allowlisted path under
-   `--artifact-root`.
-4. Hashes the file, reads its PE MVID and assembly version, and compares all
-   three values with both status and the manifest. `Common.dll` is verified
-   before its build/module contract is trusted.
-5. Requires the same manifest and process start identity in the postflight
-   attestation.
+The server's opt-in `status` result must supply:
 
-Paths remain absent from evidence. A path outside the staged root, a duplicate
-or missing simple assembly name, PID reuse, a changed artifact, or a relabeled
-manifest fails the required `runtime-artifact-manifest-match` check.
+- `buildVersion`, `processStartedUtc`, and `serving`;
+- the resolved `joinPort`;
+- the complete provider-order `moduleValidation` contract;
+- `loadedAssemblies` and `dedicatedServerAssemblies` with name, version, MVID, and location;
+- `connectionRoster` entries with controller ID, unique connection-instance ID, connected state,
+  and join state.
 
-## Dedicated-server status contract
+`serving` and `joinPort` come from the host's authoritative state. Module order and every production
+field stay stable across all snapshots. Loaded-assembly status observes assemblies already bound in
+the serving AppDomain; it never loads one to satisfy attestation. Roster state comes from current
+connections, not registered players, and disconnected entries are removed. Console parsing and
+`registeredPlayers` are not accepted substitutes.
 
-The paired BannerlordCoop.DedicatedServer revision must expose these
-authoritative fields from its opt-in live-test `status` result:
+## Evidence
 
-```json
-{
-  "buildVersion": "1.2.3+source",
-  "processStartedUtc": "2026-09-01T12:00:00Z",
-  "loadedAssemblies": [
-    {
-      "name": "Common",
-      "version": "1.0.0.0",
-      "mvid": "00000000-0000-0000-0000-000000000001",
-      "location": "C:\\stage\\engine\\Modules\\Coop\\bin\\Common.dll"
-    }
-  ],
-  "serving": true,
-  "joinPort": 4201,
-  "moduleValidation": {
-    "coopBuildVersion": "1.2.3+source",
-    "modules": [
-      {
-        "id": "Native",
-        "isOfficial": true,
-        "isDlc": false,
-        "version": {
-          "applicationVersionType": 4,
-          "major": 1,
-          "minor": 2,
-          "revision": 3,
-          "changeSet": 456
-        }
-      }
-    ]
-  },
-  "dedicatedServerAssemblies": [
-    {
-      "name": "DedicatedServer.Core",
-      "version": "1.0.0.0",
-      "mvid": "00000000-0000-0000-0000-000000000000",
-      "location": "C:\\staged-runtime\\DedicatedServer.Core.dll"
-    }
-  ],
-  "connectionRoster": [
-    {
-      "controllerId": "ds-synthetic-client-a",
-      "connectionInstanceId": "connection-a-1",
-      "connected": true,
-      "joinState": "ResolveCharacterState"
-    },
-    {
-      "controllerId": "ds-synthetic-client-b",
-      "connectionInstanceId": "connection-b-1",
-      "connected": true,
-      "joinState": "ResolveCharacterState"
-    }
-  ]
-}
-```
+`dedicated-server-synthetic.evidence.v1` records both exact source identities, required checks,
+topology, manifest identity, lifecycle snapshots, artifact hashes, timestamps, and verdict. Evidence
+copies source identities only from the verified staged manifest.
 
-`serving` must come from the host's authoritative serving phase, and `joinPort`
-must be the resolved port the co-op server actually bound. `moduleValidation`
-must preserve the exact `IModuleInfoProvider` order and every production field;
-the controller freezes it across every lifecycle snapshot. Any DLC entry,
-missing official module, duplicate ID, build change, module change, or reorder
-fails closed. `loadedAssemblies` is an observation of assemblies already bound
-in the serving AppDomain; status never loads an assembly to make attestation
-pass. `dedicatedServerAssemblies` separately exposes the loaded core,
-platform shim, and TaleWorlds entry assemblies for staged artifact binding.
-`connectionRoster`
-must come from current connection objects, not `IPlayerManager.Players`; fresh
-synthetic controllers have not registered heroes. Disconnected entries must be
-removed. `connectionInstanceId` is an opaque, sanitized identity generated for
-each accepted connection and must be unique in a snapshot. A reconnect must
-expose a new identity and no stale entry for the prior connection. The
-controller retains before-connect, two-connected, one-disconnected,
-reconnected, and final-empty snapshots; one status response cannot prove that
-lifecycle. The existing live-test envelope already carries PID, role, run token,
-and request ID. The full assembly arrays, not only the abbreviated entries
-above, must match the staged manifest exactly.
-
-No runtime may work around a missing field by parsing console text or accepting
-`registeredPlayers`.
-
-## Evidence stability
-
-The versioned evidence schema is
-`dedicated-server-synthetic.evidence.v1`. It records both exact source
-head/tree pairs, required checks, topology, manifest, timestamps, artifact
-hashes, lifecycle snapshots, and the verdict.
-
-The replay identity covers both repositories' source identities, profile,
-seed, scenario options, expected controller IDs, the frozen manifest file hash,
-and the authoritative module-validation contract. The state digest
-contains only logical checks and stable protocol identity. Timestamps, PIDs,
-paths, ports, run/request tokens, raw campaign ticks, passwords, and recyclable
-connection IDs are excluded from the state digest.
-
-The current head/tree arguments remain caller assertions until they match the
-out-of-band frozen staged manifest. Evidence source identities are copied only
-from that verified manifest, never from the arguments. The controller's pass
-verdict remains one input to the source-bound orchestration receipt rather than
-authorizing an unverified caller identity by itself.
+Replay identity covers source, profile, seed, options, controller IDs, manifest hash, and module
+contract. The logical state digest excludes timestamps, PIDs, paths, ports, tokens, passwords,
+campaign ticks, and recyclable connection IDs. A passing controller result is one input to the
+source-bound orchestration receipt; it cannot authorize caller-supplied source labels by itself.
