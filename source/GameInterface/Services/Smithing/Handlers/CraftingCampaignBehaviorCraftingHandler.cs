@@ -97,7 +97,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             // Get required objects using interface & objectManager
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
             // Replace original TaleWorlds implementation
@@ -140,7 +140,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             // Get required objects using interface & objectManager
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
             // Rebuild formula on server
@@ -209,9 +209,10 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
 
             ItemModifierGroup itemModifierGroup = null;
             if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return;
@@ -224,9 +225,15 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             CultureObject culture = null;
             if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return;
 
+            Settlement currentSettlement = null;
+            if (data.CurrentSettlementId != null && !objectManager.TryGetObjectWithLogging(data.CurrentSettlementId, out currentSettlement)) return;
+
+            CraftingOrder craftingOrder = null;
+            if (data.CraftingOrderId != null && !objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder)) return;
+
             // Replace original TaleWorlds implementation
             string nextCraftedItemId = craftingCampaignBehavior.GetNextCraftedItemId();
-            var newHeroCraftingStamina = craftingCampaignBehaviorInterface.CreateCraftedWeaponInternal(
+            bool successfulCraftedItem = craftingCampaignBehaviorInterface.CreateCraftedWeaponInternal(
                 craftingCampaignBehavior,
                 craftingHero,
                 craftingTemplate,
@@ -237,7 +244,11 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 data.IsFreeMode,
                 data.Name,
                 data.WeaponName,
-                nextCraftedItemId);
+                nextCraftedItemId,
+                out var newHeroCraftingStamina);
+
+            // Return early to prevent clients from creating an item that was rejected on the server
+            if (!successfulCraftedItem) return;
 
             // Update stamina on clients
             network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
@@ -249,10 +260,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             // Complete order on server and send result to clients
             if (!data.IsFreeMode)
             {
-                if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
-                if (!objectManager.TryGetObjectWithLogging<CraftingOrder>(data.CraftingOrderId, out var craftingOrder)) return;
                 if (!objectManager.TryGetObjectWithLogging<ItemObject>(nextCraftedItemId, out var craftedItem)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
 
                 messageBroker.Publish(this, new CompleteOrderServer(
                     currentSettlement.Town,
