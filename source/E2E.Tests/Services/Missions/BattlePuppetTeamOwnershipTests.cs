@@ -111,14 +111,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
 
             GameThread.Instance.MarkGameThread();
             await Task.Run(() => client.SimulateMessage(this, wire, markGameThread: false));
-            Assert.True(GameThread.Instance.QueueLength > 0);
-            client.Call(() =>
-            {
-                using (AllowedThread.Suspend())
-                {
-                    GameThread.Instance.Update(TimeSpan.Zero);
-                }
-            });
+            Assert.True(client.PendingGameThreadActionCount > 0);
+            client.PumpGameThread();
 
             client.Call(() =>
             {

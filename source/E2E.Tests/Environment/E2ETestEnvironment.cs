@@ -153,22 +153,35 @@ public class E2ETestEnvironment : IDisposable
             // queue that would only be pumped inside a later test's environment.
             GameThread.Instance.MarkGameThread();
 
+            var disposalFailures = new List<Exception>();
+            void CaptureDisposal(Action dispose)
+            {
+                try
+                {
+                    dispose();
+                }
+                catch (Exception e)
+                {
+                    disposalFailures.Add(e);
+                }
+            }
+
             try
             {
                 if (AutoSyncConfiguration.Enabled)
                 {
-                    Server.Resolve<AutoSyncHandler>().Dispose();
+                    CaptureDisposal(() => Server.Resolve<AutoSyncHandler>().Dispose());
                     foreach (var client in Clients)
                     {
-                        client.Resolve<AutoSyncHandler>().Dispose();
+                        CaptureDisposal(() => client.Resolve<AutoSyncHandler>().Dispose());
                     }
                 }
 
-                Server.Dispose();
+                CaptureDisposal(Server.Dispose);
 
                 foreach (var client in Clients)
                 {
-                    client.Dispose();
+                    CaptureDisposal(client.Dispose);
                 }
             }
             finally
@@ -190,6 +203,11 @@ public class E2ETestEnvironment : IDisposable
                     GameThread.Instance.UnmarkGameThread();
                 }
             }
+
+            if (disposalFailures.Count == 1)
+                throw disposalFailures[0];
+            if (disposalFailures.Count > 1)
+                throw new AggregateException(disposalFailures);
         }
         finally
         {

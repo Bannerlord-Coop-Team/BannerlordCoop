@@ -928,6 +928,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         Assert.Equal(0, emptyReserve.PlayerOwnedPartyCount);
         Assert.Equal(1000, emptyReserve.BattleSize);
         Assert.Equal(18, emptyReserve.AllocationRevision);
+        Assert.Empty(emptyReserve.Parties);
 
         var flush = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
             "rt_battle", new[] { new SupplyProgressEntry("party", 2) }, isFlush: true));

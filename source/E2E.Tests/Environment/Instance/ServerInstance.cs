@@ -14,6 +14,6 @@ public class ServerInstance : EnvironmentInstance
 
     public override void Dispose()
     {
-        Container.Dispose();
+        DisposeContainer();
     }
 }

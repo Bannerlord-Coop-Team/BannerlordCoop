@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 
 namespace Common;
@@ -18,10 +19,146 @@ public class GameThread : IUpdateable
     private static readonly Lazy<GameThread> m_Instance =
         new Lazy<GameThread>(() => new GameThread());
 
-    private readonly Queue<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> m_Queue =
-        new Queue<(Action, EventWaitHandle, string, CancellationToken)>();
+    internal sealed class QueueContext
+    {
+        internal readonly Queue<QueuedAction> queue = new Queue<QueuedAction>();
+        internal readonly object gate = new object();
+        internal bool isClosed;
+        internal int rejectedAfterCloseCount;
+        private Action waitPump;
 
-    private readonly object m_QueueLock = new object();
+        internal int Count
+        {
+            get
+            {
+                lock (gate)
+                {
+                    return queue.Count;
+                }
+            }
+        }
+
+        internal int RejectedAfterCloseCount
+        {
+            get
+            {
+                lock (gate)
+                {
+                    return rejectedAfterCloseCount;
+                }
+            }
+        }
+
+        internal Action WaitPump
+        {
+            get
+            {
+                lock (gate)
+                {
+                    return isClosed ? null : waitPump;
+                }
+            }
+            set
+            {
+                lock (gate)
+                {
+                    if (isClosed && value != null)
+                        throw new InvalidOperationException("Cannot configure a closed game-thread queue.");
+                    waitPump = value;
+                }
+            }
+        }
+    }
+
+    internal sealed class QueuedAction
+    {
+        private readonly object completionGate = new object();
+        private QueuedActionCompletionState completionState;
+        private Exception failure;
+        private string cancellationReason;
+
+        internal Action Act { get; }
+        internal EventWaitHandle Wait { get; }
+        internal string Label { get; }
+        internal CancellationToken Cancellation { get; }
+
+        internal QueuedAction(
+            Action act,
+            EventWaitHandle wait,
+            string label,
+            CancellationToken cancellation)
+        {
+            Act = act;
+            Wait = wait;
+            Label = label;
+            Cancellation = cancellation;
+        }
+
+        internal void CompleteExecuted() => Complete(QueuedActionCompletionState.Executed, null, null);
+
+        internal void CompleteCanceled(string reason) =>
+            Complete(QueuedActionCompletionState.Canceled, null, reason);
+
+        internal void CompleteFailed(Exception exception) =>
+            Complete(QueuedActionCompletionState.Failed, exception, null);
+
+        internal void ThrowIfNotExecuted()
+        {
+            QueuedActionCompletionState state;
+            Exception completedFailure;
+            string completedCancellationReason;
+            lock (completionGate)
+            {
+                state = completionState;
+                completedFailure = failure;
+                completedCancellationReason = cancellationReason;
+            }
+
+            switch (state)
+            {
+                case QueuedActionCompletionState.Executed:
+                    return;
+                case QueuedActionCompletionState.Canceled:
+                    throw new OperationCanceledException(
+                        completedCancellationReason ?? "The queued game-thread action was canceled.");
+                case QueuedActionCompletionState.Failed:
+                    ExceptionDispatchInfo.Capture(completedFailure).Throw();
+                    return;
+                default:
+                    throw new InvalidOperationException(
+                        "The queued game-thread action was signaled without a completion state.");
+            }
+        }
+
+        private void Complete(
+            QueuedActionCompletionState state,
+            Exception completedFailure,
+            string completedCancellationReason)
+        {
+            lock (completionGate)
+            {
+                if (completionState != QueuedActionCompletionState.Pending)
+                    return;
+
+                failure = completedFailure;
+                cancellationReason = completedCancellationReason;
+                completionState = state;
+                Wait?.Set();
+            }
+        }
+    }
+
+    private enum QueuedActionCompletionState
+    {
+        Pending,
+        Executed,
+        Canceled,
+        Failed,
+    }
+
+    private readonly QueueContext m_DefaultQueue = new QueueContext();
+    private static readonly AsyncLocal<QueueContext> m_AmbientQueue =
+        new AsyncLocal<QueueContext>();
     private static readonly AsyncLocal<CancellationToken> m_AmbientCancellation =
         new AsyncLocal<CancellationToken>();
     private int m_GameLoopThreadId;
@@ -30,10 +167,7 @@ public class GameThread : IUpdateable
     {
         get
         {
-            lock (m_QueueLock)
-            {
-                return m_Queue.Count;
-            }
+            return CurrentQueue.Count;
         }
     }
 
@@ -51,6 +185,8 @@ public class GameThread : IUpdateable
     }
 
     public static GameThread Instance => m_Instance.Value;
+
+    private QueueContext CurrentQueue => m_AmbientQueue.Value ?? m_DefaultQueue;
 
     #region Instrumentation
 
@@ -92,34 +228,43 @@ public class GameThread : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
-        List<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> toBeRun =
-            new List<(Action, EventWaitHandle, string, CancellationToken)>();
+        List<QueuedAction> toBeRun = new List<QueuedAction>();
 
         int backlog;
-        lock (Instance.m_QueueLock)
+        QueueContext queueContext = Instance.CurrentQueue;
+        lock (queueContext.gate)
         {
-            backlog = m_Queue.Count;
-            while (m_Queue.Count > 0)
+            backlog = queueContext.queue.Count;
+            while (queueContext.queue.Count > 0)
             {
-                toBeRun.Add(m_Queue.Dequeue());
+                toBeRun.Add(queueContext.queue.Dequeue());
             }
         }
 
         if (!Instrument)
         {
-            foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
+            for (int index = 0; index < toBeRun.Count; index++)
             {
-                RunQueuedTask(task);
+                try
+                {
+                    RunQueuedTask(toBeRun[index]);
+                }
+                catch
+                {
+                    CancelUnrunBatch(toBeRun, index + 1);
+                    throw;
+                }
             }
             return;
         }
 
         long frameStart = Stopwatch.GetTimestamp();
-        foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
+        for (int index = 0; index < toBeRun.Count; index++)
         {
+            QueuedAction task = toBeRun[index];
             if (task.Cancellation.IsCancellationRequested)
             {
-                task.Wait?.Set();
+                task.CompleteCanceled("The game-thread session ended before the queued action ran.");
                 continue;
             }
 
@@ -130,10 +275,13 @@ public class GameThread : IUpdateable
                 {
                     task.Act?.Invoke();
                 }
+                task.CompleteExecuted();
             }
-            finally
+            catch (Exception e)
             {
-                task.Wait?.Set();
+                task.CompleteFailed(e);
+                CancelUnrunBatch(toBeRun, index + 1);
+                throw;
             }
             long actionTicks = Stopwatch.GetTimestamp() - actionStart;
 
@@ -239,8 +387,24 @@ public class GameThread : IUpdateable
             return;
         }
 
+        string resolved = label ?? BuildLabel(callerFile, callerMember);
+        QueueContext queueContext = Instance.CurrentQueue;
         if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
         {
+            bool rejected;
+            lock (queueContext.gate)
+            {
+                rejected = queueContext.isClosed;
+                if (rejected)
+                    queueContext.rejectedAfterCloseCount++;
+            }
+
+            if (rejected)
+            {
+                RejectClosedQueueAction(blocking, resolved);
+                return;
+            }
+
             action();
         }
         else
@@ -248,11 +412,23 @@ public class GameThread : IUpdateable
             EventWaitHandle ewh = blocking ?
                 new EventWaitHandle(false, EventResetMode.ManualReset) :
                 null;
+            var queuedAction = new QueuedAction(action, ewh, resolved, cancellation);
 
-            string resolved = label ?? BuildLabel(callerFile, callerMember);
-            lock (Instance.m_QueueLock)
+            bool rejected;
+            lock (queueContext.gate)
             {
-                Instance.m_Queue.Enqueue((action, ewh, resolved, cancellation));
+                rejected = queueContext.isClosed;
+                if (rejected)
+                    queueContext.rejectedAfterCloseCount++;
+                else
+                    queueContext.queue.Enqueue(queuedAction);
+            }
+
+            if (rejected)
+            {
+                ewh?.Dispose();
+                RejectClosedQueueAction(blocking, resolved);
+                return;
             }
 
             if (ewh == null) return;
@@ -274,6 +450,8 @@ public class GameThread : IUpdateable
                 throw new OperationCanceledException(
                     $"The game-thread session ended before the blocking {nameof(Run)} action completed.");
             }
+
+            queuedAction.ThrowIfNotExecuted();
         }
     }
 
@@ -311,10 +489,23 @@ public class GameThread : IUpdateable
         if (cancellation.IsCancellationRequested) return;
 
         string label = context ?? BuildLabel(callerFile, callerMember);
-        lock (Instance.m_QueueLock)
+        QueueContext queueContext = Instance.CurrentQueue;
+        bool rejected;
+        lock (queueContext.gate)
         {
-            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label, cancellation));
+            rejected = queueContext.isClosed;
+            if (rejected)
+                queueContext.rejectedAfterCloseCount++;
+            else
+                queueContext.queue.Enqueue(new QueuedAction(
+                    WrapSafe(action, context),
+                    null,
+                    label,
+                    cancellation));
         }
+
+        if (rejected)
+            RejectClosedQueueAction(false, label);
     }
 
     /// <summary>
@@ -334,6 +525,10 @@ public class GameThread : IUpdateable
 
         while (true)
         {
+            // Production's network thread keeps flushing while the game loop waits. Isolated runtimes
+            // can provide the equivalent tick on their queue without changing the production default.
+            Instance.CurrentQueue.WaitPump?.Invoke();
+
             // Drain with the mod's patches live. The queued actions are ordinary game-loop work and must not
             // inherit an AllowedThread allowance the caller happens to hold — that would silence the
             // replication patches the actions rely on. The normal game-loop pump runs them with no allowance,
@@ -385,6 +580,19 @@ public class GameThread : IUpdateable
         }
     };
 
+    private static void RejectClosedQueueAction(bool blocking, string label)
+    {
+        if (blocking)
+        {
+            throw new OperationCanceledException(
+                $"The game-thread queue was closed before blocking action {label} could run.");
+        }
+
+        Logger.Warning(
+            "Dropping game-thread action {Label}: its isolated runtime queue is closed",
+            label);
+    }
+
     public void MarkGameThread()
     {
         m_GameLoopThreadId = Thread.CurrentThread.ManagedThreadId;
@@ -413,11 +621,39 @@ public class GameThread : IUpdateable
     /// </summary>
     public void DiscardQueuedActions()
     {
-        List<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> discarded;
-        lock (m_QueueLock)
+        DiscardQueuedActions(CurrentQueue, close: false);
+    }
+
+    /// <summary>
+    /// Discards one isolated runtime's queue without relying on the caller's ambient queue scope.
+    /// </summary>
+    internal int DiscardQueuedActions(QueueContext queueContext)
+    {
+        return DiscardQueuedActions(queueContext, close: false);
+    }
+
+    /// <summary>
+    /// Atomically closes one isolated runtime queue and releases everything waiting in it.
+    /// </summary>
+    internal int CloseAndDiscardQueuedActions(QueueContext queueContext)
+    {
+        return DiscardQueuedActions(queueContext, close: true);
+    }
+
+    private int DiscardQueuedActions(QueueContext queueContext, bool close)
+    {
+        if (queueContext == null) throw new ArgumentNullException(nameof(queueContext));
+
+        List<QueuedAction> discarded;
+        lock (queueContext.gate)
         {
-            discarded = new List<(Action, EventWaitHandle, string, CancellationToken)>(m_Queue);
-            m_Queue.Clear();
+            if (close)
+            {
+                queueContext.isClosed = true;
+                queueContext.WaitPump = null;
+            }
+            discarded = new List<QueuedAction>(queueContext.queue);
+            queueContext.queue.Clear();
         }
 
         if (discarded.Count > 0)
@@ -431,8 +667,10 @@ public class GameThread : IUpdateable
 
         foreach (var task in discarded)
         {
-            task.Wait?.Set();
+            task.CompleteCanceled("The isolated runtime queue closed before the action ran.");
         }
+
+        return discarded.Count;
     }
 
     /// <summary>
@@ -450,21 +688,53 @@ public class GameThread : IUpdateable
     public static IDisposable ActivateCancellation(CancellationToken cancellation) =>
         new CancellationScope(cancellation);
 
-    private static void RunQueuedTask(
-        (Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task)
+    /// <summary>
+    /// Selects the queue owned by one isolated runtime while the scope is active. Production uses the
+    /// default process queue; the in-process E2E harness assigns one context per simulated process.
+    /// </summary>
+    internal static IDisposable ActivateQueue(QueueContext queueContext)
+    {
+        if (queueContext == null) throw new ArgumentNullException(nameof(queueContext));
+        return new QueueScope(queueContext);
+    }
+
+    private static void RunQueuedTask(QueuedAction task)
     {
         try
         {
-            if (task.Cancellation.IsCancellationRequested) return;
+            if (task.Cancellation.IsCancellationRequested)
+            {
+                task.CompleteCanceled("The game-thread session ended before the queued action ran.");
+                return;
+            }
 
             using (ActivateCancellation(task.Cancellation))
             {
                 task.Act?.Invoke();
             }
+            task.CompleteExecuted();
         }
-        finally
+        catch (Exception e)
         {
-            task.Wait?.Set();
+            task.CompleteFailed(e);
+            throw;
+        }
+    }
+
+    private static void CancelUnrunBatch(IReadOnlyList<QueuedAction> batch, int firstUnrunIndex)
+    {
+        int unrunCount = batch.Count - firstUnrunIndex;
+        if (unrunCount <= 0) return;
+
+        Logger.Warning(
+            "Canceling {Count} dequeued game-thread action(s) after an earlier action failed: {Labels}",
+            unrunCount,
+            string.Join(", ", batch.Skip(firstUnrunIndex).Select(task => task.Label ?? "(unlabeled)")));
+
+        for (int index = firstUnrunIndex; index < batch.Count; index++)
+        {
+            batch[index].CompleteCanceled(
+                "An earlier game-thread action failed before this queued action could run.");
         }
     }
 
@@ -481,6 +751,22 @@ public class GameThread : IUpdateable
         public void Dispose()
         {
             m_AmbientCancellation.Value = previous;
+        }
+    }
+
+    private sealed class QueueScope : IDisposable
+    {
+        private readonly QueueContext previous;
+
+        public QueueScope(QueueContext queueContext)
+        {
+            previous = m_AmbientQueue.Value;
+            m_AmbientQueue.Value = queueContext;
+        }
+
+        public void Dispose()
+        {
+            m_AmbientQueue.Value = previous;
         }
     }
 }
