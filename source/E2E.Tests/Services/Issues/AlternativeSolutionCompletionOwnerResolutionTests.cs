@@ -47,30 +47,34 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
         var trueOwnerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var trueOwnerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
+        foreach (var instance in new[] { Server }.Concat(TestEnvironment.Clients))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+
+                using (new AllowedThread())
+                {
+                    Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                    Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+
+                    settlement.SetSettlementComponent(village);
+                    village.Bound = settlement;
+                    village.Hearth = 650f;
+                    owner.StayingInSettlement = settlement;
+                    owner.Occupation = Occupation.RuralNotable;
+                    AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Value)).SetValue(item, 40);
+                    companion.ChangeState(Hero.CharacterStates.Disabled);
+                }
+            });
+        }
+
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var owner));
-            Assert.True(Server.ObjectManager.TryGetObject<Village>(villageId, out var village));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(trueOwnerHeroId, out var trueOwner));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(trueOwnerPartyId, out var trueOwnerParty));
-
-            using (new AllowedThread())
-            {
-                Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
-                Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
-
-                settlement.SetSettlementComponent(village);
-                village.Bound = settlement;
-                village.Hearth = 650f;
-                owner.StayingInSettlement = settlement;
-                owner.Occupation = Occupation.RuralNotable;
-                AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Value)).SetValue(item, 40);
-                companion.ChangeState(Hero.CharacterStates.Disabled);
-            }
-
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player(controllerId, trueOwnerHeroId, trueOwnerPartyId, "", "")));
         });

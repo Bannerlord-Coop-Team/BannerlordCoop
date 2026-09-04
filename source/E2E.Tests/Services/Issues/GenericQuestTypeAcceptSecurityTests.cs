@@ -520,7 +520,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Campaign.Current.IssueManager.StartIssueQuest(owner);
-            Assert.Null(owner.Issue.IssueQuest);
+            Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(owner.Issue.IssueQuest);
         });
 
         Assert.Single(Client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptQuest>());
