@@ -15,8 +15,7 @@ public sealed class DedicatedServerWireManifestTests
             ("Coop.Core.Server.Connections.Messages.NetworkClientValidate", 791628818, (byte)0, "ReliableOrdered"),
             ("Coop.Core.Server.Connections.Messages.NetworkClientValidated", 29530214, (byte)0, "ReliableOrdered"),
             ("Coop.Core.Common.Session.Messages.NetworkSessionLobbyChanged", 1547717120, (byte)0, "ReliableOrdered"),
-            ("Common.PacketHandlers.AggregateMessagePacket", 1253361833, (byte)0, "ReliableOrdered"),
-            ("Coop.Core.Common.Network.Packets.GameSaveDataChunkPacket", 404232623, (byte)1, "ReliableOrdered")
+            ("Common.PacketHandlers.AggregateMessagePacket", 1253361833, (byte)0, "ReliableOrdered")
         };
 
         Assert.Equal(expected.Length, DedicatedServerWireManifest.Entries.Count);
@@ -30,16 +29,13 @@ public sealed class DedicatedServerWireManifestTests
             Assert.Equal(channel, entry.Channel);
             Assert.Equal(deliveryMethod, entry.DeliveryMethod);
         }
-
-        Assert.True(DedicatedServerWireManifest.GetByTypeId(
-            DedicatedServerWireManifest.GameSaveDataChunkPacketTypeId).Optional);
     }
 
     [Fact]
     public void Manifest_HashIsGolden()
     {
         Assert.Equal(
-            "6d880eb4ea330e9aa1f43037c1850543b08aaab70e28151793b22044e165a815",
+            "eb9325a99b4c50c6cbbd2b57b81c5a2139e32cf2aa1ce86ad4b6137589a0287f",
             DedicatedServerWireManifest.Sha256);
     }
 

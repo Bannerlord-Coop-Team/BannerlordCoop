@@ -15,7 +15,6 @@ public interface IDedicatedServerWireCodec
     DedicatedClientValidationResult DecodeClientValidationResult(byte[] wireBytes);
     ulong DecodeSessionLobbyChanged(byte[] wireBytes);
     IReadOnlyList<byte[]> DecodeAggregate(byte[] wireBytes);
-    DedicatedSaveChunk DecodeSaveChunk(byte[] wireBytes);
     byte[] EncodeCampaignTime(long serverTicks, int joinPacketsRemaining);
     byte[] EncodeModuleValidationRequest(DedicatedModuleValidationContract contract);
     byte[] EncodeModuleMismatchRequest(string clientBuildVersion);
@@ -172,21 +171,6 @@ public sealed class DedicatedServerWireCodec : IDedicatedServerWireCodec
         }
 
         return Array.AsReadOnly(messages.Select(x => x.ToArray()).ToArray());
-    }
-
-    public DedicatedSaveChunk DecodeSaveChunk(byte[] wireBytes)
-    {
-        DedicatedServerWireFrame frame = RequireType(
-            wireBytes,
-            DedicatedServerWireManifest.GameSaveDataChunkPacketTypeId);
-        DedicatedSaveChunkPayload payload = DeserializePayload<DedicatedSaveChunkPayload>(frame.Payload);
-        return new DedicatedSaveChunk(
-            payload.TransferId,
-            payload.ChunkIndex,
-            payload.ChunkCount,
-            payload.CompressedSize,
-            payload.UncompressedSize,
-            payload.ChunkData ?? Array.Empty<byte>());
     }
 
     public byte[] EncodeCampaignTime(long serverTicks, int joinPacketsRemaining)
@@ -564,14 +548,6 @@ public sealed record DedicatedModuleValidationResult(bool Matches, string Reason
 
 public sealed record DedicatedClientValidationResult(bool HeroExists, bool PlayerPayloadPresent);
 
-public sealed record DedicatedSaveChunk(
-    int TransferId,
-    int ChunkIndex,
-    int ChunkCount,
-    int CompressedSize,
-    int UncompressedSize,
-    byte[] ChunkData);
-
 [ProtoContract]
 internal sealed class DedicatedWireEnvelope
 {
@@ -679,26 +655,4 @@ internal sealed class DedicatedAggregatePayload
 {
     [ProtoMember(1)]
     public byte[][]? Messages { get; set; }
-}
-
-[ProtoContract]
-internal sealed class DedicatedSaveChunkPayload
-{
-    [ProtoMember(1)]
-    public int TransferId { get; set; }
-
-    [ProtoMember(2)]
-    public int ChunkIndex { get; set; }
-
-    [ProtoMember(3)]
-    public int ChunkCount { get; set; }
-
-    [ProtoMember(4)]
-    public int CompressedSize { get; set; }
-
-    [ProtoMember(5)]
-    public int UncompressedSize { get; set; }
-
-    [ProtoMember(6)]
-    public byte[]? ChunkData { get; set; }
 }

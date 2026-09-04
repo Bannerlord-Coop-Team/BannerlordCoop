@@ -22,7 +22,6 @@ public static class DedicatedServerWireManifest
     public const int NetworkClientValidatedTypeId = 29530214;
     public const int NetworkSessionLobbyChangedTypeId = 1547717120;
     public const int AggregateMessagePacketTypeId = 1253361833;
-    public const int GameSaveDataChunkPacketTypeId = 404232623;
 
     private static readonly IReadOnlyList<DedicatedServerWireEntry> entries = Array.AsReadOnly(new[]
     {
@@ -82,14 +81,6 @@ public static class DedicatedServerWireManifest
             "ReliableOrdered",
             "both",
             false),
-        new DedicatedServerWireEntry(
-            "save-data-chunk",
-            "Coop.Core.Common.Network.Packets.GameSaveDataChunkPacket",
-            GameSaveDataChunkPacketTypeId,
-            1,
-            "ReliableOrdered",
-            "server-to-client",
-            true),
     });
 
     public static IReadOnlyList<DedicatedServerWireEntry> Entries => entries;

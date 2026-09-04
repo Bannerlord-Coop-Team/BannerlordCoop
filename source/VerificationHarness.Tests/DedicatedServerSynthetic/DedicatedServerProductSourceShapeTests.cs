@@ -16,18 +16,6 @@ public sealed class DedicatedServerProductSourceShapeTests
             @"\[ProtoMember\(1\)\]\s*public\s+readonly\s+long\s+ServerTicks",
             @"\[ProtoMember\(2\)\]\s*public\s+readonly\s+int\s+JoinPacketsRemaining");
         AssertSource(
-            "source/Coop.Core/Common/Network/Packets/GameSaveDataChunkPacket.cs",
-            @"namespace\s+Coop\.Core\.Common\.Network\.Packets",
-            @"struct\s+GameSaveDataChunkPacket\s*:\s*IPacket",
-            @"ChunkSize\s*=\s*64\s*\*\s*1024",
-            @"DeliveryMethod\s*=>\s*DeliveryMethod\.ReliableOrdered",
-            @"\[ProtoMember\(1\)\]\s*public\s+readonly\s+int\s+TransferId",
-            @"\[ProtoMember\(2\)\]\s*public\s+readonly\s+int\s+ChunkIndex",
-            @"\[ProtoMember\(3\)\]\s*public\s+readonly\s+int\s+ChunkCount",
-            @"\[ProtoMember\(4\)\]\s*public\s+readonly\s+int\s+CompressedSize",
-            @"\[ProtoMember\(5\)\]\s*public\s+readonly\s+int\s+UncompressedSize",
-            @"\[ProtoMember\(6\)\]\s*public\s+readonly\s+byte\[\]\s+ChunkData");
-        AssertSource(
             "source/Coop.Core/Server/Connections/Messages/NetworkModuleVersionsValidate.cs",
             @"namespace\s+Coop\.Core\.Server\.Connections\.Messages",
             @"record\s+NetworkModuleVersionsValidate\s*:\s*ICommand",
@@ -61,10 +49,6 @@ public sealed class DedicatedServerProductSourceShapeTests
             "source/Common/PacketHandlers/MessagePacketHandler.cs",
             @"struct\s+MessagePacket\s*:\s*IPacket",
             @"DeliveryMethod\s*=>\s*DeliveryMethod\.ReliableOrdered");
-        AssertSource(
-            "source/Coop.Core/Common/Network/CoopNetworkBase.cs",
-            @"const\s+byte\s+BulkChannel\s*=\s*1",
-            @"packet\s+is\s+GameSaveDataPacket\s+or\s+GameSaveDataChunkPacket\s*\?\s*BulkChannel\s*:\s*\(byte\)0");
         AssertSource(
             "source/Common/Serialization/ProtoBufSerializer.cs",
             @"\[ProtoMember\(1\)\]\s*public\s+int\s+TypeId",

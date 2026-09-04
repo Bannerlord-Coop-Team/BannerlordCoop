@@ -31,10 +31,6 @@ Synthetic peers must never send `NetworkTransferNewHero`, `NetworkPlayerCampaign
 `NetworkJoinSync`, or `NetworkPlayerMissionEntered`. Those messages enter real campaign, save, or
 mission state and require rendered clients.
 
-The optional save collector assembles only bounded compressed bytes. It accepts at most 4,096
-chunks, 64 KiB per chunk, 64 MiB compressed, and 256 MiB declared uncompressed. It never
-decompresses or loads a campaign, and save receipt is not required for this profile.
-
 ## Commands
 
 The offline node is a protocol lab, not dedicated-server evidence:
