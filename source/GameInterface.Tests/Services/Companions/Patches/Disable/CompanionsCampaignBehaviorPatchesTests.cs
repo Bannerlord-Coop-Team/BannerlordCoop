@@ -11,6 +11,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.Companions.Patches.Disable;
 
 /// <summary>Verifies companion lifecycle replacement behavior.</summary>
+[Collection(ModInformationRoleCollection.Name)]
 public class CompanionsCampaignBehaviorPatchesTests
 {
     [Fact]
