@@ -1,4 +1,5 @@
 ﻿#if DEBUG
+using Common.Commands;
 using Autofac;
 using Common;
 using Common.Messaging;
@@ -28,12 +29,17 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
 
 internal class PostBattleFreezeFixtureCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private const string TubilisCastleId = "castle_A1";
     private const int FirstPlayerTroops = 179;
     private const int SecondPlayerTroops = 202;
@@ -41,248 +47,292 @@ internal class PostBattleFreezeFixtureCommands
 
     private static PostBattleFreezeFixture fixture;
 
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_start", "coop.debug.mapevent")]
-    public static string StartFixture(List<string> args)
+    public sealed class PostBattleFreezeFixtureStartCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
-            return "Run this command on the server.";
-        if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_start <firstControllerId> <secondControllerId>";
-        if (fixture != null)
-            return "The post-battle freeze fixture is already active.";
+        public string Prefix => "coop.debug.map_event";
 
-        if (!TryResolveServices(
-                out var objectManager,
-                out var playerManager,
-                out var behaviorSnapshot,
-                out var timeControl,
-                out var error))
-            return error;
+        public string Name => "post_battle_freeze_fixture_start";
 
-        if (!TryGetReadyPlayerParty(playerManager, objectManager, args[0], out var firstPlayer, out error) ||
-            !TryGetReadyPlayerParty(playerManager, objectManager, args[1], out var secondPlayer, out error))
-            return error;
-        if (firstPlayer == secondPlayer)
-            return "The fixture requires two different player parties.";
+        public string Description => "Runs the post battle freeze fixture start debug operation.";
 
-        var tubilisCastle = Settlement.Find(TubilisCastleId);
-        if (tubilisCastle == null)
-            return $"Settlement {TubilisCastleId} was not found.";
-
-        var aiLordParty = MobileParty.All
-            .Where(p => p.IsActive &&
-                        p != firstPlayer &&
-                        p != secondPlayer &&
-                        p.LeaderHero?.IsLord == true &&
-                        !p.IsPlayerParty() &&
-                        p.MapEvent == null &&
-                        p.CurrentSettlement == null &&
-                        p.MemberRoster.TotalManCount > 0 &&
-                        p.MapFaction != null &&
-                        firstPlayer.MapFaction != null &&
-                        FactionManager.IsAtWarAgainstFaction(p.MapFaction, firstPlayer.MapFaction))
-            .OrderBy(p => p.Position.ToVec2().DistanceSquared(tubilisCastle.Position.ToVec2()))
-            .FirstOrDefault();
-        if (aiLordParty == null)
-            return "No active AI lord party at war with the first player is available.";
-
-        var troop = FindFixtureTroop(firstPlayer, secondPlayer, aiLordParty);
-        if (troop == null)
-            return "No regular troop template is available for the fixture.";
-
-        var firstPlayerSnapshot = CaptureParty(firstPlayer, behaviorSnapshot);
-        var secondPlayerSnapshot = CaptureParty(secondPlayer, behaviorSnapshot);
-        var aiLordSnapshot = CaptureParty(aiLordParty, behaviorSnapshot);
-        var partySnapshots = new[]
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            firstPlayerSnapshot,
-            secondPlayerSnapshot,
-            aiLordSnapshot,
+            new ExpectedArgs("first_controller_id", "The first controller id.", true),
+            new ExpectedArgs("second_controller_id", "The second controller id.", true),
         };
-        var heroSnapshots = partySnapshots
-            .SelectMany(party => party.MemberRoster.Concat(party.PrisonRoster))
-            .Where(element => element.Character.IsHero)
-            .Select(element => element.Character.HeroObject)
-            .Concat(partySnapshots.Select(party => party.LeaderHero))
-            .Where(hero => hero != null)
-            .Distinct()
-            .Select(CaptureHero)
-            .ToArray();
-        var battleHeroes = firstPlayerSnapshot.MemberRoster
-            .Concat(secondPlayerSnapshot.MemberRoster)
-            .Where(element => element.Character.IsHero)
-            .Select(element => element.Character.HeroObject)
-            .Concat(new[]
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (fixture != null)
+                return Failed("The post-battle freeze fixture is already active.");
+
+            if (!TryResolveServices(
+                    out var objectManager,
+                    out var playerManager,
+                    out var behaviorSnapshot,
+                    out var timeControl,
+                    out var error))
+                return Failed(error);
+
+            if (!TryGetReadyPlayerParty(playerManager, objectManager, args[0], out var firstPlayer, out error) ||
+                !TryGetReadyPlayerParty(playerManager, objectManager, args[1], out var secondPlayer, out error))
+                return Failed(error);
+            if (firstPlayer == secondPlayer)
+                return Failed("The fixture requires two different player parties.");
+
+            var tubilisCastle = Settlement.Find(TubilisCastleId);
+            if (tubilisCastle == null)
+                return Failed($"Settlement {TubilisCastleId} was not found.");
+
+            var aiLordParty = MobileParty.All
+                .Where(p => p.IsActive &&
+                            p != firstPlayer &&
+                            p != secondPlayer &&
+                            p.LeaderHero?.IsLord == true &&
+                            !p.IsPlayerParty() &&
+                            p.MapEvent == null &&
+                            p.CurrentSettlement == null &&
+                            p.MemberRoster.TotalManCount > 0 &&
+                            p.MapFaction != null &&
+                            firstPlayer.MapFaction != null &&
+                            FactionManager.IsAtWarAgainstFaction(p.MapFaction, firstPlayer.MapFaction))
+                .OrderBy(p => p.Position.ToVec2().DistanceSquared(tubilisCastle.Position.ToVec2()))
+                .FirstOrDefault();
+            if (aiLordParty == null)
+                return Failed("No active AI lord party at war with the first player is available.");
+
+            var troop = FindFixtureTroop(firstPlayer, secondPlayer, aiLordParty);
+            if (troop == null)
+                return Failed("No regular troop template is available for the fixture.");
+
+            var firstPlayerSnapshot = CaptureParty(firstPlayer, behaviorSnapshot);
+            var secondPlayerSnapshot = CaptureParty(secondPlayer, behaviorSnapshot);
+            var aiLordSnapshot = CaptureParty(aiLordParty, behaviorSnapshot);
+            var partySnapshots = new[]
             {
-                firstPlayerSnapshot.LeaderHero,
-                secondPlayerSnapshot.LeaderHero,
+                firstPlayerSnapshot,
+                secondPlayerSnapshot,
+                aiLordSnapshot,
+            };
+            var heroSnapshots = partySnapshots
+                .SelectMany(party => party.MemberRoster.Concat(party.PrisonRoster))
+                .Where(element => element.Character.IsHero)
+                .Select(element => element.Character.HeroObject)
+                .Concat(partySnapshots.Select(party => party.LeaderHero))
+                .Where(hero => hero != null)
+                .Distinct()
+                .Select(CaptureHero)
+                .ToArray();
+            var battleHeroes = firstPlayerSnapshot.MemberRoster
+                .Concat(secondPlayerSnapshot.MemberRoster)
+                .Where(element => element.Character.IsHero)
+                .Select(element => element.Character.HeroObject)
+                .Concat(new[]
+                {
+                    firstPlayerSnapshot.LeaderHero,
+                    secondPlayerSnapshot.LeaderHero,
+                    aiLordParty.LeaderHero,
+                })
+                .Where(hero => hero != null)
+                .Distinct()
+                .ToArray();
+            var clanSnapshots = heroSnapshots
+                .Select(snapshot => snapshot.Hero.Clan)
+                .Where(clan => clan != null)
+                .Distinct()
+                .Select(CaptureClan)
+                .ToArray();
+
+            var pendingFixture = new PostBattleFreezeFixture(
+                args[0],
+                args[1],
+                tubilisCastle,
+                firstPlayerSnapshot,
+                secondPlayerSnapshot,
+                aiLordSnapshot,
                 aiLordParty.LeaderHero,
-            })
-            .Where(hero => hero != null)
-            .Distinct()
-            .ToArray();
-        var clanSnapshots = heroSnapshots
-            .Select(snapshot => snapshot.Hero.Clan)
-            .Where(clan => clan != null)
-            .Distinct()
-            .Select(CaptureClan)
-            .ToArray();
+                battleHeroes,
+                heroSnapshots,
+                clanSnapshots,
+                timeControl.GetTimeControl());
 
-        var pendingFixture = new PostBattleFreezeFixture(
-            args[0],
-            args[1],
-            tubilisCastle,
-            firstPlayerSnapshot,
-            secondPlayerSnapshot,
-            aiLordSnapshot,
-            aiLordParty.LeaderHero,
-            battleHeroes,
-            heroSnapshots,
-            clanSnapshots,
-            timeControl.GetTimeControl());
-
-        fixture = pendingFixture;
-        try
-        {
-            var battlePosition = new CampaignVec2(
-                new Vec2(tubilisCastle.Position.X, tubilisCastle.Position.Y - 1.5f),
-                true);
-
-            pendingFixture.AiParty = CreateDisposableAiLordParty(
-                battlePosition,
-                pendingFixture.AiLeader,
-                aiLordParty.ActualClan);
-
-            aiLordParty.RemovePartyLeader();
-            aiLordParty.MemberRoster.AddToCounts(pendingFixture.AiLeader.CharacterObject, -1);
-            pendingFixture.AiParty.MemberRoster.AddToCounts(pendingFixture.AiLeader.CharacterObject, 1);
-
-            PrepareParty(firstPlayer, battlePosition, FirstPlayerTroops, troop);
-            PrepareParty(secondPlayer, battlePosition, SecondPlayerTroops, troop);
-            PrepareParty(pendingFixture.AiParty, battlePosition, AiLordTroops, troop);
-
-            pendingFixture.MapEvent = MapEventBattleFactory.CreateMapEvent(
-                pendingFixture.AiParty.Party,
-                firstPlayer.Party,
-                default);
-            if (pendingFixture.MapEvent == null)
-                throw new InvalidOperationException("The fixture could not create a field battle.");
-
-            secondPlayer.Party.MapEventSide = firstPlayer.Party.MapEventSide;
-
-            return FormatState("Post-battle freeze fixture started", pendingFixture, timeControl);
-        }
-        catch (Exception setupException)
-        {
+            fixture = pendingFixture;
             try
             {
+                var battlePosition = new CampaignVec2(
+                    new Vec2(tubilisCastle.Position.X, tubilisCastle.Position.Y - 1.5f),
+                    true);
+
+                pendingFixture.AiParty = CreateDisposableAiLordParty(
+                    battlePosition,
+                    pendingFixture.AiLeader,
+                    aiLordParty.ActualClan);
+
+                aiLordParty.RemovePartyLeader();
+                aiLordParty.MemberRoster.AddToCounts(pendingFixture.AiLeader.CharacterObject, -1);
+                pendingFixture.AiParty.MemberRoster.AddToCounts(pendingFixture.AiLeader.CharacterObject, 1);
+
+                PrepareParty(firstPlayer, battlePosition, FirstPlayerTroops, troop);
+                PrepareParty(secondPlayer, battlePosition, SecondPlayerTroops, troop);
+                PrepareParty(pendingFixture.AiParty, battlePosition, AiLordTroops, troop);
+
+                pendingFixture.MapEvent = MapEventBattleFactory.CreateMapEvent(
+                    pendingFixture.AiParty.Party,
+                    firstPlayer.Party,
+                    default);
+                if (pendingFixture.MapEvent == null)
+                    throw new InvalidOperationException("The fixture could not create a field battle.");
+
+                secondPlayer.Party.MapEventSide = firstPlayer.Party.MapEventSide;
+
+                return Succeeded(FormatState("Post-battle freeze fixture started", pendingFixture, timeControl));
+            }
+            catch (Exception setupException)
+            {
+                try
+                {
+                    RestoreFixture(pendingFixture, behaviorSnapshot, timeControl);
+                    fixture = null;
+                }
+                catch (Exception restoreException)
+                {
+                    return Failed($"Fixture setup failed: {setupException.Message}. " +
+                           $"Rollback failed: {restoreException.Message}. Run the restore command.");
+                }
+
+                return Failed($"Fixture setup failed: {setupException.Message}. The baseline was restored.");
+            }
+        }
+    }
+
+    public sealed class PostBattleFreezeFixtureOpenCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "post_battle_freeze_fixture_open";
+
+        public string Description => "Runs the post battle freeze fixture open debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (fixture == null)
+                return Failed("The post-battle freeze fixture is not active.");
+            if (fixture.EncountersOpened)
+                return Failed("The post-battle freeze fixture encounters are already open.");
+            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+                !ContainerProvider.TryResolve<INetwork>(out var network))
+                return Failed("Unable to resolve the encounter services.");
+
+            if (!objectManager.TryGetId(fixture.AiParty.Party, out string aiPartyId) ||
+                !objectManager.TryGetId(fixture.FirstPlayer.Party.Party, out string firstPlayerPartyId) ||
+                !objectManager.TryGetId(fixture.SecondPlayer.Party.Party, out string secondPlayerPartyId) ||
+                !objectManager.TryGetId(fixture.MapEvent, out string mapEventId))
+                return Failed("The fixture could not resolve the battle's network ids.");
+
+            network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
+                $"debug-2218-first-{Guid.NewGuid():N}",
+                aiPartyId,
+                firstPlayerPartyId,
+                mapEventId));
+            network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
+                $"debug-2218-second-{Guid.NewGuid():N}",
+                aiPartyId,
+                secondPlayerPartyId,
+                mapEventId));
+            fixture.EncountersOpened = true;
+            return Succeeded($"Opened the post-battle freeze fixture encounter for " +
+                   $"{fixture.FirstControllerId} and {fixture.SecondControllerId}.");
+        }
+    }
+
+    public sealed class PostBattleFreezeFixtureStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "post_battle_freeze_fixture_state";
+
+        public string Description => "Reports post battle freeze fixture state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server. Use the existing client observation commands on each client.");
+            if (fixture == null)
+                return Failed("The post-battle freeze fixture is not active.");
+            if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
+                return Failed("Unable to resolve time control.");
+
+            return Succeeded(FormatState("Post-battle freeze fixture state", fixture, timeControl));
+        }
+    }
+
+    public sealed class PostBattleFreezeFixtureUnpauseCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "post_battle_freeze_fixture_unpause";
+
+        public string Description => "Runs the post battle freeze fixture unpause debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (fixture == null)
+                return Failed("The post-battle freeze fixture is not active.");
+            if (fixture.FirstPlayer.Party.MapEvent != null || fixture.SecondPlayer.Party.MapEvent != null)
+                return Failed("Both player parties must leave the battle before the unpause probe.");
+            if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
+                return Failed("Unable to resolve time control.");
+
+            fixture.ProbeStartedAt = CampaignTime.Now;
+            timeControl.ServerSetTimeControl(TimeControlEnum.Play_1x);
+            return Succeeded($"Post-battle unpause requested at {fixture.ProbeStartedAt.NumTicks} ticks. " +
+                   "Submit coop.debug.mobileparty.move_offset 0.5 0 on both clients, then check fixture state.");
+        }
+    }
+
+    public sealed class PostBattleFreezeFixtureRestoreCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "post_battle_freeze_fixture_restore";
+
+        public string Description => "Restores or clears post battle freeze fixture restore.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (fixture == null)
+                return Failed("The post-battle freeze fixture is not active.");
+            if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+                !ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
+                return Failed("Unable to resolve fixture restore services.");
+
+            try
+            {
+                var pendingFixture = fixture;
                 RestoreFixture(pendingFixture, behaviorSnapshot, timeControl);
                 fixture = null;
+                return Succeeded("Post-battle freeze fixture restored.");
             }
-            catch (Exception restoreException)
+            catch (Exception e)
             {
-                return $"Fixture setup failed: {setupException.Message}. " +
-                       $"Rollback failed: {restoreException.Message}. Run the restore command.";
+                return Failed($"Fixture restore failed: {e.Message}. Retry the restore command.");
             }
-
-            return $"Fixture setup failed: {setupException.Message}. The baseline was restored.";
-        }
-    }
-
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_open", "coop.debug.mapevent")]
-    public static string OpenFixtureEncounters(List<string> args)
-    {
-        if (ModInformation.IsClient)
-            return "Run this command on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_open";
-        if (fixture == null)
-            return "The post-battle freeze fixture is not active.";
-        if (fixture.EncountersOpened)
-            return "The post-battle freeze fixture encounters are already open.";
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !ContainerProvider.TryResolve<INetwork>(out var network))
-            return "Unable to resolve the encounter services.";
-
-        if (!objectManager.TryGetId(fixture.AiParty.Party, out string aiPartyId) ||
-            !objectManager.TryGetId(fixture.FirstPlayer.Party.Party, out string firstPlayerPartyId) ||
-            !objectManager.TryGetId(fixture.SecondPlayer.Party.Party, out string secondPlayerPartyId) ||
-            !objectManager.TryGetId(fixture.MapEvent, out string mapEventId))
-            return "The fixture could not resolve the battle's network ids.";
-
-        network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
-            $"debug-2218-first-{Guid.NewGuid():N}",
-            aiPartyId,
-            firstPlayerPartyId,
-            mapEventId));
-        network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
-            $"debug-2218-second-{Guid.NewGuid():N}",
-            aiPartyId,
-            secondPlayerPartyId,
-            mapEventId));
-        fixture.EncountersOpened = true;
-        return $"Opened the post-battle freeze fixture encounter for " +
-               $"{fixture.FirstControllerId} and {fixture.SecondControllerId}.";
-    }
-
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_state", "coop.debug.mapevent")]
-    public static string GetFixtureState(List<string> args)
-    {
-        if (ModInformation.IsClient)
-            return "Run this command on the server. Use the existing client observation commands on each client.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_state";
-        if (fixture == null)
-            return "The post-battle freeze fixture is not active.";
-        if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
-            return "Unable to resolve time control.";
-
-        return FormatState("Post-battle freeze fixture state", fixture, timeControl);
-    }
-
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_unpause", "coop.debug.mapevent")]
-    public static string UnpauseFixture(List<string> args)
-    {
-        if (ModInformation.IsClient)
-            return "Run this command on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_unpause";
-        if (fixture == null)
-            return "The post-battle freeze fixture is not active.";
-        if (fixture.FirstPlayer.Party.MapEvent != null || fixture.SecondPlayer.Party.MapEvent != null)
-            return "Both player parties must leave the battle before the unpause probe.";
-        if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
-            return "Unable to resolve time control.";
-
-        fixture.ProbeStartedAt = CampaignTime.Now;
-        timeControl.ServerSetTimeControl(TimeControlEnum.Play_1x);
-        return $"Post-battle unpause requested at {fixture.ProbeStartedAt.NumTicks} ticks. " +
-               "Submit coop.debug.mobileparty.move_offset 0.5 0 on both clients, then check fixture state.";
-    }
-
-    [CommandLineArgumentFunction("post_battle_freeze_fixture_restore", "coop.debug.mapevent")]
-    public static string RestoreFixture(List<string> args)
-    {
-        if (ModInformation.IsClient)
-            return "Run this command on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.post_battle_freeze_fixture_restore";
-        if (fixture == null)
-            return "The post-battle freeze fixture is not active.";
-        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
-            !ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
-            return "Unable to resolve fixture restore services.";
-
-        try
-        {
-            var pendingFixture = fixture;
-            RestoreFixture(pendingFixture, behaviorSnapshot, timeControl);
-            fixture = null;
-            return "Post-battle freeze fixture restored.";
-        }
-        catch (Exception e)
-        {
-            return $"Fixture restore failed: {e.Message}. Retry the restore command.";
         }
     }
 

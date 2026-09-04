@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -7,6 +8,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Xunit;
@@ -39,6 +41,11 @@ public class ContainerTest
             var gameInterface = module.Resolve<IGameInterface>();
             var AutoSyncPatcher = module.Resolve<AutoSyncPatcher>();
             module.Resolve<IPlayerPartyRestorer>();
+            ICoopCommand[] commands = module.Resolve<IEnumerable<ICoopCommand>>().ToArray();
+            Assert.Contains(commands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.hero.set_gold");
+            Assert.Contains(commands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.kingdom.add_decision");
 
             gameInterface.PatchAll();
             gameInterface.UnpatchAll();

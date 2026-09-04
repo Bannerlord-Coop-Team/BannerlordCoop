@@ -522,6 +522,7 @@ jobs:
           if ($archiveBytes -le 0 -or $archiveBytes -gt 8388608) { throw 'Signed client input size is invalid' }
           $archiveSha256 = (Get-FileHash $entries[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($archiveSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Signed client input checksum is invalid' }
+          $clientKey = "nightly/clients/$($env:HEAD_SHA)/$archiveSha256/Coop.7z"
 
           New-Item -ItemType Directory -Path artifact | Out-Null
           $archivePath = Join-Path artifact $env:FILE_NAME
@@ -551,10 +552,10 @@ jobs:
             builtAt = $builtAt
             client = [ordered]@{
               fileName = $env:FILE_NAME
-              key = 'nightly/Coop.7z'
+              key = $clientKey
               bytes = $archiveBytes
               sha256 = $archiveSha256
-              publicUrl = "$env:NIGHTLY_GATEWAY_ORIGIN/v1/artifacts/nightly/Coop.7z"
+              publicUrl = "$env:NIGHTLY_GATEWAY_ORIGIN/v1/artifacts/$clientKey"
             }
           }
           $utf8 = [Text.UTF8Encoding]::new($false)
@@ -575,6 +576,7 @@ jobs:
           }
           "archive_bytes=$archiveBytes" >> $env:GITHUB_OUTPUT
           "archive_sha256=$archiveSha256" >> $env:GITHUB_OUTPUT
+          "client_key=$clientKey" >> $env:GITHUB_OUTPUT
 
       - name: Skip scheduled overwrite of a published nightly
         id: published
@@ -643,22 +645,25 @@ jobs:
           RCLONE_CONFIG_PATRON_SECRET_ACCESS_KEY: ${{ secrets.R2_PATRON_NIGHTLY_SECRET_ACCESS_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           FILE_NAME: ${{ needs.build.outputs.file_name }}
+          HEAD_SHA: ${{ needs.build.outputs.head_sha }}
           ARCHIVE_BYTES: ${{ steps.artifact.outputs.archive_bytes }}
           ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+          CLIENT_KEY: ${{ steps.artifact.outputs.client_key }}
         run: |
           set -eu
           test -n "$R2_ACCOUNT_ID"
+          test "$CLIENT_KEY" = "nightly/clients/$HEAD_SHA/$ARCHIVE_SHA256/Coop.7z"
           export RCLONE_CONFIG_PATRON_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           archive="artifact/$FILE_NAME"
           test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
           test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
           test "$(stat -c %s artifact/client-release.json)" -le 4096
 
-          ./rclone.exe copyto "$archive" "patron:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" \
-            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          remote_bytes=$(./rclone.exe lsl "patron:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" | awk '{print $1}')
+          ./rclone.exe copyto "$archive" "patron:$R2_NIGHTLY_BUCKET/$CLIENT_KEY" \
+            --checksum --immutable --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          remote_bytes=$(./rclone.exe lsl "patron:$R2_NIGHTLY_BUCKET/$CLIENT_KEY" | awk '{print $1}')
           test "$remote_bytes" = "$ARCHIVE_BYTES"
-          remote_sha256=$(./rclone.exe cat "patron:$R2_NIGHTLY_BUCKET/nightly/Coop.7z" | sha256sum | awk '{print $1}')
+          remote_sha256=$(./rclone.exe cat "patron:$R2_NIGHTLY_BUCKET/$CLIENT_KEY" | sha256sum | awk '{print $1}')
           test "$remote_sha256" = "$ARCHIVE_SHA256"
           # Publish the manifest last so installers never observe incomplete client bytes.
           ./rclone.exe copyto artifact/client-release.json "patron:$R2_NIGHTLY_BUCKET/nightly/client.json" \

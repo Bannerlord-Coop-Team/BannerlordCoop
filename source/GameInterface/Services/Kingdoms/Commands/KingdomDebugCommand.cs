@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common.Commands;
+using Autofac;
 using Common;
 using Common.Extensions;
 using Common.Logging;
@@ -40,6 +41,12 @@ namespace GameInterface.Services.Kingdoms.Commands;
 /// </summary>
 public class KingdomDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomDebugCommand>();
     private static PolicyTimeoutFixture pendingPolicyTimeoutFixture;
     private enum CollectionTarget
@@ -62,11 +69,8 @@ public class KingdomDebugCommand
         Remove,
     }
 
-    private static readonly string CreateUsage = "Usage: coop.debug.kingdom.create <leaderHeroName> <kingdomName> (run on the server; use '_' for spaces in the hero name)";
-    private static readonly string CollectionAddUsage = "Usage: coop.debug.kingdom.collection_add <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
-    private static readonly string CollectionRemoveUsage = "Usage: coop.debug.kingdom.collection_remove <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <index>";
     private static readonly string RemoveUsage = "Usage: coop.debug.kingdom.remove_decision <kingdomId> <Index>";
-    private static readonly string AddBasicUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
+    private static readonly string AddBasicUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> [decisionArg1] [decisionArg2] [decisionArg3]";
     private static readonly string AddDeclareWarDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> DeclareWarDecision <factionId>";
     private static readonly string AddExpelClanFromKingdomDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> ExpelClanFromKingdomDecision <clanToExpelId>";
     private static readonly string AddKingSelectionKingdomDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> KingSelectionKingdomDecision <clanToExcludeId>";
@@ -78,7 +82,7 @@ public class KingdomDebugCommand
     private static readonly string AddProposeCallToWarAgreementDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> ProposeCallToWarAgreementDecision <calledKingdomId> <kingdomToCallToWarAgainstId>";
     private static readonly string AddStartAllianceDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> StartAllianceDecision <kingdomToStartAllianceWithId>";
     private static readonly string AddTradeAgreementDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> TradeAgreementDecision <targetKingdomId>";
-    private delegate bool KingdomDecisionDelegate(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message);
+    private delegate bool KingdomDecisionDelegate(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message);
     private static readonly Dictionary<string, KingdomDecisionDelegate> TryGetKingdomDecisionFunc = new Dictionary<string, KingdomDecisionDelegate>()
         {
             { nameof(DeclareWarDecision), TryGetDeclareWarDecision },
@@ -93,7 +97,6 @@ public class KingdomDebugCommand
             { nameof(TradeAgreementDecision), TryGetTradeAgreementDecision },
             //{ nameof(MakePeaceKingdomDecision), TryGetMakePeaceKingdomDecision },
         };
-
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -132,267 +135,373 @@ public class KingdomDebugCommand
         return container.TryResolve(out voteManager);
     }
 
-    [CommandLineArgumentFunction("open", "coop.debug.kingdom")]
-    public static string OpenKingdomScreen(List<string> args)
+    public sealed class KingdomOpenCoopCommand : ICoopCommand
     {
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.open";
-        if (Clan.PlayerClan?.Kingdom == null) return "The player clan is not in a kingdom.";
-        if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
-        if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
+        public string Prefix => "coop.debug.kingdom";
 
-        KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(
-            (IFaction)Clan.PlayerClan);
-        Game.Current.GameStateManager.PushState(kingdomState, 0);
-        return "KINGDOM_SCREEN_OPENED";
-    }
+        public string Name => "open";
 
-    [CommandLineArgumentFunction("open_decision", "coop.debug.kingdom")]
-    public static string OpenKingdomDecisionScreen(List<string> args)
-    {
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count < 2) return "Usage: <kingdomId> <decisionIndex>";
+        public string Description => "Opens the kingdom screen on a client.";
 
-        KingdomDecision decision;
-        Kingdom playerKingdom = Clan.PlayerClan?.Kingdom;
-        bool isPlayerKingdom = playerKingdom != null &&
-            (string.Equals(playerKingdom.StringId, args[0], StringComparison.Ordinal) ||
-             string.Equals($"{nameof(Kingdom)}_{playerKingdom.StringId}", args[0], StringComparison.Ordinal));
-        if (isPlayerKingdom)
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!int.TryParse(args[1], out int index)) return $"Decision index is not a number: {args[1]}";
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (Clan.PlayerClan?.Kingdom == null) return Failed("The player clan is not in a kingdom.");
+            if (Game.Current?.GameStateManager == null) return Failed("The game-state manager is unavailable.");
+            if (Game.Current.GameStateManager.ActiveState is KingdomState) return Succeeded("KINGDOM_SCREEN_ALREADY_OPEN");
 
-            int zeroBasedIndex = index - 1;
-            if (zeroBasedIndex < 0 || zeroBasedIndex >= playerKingdom._unresolvedDecisions.Count)
-                return "Decision index is out of bounds.";
-
-            decision = playerKingdom._unresolvedDecisions[zeroBasedIndex];
-        }
-        else if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out decision, out int _, out string message))
-        {
-            return message;
-        }
-        if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
-        if (Game.Current.GameStateManager.ActiveState is KingdomState) return "KINGDOM_SCREEN_ALREADY_OPEN";
-
-        KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(decision);
-        InquiryData inquiry = null;
-        Action<InquiryData, bool, bool> captureInquiry = (data, _, _) => inquiry = data;
-        InformationManager.OnShowInquiry += captureInquiry;
-        try
-        {
+            KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(
+                (IFaction)Clan.PlayerClan);
             Game.Current.GameStateManager.PushState(kingdomState, 0);
+            return Succeeded("KINGDOM_SCREEN_OPENED");
         }
-        finally
+    }
+
+    public sealed class KingdomOpenDecisionCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "open_decision";
+
+        public string Description => "Opens one queued kingdom decision.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            InformationManager.OnShowInquiry -= captureInquiry;
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("decision_index", "The one-based decision index."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+
+            KingdomDecision decision;
+            Kingdom playerKingdom = Clan.PlayerClan?.Kingdom;
+            bool isPlayerKingdom = playerKingdom != null &&
+                (string.Equals(playerKingdom.StringId, args[0], StringComparison.Ordinal) ||
+                 string.Equals($"{nameof(Kingdom)}_{playerKingdom.StringId}", args[0], StringComparison.Ordinal));
+            if (isPlayerKingdom)
+            {
+                if (!int.TryParse(args[1], out int index)) return Failed($"Decision index is not a number: {args[1]}");
+
+                int zeroBasedIndex = index - 1;
+                if (zeroBasedIndex < 0 || zeroBasedIndex >= playerKingdom._unresolvedDecisions.Count)
+                    return Failed("Decision index is out of bounds.");
+
+                decision = playerKingdom._unresolvedDecisions[zeroBasedIndex];
+            }
+            else if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out decision, out int _, out string message))
+            {
+                return Failed(message);
+            }
+            if (Game.Current?.GameStateManager == null) return Failed("The game-state manager is unavailable.");
+            if (Game.Current.GameStateManager.ActiveState is KingdomState) return Succeeded("KINGDOM_SCREEN_ALREADY_OPEN");
+
+            KingdomState kingdomState = Game.Current.GameStateManager.CreateState<KingdomState>(decision);
+            InquiryData inquiry = null;
+            Action<InquiryData, bool, bool> captureInquiry = (data, _, _) => inquiry = data;
+            InformationManager.OnShowInquiry += captureInquiry;
+            try
+            {
+                Game.Current.GameStateManager.PushState(kingdomState, 0);
+            }
+            finally
+            {
+                InformationManager.OnShowInquiry -= captureInquiry;
+            }
+
+            if (inquiry == null || inquiry.AffirmativeAction == null ||
+                !string.Equals(inquiry.TitleText, GameTexts.FindText("str_decision").ToString(), StringComparison.Ordinal))
+            {
+                return Failed("The decision confirmation did not open.");
+            }
+
+            InformationManager.HideInquiry();
+            inquiry.AffirmativeAction();
+            return Succeeded("KINGDOM_DECISION_SCREEN_OPENED");
         }
+    }
 
-        if (inquiry == null || inquiry.AffirmativeAction == null ||
-            !string.Equals(inquiry.TitleText, GameTexts.FindText("str_decision").ToString(), StringComparison.Ordinal))
+    public sealed class KingdomCloseCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "close";
+
+        public string Description => "Closes the kingdom screen on a client.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "The decision confirmation did not open.";
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (!(Game.Current?.GameStateManager?.ActiveState is KingdomState))
+                return Failed("No active Kingdom screen.");
+
+            Game.Current.GameStateManager.PopState(0);
+            return Succeeded("KINGDOM_SCREEN_CLOSED");
         }
-
-        InformationManager.HideInquiry();
-        inquiry.AffirmativeAction();
-        return "KINGDOM_DECISION_SCREEN_OPENED";
     }
 
-    [CommandLineArgumentFunction("close", "coop.debug.kingdom")]
-    public static string CloseKingdomScreen(List<string> args)
+    public sealed class KingdomScreenStateCoopCommand : ICoopCommand
     {
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.close";
-        if (!(Game.Current?.GameStateManager?.ActiveState is KingdomState))
-            return "No active Kingdom screen.";
+        public string Prefix => "coop.debug.kingdom";
 
-        Game.Current.GameStateManager.PopState(0);
-        return "KINGDOM_SCREEN_CLOSED";
-    }
+        public string Name => "screen_state";
 
-    [CommandLineArgumentFunction("screen_state", "coop.debug.kingdom")]
-    public static string KingdomScreenState(List<string> args)
-    {
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.screen_state";
+        public string Description => "Reports kingdom screen state.";
 
-        var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
-        return $"KINGDOM_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is KingdomState} " +
-            $"topScreen={kingdomScreen != null} dataSource={kingdomScreen?.DataSource != null} " +
-            $"decisionActive={kingdomScreen?.DataSource?.Decision?.IsActive ?? false} " +
-            $"clanShown={kingdomScreen?.DataSource?.Clan?.Show ?? false} " +
-            $"kingdom={kingdomScreen?.DataSource?.Kingdom?.Name} " +
-            $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}";
-    }
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
-    [CommandLineArgumentFunction("policy_timeout_capture", "coop.debug.kingdom")]
-    public static string CapturePolicyTimeoutFixture(List<string> args)
-    {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.policy_timeout_capture";
-        if (pendingPolicyTimeoutFixture != null) return "A policy-timeout fixture lifecycle is already active.";
-        if (!TryGetObjectManager(out var objectManager) || !TryGetPlayerManager(out var playerManager))
-            return "Unable to resolve policy-timeout fixture services.";
-        if (!playerManager.TryGetPlayer("testclient", out var player))
-            return "No registered player has controller id 'testclient'.";
-        if (!objectManager.TryGetObject(player.ClanId, out Clan proposerClan) || proposerClan.Kingdom == null)
-            return "The testclient clan is not in a kingdom.";
-
-        Kingdom kingdom = proposerClan.Kingdom;
-        if (kingdom.UnresolvedDecisions.Count > 0)
-            return $"Kingdom {kingdom.StringId} already has an unresolved decision.";
-
-        PolicyObject policy = PolicyObject.All
-            .Where(candidate => !kingdom.ActivePolicies.Contains(candidate))
-            .OrderBy(candidate => candidate.StringId)
-            .FirstOrDefault();
-        if (policy == null) return $"Kingdom {kingdom.StringId} has every policy active.";
-        if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
-            !objectManager.TryGetIdWithLogging(proposerClan, out string proposerClanId) ||
-            !objectManager.TryGetIdWithLogging(policy, out string policyId))
-            return "Unable to resolve policy-timeout fixture ids.";
-
-        return PolicyTimeoutJsonResult(new
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            success = true,
-            controllerId = player.ControllerId,
-            kingdomId,
-            kingdomName = kingdom.Name.ToString(),
-            proposerClanId,
-            policyId,
-            policyName = policy.Name.ToString(),
-            policyWasActive = false,
-            unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
-        });
-    }
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
 
-    [CommandLineArgumentFunction("policy_timeout_stage", "coop.debug.kingdom")]
-    public static string StagePolicyTimeoutFixture(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.kingdom.policy_timeout_stage <kingdomId> <proposerClanId> <policyId> <policyWasActive>";
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (args.Count != 4 || !bool.TryParse(args[3], out bool policyWasActive)) return usage;
-        if (pendingPolicyTimeoutFixture != null) return "A policy-timeout fixture lifecycle is already active.";
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
-        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
-        if (!objectManager.TryGetObject(args[1], out Clan proposerClan)) return $"Clan with ID: '{args[1]}' not found";
-        if (!objectManager.TryGetObject(args[2], out PolicyObject policy)) return $"PolicyObject with ID: '{args[2]}' not found";
-        if (proposerClan.Kingdom != kingdom) return $"Clan {args[1]} is not in kingdom {args[0]}.";
-        if (kingdom.UnresolvedDecisions.Count > 0)
-            return $"Kingdom {args[0]} no longer has a clean decision fixture.";
-        if (kingdom.ActivePolicies.Contains(policy) != policyWasActive)
-            return $"Policy {args[2]} changed after fixture capture.";
-
-        var fixture = new PolicyTimeoutFixture(
-            kingdom,
-            proposerClan,
-            policy,
-            args[0],
-            args[1],
-            args[2],
-            policyWasActive);
-        pendingPolicyTimeoutFixture = fixture;
-
-        var decision = new KingdomPolicyDecision(fixture.ProposerClan, fixture.Policy, fixture.PolicyWasActive);
-        fixture.Kingdom.AddDecision(decision, true);
-        fixture.DecisionStaged = true;
-        int decisionIndex = fixture.Kingdom._unresolvedDecisions.IndexOf(decision) + 1;
-        if (decisionIndex <= 0) return "The policy-timeout decision was not added to the kingdom.";
-
-        return PolicyTimeoutJsonResult(new
-        {
-            success = true,
-            fixture.KingdomId,
-            fixture.PolicyId,
-            decisionIndex,
-            votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
-        });
-    }
-
-    [CommandLineArgumentFunction("policy_timeout_state", "coop.debug.kingdom")]
-    public static string GetPolicyTimeoutState(List<string> args)
-    {
-        if (ModInformation.IsServer) return "Command can only be run on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.kingdom.policy_timeout_state";
-
-        var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
-        DecisionItemBaseVM decision = kingdomScreen?.DataSource?.Decision?.CurrentDecision;
-        string decisionTitle = decision?.TitleText ?? string.Empty;
-        return PolicyTimeoutJsonResult(new
-        {
-            success = true,
-            kingdomScreenActive = Game.Current?.GameStateManager?.ActiveState is KingdomState,
-            topScreenIsKingdom = kingdomScreen != null,
-            decisionPresent = decision != null,
-            decisionActive = decision?.IsActive ?? false,
-            decisionTitle,
-            hasVotingCountdown = decisionTitle.IndexOf("Voting ends in", StringComparison.OrdinalIgnoreCase) >= 0,
-            inquiryActive = InformationManager.IsAnyInquiryActive()
-        });
-    }
-
-    [CommandLineArgumentFunction("policy_timeout_restore", "coop.debug.kingdom")]
-    public static string RestorePolicyTimeoutFixture(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.kingdom.policy_timeout_restore <kingdomId> <proposerClanId> <policyId> <policyWasActive>";
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (args.Count != 4 || !bool.TryParse(args[3], out bool policyWasActive)) return usage;
-        if (!TryMatchPendingPolicyTimeoutFixture(args[0], args[1], args[2], policyWasActive, out var fixture, out string error))
-            return error;
-
-        KingdomPolicyDecision stagedDecision = fixture.Kingdom.UnresolvedDecisions
-            .OfType<KingdomPolicyDecision>()
-            .FirstOrDefault(decision => decision.Policy == fixture.Policy);
-        if (stagedDecision != null) fixture.Kingdom.RemoveDecision(stagedDecision);
-
-        bool policyIsActive = fixture.Kingdom.ActivePolicies.Contains(fixture.Policy);
-        if (fixture.PolicyWasActive && !policyIsActive)
-        {
-            fixture.Kingdom.AddPolicy(fixture.Policy);
+            var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
+            return Succeeded($"KINGDOM_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is KingdomState} " +
+                $"topScreen={kingdomScreen != null} dataSource={kingdomScreen?.DataSource != null} " +
+                $"decisionActive={kingdomScreen?.DataSource?.Decision?.IsActive ?? false} " +
+                $"clanShown={kingdomScreen?.DataSource?.Clan?.Show ?? false} " +
+                $"kingdom={kingdomScreen?.DataSource?.Kingdom?.Name} " +
+                $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}");
         }
-        else if (!fixture.PolicyWasActive && policyIsActive)
-        {
-            fixture.Kingdom.RemovePolicy(fixture.Policy);
-        }
-
-        pendingPolicyTimeoutFixture = null;
-        return PolicyTimeoutJsonResult(new
-        {
-            success = true,
-            fixture.KingdomId,
-            fixture.PolicyId,
-            restoredPolicyActive = fixture.Kingdom.ActivePolicies.Contains(fixture.Policy),
-            unresolvedDecisionCount = fixture.Kingdom.UnresolvedDecisions.Count
-        });
     }
 
-    [CommandLineArgumentFunction("policy_timeout_verify", "coop.debug.kingdom")]
-    public static string VerifyPolicyTimeoutFixture(List<string> args)
+    public sealed class KingdomPolicyTimeoutCaptureCoopCommand : ICoopCommand
     {
-        const string usage = "Usage: coop.debug.kingdom.policy_timeout_verify <kingdomId> <policyId> <policyWasActive>";
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (args.Count != 3 || !bool.TryParse(args[2], out bool policyWasActive)) return usage;
-        if (pendingPolicyTimeoutFixture != null) return "The policy-timeout fixture lifecycle is still active.";
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
-        if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return $"Kingdom with ID: '{args[0]}' not found";
-        if (!objectManager.TryGetObject(args[1], out PolicyObject policy)) return $"PolicyObject with ID: '{args[1]}' not found";
+        public string Prefix => "coop.debug.kingdom";
 
-        bool policyIsActive = kingdom.ActivePolicies.Contains(policy);
-        bool decisionPresent = kingdom.UnresolvedDecisions
-            .OfType<KingdomPolicyDecision>()
-            .Any(decision => decision.Policy == policy);
-        bool success = policyIsActive == policyWasActive && !decisionPresent && kingdom.UnresolvedDecisions.Count == 0;
-        return PolicyTimeoutJsonResult(new
+        public string Name => "policy_timeout_capture";
+
+        public string Description => "Captures the kingdom policy-timeout fixture.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            success,
-            kingdomId = args[0],
-            policyId = args[1],
-            expectedPolicyActive = policyWasActive,
-            policyIsActive,
-            decisionPresent,
-            unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
-        });
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (pendingPolicyTimeoutFixture != null) return Failed("A policy-timeout fixture lifecycle is already active.");
+            if (!TryGetObjectManager(out var objectManager) || !TryGetPlayerManager(out var playerManager))
+                return Failed("Unable to resolve policy-timeout fixture services.");
+            if (!playerManager.TryGetPlayer("testclient", out var player))
+                return Failed("No registered player has controller id 'testclient'.");
+            if (!objectManager.TryGetObject(player.ClanId, out Clan proposerClan) || proposerClan.Kingdom == null)
+                return Failed("The testclient clan is not in a kingdom.");
+
+            Kingdom kingdom = proposerClan.Kingdom;
+            if (kingdom.UnresolvedDecisions.Count > 0)
+                return Failed($"Kingdom {kingdom.StringId} already has an unresolved decision.");
+
+            PolicyObject policy = PolicyObject.All
+                .Where(candidate => !kingdom.ActivePolicies.Contains(candidate))
+                .OrderBy(candidate => candidate.StringId)
+                .FirstOrDefault();
+            if (policy == null) return Failed($"Kingdom {kingdom.StringId} has every policy active.");
+            if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
+                !objectManager.TryGetIdWithLogging(proposerClan, out string proposerClanId) ||
+                !objectManager.TryGetIdWithLogging(policy, out string policyId))
+                return Failed("Unable to resolve policy-timeout fixture ids.");
+
+            return Succeeded(PolicyTimeoutJsonResult(new
+            {
+                success = true,
+                controllerId = player.ControllerId,
+                kingdomId,
+                kingdomName = kingdom.Name.ToString(),
+                proposerClanId,
+                policyId,
+                policyName = policy.Name.ToString(),
+                policyWasActive = false,
+                unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
+            }));
+        }
+    }
+
+    public sealed class KingdomPolicyTimeoutStageCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "policy_timeout_stage";
+
+        public string Description => "Stages the kingdom policy-timeout fixture.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("proposer_clan_id", "The registered proposer clan id."),
+            new ExpectedArgs("policy_id", "The registered policy id."),
+            new ExpectedArgs("policy_was_active", "Whether the policy was active at capture."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (!bool.TryParse(args[3], out bool policyWasActive))
+                return Failed($"Unable to parse {args[3]} as a boolean.");
+            if (pendingPolicyTimeoutFixture != null) return Failed("A policy-timeout fixture lifecycle is already active.");
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager");
+            if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return Failed($"Kingdom with ID: '{args[0]}' not found");
+            if (!objectManager.TryGetObject(args[1], out Clan proposerClan)) return Failed($"Clan with ID: '{args[1]}' not found");
+            if (!objectManager.TryGetObject(args[2], out PolicyObject policy)) return Failed($"PolicyObject with ID: '{args[2]}' not found");
+            if (proposerClan.Kingdom != kingdom) return Failed($"Clan {args[1]} is not in kingdom {args[0]}.");
+            if (kingdom.UnresolvedDecisions.Count > 0)
+                return Failed($"Kingdom {args[0]} no longer has a clean decision fixture.");
+            if (kingdom.ActivePolicies.Contains(policy) != policyWasActive)
+                return Failed($"Policy {args[2]} changed after fixture capture.");
+
+            var fixture = new PolicyTimeoutFixture(
+                kingdom,
+                proposerClan,
+                policy,
+                args[0],
+                args[1],
+                args[2],
+                policyWasActive);
+            pendingPolicyTimeoutFixture = fixture;
+
+            var decision = new KingdomPolicyDecision(fixture.ProposerClan, fixture.Policy, fixture.PolicyWasActive);
+            fixture.Kingdom.AddDecision(decision, true);
+            fixture.DecisionStaged = true;
+            int decisionIndex = fixture.Kingdom._unresolvedDecisions.IndexOf(decision) + 1;
+            if (decisionIndex <= 0) return Failed("The policy-timeout decision was not added to the kingdom.");
+
+            return Succeeded(PolicyTimeoutJsonResult(new
+            {
+                success = true,
+                fixture.KingdomId,
+                fixture.PolicyId,
+                decisionIndex,
+                votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
+            }));
+        }
+    }
+
+    public sealed class KingdomPolicyTimeoutStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "policy_timeout_state";
+
+        public string Description => "Reports kingdom policy-timeout fixture state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer) return Failed("Command can only be run on a client.");
+
+            var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
+            DecisionItemBaseVM decision = kingdomScreen?.DataSource?.Decision?.CurrentDecision;
+            string decisionTitle = decision?.TitleText ?? string.Empty;
+            return Succeeded(PolicyTimeoutJsonResult(new
+            {
+                success = true,
+                kingdomScreenActive = Game.Current?.GameStateManager?.ActiveState is KingdomState,
+                topScreenIsKingdom = kingdomScreen != null,
+                decisionPresent = decision != null,
+                decisionActive = decision?.IsActive ?? false,
+                decisionTitle,
+                hasVotingCountdown = decisionTitle.IndexOf("Voting ends in", StringComparison.OrdinalIgnoreCase) >= 0,
+                inquiryActive = InformationManager.IsAnyInquiryActive()
+            }));
+        }
+    }
+
+    public sealed class KingdomPolicyTimeoutRestoreCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "policy_timeout_restore";
+
+        public string Description => "Restores the kingdom policy-timeout fixture.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("proposer_clan_id", "The registered proposer clan id."),
+            new ExpectedArgs("policy_id", "The registered policy id."),
+            new ExpectedArgs("policy_was_active", "Whether the policy was active at capture."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (!bool.TryParse(args[3], out bool policyWasActive))
+                return Failed($"Unable to parse {args[3]} as a boolean.");
+            if (!TryMatchPendingPolicyTimeoutFixture(args[0], args[1], args[2], policyWasActive, out var fixture, out string error))
+                return Failed(error);
+
+            KingdomPolicyDecision stagedDecision = fixture.Kingdom.UnresolvedDecisions
+                .OfType<KingdomPolicyDecision>()
+                .FirstOrDefault(decision => decision.Policy == fixture.Policy);
+            if (stagedDecision != null) fixture.Kingdom.RemoveDecision(stagedDecision);
+
+            bool policyIsActive = fixture.Kingdom.ActivePolicies.Contains(fixture.Policy);
+            if (fixture.PolicyWasActive && !policyIsActive)
+            {
+                fixture.Kingdom.AddPolicy(fixture.Policy);
+            }
+            else if (!fixture.PolicyWasActive && policyIsActive)
+            {
+                fixture.Kingdom.RemovePolicy(fixture.Policy);
+            }
+
+            pendingPolicyTimeoutFixture = null;
+            return Succeeded(PolicyTimeoutJsonResult(new
+            {
+                success = true,
+                fixture.KingdomId,
+                fixture.PolicyId,
+                restoredPolicyActive = fixture.Kingdom.ActivePolicies.Contains(fixture.Policy),
+                unresolvedDecisionCount = fixture.Kingdom.UnresolvedDecisions.Count
+            }));
+        }
+    }
+
+    public sealed class KingdomPolicyTimeoutVerifyCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "policy_timeout_verify";
+
+        public string Description => "Verifies the kingdom policy-timeout fixture.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("policy_id", "The registered policy id."),
+            new ExpectedArgs("policy_was_active", "Whether the policy was active at capture."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (!bool.TryParse(args[2], out bool policyWasActive))
+                return Failed($"Unable to parse {args[2]} as a boolean.");
+            if (pendingPolicyTimeoutFixture != null) return Failed("The policy-timeout fixture lifecycle is still active.");
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager");
+            if (!objectManager.TryGetObject(args[0], out Kingdom kingdom)) return Failed($"Kingdom with ID: '{args[0]}' not found");
+            if (!objectManager.TryGetObject(args[1], out PolicyObject policy)) return Failed($"PolicyObject with ID: '{args[1]}' not found");
+
+            bool policyIsActive = kingdom.ActivePolicies.Contains(policy);
+            bool decisionPresent = kingdom.UnresolvedDecisions
+                .OfType<KingdomPolicyDecision>()
+                .Any(decision => decision.Policy == policy);
+            bool success = policyIsActive == policyWasActive && !decisionPresent && kingdom.UnresolvedDecisions.Count == 0;
+            string output = PolicyTimeoutJsonResult(new
+            {
+                success,
+                kingdomId = args[0],
+                policyId = args[1],
+                expectedPolicyActive = policyWasActive,
+                policyIsActive,
+                decisionPresent,
+                unresolvedDecisionCount = kingdom.UnresolvedDecisions.Count
+            });
+            return success ? Succeeded(output) : Failed(output);
+        }
     }
 
     private static bool TryMatchPendingPolicyTimeoutFixture(
@@ -453,59 +562,72 @@ public class KingdomDebugCommand
         }
     }
 
-    // coop.debug.kingdom.create Derthert Vlandia_Reborn
+    // coop.debug.kingdom.create Derthert "Vlandia Reborn"
     /// <summary>
     /// Creates a kingdom ruled by the named hero's clan and replicates it to every client through the
     /// same notification the governor "create kingdom" dialog uses. Server only.
     /// </summary>
-    /// <param name="args">leader hero (coop id, game StringId, or name with '_' for spaces), then the kingdom name</param>
+    /// <param name="args">Leader hero id or quoted display name, then the quoted kingdom name.</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("create", "coop.debug.kingdom")]
-    public static string CreateKingdomCommand(List<string> args)
+
+    public sealed class KingdomCreateCoopCommand : ICoopCommand
     {
-        if (!ModInformation.IsServer) return "This command can only be run on the server.";
-        if (args.Count < 2) return CreateUsage;
-        if (Campaign.Current == null) return "No campaign is loaded.";
-        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
-        if (!ContainerProvider.TryResolve<IKingdomCreator>(out var kingdomCreator)) return "Unable to resolve KingdomCreator";
+        public string Prefix => "coop.debug.kingdom";
 
-        if (!TryGetLeaderHero(objectManager, args[0], out Hero leader, out string heroError)) return heroError;
-        if (leader.IsDead) return $"{leader.Name} ({leader.StringId}) is dead and cannot rule a kingdom.";
+        public string Name => "create";
 
-        Clan clan = leader.Clan;
-        if (clan == null) return $"{leader.Name} ({leader.StringId}) does not belong to a clan.";
+        public string Description => "Creates a kingdom for a clan leader on the server.";
 
-        // A kingdom is ruled by its ruling clan's leader, and clan leadership changes have no sync yet,
-        // so reject rather than silently create a kingdom ruled by a different hero.
-        if (clan.Leader != leader) return $"{leader.Name} does not lead clan {clan.StringId}. Pass the clan leader instead.";
-
-        // The console splits arguments on spaces, so everything after the hero is the kingdom name.
-        string kingdomName = string.Join(" ", args.Skip(1)).Trim();
-        if (!KingdomHandler.CanCreateKingdomForClan(clan, kingdomName, out string reason))
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Unable to create kingdom {kingdomName}: {reason}.";
-        }
+            new ExpectedArgs("leader_hero_name", "The exact leader display name or id. Quote multi-word names."),
+            new ExpectedArgs("kingdom_name", "The kingdom display name. Quote multi-word values."),
+        };
 
-        CultureObject culture = clan.Culture ?? leader.Culture;
-        if (culture == null) return $"Clan {clan.StringId} has no culture for the new kingdom to inherit.";
-
-        // A debug-created kingdom usually has no owning player; an empty controller id makes the
-        // notification's settlement-restore steps a no-op on the server and every client.
-        TryGetPlayerManager(out var playerManager);
-        objectManager.TryGetId(clan, out string clanId);
-        string controllerId = playerManager?.Players.FirstOrDefault(player => player.ClanId == clanId)?.ControllerId ?? string.Empty;
-
-        if (!kingdomCreator.TryCreateKingdom(clan, kingdomName, culture, controllerId, out string kingdomId, out string createError))
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to create kingdom {kingdomName}: {createError}.";
-        }
+            if (ModInformation.IsClient) return Failed("This command can only be run on the server.");
+            if (Campaign.Current == null) return Failed("No campaign is loaded.");
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager");
+            if (!ContainerProvider.TryResolve<IKingdomCreator>(out var kingdomCreator)) return Failed("Unable to resolve KingdomCreator");
 
-        return $"Created kingdom '{kingdomName}' ({kingdomId}) ruled by {leader.Name} of clan {clan.StringId}.";
+            if (!TryGetLeaderHero(objectManager, args[0], out Hero leader, out string heroError)) return Failed(heroError);
+            if (leader.IsDead) return Failed($"{leader.Name} ({leader.StringId}) is dead and cannot rule a kingdom.");
+
+            Clan clan = leader.Clan;
+            if (clan == null) return Failed($"{leader.Name} ({leader.StringId}) does not belong to a clan.");
+
+            // A kingdom is ruled by its ruling clan's leader, and clan leadership changes have no sync yet,
+            // so reject rather than silently create a kingdom ruled by a different hero.
+            if (clan.Leader != leader) return Failed($"{leader.Name} does not lead clan {clan.StringId}. Pass the clan leader instead.");
+
+            string kingdomName = args[1];
+            if (!KingdomHandler.CanCreateKingdomForClan(clan, kingdomName, out string reason))
+            {
+                return Failed($"Unable to create kingdom {kingdomName}: {reason}.");
+            }
+
+            CultureObject culture = clan.Culture ?? leader.Culture;
+            if (culture == null) return Failed($"Clan {clan.StringId} has no culture for the new kingdom to inherit.");
+
+            // A debug-created kingdom usually has no owning player; an empty controller id makes the
+            // notification's settlement-restore steps a no-op on the server and every client.
+            TryGetPlayerManager(out var playerManager);
+            objectManager.TryGetId(clan, out string clanId);
+            string controllerId = playerManager?.Players.FirstOrDefault(player => player.ClanId == clanId)?.ControllerId ?? string.Empty;
+
+            if (!kingdomCreator.TryCreateKingdom(clan, kingdomName, culture, controllerId, out string kingdomId, out string createError))
+            {
+                return Failed($"Unable to create kingdom {kingdomName}: {createError}.");
+            }
+
+            return Succeeded($"Created kingdom '{kingdomName}' ({kingdomId}) ruled by {leader.Name} of clan {clan.StringId}.");
+        }
     }
 
     /// <summary>
-    /// Resolves the leader from a coop object manager id, a game StringId, or a hero name ('_' stands in
-    /// for a space because the console splits arguments on spaces).
+    /// Resolves the leader from a coop object manager id, a game StringId, or a display name. Quote a
+    /// multi-word display name so it arrives in this fixed argument slot.
     /// </summary>
     private static bool TryGetLeaderHero(IObjectManager objectManager, string nameOrId, out Hero hero, out string error)
     {
@@ -517,7 +639,7 @@ public class KingdomDebugCommand
             ?? Hero.AllAliveHeroes.FirstOrDefault(candidate => string.Equals(candidate.Name?.ToString(), heroName, StringComparison.OrdinalIgnoreCase));
         if (hero != null) return true;
 
-        error = $"No hero '{nameOrId}' found by coop id, game StringId, or name. Run coop.debug.hero.id <hero name> to look one up.";
+        error = $"No hero '{nameOrId}' found by coop id, game StringId, or name. Run coop.debug.hero.id \"<hero name>\" to look one up.";
         return false;
     }
 
@@ -527,17 +649,28 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the kingdoms</returns>
-    [CommandLineArgumentFunction("list", "coop.debug.kingdom")]
-    public static string ListKingdoms(List<string> args)
-    {
-        StringBuilder stringBuilder = new StringBuilder();
 
-        List<Kingdom> kingdoms = Campaign.Current.CampaignObjectManager.Kingdoms.ToList();
-        kingdoms.ForEach((kingdom) =>
+    public sealed class KingdomListCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "list";
+
+        public string Description => "Lists campaign kingdoms.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            stringBuilder.Append(string.Format("Name: '{0}'\n Id : '{1}'\n", kingdom.Name, kingdom.StringId));
-        });
-        return stringBuilder.ToString();
+            StringBuilder stringBuilder = new StringBuilder();
+
+            List<Kingdom> kingdoms = Campaign.Current.CampaignObjectManager.Kingdoms.ToList();
+            kingdoms.ForEach((kingdom) =>
+            {
+                stringBuilder.Append(string.Format("Name: '{0}'\n Id : '{1}'\n", kingdom.Name, kingdom.StringId));
+            });
+            return Succeeded(stringBuilder.ToString());
+        }
     }
 
     // coop.debug.kingdom.info <kingdomId>
@@ -545,19 +678,32 @@ public class KingdomDebugCommand
     /// Reflection-dumps every field of a Kingdom so a server screenshot and a client screenshot can be
     /// compared field-for-field to confirm Kingdom field syncs still replicate.
     /// </summary>
-    [CommandLineArgumentFunction("info", "coop.debug.kingdom")]
-    public static string Info(List<string> args)
-    {
-        if (args.Count != 1) return "Usage: coop.debug.kingdom.info <kingdomId>";
-        if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
-        if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false) return $"Unable to find kingdom with id: {args[0]}";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var field in typeof(Kingdom).GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance))
+    public sealed class KingdomInfoCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "info";
+
+        public string Description => "Reports state for a registered kingdom.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            stringBuilder.AppendLine($"{field.Name} = {field.GetValue(kingdom)}");
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetObjectManager(out IObjectManager objectManager)) return Failed("Unable to resolve ObjectManager");
+            if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false) return Failed($"Unable to find kingdom with id: {args[0]}");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var field in typeof(Kingdom).GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance))
+            {
+                stringBuilder.AppendLine($"{field.Name} = {field.GetValue(kingdom)}");
+            }
+            return Succeeded(stringBuilder.ToString());
         }
-        return stringBuilder.ToString();
     }
 
     // coop.debug.kingdom.force_player_join_kingdom
@@ -566,124 +712,145 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">controller id, kingdom id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("force_player_join_kingdom", "coop.debug.kingdom")]
-    public static string ForcePlayerJoinKingdom(List<string> args)
+
+    public sealed class KingdomForcePlayerJoinCoopCommand : ICoopCommand
     {
-        if (!ModInformation.IsServer)
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "force_player_join_kingdom";
+
+        public string Description => "Moves a player clan into a kingdom.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "This command can only be run on the server.";
-        }
+            new ExpectedArgs("controller_id", "The player controller id."),
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+        };
 
-        if (args.Count != 2)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Usage: coop.debug.kingdom.force_player_join_kingdom <controllerId> <kingdomId>";
+            if (!ModInformation.IsServer)
+            {
+                return Failed("This command can only be run on the server.");
+            }
+
+            if (TryGetPlayerManager(out var playerManager) == false)
+            {
+                return Failed("Unable to resolve PlayerManager");
+            }
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (TryGetKingdomMembershipState(out var kingdomMembershipState) == false)
+            {
+                return Failed("Unable to resolve KingdomMembershipState");
+            }
+
+            string controllerId = args[0];
+            string kingdomId = args[1];
+
+            if (!playerManager.TryGetPlayer(controllerId, out var player))
+            {
+                return Failed($"Player not found with controller id: {controllerId}");
+            }
+
+            if (string.IsNullOrEmpty(player.ClanId))
+            {
+                return Failed($"Player {controllerId} does not have a clan id.");
+            }
+
+            if (!objectManager.TryGetObject(player.ClanId, out Clan clan))
+            {
+                return Failed($"Clan not found for player {controllerId} with clan id: {player.ClanId}");
+            }
+
+            if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom))
+            {
+                return Failed($"Kingdom not found with id: {kingdomId}");
+            }
+
+            Kingdom previousKingdom = clan.Kingdom;
+            if (previousKingdom == kingdom)
+            {
+                return Succeeded($"Player {controllerId}'s clan {clan.StringId} is already in kingdom {kingdom.StringId}.");
+            }
+
+            // Server-authoritative apply: run with patches live (no AllowedThread) so membership
+            // and fief collection changes replicate to clients.
+            kingdomMembershipState.MoveClanToKingdom(
+                previousKingdom,
+                kingdom,
+                clan,
+                publishCollectionChanges: true);
+
+            if (clan.Kingdom != kingdom)
+            {
+                string currentKingdomId = clan.Kingdom?.StringId ?? "<none>";
+                return Succeeded($"Tried to force player {controllerId}'s clan {clan.StringId} to join {kingdom.StringId}, but current kingdom is {currentKingdomId}.");
+            }
+
+            string previousKingdomId = previousKingdom?.StringId ?? "<none>";
+            return Succeeded($"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.");
         }
-
-        if (TryGetPlayerManager(out var playerManager) == false)
-        {
-            return "Unable to resolve PlayerManager";
-        }
-
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (TryGetKingdomMembershipState(out var kingdomMembershipState) == false)
-        {
-            return "Unable to resolve KingdomMembershipState";
-        }
-
-        string controllerId = args[0];
-        string kingdomId = args[1];
-
-        if (!playerManager.TryGetPlayer(controllerId, out var player))
-        {
-            return $"Player not found with controller id: {controllerId}";
-        }
-
-        if (string.IsNullOrEmpty(player.ClanId))
-        {
-            return $"Player {controllerId} does not have a clan id.";
-        }
-
-        if (!objectManager.TryGetObject(player.ClanId, out Clan clan))
-        {
-            return $"Clan not found for player {controllerId} with clan id: {player.ClanId}";
-        }
-
-        if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom))
-        {
-            return $"Kingdom not found with id: {kingdomId}";
-        }
-
-        Kingdom previousKingdom = clan.Kingdom;
-        if (previousKingdom == kingdom)
-        {
-            return $"Player {controllerId}'s clan {clan.StringId} is already in kingdom {kingdom.StringId}.";
-        }
-
-        // Server-authoritative apply: run with patches live (no AllowedThread) so membership
-        // and fief collection changes replicate to clients.
-        kingdomMembershipState.MoveClanToKingdom(
-            previousKingdom,
-            kingdom,
-            clan,
-            publishCollectionChanges: true);
-
-        if (clan.Kingdom != kingdom)
-        {
-            string currentKingdomId = clan.Kingdom?.StringId ?? "<none>";
-            return $"Tried to force player {controllerId}'s clan {clan.StringId} to join {kingdom.StringId}, but current kingdom is {currentKingdomId}.";
-        }
-
-        string previousKingdomId = previousKingdom?.StringId ?? "<none>";
-        return $"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.";
     }
 
     // coop.debug.kingdom.force_player_vassalage Player khuzait true
-    [CommandLineArgumentFunction("force_player_vassalage", "coop.debug.kingdom")]
-    public static string ForcePlayerVassalage(List<string> args)
+
+    public sealed class KingdomForcePlayerVassalageCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
-        {
-            return "This command can only be run on the server.";
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        if (args.Count < 2 || args.Count > 3)
-        {
-            return "Usage: coop.debug.kingdom.force_player_vassalage <controllerId> <kingdomId> [grantRewards]";
-        }
+        public string Name => "force_player_vassalage";
 
-        if (!TryGetPlayerManager(out var playerManager))
-        {
-            return "Unable to resolve PlayerManager";
-        }
+        public string Description => "Requests player vassalage in a kingdom.";
 
-        if (!playerManager.TryGetPlayer(args[0], out var player))
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Player not found with controller id: {args[0]}";
-        }
+            new ExpectedArgs("controller_id", "The player controller id."),
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("grant_rewards", "Whether vassalage rewards should be granted.", false),
+        };
 
-        if (!playerManager.TryGetPeer(args[0], out var peer))
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Player {args[0]} does not have a connected peer.";
-        }
+            if (ModInformation.IsClient)
+            {
+                return Failed("This command can only be run on the server.");
+            }
 
-        if (!TryGetObjectManager(out var objectManager) ||
-            !objectManager.TryGetObject<Kingdom>(args[1], out var kingdom))
-        {
-            return $"Kingdom not found with id: {args[1]}";
-        }
+            if (!TryGetPlayerManager(out var playerManager))
+            {
+                return Failed("Unable to resolve PlayerManager");
+            }
 
-        bool grantRewards = true;
-        if (args.Count == 3 && !bool.TryParse(args[2], out grantRewards))
-        {
-            return $"Unable to parse {args[2]} as a boolean.";
-        }
+            if (!playerManager.TryGetPlayer(args[0], out var player))
+            {
+                return Failed($"Player not found with controller id: {args[0]}");
+            }
 
-        MessageBroker.Instance.Publish(peer, new RequestVassalService(kingdom.StringId, grantRewards));
-        return $"Queued vassalage for player {player.ControllerId} in kingdom {kingdom.StringId}. GrantRewards={grantRewards}.";
+            if (!playerManager.TryGetPeer(args[0], out var peer))
+            {
+                return Failed($"Player {args[0]} does not have a connected peer.");
+            }
+
+            if (!TryGetObjectManager(out var objectManager) ||
+                !objectManager.TryGetObject<Kingdom>(args[1], out var kingdom))
+            {
+                return Failed($"Kingdom not found with id: {args[1]}");
+            }
+
+            bool grantRewards = true;
+            if (args.Count == 3 && !bool.TryParse(args[2], out grantRewards))
+            {
+                return Failed($"Unable to parse {args[2]} as a boolean.");
+            }
+
+            MessageBroker.Instance.Publish(peer, new RequestVassalService(kingdom.StringId, grantRewards));
+            return Succeeded($"Queued vassalage for player {player.ControllerId} in kingdom {kingdom.StringId}. GrantRewards={grantRewards}.");
+        }
     }
 
     // coop.debug.kingdom.add_decision_usage
@@ -692,25 +859,36 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the usages</returns>
-    [CommandLineArgumentFunction("add_decision_usage", "coop.debug.kingdom")]
-    public static string AddDecisionUsage(List<string> args)
+
+    public sealed class KingdomAddDecisionUsageCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
+        public string Prefix => "coop.debug.kingdom";
 
-        stringBuilder.Append($"Basic usage: {AddBasicUsage}\n");
-        stringBuilder.Append($"{AddDeclareWarDecisionUsage}\n");
-        stringBuilder.Append($"{AddExpelClanFromKingdomDecisionUsage}\n");
-        stringBuilder.Append($"{AddKingSelectionKingdomDecisionUsage}\n");
-        stringBuilder.Append($"{AddKingdomPolicyDecisionUsage}\n");
-        stringBuilder.Append($"{AddSettlementClaimantDecisionUsage}\n");
-        stringBuilder.Append($"{AddSettlementClaimantPreliminaryDecisionUsage}\n");
-        stringBuilder.Append($"{AddMakePeaceKingdomDecisionUsage}\n");
-        stringBuilder.Append($"{AddAcceptCallToWarAgreementDecisionUsage}\n");
-        stringBuilder.Append($"{AddProposeCallToWarAgreementDecisionUsage}\n");
-        stringBuilder.Append($"{AddStartAllianceDecisionUsage}\n");
-        stringBuilder.Append($"{AddTradeAgreementDecisionUsage}\n");
+        public string Name => "add_decision_usage";
 
-        return stringBuilder.ToString();
+        public string Description => "Lists supported kingdom decision arguments.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+
+            stringBuilder.Append($"Basic usage: {AddBasicUsage}\n");
+            stringBuilder.Append($"{AddDeclareWarDecisionUsage}\n");
+            stringBuilder.Append($"{AddExpelClanFromKingdomDecisionUsage}\n");
+            stringBuilder.Append($"{AddKingSelectionKingdomDecisionUsage}\n");
+            stringBuilder.Append($"{AddKingdomPolicyDecisionUsage}\n");
+            stringBuilder.Append($"{AddSettlementClaimantDecisionUsage}\n");
+            stringBuilder.Append($"{AddSettlementClaimantPreliminaryDecisionUsage}\n");
+            stringBuilder.Append($"{AddMakePeaceKingdomDecisionUsage}\n");
+            stringBuilder.Append($"{AddAcceptCallToWarAgreementDecisionUsage}\n");
+            stringBuilder.Append($"{AddProposeCallToWarAgreementDecisionUsage}\n");
+            stringBuilder.Append($"{AddStartAllianceDecisionUsage}\n");
+            stringBuilder.Append($"{AddTradeAgreementDecisionUsage}\n");
+
+            return Succeeded(stringBuilder.ToString());
+        }
     }
 
     // coop.debug.kingdom.remove_decision_usage
@@ -719,14 +897,25 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of usage.</returns>
-    [CommandLineArgumentFunction("remove_decision_usage", "coop.debug.kingdom")]
-    public static string RemoveDecisionUsage(List<string> args)
+
+    public sealed class KingdomRemoveDecisionUsageCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
+        public string Prefix => "coop.debug.kingdom";
 
-        stringBuilder.Append(RemoveUsage);
+        public string Name => "remove_decision_usage";
 
-        return stringBuilder.ToString();
+        public string Description => "Describes kingdom decision removal arguments.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+
+            stringBuilder.Append(RemoveUsage);
+
+            return Succeeded(stringBuilder.ToString());
+        }
     }
 
     // coop.debug.kingdom.list_decisions
@@ -735,35 +924,44 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the decisions of a specific kingdom</returns>
-    [CommandLineArgumentFunction("list_kingdom_decisions", "coop.debug.kingdom")]
-    public static string ListKingdomDecisions(List<string> args)
+
+    public sealed class KingdomListDecisionsCoopCommand : ICoopCommand
     {
-        if (args.Count < 1)
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "list_kingdom_decisions";
+
+        public string Description => "Lists queued decisions for a kingdom.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.kingdom.list_kingdom_decisions <kingdomId>";
-        }
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+        };
 
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
+            {
+                return Failed($"ID: '{args[0]}' not found");
+            }
+
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.Append($"Kingdom decisions of Kingdom: {kingdom.Name}\n");
+
+            int i = 1;
+            foreach (KingdomDecision kingdomDecision in kingdom.UnresolvedDecisions)
+            {
+                stringBuilder.Append($"{i}. {kingdomDecision.GetType().Name}\n");
+                i++;
+            }
+
+            return Succeeded(stringBuilder.ToString());
         }
-
-        if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
-        {
-            return $"ID: '{args[0]}' not found";
-        }
-
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.Append($"Kingdom decisions of Kingdom: {kingdom.Name}\n");
-
-        int i = 1;
-        foreach (KingdomDecision kingdomDecision in kingdom.UnresolvedDecisions)
-        {
-            stringBuilder.Append($"{i}. {kingdomDecision.GetType().Name}\n");
-            i++;
-        }
-
-        return stringBuilder.ToString();
     }
 
     // coop.debug.kingdom.decisions
@@ -772,76 +970,85 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId</param>
     /// <returns>strings of all active kingdom decisions with client votes</returns>
-    [CommandLineArgumentFunction("decisions", "coop.debug.kingdom")]
-    public static string ListKingdomDecisionVotes(List<string> args)
+
+    public sealed class KingdomDecisionsCoopCommand : ICoopCommand
     {
-        if (args.Count < 1)
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "decisions";
+
+        public string Description => "Lists queued decisions and client votes for a kingdom.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.kingdom.decisions <kingdomId>";
-        }
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+        };
 
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (TryGetPlayerManager(out var playerManager) == false)
-        {
-            return "Unable to resolve PlayerManager";
-        }
-
-        if (TryGetKingdomDecisionVoteManager(out var voteManager) == false)
-        {
-            return "Unable to resolve KingdomDecisionVoteManager";
-        }
-
-        if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
-        {
-            return $"ID: '{args[0]}' not found";
-        }
-
-        IReadOnlyList<KingdomDecisionVoteManager.KingdomDecisionDebugInfo> decisionInfos =
-            voteManager.GetDecisionDebugInfo(kingdom);
-
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.AppendLine($"Active decisions of Kingdom: {kingdom.Name} ({kingdom.StringId})");
-        stringBuilder.AppendLine($"Registered clients: {playerManager.Players.Count}");
-
-        if (decisionInfos.Count == 0)
-        {
-            stringBuilder.AppendLine("(none)");
-            return stringBuilder.ToString();
-        }
-
-        foreach (KingdomDecisionVoteManager.KingdomDecisionDebugInfo decisionInfo in decisionInfos)
-        {
-            stringBuilder.AppendLine($"{decisionInfo.DecisionIndex + 1}. {decisionInfo.DecisionType}");
-            if (decisionInfo.ClientVotes.Count == 0)
+            if (TryGetObjectManager(out var objectManager) == false)
             {
-                stringBuilder.AppendLine("  Clients: (none registered)");
-                continue;
+                return Failed("Unable to resolve ObjectManager");
             }
 
-            foreach (KingdomDecisionVoteManager.KingdomDecisionClientVoteDebugInfo clientVote in decisionInfo.ClientVotes)
+            if (TryGetPlayerManager(out var playerManager) == false)
             {
-                string clanId = string.IsNullOrWhiteSpace(clientVote.ClanId) ? "<none>" : clientVote.ClanId;
-                stringBuilder.Append($"  - {clientVote.ControllerId} | Clan: {clientVote.ClanName} ({clanId}) | {clientVote.Status}");
-
-                if (!string.IsNullOrWhiteSpace(clientVote.SupportWeight))
-                {
-                    stringBuilder.Append($" | Support: {clientVote.SupportWeight}");
-                }
-
-                if (clientVote.HasVote && !clientVote.IsFinal)
-                {
-                    stringBuilder.Append(" | Not Final");
-                }
-
-                stringBuilder.AppendLine();
+                return Failed("Unable to resolve PlayerManager");
             }
-        }
 
-        return stringBuilder.ToString();
+            if (TryGetKingdomDecisionVoteManager(out var voteManager) == false)
+            {
+                return Failed("Unable to resolve KingdomDecisionVoteManager");
+            }
+
+            if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
+            {
+                return Failed($"ID: '{args[0]}' not found");
+            }
+
+            IReadOnlyList<KingdomDecisionVoteManager.KingdomDecisionDebugInfo> decisionInfos =
+                voteManager.GetDecisionDebugInfo(kingdom);
+
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.AppendLine($"Active decisions of Kingdom: {kingdom.Name} ({kingdom.StringId})");
+            stringBuilder.AppendLine($"Registered clients: {playerManager.Players.Count}");
+
+            if (decisionInfos.Count == 0)
+            {
+                stringBuilder.AppendLine("(none)");
+                return Succeeded(stringBuilder.ToString());
+            }
+
+            foreach (KingdomDecisionVoteManager.KingdomDecisionDebugInfo decisionInfo in decisionInfos)
+            {
+                stringBuilder.AppendLine($"{decisionInfo.DecisionIndex + 1}. {decisionInfo.DecisionType}");
+                if (decisionInfo.ClientVotes.Count == 0)
+                {
+                    stringBuilder.AppendLine("  Clients: (none registered)");
+                    continue;
+                }
+
+                foreach (KingdomDecisionVoteManager.KingdomDecisionClientVoteDebugInfo clientVote in decisionInfo.ClientVotes)
+                {
+                    string clanId = string.IsNullOrWhiteSpace(clientVote.ClanId) ? "<none>" : clientVote.ClanId;
+                    stringBuilder.Append($"  - {clientVote.ControllerId} | Clan: {clientVote.ClanName} ({clanId}) | {clientVote.Status}");
+
+                    if (!string.IsNullOrWhiteSpace(clientVote.SupportWeight))
+                    {
+                        stringBuilder.Append($" | Support: {clientVote.SupportWeight}");
+                    }
+
+                    if (clientVote.HasVote && !clientVote.IsFinal)
+                    {
+                        stringBuilder.Append(" | Not Final");
+                    }
+
+                    stringBuilder.AppendLine();
+                }
+            }
+
+            return Succeeded(stringBuilder.ToString());
+        }
     }
 
     // coop.debug.kingdom.list_decision_outcomes
@@ -850,30 +1057,45 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : 1-based decision index</param>
     /// <returns>strings of all outcomes of a decision</returns>
-    [CommandLineArgumentFunction("list_decision_outcomes", "coop.debug.kingdom")]
-    public static string ListKingdomDecisionOutcomes(List<string> args)
+
+    public sealed class KingdomListDecisionOutcomesCoopCommand : ICoopCommand
     {
-        if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int _, out string message))
-        {
-            return message;
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        KingdomElection election = new KingdomElection(decision);
-        election.Setup();
-        election.DetermineSupport(election._possibleOutcomes, false);
-        decision.DetermineSponsors(election._possibleOutcomes);
-        election.UpdateSupport(election._possibleOutcomes);
+        public string Name => "list_decision_outcomes";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.Append($"Decision outcomes for {decision.GetType().Name} in {kingdom.Name}:\n");
-        for (int i = 0; i < election._possibleOutcomes.Count; i++)
+        public string Description => "Lists possible outcomes for a kingdom decision.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            DecisionOutcome outcome = election._possibleOutcomes[i];
-            string sponsor = outcome.SponsorClan == null ? "<none>" : outcome.SponsorClan.StringId;
-            stringBuilder.Append($"{i + 1}. {outcome.GetDecisionTitle()} Sponsor: {sponsor} Support: {outcome.TotalSupportPoints}\n");
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("decision_index", "The one-based decision index."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int _, out string message))
+            {
+                return Failed(message);
+            }
+
+            KingdomElection election = new KingdomElection(decision);
+            election.Setup();
+            election.DetermineSupport(election._possibleOutcomes, false);
+            decision.DetermineSponsors(election._possibleOutcomes);
+            election.UpdateSupport(election._possibleOutcomes);
+
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.Append($"Decision outcomes for {decision.GetType().Name} in {kingdom.Name}:\n");
+            for (int i = 0; i < election._possibleOutcomes.Count; i++)
+            {
+                DecisionOutcome outcome = election._possibleOutcomes[i];
+                string sponsor = outcome.SponsorClan == null ? "<none>" : outcome.SponsorClan.StringId;
+                stringBuilder.Append($"{i + 1}. {outcome.GetDecisionTitle()} Sponsor: {sponsor} Support: {outcome.TotalSupportPoints}\n");
+            }
+            stringBuilder.Append("Use support weights: Choose, StayNeutral, SlightlyFavor, StronglyFavor, FullyPush.\n");
+            return Succeeded(stringBuilder.ToString());
         }
-        stringBuilder.Append("Use support weights: Choose, StayNeutral, SlightlyFavor, StronglyFavor, FullyPush.\n");
-        return stringBuilder.ToString();
     }
 
     // coop.debug.kingdom.vote_decision
@@ -882,54 +1104,67 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index, 1-based outcome index or abstain, support weight</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("vote_decision", "coop.debug.kingdom")]
-    public static string VoteKingdomDecision(List<string> args)
+
+    public sealed class KingdomVoteDecisionCoopCommand : ICoopCommand
     {
-        if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int decisionIndex, out string message))
-        {
-            return message;
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        if (args.Count < 4 || args.Count > 5)
-        {
-            return "Usage: coop.debug.kingdom.vote_decision <kingdomId> <decisionIndex> <outcomeIndex|abstain> <supportWeight> [isFinal]";
-        }
+        public string Name => "vote_decision";
 
-        bool isAbstain = args[2].Equals("abstain", StringComparison.OrdinalIgnoreCase);
-        int outcomeIndex = -1;
-        if (!isAbstain)
+        public string Description => "Requests a client vote on a kingdom decision.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (!int.TryParse(args[2], out int parsedOutcomeIndex))
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("decision_index", "The one-based decision index."),
+            new ExpectedArgs("outcome", "A one-based outcome index or abstain."),
+            new ExpectedArgs("support_weight", "The support weight name or value."),
+            new ExpectedArgs("is_final", "Whether this is the final vote.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int decisionIndex, out string message))
             {
-                return $"Outcome index is not a number: {args[2]}";
+                return Failed(message);
             }
-            outcomeIndex = parsedOutcomeIndex - 1;
-        }
 
-        if (!TryParseSupportWeight(args[3], out Supporter.SupportWeights supportWeight))
-        {
-            return $"Support weight is invalid: {args[3]}. Use Choose, StayNeutral, SlightlyFavor, StronglyFavor, or FullyPush.";
-        }
+            bool isAbstain = args[2].Equals("abstain", StringComparison.OrdinalIgnoreCase);
+            int outcomeIndex = -1;
+            if (!isAbstain)
+            {
+                if (!int.TryParse(args[2], out int parsedOutcomeIndex))
+                {
+                    return Failed($"Outcome index is not a number: {args[2]}");
+                }
+                outcomeIndex = parsedOutcomeIndex - 1;
+            }
 
-        bool finalVote = false;
-        if (args.Count == 5 && !bool.TryParse(args[4], out finalVote))
-        {
-            return $"Unable to parse {args[4]} as a boolean.";
-        }
+            if (!TryParseSupportWeight(args[3], out Supporter.SupportWeights supportWeight))
+            {
+                return Failed($"Support weight is invalid: {args[3]}. Use Choose, StayNeutral, SlightlyFavor, StronglyFavor, or FullyPush.");
+            }
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-        if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId))
-        {
-            return "Unable to resolve kingdom id.";
-        }
+            bool finalVote = false;
+            if (args.Count == 5 && !bool.TryParse(args[4], out finalVote))
+            {
+                return Failed($"Unable to parse {args[4]} as a boolean.");
+            }
 
-        MessageBroker.Instance.Publish(decision, new KingdomDecisionVoteRequested(
-            new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain, finalVote)));
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+            if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId))
+            {
+                return Failed("Unable to resolve kingdom id.");
+            }
 
-        return $"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}, final={finalVote}.";
+            MessageBroker.Instance.Publish(decision, new KingdomDecisionVoteRequested(
+                new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain, finalVote)));
+
+            return Succeeded($"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}, final={finalVote}.");
+        }
     }
 
     // coop.debug.kingdom.resolve_decision
@@ -938,22 +1173,37 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdomId, 1-based decision index</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("resolve_decision", "coop.debug.kingdom")]
-    public static string ResolveKingdomDecision(List<string> args)
+
+    public sealed class KingdomResolveDecisionCoopCommand : ICoopCommand
     {
-        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
-        {
-            return message;
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        if (TryGetKingdomDecisionVoteManager(out var voteManager) == false)
-        {
-            return "Unable to resolve KingdomDecisionVoteManager";
-        }
+        public string Name => "resolve_decision";
 
-        return voteManager.TryResolveDecision(decision)
-            ? $"Resolved {decision.GetType().Name} through player vote manager."
-            : $"Could not resolve {decision.GetType().Name} through player vote manager.";
+        public string Description => "Resolves a queued kingdom decision.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("decision_index", "The one-based decision index."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+            {
+                return Failed(message);
+            }
+
+            if (TryGetKingdomDecisionVoteManager(out var voteManager) == false)
+            {
+                return Failed("Unable to resolve KingdomDecisionVoteManager");
+            }
+
+            return voteManager.TryResolveDecision(decision)
+                ? Succeeded($"Resolved {decision.GetType().Name} through player vote manager.")
+                : Failed($"Could not resolve {decision.GetType().Name} through player vote manager.");
+        }
     }
 
     // coop.debug.kingdom.list_policies
@@ -963,40 +1213,49 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId</param>
     /// <returns>strings of all the active policies of a specific kingdom</returns>
-    [CommandLineArgumentFunction("list_policies", "coop.debug.kingdom")]
-    public static string ListKingdomPolicies(List<string> args)
+
+    public sealed class KingdomListPoliciesCoopCommand : ICoopCommand
     {
-        if (args.Count < 1)
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "list_policies";
+
+        public string Description => "Lists active policies for a kingdom.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.kingdom.list_policies <kingdomId>";
-        }
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+        };
 
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
+            {
+                return Failed($"ID: '{args[0]}' not found");
+            }
+
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.Append($"Active policies of Kingdom: {kingdom.Name}\n");
+
+            int i = 1;
+            foreach (PolicyObject policy in kingdom.ActivePolicies)
+            {
+                stringBuilder.Append($"{i}. {policy.Name} ({policy.StringId})\n");
+                i++;
+            }
+
+            if (kingdom.ActivePolicies.Count == 0)
+            {
+                stringBuilder.Append("(none)\n");
+            }
+
+            return Succeeded(stringBuilder.ToString());
         }
-
-        if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
-        {
-            return $"ID: '{args[0]}' not found";
-        }
-
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.Append($"Active policies of Kingdom: {kingdom.Name}\n");
-
-        int i = 1;
-        foreach (PolicyObject policy in kingdom.ActivePolicies)
-        {
-            stringBuilder.Append($"{i}. {policy.Name} ({policy.StringId})\n");
-            i++;
-        }
-
-        if (kingdom.ActivePolicies.Count == 0)
-        {
-            stringBuilder.Append("(none)\n");
-        }
-
-        return stringBuilder.ToString();
     }
 
     // coop.debug.kingdom.collection_list clans kingdom_V1
@@ -1005,41 +1264,61 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name and kingdom id</param>
     /// <returns>IDs currently present in the selected collection</returns>
-    [CommandLineArgumentFunction("collection_list", "coop.debug.kingdom")]
-    public static string ListKingdomCollection(List<string> args)
+
+    public sealed class KingdomCollectionListCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.kingdom.collection_list <collection> <kingdomId>";
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
+        public string Name => "collection_list";
 
-        if (objectManager.TryGetObject(args[1], out Kingdom kingdom) == false)
-        {
-            return $"Kingdom with ID: '{args[1]}' not found";
-        }
+        public string Description => "Lists a synced kingdom collection.";
 
-        var collectionName = NormalizeCollectionName(args[0]);
-        if (collectionName == "activepolicies")
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return FormatCollection(objectManager, args[0], kingdom.ActivePolicies.Cast<object>());
-        }
+            new ExpectedArgs("collection", "The kingdom collection name."),
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+        };
 
-        if (collectionName == "unresolveddecisions")
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return ListKingdomDecisions(new List<string> { args[1] });
-        }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
 
-        if (!TryParseCollectionTarget(args[0], out var collectionType, out var parseMessage))
-        {
-            return parseMessage;
-        }
+            if (objectManager.TryGetObject(args[1], out Kingdom kingdom) == false)
+            {
+                return Failed($"Kingdom with ID: '{args[1]}' not found");
+            }
 
-        return FormatCollection(objectManager, args[0], GetCollectionValues(kingdom, collectionType));
+            var collectionName = NormalizeCollectionName(args[0]);
+            if (collectionName == "activepolicies")
+            {
+                return Succeeded(FormatCollection(objectManager, args[0], kingdom.ActivePolicies.Cast<object>()));
+            }
+
+            if (collectionName == "unresolveddecisions")
+            {
+                StringBuilder stringBuilder = new StringBuilder();
+                stringBuilder.Append($"Kingdom decisions of Kingdom: {kingdom.Name}\n");
+
+                int i = 1;
+                foreach (KingdomDecision kingdomDecision in kingdom.UnresolvedDecisions)
+                {
+                    stringBuilder.Append($"{i}. {kingdomDecision.GetType().Name}\n");
+                    i++;
+                }
+
+                return Succeeded(stringBuilder.ToString());
+            }
+
+            if (!TryParseCollectionTarget(args[0], out var collectionType, out var parseMessage))
+            {
+                return Failed(parseMessage);
+            }
+
+            return Succeeded(FormatCollection(objectManager, args[0], GetCollectionValues(kingdom, collectionType)));
+        }
     }
 
     // coop.debug.kingdom.collection_add clans kingdom_V1 clan_1
@@ -1048,10 +1327,89 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name, kingdom id, and value id</param>
     /// <returns>Result of the collection add</returns>
-    [CommandLineArgumentFunction("collection_add", "coop.debug.kingdom")]
-    public static string AddKingdomCollectionItem(List<string> args)
+
+    public sealed class KingdomCollectionAddCoopCommand : ICoopCommand
     {
-        return ChangeKingdomCollection(args, CollectionOperation.Add);
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "collection_add";
+
+        public string Description => "Adds a value to a synced kingdom collection.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("collection", "The kingdom collection name."),
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("value_id", "The registered value id or proposer clan id."),
+            new ExpectedArgs("ignore_influence_cost", "For unresolvedDecisions, whether influence is ignored.", false),
+            new ExpectedArgs("decision_type", "For unresolvedDecisions, the decision type.", false),
+            new ExpectedArgs("decision_arg1", "The first fixed decision-specific argument.", false),
+            new ExpectedArgs("decision_arg2", "The second fixed decision-specific argument.", false),
+            new ExpectedArgs("decision_arg3", "The third fixed decision-specific argument.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Command is only available to run on the server");
+
+            var collectionName = NormalizeCollectionName(args[0]);
+            if (collectionName == "activepolicies")
+                return ChangeActivePolicy(args, CollectionOperation.Add);
+
+            if (collectionName == "unresolveddecisions")
+            {
+                var forwardedArgs = args.Skip(1).ToList();
+                string kingdomId = forwardedArgs[0];
+                string clanId = forwardedArgs[1];
+                string ignoreInfluence = forwardedArgs[2];
+                string decisionType = forwardedArgs[3];
+
+                if (TryGetObjectManager(out var decisionObjectManager) == false)
+                {
+                    return Failed("Unable to resolve ObjectManager");
+                }
+                if (decisionObjectManager.TryGetObject(kingdomId, out Kingdom decisionKingdom) == false)
+                {
+                    return Failed($"Kingdom with ID: '{kingdomId}' not found");
+                }
+
+                if (decisionObjectManager.TryGetObject(clanId, out Clan proposerClan) == false)
+                {
+                    return Failed($"Clan with ID: '{clanId}' not found");
+                }
+
+                if (!bool.TryParse(ignoreInfluence, out bool ignoreInfluenceCost))
+                {
+                    return Failed($"Couldnt convert ignoreInfluenceCost: {ignoreInfluence}");
+                }
+
+                if (!TryGetKingdomDecisionFunc.ContainsKey(decisionType))
+                {
+                    return Failed($"Kingdom decision type: {decisionType} does not exist.");
+                }
+
+                if (!TryGetKingdomDecisionFunc[decisionType](decisionObjectManager, forwardedArgs, proposerClan, out KingdomDecision kingdomDecision, out string message))
+                {
+                    return Failed(message);
+                }
+
+                decisionKingdom.AddDecision(kingdomDecision, ignoreInfluenceCost);
+                return Succeeded($"Kingdom decision added successfully.");
+            }
+
+            if (!TryParseCollectionTarget(args[0], out var collectionType, out var parseMessage))
+                return Failed(parseMessage);
+            if (!TryGetObjectManager(out var objectManager))
+                return Failed("Unable to resolve ObjectManager");
+            if (!objectManager.TryGetObject(args[1], out Kingdom kingdom))
+                return Failed($"Kingdom with ID: '{args[1]}' not found");
+            if (!TryResolveCollectionValue(objectManager, collectionType, args[2], out var value, out var resolveMessage))
+                return Failed(resolveMessage);
+
+            ApplyCollectionChange(kingdom, collectionType, CollectionOperation.Add, value);
+            return Succeeded($"{CollectionOperation.Add} {args[2]} in {args[0]} for kingdom {args[1]}.");
+        }
     }
 
     // coop.debug.kingdom.collection_remove clans kingdom_V1 clan_1
@@ -1060,10 +1418,76 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">collection name, kingdom id, and value id</param>
     /// <returns>Result of the collection remove</returns>
-    [CommandLineArgumentFunction("collection_remove", "coop.debug.kingdom")]
-    public static string RemoveKingdomCollectionItem(List<string> args)
+
+    public sealed class KingdomCollectionRemoveCoopCommand : ICoopCommand
     {
-        return ChangeKingdomCollection(args, CollectionOperation.Remove);
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "collection_remove";
+
+        public string Description => "Removes a value from a synced kingdom collection.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("collection", "The kingdom collection name."),
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("value_id_or_index", "The registered value id or one-based decision index."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Command is only available to run on the server");
+
+            var collectionName = NormalizeCollectionName(args[0]);
+            if (collectionName == "activepolicies")
+                return ChangeActivePolicy(args, CollectionOperation.Remove);
+
+            if (collectionName == "unresolveddecisions")
+            {
+                var forwardedArgs = args.Skip(1).ToList();
+                string kingdomId = forwardedArgs[0];
+                string index = forwardedArgs[1];
+
+                if (TryGetObjectManager(out var decisionObjectManager) == false)
+                {
+                    return Failed("Unable to resolve ObjectManager");
+                }
+                if (decisionObjectManager.TryGetObject(kingdomId, out Kingdom decisionKingdom) == false)
+                {
+                    return Failed($"Kingdom with ID: '{kingdomId}' not found");
+                }
+
+                if (!int.TryParse(index, out int idx))
+                {
+                    return Failed($"Argument2: {index} is not a number.");
+                }
+
+                var decisions = decisionKingdom._unresolvedDecisions;
+                if (idx > 0 && idx <= decisions.Count)
+                {
+                    decisionKingdom.RemoveDecision(decisions[idx - 1]);
+                }
+                else
+                {
+                    return Failed("Index is out of bounds.");
+                }
+
+                return Succeeded($"Kingdom decision removed.");
+            }
+
+            if (!TryParseCollectionTarget(args[0], out var collectionType, out var parseMessage))
+                return Failed(parseMessage);
+            if (!TryGetObjectManager(out var objectManager))
+                return Failed("Unable to resolve ObjectManager");
+            if (!objectManager.TryGetObject(args[1], out Kingdom kingdom))
+                return Failed($"Kingdom with ID: '{args[1]}' not found");
+            if (!TryResolveCollectionValue(objectManager, collectionType, args[2], out var value, out var resolveMessage))
+                return Failed(resolveMessage);
+
+            ApplyCollectionChange(kingdom, collectionType, CollectionOperation.Remove, value);
+            return Succeeded($"{CollectionOperation.Remove} {args[2]} in {args[0]} for kingdom {args[1]}.");
+        }
     }
 
     // coop.debug.kingdom.declare_war
@@ -1073,31 +1497,41 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("declare_war", "coop.debug.kingdom")]
-    public static string DeclareWar(List<string> args)
+
+    public sealed class KingdomDeclareWarCoopCommand : ICoopCommand
     {
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.kingdom.declare_war <faction1Id> <faction2Id> (run on the server)";
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
+        public string Name => "declare_war";
 
-        if (TryGetFaction(objectManager, args[0], out IFaction faction1) == false)
-        {
-            return $"Faction not found with id: {args[0]}";
-        }
+        public string Description => "Declares war between two factions on the server.";
 
-        if (TryGetFaction(objectManager, args[1], out IFaction faction2) == false)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Faction not found with id: {args[1]}";
-        }
+            new ExpectedArgs("faction1_id", "The first registered faction id."),
+            new ExpectedArgs("faction2_id", "The second registered faction id."),
+        };
 
-        DeclareWarAction.ApplyByDefault(faction1, faction2);
-        return $"Declared war between '{faction1.Name}' and '{faction2.Name}'.";
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (TryGetFaction(objectManager, args[0], out IFaction faction1) == false)
+            {
+                return Failed($"Faction not found with id: {args[0]}");
+            }
+
+            if (TryGetFaction(objectManager, args[1], out IFaction faction2) == false)
+            {
+                return Failed($"Faction not found with id: {args[1]}");
+            }
+
+            DeclareWarAction.ApplyByDefault(faction1, faction2);
+            return Succeeded($"Declared war between '{faction1.Name}' and '{faction2.Name}'.");
+        }
     }
 
     // coop.debug.kingdom.make_peace
@@ -1106,33 +1540,43 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("make_peace", "coop.debug.kingdom")]
-    public static string MakePeace(List<string> args)
+
+    public sealed class KingdomMakePeaceCoopCommand : ICoopCommand
     {
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.kingdom.make_peace <faction1Id> <faction2Id> (run on the server)";
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
+        public string Name => "make_peace";
 
-        if (TryGetFaction(objectManager, args[0], out IFaction faction1) == false)
-        {
-            return $"Faction not found with id: {args[0]}";
-        }
+        public string Description => "Makes peace between two factions on the server.";
 
-        if (TryGetFaction(objectManager, args[1], out IFaction faction2) == false)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Faction not found with id: {args[1]}";
-        }
+            new ExpectedArgs("faction1_id", "The first registered faction id."),
+            new ExpectedArgs("faction2_id", "The second registered faction id."),
+        };
 
-        MakePeaceAction.Apply(faction1, faction2);
-        return $"Made peace between '{faction1.Name}' and '{faction2.Name}'.";
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (TryGetFaction(objectManager, args[0], out IFaction faction1) == false)
+            {
+                return Failed($"Faction not found with id: {args[0]}");
+            }
+
+            if (TryGetFaction(objectManager, args[1], out IFaction faction2) == false)
+            {
+                return Failed($"Faction not found with id: {args[1]}");
+            }
+
+            MakePeaceAction.Apply(faction1, faction2);
+            return Succeeded($"Made peace between '{faction1.Name}' and '{faction2.Name}'.");
+        }
     }
-    
+
     // coop.debug.kingdom.force_ally
     /// <summary>
     /// forms an alliance between two kingdoms (run on the server). Alternative
@@ -1148,7 +1592,7 @@ public class KingdomDebugCommand
         {
             return "Command is only available to run on the server";
         }
-        
+
         if (args.Count < 2)
         {
             return "Usage: coop.debug.kingdom.force_ally <kingdom1Id> <kingdom2Id> (run on the server)";
@@ -1219,7 +1663,7 @@ public class KingdomDebugCommand
         {
             return "TradeAgreementsCampaignBehavior is not available.";
         }
-        
+
         if (behavior.HasTradeAgreement(kingdom1, kingdom2, out _))
         {
             return $"'{kingdom1.Name}' and '{kingdom2.Name}' already have a trade agreement.";
@@ -1237,7 +1681,7 @@ public class KingdomDebugCommand
 
         return $"Forced trade agreement between '{kingdom1.Name}' and '{kingdom2.Name}'.";
     }
-    
+
     internal static bool TryGetKingdomPair(IObjectManager objectManager, List<string> args, out Kingdom kingdom1, out Kingdom kingdom2, out string error)
     {
         kingdom2 = null;
@@ -1276,82 +1720,25 @@ public class KingdomDebugCommand
         return true;
     }
 
-    private static string ChangeKingdomCollection(List<string> args, CollectionOperation operation)
+    private static CoopCommandResult ChangeActivePolicy(
+        IReadOnlyList<string> args,
+        CollectionOperation operation)
     {
-        if (ModInformation.IsClient)
-        {
-            return "Command is only available to run on the server";
-        }
-
-        if (args.Count < 3)
-        {
-            return operation == CollectionOperation.Add ? CollectionAddUsage : CollectionRemoveUsage;
-        }
-
-        var collectionName = NormalizeCollectionName(args[0]);
-        if (collectionName == "activepolicies")
-        {
-            return ChangeActivePolicy(args, operation);
-        }
-
-        if (collectionName == "unresolveddecisions")
-        {
-            var forwardedArgs = args.Skip(1).ToList();
-            return operation == CollectionOperation.Add
-                ? AddDecision(forwardedArgs)
-                : RemoveDecision(forwardedArgs);
-        }
-
-        if (!TryParseCollectionTarget(args[0], out var collectionType, out var parseMessage))
-        {
-            return parseMessage;
-        }
-
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (objectManager.TryGetObject(args[1], out Kingdom kingdom) == false)
-        {
-            return $"Kingdom with ID: '{args[1]}' not found";
-        }
-
-        if (!TryResolveCollectionValue(objectManager, collectionType, args[2], out var value, out var resolveMessage))
-        {
-            return resolveMessage;
-        }
-
-        ApplyCollectionChange(kingdom, collectionType, operation, value);
-
-        return $"{operation} {args[2]} in {args[0]} for kingdom {args[1]}.";
-    }
-
-    private static string ChangeActivePolicy(List<string> args, CollectionOperation operation)
-    {
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (objectManager.TryGetObject(args[1], out Kingdom kingdom) == false)
-        {
-            return $"Kingdom with ID: '{args[1]}' not found";
-        }
-
-        if (objectManager.TryGetObject(args[2], out PolicyObject policy) == false)
-        {
-            return $"PolicyObject with ID: '{args[2]}' not found";
-        }
+        if (!TryGetObjectManager(out var objectManager))
+            return Failed("Unable to resolve ObjectManager");
+        if (!objectManager.TryGetObject(args[1], out Kingdom kingdom))
+            return Failed($"Kingdom with ID: '{args[1]}' not found");
+        if (!objectManager.TryGetObject(args[2], out PolicyObject policy))
+            return Failed($"PolicyObject with ID: '{args[2]}' not found");
 
         if (operation == CollectionOperation.Add)
         {
             kingdom.AddPolicy(policy);
-            return $"Added policy {args[2]} to kingdom {args[1]}.";
+            return Succeeded($"Added policy {args[2]} to kingdom {args[1]}.");
         }
 
         kingdom.RemovePolicy(policy);
-        return $"Removed policy {args[2]} from kingdom {args[1]}.";
+        return Succeeded($"Removed policy {args[2]} from kingdom {args[1]}.");
     }
 
     /// <summary>
@@ -1642,17 +2029,11 @@ public class KingdomDebugCommand
         return true;
     }
 
-    private static bool TryGetKingdomDecisionByIndex(List<string> args, out Kingdom kingdom, out KingdomDecision decision, out int zeroBasedIndex, out string message)
+    private static bool TryGetKingdomDecisionByIndex(IReadOnlyList<string> args, out Kingdom kingdom, out KingdomDecision decision, out int zeroBasedIndex, out string message)
     {
         kingdom = null;
         decision = null;
         zeroBasedIndex = -1;
-
-        if (args.Count < 2)
-        {
-            message = "Usage: <kingdomId> <decisionIndex>";
-            return false;
-        }
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
@@ -1699,50 +2080,65 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : decision to add</param>
     /// <returns></returns>
-    [CommandLineArgumentFunction("add_decision", "coop.debug.kingdom")]
-    public static string AddDecision(List<string> args)
+
+    public sealed class KingdomAddDecisionCoopCommand : ICoopCommand
     {
-        if (args.Count < 4)
-        {
-            return AddBasicUsage;
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        string kingdomId = args[0];
-        string clanId = args[1];
-        string ignoreInfluence = args[2];
-        string decisionType = args[3];
+        public string Name => "add_decision";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-        if (objectManager.TryGetObject(kingdomId, out Kingdom kingdom) == false)
-        {
-            return $"Kingdom with ID: '{kingdomId}' not found";
-        }
+        public string Description => "Adds a supported decision to a kingdom.";
 
-        if (objectManager.TryGetObject(clanId, out Clan proposerClan) == false)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Clan with ID: '{clanId}' not found";
-        }
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("proposer_clan_id", "The registered proposer clan id."),
+            new ExpectedArgs("ignore_influence_cost", "Whether influence cost is ignored."),
+            new ExpectedArgs("decision_type", "The decision type."),
+            new ExpectedArgs("decision_arg1", "The first fixed decision-specific argument.", false),
+            new ExpectedArgs("decision_arg2", "The second fixed decision-specific argument.", false),
+            new ExpectedArgs("decision_arg3", "The third fixed decision-specific argument.", false),
+        };
 
-        if (!bool.TryParse(ignoreInfluence, out bool ignoreInfluenceCost))
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Couldnt convert ignoreInfluenceCost: {ignoreInfluence}";
-        }
+            string kingdomId = args[0];
+            string clanId = args[1];
+            string ignoreInfluence = args[2];
+            string decisionType = args[3];
 
-        if (!TryGetKingdomDecisionFunc.ContainsKey(decisionType))
-        {
-            return $"Kingdom decision type: {decisionType} does not exist.";
-        }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+            if (objectManager.TryGetObject(kingdomId, out Kingdom kingdom) == false)
+            {
+                return Failed($"Kingdom with ID: '{kingdomId}' not found");
+            }
 
-        if (!TryGetKingdomDecisionFunc[decisionType](objectManager, args, proposerClan, out KingdomDecision kingdomDecision, out string message))
-        {
-            return message;
-        }
+            if (objectManager.TryGetObject(clanId, out Clan proposerClan) == false)
+            {
+                return Failed($"Clan with ID: '{clanId}' not found");
+            }
 
-        kingdom.AddDecision(kingdomDecision, ignoreInfluenceCost);
-        return $"Kingdom decision added successfully.";
+            if (!bool.TryParse(ignoreInfluence, out bool ignoreInfluenceCost))
+            {
+                return Failed($"Couldnt convert ignoreInfluenceCost: {ignoreInfluence}");
+            }
+
+            if (!TryGetKingdomDecisionFunc.ContainsKey(decisionType))
+            {
+                return Failed($"Kingdom decision type: {decisionType} does not exist.");
+            }
+
+            if (!TryGetKingdomDecisionFunc[decisionType](objectManager, args, proposerClan, out KingdomDecision kingdomDecision, out string message))
+            {
+                return Failed(message);
+            }
+
+            kingdom.AddDecision(kingdomDecision, ignoreInfluenceCost);
+            return Succeeded($"Kingdom decision added successfully.");
+        }
     }
 
     // coop.debug.kingdom.remove_decision
@@ -1751,42 +2147,52 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">first arg : kingdomId ; second arg : index of decision to remove</param>
     /// <returns></returns>
-    [CommandLineArgumentFunction("remove_decision", "coop.debug.kingdom")]
-    public static string RemoveDecision(List<string> args)
+
+    public sealed class KingdomRemoveDecisionCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
-        {
-            return RemoveUsage;
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        string kingdomId = args[0];
-        string index = args[1];
+        public string Name => "remove_decision";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-        if (objectManager.TryGetObject(kingdomId, out Kingdom kingdom) == false)
-        {
-            return $"Kingdom with ID: '{kingdomId}' not found";
-        }
+        public string Description => "Removes a queued decision from a kingdom.";
 
-        if (!int.TryParse(index, out int idx))
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Argument2: {index} is not a number.";
-        }
+            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("decision_index", "The one-based decision index."),
+        };
 
-        var decisions = kingdom._unresolvedDecisions;
-        if (idx > 0 && idx <= decisions.Count)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            kingdom.RemoveDecision(decisions[idx - 1]);
-        }
-        else
-        {
-            return "Index is out of bounds.";
-        }
+            string kingdomId = args[0];
+            string index = args[1];
 
-        return $"Kingdom decision removed.";
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+            if (objectManager.TryGetObject(kingdomId, out Kingdom kingdom) == false)
+            {
+                return Failed($"Kingdom with ID: '{kingdomId}' not found");
+            }
+
+            if (!int.TryParse(index, out int idx))
+            {
+                return Failed($"Argument2: {index} is not a number.");
+            }
+
+            var decisions = kingdom._unresolvedDecisions;
+            if (idx > 0 && idx <= decisions.Count)
+            {
+                kingdom.RemoveDecision(decisions[idx - 1]);
+            }
+            else
+            {
+                return Failed("Index is out of bounds.");
+            }
+
+            return Succeeded($"Kingdom decision removed.");
+        }
     }
 
     /// <summary>
@@ -1798,7 +2204,7 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-    private static bool TryGetDeclareWarDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetDeclareWarDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 5)
         {
@@ -1839,7 +2245,7 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-    private static bool TryGetExpelClanFromKingdomDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetExpelClanFromKingdomDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 5)
         {
@@ -1869,7 +2275,7 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-    private static bool TryGetKingSelectionKingdomDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetKingSelectionKingdomDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 5)
         {
@@ -1899,7 +2305,7 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-    private static bool TryGetKingdomPolicyDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetKingdomPolicyDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 6)
         {
@@ -1939,7 +2345,7 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-    private static bool TryGetSettlementClaimantDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetSettlementClaimantDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 7)
         {
@@ -1986,7 +2392,7 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-    private static bool TryGetSettlementClaimantPreliminaryDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetSettlementClaimantPreliminaryDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 5)
         {
@@ -2008,7 +2414,7 @@ public class KingdomDebugCommand
         return true;
     }
 
-    private static bool TryGetAcceptCallToWarAgreementDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetAcceptCallToWarAgreementDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 6)
         {
@@ -2036,7 +2442,7 @@ public class KingdomDebugCommand
         return true;
     }
 
-    private static bool TryGetProposeCallToWarAgreementDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetProposeCallToWarAgreementDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 6)
         {
@@ -2064,7 +2470,7 @@ public class KingdomDebugCommand
         return true;
     }
 
-    private static bool TryGetStartAllianceDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetStartAllianceDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 5)
         {
@@ -2085,7 +2491,7 @@ public class KingdomDebugCommand
         return true;
     }
 
-    private static bool TryGetTradeAgreementDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    private static bool TryGetTradeAgreementDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     {
         if (args.Count < 5)
         {
@@ -2116,7 +2522,7 @@ public class KingdomDebugCommand
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
 
-    //private static bool TryGetMakePeaceKingdomDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    //private static bool TryGetMakePeaceKingdomDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     //{
     //    if (args.Count < 7)
     //    {

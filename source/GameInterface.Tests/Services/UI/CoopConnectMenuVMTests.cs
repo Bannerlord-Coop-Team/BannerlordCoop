@@ -2,6 +2,8 @@
 using Common.Messaging;
 using Common.Network.Session;
 using GameInterface.Services.UI;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +13,86 @@ namespace GameInterface.Tests.Services.UI;
 
 public class CoopConnectMenuVMTests
 {
+    [Theory]
+    [InlineData("localhost", "localhost", 4200)]
+    [InlineData("localhost:4300", "localhost", 4300)]
+    [InlineData("127.0.0.1:4400", "127.0.0.1", 4400)]
+    [InlineData("::1", "::1", 4200)]
+    [InlineData("[::1]:4500", "::1", 4500)]
+    public void TryParseServerAddress_UsesAttachedPortOrDefault(
+        string enteredAddress,
+        string expectedHost,
+        int expectedPort)
+    {
+        bool parsed = CoopConnectMenuVM.TryParseServerAddress(
+            enteredAddress,
+            out string host,
+            out int port);
+
+        Assert.True(parsed);
+        Assert.Equal(expectedHost, host);
+        Assert.Equal(expectedPort, port);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("localhost:")]
+    [InlineData("localhost:0")]
+    [InlineData("localhost:65536")]
+    [InlineData("[::1]:invalid")]
+    public void TryParseServerAddress_RejectsInvalidAddressesAndPorts(string enteredAddress)
+    {
+        Assert.False(CoopConnectMenuVM.TryParseServerAddress(
+            enteredAddress,
+            out _,
+            out _));
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1", 4200)]
+    [InlineData("127.0.0.1:4300", 4300)]
+    public void DirectConnect_PublishesAndSavesAttachedPortOrDefault(string enteredAddress, int expectedPort)
+    {
+        var browser = new TestSteamLobbyBrowser();
+        var optionsStore = new TestCoopOptionsStore();
+        using var messageBroker = new MessageBroker();
+        AttemptJoin? publishedJoin = null;
+        Action<MessagePayload<AttemptJoin>> capture = payload => publishedJoin = payload.What;
+        messageBroker.Subscribe(capture);
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, optionsStore)
+        {
+            Ip = enteredAddress,
+        };
+
+        viewModel.ActionConnect();
+
+        Assert.NotNull(publishedJoin);
+        Assert.Equal("127.0.0.1", publishedJoin.Address.ToString());
+        Assert.Equal(expectedPort, publishedJoin.Port);
+        Assert.True(optionsStore.LoadOrDefault().TryGetSection(
+            CoopConnectMenuVM.OptionsTabId,
+            CoopConnectMenuVM.OptionsSectionId,
+            out DirectConnectionOptions saved));
+        Assert.Equal(enteredAddress, saved.LastServerAddress);
+    }
+
+    [Fact]
+    public void DirectConnect_LoadsLastSavedServerAddress()
+    {
+        var savedOptions = new CoopOptionsData();
+        savedOptions.SetSection(
+            CoopConnectMenuVM.OptionsTabId,
+            CoopConnectMenuVM.OptionsSectionId,
+            new DirectConnectionOptions { LastServerAddress = "203.0.113.7:4300" });
+        var browser = new TestSteamLobbyBrowser();
+        var optionsStore = new TestCoopOptionsStore(savedOptions);
+        using var messageBroker = new MessageBroker();
+
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker, optionsStore);
+
+        Assert.Equal("203.0.113.7:4300", viewModel.Ip);
+    }
+
     [Fact]
     public void SteamLobbyPages_SliceResultsAndStopAtBoundaries()
     {
@@ -324,6 +406,31 @@ public class CoopConnectMenuVMTests
     private static string[] VisibleHosts(CoopConnectMenuVM viewModel)
     {
         return viewModel.SteamLobbies.Select(lobby => lobby.HostText).ToArray();
+    }
+
+    private sealed class TestCoopOptionsStore : ICoopOptionsStore
+    {
+        private CoopOptionsData options;
+
+        public TestCoopOptionsStore(CoopOptionsData? options = null)
+        {
+            this.options = options ?? new CoopOptionsData();
+        }
+
+        public string FilePath => string.Empty;
+
+        public bool TryLoad(out CoopOptionsData loaded)
+        {
+            loaded = options;
+            return true;
+        }
+
+        public CoopOptionsData LoadOrDefault() => options;
+
+        public void Save(CoopOptionsData saved)
+        {
+            options = saved;
+        }
     }
 
     private sealed class TestSteamLobbyBrowser : ISteamLobbyBrowser
