@@ -81,39 +81,47 @@ internal class CompanionsCampaignBehaviorPatches
     public static bool TryKillCompanionPrefix(CompanionsCampaignBehavior __instance)
     {
         if (ModInformation.IsClient) return false;
-        if (MBRandom.RandomFloat > 0.1f || __instance._aliveCompanionTemplates.Count <= 0)
+
+        return TryKillCompanionPrefix(
+            __instance,
+            MBRandom.RandomFloat,
+            () => Hero.AllAliveHeroes,
+            () => Campaign.Current.CampaignObjectManager.GetPlayerHeroes(),
+            hero => KillCharacterAction.ApplyByRemove(hero));
+    }
+
+    internal static bool TryKillCompanionPrefix(
+        CompanionsCampaignBehavior behavior,
+        float randomFloat,
+        Func<IEnumerable<Hero>> getAliveHeroes,
+        Func<IEnumerable<Hero>> getPlayerHeroes,
+        Action<Hero> removeWanderer)
+    {
+        if (randomFloat > 0.1f || behavior._aliveCompanionTemplates.Count <= 0)
             return false;
 
-        CharacterObject template = __instance._aliveCompanionTemplates.GetRandomElementInefficiently();
+        CharacterObject template = behavior._aliveCompanionTemplates.GetRandomElementInefficiently();
         Hero candidate = null;
-        foreach (Hero hero in Hero.AllAliveHeroes)
+        foreach (Hero hero in getAliveHeroes())
         {
             if (hero.Template != template || !hero.IsWanderer) continue;
             candidate = hero;
             break;
         }
 
-        bool sharesSettlementWithPlayer = candidate != null &&
-            IsAnyPlayerAtSettlement(
-                candidate.CurrentSettlement,
-                Campaign.Current.CampaignObjectManager.GetPlayerHeroes());
+        if (candidate == null || candidate.CompanionOf != null)
+            return false;
 
-        if (ShouldCullWanderer(
-                candidateExists: candidate != null,
-                isHired: candidate?.CompanionOf != null,
-                sharesSettlementWithPlayer: sharesSettlementWithPlayer))
-        {
-            KillCharacterAction.ApplyByRemove(candidate);
-        }
+        // Vanilla keeps a wanderer eligible when it has no current settlement. Only a real shared
+        // settlement makes the candidate visible to a player and therefore protected from culling.
+        if (candidate.CurrentSettlement != null &&
+            IsAnyPlayerAtSettlement(candidate.CurrentSettlement, getPlayerHeroes()))
+            return false;
+
+        removeWanderer(candidate);
 
         return false;
     }
-
-    internal static bool ShouldCullWanderer(
-        bool candidateExists,
-        bool isHired,
-        bool sharesSettlementWithPlayer) =>
-        candidateExists && !isHired && !sharesSettlementWithPlayer;
 
     internal static bool IsAnyPlayerAtSettlement(
         Settlement settlement,

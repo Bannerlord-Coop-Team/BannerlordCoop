@@ -1,7 +1,9 @@
-﻿using Common.Util;
+﻿using Common;
+using Common.Util;
 using GameInterface.Services.Companions.Patches.Disable;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
@@ -12,55 +14,85 @@ namespace GameInterface.Tests.Services.Companions.Patches.Disable;
 public class CompanionsCampaignBehaviorPatchesTests
 {
     [Fact]
-    public void ShouldCullWanderer_PlayerSharesSettlement_ReturnsFalse()
+    public void TryKillCompanionPrefix_Client_SuppressesVanillaBeforeReadingServerState()
     {
-        Assert.False(CompanionsCampaignBehaviorPatches.ShouldCullWanderer(
-            candidateExists: true,
-            isHired: false,
-            sharesSettlementWithPlayer: true));
+        bool wasServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = false;
+            Assert.False(CompanionsCampaignBehaviorPatches.TryKillCompanionPrefix(null));
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
     }
 
     [Fact]
-    public void ShouldCullWanderer_UnwatchedCandidate_ReturnsTrue()
+    public void TryKillCompanionPrefix_ServerRandomGate_DoesNotCull()
     {
-        Assert.True(CompanionsCampaignBehaviorPatches.ShouldCullWanderer(
-            candidateExists: true,
-            isHired: false,
-            sharesSettlementWithPlayer: false));
-    }
+        var (behavior, candidate) = CreateCullCandidate();
+        var removed = new List<Hero>();
 
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    public void ShouldCullWanderer_MissingOrHiredCandidate_ReturnsFalse(
-        bool candidateExists,
-        bool isHired)
-    {
-        Assert.False(CompanionsCampaignBehaviorPatches.ShouldCullWanderer(
-            candidateExists,
-            isHired,
-            sharesSettlementWithPlayer: false));
+        Assert.False(CompanionsCampaignBehaviorPatches.TryKillCompanionPrefix(
+            behavior,
+            randomFloat: 0.11f,
+            getAliveHeroes: () => new[] { candidate },
+            getPlayerHeroes: () => new[] { CreateHero(Hero.CharacterStates.Active) },
+            removeWanderer: removed.Add));
+
+        Assert.Empty(removed);
     }
 
     [Fact]
-    public void IsAnyPlayerAtSettlement_MatchingNullSettlements_ReturnsTrue()
+    public void TryKillCompanionPrefix_ServerWithoutTemplates_DoesNotCull()
     {
+        var removed = new List<Hero>();
+
+        Assert.False(CompanionsCampaignBehaviorPatches.TryKillCompanionPrefix(
+            new CompanionsCampaignBehavior(),
+            randomFloat: 0f,
+            getAliveHeroes: () => new[] { CreateHero(Hero.CharacterStates.Active) },
+            getPlayerHeroes: () => new[] { CreateHero(Hero.CharacterStates.Active) },
+            removeWanderer: removed.Add));
+
+        Assert.Empty(removed);
+    }
+
+    [Fact]
+    public void TryKillCompanionPrefix_ServerCandidateWithoutSettlement_CullsWanderer()
+    {
+        var (behavior, candidate) = CreateCullCandidate();
         var playerHero = CreateHero(Hero.CharacterStates.Active);
+        var removed = new List<Hero>();
 
-        Assert.True(CompanionsCampaignBehaviorPatches.IsAnyPlayerAtSettlement(
-            settlement: null,
-            playerHeroes: new[] { playerHero }));
+        Assert.False(CompanionsCampaignBehaviorPatches.TryKillCompanionPrefix(
+            behavior,
+            randomFloat: 0f,
+            getAliveHeroes: () => new[] { candidate },
+            getPlayerHeroes: () => new[] { playerHero },
+            removeWanderer: removed.Add));
+
+        Assert.Equal(new[] { candidate }, removed);
     }
 
     [Fact]
-    public void IsAnyPlayerAtSettlement_DifferentSettlement_ReturnsFalse()
+    public void TryKillCompanionPrefix_ServerCandidateAtPlayerSettlement_DoesNotCull()
     {
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var (behavior, candidate) = CreateCullCandidate(settlement);
         var playerHero = CreateHero(Hero.CharacterStates.Active);
-        playerHero._stayingInSettlement = ObjectHelper.SkipConstructor<Settlement>();
+        playerHero._stayingInSettlement = settlement;
+        var removed = new List<Hero>();
 
-        Assert.False(CompanionsCampaignBehaviorPatches.IsAnyPlayerAtSettlement(
-            ObjectHelper.SkipConstructor<Settlement>(),
-            new[] { playerHero }));
+        Assert.False(CompanionsCampaignBehaviorPatches.TryKillCompanionPrefix(
+            behavior,
+            randomFloat: 0f,
+            getAliveHeroes: () => new[] { candidate },
+            getPlayerHeroes: () => new[] { playerHero },
+            removeWanderer: removed.Add));
+
+        Assert.Empty(removed);
     }
 
     [Fact]
@@ -85,5 +117,25 @@ public class CompanionsCampaignBehaviorPatchesTests
         var hero = new Hero();
         hero._heroState = state;
         return hero;
+    }
+
+    private static (CompanionsCampaignBehavior behavior, Hero candidate) CreateCullCandidate(
+        Settlement settlement = null)
+    {
+        var template = new CharacterObject { _occupation = Occupation.Wanderer };
+        var generatedCharacter = new CharacterObject
+        {
+            _occupation = Occupation.Wanderer,
+            _originCharacter = template,
+        };
+        var candidate = CreateHero(Hero.CharacterStates.Active);
+        candidate._characterObject = generatedCharacter;
+        candidate.Occupation = Occupation.Wanderer;
+        candidate._stayingInSettlement = settlement;
+        generatedCharacter._heroObject = candidate;
+
+        var behavior = new CompanionsCampaignBehavior();
+        behavior._aliveCompanionTemplates.Add(template);
+        return (behavior, candidate);
     }
 }
