@@ -1,17 +1,16 @@
-﻿using Coop.Core.Client.Services.MobileParties.Messages;
+﻿using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Client.Services.SiegeEvents.Handlers;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
-using Common.Messaging;
-using Common.Network;
-using Common.Util;
-using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.Barters.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Bandits.Messages;
+using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Locations.Conversations;
@@ -33,22 +32,22 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Stances.Messages;
-using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using Missions.Messages;
-using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.BarterSystem;
+using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.BarterSystem;
-using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -357,7 +356,9 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Contains(PlayerPartyInteractionOption.Vassal, initialState.Options);
         Assert.DoesNotContain(PlayerPartyInteractionOption.JoinClan, initialState.EnabledOptions);
         Assert.DoesNotContain(PlayerPartyInteractionOption.Vassal, initialState.EnabledOptions);
+        Assert.DoesNotContain(PlayerPartyInteractionOption.Mercenary, initialState.EnabledOptions);
         Assert.Equal(PlayerPartyInteractionVassalUnavailableReason.TargetIsNotKingdomLeader, initialState.VassalUnavailableReason);
+        Assert.Equal(PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow, initialState.MercenaryUnavailableReason);
 
         Server.NetworkSentMessages.Clear();
         client1.NetworkSentMessages.Clear();
@@ -374,6 +375,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary));
         });
 
         Server.NetworkSentMessages.Clear();
@@ -408,6 +411,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
         });
@@ -438,7 +443,492 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out var explanation));
             Assert.Equal("Your clan must be at least tier 2 to swear allegiance.", explanation.ToString());
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary));
         });
+    }
+
+    [Fact]
+    public void OfferServices_WithTierZeroClan_DisablesMercenary()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 0);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Assert.Equal(PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow, initialState.VassalUnavailableReason);
+
+        OpenServiceOptions(client1, initialState);
+
+        client1.Call(() =>
+        {
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out var explanation));
+            Assert.Equal("Your clan must be at least tier 2 to swear allegiance.", explanation.ToString());
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary, out var explanation1));
+            Assert.Equal("Your clan must be at least tier 1 to join as mercenary.", explanation1.ToString());
+        });
+    }
+
+    [Fact]
+    public void MercenaryServiceProposal_AcceptedByKingdomLeader_JoinsKingdomMercenaryOnAllInstances()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
+        });
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.MercenaryAccepted, ended.OutcomeType);
+
+        foreach (var instance in new[] { Server, client1, client2 })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+
+                var initiatorClan = initiatorParty.LeaderHero.Clan;
+                var responderKingdom = responderParty.LeaderHero.Clan.Kingdom;
+
+                Assert.Same(responderKingdom, initiatorClan.Kingdom);
+                Assert.Contains(initiatorClan, responderKingdom.Clans);
+                Assert.True(initiatorClan.IsUnderMercenaryService);
+            });
+        }
+    }
+
+    [Fact]
+    public void MercenarySelected_ShowsConfirmPromptAndDoesNotNotifyResponder()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        OpenServiceOptions(client1, initialState);
+        Server.NetworkSentMessages.Clear();
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+
+        var confirmState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.MercenaryConfirm);
+        Assert.Equal(PlayerPartyInteractionProposal.Mercenary, confirmState.Proposal);
+        Assert.Equal(
+            new[]
+            {
+            PlayerPartyInteractionOption.ConfirmMercenary,
+            PlayerPartyInteractionOption.CancelMercenary
+            },
+            confirmState.Options);
+
+        // Responder must not learn about the proposal until the initiator actually confirms.
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Where(s =>
+            s.PartyId == responderPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.ProposalPending));
+
+        client1.Call(() =>
+        {
+            Assert.Equal(PlayerPartyInteractionPhase.MercenaryConfirm, PlayerPartyInteractionDialogState.Phase);
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.ConfirmMercenary));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.CancelMercenary));
+            Assert.Contains("Do you accept these terms?", PlayerPartyInteractionDialogState.GetDialogText());
+        });
+    }
+
+    [Fact]
+    public void MercenaryProposal_ResponderCannotAcceptBeforeInitiatorConfirms()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+
+        Server.NetworkSentMessages.Clear();
+        // Responder attempts to accept before the initiator has confirmed the terms.
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
+            Assert.False(initiatorParty.LeaderHero.Clan.IsUnderMercenaryService);
+        });
+
+        // Session should still be alive and completable via the real flow.
+        Server.NetworkSentMessages.Clear();
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.MercenaryAccepted, ended.OutcomeType);
+    }
+
+    [Fact]
+    public void MercenaryProposal_ResponderCannotDeclineBeforeInitiatorConfirms()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.DeclineProposal);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+
+        // The still-pending confirm should still be honorable by the initiator afterward.
+        Server.NetworkSentMessages.Clear();
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
+        var proposalStates = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().ToArray();
+        Assert.Contains(proposalStates, s =>
+            s.PartyId == responderPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.ProposalPending &&
+            s.Proposal == PlayerPartyInteractionProposal.Mercenary);
+    }
+
+    [Fact]
+    public void MercenaryCancel_ReturnsToOfferServicesAndClearsProposal()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+
+        Server.NetworkSentMessages.Clear();
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.CancelMercenary);
+
+        var canceledState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.PartyId == initiatorPartyId);
+        Assert.Equal(PlayerPartyInteractionPhase.OfferServices, canceledState.Phase);
+        Assert.Equal(PlayerPartyInteractionProposal.None, canceledState.Proposal);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Where(s => s.PartyId == responderPartyId));
+
+        // A stale accept sent after cancellation must not resurrect the proposal.
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+    }
+
+    [Fact]
+    public void MercenaryConfirm_SubmittedTwice_DoesNotResendResponderProposal()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
+
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmMercenary);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+    }
+
+    [Fact]
+    public void MercenaryProposal_DeclinedAfterConfirm_EndsWithoutJoiningKingdom()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
+
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.DeclineProposal);
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.MercenaryDeclined, ended.OutcomeType);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
+            Assert.False(initiatorParty.LeaderHero.Clan.IsUnderMercenaryService);
+        });
+    }
+
+    [Fact]
+    public void AcceptProposal_WithNoPendingProposal_IsIgnored()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+
+        Server.NetworkSentMessages.Clear();
+        // No proposal has been made yet, session.Proposal is still None.
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+
+        // Session should still be usable afterward.
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.TradeProposal);
+        Assert.Contains(
+            Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>(),
+            s => s.PartyId == responderPartyId && s.Phase == PlayerPartyInteractionPhase.ProposalPending);
+    }
+
+    [Fact]
+    public void MercenaryAwardMultiplier_MatchesAcrossProposalAndAcceptance_WhenStateUnchanged()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        int expectedMultiplier = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+
+            var initiatorClan = initiatorParty.LeaderHero.Clan;
+            var targetKingdom = responderParty.LeaderHero.Clan.Kingdom;
+
+            expectedMultiplier = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(
+                initiatorClan, targetKingdom, false);
+            if (initiatorClan.IsUnderMercenaryService)
+            {
+                expectedMultiplier = expectedMultiplier * 3 / 2;
+            }
+        });
+
+        // Multiplier shown at proposal time (session creation) matches the model's true value.
+        Assert.Equal(expectedMultiplier, initialState.MercenaryAwardMultiplier);
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+
+        var confirmState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.MercenaryConfirm);
+        // Multiplier shown in the confirm dialog is the same session-carried value.
+        Assert.Equal(expectedMultiplier, confirmState.MercenaryAwardMultiplier);
+
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
+
+        var responderProposalState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.PartyId == responderPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.ProposalPending);
+        // Multiplier shown to the responder before they decide matches too.
+        Assert.Equal(expectedMultiplier, responderProposalState.MercenaryAwardMultiplier);
+
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.MercenaryAccepted, ended.OutcomeType);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            var initiatorClan = initiatorParty.LeaderHero.Clan;
+            Assert.Equal(expectedMultiplier, initiatorClan.MercenaryAwardMultiplier);
+        });
+    }
+
+    [Fact]
+    public void MercenaryProposal_InitiatorLosesEligibilityBeforeAcceptance_AcceptDoesNotApplyJoin()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
+
+        // Eligibility changes after confirmation but before the responder accepts;
+        // ApplyMercenaryJoin's own re-check (initiatorClan.Tier < 1) must catch this.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            initiatorParty.LeaderHero.Clan.Tier = 0;
+        });
+
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.MercenaryDeclined, ended.OutcomeType);
+
+        // The outcome fires, but ApplyMercenaryJoin's guard should have blocked appliance
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
+            Assert.False(initiatorParty.LeaderHero.Clan.IsUnderMercenaryService);
+        });
+    }
+
+    [Fact]
+    public void VassalProposalAsMercenary_AcceptedByKingdomLeader_JoinsKingdomOnAllInstances()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeaderAndInitiatorParty(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.NotNull(initiatorParty.LeaderHero.Clan.Kingdom);
+        });
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Vassal);
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.VassalAccepted, ended.OutcomeType);
+
+        foreach (var instance in new[] { Server, client1, client2 })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+
+                var initiatorClan = initiatorParty.LeaderHero.Clan;
+                var responderKingdom = responderParty.LeaderHero.Clan.Kingdom;
+
+                Assert.Same(responderKingdom, initiatorClan.Kingdom);
+                Assert.Contains(initiatorClan, responderKingdom.Clans);
+                Assert.False(initiatorClan.IsUnderMercenaryService);
+            });
+        }
+    }
+
+    [Fact]
+    public void VassalProposalAsMercenaryFromDifferentKingdom_AcceptedByKingdomLeader_JoinsKingdomOnAllInstances()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeaderAndInitiatorPartyAsDifferentMercenaryKingdom(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.NotNull(initiatorParty.LeaderHero.Clan.Kingdom);
+        });
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Vassal);
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.VassalAccepted, ended.OutcomeType);
+
+        foreach (var instance in new[] { Server, client1, client2 })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+
+                var initiatorClan = initiatorParty.LeaderHero.Clan;
+                var responderKingdom = responderParty.LeaderHero.Clan.Kingdom;
+
+                Assert.Same(responderKingdom, initiatorClan.Kingdom);
+                Assert.Contains(initiatorClan, responderKingdom.Clans);
+                Assert.False(initiatorClan.IsUnderMercenaryService);
+            });
+        }
     }
 
     [Theory]
@@ -469,6 +959,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
             Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary));
         });
     }
 
@@ -552,13 +1044,21 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(PlayerPartyInteractionProposal.Trade, "I have a proposal that may benefit us both.")]
-    [InlineData(PlayerPartyInteractionProposal.JoinClan, "(COMING SOON) I wish to offer my services in your clan.")]
-    [InlineData(PlayerPartyInteractionProposal.Vassal, "I wish to swear my allegiance to your majesty.")]
+    [InlineData(PlayerPartyInteractionProposal.Trade, 0, "I have a proposal that may benefit us both.")]
+    [InlineData(PlayerPartyInteractionProposal.JoinClan, 0, "(COMING SOON) I wish to offer my services in your clan.")]
+    [InlineData(PlayerPartyInteractionProposal.Vassal, 0, "I wish to swear my allegiance to your majesty.")]
+    [InlineData(PlayerPartyInteractionProposal.Mercenary, 12, null)]
     public void ProposalPending_DialogText_ShowsInitiatorSelectedLine(
-        PlayerPartyInteractionProposal proposal,
-        string expectedText)
+    PlayerPartyInteractionProposal proposal,
+    int mercenaryAwardMultiplier,
+    string expectedText)
     {
+        if (proposal == PlayerPartyInteractionProposal.Mercenary)
+        {
+            expectedText =
+                $"RandomPlayer offers to serve as a mercenary. The kingdom will pay {mercenaryAwardMultiplier} gold per influence point earned, whenever the contract is honored. Do you accept?";
+        }
+
         PlayerPartyInteractionDialogState.Apply(new NetworkPlayerPartyInteractionState(
             "session-1",
             "responder-party",
@@ -568,11 +1068,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             proposal,
             new[]
             {
-                PlayerPartyInteractionOption.AcceptProposal,
-                PlayerPartyInteractionOption.DeclineProposal,
-                PlayerPartyInteractionOption.Leave
+            PlayerPartyInteractionOption.AcceptProposal,
+            PlayerPartyInteractionOption.DeclineProposal,
+            PlayerPartyInteractionOption.Leave
             },
-            isInitiator: false));
+            isInitiator: false,
+            mercenaryAwardMultiplier: mercenaryAwardMultiplier));
 
         try
         {
@@ -591,18 +1092,11 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     [InlineData(PlayerPartyInteractionOutcomeType.ClanJoinDeclined, "Clan service proposal declined.")]
     [InlineData(PlayerPartyInteractionOutcomeType.VassalAccepted, "Vassalage offer accepted.")]
     [InlineData(PlayerPartyInteractionOutcomeType.VassalDeclined, "Vassalage offer declined.")]
+    [InlineData(PlayerPartyInteractionOutcomeType.MercenaryAccepted, "Mercenary offer accepted.")]
+    [InlineData(PlayerPartyInteractionOutcomeType.MercenaryDeclined, "Mercenary offer declined.")]
     public void OutcomeMessages_UsePlayerPartyInteractionResult(PlayerPartyInteractionOutcomeType outcomeType, string expectedMessage)
     {
         Assert.Equal(expectedMessage, PlayerPartyTradeContext.GetOutcomeMessage(outcomeType));
-    }
-
-    [Fact]
-    public void RemovedMercenaryInteractionValues_AreNotDefined()
-    {
-        Assert.DoesNotContain("Mercenary", Enum.GetNames(typeof(PlayerPartyInteractionOption)));
-        Assert.DoesNotContain("Mercenary", Enum.GetNames(typeof(PlayerPartyInteractionProposal)));
-        Assert.DoesNotContain("MercenaryAccepted", Enum.GetNames(typeof(PlayerPartyInteractionOutcomeType)));
-        Assert.DoesNotContain("MercenaryDeclined", Enum.GetNames(typeof(PlayerPartyInteractionOutcomeType)));
     }
 
     [Fact]
@@ -1580,8 +2074,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var disabledRouter = new[]
         {
             AccessTools.Method(
-                typeof(TestNetworkRouter),
-                nameof(TestNetworkRouter.SendAll),
+                typeof(Environment.TestNetworkRouter),
+                nameof(Environment.TestNetworkRouter.SendAll),
                 new[] { typeof(NetPeer), typeof(IMessage) }),
         };
         PublishConversationRequest(client1, initiatorPartyId, firstAiPartyId, disabledRouter);
@@ -3752,8 +4246,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     private static MethodBase GetNetworkRoutingMethod()
     {
         var method = AccessTools.Method(
-            typeof(TestNetworkRouter),
-            nameof(TestNetworkRouter.SendAll),
+            typeof(Environment.TestNetworkRouter),
+            nameof(Environment.TestNetworkRouter.SendAll),
             new[] { typeof(NetPeer), typeof(IMessage) });
         Assert.NotNull(method);
         return method;
@@ -3762,8 +4256,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     private static MethodBase GetDirectNetworkRoutingMethod()
     {
         var method = AccessTools.Method(
-            typeof(TestNetworkRouter),
-            nameof(TestNetworkRouter.Send),
+            typeof(Environment.TestNetworkRouter),
+            nameof(Environment.TestNetworkRouter.Send),
             new[] { typeof(NetPeer), typeof(NetPeer), typeof(IMessage) });
         Assert.NotNull(method);
         return method;
@@ -4293,6 +4787,47 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             responderParty.LeaderHero.Clan.Kingdom = kingdom;
             kingdom.RulingClan = responderParty.LeaderHero.Clan;
             Assert.True(responderParty.LeaderHero.IsKingdomLeader);
+        });
+    }
+
+    private void SetupResponderKingdomLeaderAndInitiatorParty(string initiatorPartyId, string responderPartyId, int initiatorClanTier)
+    {
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+
+            initiatorParty.LeaderHero.Clan.Tier = initiatorClanTier;
+            responderParty.LeaderHero.Clan.Kingdom = kingdom;
+            kingdom.RulingClan = responderParty.LeaderHero.Clan;
+            Assert.True(responderParty.LeaderHero.IsKingdomLeader);
+            ChangeKingdomAction.ApplyByJoinFactionAsMercenary(initiatorParty.LeaderHero.Clan, kingdom, default(CampaignTime), 50, true);
+            Assert.True(initiatorParty.LeaderHero.Clan.IsUnderMercenaryService);
+        });
+    }
+
+    private void SetupResponderKingdomLeaderAndInitiatorPartyAsDifferentMercenaryKingdom(string initiatorPartyId, string responderPartyId, int initiatorClanTier)
+    {
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var kingdomId2 = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId2, out var kingdom2));
+
+            initiatorParty.LeaderHero.Clan.Tier = initiatorClanTier;
+            responderParty.LeaderHero.Clan.Kingdom = kingdom;
+            kingdom.RulingClan = responderParty.LeaderHero.Clan;
+            Assert.True(responderParty.LeaderHero.IsKingdomLeader);
+            ChangeKingdomAction.ApplyByJoinFactionAsMercenary(initiatorParty.LeaderHero.Clan, kingdom2, default(CampaignTime), 50, true);
+            Assert.True(initiatorParty.LeaderHero.Clan.IsUnderMercenaryService);
+            Assert.NotEqual(initiatorParty.LeaderHero.Clan.Kingdom, responderParty.LeaderHero.Clan.Kingdom);
         });
     }
 

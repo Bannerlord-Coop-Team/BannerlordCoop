@@ -11,6 +11,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
     private const string ResponderToken = "coop_player_party_interaction_responder";
     private const string HostileConfirmToken = "coop_player_party_interaction_hostile_confirm";
     private const string InitiatorWaitToken = "coop_player_party_interaction_initiator_wait";
+    private const string MercenaryConfirmToken = "coop_player_party_interaction_mercenary_confirm";
     private const string CloseToken = "close_window";
     private const int PlayerPartyDialogPriority = 10000;
 
@@ -85,6 +86,16 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             PlayerPartyDialogPriority,
             null);
 
+        starter.AddDialogLine(
+            "coop_player_party_interaction_mercenary_confirm_line",
+            MercenaryConfirmToken,
+            MercenaryConfirmToken,
+            "{=coop_player_party_mercenary_confirm}{COOP_PLAYER_PARTY_INTERACTION_TEXT}",
+            () => IsPhase(PlayerPartyInteractionPhase.MercenaryConfirm),
+            null,
+            PlayerPartyDialogPriority,
+            null);
+
         starter.AddPlayerLine(
             "coop_player_party_interaction_trade",
             InitialToken,
@@ -138,6 +149,39 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.Vassal),
             PlayerPartyDialogPriority,
             IsVassalEnabled,
+            null);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_mercenary_select",
+            ServiceToken,
+            MercenaryConfirmToken,
+            "I wish to join as a mercenary.",
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary),
+            PlayerPartyInteractionDialogState.SelectMercenary,
+            PlayerPartyDialogPriority,
+            IsMercenaryEnabled,
+            null);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_mercenary_confirm",
+            MercenaryConfirmToken,
+            InitiatorWaitToken,
+            "I accept these terms.",
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.ConfirmMercenary),
+            PlayerPartyInteractionDialogState.ConfirmMercenary,
+            PlayerPartyDialogPriority,
+            null,
+            null);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_mercenary_cancel",
+            MercenaryConfirmToken,
+            ServiceToken,
+            "On second thought, never mind.",
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.CancelMercenary),
+            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.CancelMercenary),
+            PlayerPartyDialogPriority,
+            null,
             null);
 
         starter.AddPlayerLine(
@@ -252,6 +296,8 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
     private static bool IsVassalEnabled(out TextObject explanation)
         => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out explanation);
 
+    private static bool IsMercenaryEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary, out explanation);
     private static bool IsHostileDemandEnabled(out TextObject explanation)
         => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.HostileDemand, out explanation);
 

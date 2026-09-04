@@ -21,14 +21,12 @@ using System.Linq;
 using System.Reflection;
 using TroopRosterElementData = GameInterface.Services.TroopRosters.Data.TroopRosterElementData;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -36,8 +34,6 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 using TaleWorlds.Core;
 using TaleWorlds.ScreenSystem;
-using Helpers;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
@@ -482,6 +478,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (TryHandleInitiatorLeaveOption(session, option)) return;
         if (option == PlayerPartyInteractionOption.OfferServices) return;
         if (TryHandleInitiatorHostileDemandOption(session, option)) return;
+        if (TryHandleInitiatorMercenaryOption(session, option)) return;
 
         HandleInitiatorProposalOption(session, option);
     }
@@ -515,6 +512,73 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
     }
 
+    private bool TryHandleInitiatorMercenaryOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        switch (option)
+        {
+            case PlayerPartyInteractionOption.Mercenary:
+                HandleMercenarySelected(session, option);
+                return true;
+            case PlayerPartyInteractionOption.ConfirmMercenary:
+                HandleMercenaryConfirmed(session);
+                return true;
+            case PlayerPartyInteractionOption.CancelMercenary:
+                HandleMercenaryCanceled(session);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void HandleMercenarySelected(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        if (!session.InitiatorEnabledOptions.Contains(option)) return;
+
+        session.Proposal = PlayerPartyInteractionProposal.Mercenary;
+        session.MercenaryConfirmed = false;
+        SendInitiatorState(
+            session,
+            PlayerPartyInteractionPhase.MercenaryConfirm,
+            session.Proposal,
+            new[]
+            {
+            PlayerPartyInteractionOption.ConfirmMercenary,
+            PlayerPartyInteractionOption.CancelMercenary,
+            });
+    }
+
+    private void HandleMercenaryConfirmed(PlayerPartyInteractionSession session)
+    {
+        if (session.Proposal != PlayerPartyInteractionProposal.Mercenary) return;
+        if (session.MercenaryConfirmed) return;
+        session.MercenaryConfirmed = true;
+
+        SendInitiatorState(session, PlayerPartyInteractionPhase.WaitingForResponse, session.Proposal, Array.Empty<PlayerPartyInteractionOption>());
+        SendResponderState(
+            session,
+            PlayerPartyInteractionPhase.ProposalPending,
+            session.Proposal,
+            new[]
+            {
+            PlayerPartyInteractionOption.AcceptProposal,
+            PlayerPartyInteractionOption.DeclineProposal,
+            PlayerPartyInteractionOption.Leave
+            });
+    }
+
+    private void HandleMercenaryCanceled(PlayerPartyInteractionSession session)
+    {
+        if (session.Proposal != PlayerPartyInteractionProposal.Mercenary) return;
+
+        session.Proposal = PlayerPartyInteractionProposal.None;
+        session.MercenaryConfirmed = false;
+        SendInitiatorState(
+            session,
+            PlayerPartyInteractionPhase.OfferServices,
+            PlayerPartyInteractionProposal.None,
+            session.InitiatorOptions.ToArray(),
+            session.InitiatorEnabledOptions.ToArray());
+    }
     private void HandleHostileDemandSelected(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
         if (!session.InitiatorEnabledOptions.Contains(option)) return;
@@ -609,11 +673,17 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         if (option == PlayerPartyInteractionOption.DeclineProposal)
         {
+            if (session.Proposal == PlayerPartyInteractionProposal.None) return;
+            if (session.Proposal == PlayerPartyInteractionProposal.Mercenary && !session.MercenaryConfirmed) return;
+
             EndSession(session, GetDeclinedOutcome(session.Proposal));
             return;
         }
 
         if (option != PlayerPartyInteractionOption.AcceptProposal) return;
+
+        if (session.Proposal == PlayerPartyInteractionProposal.None) return;
+        if (session.Proposal == PlayerPartyInteractionProposal.Mercenary && !session.MercenaryConfirmed) return;
 
         if (session.Proposal == PlayerPartyInteractionProposal.Trade)
         {
@@ -700,13 +770,15 @@ internal class PlayerPartyInteractionHandler : IHandler
             proposal,
             options,
             true,
+            session.MercenaryAwardMultiplier,
             session.InitiatorAcceptedTrade,
             session.ResponderAcceptedTrade,
             partyItems,
             otherPartyItems,
             enabledOptions,
             session.IsHostile,
-            session.VassalUnavailableReason));
+            session.VassalUnavailableReason,
+            session.MercenaryUnavailableReason));
     }
 
     private void SendResponderState(
@@ -732,13 +804,15 @@ internal class PlayerPartyInteractionHandler : IHandler
             proposal,
             options,
             false,
+            session.MercenaryAwardMultiplier,
             session.InitiatorAcceptedTrade,
             session.ResponderAcceptedTrade,
             partyItems,
             otherPartyItems,
             enabledOptions,
             session.IsHostile,
-            session.VassalUnavailableReason));
+            session.VassalUnavailableReason,
+            session.MercenaryUnavailableReason));
     }
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
@@ -753,22 +827,23 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         var outcome = new PlayerPartyInteractionOutcome(session, outcomeType);
-        outcomeHandler.Handle(outcome);
+        var applied = outcomeHandler.Handle(outcome);
+        var finalOutcomeType = applied ? outcomeType : GetDeclinedOutcome(session.Proposal);
 
         network.SendAll(new NetworkPlayerPartyInteractionEnded(
             session.SessionId,
             session.InitiatorPartyId,
             session.ResponderPartyId,
-            outcomeType));
+            finalOutcomeType));
 
-        if (outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ||
-            outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded)
+        if (finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ||
+            finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded)
         {
             hostileEncounterService.TryStartHostileEncounter(
                 session.SessionId,
                 session.InitiatorPartyId,
                 session.ResponderPartyId,
-                outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded);
+                finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded);
         }
     }
 
@@ -779,14 +854,32 @@ internal class PlayerPartyInteractionHandler : IHandler
         AddInitiatorOption(session, PlayerPartyInteractionOption.HostileDemand, hostileEncounterService.CanStartHostileEncounter(initiatorParty, responderParty));
         AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan, enabled: false);
         var vassalAvailable = IsVassalServiceAvailable(initiatorParty, responderParty, out var vassalUnavailableReason);
+        var mercenaryAvailable = IsMercenaryAvailable(initiatorParty, responderParty, out var mercenaryUnavailableReason);
         session.VassalUnavailableReason = vassalUnavailableReason;
+        session.MercenaryUnavailableReason = mercenaryUnavailableReason;
+        session.MercenaryAwardMultiplier = mercenaryAvailable
+            ? GetMercenaryAwardMultiplier(initiatorParty.LeaderHero?.Clan, responderParty.LeaderHero?.Clan?.Kingdom)
+            : 0;
+        session.TargetKingdom = responderParty.LeaderHero?.Clan?.Kingdom;
         AddInitiatorOption(
             session,
             PlayerPartyInteractionOption.Vassal,
             vassalAvailable);
+        AddInitiatorOption(
+            session,
+            PlayerPartyInteractionOption.Mercenary,
+            mercenaryAvailable);
         AddInitiatorOption(session, PlayerPartyInteractionOption.Leave, enabled: true);
     }
-
+    private static int GetMercenaryAwardMultiplier(Clan mercenaryClan, Kingdom kingdom)
+    {
+        int num = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(mercenaryClan, kingdom, false);
+        if (mercenaryClan.IsUnderMercenaryService)
+        {
+            num = num * 3 / 2;
+        }
+        return num;
+    }
     private static void AddInitiatorOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option, bool enabled)
     {
         session.InitiatorOptions.Add(option);
@@ -815,19 +908,94 @@ internal class PlayerPartyInteractionHandler : IHandler
             return false;
         }
 
-        if (initiatorClan.Kingdom != null)
+        if (initiatorClan.Kingdom != null && !initiatorClan.IsUnderMercenaryService)
         {
             unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorIsInKingdom;
             return false;
         }
 
-        if (initiatorClan.Tier < 2)
+        if (initiatorClan.Tier < Campaign.Current.Models.ClanTierModel.VassalEligibleTier)
         {
             unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow;
             return false;
         }
 
         unavailableReason = PlayerPartyInteractionVassalUnavailableReason.None;
+        return true;
+    }
+
+    private static bool IsMercenaryAvailable(
+        PartyBase initiatorParty,
+        PartyBase responderParty,
+        out PlayerPartyInteractionMercenaryUnavailableReason unavailableReason)
+    {
+        var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
+        var responderHero = responderParty.LeaderHero;
+        var targetKingdom = responderHero?.Clan?.Kingdom;
+
+        if (initiatorClan == null)
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.InitiatorHasNoClan;
+            return false;
+        }
+
+        if (initiatorClan.Leader != initiatorParty.LeaderHero)
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.InitiatorIsNotClanLeader;
+            return false;
+        }
+
+        if (initiatorClan.Tier < Campaign.Current.Models.ClanTierModel.MercenaryEligibleTier)
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow;
+            return false;
+        }
+
+        if (initiatorClan.IsUnderMercenaryService && initiatorClan.Kingdom == targetKingdom)
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.AlreadyMercenaryForThisKingdom;
+            return false;
+        }
+
+        if (!initiatorClan.Settlements.IsEmpty<Settlement>())
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanHasSettlement;
+            return false;
+        }
+
+        if (initiatorParty.LeaderHero.GetRelation(responderHero) < (float)Campaign.Current.Models.DiplomacyModel.MinimumRelationWithConversationCharacterToJoinKingdom)
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.NotEnoughRelation;
+            return false;
+        }
+
+        if (initiatorClan.MapFaction.IsKingdomFaction && !initiatorClan.IsUnderMercenaryService)
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.ClanIsInKingdom;
+            return false;
+        }
+
+        if (targetKingdom == null)
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.TargetHasNoKingdom;
+            return false;
+        }
+
+        var initiatorWars = initiatorClan.MapFaction?.FactionsAtWarWith;
+        if (initiatorWars != null)
+        {
+            foreach (var enemyFaction in initiatorWars)
+            {
+                if (enemyFaction == null) continue;
+                if (!FactionManager.IsAtWarAgainstFaction(targetKingdom, enemyFaction))
+                {
+                    unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars;
+                    return false;
+                }
+            }
+        }
+
+        unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.None;
         return true;
     }
 
@@ -841,6 +1009,8 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionProposal.JoinClan;
             case PlayerPartyInteractionOption.Vassal:
                 return PlayerPartyInteractionProposal.Vassal;
+            case PlayerPartyInteractionOption.Mercenary:
+                return PlayerPartyInteractionProposal.Mercenary;
             case PlayerPartyInteractionOption.HostileDemand:
                 return PlayerPartyInteractionProposal.HostileDemand;
             default:
@@ -856,6 +1026,8 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionOutcomeType.ClanJoinAccepted;
             case PlayerPartyInteractionProposal.Vassal:
                 return PlayerPartyInteractionOutcomeType.VassalAccepted;
+            case PlayerPartyInteractionProposal.Mercenary:
+                return PlayerPartyInteractionOutcomeType.MercenaryAccepted;
             default:
                 return PlayerPartyInteractionOutcomeType.None;
         }
@@ -871,6 +1043,8 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionOutcomeType.ClanJoinDeclined;
             case PlayerPartyInteractionProposal.Vassal:
                 return PlayerPartyInteractionOutcomeType.VassalDeclined;
+            case PlayerPartyInteractionProposal.Mercenary:
+                return PlayerPartyInteractionOutcomeType.MercenaryDeclined;
             default:
                 return PlayerPartyInteractionOutcomeType.None;
         }
