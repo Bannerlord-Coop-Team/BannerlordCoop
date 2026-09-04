@@ -20,7 +20,7 @@ namespace GameInterface.Tests.Services.UI;
 public class PlayerNameplatesOptionsTests
 {
     [Fact]
-    public void PlayerNameplates_DefaultToEnabled()
+    public void PlayerNameplates_DefaultToAlways()
     {
         using var messageBroker = new MessageBroker();
         var provider = new PlayerNameplatesOptionsTabProvider();
@@ -28,11 +28,14 @@ public class PlayerNameplatesOptionsTests
         var tab = provider.CreateTab(new CoopOptionsData(), messageBroker, _ => { });
 
         var section = Assert.IsType<PlayerNameplatesSection>(Assert.Single(tab.Sections));
-        Assert.True(section.ShowPlayerNameplates);
+        Assert.Equal(PlayerNameplatesDisplayMode.Always, section.SelectedDisplayMode);
     }
 
-    [Fact]
-    public void PlayerNameplates_Disabled_PersistAndPublishAfterApply()
+    [Theory]
+    [InlineData(PlayerNameplatesDisplayMode.Always)]
+    [InlineData(PlayerNameplatesDisplayMode.HoldIndicators)]
+    [InlineData(PlayerNameplatesDisplayMode.Never)]
+    public void PlayerNameplates_Mode_PersistAndPublishAfterApply(PlayerNameplatesDisplayMode mode)
     {
         string filePath = CreateTempFilePath();
 
@@ -47,15 +50,15 @@ public class PlayerNameplatesOptionsTests
             var tab = provider.CreateTab(store.LoadOrDefault(), messageBroker, _ => { });
             var section = Assert.IsType<PlayerNameplatesSection>(Assert.Single(tab.Sections));
 
-            section.ShowPlayerNameplates = false;
+            section.DisplayModeSelector.SelectedIndex = (int)mode;
             var options = store.LoadOrDefault();
             tab.Apply(options);
             store.Save(options);
             tab.AfterApply();
 
-            Assert.False(PlayerNameplatesOptionsTabProvider.GetShowPlayerNameplatesOrDefault(store.LoadOrDefault()));
+            Assert.Equal(mode, PlayerNameplatesOptionsTabProvider.GetDisplayModeOrDefault(store.LoadOrDefault()));
             Assert.True(selected.HasValue);
-            Assert.False(selected.Value.ShowPlayerNameplates);
+            Assert.Equal(mode, selected.Value.DisplayMode);
             GC.KeepAlive(handler);
         }
         finally

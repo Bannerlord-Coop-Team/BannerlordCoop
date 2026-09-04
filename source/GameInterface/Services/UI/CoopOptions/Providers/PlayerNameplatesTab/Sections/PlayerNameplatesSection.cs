@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.UI.Messages;
+using TaleWorlds.Core.ViewModelCollection.Selector;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab.Sections;
@@ -10,42 +11,37 @@ public class PlayerNameplatesSection : CoopOptionsSectionVM
     public const string SectionId = "PlayerNameplatesSection";
 
     private readonly IMessageBroker messageBroker;
-    private bool showPlayerNameplates;
 
-    public PlayerNameplatesSection(bool showPlayerNameplates, IMessageBroker messageBroker)
+    public PlayerNameplatesSection(PlayerNameplatesDisplayMode displayMode, IMessageBroker messageBroker)
     {
-        this.showPlayerNameplates = showPlayerNameplates;
         this.messageBroker = messageBroker;
+        DisplayModeSelector = new SelectorVM<SelectorItemVM>(
+            new[] { "Always", "Hold Indicators", "Never" },
+            (int)displayMode,
+            null);
     }
 
     public override string Id => SectionId;
     public string TitleText => "Player Nameplates";
     public string DescriptionText => "Show names above allied players in co-op missions.";
-    public string ShowPlayerNameplatesText => "Show Player Nameplates";
+    public string DisplayModeText => "Display Mode";
 
     [DataSourceProperty]
-    public bool ShowPlayerNameplates
-    {
-        get => showPlayerNameplates;
-        set
-        {
-            if (showPlayerNameplates == value) return;
+    public SelectorVM<SelectorItemVM> DisplayModeSelector { get; }
 
-            showPlayerNameplates = value;
-            OnPropertyChanged(nameof(ShowPlayerNameplates));
-        }
-    }
+    public PlayerNameplatesDisplayMode SelectedDisplayMode =>
+        (PlayerNameplatesDisplayMode)DisplayModeSelector.SelectedIndex;
 
     public override void Apply(string tabId, CoopOptionsData options)
     {
         options.SetSection(
             tabId,
             Id,
-            new PlayerNameplatesSectionOptions { ShowPlayerNameplates = showPlayerNameplates });
+            new PlayerNameplatesSectionOptions { DisplayMode = SelectedDisplayMode });
     }
 
     public override void AfterApply()
     {
-        messageBroker.Publish(this, new PlayerNameplateVisibilitySelected(showPlayerNameplates));
+        messageBroker.Publish(this, new PlayerNameplateVisibilitySelected(SelectedDisplayMode));
     }
 }

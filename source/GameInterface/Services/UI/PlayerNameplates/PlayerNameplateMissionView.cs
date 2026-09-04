@@ -39,6 +39,7 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
     private GauntletMovieIdentifier movie;
     private bool serverAllowsPlayerNameplates;
     private bool showPlayerNameplates;
+    private PlayerNameplatesDisplayMode displayMode = PlayerNameplatesDisplayMode.Always;
     private float targetRefreshElapsed;
 
     public bool IsVisible => dataSource?.IsEnabled == true;
@@ -75,7 +76,7 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         messageBroker.Subscribe<ModConfigApplied>(HandleModConfigApplied);
         messageBroker.Subscribe<PlayerNameplateVisibilitySelected>(HandleVisibilitySelected);
         serverAllowsPlayerNameplates = ModConfigProvider.ModOptions.ShowPlayerNameplates;
-        ApplyVisibility(PlayerNameplatesOptionsTabProvider.GetShowPlayerNameplatesOrDefault(
+        ApplyMode(PlayerNameplatesOptionsTabProvider.GetDisplayModeOrDefault(
             optionsStore.LoadOrDefault()));
     }
 
@@ -83,7 +84,10 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
     {
         base.OnMissionScreenTick(dt);
 
-        if (dataSource == null || !showPlayerNameplates) return;
+        if (dataSource == null) return;
+
+        UpdateVisibility();
+        if (!showPlayerNameplates) return;
 
         targetRefreshElapsed += dt;
         if (targetRefreshElapsed >= TargetRefreshInterval)
@@ -183,24 +187,51 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
     {
         GameThread.RunSafe(() =>
         {
-            ApplyVisibility(payload.What.ShowPlayerNameplates);
+            ApplyMode(payload.What.DisplayMode);
         }, context: nameof(PlayerNameplateMissionView));
     }
 
     private void HandleModConfigApplied(MessagePayload<ModConfigApplied> payload)
     {
         serverAllowsPlayerNameplates = payload.What.ModOptions.ShowPlayerNameplates;
-        ApplyVisibility(PlayerNameplatesOptionsTabProvider.GetShowPlayerNameplatesOrDefault(
+        ApplyMode(PlayerNameplatesOptionsTabProvider.GetDisplayModeOrDefault(
             optionsStore.LoadOrDefault()));
     }
 
-    private void ApplyVisibility(bool clientAllowsPlayerNameplates)
+    private void ApplyMode(PlayerNameplatesDisplayMode mode)
     {
         if (dataSource == null) return;
 
-        showPlayerNameplates = serverAllowsPlayerNameplates && clientAllowsPlayerNameplates;
-        dataSource.IsEnabled = showPlayerNameplates;
-        if (showPlayerNameplates) RefreshTargets();
+        displayMode = mode;
+        UpdateVisibility();
+    }
+
+    private void UpdateVisibility()
+    {
+        bool shouldShow = serverAllowsPlayerNameplates && displayMode switch
+        {
+            PlayerNameplatesDisplayMode.Always => true,
+            PlayerNameplatesDisplayMode.HoldIndicators => IsShowIndicatorsHeld(),
+            _ => false,
+        };
+
+        if (shouldShow == showPlayerNameplates) return;
+
+        showPlayerNameplates = shouldShow;
+        dataSource.IsEnabled = shouldShow;
+        if (shouldShow)
+        {
+            RefreshTargets();
+        }
+        else
+        {
+            dataSource.ClearTargets();
+        }
+    }
+
+    private bool IsShowIndicatorsHeld()
+    {
+        return MissionScreen != null && Input.IsGameKeyDown(GenericGameKeyContext.ShowIndicators);
     }
 
     private bool TryGetControllerId(Agent agent, out string controllerId)
