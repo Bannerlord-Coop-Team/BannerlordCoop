@@ -531,13 +531,9 @@ public class VirtualNetworkScheduler : IVirtualNetworkScheduler
             PendingDeliveries = pendingDeliveries,
         };
         string json = JsonSerializer.Serialize(stateMaterial);
-        string stateDigest;
-        using (SHA256 sha256 = SHA256.Create())
-        {
-            stateDigest = Convert.ToHexString(
-                    sha256.ComputeHash(Encoding.UTF8.GetBytes(json)))
-                .ToLowerInvariant();
-        }
+        string stateDigest = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(json)))
+            .ToLowerInvariant();
 
         return new VirtualNetworkStateSnapshot(
             CurrentTime.Ticks,

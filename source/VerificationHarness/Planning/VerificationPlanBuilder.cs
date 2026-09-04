@@ -402,7 +402,7 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
         }
 
         string candidate = suppliedPath.Trim().Replace('\\', '/');
-        if (candidate.StartsWith("/", StringComparison.Ordinal) ||
+        if (candidate.StartsWith('/') ||
             (candidate.Length >= 2 && char.IsLetter(candidate[0]) && candidate[1] == ':'))
         {
             rejectionReason = "path must be repository-relative";

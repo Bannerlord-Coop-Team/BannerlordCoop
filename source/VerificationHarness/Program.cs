@@ -109,7 +109,7 @@ public static class Program
                     readStdin = true;
                     break;
                 default:
-                    if (argument.StartsWith("-", StringComparison.Ordinal))
+                    if (argument.StartsWith('-'))
                     {
                         throw new ArgumentException($"Unknown plan option: {argument}");
                     }

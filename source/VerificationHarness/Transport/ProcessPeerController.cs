@@ -836,7 +836,6 @@ internal sealed class ProcessPeerOptions
             throw new ArgumentException($"process-peer {name} must be exactly 40 hexadecimal characters.");
         }
     }
-
 }
 
 internal sealed class TransportChildProcess : IDisposable

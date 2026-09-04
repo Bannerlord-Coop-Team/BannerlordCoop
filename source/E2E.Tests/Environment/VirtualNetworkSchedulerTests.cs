@@ -776,7 +776,6 @@ public class VirtualNetworkSchedulerTests
         Assert.Equal(originalDeliveries, replayDeliveries);
         Assert.Equal(original.Trace, replay.Trace);
         Assert.Equal(2, replay.GetConnectionGeneration(replayEndpoints[2]));
-
     }
 
     [Fact]
