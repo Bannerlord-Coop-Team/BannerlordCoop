@@ -22,4 +22,9 @@ public static class QuestTypeRegistry
     public static bool IsRegistered(Type issueType) => issueType != null && ByIssueType.ContainsKey(issueType);
 
     internal static void ClearAllForTests() => ByIssueType.Clear();
+
+    internal static void UnregisterForTests(Type issueType)
+    {
+        if (issueType != null) ByIssueType.Remove(issueType);
+    }
 }

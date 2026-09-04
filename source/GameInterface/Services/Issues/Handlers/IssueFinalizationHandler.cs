@@ -423,6 +423,10 @@ internal class IssueFinalizationHandler : IHandler
                 if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
             }
 
+            var isLocalPeerOwner = ownershipRegistry.IsLocalPeerOwner(owner);
+            var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            var quest = owner.Issue?.IssueQuest;
+
             SetProofContext(reason, proof);
             try
             {
@@ -434,6 +438,11 @@ internal class IssueFinalizationHandler : IHandler
             finally
             {
                 SetProofContext(reason, 0);
+            }
+
+            if (isLocalPeerOwner && reason == IssueFinalizeReason.QuestSuccess && quest != null)
+            {
+                descriptor?.ApplyQuestSuccessLocalOwnerConsequence?.Invoke(quest);
             }
         });
     }
