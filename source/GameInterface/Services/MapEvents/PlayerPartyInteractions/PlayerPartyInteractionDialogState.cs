@@ -32,6 +32,7 @@ public static class PlayerPartyInteractionDialogState
     public static bool ResponderAcceptedTrade => hasState && currentState.ResponderAcceptedTrade;
     public static bool IsHostile => hasState && currentState.IsHostile;
     public static bool HasActiveState => hasState;
+    internal static bool IsInitiator => hasState && currentState.IsInitiator;
 
     internal static void Apply(NetworkPlayerPartyInteractionState state)
     {

@@ -5,6 +5,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
+[Collection(PlayerPartyInteractionStaticsCollection.Name)]
 public class PlayerPartyInteractionDialogStateTests
 {
     [Fact]
