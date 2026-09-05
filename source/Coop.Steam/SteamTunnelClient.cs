@@ -16,6 +16,7 @@ public class SteamTunnelClient : IDisposable
     private static readonly ILogger Logger = LogManager.GetLogger<SteamTunnelClient>();
 
     private readonly ISteamTunnelTransport transport;
+    private readonly IReceivePathDiagnostics diagnostics;
     private readonly byte[] udpBuffer = new byte[SteamTunnel.MaxDatagramBytes];
     private readonly byte[] steamBuffer = new byte[SteamTunnel.MaxDatagramBytes];
 
@@ -30,9 +31,11 @@ public class SteamTunnelClient : IDisposable
     // udpBuffer, which nothing overwrites until the retry succeeds.
     private int pendingLength;
 
-    public SteamTunnelClient(ISteamTunnelTransport transport)
+    public SteamTunnelClient(ISteamTunnelTransport transport, IReceivePathDiagnostics diagnostics)
     {
         this.transport = transport;
+        if (diagnostics == null) throw new ArgumentNullException(nameof(diagnostics));
+        this.diagnostics = diagnostics;
         transport.ConnectionStateChanged += OnConnectionStateChanged;
     }
 
@@ -55,6 +58,7 @@ public class SteamTunnelClient : IDisposable
 
         connection = transport.ConnectToHost(hostSteamId, virtualPort);
 
+        diagnostics.Start(Logger, $"steam-client connection={connection} remoteSteamId={hostSteamId} localRelay=127.0.0.1:{LocalPort} virtualPort={virtualPort}");
         poller = new Poller(Update, SteamTunnel.PumpInterval);
         poller.Start();
 
@@ -66,20 +70,28 @@ public class SteamTunnelClient : IDisposable
     {
         PumpToSteam();
 
+        int forwardingBytes = 0;
         try
         {
             int size;
             while ((size = transport.ReceiveDatagram(connection, steamBuffer)) > 0)
             {
                 // Nothing has dialed the pump yet; the server never sends first, so drop.
-                if (clientEndpoint == null) continue;
+                diagnostics.Record(ReceivePathEvent.SteamReceive, size);
+                if (clientEndpoint == null)
+                {
+                    diagnostics.Record(ReceivePathEvent.NoEndpointDrop, size);
+                    continue;
+                }
 
-                socket.SendTo(steamBuffer, size, SocketFlags.None, clientEndpoint);
+                forwardingBytes = size;
+                int sent = socket.SendTo(steamBuffer, size, SocketFlags.None, clientEndpoint);
+                diagnostics.Record(sent == size ? ReceivePathEvent.UdpForwarded : ReceivePathEvent.UdpForwardFailed, sent);
             }
         }
-        catch (SocketException)
+        catch (SocketException ex)
         {
-            // A refused loopback send loses one datagram; LiteNetLib retransmits what matters.
+            diagnostics.Record(ReceivePathEvent.UdpForwardFailed, forwardingBytes, ex.SocketErrorCode);
         }
     }
 
@@ -97,10 +109,15 @@ public class SteamTunnelClient : IDisposable
 
         while (true)
         {
-            int length = TunnelSocket.TryReceiveFrom(socket, udpBuffer, ref receiveSender);
+            int length = TunnelSocket.TryReceiveFrom(socket, udpBuffer, ref receiveSender, diagnostics);
             if (length < 0) break;
             if (length == 0) continue;
 
+            if (clientEndpoint == null)
+            {
+                Logger.Information("[ReceivePath] utc={Utc:O} connection={Connection} localRelayPort={LocalPort} UDP destination learned target={Target}",
+                    DateTime.UtcNow, connection, LocalPort, receiveSender);
+            }
             clientEndpoint = receiveSender;
             bool droppable = SteamTunnel.IsDroppableDatagram(udpBuffer, length);
             if (!transport.SendDatagram(connection, udpBuffer, length, droppable))
@@ -137,5 +154,6 @@ public class SteamTunnelClient : IDisposable
         transport.CloseConnection(connection);
         transport.Dispose();
         socket?.Close();
+        diagnostics.End("client-disposed");
     }
 }
