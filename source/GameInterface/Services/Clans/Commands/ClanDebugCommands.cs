@@ -2,9 +2,12 @@
 using Autofac;
 using Common;
 using Common.Network;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using SandBox.GauntletUI;
 using System;
 using System.Collections.Generic;
@@ -16,6 +19,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.GameDebug.Commands
@@ -274,6 +278,91 @@ namespace GameInterface.Services.GameDebug.Commands
                 return Succeeded($"REFRESH_BURST_SENT party={args[0]} count={count}");
         }
     }
+
+        public sealed class ClanAddHeirsCoopCommand : ICoopCommand
+        {
+            public string Prefix => "coop.debug.clan";
+
+            public string Name => "add_heirs";
+
+            public string Description => "Creates eligible heirs for a registered player clan on the server.";
+
+            public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+            {
+                new ExpectedArgs("clan_id", "The registered player clan id."),
+                new ExpectedArgs("count", "The number of heirs to create, from 1 through 10."),
+            };
+
+            public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+            {
+                if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.clan.add_heirs"))
+                    return Failed(error);
+
+                if (!int.TryParse(args[1], out int count) || count < 1 || count > 10)
+                    return Failed($"Heir count must be an integer from 1 through 10: {args[1]}.");
+
+                if (!TryGetObjectManager(out var objectManager))
+                    return Failed($"Unable to resolve {nameof(IObjectManager)}");
+                if (!objectManager.TryGetObjectWithLogging(args[0], out Clan playerClan))
+                    return Failed($"Unable to resolve clan {args[0]}");
+
+                if (!playerClan.IsPlayerClan())
+                    return Failed("Targeted clan is not a player clan. Only add new heirs to player clans.");
+
+                Hero playerHero = playerClan.Leader;
+
+                var templates = playerHero.Culture?.LordTemplates?
+                    .Where(template => template != null)
+                    .ToList();
+                if (templates == null || templates.Count == 0)
+                    return Failed($"Player hero '{playerHero.StringId}' has no culture lord templates.");
+
+                int minimumAge = Campaign.Current.Models.AgeModel.HeroComesOfAge;
+                int maximumAge = Math.Max(minimumAge, 40);
+                var createdHeroes = new List<Hero>();
+
+                for (int i = 0; i < count; i++)
+                {
+                    int age = MBRandom.RandomInt(minimumAge, maximumAge + 1);
+                    var template = templates[MBRandom.RandomInt(templates.Count)];
+                    var relative = HeroCreator.CreateSpecialHero(
+                        template,
+                        playerHero.HomeSettlement ?? playerClan.HomeSettlement,
+                        playerClan,
+                        age: age);
+
+                    relative.SetNewOccupation(Occupation.Lord);
+                    if (playerHero.IsFemale)
+                        relative.Mother = playerHero;
+                    else
+                        relative.Father = playerHero;
+                    relative.ChangeState(Hero.CharacterStates.Active);
+                    createdHeroes.Add(relative);
+                }
+
+                Dictionary<Hero, int> eligibleHeirs = playerClan.GetHeirApparents();
+                var output = new StringBuilder();
+                int eligibleCount = 0;
+                foreach (var relative in createdHeroes)
+                {
+                    bool eligible = eligibleHeirs.TryGetValue(relative, out int selectionPoints);
+                    if (eligible) eligibleCount++;
+
+                    string heroId = objectManager.TryGetId(relative, out string registeredId)
+                        ? registeredId
+                        : relative.StringId;
+                    output.AppendLine(
+                        $"HEIR hero={heroId} name='{relative.Name}' age={relative.Age:F0} " +
+                        $"relation=child eligible={eligible} points={(eligible ? selectionPoints : 0)}");
+                }
+
+                output.Insert(
+                    0,
+                    $"ADD_HEIRS clan={args[0]} player={playerHero.StringId} " +
+                    $"created={createdHeroes.Count} eligible={eligibleCount}\n");
+                return Succeeded(output.ToString());
+            }
+        }
 
         // coop.debug.clan.list
         /// <summary>

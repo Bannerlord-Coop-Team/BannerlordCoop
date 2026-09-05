@@ -8,6 +8,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using System;
 using Xunit;
@@ -110,6 +111,18 @@ public class ConnectionMessageQueueTests
 
         queue.Flush(peer);
         Assert.True(NothingSentTo(peer));
+    }
+
+    [Fact]
+    public void PlayerDeletionStopsWorldAndCampaignTimeBroadcasts()
+    {
+        var peer = Connect();
+
+        messageBroker.Publish(this, new PlayerDeletionStarted(peer));
+
+        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
+        Assert.True(queue.TryHandleBroadcast(peer, new FakeCampaignTimePacket()));
+        Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
     }
 
     [Fact]

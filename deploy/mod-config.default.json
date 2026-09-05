@@ -65,10 +65,10 @@
     // Realistic: Enable battle death for all heroes
     "battleDeath": "VeryEasy",
 
-    // (Not currently supported) Toggle aging, births and natural deaths.
+    // Toggle aging, births and natural deaths.
     // NOTE: Having this off doesn't necessarily disable battle deaths
     // To disable battle deaths change "battleDeath" and "clanMemberDeathChance" instead
-    "birthAndDeath": false,
+    "birthAndDeath": true,
 
     // Toggle auto allocation of perks for members of player clans.
     "autoAllocateClanMemberPerks": false
@@ -179,6 +179,11 @@
     // This includes player companions and family members.
     // Default is false and won't have any effect if enableHeroExecutions is false.
     "enablePlayerClanMemberExecutions": false,
+
+    // Toggle players being able to execute each other.
+    // WARNING: The only requirement for doing this is having another player as prisoner.
+    // Default is false and won't have any effect if enableHeroExecutions is false.
+    "enablePlayerExecutions": false,
 
     // Toggle player nameplates in co-op missions.
     // (Default) true: Clients may show nameplates above allied remote players.
