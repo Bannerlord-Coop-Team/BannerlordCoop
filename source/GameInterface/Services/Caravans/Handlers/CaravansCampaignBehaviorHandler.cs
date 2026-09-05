@@ -15,6 +15,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Caravans.Handlers;
 
@@ -290,9 +292,24 @@ internal class CaravansCampaignBehaviorHandler : IHandler
         return true;
     }
 
-    private bool UnpackTradeActionLogData(TradeActionLogData tradeActionLogData, out CaravansCampaignBehavior.TradeActionLog tradeActionLog)
+    internal bool UnpackTradeActionLogData(TradeActionLogData tradeActionLogData, out CaravansCampaignBehavior.TradeActionLog tradeActionLog)
     {
         tradeActionLog = new();
+
+        // The preceding queued crafted-item creation must run before these native lookups.
+        var itemData = tradeActionLogData.ItemRosterElement;
+        var item = string.IsNullOrEmpty(itemData.ItemObjectId)
+            ? null
+            : MBObjectManager.Instance.GetObject<ItemObject>(itemData.ItemObjectId);
+        var modifier = string.IsNullOrEmpty(itemData.ItemModifierId)
+            ? null
+            : MBObjectManager.Instance.GetObject<ItemModifier>(itemData.ItemModifierId);
+        if (item == null || (!string.IsNullOrEmpty(itemData.ItemModifierId) && modifier == null))
+        {
+            Logger.Debug("Skipping caravan trade record with unavailable item {ItemId} or modifier {ModifierId}",
+                itemData.ItemObjectId, itemData.ItemModifierId);
+            return false;
+        }
 
         Settlement boughtSettlement = null;
         if (tradeActionLogData.BoughtSettlementId != null && !objectManager.TryGetObjectWithLogging(tradeActionLogData.BoughtSettlementId, out boughtSettlement)) return false;
@@ -305,7 +322,7 @@ internal class CaravansCampaignBehaviorHandler : IHandler
             BoughtSettlement = boughtSettlement,
             BuyPrice = tradeActionLogData.BuyPrice,
             SellPrice = tradeActionLogData.SellPrice,
-            ItemRosterElement = tradeActionLogData.ItemRosterElement,
+            ItemRosterElement = new ItemRosterElement(item, itemData.Amount, modifier),
             SoldSettlement = soldSettlement,
             BoughtTime = tradeActionLogData.BoughtTime
         };
