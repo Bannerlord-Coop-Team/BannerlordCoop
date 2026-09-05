@@ -1,7 +1,10 @@
 ﻿using HarmonyLib;
 using SandBox.View.Map;
 using System;
+using System.Collections.Generic;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ViewModelCollection.Information;
@@ -17,7 +20,23 @@ internal static class ClanManagementVMPatches
     [HarmonyPostfix]
     public static void ConstructorPostfix(ClanManagementVM __instance)
     {
+        __instance.RenownHint = new BasicTooltipViewModel(() => CampaignUIHelper.GetClanRenownTooltip(__instance._clan));
         RefreshValuesPostfix(__instance);
+    }
+
+    [HarmonyPatch(typeof(ClanManagementVM), MethodType.Constructor,
+        typeof(Action), typeof(Action<Hero>), typeof(Action<Hero>), typeof(Action))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> ConstructorTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        return ReplacePlayerClan(instructions, 5);
+    }
+
+    [HarmonyPatch(typeof(ClanManagementVM), nameof(ClanManagementVM.RefreshValues))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> RefreshValuesTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        return ReplacePlayerClan(instructions, 1);
     }
 
     [HarmonyPatch(typeof(ClanManagementVM), nameof(ClanManagementVM.RefreshValues))]
@@ -60,5 +79,30 @@ internal static class ClanManagementVMPatches
     public static bool OpenBannerEditorScreenPrefix()
     {
         return SharedClanPermissions.CanManageClan(Hero.MainHero.Clan);
+    }
+
+    private static IEnumerable<CodeInstruction> ReplacePlayerClan(IEnumerable<CodeInstruction> instructions, int expectedReplacements)
+    {
+        var playerClanGetter = AccessTools.PropertyGetter(typeof(Clan), nameof(Clan.PlayerClan));
+        var clanField = AccessTools.Field(typeof(ClanManagementVM), nameof(ClanManagementVM._clan));
+        int replacements = 0;
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(playerClanGetter))
+            {
+                instruction.opcode = OpCodes.Ldarg_0;
+                instruction.operand = null;
+                yield return instruction;
+                yield return new CodeInstruction(OpCodes.Ldfld, clanField);
+                replacements++;
+            }
+            else
+            {
+                yield return instruction;
+            }
+        }
+
+        if (replacements != expectedReplacements)
+            throw new InvalidOperationException($"Expected {expectedReplacements} player clan lookups in clan management, found {replacements}.");
     }
 }
