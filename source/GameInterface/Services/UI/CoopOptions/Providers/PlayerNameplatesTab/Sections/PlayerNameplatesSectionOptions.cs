@@ -5,13 +5,14 @@ namespace GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab.Se
 /// <summary>Stores the client's optional nameplate preference.</summary>
 public class PlayerNameplatesSectionOptions
 {
-    public const bool DefaultShowPlayerNameplates = true;
+    public const PlayerNameplatesDisplayMode DefaultDisplayMode = PlayerNameplatesDisplayMode.Always;
 
     [JsonPropertyName("showPlayerNameplates")]
-    public bool? ShowPlayerNameplates { get; set; }
+    [JsonConverter(typeof(PlayerNameplatesDisplayModeConverter))]
+    public PlayerNameplatesDisplayMode? DisplayMode { get; set; }
 
-    public bool GetShowPlayerNameplatesOrDefault()
+    public PlayerNameplatesDisplayMode GetDisplayModeOrDefault()
     {
-        return ShowPlayerNameplates ?? DefaultShowPlayerNameplates;
+        return DisplayMode ?? DefaultDisplayMode;
     }
 }
