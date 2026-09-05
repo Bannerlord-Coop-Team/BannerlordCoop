@@ -67,6 +67,96 @@ public class PlayerNameplatesOptionsTests
         }
     }
 
+    [Theory]
+    [InlineData(true, PlayerNameplatesDisplayMode.Always)]
+    [InlineData(false, PlayerNameplatesDisplayMode.Never)]
+    public void PlayerNameplates_LegacyBool_MapsToDisplayMode(bool legacyValue, PlayerNameplatesDisplayMode expected)
+    {
+        string filePath = CreateTempFilePath();
+
+        try
+        {
+            File.WriteAllText(
+                filePath,
+                "{\""
+                    + PlayerNameplatesOptionsTabProvider.TabId
+                    + "\":{\""
+                    + PlayerNameplatesSection.SectionId
+                    + "\":{\"showPlayerNameplates\":"
+                    + (legacyValue ? "true" : "false")
+                    + "}}}");
+
+            var store = new CoopOptionsStore(filePath);
+
+            Assert.Equal(expected, PlayerNameplatesOptionsTabProvider.GetDisplayModeOrDefault(store.LoadOrDefault()));
+        }
+        finally
+        {
+            if (File.Exists(filePath)) File.Delete(filePath);
+        }
+    }
+
+    [Theory]
+    [InlineData("\"Always\"", PlayerNameplatesDisplayMode.Always)]
+    [InlineData("\"HoldIndicators\"", PlayerNameplatesDisplayMode.HoldIndicators)]
+    [InlineData("\"Never\"", PlayerNameplatesDisplayMode.Never)]
+    public void PlayerNameplates_DisplayMode_RoundTripsUnderLegacyKey(string jsonValue, PlayerNameplatesDisplayMode expected)
+    {
+        string filePath = CreateTempFilePath();
+
+        try
+        {
+            File.WriteAllText(
+                filePath,
+                "{\""
+                    + PlayerNameplatesOptionsTabProvider.TabId
+                    + "\":{\""
+                    + PlayerNameplatesSection.SectionId
+                    + "\":{\"showPlayerNameplates\":"
+                    + jsonValue
+                    + "}}}");
+
+            var store = new CoopOptionsStore(filePath);
+
+            Assert.Equal(expected, PlayerNameplatesOptionsTabProvider.GetDisplayModeOrDefault(store.LoadOrDefault()));
+        }
+        finally
+        {
+            if (File.Exists(filePath)) File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public void PlayerNameplates_Apply_PersistsUnderLegacyKey()
+    {
+        string filePath = CreateTempFilePath();
+
+        try
+        {
+            var store = new CoopOptionsStore(filePath);
+            using var messageBroker = new MessageBroker();
+            var provider = new PlayerNameplatesOptionsTabProvider();
+            var tab = provider.CreateTab(store.LoadOrDefault(), messageBroker, _ => { });
+            var section = Assert.IsType<PlayerNameplatesSection>(Assert.Single(tab.Sections));
+
+            section.DisplayModeSelector.SelectedIndex = (int)PlayerNameplatesDisplayMode.HoldIndicators;
+            var options = store.LoadOrDefault();
+            tab.Apply(options);
+            store.Save(options);
+
+            string saved = File.ReadAllText(filePath);
+            Assert.Contains("\"showPlayerNameplates\"", saved);
+            Assert.DoesNotContain("playerNameplatesDisplayMode", saved);
+            Assert.Equal(
+                PlayerNameplatesDisplayMode.HoldIndicators,
+                PlayerNameplatesOptionsTabProvider.GetDisplayModeOrDefault(store.LoadOrDefault()));
+        }
+        finally
+        {
+            if (File.Exists(filePath)) File.Delete(filePath);
+        }
+    }
+
     [Fact]
     public void ServerDisabled_HidesPlayerNameplatesTab()
     {

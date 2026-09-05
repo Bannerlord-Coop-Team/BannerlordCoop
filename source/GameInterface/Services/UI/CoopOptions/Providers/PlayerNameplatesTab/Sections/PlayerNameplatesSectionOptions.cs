@@ -7,8 +7,8 @@ public class PlayerNameplatesSectionOptions
 {
     public const PlayerNameplatesDisplayMode DefaultDisplayMode = PlayerNameplatesDisplayMode.Always;
 
-    [JsonPropertyName("playerNameplatesDisplayMode")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonPropertyName("showPlayerNameplates")]
+    [JsonConverter(typeof(PlayerNameplatesDisplayModeConverter))]
     public PlayerNameplatesDisplayMode? DisplayMode { get; set; }
 
     public PlayerNameplatesDisplayMode GetDisplayModeOrDefault()
