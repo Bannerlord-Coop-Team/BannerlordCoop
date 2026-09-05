@@ -40,6 +40,22 @@
       <Link>mod-config.default.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\mb2\Modules\SandBox\GUI\Prefabs\Clan\ClanMembers.xml">
+      <Link>ClanMembers.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\deploy\ModuleData\global_strings.xml">
+      <Link>global_strings.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\deploy\SubModule.xml">
+      <Link>coop_SubModule.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\mb2\Modules\Native\ModuleData\module_strings.xml">
+      <Link>native_module_strings.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.2.0" />

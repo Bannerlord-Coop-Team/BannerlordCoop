@@ -2,5 +2,10 @@
 <strings>
     <string id="str_coop_server_managed_player_received_damage" text="{=!}Managing this option is disabled on clients; the server does this." />
     <string id="coop_wanderer_alley_orders" text="Do you have any orders for your alley, {?PLAYER.GENDER}madam{?}sir{\?}" />
+    <string id="str_coop_clan_players" text="{=str_coop_clan_players}Players" />
+    <string id="str_coop_clan_other_families" text="{=str_coop_clan_other_families}Other Families" />
+    <string id="str_coop_clan_player" text="{=str_coop_clan_player}Player" />
+    <string id="str_coop_clan_player_leader" text="{=str_coop_clan_player_leader}Player · Clan leader" />
+    <string id="str_coop_clan_player_self" text="{=str_coop_clan_player_self}{ROLE} (You)" />
     <!-- Add other custom text here in the future-->
 </strings>
