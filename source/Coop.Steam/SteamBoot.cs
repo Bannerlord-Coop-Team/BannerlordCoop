@@ -75,7 +75,7 @@ public static class SteamBoot
         JoinListener = new SteamJoinListener(messageBroker, lobbyApi);
         LobbyBrowser = new SteamLobbyBrowser(lobbyApi);
         Common.Network.Session.SessionDiscovery.SteamLobbyBrowser = LobbyBrowser;
-        TunnelPreparer = new SteamTunnelJoinEndpointPreparer();
+        TunnelPreparer = new SteamTunnelJoinEndpointPreparer(() => new ReceivePathDiagnostics());
         JoinListener.ProcessLaunchArguments(commandLine);
     }
 }

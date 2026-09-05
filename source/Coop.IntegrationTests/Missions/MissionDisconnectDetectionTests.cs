@@ -168,7 +168,7 @@ public class MissionDisconnectDetectionTests
             controllerIdProvider.Object,
             steamBridge.Object,
             movementPacketCompressor.Object,
-            new ReliableMessageBatcher<string>(serializer.Object));
+            new ReliableMessageBatcher<string>(serializer.Object), () => new Common.Logging.ReceivePathDiagnostics());
 
         var droppedPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 55001), 1);
 

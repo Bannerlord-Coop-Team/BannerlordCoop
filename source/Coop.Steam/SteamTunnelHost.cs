@@ -24,6 +24,7 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
     private sealed class TunnelPeer
     {
         public Socket Socket;
+        public IReceivePathDiagnostics Diagnostics;
         public IPEndPoint ServerPeerEndpoint;
         public ulong RemoteSteamId;
         public byte[] PendingDatagram = new byte[SteamTunnel.MaxDatagramBytes];
@@ -31,6 +32,7 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
     }
 
     private readonly ISteamTunnelTransport transport;
+    private readonly Func<IReceivePathDiagnostics> diagnosticsFactory;
     private readonly object gate = new object();
     private readonly HashSet<uint> connectingConnections = new HashSet<uint>();
     private readonly Dictionary<uint, TunnelPeer> peers = new Dictionary<uint, TunnelPeer>();
@@ -51,9 +53,11 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
     private const int StatsLogTicks = 5000;
     private int ticksSinceStatsLog;
 
-    public SteamTunnelHost(ISteamTunnelTransport transport)
+    public SteamTunnelHost(ISteamTunnelTransport transport, Func<IReceivePathDiagnostics> diagnosticsFactory)
     {
         this.transport = transport;
+        if (diagnosticsFactory == null) throw new ArgumentNullException(nameof(diagnosticsFactory));
+        this.diagnosticsFactory = diagnosticsFactory;
         transport.ConnectionStateChanged += OnConnectionStateChanged;
     }
 
@@ -87,6 +91,7 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
     {
         if (listening) return;
 
+        ticksSinceStatsLog = 0;
         serverEndpoint = new IPEndPoint(IPAddress.Loopback, serverPort);
         transport.EnsureRelayAccess();
         transport.ListenForClients(virtualPort);
@@ -149,6 +154,7 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
         {
             transport.CloseConnection(peer.Key);
             peer.Value.Socket.Close();
+            peer.Value.Diagnostics.End("host-stopped");
         }
 
         Logger.Information("Steam tunnel host stopped");
@@ -198,9 +204,12 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
                         {
                             identityResolver.TryGetRemoteSteamId(connection, out steamId);
                         }
+                        var diagnostics = diagnosticsFactory();
+                        diagnostics.Start(Logger, $"steam-host connection={connection} remoteSteamId={steamId} localRelay={serverPeerEndpoint} target={serverEndpoint}");
                         peers[connection] = new TunnelPeer
                         {
                             Socket = socket,
+                            Diagnostics = diagnostics,
                             ServerPeerEndpoint = serverPeerEndpoint,
                             RemoteSteamId = steamId,
                         };
@@ -238,6 +247,7 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
 
     private void RemovePeerLocked(uint connection, TunnelPeer peer)
     {
+        peer.Diagnostics.End("peer-removed");
         peers.Remove(connection);
         remoteSteamIds.Remove(peer.ServerPeerEndpoint);
         peerSnapshot = peers.ToArray();
@@ -257,6 +267,8 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
 
         foreach (var peer in peerSnapshot)
         {
+            bool forwarding = false;
+            int forwardingBytes = 0;
             try
             {
                 PumpToSteam(peer.Key, peer.Value);
@@ -264,17 +276,22 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
                 int size;
                 while ((size = transport.ReceiveDatagram(peer.Key, steamBuffer)) > 0)
                 {
-                    peer.Value.Socket.Send(steamBuffer, size, SocketFlags.None);
+                    peer.Value.Diagnostics.Record(ReceivePathEvent.SteamReceive, size);
+                    forwarding = true;
+                    forwardingBytes = size;
+                    int sent = peer.Value.Socket.Send(steamBuffer, size, SocketFlags.None);
+                    peer.Value.Diagnostics.Record(sent == size ? ReceivePathEvent.UdpForwarded : ReceivePathEvent.UdpForwardFailed, sent);
+                    forwarding = false;
                 }
             }
             catch (ObjectDisposedException)
             {
-                // The Closed handler disposed this peer's socket mid-tick; the next tick's
-                // snapshot no longer contains it.
+                peer.Value.Diagnostics.Record(ReceivePathEvent.DisposedSocket);
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
-                // A refused loopback send loses one datagram; LiteNetLib retransmits what matters.
+                peer.Value.Diagnostics.Record(forwarding ? ReceivePathEvent.UdpForwardFailed : ReceivePathEvent.UdpReceiveError,
+                    forwarding ? forwardingBytes : 0, ex.SocketErrorCode);
             }
         }
     }
@@ -292,7 +309,7 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
         }
 
         int length;
-        while ((length = TunnelSocket.TryReceiveFrom(peer.Socket, serverBuffer, ref receiveSender)) >= 0)
+        while ((length = TunnelSocket.TryReceiveFrom(peer.Socket, serverBuffer, ref receiveSender, peer.Diagnostics)) >= 0)
         {
             if (length == 0) continue;
 
