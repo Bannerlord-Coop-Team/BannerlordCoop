@@ -63,21 +63,6 @@ internal class TimeCommands
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("verify_time_mode", "coop.debug")]
-    public static string VerifyTimeMode(List<string> strings)
-    {
-        if (strings.Count != 1 ||
-            !Enum.TryParse(strings[0], true, out TimeControlEnum expectedTimeMode))
-            return "Usage: coop.debug.verify_time_mode <Pause|Play_1x|Play_2x>";
-
-        if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface))
-            return "Failed to get time control interface";
-
-        return (timeControlInterface.GetTimeControl() == expectedTimeMode).ToString();
-    }
-#endif
-
-#if DEBUG
     [CommandLineArgumentFunction("request_time_mode", "coop.debug")]
     public static string RequestTimeMode(List<string> strings)
     {
