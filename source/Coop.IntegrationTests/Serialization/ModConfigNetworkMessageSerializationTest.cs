@@ -72,6 +72,7 @@ namespace Coop.IntegrationTests.Serialization
                 WandererLimitScalesWithPlayers = true,
                 PlayerKingdomClanTierRequired = 2,
                 SmithingStaminaRecoveryMultiplier = 2.5f,
+                SmithingCraftedItemsValueMultiplier = 3.5f,
                 MaximumLootersMultiplier = 0.25f,
                 LooterPartySizeMultiplier = 0.33f,
                 ShowPlayerNameplates = true,
@@ -88,6 +89,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(2, copy.PlayerKingdomClanTierRequired);
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
+            Assert.Equal(3.5f, copy.SmithingCraftedItemsValueMultiplier);
             Assert.Equal(0.25f, copy.MaximumLootersMultiplier);
             Assert.Equal(0.33f, copy.LooterPartySizeMultiplier);
             Assert.False(copy.PlayerWoundedBattleEntry);
@@ -114,6 +116,7 @@ namespace Coop.IntegrationTests.Serialization
             PlayerKingdomClanTierRequired = 0,
             SmithingStaminaRecoveryOutsideSettlements = false,
             SmithingStaminaRecoveryMultiplier = 0f,
+            SmithingCraftedItemsValueMultiplier = 0f,
             MaximumLootersMultiplier = 0f,
             LooterPartySizeMultiplier = 0f,
             ShowPlayerNameplates = false,
@@ -135,6 +138,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(0, copy.PlayerKingdomClanTierRequired);
             Assert.False(copy.SmithingStaminaRecoveryOutsideSettlements);
             Assert.Equal(0f, copy.SmithingStaminaRecoveryMultiplier);
+            Assert.Equal(0f, copy.SmithingCraftedItemsValueMultiplier);
             Assert.Equal(0f, copy.MaximumLootersMultiplier);
             Assert.Equal(0f, copy.LooterPartySizeMultiplier);
             Assert.False(copy.ShowPlayerNameplates);

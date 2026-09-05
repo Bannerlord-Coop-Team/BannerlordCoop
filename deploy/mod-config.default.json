@@ -146,6 +146,12 @@
     // Stamina is stored as an integer and ticks are rounded up to ensure heroes always recover some stamina.
     "smithingStaminaRecoveryMultiplier": 0.1,
 
+    // Set a multiplier for increasing/decreasing the value of items crafted by players.
+    // Use this option to nerf or buff gold obtained by selling crafted items.
+    // The vanilla rate is 1 and is the default.
+    // Negative values will default back to 1.0
+    "smithingCraftedItemsValueMultiplier": 1.0,
+
     // Set a multiplier for increasing/decreasing the number of looter/bandit parties.
     // The higher the multiplier, the more looter parties can exist on the map at a time.
     // WARNING: Setting this value too high will cause performance issues.
