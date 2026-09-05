@@ -25,7 +25,7 @@ internal class HeroDeveloperCommands
     /// <summary>
     /// Add skill xp to a hero with a skill object name.
     /// Examples:
-    /// coop.debug.herodeveloper.addskillxp RandomPlayer OneHanded 3000
+    /// coop.debug.hero_developer.add_skill_xp RandomPlayer OneHanded 3000
     /// </summary>
     public sealed class HeroDeveloperAddSkillXpCoopCommand : ICoopCommand
     {
@@ -71,7 +71,7 @@ internal class HeroDeveloperCommands
     /// <summary>
     /// Add attribute points to a hero.
     /// Example:
-    /// coop.debug.herodeveloper.addattributepoints RandomPlayer 10
+    /// coop.debug.hero_developer.add_attribute_points RandomPlayer 10
     /// </summary>
     public sealed class HeroDeveloperAddAttributePointsCoopCommand : ICoopCommand
     {
@@ -114,7 +114,7 @@ internal class HeroDeveloperCommands
     /// <summary>
     /// Add focus points to a hero.
     /// Example:
-    /// coop.debug.herodeveloper.addfocuspoints RandomPlayer 10
+    /// coop.debug.hero_developer.add_focus_points RandomPlayer 10
     /// </summary>
     public sealed class HeroDeveloperAddFocusPointsCoopCommand : ICoopCommand
     {
@@ -157,7 +157,7 @@ internal class HeroDeveloperCommands
     /// <summary>
     /// Reset all skills of a hero and give focus/attribute points back based on level.
     /// Example:
-    /// coop.debug.herodeveloper.resetskills
+    /// coop.debug.hero_developer.reset_skills
     /// </summary>
     public sealed class HeroDeveloperResetSkillsCoopCommand : ICoopCommand
     {

@@ -7,7 +7,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Party.Patches;
 
 /// <summary>
-/// Debug-only: for parties flagged by coop.debug.mobileparty.siege_buff, forces a high map speed and a
+/// Debug-only: for parties flagged by coop.debug.mobile_party.siege_buff, forces a high map speed and a
 /// huge party size limit so the added troops don't desert back down to the normal cap. Both postfixes
 /// are no-ops unless the cheat has flagged a party (the set is empty in normal play) and only run where
 /// the flag was set (the server).

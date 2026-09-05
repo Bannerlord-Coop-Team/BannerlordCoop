@@ -40,6 +40,11 @@ namespace Coop.Tests.Autofac
             Assert.Contains(registeredCommands, command =>
                 $"{command.Prefix}.{command.Name}" == "coop.debug.map_event.kms");
 
+            ICoopCommandRegistry commandRegistry = container.Resolve<ICoopCommandRegistry>();
+            Assert.True(commandRegistry.Contains("coop.debug.herodeveloper.addattributepoints"));
+            Assert.Equal(
+                "coop.debug.hero_developer.add_attribute_points",
+                commandRegistry.LegacyAliases["coop.debug.herodeveloper.addattributepoints"]);
             ICoopCommand[] missionCommands = registeredCommands
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
                 .ToArray();
@@ -72,6 +77,12 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+
+            ICoopCommandRegistry serverCommands = container.Resolve<ICoopCommandRegistry>();
+            Assert.True(serverCommands.Contains("coop.debug.herodeveloper.addattributepoints"));
+            Assert.Equal(
+                "coop.debug.hero_developer.add_attribute_points",
+                serverCommands.LegacyAliases["coop.debug.herodeveloper.addattributepoints"]);
 
 #if DEBUG
             ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();

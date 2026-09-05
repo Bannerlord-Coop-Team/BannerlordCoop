@@ -298,7 +298,7 @@ internal class PostBattleFreezeFixtureCommands
             fixture.ProbeStartedAt = CampaignTime.Now;
             timeControl.ServerSetTimeControl(TimeControlEnum.Play_1x);
             return Succeeded($"Post-battle unpause requested at {fixture.ProbeStartedAt.NumTicks} ticks. " +
-                   "Submit coop.debug.mobileparty.move_offset 0.5 0 on both clients, then check fixture state.");
+                   "Submit coop.debug.mobile_party.move_offset 0.5 0 on both clients, then check fixture state.");
         }
     }
 

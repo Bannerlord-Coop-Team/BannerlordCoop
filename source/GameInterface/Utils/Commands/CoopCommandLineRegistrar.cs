@@ -89,31 +89,42 @@ public sealed class CoopCommandLineRegistrar : ICoopCommandLineRegistrar
     {
         foreach (CoopCommandDescriptor descriptor in commandRegistry.Commands)
         {
-            string fullName = descriptor.FullName;
-            object previousRegistration = null;
-            if (gameCommands.Contains(fullName))
-            {
-                previousRegistration = gameCommands[fullName];
-                // Reconnects and tests may temporarily have overlapping session lifetime scopes.
-                if (!TryGetOwningRegistrar(previousRegistration, out _))
-                    throw new InvalidOperationException($"The command '{fullName}' is already registered with the game.");
-            }
-
-            var invoker = new GameCommandInvoker(this, fullName);
-            Func<List<string>, string> commandDelegate = invoker.ProcessCommand;
-            object gameCommand = Activator.CreateInstance(
-                gameCommandType,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                null,
-                new object[] { commandDelegate },
-                null);
-            if (gameCommand == null)
-                throw new InvalidOperationException($"Unable to create a game registration for '{fullName}'.");
-
-            gameCommands[fullName] = gameCommand;
-            registrations.Add(fullName, new Registration(gameCommand, previousRegistration));
-            rglCommandLineRegistry.RegisterCommand(fullName);
+            RegisterCommand(descriptor.FullName, descriptor.FullName);
         }
+
+        IReadOnlyDictionary<string, string> legacyAliases =
+            commandRegistry.LegacyAliases ?? new Dictionary<string, string>();
+        foreach (KeyValuePair<string, string> alias in legacyAliases)
+        {
+            RegisterCommand(alias.Key, alias.Value);
+        }
+    }
+
+    private void RegisterCommand(string registeredName, string targetFullName)
+    {
+        object previousRegistration = null;
+        if (gameCommands.Contains(registeredName))
+        {
+            previousRegistration = gameCommands[registeredName];
+            // Reconnects and tests may temporarily have overlapping session lifetime scopes.
+            if (!TryGetOwningRegistrar(previousRegistration, out _))
+                throw new InvalidOperationException($"The command '{registeredName}' is already registered with the game.");
+        }
+
+        var invoker = new GameCommandInvoker(this, targetFullName);
+        Func<List<string>, string> commandDelegate = invoker.ProcessCommand;
+        object gameCommand = Activator.CreateInstance(
+            gameCommandType,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            null,
+            new object[] { commandDelegate },
+            null);
+        if (gameCommand == null)
+            throw new InvalidOperationException($"Unable to create a game registration for '{registeredName}'.");
+
+        gameCommands[registeredName] = gameCommand;
+        registrations.Add(registeredName, new Registration(gameCommand, previousRegistration));
+        rglCommandLineRegistry.RegisterCommand(registeredName);
     }
 
     private string ProcessCommand(string fullName, IEnumerable<string> tokens)
