@@ -42,7 +42,7 @@ public class LiveTestCommandDispatcherTests
     [Fact]
     public void Execute_WhenFrameworkCommandExists_PreservesStructuredArguments()
     {
-        const string commandName = "coop.debug.live_testing_dispatcher_test.framework_capture";
+        const string commandName = "coop.live_testing_dispatcher_test.framework_capture";
         var registry = new CoopCommandRegistry(
             new[] { new FrameworkCaptureCommand() },
             Mock.Of<ILogger>());
@@ -55,6 +55,7 @@ public class LiveTestCommandDispatcherTests
 
         LiveTestCommandResult result = dispatcher.Execute(commandName, arguments);
 
+        Assert.Contains(commandName, dispatcher.GetCommandNames());
         Assert.True(result.Found);
         Assert.Equal("argument with spaces|quoted \"value\"", result.Output);
     }
@@ -96,7 +97,7 @@ public class LiveTestCommandDispatcherTests
         LiveTestCommandResult result = new LiveTestCommandDispatcher().Execute(NonDebugCommand, new List<string>());
 
         Assert.False(result.Found);
-        Assert.Equal("Only coop.debug. commands may be run through live testing", result.Output);
+        Assert.Equal("Only registered co-op commands and legacy coop.debug.* commands may be run through live testing", result.Output);
         Assert.Equal(0, nonDebugInvocations);
     }
 
@@ -115,7 +116,7 @@ public class LiveTestCommandDispatcherTests
 
     private sealed class FrameworkCaptureCommand : ICoopCommand
     {
-        public string Prefix => "coop.debug.live_testing_dispatcher_test";
+        public string Prefix => "coop.live_testing_dispatcher_test";
 
         public string Name => "framework_capture";
 

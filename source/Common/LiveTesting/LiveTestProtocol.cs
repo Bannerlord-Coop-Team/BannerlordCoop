@@ -240,6 +240,8 @@ public sealed class LiveTestProcessInfo
     public string PlatformId { get; set; }
 
     public string RunToken { get; set; }
+
+    public DateTime ProcessStartedUtc { get; set; }
 }
 
 public sealed class LiveTestError
