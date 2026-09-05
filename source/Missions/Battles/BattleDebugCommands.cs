@@ -56,7 +56,107 @@ internal static class BattleDebugCommands
 
     private sealed class BattleDebugTickBehavior : MissionBehavior
     {
+#if DEBUG
+        private readonly Dictionary<Agent, OwnedAgentMovementDriveState> ownedAgentMovementDriveStates =
+            new Dictionary<Agent, OwnedAgentMovementDriveState>();
+        private Mission ownedAgentMovementDriveMission;
+        private float ownedAgentMovementDriveEndTime;
+#endif
+
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
+
+#if DEBUG
+        public void BeginOwnedAgentMovementDrive(
+            Mission mission,
+            IEnumerable<Agent> agents,
+            float durationSeconds)
+        {
+            CancelOwnedAgentMovementDrive();
+            if (mission == null)
+                return;
+
+            ownedAgentMovementDriveMission = mission;
+            foreach (Agent agent in agents)
+            {
+                if (!CanDriveOwnedAgent(agent, mission))
+                    continue;
+
+                bool applyAiDrive = agent.Controller == AgentControllerType.AI;
+                AgentMovementLockedState movementLockedState = applyAiDrive
+                    ? agent.MovementLockedState
+                    : AgentMovementLockedState.None;
+                ownedAgentMovementDriveStates.Add(agent, new OwnedAgentMovementDriveState
+                {
+                    LocomotionFlags = Missions.Agents.Packets.AgentData.GetLocomotionMovementFlags(
+                        agent.MovementFlags),
+                    MovementInput = agent.MovementInputVector,
+                    ApplyAiDrive = applyAiDrive,
+                    IsAiPaused = applyAiDrive && agent.IsPaused,
+                    MovementLockedState = movementLockedState,
+                    TargetPosition = movementLockedState == AgentMovementLockedState.None
+                        ? default
+                        : agent.GetTargetPosition(),
+                    TargetDirection = movementLockedState == AgentMovementLockedState.FrameLocked
+                        ? agent.GetTargetDirection()
+                        : default,
+                });
+                ApplyOwnedAgentMovementDrive(agent, applyAiDrive);
+            }
+
+            ownedAgentMovementDriveEndTime = mission.CurrentTime + durationSeconds;
+        }
+
+        public void CancelOwnedAgentMovementDrive()
+        {
+            foreach (KeyValuePair<Agent, OwnedAgentMovementDriveState> entry in
+                     ownedAgentMovementDriveStates)
+            {
+                if (!CanDriveOwnedAgent(entry.Key, ownedAgentMovementDriveMission))
+                    continue;
+
+                bool restoreAiDrive = entry.Value.ApplyAiDrive
+                    && entry.Key.Controller == AgentControllerType.AI;
+                if (entry.Value.ApplyAiDrive && !restoreAiDrive)
+                    entry.Key.ClearTargetFrame();
+                RestoreOwnedAgentMovementDrive(
+                    entry.Key,
+                    entry.Value.LocomotionFlags,
+                    entry.Value.MovementInput,
+                    restoreAiDrive,
+                    entry.Value.IsAiPaused,
+                    entry.Value.MovementLockedState,
+                    entry.Value.TargetPosition,
+                    entry.Value.TargetDirection);
+            }
+
+            ownedAgentMovementDriveStates.Clear();
+            ownedAgentMovementDriveMission = null;
+            ownedAgentMovementDriveEndTime = 0f;
+        }
+
+        public override void OnPreMissionTick(float dt)
+        {
+            if (ownedAgentMovementDriveStates.Count == 0)
+                return;
+            if (!ReferenceEquals(ownedAgentMovementDriveMission, Mission)
+                || Mission.CurrentTime >= ownedAgentMovementDriveEndTime)
+            {
+                CancelOwnedAgentMovementDrive();
+                return;
+            }
+
+            foreach (KeyValuePair<Agent, OwnedAgentMovementDriveState> entry in
+                     ownedAgentMovementDriveStates)
+            {
+                if (CanDriveOwnedAgent(entry.Key, ownedAgentMovementDriveMission))
+                {
+                    entry.Value.ApplyAiDrive = ApplyOwnedAgentMovementDrive(
+                        entry.Key,
+                        entry.Value.ApplyAiDrive);
+                }
+            }
+        }
+#endif
 
         public override void OnPreDisplayMissionTick(float dt)
         {
@@ -85,6 +185,9 @@ internal static class BattleDebugCommands
 
         public override void OnRemoveBehavior()
         {
+#if DEBUG
+            CancelOwnedAgentMovementDrive();
+#endif
             if (ReferenceEquals(battleDebugTickBehavior, this))
                 battleDebugTickBehavior = null;
         }
@@ -107,6 +210,19 @@ internal static class BattleDebugCommands
     }
 
 #if DEBUG
+    private sealed class OwnedAgentMovementDriveState
+    {
+        public Agent.MovementControlFlag LocomotionFlags { get; set; }
+        public Vec2 MovementInput { get; set; }
+        public bool ApplyAiDrive { get; set; }
+        public bool IsAiPaused { get; set; }
+        public AgentMovementLockedState MovementLockedState { get; set; }
+        public Vec2 TargetPosition { get; set; }
+        public Vec3 TargetDirection { get; set; }
+    }
+
+    private const float OwnedAgentMovementDriveAcceleration = 4f;
+    private const float OwnedAgentMovementDriveTargetDistance = 20f;
     private static Agent wieldTestAgent;
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
@@ -935,6 +1051,153 @@ internal static class BattleDebugCommands
             return Succeeded($"Charged {formations.Length} locally owned formation(s) with {ownedAgents.Length} active agent(s)");
         }
     }
+
+#if DEBUG
+    public sealed class DriveOwnedAgentsCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+
+        public string Name => "drive_owned_agents";
+
+        public string Description => "Drives locally authoritative agents for a bounded duration.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("seconds", "The duration in seconds."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!int.TryParse(
+                    args[0],
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int durationSeconds)
+                || durationSeconds < 3
+                || durationSeconds > 30)
+            {
+                return Failed("Usage: coop.debug.battle.drive_owned_agents <seconds: 3-30>");
+            }
+
+            Mission mission = Mission.Current;
+            CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
+            if (mission == null || controller == null)
+                return Failed("No active coop battle mission");
+            if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+                return Failed("Network agent registry is unavailable");
+
+            string controllerId = controller.Session.OwnControllerId;
+            CoopAgentInfo[] ownedAgents = registry.GetAgents(controllerId)
+                .Where(info => info.OriginalOwner == controllerId)
+                .Where(info => info.CurrentAuthority == controllerId)
+                .Where(info => info.Agent != null
+                    && info.Agent.Mission == mission
+                    && info.Agent.IsActive())
+                .ToArray();
+            CoopAgentInfo[] driveAgents = ownedAgents
+                .Where(info => !info.Agent.IsMount)
+                .ToArray();
+            if (driveAgents.Length == 0)
+                driveAgents = ownedAgents;
+            if (driveAgents.Length == 0)
+                return Failed("The local player has no active authoritative agents");
+
+            ObserveMission(mission);
+            EnsureBattleDebugTickBehavior(mission);
+            battleDebugTickBehavior.BeginOwnedAgentMovementDrive(
+                mission,
+                driveAgents.Select(info => info.Agent),
+                durationSeconds);
+
+            string structuredState = JsonConvert.SerializeObject(new
+            {
+                success = true,
+                controllerId,
+                durationSeconds,
+                agentCount = driveAgents.Length,
+                agentIds = driveAgents.Select(info => info.AgentId.ToString("D")).ToArray(),
+            });
+            return Succeeded($"DRIVING_OWNED_AGENTS controller={controllerId}|seconds={durationSeconds}|" +
+                $"agents={driveAgents.Length}\nLIVE_TEST_JSON={structuredState}");
+        }
+    }
+
+    internal static bool ApplyOwnedAgentMovementDrive(Agent agent, bool applyAiDrive)
+    {
+        if (applyAiDrive && agent.Controller != AgentControllerType.AI)
+        {
+            agent.ClearTargetFrame();
+            applyAiDrive = false;
+        }
+        if (applyAiDrive)
+            agent.SetIsAIPaused(false);
+
+        Missions.Agents.Packets.AgentData.ApplyLocomotionMovementFlags(
+            agent,
+            Agent.MovementControlFlag.Forward);
+        Missions.Agents.Packets.AgentData.ApplyMovementInput(agent, Vec2.Forward);
+
+        // Local player input is overwritten by the client control loop, so drive this DEBUG fixture natively.
+        Vec3 acceleration = new Vec3(agent.LookDirection.X, agent.LookDirection.Y, 0f);
+        if (acceleration.LengthSquared <= 0.0001f)
+            acceleration = new Vec3(Vec2.Forward.X, Vec2.Forward.Y, 0f);
+        else
+            acceleration.Normalize();
+
+        if (applyAiDrive)
+        {
+            Vec2 direction = acceleration.AsVec2;
+            Vec2 targetPosition = agent.Position.AsVec2 +
+                (direction * OwnedAgentMovementDriveTargetDistance);
+            agent.SetTargetPositionAndDirection(in targetPosition, in acceleration);
+        }
+
+        acceleration = new Vec3(
+            acceleration.X * OwnedAgentMovementDriveAcceleration,
+            acceleration.Y * OwnedAgentMovementDriveAcceleration,
+            0f);
+        agent.AddAcceleration(in acceleration);
+        return applyAiDrive;
+    }
+
+    internal static void RestoreOwnedAgentMovementDrive(
+        Agent agent,
+        Agent.MovementControlFlag locomotionFlags,
+        Vec2 movementInput,
+        bool restoreAiDrive,
+        bool isAiPaused,
+        AgentMovementLockedState movementLockedState,
+        Vec2 targetPosition,
+        Vec3 targetDirection)
+    {
+        if (restoreAiDrive)
+        {
+            agent.SetIsAIPaused(isAiPaused);
+            switch (movementLockedState)
+            {
+                case AgentMovementLockedState.PositionLocked:
+                    agent.SetTargetPosition(targetPosition);
+                    break;
+                case AgentMovementLockedState.FrameLocked:
+                    agent.SetTargetPositionAndDirection(in targetPosition, in targetDirection);
+                    break;
+                default:
+                    agent.ClearTargetFrame();
+                    break;
+            }
+        }
+        Missions.Agents.Packets.AgentData.ApplyLocomotionMovementFlags(agent, locomotionFlags);
+        Missions.Agents.Packets.AgentData.ApplyMovementInput(agent, movementInput);
+    }
+
+    internal static bool CanDriveOwnedAgent(Agent agent, Mission mission)
+    {
+        return agent != null
+            && mission != null
+            && agent.Mission == mission
+            && agent.IsActive();
+    }
+#endif
 
     public sealed class MountStateCoopCommand : ICoopCommand
     {

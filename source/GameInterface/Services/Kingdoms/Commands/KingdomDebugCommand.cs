@@ -2502,7 +2502,6 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-
     //private static bool TryGetMakePeaceKingdomDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     //{
     //    if (args.Count < 7)

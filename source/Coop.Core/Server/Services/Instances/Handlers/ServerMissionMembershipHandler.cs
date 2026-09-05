@@ -77,29 +77,43 @@ public class ServerMissionMembershipHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!missionManager.TryEnterMission(peer, controllerId, message.InstanceId, out var result) ||
-                result.Status == MissionEntryStatus.Unchanged)
+            if (!missionManager.TryEnterMission(peer, controllerId, message.InstanceId, out var result))
             {
                 return;
             }
 
-            foreach (var departure in result.PreviousDepartures)
-                PublishDeparture(departure, wasRetreat: true);
+            // This is sent first on the same ReliableOrdered campaign connection. The client does not
+            // initiate or accept a mapped mission link until it has this server-issued credential.
+            network.Send(peer, new NetworkMissionCredentialIssued(
+                result.InstanceId,
+                result.PeerCredential));
 
-            // A replacement peer must report battle completion again even though membership is preserved.
-            messageBroker.Publish(this,
-                new MissionMemberEntered(result.ControllerId, result.InstanceId, result.IsFirstMember));
+            if (result.Status != MissionEntryStatus.Unchanged)
+            {
+                foreach (var departure in result.PreviousDepartures)
+                    PublishDeparture(departure, wasRetreat: true);
 
-            // Introduce the newcomer and each existing member to each other so BOTH sides send their join info.
+                // A replacement peer must report battle completion again even though membership is preserved.
+                messageBroker.Publish(this,
+                    new MissionMemberEntered(result.ControllerId, result.InstanceId, result.IsFirstMember));
+            }
+
+            // Introduce the entrant and each existing member to each other so both sides can rebuild their mesh.
             var newcomerSteamId = ResolveSteamId(peer, result.ControllerId);
-            foreach (var (otherControllerId, otherPeer) in result.ExistingMembers)
+            foreach (var (otherControllerId, otherPeer, otherPeerCredential) in result.ExistingMembers)
             {
                 var existingSteamId = ResolveSteamId(otherPeer, otherControllerId);
 
                 network.Send(otherPeer, new NetworkMissionPeerEntered(
-                    result.ControllerId, result.InstanceId, newcomerSteamId));
+                    result.ControllerId,
+                    result.InstanceId,
+                    newcomerSteamId,
+                    result.PeerCredential));
                 network.Send(peer, new NetworkMissionPeerEntered(
-                    otherControllerId, result.InstanceId, existingSteamId));
+                    otherControllerId,
+                    result.InstanceId,
+                    existingSteamId,
+                    otherPeerCredential));
             }
         }, context: nameof(Handle_MissionEntered));
     }

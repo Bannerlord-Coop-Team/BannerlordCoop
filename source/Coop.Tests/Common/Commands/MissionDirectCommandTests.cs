@@ -22,7 +22,7 @@ public class MissionDirectCommandTests
     {
         Type[] commandTypes = GetCommandTypes();
 #if DEBUG
-        Assert.Equal(26, commandTypes.Length);
+        Assert.Equal(29, commandTypes.Length);
 #else
         Assert.Equal(15, commandTypes.Length);
 #endif
@@ -32,6 +32,11 @@ public class MissionDirectCommandTests
         var registry = new CoopCommandRegistry(commands, new LoggerConfiguration().CreateLogger());
 
         Assert.Equal(commands.Length, registry.Commands.Count);
+#if DEBUG
+        Assert.Contains(commands, command => command.Name == "peer_state");
+        Assert.Contains(commands, command => command.Name == "controller_agents");
+        Assert.Contains(commands, command => command.Name == "drive_owned_agents");
+#endif
         Assert.All(commandTypes, type =>
         {
             Assert.Equal(typeof(object), type.BaseType);

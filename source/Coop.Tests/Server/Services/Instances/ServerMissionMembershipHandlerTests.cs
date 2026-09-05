@@ -48,11 +48,18 @@ public class ServerMissionMembershipHandlerTests
                 network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(existing));
             Assert.Equal("1111", sentToExisting.ControllerId);
             Assert.Equal(9001UL, sentToExisting.SteamId);
+            Assert.NotEqual(Guid.Empty, sentToExisting.PeerCredential);
 
             var sentToNewcomer = Assert.Single(
                 network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(newcomer));
             Assert.Equal("2222", sentToNewcomer.ControllerId);
             Assert.Equal(9002UL, sentToNewcomer.SteamId);
+            Assert.NotEqual(Guid.Empty, sentToNewcomer.PeerCredential);
+
+            var issued = Assert.Single(
+                network.GetPeerMessagesFromType<NetworkMissionCredentialIssued>(newcomer));
+            Assert.Equal(sentToExisting.PeerCredential, issued.PeerCredential);
+            Assert.NotEqual(sentToNewcomer.PeerCredential, issued.PeerCredential);
         });
     }
 
@@ -114,7 +121,8 @@ public class ServerMissionMembershipHandlerTests
             "first",
             InstanceId,
             MissionEntryStatus.Entered,
-            Array.Empty<(string, NetPeer)>(),
+            Guid.NewGuid(),
+            Array.Empty<(string, NetPeer, Guid)>(),
             Array.Empty<MissionDeparture>(),
             isFirstMember: true);
         missionManager
@@ -144,7 +152,8 @@ public class ServerMissionMembershipHandlerTests
             "current",
             InstanceId,
             MissionEntryStatus.Entered,
-            Array.Empty<(string, NetPeer)>(),
+            Guid.NewGuid(),
+            Array.Empty<(string, NetPeer, Guid)>(),
             Array.Empty<MissionDeparture>(),
             isFirstMember: true);
         missionManager
@@ -170,7 +179,8 @@ public class ServerMissionMembershipHandlerTests
             "current",
             InstanceId,
             MissionEntryStatus.Reconnected,
-            Array.Empty<(string, NetPeer)>(),
+            Guid.NewGuid(),
+            Array.Empty<(string, NetPeer, Guid)>(),
             Array.Empty<MissionDeparture>(),
             isFirstMember: false);
         missionManager
@@ -194,14 +204,18 @@ public class ServerMissionMembershipHandlerTests
     public void MissionEntered_DuplicateDoesNotPublishCompletionResetEvent()
     {
         var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51014), 14);
+        var existingPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51015), 15);
         var messageBroker = new TestMessageBroker();
         var missionManager = new Mock<IMissionManager>();
         var playerManager = CreatePlayerManager(peer, "current");
+        var ownCredential = Guid.NewGuid();
+        var existingCredential = Guid.NewGuid();
         var entry = new MissionEntryResult(
             "current",
             InstanceId,
             MissionEntryStatus.Unchanged,
-            Array.Empty<(string, NetPeer)>(),
+            ownCredential,
+            new[] { ("existing", existingPeer, existingCredential) },
             Array.Empty<MissionDeparture>(),
             isFirstMember: false);
         missionManager
@@ -209,13 +223,26 @@ public class ServerMissionMembershipHandlerTests
             .Returns(true);
         MissionMemberEntered? entered = null;
         messageBroker.Subscribe<MissionMemberEntered>(payload => entered = payload.What);
+        var network = new TestNetwork();
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+            messageBroker, missionManager.Object, network, playerManager.Object);
 
         messageBroker.Publish(peer, new NetworkMissionEntered("current", InstanceId));
         DrainGameThread();
 
         Assert.False(entered.HasValue);
+        Assert.Equal(
+            ownCredential,
+            Assert.Single(network.GetPeerMessagesFromType<NetworkMissionCredentialIssued>(peer))
+                .PeerCredential);
+        var existingAnnouncement = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(peer));
+        Assert.Equal("existing", existingAnnouncement.ControllerId);
+        Assert.Equal(existingCredential, existingAnnouncement.PeerCredential);
+        var entrantAnnouncement = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(existingPeer));
+        Assert.Equal("current", entrantAnnouncement.ControllerId);
+        Assert.Equal(ownCredential, entrantAnnouncement.PeerCredential);
     }
 
     [Fact]
@@ -292,15 +319,16 @@ public class ServerMissionMembershipHandlerTests
         var messageBroker = new TestMessageBroker();
         var missionManager = new Mock<IMissionManager>();
         var playerManager = CreatePlayerManager(newcomer, newcomerControllerId);
-        IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers =
-            new List<(string controllerId, NetPeer peer)>
+        IReadOnlyList<(string controllerId, NetPeer peer, Guid peerCredential)> existingMembers =
+            new List<(string controllerId, NetPeer peer, Guid peerCredential)>
         {
-            (existingControllerId, existing),
+            (existingControllerId, existing, Guid.NewGuid()),
         };
         var entry = new MissionEntryResult(
             newcomerControllerId,
             InstanceId,
             MissionEntryStatus.Entered,
+            Guid.NewGuid(),
             existingMembers,
             Array.Empty<MissionDeparture>(),
             isFirstMember: false);

@@ -194,7 +194,12 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetMovementDirection), nameof(Agent_GetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.TeleportToPosition), nameof(Agent_TeleportToPosition));
+        Prefix(typeof(Agent), "get_MovementLockedState", nameof(Agent_get_MovementLockedState));
+        Prefix(typeof(Agent), nameof(Agent.GetTargetPosition), nameof(Agent_GetTargetPosition));
+        Prefix(typeof(Agent), nameof(Agent.GetTargetDirection), nameof(Agent_GetTargetDirection));
+        Prefix(typeof(Agent), nameof(Agent.SetTargetPosition), nameof(Agent_SetTargetPosition));
         Prefix(typeof(Agent), nameof(Agent.SetTargetPositionAndDirection), nameof(Agent_SetTargetPositionAndDirection));
+        Prefix(typeof(Agent), nameof(Agent.ClearTargetFrame), nameof(Agent_ClearTargetFrame));
         Prefix(typeof(Agent), nameof(Agent.GetRealGlobalVelocity), nameof(Agent_GetRealGlobalVelocity));
         Prefix(typeof(Agent), nameof(Agent.GetMaximumForwardUnlimitedSpeed), nameof(Agent_GetMaximumForwardUnlimitedSpeed));
         Prefix(typeof(Agent), nameof(Agent.GetMaximumSpeedLimit), nameof(Agent_GetMaximumSpeedLimit));
@@ -203,6 +208,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
+        Prefix(typeof(Agent), nameof(Agent.AddAcceleration), nameof(Agent_AddAcceleration));
         // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
@@ -965,6 +971,38 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_get_MovementLockedState(
+        Agent __instance,
+        ref AgentMovementLockedState __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MovementLockedState;
+        return false;
+    }
+
+    private static bool Agent_GetTargetPosition(Agent __instance, ref Vec2 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.LastTargetPosition;
+        return false;
+    }
+
+    private static bool Agent_GetTargetDirection(Agent __instance, ref Vec3 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.LastTargetDirection;
+        return false;
+    }
+
+    private static bool Agent_SetTargetPosition(Agent __instance, Vec2 value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetTargetPositionCalls++;
+        m.MovementLockedState = AgentMovementLockedState.PositionLocked;
+        m.LastTargetPosition = value;
+        return false;
+    }
+
     private static bool Agent_SetTargetPositionAndDirection(
         Agent __instance,
         ref Vec2 targetPosition,
@@ -972,8 +1010,17 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetTargetPositionAndDirectionCalls++;
+        m.MovementLockedState = AgentMovementLockedState.FrameLocked;
         m.LastTargetPosition = targetPosition;
         m.LastTargetDirection = targetDirection;
+        return false;
+    }
+
+    private static bool Agent_ClearTargetFrame(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ClearTargetFrameCalls++;
+        m.MovementLockedState = AgentMovementLockedState.None;
         return false;
     }
 
@@ -1036,6 +1083,14 @@ public sealed class MissionEngineFixture : IDisposable
         m.SetMovementInputCalls++;
         if (m.ClearLocomotionFlagsOnContinuousStateWrite)
             m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
+        return false;
+    }
+
+    private static bool Agent_AddAcceleration(Agent __instance, Vec3 __0)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.AddAccelerationCalls++;
+        m.LastAcceleration = __0;
         return false;
     }
 

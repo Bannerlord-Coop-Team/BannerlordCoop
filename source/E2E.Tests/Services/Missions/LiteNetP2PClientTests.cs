@@ -56,6 +56,9 @@ public class LiteNetP2PClientTests
             batcher);
         NetPeer peer = NetPeerExtensions.CreatePeer(97);
         GetPendingPeerControllers(client)[peer] = controllerId;
+        Guid peerCredential = Guid.NewGuid();
+        GetControllerPeerCredentials(client)[controllerId] = peerCredential;
+        GetPeerCredentials(client)[peer] = peerCredential;
 
         Task reliableSend = Task.Run(() => client.Send(
             controllerId,
@@ -88,6 +91,22 @@ public class LiteNetP2PClientTests
             "pendingPeerControllers",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
         return Assert.IsType<Dictionary<NetPeer, string>>(field.GetValue(client));
+    }
+
+    private static Dictionary<string, Guid> GetControllerPeerCredentials(LiteNetP2PClient client)
+    {
+        FieldInfo field = typeof(LiteNetP2PClient).GetField(
+            "controllerPeerCredentials",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return Assert.IsType<Dictionary<string, Guid>>(field.GetValue(client));
+    }
+
+    private static Dictionary<NetPeer, Guid> GetPeerCredentials(LiteNetP2PClient client)
+    {
+        FieldInfo field = typeof(LiteNetP2PClient).GetField(
+            "peerCredentials",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return Assert.IsType<Dictionary<NetPeer, Guid>>(field.GetValue(client));
     }
 
     private sealed class PromotionRaceBatcher : IReliableMessageBatcher<string>, IDisposable
