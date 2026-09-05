@@ -9,10 +9,18 @@ public interface ISharedClanPermissions
     bool CanManageClan(Hero actor, Clan clan);
     bool CanManageParty(Hero actor, MobileParty party);
     bool CanAssignRoles(Hero actor, MobileParty party);
+    bool CanRenameHero(Hero actor, Hero hero);
 }
 
 public class SharedClanPermissions : ISharedClanPermissions
 {
+    private readonly IClanMemberGrouping grouping;
+
+    public SharedClanPermissions(IClanMemberGrouping grouping)
+    {
+        this.grouping = grouping;
+    }
+
     public static bool CanManageClan(Clan clan)
     {
         return ContainerProvider.TryResolve<ISharedClanPermissions>(out var permissions) &&
@@ -31,6 +39,12 @@ public class SharedClanPermissions : ISharedClanPermissions
             permissions.CanAssignRoles(Hero.MainHero, party);
     }
 
+    public static bool CanRenameHero(Hero hero)
+    {
+        return ContainerProvider.TryResolve<ISharedClanPermissions>(out var permissions) &&
+            permissions.CanRenameHero(Hero.MainHero, hero);
+    }
+
     public bool CanManageClan(Hero actor, Clan clan)
     {
         return actor != null && clan != null && actor.Clan == clan && clan.Leader == actor;
@@ -47,5 +61,11 @@ public class SharedClanPermissions : ISharedClanPermissions
     public bool CanAssignRoles(Hero actor, MobileParty party)
     {
         return actor != null && party != null && party.LeaderHero == actor;
+    }
+
+    public bool CanRenameHero(Hero actor, Hero hero)
+    {
+        return actor != null && hero != null && actor.Clan != null && hero.Clan == actor.Clan &&
+            actor.Clan.AliveLords.Contains(hero) && grouping.GetGroup(hero, actor) == ClanMemberGroup.Family;
     }
 }

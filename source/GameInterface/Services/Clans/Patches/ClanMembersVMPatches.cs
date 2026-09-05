@@ -64,6 +64,7 @@ internal static class ClanMembersVMPatches
     internal static void UpdatePropertiesPostfix(ClanLordItemVM __instance)
     {
         var hero = __instance.GetHero();
+        __instance.IsFamilyMember = SharedClanPermissions.CanRenameHero(hero);
         if (hero.IsPlayerHero())
         {
             __instance.IsRecallVisible = false;
@@ -80,5 +81,19 @@ internal static class ClanMembersVMPatches
         {
             __instance.RelationToMainHeroText = CampaignUIHelper.GetHeroRelationToHeroText(hero, leader, true).ToString();
         }
+    }
+
+    [HarmonyPatch(typeof(ClanLordItemVM), nameof(ClanLordItemVM.ExecuteRename))]
+    [HarmonyPrefix]
+    public static bool ExecuteRenamePrefix(ClanLordItemVM __instance)
+    {
+        return SharedClanPermissions.CanRenameHero(__instance.GetHero());
+    }
+
+    [HarmonyPatch(typeof(ClanLordItemVM), nameof(ClanLordItemVM.OnNamingHeroOver))]
+    [HarmonyPrefix]
+    public static bool OnNamingHeroOverPrefix(ClanLordItemVM __instance)
+    {
+        return SharedClanPermissions.CanRenameHero(__instance.GetHero());
     }
 }

@@ -11,5 +11,6 @@
     <string id="str_coop_clan_party_roles_owner_only" text="{=str_coop_clan_party_roles_owner_only}Only this party's leader can assign its roles." />
     <string id="str_coop_clan_player_party_protected" text="{=str_coop_clan_player_party_protected}Player parties cannot be disbanded or have their leaders replaced." />
     <string id="str_coop_clan_player_party_wages_disabled" text="{=str_coop_clan_player_party_wages_disabled}Wage limits cannot be set for player parties." />
+    <string id="str_coop_clan_identity_leader_only" text="{=str_coop_clan_identity_leader_only}Only the clan leader can change the clan's name or banner." />
     <!-- Add other custom text here in the future-->
 </strings>
