@@ -1,5 +1,7 @@
-using Common;
+﻿using Common;
 using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.Banners.Messages;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
@@ -61,13 +63,16 @@ internal class PlayerPartyInteractionOutcomeHandler
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerPartyInteractionOutcomeHandler>();
 
     private readonly IObjectManager objectManager;
+    private readonly IMessageBroker messageBroker;
     private readonly IKingdomMembershipState kingdomMembershipState;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
+        IMessageBroker messageBroker,
         IKingdomMembershipState kingdomMembershipState)
     {
         this.objectManager = objectManager;
+        this.messageBroker = messageBroker;
         this.kingdomMembershipState = kingdomMembershipState;
     }
 
@@ -211,6 +216,9 @@ internal class PlayerPartyInteractionOutcomeHandler
         initiatorHero.Clan = responderClan;
         if (initiatorParty.MobileParty != null)
             initiatorParty.MobileParty.ActualClan = responderClan;
+
+        // Refresh client map flags and nameplates after the clan membership updates.
+        messageBroker.Publish(this, new PlayerBannerChanged(responderClan));
     }
 
     private void ApplyAcceptedTrade(PlayerPartyInteractionOutcome outcome)

@@ -79,7 +79,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.conversationPartyTracker = conversationPartyTracker;
         this.configuration = configuration;
         this.hostileEncounterService = hostileEncounterService;
-        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, kingdomMembershipState);
+        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, messageBroker, kingdomMembershipState);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -777,7 +777,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
         AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, enabled: !session.IsHostile);
         AddInitiatorOption(session, PlayerPartyInteractionOption.HostileDemand, hostileEncounterService.CanStartHostileEncounter(initiatorParty, responderParty));
-        AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan, enabled: false);
+        AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan, enabled: true);
         var vassalAvailable = IsVassalServiceAvailable(initiatorParty, responderParty, out var vassalUnavailableReason);
         session.VassalUnavailableReason = vassalUnavailableReason;
         AddInitiatorOption(

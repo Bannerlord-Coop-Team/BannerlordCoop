@@ -191,7 +191,7 @@ public static class PlayerPartyInteractionDialogState
             case PlayerPartyInteractionProposal.Trade:
                 return "I have a proposal that may benefit us both.";
             case PlayerPartyInteractionProposal.JoinClan:
-                return "(COMING SOON) I wish to offer my services in your clan.";
+                return "I wish to offer my services in your clan.";
             case PlayerPartyInteractionProposal.Vassal:
                 return "I wish to swear my allegiance to your majesty.";
             case PlayerPartyInteractionProposal.HostileDemand:

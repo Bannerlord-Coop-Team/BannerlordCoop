@@ -556,7 +556,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
     [Theory]
     [InlineData(PlayerPartyInteractionProposal.Trade, "I have a proposal that may benefit us both.")]
-    [InlineData(PlayerPartyInteractionProposal.JoinClan, "(COMING SOON) I wish to offer my services in your clan.")]
+    [InlineData(PlayerPartyInteractionProposal.JoinClan, "I wish to offer my services in your clan.")]
     [InlineData(PlayerPartyInteractionProposal.Vassal, "I wish to swear my allegiance to your majesty.")]
     public void ProposalPending_DialogText_ShowsInitiatorSelectedLine(
         PlayerPartyInteractionProposal proposal,

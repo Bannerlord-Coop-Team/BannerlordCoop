@@ -122,7 +122,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             "coop_player_party_interaction_join_clan",
             ServiceToken,
             InitiatorWaitToken,
-            "(COMING SOON) I wish to offer my services in your clan.",
+            "I wish to offer my services in your clan.",
             () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan),
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.JoinClan),
             PlayerPartyDialogPriority,
