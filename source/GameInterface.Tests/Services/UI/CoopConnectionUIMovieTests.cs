@@ -8,6 +8,21 @@ namespace GameInterface.Tests.Services.UI;
 public class CoopConnectionUIMovieTests
 {
     [Fact]
+    public void DirectConnection_UsesOneAddressInputWithoutSeparatePortInput()
+    {
+        var document = XDocument.Load(FindMoviePath());
+
+        Assert.Single(document.Descendants("EditableTextWidget"),
+            element => element.Attribute("Text")?.Value == "@Ip");
+        Assert.DoesNotContain(document.Descendants("EditableTextWidget"),
+            element => element.Attribute("Text")?.Value == "@Port");
+        Assert.DoesNotContain(document.Descendants("TextWidget"),
+            element => element.Attribute("Text")?.Value == "@PortText");
+        Assert.DoesNotContain(document.Descendants("HintWidget"),
+            element => element.Attribute("DataSource")?.Value == "{PortHint}");
+    }
+
+    [Fact]
     public void IncompatibleStatusHint_KeepsRowBindingsOutsideHintDataSource()
     {
         var document = XDocument.Load(FindMoviePath());

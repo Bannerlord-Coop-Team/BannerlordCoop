@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
@@ -6,12 +6,14 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -431,6 +433,74 @@ public class BattleSurrenderTests : MapEventTestBase
     }
 
     /// <summary>
+    /// A server-approved field-battle leave must also clear the leaving party's authoritative engage order,
+    /// otherwise the encounter immediately reopens after its local menu closes.
+    /// </summary>
+    [Fact]
+    public void FieldBattleLeave_WithHealthyAlly_DisengagesLeavingPartyOnAllInstances()
+    {
+        var ctx = CreateServerMapEvent();
+        var leavingPartyId = JoinNewServerPartyToSide(ctx.MapEventId, BattleSideEnum.Defender);
+        var leavingClient = Clients.Last();
+
+        RegisterAsPlayerParty("2", TestEnvironment.CreateRegisteredObject<Hero>(), leavingPartyId);
+        Server.Resolve<IPlayerManager>().SetPeer("2", leavingClient.NetPeer);
+        SetMainPartyInBattle(leavingClient, leavingPartyId);
+        EnableHeadlessEncounterFinish(leavingClient);
+        SetMockPlayerEncounter(
+            leavingClient,
+            encounteredPartyId: ctx.AttackerPartyId,
+            mapEventId: ctx.MapEventId);
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ctx.AttackerPartyId, out var target));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(leavingPartyId, out var leavingParty));
+                using (new AllowedThread())
+                {
+                    leavingParty.SetMoveEngageParty(target, MobileParty.NavigationType.Default);
+                    leavingParty.SetShortTermBehavior(AiBehavior.EngageParty, target.Party);
+                }
+
+                Assert.Equal(AiBehavior.EngageParty, leavingParty.DefaultBehavior);
+                Assert.Equal(AiBehavior.EngageParty, leavingParty.ShortTermBehavior);
+                Assert.Same(target, leavingParty.ShortTermTargetParty);
+            }, MapEventDisabledMethods);
+        }
+
+        leavingClient.Call(InvokePatchedEncounterLeave, BattleMenuSurrenderDisabledMethods());
+        TestEnvironment.FlushCoalescer();
+
+        leavingClient.Call(() =>
+        {
+            Assert.True(leavingClient.ObjectManager.TryGetObject<MobileParty>(leavingPartyId, out var leavingParty));
+            EncounterManager.HandleEncounterForMobileParty(leavingParty, 0f);
+            Assert.Null(PlayerEncounter.Current);
+        });
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(leavingPartyId, out var leavingParty));
+                Assert.Null(leavingParty.Party.MapEventSide);
+                Assert.Equal(AiBehavior.Hold, leavingParty.DefaultBehavior);
+                Assert.Equal(AiBehavior.Hold, leavingParty.ShortTermBehavior);
+                Assert.Null(leavingParty.ShortTermTargetParty);
+                Assert.Null(leavingParty.MoveTargetParty);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.NotNull(mapEvent.DefenderSide.LeaderParty);
+        });
+    }
+
+    /// <summary>
     /// BR-001's exclusivity extended to surrender: while a live mission (or simulation) owns the map event,
     /// a surrender request must not conclude the battle under the players resolving it — the server refuses
     /// it authoritatively (<see cref="ServerBattleModeArbiter"/> backstop; the client menu refusal is
@@ -481,6 +551,19 @@ public class BattleSurrenderTests : MapEventTestBase
         var method = AccessTools.Method(typeof(PlayerEncounter), "PlayerSurrenderInternal");
         Assert.NotNull(method);
         method.Invoke(encounter, new object[method.GetParameters().Length]);
+    }
+
+    /// <summary>Invokes the actual encounter-menu Leave consequence so the coop prefix routes the
+    /// joined party's authoritative leave exactly as it does in-game.</summary>
+    private static void InvokePatchedEncounterLeave()
+    {
+        var method = AccessTools.Method(
+            typeof(EncounterGameMenuBehavior),
+            "game_menu_encounter_leave_on_consequence");
+        Assert.NotNull(method);
+
+        var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+        method.Invoke(behavior, new object[] { null });
     }
 
     /// <summary>Publishes the recipient's surrender directly (the client-local <see cref="PlayerSurrendered"/>
