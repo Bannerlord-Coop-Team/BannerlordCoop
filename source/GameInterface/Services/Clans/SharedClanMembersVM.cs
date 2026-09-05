@@ -34,7 +34,7 @@ public class SharedClanMembersVM : ClanMembersVM
         : base(onRefresh, showHeroOnMap)
     {
         this.grouping = grouping;
-        SortController._listsToControl.Insert(1, Players);
+        SortController._listsToControl.Insert(0, Players);
         SortController._listsToControl.Insert(2, OtherFamilies);
         RegroupMembers();
     }
@@ -46,14 +46,26 @@ public class SharedClanMembersVM : ClanMembersVM
 
         Players.Clear();
         OtherFamilies.Clear();
+        var viewer = Hero.MainHero;
+        if (Family.Count(member => grouping.GetGroup(member.GetHero(), viewer) == ClanMemberGroup.Players) <= 1)
+        {
+            RefreshGroupProperties();
+            return;
+        }
+
         foreach (var member in Family.ToArray())
         {
-            var group = grouping.GetGroup(member.GetHero(), Hero.MainHero);
+            var group = grouping.GetGroup(member.GetHero(), viewer);
             if (group == ClanMemberGroup.Family) continue;
 
             Family.Remove(member);
             if (group == ClanMemberGroup.Players)
-                Players.Add(member);
+            {
+                if (member.GetHero() == viewer)
+                    Players.Insert(0, member);
+                else
+                    Players.Add(member);
+            }
             else
                 OtherFamilies.Add(member);
         }

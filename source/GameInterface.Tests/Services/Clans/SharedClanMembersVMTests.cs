@@ -31,7 +31,7 @@ public class SharedClanMembersVMTests
             var relative = CreateMember();
             var otherRelative = CreateMember();
             var companion = CreateMember();
-            var allLords = new[] { viewer, player, relative, otherRelative };
+            var allLords = new[] { player, relative, viewer, otherRelative };
 
             var character = ObjectHelper.SkipConstructor<CharacterObject>();
             character._heroObject = viewer.GetHero();
@@ -54,6 +54,7 @@ public class SharedClanMembersVMTests
             Assert.Equal("Player · Clan leader", GameTexts.FindText("str_coop_clan_player_leader").ToString());
 
             var grouping = new Mock<IClanMemberGrouping>();
+            grouping.Setup(service => service.GetGroup(viewer.GetHero(), viewer.GetHero())).Returns(ClanMemberGroup.Players);
             grouping.Setup(service => service.GetGroup(player.GetHero(), viewer.GetHero())).Returns(ClanMemberGroup.Players);
             grouping.Setup(service => service.GetGroup(otherRelative.GetHero(), viewer.GetHero())).Returns(ClanMemberGroup.OtherFamilies);
 
@@ -78,14 +79,14 @@ public class SharedClanMembersVMTests
                 foreach (var lord in allLords) members.Family.Add(lord);
                 members.RegroupMembers();
 
-                Assert.Equal(new[] { viewer, relative }, members.Family);
-                Assert.Same(player, Assert.Single(members.Players));
+                Assert.Same(relative, Assert.Single(members.Family));
+                Assert.Equal(new[] { viewer, player }, members.Players);
                 Assert.Same(otherRelative, Assert.Single(members.OtherFamilies));
                 Assert.Same(companion, Assert.Single(members.Companions));
                 var visible = members.Family.Concat(members.Players).Concat(members.OtherFamilies).Concat(members.Companions).ToArray();
                 Assert.Equal(5, visible.Length);
                 Assert.Equal(5, visible.Distinct().Count());
-                Assert.Equal("Players (1)", members.PlayersText);
+                Assert.Equal("Players (2)", members.PlayersText);
                 Assert.Equal("Other Families (1)", members.OtherFamiliesText);
                 Assert.True(members.HasPlayers);
                 Assert.True(members.HasOtherFamilies);
@@ -96,16 +97,32 @@ public class SharedClanMembersVMTests
                 Assert.Same(otherRelative, members.CurrentSelectedMember);
                 Assert.False(player.IsSelected);
                 Assert.True(otherRelative.IsSelected);
-                Assert.False(members.SelectAdditionalMember(viewer.GetHero()));
+                Assert.True(members.SelectAdditionalMember(viewer.GetHero()));
+                Assert.Same(viewer, members.CurrentSelectedMember);
+                Assert.False(otherRelative.IsSelected);
+                Assert.True(viewer.IsSelected);
 
                 members.Family.Clear();
                 members.Family.Add(viewer);
+                members.Family.Add(relative);
+                members.Family.Add(otherRelative);
                 changedProperties.Clear();
+                members.RegroupMembers();
+                Assert.Equal(new[] { viewer, relative, otherRelative }, members.Family);
+                Assert.Empty(members.Players);
+                Assert.Empty(members.OtherFamilies);
+                Assert.Same(companion, Assert.Single(members.Companions));
+                Assert.Equal("Family (3)", members.FamilyText);
+                Assert.False(members.HasPlayers);
+                Assert.False(members.HasOtherFamilies);
+                Assert.False(members.SelectAdditionalMember(viewer.GetHero()));
+                Assert.Contains(nameof(members.HasPlayers), changedProperties);
+                Assert.Contains(nameof(members.HasOtherFamilies), changedProperties);
+
+                members.Family.Clear();
                 members.RegroupMembers();
                 Assert.False(members.HasPlayers);
                 Assert.False(members.HasOtherFamilies);
-                Assert.Contains(nameof(members.HasPlayers), changedProperties);
-                Assert.Contains(nameof(members.HasOtherFamilies), changedProperties);
             }
         }
         finally

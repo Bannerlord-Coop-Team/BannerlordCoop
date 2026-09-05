@@ -17,10 +17,12 @@ public class ClanMembersPrefabEditorTests
         var editor = new ClanMembersPrefabEditor();
         editor.AddMemberGroups(root);
 
-        string[] groups = { "Family", "Players", "OtherFamilies", "Companions" };
+        string[] groups = { "Players", "Family", "OtherFamilies", "Companions" };
         var lists = root.SelectNodes(".//*[@Id='ClanElementsListPanel']/Children/NavigatableListPanel")!
             .Cast<XmlNode>().ToArray();
         Assert.Equal(groups.Select(group => "{" + group + "}"), lists.Select(list => list.Attributes!["DataSource"]!.Value));
+        var toggles = root.SelectNodes(".//PartyHeaderToggleWidget")!.Cast<XmlNode>();
+        Assert.Equal(groups.Select(group => group + "ToggleButton"), toggles.Select(toggle => toggle.Attributes!["Id"]!.Value));
 
         foreach (var group in groups)
         {

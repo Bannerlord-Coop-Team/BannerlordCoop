@@ -20,8 +20,7 @@ public class ClanMemberGrouping : IClanMemberGrouping
 
     public ClanMemberGroup GetGroup(Hero member, Hero viewer)
     {
-        if (member == viewer) return ClanMemberGroup.Family;
-        if (playerManager.Contains(member)) return ClanMemberGroup.Players;
+        if (member == viewer || playerManager.Contains(member)) return ClanMemberGroup.Players;
 
         var ancestors = GetAncestors(viewer);
         if (ancestors.Overlaps(GetAncestors(member)) ||

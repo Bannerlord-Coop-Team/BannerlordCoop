@@ -12,12 +12,12 @@ public class ClanMemberGroupingTests
     private readonly Mock<IPlayerManager> players = new();
 
     [Fact]
-    public void ViewingPlayer_StaysWithOwnFamily()
+    public void ViewingPlayer_GoesInPlayers()
     {
         var viewer = CreateHero();
         players.Setup(manager => manager.Contains(viewer)).Returns(true);
 
-        Assert.Equal(ClanMemberGroup.Family, Group(viewer, viewer));
+        Assert.Equal(ClanMemberGroup.Players, Group(viewer, viewer));
     }
 
     [Fact]

@@ -66,6 +66,7 @@ public class SharedClanPermissions : ISharedClanPermissions
     public bool CanRenameHero(Hero actor, Hero hero)
     {
         return actor != null && hero != null && actor.Clan != null && hero.Clan == actor.Clan &&
-            actor.Clan.AliveLords.Contains(hero) && grouping.GetGroup(hero, actor) == ClanMemberGroup.Family;
+            actor.Clan.AliveLords.Contains(hero) &&
+            (hero == actor || grouping.GetGroup(hero, actor) == ClanMemberGroup.Family);
     }
 }
