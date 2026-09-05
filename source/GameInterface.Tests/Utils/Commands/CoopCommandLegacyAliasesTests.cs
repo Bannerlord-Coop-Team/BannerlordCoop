@@ -1,4 +1,6 @@
 ﻿using Common.Commands;
+using Moq;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,6 +28,18 @@ public class CoopCommandLegacyAliasesTests
     }
 
     [Fact]
+    public void Registry_AcceptsLegacyTableForAllAssemblyCommands()
+    {
+        var registry = new CoopCommandRegistry(
+            GetAllCommands(),
+            Mock.Of<ILogger>(),
+            CoopCommandLegacyAliases.Map);
+
+        Assert.True(registry.Contains("coop.debug.hero_developer.add_attribute_points"));
+        Assert.True(registry.Contains("coop.debug.herodeveloper.addattributepoints"));
+    }
+
+    [Fact]
     public void LegacyAliases_KeepsReportedHeroDeveloperCommandsWorking()
     {
         Assert.Equal(
@@ -45,13 +59,18 @@ public class CoopCommandLegacyAliasesTests
             CoopCommandLegacyAliases.Map["coop.debug.herodeveloper.stats"]);
     }
 
+    private static ICoopCommand[] GetAllCommands()
+    {
+        return typeof(GameInterfaceModule).Assembly.GetTypes()
+            .Where(type => type.IsClass && !type.IsAbstract && typeof(ICoopCommand).IsAssignableFrom(type))
+            .Select(type => (ICoopCommand)Activator.CreateInstance(type))
+            .ToArray();
+    }
+
     private static HashSet<string> GetCanonicalFullNames()
     {
         return new HashSet<string>(
-            typeof(GameInterfaceModule).Assembly.GetTypes()
-                .Where(type => type.IsClass && !type.IsAbstract && typeof(ICoopCommand).IsAssignableFrom(type))
-                .Select(type => (ICoopCommand)Activator.CreateInstance(type))
-                .Select(command => $"{command.Prefix}.{command.Name}"),
+            GetAllCommands().Select(command => $"{command.Prefix}.{command.Name}"),
             StringComparer.Ordinal);
     }
 }

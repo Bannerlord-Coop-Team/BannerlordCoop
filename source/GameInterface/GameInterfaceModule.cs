@@ -86,8 +86,12 @@ public class GameInterfaceModule : Module
 
         builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
         builder.RegisterType<RglCommandLineRegistry>().As<IRglCommandLineRegistry>().InstancePerDependency();
-        builder.RegisterInstance(CoopCommandLegacyAliases.Map).As<IReadOnlyDictionary<string, string>>().SingleInstance();
-        builder.RegisterType<CoopCommandRegistry>().As<ICoopCommandRegistry>().InstancePerLifetimeScope();
+        builder.Register(context => new CoopCommandRegistry(
+                context.Resolve<IEnumerable<ICoopCommand>>(),
+                LogManager.GetLogger<CoopCommandRegistry>(),
+                CoopCommandLegacyAliases.Map))
+            .As<ICoopCommandRegistry>()
+            .InstancePerLifetimeScope();
         builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
             .Where(type => type.IsClass &&
                            !type.IsAbstract &&

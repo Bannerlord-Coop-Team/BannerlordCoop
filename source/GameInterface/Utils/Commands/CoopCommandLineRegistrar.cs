@@ -92,7 +92,9 @@ public sealed class CoopCommandLineRegistrar : ICoopCommandLineRegistrar
             RegisterCommand(descriptor.FullName, descriptor.FullName);
         }
 
-        foreach (KeyValuePair<string, string> alias in commandRegistry.LegacyAliases)
+        IReadOnlyDictionary<string, string> legacyAliases =
+            commandRegistry.LegacyAliases ?? new Dictionary<string, string>();
+        foreach (KeyValuePair<string, string> alias in legacyAliases)
         {
             RegisterCommand(alias.Key, alias.Value);
         }
