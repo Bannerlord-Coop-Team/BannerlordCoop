@@ -65,35 +65,6 @@ internal class ClanPartyItemVMPatches
 
     [HarmonyPatch(nameof(ClanPartyItemVM.UpdateProperties))]
     [HarmonyTranspiler]
-    public static IEnumerable<CodeInstruction> MemberClanTranspiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var playerClanGetter = AccessTools.PropertyGetter(typeof(Clan), nameof(Clan.PlayerClan));
-        var mainHeroGetter = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.MainHero));
-        var heroClanGetter = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.Clan));
-        int replacements = 0;
-
-        foreach (var instruction in instructions)
-        {
-            if (instruction.Calls(playerClanGetter))
-            {
-                // Filter against current membership instead of the default clan
-                instruction.operand = mainHeroGetter;
-                yield return instruction;
-                yield return new CodeInstruction(OpCodes.Callvirt, heroClanGetter);
-                replacements++;
-            }
-            else
-            {
-                yield return instruction;
-            }
-        }
-
-        if (replacements != 1)
-            throw new InvalidOperationException($"Expected one player clan lookup in {nameof(ClanPartyItemVM.UpdateProperties)}, found {replacements}.");
-    }
-
-    [HarmonyPatch(nameof(ClanPartyItemVM.UpdateProperties))]
-    [HarmonyTranspiler]
     internal static IEnumerable<CodeInstruction> UpdatePropertiesTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
     {
         var instructionList = instructions.ToList();
