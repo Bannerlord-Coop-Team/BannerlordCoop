@@ -1,8 +1,9 @@
-﻿using Common.Commands;
+﻿﻿using Common.Commands;
 using GameInterface.Utils.Commands;
 using Moq;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
 using Xunit;
@@ -37,6 +38,38 @@ public class CoopCommandLineRegistrarTests
         }
 
         Assert.False(CommandLineFunctionality.HasFunctionForCommand(FullName));
+    }
+
+    [Fact]
+    public void Registration_ExposesLegacyAliasToBannerlord()
+    {
+        const string legacyName = "coop.debug.command_framework_test.legacy_capture";
+        var registry = new CoopCommandRegistry(
+            new[] { new CaptureCommand() },
+            Mock.Of<ILogger>(),
+            new Dictionary<string, string> { { legacyName, FullName } });
+        var argsFactory = new CoopCommandArgsFactory();
+        var rglCommandLineRegistry = new Mock<IRglCommandLineRegistry>();
+
+        using (var registrar = new CoopCommandLineRegistrar(
+                   registry,
+                   argsFactory,
+                   rglCommandLineRegistry.Object))
+        {
+            string output = CommandLineFunctionality.CallFunction(
+                legacyName,
+                "current",
+                out bool found);
+
+            Assert.True(found);
+            Assert.Equal("current", output);
+            Assert.True(CommandLineFunctionality.HasFunctionForCommand(legacyName));
+            rglCommandLineRegistry.Verify(
+                commandLineRegistry => commandLineRegistry.RegisterCommand(legacyName),
+                Times.Once);
+        }
+
+        Assert.False(CommandLineFunctionality.HasFunctionForCommand(legacyName));
     }
 
     [Fact]

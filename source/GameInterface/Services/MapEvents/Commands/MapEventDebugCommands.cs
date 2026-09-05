@@ -625,7 +625,7 @@ public class MapEventDebugCommands
 
     }
 
-    // coop.debug.mapevent.start_looter
+    // coop.debug.map_event.start_looter
     /// <summary>
     /// Starts combat with looter
     /// </summary>
@@ -656,7 +656,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.start_nearest_looter
+    // coop.debug.map_event.start_nearest_looter
     /// <summary>
     /// Forces an encounter between the player's party and the nearest active bandit/looter party, so
     /// the bandit surrender/recruit dialogue can be reached without chasing one down. Run on a client
@@ -707,7 +707,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne [excludedPartyId]
+    // coop.debug.map_event.start_nearest_bandit_attack PlayerOne [excludedPartyId]
     /// <summary>
     /// Starts a server-authoritative bandit attack encounter against a connected player.
     /// </summary>
@@ -796,7 +796,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_prepare PlayerOne mountain_bandits_24
+    // coop.debug.map_event.bandit_attack_fixture_prepare PlayerOne mountain_bandits_24
     /// <summary>Prepares a reversible exact-bandit attack fixture for evidence capture.</summary>
     public sealed class BanditAttackFixturePrepareCoopCommand : ICoopCommand
     {
@@ -934,7 +934,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_start PlayerOne mountain_bandits_24
+    // coop.debug.map_event.bandit_attack_fixture_start PlayerOne mountain_bandits_24
     /// <summary>Starts the prepared server-authoritative attack by the exact bandit party.</summary>
     public sealed class BanditAttackFixtureStartCoopCommand : ICoopCommand
     {
@@ -1016,7 +1016,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_state PlayerOne mountain_bandits_24
+    // coop.debug.map_event.bandit_attack_fixture_state PlayerOne mountain_bandits_24
     /// <summary>Reports the exact bandit attack state on the server or a client.</summary>
     public sealed class BanditAttackFixtureStateCoopCommand : ICoopCommand
     {
@@ -1069,7 +1069,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_restore PlayerOne
+    // coop.debug.map_event.bandit_attack_fixture_restore PlayerOne
     /// <summary>Finalizes the bandit attack and restores both parties' original behavior.</summary>
     public sealed class BanditAttackFixtureRestoreCoopCommand : ICoopCommand
     {
@@ -1244,7 +1244,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_prepare testclient testclient2
+    // coop.debug.map_event.battle_reward_fixture_prepare testclient testclient2
     /// <summary>Closes the unfinished idle player encounter loaded by the #2308 live-test save.</summary>
     public sealed class BattleRewardFixturePrepareCoopCommand : ICoopCommand
     {
@@ -1310,7 +1310,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_start testclient testclient2 army
+    // coop.debug.map_event.battle_reward_fixture_start testclient testclient2 army
     /// <summary>Creates the two-player late-join field battle from #2308.</summary>
     public sealed class BattleRewardFixtureStartCoopCommand : ICoopCommand
     {
@@ -1570,7 +1570,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_join
+    // coop.debug.map_event.battle_reward_fixture_join
     /// <summary>Adds the second player to the active #2308 battle and opens its encounter.</summary>
     public sealed class BattleRewardFixtureJoinCoopCommand : ICoopCommand
     {
@@ -1711,7 +1711,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_state
+    // coop.debug.map_event.battle_reward_fixture_state
     /// <summary>Reports contributions and roster reward deltas for the active #2308 fixture.</summary>
     public sealed class BattleRewardFixtureStateCoopCommand : ICoopCommand
     {
@@ -1751,7 +1751,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.battle_reward_client_state
+    // coop.debug.map_event.battle_reward_client_state
     /// <summary>Reports the local player's staged or already-applied native battle rewards.</summary>
     public sealed class BattleRewardClientStateCoopCommand : ICoopCommand
     {
@@ -1789,7 +1789,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.battle_reward_fixture_restore
+    // coop.debug.map_event.battle_reward_fixture_restore
     /// <summary>Finalizes the #2308 battle, removes its bandits, and restores both players.</summary>
     public sealed class BattleRewardFixtureRestoreCoopCommand : ICoopCommand
     {
@@ -2025,7 +2025,7 @@ public class MapEventDebugCommands
             roster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, true);
     }
 
-    // coop.debug.mapevent.wounded_allied_fixture_start PlayerOne
+    // coop.debug.map_event.wounded_allied_fixture_start PlayerOne
     /// <summary>Creates the wounded, troop-less player plus healthy allied force field encounter from #2097.</summary>
     public sealed class WoundedAlliedFixtureStartCoopCommand : ICoopCommand
     {
@@ -2145,7 +2145,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.wounded_allied_fixture_state PlayerOne
+    // coop.debug.map_event.wounded_allied_fixture_state PlayerOne
     /// <summary>Reports the #2097 fixture state and the local patched order-attack option when applicable.</summary>
     public sealed class WoundedAlliedFixtureStateCoopCommand : ICoopCommand
     {
@@ -2202,7 +2202,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.wounded_allied_fixture_restore PlayerOne
+    // coop.debug.map_event.wounded_allied_fixture_restore PlayerOne
     /// <summary>Finalizes the #2097 fixture and restores the player's original hero, morale, and roster state.</summary>
     public sealed class WoundedAlliedFixtureRestoreCoopCommand : ICoopCommand
     {
@@ -2443,7 +2443,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.finish_player_encounter PlayerOne
+    // coop.debug.map_event.finish_player_encounter PlayerOne
     /// <summary>
     /// Closes the connected player's encounter through the existing authoritative leave path.
     /// </summary>
@@ -2491,7 +2491,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.conversation_hold_state <partyBaseId>
+    // coop.debug.map_event.conversation_hold_state <partyBaseId>
     /// <summary>
     /// Reports whether the server currently holds an AI PartyBase for a conversation.
     /// </summary>
@@ -2521,7 +2521,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.late_join_mode_fixture PlayerOne PlayerTwo
+    // coop.debug.map_event.late_join_mode_fixture PlayerOne PlayerTwo
     /// <summary>
     /// Creates a server-authoritative battle, claims mission mode before the second player joins, then routes the
     /// second player's join through the real request handler.
@@ -2673,7 +2673,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.late_join_mode_join
+    // coop.debug.map_event.late_join_mode_join
     /// <summary>Routes the waiting player's attacker-side join after the first player has entered the mission.</summary>
     public sealed class LateJoinModeJoinCoopCommand : ICoopCommand
     {
@@ -2735,7 +2735,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.late_join_mode_enter
+    // coop.debug.map_event.late_join_mode_enter
     /// <summary>Routes the late joiner's Attack request through the real mission-start handler.</summary>
     public sealed class LateJoinModeEnterCoopCommand : ICoopCommand
     {
@@ -2783,7 +2783,7 @@ public class MapEventDebugCommands
     }
 
 #if DEBUG
-    // coop.debug.mapevent.late_join_mode_begin_field_battle
+    // coop.debug.map_event.late_join_mode_begin_field_battle
     /// <summary>Finishes the local deployment phase so live evidence shows the active field battle.</summary>
     public sealed class LateJoinModeBeginFieldBattleCoopCommand : ICoopCommand
     {
@@ -2821,7 +2821,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.late_join_mode_disable_dying
+    // coop.debug.map_event.late_join_mode_disable_dying
     /// <summary>Prevents the live-test battle from resolving before both client views are captured.</summary>
     public sealed class LateJoinModeDisableDyingCoopCommand : ICoopCommand
     {
@@ -2861,7 +2861,7 @@ public class MapEventDebugCommands
         return true;
     }
 
-    // coop.debug.mapevent.late_join_mode_exit_missions
+    // coop.debug.map_event.late_join_mode_exit_missions
     /// <summary>Asks every fixture mission member to return to campaign before authoritative cleanup.</summary>
     public sealed class LateJoinModeExitMissionsCoopCommand : ICoopCommand
     {
@@ -2940,7 +2940,7 @@ public class MapEventDebugCommands
     }
 #endif
 
-    // coop.debug.mapevent.late_join_mode_state PlayerTwo
+    // coop.debug.map_event.late_join_mode_state PlayerTwo
     /// <summary>Reports a player's map-event membership and known authoritative battle mode.</summary>
     public sealed class LateJoinModeStateCoopCommand : ICoopCommand
     {
@@ -2998,7 +2998,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.late_join_mode_cleanup
+    // coop.debug.map_event.late_join_mode_cleanup
     /// <summary>Removes the fixture field battle and restores each party's movement state.</summary>
     public sealed class LateJoinModeCleanupCoopCommand : ICoopCommand
     {
@@ -3100,7 +3100,7 @@ public class MapEventDebugCommands
         return behaviorSnapshot.TryApply(mobileParty, behavior, out _);
     }
 
-    // coop.debug.mapevent.peace_pursuit_fixture PlayerOne
+    // coop.debug.map_event.peace_pursuit_fixture PlayerOne
     /// <summary>
     /// Finds a neutral AI party that can be used without changing its original movement state.
     /// </summary>
@@ -3140,7 +3140,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.peace_pursuit_state PlayerOne mobileParty_1
+    // coop.debug.map_event.peace_pursuit_state PlayerOne mobileParty_1
     /// <summary>
     /// Reports the pursuit-test party state on the current machine.
     /// </summary>
@@ -3175,7 +3175,7 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.mapevent.test_peace_stops_pursuit PlayerOne mobileParty_1
+    // coop.debug.map_event.test_peace_stops_pursuit PlayerOne mobileParty_1
     /// <summary>
     /// Makes a selected neutral AI party pursue a connected player, then makes peace.
     /// </summary>

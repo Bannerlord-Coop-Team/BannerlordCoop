@@ -9,6 +9,8 @@ public interface ICoopCommandRegistry
 {
     IReadOnlyList<CoopCommandDescriptor> Commands { get; }
 
+    IReadOnlyDictionary<string, string> LegacyAliases { get; }
+
     bool Contains(string fullName);
 
     CoopCommandResult ProcessCommand(string fullName, ICoopCommandArgs args);
@@ -20,7 +22,10 @@ public sealed class CoopCommandRegistry : ICoopCommandRegistry
     private readonly IReadOnlyDictionary<string, CoopCommandDescriptor> descriptorsByName;
     private readonly ILogger logger;
 
-    public CoopCommandRegistry(IEnumerable<ICoopCommand> commands, ILogger logger)
+    public CoopCommandRegistry(
+        IEnumerable<ICoopCommand> commands,
+        ILogger logger,
+        IReadOnlyDictionary<string, string> legacyAliases = null)
     {
         if (commands == null) throw new ArgumentNullException(nameof(commands));
         if (logger == null) throw new ArgumentNullException(nameof(logger));
@@ -54,12 +59,17 @@ public sealed class CoopCommandRegistry : ICoopCommandRegistry
         descriptors.Sort((first, second) =>
             StringComparer.Ordinal.Compare(first.FullName, second.FullName));
 
+        var resolvedAliases = ResolveLegacyAliases(legacyAliases, commandMap, descriptorMap);
+
         commandsByName = new ReadOnlyDictionary<string, ICoopCommand>(commandMap);
         descriptorsByName = new ReadOnlyDictionary<string, CoopCommandDescriptor>(descriptorMap);
         Commands = descriptors.AsReadOnly();
+        LegacyAliases = new ReadOnlyDictionary<string, string>(resolvedAliases);
     }
 
     public IReadOnlyList<CoopCommandDescriptor> Commands { get; }
+
+    public IReadOnlyDictionary<string, string> LegacyAliases { get; }
 
     public bool Contains(string fullName)
     {
@@ -99,6 +109,33 @@ public sealed class CoopCommandRegistry : ICoopCommandRegistry
                 $"Command '{fullName}' failed: {exception.Message}",
                 "command_failed");
         }
+    }
+
+    private static Dictionary<string, string> ResolveLegacyAliases(
+        IReadOnlyDictionary<string, string> legacyAliases,
+        Dictionary<string, ICoopCommand> commandMap,
+        Dictionary<string, CoopCommandDescriptor> descriptorMap)
+    {
+        var resolvedAliases = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (legacyAliases == null) return resolvedAliases;
+
+        foreach (KeyValuePair<string, string> alias in legacyAliases)
+        {
+            if (string.IsNullOrWhiteSpace(alias.Key) || ContainsWhitespace(alias.Key))
+                throw new InvalidOperationException($"The legacy command alias '{alias.Key}' is invalid.");
+            if (string.IsNullOrWhiteSpace(alias.Value) || ContainsWhitespace(alias.Value))
+                throw new InvalidOperationException($"The legacy command alias '{alias.Key}' has an invalid target.");
+            if (!commandMap.TryGetValue(alias.Value, out ICoopCommand command))
+                throw new InvalidOperationException($"The legacy command alias '{alias.Key}' has no matching command '{alias.Value}'.");
+            if (commandMap.ContainsKey(alias.Key))
+                throw new InvalidOperationException($"The command '{alias.Key}' is registered more than once.");
+
+            commandMap.Add(alias.Key, command);
+            descriptorMap.Add(alias.Key, descriptorMap[alias.Value]);
+            resolvedAliases.Add(alias.Key, alias.Value);
+        }
+
+        return resolvedAliases;
     }
 
     private void ValidateCommand(ICoopCommand command, IExpectedArgs[] expectedArgs)
@@ -177,7 +214,7 @@ public sealed class CoopCommandRegistry : ICoopCommandRegistry
         return new CoopCommandArgs(trimmedValues.AsReadOnly());
     }
 
-    private bool ContainsWhitespace(string value)
+    private static bool ContainsWhitespace(string value)
     {
         foreach (char character in value)
         {

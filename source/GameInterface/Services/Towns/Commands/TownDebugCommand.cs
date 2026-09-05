@@ -406,7 +406,7 @@ public class TownDebugCommand
         }
     }
 
-    // coop.debug.town.set_foodStocks
+    // coop.debug.town.set_food_stocks
     /// <summary>
     /// Set the food stocks for a Town
     /// </summary>

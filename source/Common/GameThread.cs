@@ -197,7 +197,7 @@ public class GameThread : IUpdateable
     /// game-thread (render-thread) lag to the handlers that cause it. Each queued action is labeled
     /// automatically from its caller (file + method) unless an explicit context is supplied, so no
     /// call site needs to change. Off by default; toggle it at runtime on the process you want to
-    /// profile (typically the client) with the <c>coop.debug.gamethread.instrument</c> console command.
+    /// profile (typically the client) with the <c>coop.debug.game_thread.instrument</c> console command.
     /// </summary>
     public static bool Instrument = false;
 

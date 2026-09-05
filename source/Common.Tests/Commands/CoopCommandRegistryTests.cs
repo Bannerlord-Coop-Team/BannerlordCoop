@@ -218,6 +218,93 @@ public class CoopCommandRegistryTests
         Assert.Contains("test failure", result.Output);
     }
 
+    [Fact]
+    public void ProcessCommand_WhenLegacyAliasIsUsed_RoutesToCanonicalCommand()
+    {
+        var command = new TestCommand(
+            "coop.debug.test",
+            "capture",
+            "Captures one value.",
+            expectedArgs: new IExpectedArgs[]
+            {
+                new ExpectedArgs("value", "The value to capture."),
+            });
+        var registry = CreateRegistry(
+            new Dictionary<string, string>
+            {
+                { "coop.debug.oldtest.capture", "coop.debug.test.capture" },
+            },
+            command);
+        var args = new CoopCommandArgsFactory().FromValues(new[] { "first" });
+
+        Assert.True(registry.Contains("coop.debug.oldtest.capture"));
+        CoopCommandResult result = registry.ProcessCommand("coop.debug.oldtest.capture", args);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("first", result.Output);
+        Assert.Equal(1, command.ProcessCount);
+        Assert.Equal("coop.debug.test.capture", Assert.Single(registry.LegacyAliases.Values));
+    }
+
+    [Fact]
+    public void ProcessCommand_WhenLegacyAliasArgumentsAreInvalid_ReturnsCanonicalUsage()
+    {
+        var command = new TestCommand(
+            "coop.debug.test",
+            "capture",
+            "Captures one value.",
+            expectedArgs: new IExpectedArgs[]
+            {
+                new ExpectedArgs("value", "The value to capture."),
+            });
+        var registry = CreateRegistry(
+            new Dictionary<string, string>
+            {
+                { "coop.debug.oldtest.capture", "coop.debug.test.capture" },
+            },
+            command);
+        var args = new CoopCommandArgsFactory().FromValues(Array.Empty<string>());
+
+        CoopCommandResult result = registry.ProcessCommand("coop.debug.oldtest.capture", args);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("invalid_arguments", result.ErrorCode);
+        Assert.StartsWith("Usage: coop.debug.test.capture <value>", result.Output);
+        Assert.Equal(0, command.ProcessCount);
+    }
+
+    [Fact]
+    public void Constructor_WhenLegacyAliasTargetIsMissing_Throws()
+    {
+        var command = new TestCommand("coop.debug.test", "capture", "Captures values.");
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => CreateRegistry(
+                new Dictionary<string, string>
+                {
+                    { "coop.debug.oldtest.capture", "coop.debug.test.missing" },
+                },
+                command));
+
+        Assert.Contains("coop.debug.oldtest.capture", exception.Message);
+    }
+
+    [Fact]
+    public void Constructor_WhenLegacyAliasCollidesWithCommand_Throws()
+    {
+        var command = new TestCommand("coop.debug.test", "capture", "Captures values.");
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => CreateRegistry(
+                new Dictionary<string, string>
+                {
+                    { "coop.debug.test.capture", "coop.debug.test.capture" },
+                },
+                command));
+
+        Assert.Contains("coop.debug.test.capture", exception.Message);
+    }
+
     private static string ExpectedUsage(params string[] lines)
     {
         return string.Join(Environment.NewLine, lines);
@@ -226,6 +313,13 @@ public class CoopCommandRegistryTests
     private static CoopCommandRegistry CreateRegistry(params ICoopCommand[] commands)
     {
         return new CoopCommandRegistry(commands, Mock.Of<ILogger>());
+    }
+
+    private static CoopCommandRegistry CreateRegistry(
+        IReadOnlyDictionary<string, string> legacyAliases,
+        params ICoopCommand[] commands)
+    {
+        return new CoopCommandRegistry(commands, Mock.Of<ILogger>(), legacyAliases);
     }
 
     private sealed class TestCommand : ICoopCommand

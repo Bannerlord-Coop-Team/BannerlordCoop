@@ -353,7 +353,7 @@ internal class MobilePartyDebugCommand
         return $"{genericTypeName}<{string.Join(", ", genericArguments)}>";
     }
 
-    // coop.debug.mobileparty.createParty lord_1_1 town_V1
+    // coop.debug.mobileparty.create_party lord_1_1 town_V1
     public sealed class CreateNewPartyCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.mobileparty";
@@ -514,7 +514,7 @@ internal class MobilePartyDebugCommand
         }
     }
 
-    // coop.debug.mobileparty.destroyAllBanditParties
+    // coop.debug.mobileparty.destroy_all_bandit_parties
     public sealed class DestroyAllBanditPartiesCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.mobileparty";

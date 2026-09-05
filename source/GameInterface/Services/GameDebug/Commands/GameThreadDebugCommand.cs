@@ -19,7 +19,7 @@ public class GameThreadDebugCommand
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
 
-    // coop.debug.gamethread.instrument [on|off|toggle|status]
+    // coop.debug.game_thread.instrument [on|off|toggle|status]
     /// <summary>
     /// Turns the game-thread drain instrumentation on or off, or reports its current state. With no
     /// argument it flips the current setting.

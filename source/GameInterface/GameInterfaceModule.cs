@@ -58,6 +58,7 @@ using GameInterface.Surrogates;
 using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Serilog;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
@@ -85,6 +86,7 @@ public class GameInterfaceModule : Module
 
         builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
         builder.RegisterType<RglCommandLineRegistry>().As<IRglCommandLineRegistry>().InstancePerDependency();
+        builder.RegisterInstance(CoopCommandLegacyAliases.Map).As<IReadOnlyDictionary<string, string>>().SingleInstance();
         builder.RegisterType<CoopCommandRegistry>().As<ICoopCommandRegistry>().InstancePerLifetimeScope();
         builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
             .Where(type => type.IsClass &&

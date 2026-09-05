@@ -776,11 +776,11 @@ internal class PartyCommands
         }
     }
 
-    // coop.debug.mobileparty.siege_buff
+    // coop.debug.mobile_party.siege_buff
     /// <summary>
     /// Fills a party to 2000 troops, maxes its morale, forces a high map speed, and stocks it with food so it
     /// can march to and win a siege for testing without starving. Server only; the troop and item adds replicate
-    /// via the roster sync. Get the party id from coop.debug.mobileparty.whoami on the client that owns the party.
+    /// via the roster sync. Get the party id from coop.debug.mobile_party.who_am_i on the client that owns the party.
     /// </summary>
     public sealed class SiegeBuffCoopCommand : ICoopCommand
     {
@@ -824,7 +824,7 @@ internal class PartyCommands
         }
     }
 
-    // coop.debug.mobileparty.declare_war
+    // coop.debug.mobile_party.declare_war
     /// <summary>
     /// Declares war between a party's faction and a settlement's faction, so the party can besiege that
     /// settlement. Works for an independent clan (no kingdom needed). Server only; the war replicates.

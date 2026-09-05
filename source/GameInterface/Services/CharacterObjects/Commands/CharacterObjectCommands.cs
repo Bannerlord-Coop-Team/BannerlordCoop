@@ -17,7 +17,7 @@ internal class CharacterObjectCommands
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
 
-    // coop.debug.characterObjects.info <charId>
+    // coop.debug.character_objects.info <charId>
     /// <summary>
     /// Reflection-dumps every field of a CharacterObject (walking up to its BasicCharacterObject base, where
     /// the synced _characterTraits / _occupation / _persona fields live) so a server screenshot and a client
@@ -53,7 +53,7 @@ internal class CharacterObjectCommands
         }
     }
 
-    // coop.debug.characterObjects.list
+    // coop.debug.character_objects.list
     public sealed class CharacterObjectsListCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.character_objects";
