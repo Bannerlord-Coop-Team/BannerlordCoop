@@ -20,6 +20,7 @@ using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MobileParties.Commands;
 
+#if DEBUG
 internal static class PartyInteractionMovementDebugCommands
 {
     private static CaravanProximityFixtureState caravanProximityFixture;
@@ -408,7 +409,6 @@ internal static class PartyInteractionMovementDebugCommands
             });
         }
 
-        caravanProximityFixture = null;
         restoredCaravanProximityFixture = restoring;
         return JsonResult(new
         {
@@ -448,9 +448,13 @@ internal static class PartyInteractionMovementDebugCommands
             restored.TargetNextTargetPosition,
             restored.TargetDefaultBehaviorNeedsUpdate);
         bool targetVerified = restored.TargetRestoredVerified;
-        bool verified = playerVerified && targetVerified;
+        bool verified = playerVerified && playerCurrentMatchesCaptured &&
+            targetVerified && targetCurrentMatchesCaptured;
         if (verified)
+        {
+            caravanProximityFixture = null;
             restoredCaravanProximityFixture = null;
+        }
 
         return JsonResult(new
         {
@@ -816,3 +820,4 @@ internal static class PartyInteractionMovementDebugCommands
     private static string JsonResult(object value) =>
         "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);
 }
+#endif

@@ -17,6 +17,7 @@ internal static class MobilePartyMovementStatePatches
     [ThreadStatic]
     private static int movementCommandDepth;
 
+#if DEBUG
     [ThreadStatic]
     private static int automaticBehaviorBroadcastSuppressionDepth;
 
@@ -37,6 +38,9 @@ internal static class MobilePartyMovementStatePatches
             automaticBehaviorBroadcastSuppressionDepth--;
         }
     }
+#else
+    internal static bool IsAutomaticBehaviorBroadcastSuppressed => false;
+#endif
 
     private static IEnumerable<MethodBase> TargetMethods() =>
         AccessTools.GetDeclaredMethods(typeof(MobileParty))
@@ -66,8 +70,11 @@ internal static class MobilePartyMovementStatePatches
             !CallOriginalPolicy.IsOriginalAllowed())
             __instance.SetNavigationModeHold();
 
-        if (__exception == null && __state && __instance?.IsActive == true &&
-            !IsAutomaticBehaviorBroadcastSuppressed)
+        if (__exception == null && __state && __instance?.IsActive == true
+#if DEBUG
+            && !IsAutomaticBehaviorBroadcastSuppressed
+#endif
+        )
             MessageBroker.Instance.Publish(__instance, new PartyBehaviorChangeAttempted(__instance));
 
         return __exception;
