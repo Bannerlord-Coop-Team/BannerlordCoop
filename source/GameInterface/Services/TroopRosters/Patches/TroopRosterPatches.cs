@@ -45,33 +45,44 @@ internal class TroopRosterPatches
     internal static bool ShouldReportClientMutation(bool isClient, bool isRegistered)
         => isClient && isRegistered;
 
+    internal static bool ShouldRejectHeroAddition(bool isHero, int currentCount, int countChange)
+        => countChange > 0 && isHero && currentCount + countChange > 1;
+
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
     [HarmonyPrefix]
-    private static void PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
-        int woundedCountChange, int xpChange, bool removeDepleted)
+    private static bool PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
+        int woundedCountChange, int xpChange, bool removeDepleted, ref int __result)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
-        if (ModInformation.IsClient)
-        {
-            if (ShouldReportClientMutation(ModInformation.IsClient, IsRegistered(__instance)))
-                Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddToCountsAtIndex), typeof(TroopRoster));
-            return;
-        }
-
-        // Skip rosters with no network identity (battle tally dummies, etc.) before allocating/publishing.
-        if (!IsRegistered(__instance)) return;
-
-        // Match the bounds guard the SetElement* prefixes use: an index in the slot-padding window
-        // (Count <= index < data.Length) would read a cleared element with a null Character.
-        if (index < 0 || index >= __instance.Count) return;
+        if (index < 0 || index >= __instance.Count) return true;
 
         // Resolve the element by identity now: the index is valid here (pre-mutation), but a subtract-to-zero
         // with removeDepleted removes it before a postfix could read it back.
         var character = __instance.GetElementCopyAtIndex(index).Character;
+        if (character != null &&
+            ShouldRejectHeroAddition(character.IsHero, __instance.GetTroopCount(character), countChange))
+        {
+            __result = index;
+            Logger.Error("Attempted to add a hero to a TroopRoster where they were already present.");
+            return false;
+        }
+
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient)
+        {
+            if (ShouldReportClientMutation(ModInformation.IsClient, IsRegistered(__instance)))
+                Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddToCountsAtIndex), typeof(TroopRoster));
+            return true;
+        }
+
+        // Skip rosters with no network identity (battle tally dummies, etc.) before allocating/publishing.
+        if (!IsRegistered(__instance)) return true;
+
         MessageBroker.Instance.Publish(__instance,
             new CountsAtIndexAdded(__instance, character, countChange, woundedCountChange, xpChange, removeDepleted));
 
         _inAddToCountsAtIndex = true;
+
+        return true;
     }
 
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
@@ -208,10 +219,27 @@ internal class TroopRosterPatches
 [HarmonyPatch(typeof(TroopRoster), nameof(TroopRoster.AddToCounts))]
 internal class TroopRosterAddToCountsPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterAddToCountsPatch>();
+
+    [HarmonyPrefix]
+    static bool Prefix(TroopRoster __instance, CharacterObject character, int count, out bool __state, ref int __result)
+    {
+        __state = true;
+        if (character == null ||
+            !TroopRosterPatches.ShouldRejectHeroAddition(character.IsHero, __instance.GetTroopCount(character), count))
+            return true;
+
+        __state = false;
+        __result = __instance.FindIndexOfTroop(character);
+        Logger.Error("Attempted to add a hero to a TroopRoster where they were already present.");
+        return false;
+    }
+
     [HarmonyPostfix]
     static void Postfix(TroopRoster __instance, CharacterObject character, int count,
-        int woundedCount, int xpChange, bool removeDepleted)
+        int woundedCount, int xpChange, bool removeDepleted, bool __state)
     {
+        if (!__state) return;
         if (!AllowedThread.IsThisThreadAllowed()) return;
         if (ModInformation.IsClient) return;
         if (__instance == null || character == null) return;
