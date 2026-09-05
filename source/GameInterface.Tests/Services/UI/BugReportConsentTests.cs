@@ -16,8 +16,8 @@ public class BugReportConsentTests
     {
         Assert.Contains("sent to the dedicated server", BugReportConsentCoordinator.PromptText);
         Assert.Contains("IP addresses", BugReportConsentCoordinator.PromptText);
-        Assert.Contains("current campaign save", BugReportConsentCoordinator.PromptText);
-        Assert.Contains("campaign save is still included", BugReportConsentCoordinator.PromptText);
+        Assert.Contains("current campaign save and paired co-op session data", BugReportConsentCoordinator.PromptText);
+        Assert.Contains("campaign save and paired co-op session data are still included", BugReportConsentCoordinator.PromptText);
         Assert.Contains("Client saves, configuration files, and memory dumps are not included",
             BugReportConsentCoordinator.PromptText);
         Assert.Contains("cancel this bug report", BugReportSubmissionConsent.PromptText);
@@ -27,7 +27,7 @@ public class BugReportConsentTests
         Assert.Contains("public GitHub issue", BugReportSubmissionConsent.PromptText);
         Assert.Contains("publicly accessible links", BugReportSubmissionConsent.PromptText);
         Assert.Contains("remote deletion or expiry is not guaranteed", BugReportSubmissionConsent.PromptText);
-        Assert.Contains("current campaign save", BugReportSubmissionConsent.PromptText);
+        Assert.Contains("current campaign save and paired co-op", BugReportSubmissionConsent.PromptText);
         Assert.Contains("Client saves, configuration files, and memory dumps are not included",
             BugReportSubmissionConsent.PromptText);
     }
@@ -53,7 +53,7 @@ public class BugReportConsentTests
     }
 
     [Fact]
-    public void ConsentWithoutServerSaveDisclosure_IsDisabledAndPromptedAgain()
+    public void ConsentWithoutSaveSidecarDisclosure_IsDisabledAndPromptedAgain()
     {
         var store = new TestOptionsStore();
         var options = store.LoadOrDefault();
@@ -63,7 +63,7 @@ public class BugReportConsentTests
             new BugReportConsentOptions
             {
                 ShareBugReportLogs = true,
-                DisclosureVersion = 2,
+                DisclosureVersion = 3,
             });
         store.Save(options);
         var coordinator = new BugReportConsentCoordinator(store, _ => { });
