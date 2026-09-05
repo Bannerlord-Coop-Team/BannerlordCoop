@@ -101,11 +101,17 @@ namespace GameInterface.Services.GameDebug.Commands
                 if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
 
                 var clanScreen = ScreenManager.TopScreen as GauntletClanScreen;
+                var selectedParty = clanScreen?._dataSource?.ClanParties?.CurrentSelectedParty;
                 return Succeeded($"CLAN_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is ClanState} " +
                     $"topScreen={clanScreen != null} dataSource={clanScreen?._dataSource != null} " +
                     $"parties={clanScreen?._dataSource?.ClanParties?._parties?.Count ?? -1} " +
                     $"partiesSelected={clanScreen?._dataSource?.IsPartiesSelected ?? false} " +
-                    $"mainHero={Hero.MainHero?.StringId ?? "none"}");
+                    $"mainHero={Hero.MainHero?.StringId ?? "none"} " +
+                    $"heroClan={Hero.MainHero?.Clan?.StringId ?? "none"} playerClan={Clan.PlayerClan?.StringId ?? "none"} " +
+                    $"partyVm={selectedParty?.GetType().Name ?? "none"} selectedParty={selectedParty?.Party?.MobileParty?.StringId ?? "none"} " +
+                    $"heroMembers={string.Join(",", selectedParty?.HeroMembers.Select(member => member.HeroObject.StringId) ?? Enumerable.Empty<string>())} " +
+                    $"hasCompanion={selectedParty?.HasCompanion ?? false} " +
+                    $"roles={selectedParty?.Roles.Count ?? -1} enabledRoles={selectedParty?.Roles.Count(role => role.IsEnabled) ?? -1}");
         }
     }
 

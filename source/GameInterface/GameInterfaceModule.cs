@@ -108,6 +108,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
         builder.RegisterType<ClanMemberGrouping>().As<IClanMemberGrouping>().InstancePerDependency();
+        builder.RegisterType<SharedClanPermissions>().As<ISharedClanPermissions>().InstancePerDependency();
         builder.RegisterType<ClanMembersVMFactory>().As<IClanMembersVMFactory>().InstancePerDependency();
         builder.RegisterType<ClanMembersPrefabEditor>().As<IClanMembersPrefabEditor>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();

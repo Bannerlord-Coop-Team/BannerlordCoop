@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -8,9 +9,9 @@ using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
+using TaleWorlds.Core;
 using TaleWorlds.Core.ViewModelCollection.Selector;
 
 namespace GameInterface.Services.Clans.Patches;
@@ -18,6 +19,79 @@ namespace GameInterface.Services.Clans.Patches;
 [HarmonyPatch(typeof(ClanPartyItemVM))]
 internal class ClanPartyItemVMPatches
 {
+    [HarmonyPatch(nameof(ClanPartyItemVM.UpdateProperties))]
+    [HarmonyPostfix]
+    public static void UpdatePropertiesPostfix(ClanPartyItemVM __instance)
+    {
+        var party = __instance.Party?.MobileParty;
+        bool canManage = SharedClanPermissions.CanManageParty(party);
+        bool canAssignRoles = SharedClanPermissions.CanAssignRoles(party);
+        bool isPlayerParty = party?.IsPlayerParty() == true;
+        var managementHint = GameTexts.FindText(isPlayerParty
+            ? "str_coop_clan_player_party_protected" : "str_coop_clan_party_leader_only");
+
+        __instance.IsChangeLeaderVisible &= canManage;
+        __instance.IsChangeLeaderEnabled &= canManage;
+        if (!canManage) __instance.ChangeLeaderHint.HintText = managementHint;
+        __instance.IsPartyBehaviorEnabled &= canManage;
+        __instance.CanUseActions &= canManage || canAssignRoles;
+        if (!canManage && !canAssignRoles)
+            __instance.ActionsDisabledHint.HintText = managementHint;
+
+        if (__instance.ExpenseItem != null && !canManage)
+        {
+            __instance.ExpenseItem.IsEnabled = false;
+            __instance.ExpenseItem.WageLimitHint.HintText = GameTexts.FindText(isPlayerParty
+                ? "str_coop_clan_player_party_wages_disabled" : "str_coop_clan_party_leader_only");
+            __instance.ActionsDisabledHint.HintText = __instance.ExpenseItem.WageLimitHint.HintText;
+        }
+        if (!canManage)
+            __instance.AutoRecruitmentHint.HintText = managementHint;
+        foreach (var role in __instance.Roles)
+        {
+            if (!canAssignRoles)
+                role.SetEnabled(false, GameTexts.FindText("str_coop_clan_party_roles_owner_only"));
+        }
+        if (__instance.PartyBehaviorSelector != null)
+            __instance.PartyBehaviorSelector.CanUseActions &= canManage;
+    }
+
+    [HarmonyPatch(nameof(ClanPartyItemVM.ExecuteChangeLeader))]
+    [HarmonyPrefix]
+    public static bool ExecuteChangeLeaderPrefix(ClanPartyItemVM __instance)
+    {
+        return SharedClanPermissions.CanManageParty(__instance.Party?.MobileParty);
+    }
+
+    [HarmonyPatch(nameof(ClanPartyItemVM.UpdateProperties))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> MemberClanTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var playerClanGetter = AccessTools.PropertyGetter(typeof(Clan), nameof(Clan.PlayerClan));
+        var mainHeroGetter = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.MainHero));
+        var heroClanGetter = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.Clan));
+        int replacements = 0;
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(playerClanGetter))
+            {
+                // Filter against current membership instead of the default clan
+                instruction.operand = mainHeroGetter;
+                yield return instruction;
+                yield return new CodeInstruction(OpCodes.Callvirt, heroClanGetter);
+                replacements++;
+            }
+            else
+            {
+                yield return instruction;
+            }
+        }
+
+        if (replacements != 1)
+            throw new InvalidOperationException($"Expected one player clan lookup in {nameof(ClanPartyItemVM.UpdateProperties)}, found {replacements}.");
+    }
+
     [HarmonyPatch(nameof(ClanPartyItemVM.UpdateProperties))]
     [HarmonyTranspiler]
     internal static IEnumerable<CodeInstruction> UpdatePropertiesTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
@@ -159,6 +233,8 @@ internal class ClanPartyItemVMPatches
     [HarmonyPrefix]
     public static bool UpdatePartyBehaviorSelectionUpdatePrefix(ref ClanPartyItemVM __instance, SelectorVM<SelectorItemVM> s)
     {
+        if (!SharedClanPermissions.CanManageParty(__instance.Party?.MobileParty)) return false;
+
         if (s.SelectedIndex != (int)__instance.Party.MobileParty.Objective)
         {
             // Manage setting the party behavior on the server
@@ -173,6 +249,8 @@ internal class ClanPartyItemVMPatches
     [HarmonyPrefix]
     public static bool OnAutoRecruitChangedPrefix(ref ClanPartyItemVM __instance, bool value)
     {
+        if (!SharedClanPermissions.CanManageParty(__instance.Party?.MobileParty)) return false;
+
         if (__instance.Party.IsMobile && __instance.Party.MobileParty.IsGarrison)
         {
             Settlement homeSettlement = __instance.Party.MobileParty.HomeSettlement;

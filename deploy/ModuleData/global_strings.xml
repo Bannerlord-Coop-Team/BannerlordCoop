@@ -7,5 +7,9 @@
     <string id="str_coop_clan_player" text="{=str_coop_clan_player}Player" />
     <string id="str_coop_clan_player_leader" text="{=str_coop_clan_player_leader}Player · Clan leader" />
     <string id="str_coop_clan_player_self" text="{=str_coop_clan_player_self}{ROLE} (You)" />
+    <string id="str_coop_clan_party_leader_only" text="{=str_coop_clan_party_leader_only}Only the clan leader can manage clan parties." />
+    <string id="str_coop_clan_party_roles_owner_only" text="{=str_coop_clan_party_roles_owner_only}Only this party's leader can assign its roles." />
+    <string id="str_coop_clan_player_party_protected" text="{=str_coop_clan_player_party_protected}Player parties cannot be disbanded or have their leaders replaced." />
+    <string id="str_coop_clan_player_party_wages_disabled" text="{=str_coop_clan_player_party_wages_disabled}Wage limits cannot be set for player parties." />
     <!-- Add other custom text here in the future-->
 </strings>
