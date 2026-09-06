@@ -151,6 +151,7 @@ internal class IssueFinalizationHandler : IHandler
             objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out hostParty);
         }
 
+        var quest = owner.Issue.IssueQuest;
         var descriptor = QuestTypeRegistry.Get(owner.Issue);
         var successProof = descriptor?.CaptureQuestSuccessProof?.Invoke(owner.Issue) ?? 0;
         var validator = descriptor?.ValidateQuestSuccess;
@@ -175,10 +176,12 @@ internal class IssueFinalizationHandler : IHandler
             }
         }
 
-        FinalizeAndBroadcast(owner, ownerId, player, IssueFinalizeReason.QuestSuccess, successProof);
+        if (!FinalizeAndBroadcast(owner, ownerId, player, IssueFinalizeReason.QuestSuccess, successProof)) return;
+
+        descriptor?.ApplyQuestSuccessLocalOwnerConsequence?.Invoke(quest);
     }
 
-    private void FinalizeAndBroadcast(Hero owner, string ownerId, Player player, IssueFinalizeReason reason, byte proof = 0)
+    private bool FinalizeAndBroadcast(Hero owner, string ownerId, Player player, IssueFinalizeReason reason, byte proof = 0)
     {
         MobileParty ownerParty = null;
         if (player.MobilePartyId != null)
@@ -199,11 +202,14 @@ internal class IssueFinalizationHandler : IHandler
         catch (Exception e)
         {
             Logger.Error(e, "Failed to finalize {Reason} for owner {Owner} - not broadcasting", reason, ownerId);
+            return false;
         }
         finally
         {
             SetProofContext(reason, 0);
         }
+
+        return true;
     }
 
     private void Handle_RequestIssueRemoved(MessagePayload<RequestIssueRemoved> payload)
@@ -423,6 +429,10 @@ internal class IssueFinalizationHandler : IHandler
                 if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
             }
 
+            var isLocalPeerOwner = ownershipRegistry.IsLocalPeerOwner(owner);
+            var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            var quest = owner.Issue?.IssueQuest;
+
             SetProofContext(reason, proof);
             try
             {
@@ -434,6 +444,11 @@ internal class IssueFinalizationHandler : IHandler
             finally
             {
                 SetProofContext(reason, 0);
+            }
+
+            if (isLocalPeerOwner && reason == IssueFinalizeReason.QuestSuccess && quest != null)
+            {
+                descriptor?.ApplyQuestSuccessLocalOwnerConsequence?.Invoke(quest);
             }
         });
     }

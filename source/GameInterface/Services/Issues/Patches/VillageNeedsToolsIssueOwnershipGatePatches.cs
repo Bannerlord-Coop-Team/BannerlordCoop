@@ -1,12 +1,37 @@
 using Common;
+using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Patches;
+
+[HarmonyPatch(typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest), "FinishQuestSuccess1")]
+internal class VillageNeedsToolsQuestSuccessGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix() => CallOriginalPolicy.IsOriginalAllowed() || IssueFinalizeAuthorityGuard.IsActive;
+}
+
+[HarmonyPatch(typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest), "FinishQuestSuccess1")]
+internal class VillageNeedsToolsQuestSuccessTriggerPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed() || IssueFinalizeAuthorityGuard.IsActive) return;
+
+        var owner = __instance.QuestGiver;
+        if (owner == null) return;
+
+        ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
+        MessageBroker.Instance.Publish(owner, new QuestSuccessTriggered(owner, controllerIdProvider?.ControllerId));
+    }
+}
 
 [HarmonyPatch(typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest), "RaidCompleted")]
 internal class VillageNeedsToolsQuestRaidCompletedAuthorityPatch

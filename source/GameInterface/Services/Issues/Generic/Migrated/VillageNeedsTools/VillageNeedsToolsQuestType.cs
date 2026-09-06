@@ -236,14 +236,18 @@ internal static class VillageNeedsToolsQuestType
         return objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out trueOwnerHero);
     }
 
-    private static void ApplyQuestSuccessConsequence(Quest quest)
+    private static void ApplyQuestSuccessLocalOwnerConsequence(Quest quest)
     {
-        quest.AddLog(quest.QuestSuccessLog);
-        quest.QuestGiver.AddPower(10f);
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
         {
             new Tuple<TraitObject, int>(DefaultTraits.Honor, 30)
         });
+    }
+
+    private static void ApplyQuestSuccessConsequence(Quest quest)
+    {
+        quest.AddLog(quest.QuestSuccessLog);
+        quest.QuestGiver.AddPower(10f);
         PartyBase.MainParty.ItemRoster.AddToCounts(quest._requestedTradeGood, -quest._numberOfRequestedGood);
         Quest.GiveTradeOrExchangeRewardToMainParty(quest.QuestGiver, quest.RewardGold, quest._exchangeItem, quest._numberOfExchangeItem);
 
@@ -274,6 +278,7 @@ internal static class VillageNeedsToolsQuestType
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
+            .WithQuestSuccessLocalOwnerConsequence(ApplyQuestSuccessLocalOwnerConsequence)
             .WithQuestCancelValidation(ValidateQuestCancel)
             .WithQuestFailValidation(issue => true)
             .Build();

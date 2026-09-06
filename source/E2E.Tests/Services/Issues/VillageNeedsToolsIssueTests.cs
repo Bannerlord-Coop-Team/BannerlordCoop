@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
+using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -788,6 +789,71 @@ public class VillageNeedsToolsIssueTests : IDisposable
                 Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
             });
         }
+    }
+
+    [Fact]
+    public void ClientTurnInWithDoubleTheRequestedTools_RemovesExactlyTheRequestedCountOnce_AndCreditsHonorOnlyToTheOwningClient()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var partyId = AcceptQuestFromClient(fixture, "player-A");
+
+        var requestedCount = 0;
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(fixture.ItemId, out var requestedItem));
+                var instanceQuest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(owner.Issue.IssueQuest);
+                Assert.Same(requestedItem, instanceQuest._requestedTradeGood);
+                Assert.True(instanceQuest._numberOfRequestedGood > 0);
+
+                using (new AllowedThread())
+                {
+                    party.ItemRoster.AddToCounts(requestedItem, 2 * instanceQuest._numberOfRequestedGood);
+                }
+                if (instance == Server) requestedCount = instanceQuest._numberOfRequestedGood;
+            });
+        }
+
+        int serverHonorXpBefore = 0;
+        Server.Call(() => serverHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        int clientHonorXpBefore = 0;
+        Client.Call(() => clientHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            var quest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(owner.Issue.IssueQuest);
+
+            quest.FinishQuestSuccess1();
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(fixture.ItemId, out var requestedItem));
+            var rosterUpdate = Assert.Single(Server.InternalMessages.GetMessages<ItemRosterUpdated>().Where(update => update.Item == requestedItem));
+            Assert.Equal(-requestedCount, rosterUpdate.Amount);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(fixture.ItemId, out var requestedItem));
+                Assert.Null(owner.Issue);
+                Assert.Equal(requestedCount, party.ItemRoster.GetItemNumber(requestedItem));
+            });
+        }
+
+        Server.Call(() => Assert.Equal(serverHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+        Client.Call(() => Assert.Equal(clientHonorXpBefore + 30, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
     }
 
     private record VillageFixtureWithCompanion(string HeroId, string VillageId, string SettlementId, string ItemId, string CompanionHeroId);
