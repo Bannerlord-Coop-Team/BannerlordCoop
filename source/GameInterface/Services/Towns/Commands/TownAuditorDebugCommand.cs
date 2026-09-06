@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using Autofac;
 using Common;
 using Common.Messaging;
@@ -9,12 +10,16 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
 namespace GameInterface.Services.Towns.Commands;
 
 public class TownAuditorDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     /// <summary>
     /// Attempts to get the ObjectManager
     /// </summary>
@@ -34,29 +39,40 @@ public class TownAuditorDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the towns</returns>
-    [CommandLineArgumentFunction("auditor", "coop.debug.town")]
-    public static string Auditor(List<string> args)
+    public sealed class AuditorCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
+        public string Prefix => "coop.debug.town";
 
-        if (ModInformation.IsServer)
+        public string Name => "auditor";
+
+        public string Description => "Runs the relevant state for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "The town Auditor debug command can only be called by a Client";
-        }
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
+            StringBuilder stringBuilder = new StringBuilder();
+
+            if (ModInformation.IsServer)
+            {
+                return Failed("The town Auditor debug command can only be called by a Client");
+            }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+
+            }
+            Settlement first_settlement = Campaign.Current.CampaignObjectManager.Settlements
+                        .First();
+
+            var message = new TownAuditorSent(getAllTownInfo(objectManager, stringBuilder));
+            MessageBroker.Instance.Publish(first_settlement, message);
+
+            stringBuilder.Append("Debug command done.");
+            return Succeeded(stringBuilder.ToString());
+
 
         }
-        Settlement first_settlement = Campaign.Current.CampaignObjectManager.Settlements
-                    .First();
-
-        var message = new TownAuditorSent(getAllTownInfo(objectManager, stringBuilder));
-        MessageBroker.Instance.Publish(first_settlement, message);
-
-        stringBuilder.Append("Debug command done.");
-        return stringBuilder.ToString();
-
     }
 
     public static List<TownAuditorData> getAllTownInfo(IObjectManager objectManager, StringBuilder stringBuilder = null)
@@ -74,7 +90,7 @@ public class TownAuditorDebugCommand
             else
             {
                 Fief fief = town.Settlement.SettlementComponent as Fief;
-                
+
                 TownAuditorData auditorData = new TownAuditorData(
                     townStringId: town.StringId,
                     name: town.Name.ToString(),

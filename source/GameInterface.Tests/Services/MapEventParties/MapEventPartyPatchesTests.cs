@@ -18,4 +18,18 @@ public class MapEventPartyPatchesTests
         bool result = MapEventPartyPatches.ShouldRunTroopStateUpdate(isOriginalAllowed, isServer);
         Assert.Equal(expected, result);
     }
+
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    public void ShouldUseClientTroopStateFallback_ReturnsExpectedResults(
+        bool battleSpawnEnabled,
+        bool isCoopBattleActive,
+        bool expected)
+    {
+        bool result = MapEventPartyPatches.ShouldUseClientTroopStateFallback(battleSpawnEnabled, isCoopBattleActive);
+        Assert.Equal(expected, result);
+    }
 }

@@ -24,17 +24,17 @@ public class PlayerNameplatesOptionsTabProvider : ICoopOptionsTabProvider
             TabName,
             new CoopOptionsSectionVM[]
             {
-                new PlayerNameplatesSection(GetShowPlayerNameplatesOrDefault(options), messageBroker)
+                new PlayerNameplatesSection(GetDisplayModeOrDefault(options), messageBroker)
             },
             onSelect);
     }
 
-    public static bool GetShowPlayerNameplatesOrDefault(CoopOptionsData options)
+    public static PlayerNameplatesDisplayMode GetDisplayModeOrDefault(CoopOptionsData options)
     {
         var sectionOptions = (options ?? new CoopOptionsData()).GetSectionOrDefault(
             TabId,
             PlayerNameplatesSection.SectionId,
             new PlayerNameplatesSectionOptions());
-        return sectionOptions.GetShowPlayerNameplatesOrDefault();
+        return sectionOptions.GetDisplayModeOrDefault();
     }
 }

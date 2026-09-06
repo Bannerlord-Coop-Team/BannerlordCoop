@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using Common.Commands;
 using Common.Messaging;
 using Common.Network;
 using Common.Tests.Utils;
@@ -53,7 +54,7 @@ public class PartySyncPerformanceLogsCommandTests : IDisposable
     {
         logger.Setup(l => l.Enable(TimeSpan.FromSeconds(60), "test_log")).Returns("enabled");
 
-        var result = PartySyncPerformanceLogsCommand.PartySyncPerformanceLogs(new List<string> { "on", "60", "test_log" });
+        var result = ExecuteCommand(new List<string> { "on", "60", "test_log" });
 
         Assert.Equal("enabled", result);
         logger.Verify(l => l.Enable(TimeSpan.FromSeconds(60), "test_log"), Times.Once);
@@ -64,7 +65,7 @@ public class PartySyncPerformanceLogsCommandTests : IDisposable
     {
         logger.Setup(l => l.Disable()).Returns("disabled");
 
-        var result = PartySyncPerformanceLogsCommand.PartySyncPerformanceLogs(new List<string> { "off" });
+        var result = ExecuteCommand(new List<string> { "off" });
 
         Assert.Equal("disabled", result);
         logger.Verify(l => l.Disable(), Times.Once);
@@ -75,7 +76,7 @@ public class PartySyncPerformanceLogsCommandTests : IDisposable
     {
         logger.Setup(l => l.Status()).Returns("status");
 
-        var result = PartySyncPerformanceLogsCommand.PartySyncPerformanceLogs(new List<string> { "status" });
+        var result = ExecuteCommand(new List<string> { "status" });
 
         Assert.Equal("status", result);
         logger.Verify(l => l.Status(), Times.Once);
@@ -84,16 +85,16 @@ public class PartySyncPerformanceLogsCommandTests : IDisposable
     [Fact]
     public void On_MissingArgs_ReturnsUsage()
     {
-        var result = PartySyncPerformanceLogsCommand.PartySyncPerformanceLogs(new List<string> { "on", "60" });
+        var result = ExecuteCommand(new List<string> { "on", "60" });
 
-        Assert.Contains("Usage:", result);
+        Assert.Contains("requires seconds and a file name", result);
         logger.Verify(l => l.Enable(It.IsAny<TimeSpan>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
     public void On_NonPositiveSeconds_ReturnsError()
     {
-        var result = PartySyncPerformanceLogsCommand.PartySyncPerformanceLogs(new List<string> { "on", "0", "test_log" });
+        var result = ExecuteCommand(new List<string> { "on", "0", "test_log" });
 
         Assert.Equal("Seconds must be a positive number", result);
         logger.Verify(l => l.Enable(It.IsAny<TimeSpan>(), It.IsAny<string>()), Times.Never);
@@ -106,7 +107,7 @@ public class PartySyncPerformanceLogsCommandTests : IDisposable
         using var realContainer = CreateLoggerContainer(fileWriter);
         ContainerProvider.SetContainer(realContainer);
 
-        var result = PartySyncPerformanceLogsCommand.PartySyncPerformanceLogs(new List<string> { "on", "60", "test_log" });
+        var result = ExecuteCommand(new List<string> { "on", "60", "test_log" });
 
         Assert.Contains("test_log.csv", result);
         var write = Assert.Single(fileWriter.Writes);
@@ -118,10 +119,16 @@ public class PartySyncPerformanceLogsCommandTests : IDisposable
     {
         ModInformation.IsServer = true;
 
-        var result = PartySyncPerformanceLogsCommand.PartySyncPerformanceLogs(new List<string> { "status" });
+        var result = ExecuteCommand(new List<string> { "status" });
 
         Assert.Equal("party_sync_performance_logs can only be called by a client", result);
         logger.Verify(l => l.Status(), Times.Never);
+    }
+
+    private static string ExecuteCommand(List<string> args)
+    {
+        var command = new PartySyncPerformanceLogsCommand.MetricsPartySyncPerformanceLogsCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
     }
 
     private static IContainer CreateLoggerContainer(FakeFileWriter fileWriter)

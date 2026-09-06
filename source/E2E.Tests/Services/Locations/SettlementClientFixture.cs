@@ -52,7 +52,12 @@ public sealed class SettlementClientFixture : IDisposable
     public void Tick(float elapsedSeconds)
     {
         ThrowIfDisposed();
-        Instance.Call(() => Controller.OnMissionTick(elapsedSeconds));
+        Instance.Call(() =>
+        {
+            Controller.OnPreMissionTick(elapsedSeconds);
+            Controller.OnMissionTick(elapsedSeconds);
+            Controller.OnPreDisplayMissionTick(elapsedSeconds);
+        });
     }
 
     public void Leave()

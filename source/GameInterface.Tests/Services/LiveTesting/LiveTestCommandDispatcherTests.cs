@@ -1,5 +1,8 @@
 ﻿using Common;
+using Common.Commands;
 using GameInterface.Services.LiveTesting;
+using Moq;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,6 +37,27 @@ public class LiveTestCommandDispatcherTests
 
         Assert.True(result.Found);
         Assert.Equal("argument with spaces|identifier-42", result.Output);
+    }
+
+    [Fact]
+    public void Execute_WhenFrameworkCommandExists_PreservesStructuredArguments()
+    {
+        const string commandName = "coop.live_testing_dispatcher_test.framework_capture";
+        var registry = new CoopCommandRegistry(
+            new[] { new FrameworkCaptureCommand() },
+            Mock.Of<ILogger>());
+        var dispatcher = new LiveTestCommandDispatcher(registry, new CoopCommandArgsFactory());
+        var arguments = new List<string>
+        {
+            "argument with spaces",
+            "quoted \"value\"",
+        };
+
+        LiveTestCommandResult result = dispatcher.Execute(commandName, arguments);
+
+        Assert.Contains(commandName, dispatcher.GetCommandNames());
+        Assert.True(result.Found);
+        Assert.Equal("argument with spaces|quoted \"value\"", result.Output);
     }
 
     [Fact]
@@ -73,7 +97,7 @@ public class LiveTestCommandDispatcherTests
         LiveTestCommandResult result = new LiveTestCommandDispatcher().Execute(NonDebugCommand, new List<string>());
 
         Assert.False(result.Found);
-        Assert.Equal("Only coop.debug. commands may be run through live testing", result.Output);
+        Assert.Equal("Only registered co-op commands and legacy coop.debug.* commands may be run through live testing", result.Output);
         Assert.Equal(0, nonDebugInvocations);
     }
 
@@ -88,5 +112,25 @@ public class LiveTestCommandDispatcherTests
     {
         nonDebugInvocations++;
         return "invoked";
+    }
+
+    private sealed class FrameworkCaptureCommand : ICoopCommand
+    {
+        public string Prefix => "coop.live_testing_dispatcher_test";
+
+        public string Name => "framework_capture";
+
+        public string Description => "Captures structured live-test arguments.";
+
+        public IExpectedArgs[] ExpectedArgs => new IExpectedArgs[]
+        {
+            new ExpectedArgs("first", "The first value to capture."),
+            new ExpectedArgs("second", "The second value to capture."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            return new CoopCommandResult(true, string.Join("|", args));
+        }
     }
 }

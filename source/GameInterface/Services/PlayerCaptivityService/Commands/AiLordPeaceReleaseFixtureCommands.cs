@@ -1,4 +1,5 @@
 ﻿#if DEBUG
+using Common.Commands;
 using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
@@ -26,254 +27,347 @@ namespace GameInterface.Services.PlayerCaptivityService.Commands;
 /// </summary>
 internal static class AiLordPeaceReleaseFixtureCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private static AiLordPeaceReleaseFixture fixture;
     private static StanceLinkSnapshot clientDiplomaticSnapshot;
 
-    [CommandLineArgumentFunction("observe_ai_lord_pair", "coop.debug.player_captivity")]
-    public static string ObserveAiLordPair(List<string> args)
+    public sealed class PlayerCaptivityObserveAiLordPairCoopCommand : ICoopCommand
     {
-        const string usage = "Usage: coop.debug.player_captivity.observe_ai_lord_pair <prisonerHeroId> <captorHeroId>";
-        var context = new CommandContext("observe_ai_lord_pair", usage, args);
+        public string Prefix => "coop.debug.player_captivity";
 
-        if (!context.RequireArgCount(2, out var error)) return error;
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-            return "Failed to observe AI lords: " + error;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var prisoner, out error))
-            return "Failed to observe AI lords: " + error;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[1], out var captorHero, out error))
-            return "Failed to observe AI lords: " + error;
+        public string Name => "observe_ai_lord_pair";
 
-        var heroParty = prisoner.PartyBelongedTo;
-        var captorParty = prisoner.PartyBelongedToAsPrisoner?.MobileParty;
-        var captorHeroParty = captorHero.PartyBelongedTo;
-        var prisonerFaction = prisoner.MapFaction;
-        var captorFaction = captorHero.MapFaction;
-        var output = new StringBuilder();
-        output.AppendLine("PrisonerHeroId=" + prisoner.StringId);
-        output.AppendLine("CaptorHeroId=" + captorHero.StringId);
-        output.AppendLine("PrisonerFactionId=" + (prisonerFaction?.StringId ?? "none"));
-        output.AppendLine("CaptorFactionId=" + (captorFaction?.StringId ?? "none"));
-        output.AppendLine("AtWar=" + (prisonerFaction != null && captorFaction != null
-            ? prisonerFaction.IsAtWarWith(captorFaction).ToString()
-            : "none"));
-        output.AppendLine("HeroState=" + prisoner.HeroState);
-        output.AppendLine("IsPrisoner=" + prisoner.IsPrisoner);
-        output.AppendLine("CaptorPartyId=" + (captorParty?.StringId ?? "none"));
-        output.AppendLine("CaptorPrisonerCount=" + (captorParty?.PrisonRoster.GetTroopCount(prisoner.CharacterObject) ?? 0));
-        output.AppendLine("HeroPartyId=" + (heroParty?.StringId ?? "none"));
-        output.AppendLine("HeroPartyActive=" + (heroParty?.IsActive.ToString() ?? "none"));
-        output.AppendLine("HeroPartyLeaderId=" + (heroParty?.LeaderHero?.StringId ?? "none"));
-        output.AppendLine("HeroPartyPosition=" + (heroParty == null ? "none" : FormatPosition(heroParty.Position)));
-        output.AppendLine("CaptorHeroPartyId=" + (captorHeroParty?.StringId ?? "none"));
-        output.AppendLine("CaptorHeroPartyActive=" + (captorHeroParty?.IsActive.ToString() ?? "none"));
-        output.AppendLine("CaptorHeroPartyPosition=" + (captorHeroParty == null ? "none" : FormatPosition(captorHeroParty.Position)));
-        output.Append("DiplomaticStateFingerprint=" + GetDiplomaticStateFingerprint(prisonerFaction, captorFaction));
-        return output.ToString();
-    }
+        public string Description => "Runs the observe ai lord pair debug operation.";
 
-    [CommandLineArgumentFunction("focus_hero_party", "coop.debug.player_captivity")]
-    public static string FocusHeroParty(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.player_captivity.focus_hero_party <heroId>";
-        var context = new CommandContext("focus_hero_party", usage, args);
-
-        if (!context.RequireArgCount(1, out var error)) return error;
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-            return "Failed to focus hero party: " + error;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error))
-            return "Failed to focus hero party: " + error;
-
-        var party = hero.PartyBelongedTo ?? hero.PartyBelongedToAsPrisoner?.MobileParty;
-        if (party?.IsActive != true)
-            return $"Failed to focus hero party: '{hero.StringId}' has no active member or captor party.";
-
-        party.Party.SetAsCameraFollowParty();
-        return $"Following party '{party.StringId}' for hero '{hero.StringId}' on the campaign map.";
-    }
-
-    [CommandLineArgumentFunction("snapshot_ai_lord_diplomacy_fixture", "coop.debug.player_captivity")]
-    public static string SnapshotAiLordDiplomacyFixture(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.player_captivity.snapshot_ai_lord_diplomacy_fixture <prisonerHeroId> <captorHeroId>";
-        var context = new CommandContext("snapshot_ai_lord_diplomacy_fixture", usage, args);
-
-        if (!ModInformation.IsClient) return "snapshot_ai_lord_diplomacy_fixture must be run on a client.";
-        if (!context.RequireArgCount(2, out var error)) return error;
-        if (clientDiplomaticSnapshot != null) return "A client AI-lord diplomatic fixture is already active.";
-        if (!TryGetHeroFactions(args, out var prisonerFaction, out var captorFaction, out error))
-            return "Failed to snapshot AI-lord diplomacy: " + error;
-
-        clientDiplomaticSnapshot = StanceLinkSnapshot.Capture(prisonerFaction, captorFaction);
-        return "Client AI-lord diplomatic fixture captured.\nOriginalDiplomaticStateFingerprint=" +
-            clientDiplomaticSnapshot.OriginalFingerprint;
-    }
-
-    [CommandLineArgumentFunction("restore_ai_lord_diplomacy_fixture", "coop.debug.player_captivity")]
-    public static string RestoreAiLordDiplomacyFixture(List<string> args)
-    {
-        if (!ModInformation.IsClient)
-            return "restore_ai_lord_diplomacy_fixture must be run on a client.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.player_captivity.restore_ai_lord_diplomacy_fixture";
-        if (clientDiplomaticSnapshot == null)
-            return "No client AI-lord diplomatic fixture is active.";
-
-        var pendingSnapshot = clientDiplomaticSnapshot;
-        pendingSnapshot.Restore(false);
-        var verification = pendingSnapshot.VerifyRestored();
-        if (verification != null)
-            return "Failed to restore client AI-lord diplomatic fixture: " + verification;
-
-        clientDiplomaticSnapshot = null;
-        return "Client AI-lord diplomatic fixture restored.";
-    }
-
-    [CommandLineArgumentFunction("capture_ai_lord_fixture", "coop.debug.player_captivity")]
-    public static string CaptureAiLordFixture(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.player_captivity.capture_ai_lord_fixture <prisonerHeroId> <captorHeroId>";
-        var context = new CommandContext("capture_ai_lord_fixture", usage, args);
-
-        if (!context.RequireServer(out var error)) return error;
-        if (!context.RequireArgCount(2, out error)) return error;
-        if (fixture != null) return "An AI-lord captivity fixture is already active.";
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-            return "Failed to create AI-lord fixture: " + error;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var prisoner, out error))
-            return "Failed to create AI-lord fixture: " + error;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[1], out var captorHero, out error))
-            return "Failed to create AI-lord fixture: " + error;
-
-        if (prisoner.IsPrisoner)
-            return $"Failed to create AI-lord fixture: '{prisoner.StringId}' is already a prisoner.";
-        if (!prisoner.IsLord || prisoner.IsPlayerHero())
-            return $"Failed to create AI-lord fixture: '{prisoner.StringId}' is not an AI lord.";
-
-        var prisonerParty = prisoner.PartyBelongedTo;
-        var captorParty = captorHero.PartyBelongedTo;
-        if (prisonerParty?.IsActive != true)
-            return $"Failed to create AI-lord fixture: '{prisoner.StringId}' has no active party.";
-        if (captorParty?.IsActive != true)
-            return $"Failed to create AI-lord fixture: '{captorHero.StringId}' has no active party.";
-        if (prisonerParty == captorParty)
-            return "Failed to create AI-lord fixture: prisoner and captor belong to the same party.";
-
-        var prisonerFaction = prisoner.MapFaction;
-        var captorFaction = captorHero.MapFaction;
-        if (prisonerFaction == null || captorFaction == null || prisonerFaction == captorFaction)
-            return "Failed to create AI-lord fixture: prisoner and captor need distinct map factions.";
-
-        var prisonerIndex = prisonerParty.MemberRoster.FindIndexOfTroop(prisoner.CharacterObject);
-        if (prisonerIndex < 0)
-            return $"Failed to create AI-lord fixture: '{prisoner.StringId}' is absent from its party roster.";
-
-        if (!prisonerFaction.IsAtWarWith(captorFaction))
-            return "Failed to create AI-lord fixture: the prisoner and captor factions must already be at war.";
-
-        var pendingFixture = new AiLordPeaceReleaseFixture(
-            prisoner,
-            captorHero,
-            prisonerParty,
-            captorParty,
-            prisonerParty.MemberRoster.GetElementCopyAtIndex(prisonerIndex),
-            prisoner.HeroState,
-            prisonerParty.LeaderHero,
-            prisonerParty.CurrentSettlement,
-            prisonerParty.Position,
-            prisonerParty.IsActive,
-            captorParty.CurrentSettlement,
-            captorParty.Position,
-            captorParty.IsActive,
-            prisonerFaction,
-            captorFaction,
-            StanceLinkSnapshot.Capture(prisonerFaction, captorFaction));
-
-        fixture = pendingFixture;
-        try
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            TakePrisonerAction.Apply(captorParty.Party, prisoner);
-            if (!prisoner.IsPrisoner || prisoner.PartyBelongedToAsPrisoner != captorParty.Party)
-            {
-                Restore(pendingFixture);
-                var verification = VerifyRestored(pendingFixture);
-                if (verification != null)
-                    return "Failed to create AI-lord fixture: the capture action did not establish captivity; rollback failed: " + verification;
+            new ExpectedArgs("prisoner_hero_id", "The registered prisoner hero id.", isRequired: true),
+            new ExpectedArgs("captor_hero_id", "The registered captor hero id.", isRequired: true),
+        };
 
-                fixture = null;
-                return "Failed to create AI-lord fixture: the capture action did not establish captivity; the baseline was restored.";
-            }
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string error;
+            var context = new CommandContext("observe_ai_lord_pair", "Argument must not be empty.", new List<string>(args));
 
-            return "AI-lord captivity fixture created.\n" + Observe(fixture);
+            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+                return Failed("Failed to observe AI lords: " + error);
+            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var prisoner, out error))
+                return Failed("Failed to observe AI lords: " + error);
+            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[1], out var captorHero, out error))
+                return Failed("Failed to observe AI lords: " + error);
+
+            var heroParty = prisoner.PartyBelongedTo;
+            var captorParty = prisoner.PartyBelongedToAsPrisoner?.MobileParty;
+            var captorHeroParty = captorHero.PartyBelongedTo;
+            var prisonerFaction = prisoner.MapFaction;
+            var captorFaction = captorHero.MapFaction;
+            var output = new StringBuilder();
+            output.AppendLine("PrisonerHeroId=" + prisoner.StringId);
+            output.AppendLine("CaptorHeroId=" + captorHero.StringId);
+            output.AppendLine("PrisonerFactionId=" + (prisonerFaction?.StringId ?? "none"));
+            output.AppendLine("CaptorFactionId=" + (captorFaction?.StringId ?? "none"));
+            output.AppendLine("AtWar=" + (prisonerFaction != null && captorFaction != null
+                ? prisonerFaction.IsAtWarWith(captorFaction).ToString()
+                : "none"));
+            output.AppendLine("HeroState=" + prisoner.HeroState);
+            output.AppendLine("IsPrisoner=" + prisoner.IsPrisoner);
+            output.AppendLine("CaptorPartyId=" + (captorParty?.StringId ?? "none"));
+            output.AppendLine("CaptorPrisonerCount=" + (captorParty?.PrisonRoster.GetTroopCount(prisoner.CharacterObject) ?? 0));
+            output.AppendLine("HeroPartyId=" + (heroParty?.StringId ?? "none"));
+            output.AppendLine("HeroPartyActive=" + (heroParty?.IsActive.ToString() ?? "none"));
+            output.AppendLine("HeroPartyLeaderId=" + (heroParty?.LeaderHero?.StringId ?? "none"));
+            output.AppendLine("HeroPartyPosition=" + (heroParty == null ? "none" : FormatPosition(heroParty.Position)));
+            output.AppendLine("CaptorHeroPartyId=" + (captorHeroParty?.StringId ?? "none"));
+            output.AppendLine("CaptorHeroPartyActive=" + (captorHeroParty?.IsActive.ToString() ?? "none"));
+            output.AppendLine("CaptorHeroPartyPosition=" + (captorHeroParty == null ? "none" : FormatPosition(captorHeroParty.Position)));
+            output.Append("DiplomaticStateFingerprint=" + GetDiplomaticStateFingerprint(prisonerFaction, captorFaction));
+            return Succeeded(output.ToString());
         }
-        catch (Exception captureException)
+    }
+
+    public sealed class PlayerCaptivityFocusHeroPartyCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.player_captivity";
+
+        public string Name => "focus_hero_party";
+
+        public string Description => "Runs the focus hero party debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
+            new ExpectedArgs("hero_id", "The registered hero id.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string error;
+            var context = new CommandContext("focus_hero_party", "Argument must not be empty.", new List<string>(args));
+
+            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+                return Failed("Failed to focus hero party: " + error);
+            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error))
+                return Failed("Failed to focus hero party: " + error);
+
+            var party = hero.PartyBelongedTo ?? hero.PartyBelongedToAsPrisoner?.MobileParty;
+            if (party?.IsActive != true)
+                return Failed($"Failed to focus hero party: '{hero.StringId}' has no active member or captor party.");
+
+            party.Party.SetAsCameraFollowParty();
+            return Succeeded($"Following party '{party.StringId}' for hero '{hero.StringId}' on the campaign map.");
+        }
+    }
+
+    public sealed class PlayerCaptivitySnapshotAiLordDiplomacyFixtureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.player_captivity";
+
+        public string Name => "snapshot_ai_lord_diplomacy_fixture";
+
+        public string Description => "Runs the snapshot ai lord diplomacy fixture debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("prisoner_hero_id", "The registered prisoner hero id.", isRequired: true),
+            new ExpectedArgs("captor_hero_id", "The registered captor hero id.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string error;
+            var context = new CommandContext("snapshot_ai_lord_diplomacy_fixture", "Argument must not be empty.", new List<string>(args));
+
+            if (!ModInformation.IsClient) return Failed("snapshot_ai_lord_diplomacy_fixture must be run on a client.");
+            if (clientDiplomaticSnapshot != null) return Failed("A client AI-lord diplomatic fixture is already active.");
+            if (!TryGetHeroFactions(args, out var prisonerFaction, out var captorFaction, out error))
+                return Failed("Failed to snapshot AI-lord diplomacy: " + error);
+
+            clientDiplomaticSnapshot = StanceLinkSnapshot.Capture(prisonerFaction, captorFaction);
+            return Succeeded("Client AI-lord diplomatic fixture captured.\nOriginalDiplomaticStateFingerprint=" +
+                clientDiplomaticSnapshot.OriginalFingerprint);
+        }
+    }
+
+    public sealed class PlayerCaptivityRestoreAiLordDiplomacyFixtureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.player_captivity";
+
+        public string Name => "restore_ai_lord_diplomacy_fixture";
+
+        public string Description => "Runs the restore ai lord diplomacy fixture debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient)
+                return Failed("restore_ai_lord_diplomacy_fixture must be run on a client.");
+            if (clientDiplomaticSnapshot == null)
+                return Failed("No client AI-lord diplomatic fixture is active.");
+
+            var pendingSnapshot = clientDiplomaticSnapshot;
+            pendingSnapshot.Restore(false);
+            var verification = pendingSnapshot.VerifyRestored();
+            if (verification != null)
+                return Failed("Failed to restore client AI-lord diplomatic fixture: " + verification);
+
+            clientDiplomaticSnapshot = null;
+            return Succeeded("Client AI-lord diplomatic fixture restored.");
+        }
+    }
+
+    public sealed class PlayerCaptivityCaptureAiLordFixtureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.player_captivity";
+
+        public string Name => "capture_ai_lord_fixture";
+
+        public string Description => "Runs the capture ai lord fixture debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("prisoner_hero_id", "The registered prisoner hero id.", isRequired: true),
+            new ExpectedArgs("captor_hero_id", "The registered captor hero id.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var context = new CommandContext("capture_ai_lord_fixture", "Argument must not be empty.", new List<string>(args));
+
+            if (!context.RequireServer(out var error)) return Failed(error);
+            if (fixture != null) return Failed("An AI-lord captivity fixture is already active.");
+            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+                return Failed("Failed to create AI-lord fixture: " + error);
+            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var prisoner, out error))
+                return Failed("Failed to create AI-lord fixture: " + error);
+            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[1], out var captorHero, out error))
+                return Failed("Failed to create AI-lord fixture: " + error);
+
+            if (prisoner.IsPrisoner)
+                return Failed($"Failed to create AI-lord fixture: '{prisoner.StringId}' is already a prisoner.");
+            if (!prisoner.IsLord || prisoner.IsPlayerHero())
+                return Failed($"Failed to create AI-lord fixture: '{prisoner.StringId}' is not an AI lord.");
+
+            var prisonerParty = prisoner.PartyBelongedTo;
+            var captorParty = captorHero.PartyBelongedTo;
+            if (prisonerParty?.IsActive != true)
+                return Failed($"Failed to create AI-lord fixture: '{prisoner.StringId}' has no active party.");
+            if (captorParty?.IsActive != true)
+                return Failed($"Failed to create AI-lord fixture: '{captorHero.StringId}' has no active party.");
+            if (prisonerParty == captorParty)
+                return Failed("Failed to create AI-lord fixture: prisoner and captor belong to the same party.");
+
+            var prisonerFaction = prisoner.MapFaction;
+            var captorFaction = captorHero.MapFaction;
+            if (prisonerFaction == null || captorFaction == null || prisonerFaction == captorFaction)
+                return Failed("Failed to create AI-lord fixture: prisoner and captor need distinct map factions.");
+
+            var prisonerIndex = prisonerParty.MemberRoster.FindIndexOfTroop(prisoner.CharacterObject);
+            if (prisonerIndex < 0)
+                return Failed($"Failed to create AI-lord fixture: '{prisoner.StringId}' is absent from its party roster.");
+
+            if (!prisonerFaction.IsAtWarWith(captorFaction))
+                return Failed("Failed to create AI-lord fixture: the prisoner and captor factions must already be at war.");
+
+            var pendingFixture = new AiLordPeaceReleaseFixture(
+                prisoner,
+                captorHero,
+                prisonerParty,
+                captorParty,
+                prisonerParty.MemberRoster.GetElementCopyAtIndex(prisonerIndex),
+                prisoner.HeroState,
+                prisonerParty.LeaderHero,
+                prisonerParty.CurrentSettlement,
+                prisonerParty.Position,
+                prisonerParty.IsActive,
+                captorParty.CurrentSettlement,
+                captorParty.Position,
+                captorParty.IsActive,
+                prisonerFaction,
+                captorFaction,
+                StanceLinkSnapshot.Capture(prisonerFaction, captorFaction));
+
+            fixture = pendingFixture;
             try
             {
-                Restore(pendingFixture);
-                var verification = VerifyRestored(pendingFixture);
-                if (verification != null)
-                    throw new InvalidOperationException(verification);
+                TakePrisonerAction.Apply(captorParty.Party, prisoner);
+                if (!prisoner.IsPrisoner || prisoner.PartyBelongedToAsPrisoner != captorParty.Party)
+                {
+                    Restore(pendingFixture);
+                    var verification = VerifyRestored(pendingFixture);
+                    if (verification != null)
+                        return Failed("Failed to create AI-lord fixture: the capture action did not establish captivity; rollback failed: " + verification);
 
-                fixture = null;
+                    fixture = null;
+                    return Failed("Failed to create AI-lord fixture: the capture action did not establish captivity; the baseline was restored.");
+                }
+
+                return Succeeded("AI-lord captivity fixture created.\n" + Observe(fixture));
             }
-            catch (Exception restoreException)
+            catch (Exception captureException)
             {
-                throw new AggregateException(
-                    "AI-lord fixture capture failed and rollback failed; the retained fixture can be restored manually.",
-                    captureException,
-                    restoreException);
-            }
+                try
+                {
+                    Restore(pendingFixture);
+                    var verification = VerifyRestored(pendingFixture);
+                    if (verification != null)
+                        throw new InvalidOperationException(verification);
 
-            throw;
+                    fixture = null;
+                }
+                catch (Exception restoreException)
+                {
+                    throw new AggregateException(
+                        "AI-lord fixture capture failed and rollback failed; the retained fixture can be restored manually.",
+                        captureException,
+                        restoreException);
+                }
+
+                throw;
+            }
         }
     }
 
-    [CommandLineArgumentFunction("observe_ai_lord_fixture", "coop.debug.player_captivity")]
-    public static string ObserveAiLordFixture(List<string> args)
+    public sealed class PlayerCaptivityObserveAiLordFixtureCoopCommand : ICoopCommand
     {
-        if (args.Count != 0)
-            return "Usage: coop.debug.player_captivity.observe_ai_lord_fixture";
+        public string Prefix => "coop.debug.player_captivity";
 
-        return fixture == null
-            ? "No AI-lord captivity fixture is active."
-            : Observe(fixture);
+        public string Name => "observe_ai_lord_fixture";
+
+        public string Description => "Runs the observe ai lord fixture debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            if (fixture == null)
+                return Failed("No AI-lord captivity fixture is active.");
+
+            return Succeeded(Observe(fixture));
+        }
     }
 
-    [CommandLineArgumentFunction("focus_party", "coop.debug.player_captivity")]
-    public static string FocusParty(List<string> args)
+    public sealed class PlayerCaptivityFocusPartyCoopCommand : ICoopCommand
     {
-        const string usage = "Usage: coop.debug.player_captivity.focus_party <mobilePartyId>";
-        var context = new CommandContext("focus_party", usage, args);
+        public string Prefix => "coop.debug.player_captivity";
 
-        if (!context.RequireArgCount(1, out var error)) return error;
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-            return "Failed to focus party: " + error;
-        if (!objectManager.TryGetObject(args[0], out MobileParty party) &&
-            !CommandHelpers.TryGetMobileParty(args[0], out party, out error))
-            return "Failed to focus party: " + error;
+        public string Name => "focus_party";
 
-        party.Party.SetAsCameraFollowParty();
-        return $"Following party '{party.StringId}' on the campaign map.";
+        public string Description => "Runs the focus party debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("mobile_party_id", "The registered mobile party id.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string error;
+            var context = new CommandContext("focus_party", "Argument must not be empty.", new List<string>(args));
+
+            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+                return Failed("Failed to focus party: " + error);
+            if (!objectManager.TryGetObject(args[0], out MobileParty party) &&
+                !CommandHelpers.TryGetMobileParty(args[0], out party, out error))
+                return Failed("Failed to focus party: " + error);
+
+            party.Party.SetAsCameraFollowParty();
+            return Succeeded($"Following party '{party.StringId}' on the campaign map.");
+        }
     }
 
-    [CommandLineArgumentFunction("restore_ai_lord_fixture", "coop.debug.player_captivity")]
-    public static string RestoreAiLordFixture(List<string> args)
+    public sealed class PlayerCaptivityRestoreAiLordFixtureCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
-            return "restore_ai_lord_fixture must be run on the server.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.player_captivity.restore_ai_lord_fixture";
-        if (fixture == null)
-            return "No AI-lord captivity fixture is active.";
+        public string Prefix => "coop.debug.player_captivity";
 
-        var pendingFixture = fixture;
-        Restore(pendingFixture);
-        var verification = VerifyRestored(pendingFixture);
-        if (verification != null)
-            return "Failed to restore AI-lord captivity fixture: " + verification;
+        public string Name => "restore_ai_lord_fixture";
 
-        fixture = null;
-        return "AI-lord captivity fixture restored.";
+        public string Description => "Runs the restore ai lord fixture debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("restore_ai_lord_fixture must be run on the server.");
+            if (fixture == null)
+                return Failed("No AI-lord captivity fixture is active.");
+
+            var pendingFixture = fixture;
+            Restore(pendingFixture);
+            var verification = VerifyRestored(pendingFixture);
+            if (verification != null)
+                return Failed("Failed to restore AI-lord captivity fixture: " + verification);
+
+            fixture = null;
+            return Succeeded("AI-lord captivity fixture restored.");
+        }
     }
 
     private static string Observe(AiLordPeaceReleaseFixture activeFixture)

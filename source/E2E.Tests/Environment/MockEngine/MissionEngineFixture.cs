@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Autofac;
 using E2E.Tests.Environment.Instance;
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
+using Missions.Agents.Packets;
 using SandBox;
 using SandBox.Missions.MissionLogics;
 using TaleWorlds.CampaignSystem.Party;
@@ -28,6 +30,7 @@ namespace E2E.Tests.Environment.MockEngine;
 /// </summary>
 public sealed class MissionEngineFixture : IDisposable
 {
+    private const int FirstInvalidMockActionIndex = 1000000;
     private readonly Harmony harmony = new("e2e.mockengine");
     private static readonly Dictionary<ILifetimeScope, MockMission> ByContainer = new();
 
@@ -105,6 +108,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "set_Health", nameof(Agent_set_Health));
         Prefix(typeof(Agent), "get_Index", nameof(Agent_get_Index));
         Prefix(typeof(Agent), "get_Character", nameof(Agent_get_Character));
+        Prefix(typeof(BasicCharacterObject), nameof(BasicCharacterObject.GetStepSize), nameof(BasicCharacterObject_GetStepSize));
         Prefix(typeof(Agent), "get_Team", nameof(Agent_get_Team));
         Prefix(typeof(Agent), "get_Position", nameof(Agent_get_Position));
         Prefix(typeof(Agent), "get_Equipment", nameof(Agent_get_Equipment));
@@ -125,6 +129,15 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_RiderAgent", nameof(Agent_get_RiderAgent));
         Prefix(typeof(Agent), nameof(Agent.AddComponent), nameof(Agent_AddComponent));
         Prefix(typeof(Agent), nameof(Agent.RemoveComponent), nameof(Agent_RemoveComponent));
+        harmony.Patch(
+            AccessTools.Method(typeof(Agent), nameof(Agent.GetComponent))
+                .MakeGenericMethod(typeof(CampaignAgentComponent)),
+            prefix: new HarmonyMethod(AccessTools.Method(
+                typeof(MissionEngineFixture), nameof(Agent_GetCampaignAgentComponent))));
+        harmony.Patch(
+            AccessTools.Method(typeof(CampaignAgentComponent), nameof(CampaignAgentComponent.CreateAgentNavigator), Type.EmptyTypes),
+            prefix: new HarmonyMethod(AccessTools.Method(
+                typeof(MissionEngineFixture), nameof(CampaignAgentComponent_CreateAgentNavigator))));
         harmony.Patch(
             AccessTools.Constructor(typeof(CommonAIComponent), new[] { typeof(Agent) }),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(CommonAIComponent_ctor))));
@@ -160,16 +173,17 @@ public sealed class MissionEngineFixture : IDisposable
         // headless and would poison the type for the whole process (a failed cctor is cached). Answer
         // "unresolved" (-1) instead so the cctor completes.
         Prefix(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName), nameof(MBAnimation_GetActionCodeWithName));
-        Prefix(typeof(Agent), "get_ActionSet", nameof(Agent_get_ActionSet));
+        Prefix(typeof(AgentActionData), "GetActionNameWithCode", nameof(AgentActionData_GetActionNameWithCode));
+        Prefix(typeof(AgentActionData), "GetCurrentActionSpeed", nameof(AgentActionData_GetCurrentActionSpeed));
         Prefix(typeof(MBGlobals), nameof(MBGlobals.GetActionSet), nameof(MBGlobals_GetActionSet));
-        Prefix(typeof(BasicCharacterObject), nameof(BasicCharacterObject.GetStepSize), nameof(BasicCharacterObject_GetStepSize));
         harmony.Patch(
-            AccessTools.Method(
-                typeof(MonsterExtensions),
-                nameof(MonsterExtensions.FillAnimationSystemData),
-                new[] { typeof(Monster), typeof(MBActionSet), typeof(float), typeof(bool) }),
-            prefix: new HarmonyMethod(
-                AccessTools.Method(typeof(MissionEngineFixture), nameof(MonsterExtensions_FillAnimationSystemData))));
+            AccessTools.Method(typeof(MonsterExtensions), nameof(MonsterExtensions.FillAnimationSystemData), new[]
+            {
+                typeof(Monster), typeof(MBActionSet), typeof(float), typeof(bool),
+            }),
+            prefix: new HarmonyMethod(AccessTools.Method(
+                typeof(MissionEngineFixture), nameof(MonsterExtensions_FillAnimationSystemData))));
+        Prefix(typeof(Agent), "get_ActionSet", nameof(Agent_get_ActionSet));
         Prefix(typeof(Agent), nameof(Agent.SetActionSet), nameof(Agent_SetActionSet));
         Prefix(typeof(MBActionSet), nameof(MBActionSet.GetActionAnimationDuration), nameof(MBActionSet_GetActionAnimationDuration));
         // Standalone mount movement: a masterless horse's own AgentMountData capture/apply reads and writes
@@ -517,6 +531,13 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool BasicCharacterObject_GetStepSize(ref float __result)
+    {
+        if (!TryActiveMock(out _)) return true;
+        __result = 0.5f;
+        return false;
+    }
+
     private static bool Agent_get_Team(Agent __instance, ref Team __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
@@ -634,6 +655,20 @@ public sealed class MissionEngineFixture : IDisposable
         if (!AgentMirror.TryGet(agent, out _)) return true;
         __instance.ReservedRiderAgentIndex = -1;
         return false;
+    }
+
+    private static bool Agent_GetCampaignAgentComponent(
+        Agent __instance,
+        ref CampaignAgentComponent __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.Components.OfType<CampaignAgentComponent>().FirstOrDefault();
+        return false;
+    }
+
+    private static bool CampaignAgentComponent_CreateAgentNavigator(CampaignAgentComponent __instance)
+    {
+        return __instance?.Agent == null || !AgentMirror.TryGet(__instance.Agent, out _);
     }
 
     private static bool Agent_AddComponent(Agent __instance, AgentComponent agentComponent)
@@ -806,16 +841,36 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool MBAnimation_GetActionCodeWithName(ref int __result)
+    private static bool MBAnimation_GetActionCodeWithName(string __0, ref int __result)
     {
-        __result = -1;
+        const string prefix = "mock_action_";
+        __result = __0 != null
+            && __0.StartsWith(prefix, StringComparison.Ordinal)
+            && int.TryParse(__0.AsSpan(prefix.Length), out int actionIndex)
+            && actionIndex < FirstInvalidMockActionIndex
+                ? actionIndex
+                : -1;
         return false;
     }
 
-    private static bool Agent_get_ActionSet(Agent __instance, ref MBActionSet __result)
+    private static bool AgentActionData_GetActionNameWithCode(int actionCode, ref string __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = MBActionSet.GetActionSetWithIndex(0);
+        if (!TryActiveMock(out _)) return true;
+        __result = actionCode >= 0
+            && actionCode < FirstInvalidMockActionIndex
+            ? $"mock_action_{actionCode}"
+            : null;
+        return false;
+    }
+
+    private static bool AgentActionData_GetCurrentActionSpeed(
+        Agent agent,
+        int channel,
+        ref float __result)
+    {
+        if (!AgentMirror.TryGet(agent, out var mirror)) return true;
+        mirror.GetCurrentActionSpeedCalls++;
+        __result = channel == 0 ? mirror.Action0Speed : mirror.Action1Speed;
         return false;
     }
 
@@ -826,17 +881,17 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool BasicCharacterObject_GetStepSize(ref float __result)
-    {
-        if (!TryActiveMock(out _)) return true;
-        __result = 0.5f;
-        return false;
-    }
-
     private static bool MonsterExtensions_FillAnimationSystemData(ref AnimationSystemData __result)
     {
         if (!TryActiveMock(out _)) return true;
         __result = default;
+        return false;
+    }
+
+    private static bool Agent_get_ActionSet(Agent __instance, ref MBActionSet __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = MBActionSet.GetActionSetWithIndex(0);
         return false;
     }
 
@@ -1091,10 +1146,10 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         if (channelNo == 0)
-        {
             m.Action0Speed = speed;
-            m.SetCurrentActionSpeedCalls++;
-        }
+        else
+            m.Action1Speed = speed;
+        m.SetCurrentActionSpeedCalls++;
         return false;
     }
 
@@ -1159,6 +1214,7 @@ public sealed class MissionEngineFixture : IDisposable
             m.Action1Index = actionIndexCache.Index;
             m.Action1Flags = additionalFlags;
             m.Action1Progress = startProgress;
+            m.Action1Speed = actionSpeed;
             if (m.HasVisualSkeleton)
             {
                 m.SkeletonAction1Index = actionIndexCache.Index;

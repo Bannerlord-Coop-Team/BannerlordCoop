@@ -193,15 +193,19 @@ internal class LocationConversationHandler : IHandler
     {
         if (!ModInformation.IsServer) return;
 
-        if (tracker.TryEndEngagement(payload.What.PlayerId, out var npcKey, out var engagerKey))
+        var peer = payload.What.PlayerId;
+        GameThread.RunSafe(() =>
         {
-            BroadcastNpcRelease(npcKey);
-            EndPlayerWaitingInteraction(engagerKey as NetPeer);
-        }
-        else
-        {
-            EndPlayerWaitingInteraction(payload.What.PlayerId);
-        }
+            if (tracker.TryEndEngagement(peer, out var npcKey, out var engagerKey))
+            {
+                BroadcastNpcRelease(npcKey);
+                EndPlayerWaitingInteraction(engagerKey as NetPeer);
+            }
+            else
+            {
+                EndPlayerWaitingInteraction(peer);
+            }
+        }, context: nameof(PlayerDisconnected));
     }
 
     // SR-040: undo the hold the grant broadcast. The engagement key is ComposeKey's

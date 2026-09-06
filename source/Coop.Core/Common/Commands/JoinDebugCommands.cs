@@ -1,4 +1,6 @@
 ﻿#if DEBUG
+using System;
+using Common.Commands;
 using Common;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
@@ -19,154 +21,193 @@ namespace Coop.Core.Common.Commands;
 /// <summary>
 /// Stages and observes campaign-join scenarios in DEBUG builds.
 /// </summary>
-internal static class JoinDebugCommands
+public static class JoinDebugCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    private static Func<bool> startClientSession;
     private static int forceNextInactivePartyDeficit;
     private static string desiredInactivePartyId;
     private static string lastForcedPartyId = "none";
     private static MobileParty stagedInactiveParty;
     private static bool stagedInactivePartyWasActive;
 
-    [CommandLineArgumentFunction("join_state", "coop.debug.connection")]
-    public static string JoinState(List<string> args)
+    public sealed class JoinStateCoopCommand : ICoopCommand
     {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.connection.join_state";
-        }
+        public string Prefix => "coop.debug.connection";
 
-        if (ModInformation.IsServer)
+        public string Name => "join_state";
+
+        public string Description => "Reports the current campaign join state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<IConnectionCollection>(out var connections))
+            if (ModInformation.IsServer)
             {
-                return "Failed to get connection collection";
+                if (!ContainerProvider.TryResolve<IConnectionCollection>(out var connections))
+                {
+                    return Failed("Failed to get connection collection");
+                }
+
+                string connectionState = string.Join(" | ", connections.Select(connection =>
+                {
+                    string state = connection.State?.GetType().Name ?? "none";
+                    string details = connection.State is ServerLoadingState loading
+                        ? loading.DebugJoinState
+                        : "joinCatchUpPending=false";
+                    return $"peer={connection.Peer.Id} state={state} {details}";
+                }));
+                return Succeeded($"{GetPartyCounts()} | {connectionState}");
             }
 
-            string connectionState = string.Join(" | ", connections.Select(connection =>
+            if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
             {
-                string state = connection.State?.GetType().Name ?? "none";
-                string details = connection.State is ServerLoadingState loading
-                    ? loading.DebugJoinState
-                    : "joinCatchUpPending=false";
-                return $"peer={connection.Peer.Id} state={state} {details}";
-            }));
-            return $"{GetPartyCounts()} | {connectionState}";
-        }
+                return Failed("Failed to get client logic");
+            }
 
-        if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
-        {
-            return "Failed to get client logic";
+            return Succeeded(clientLogic.State is CampaignState campaignState
+                ? $"{campaignState.DebugJoinState} {GetPartyCounts()} " +
+                  $"forcedInactiveParty={lastForcedPartyId}"
+                : $"state={clientLogic.State?.GetType().Name ?? "none"} {GetPartyCounts()} " +
+                  $"forcedInactiveParty={lastForcedPartyId}");
         }
-
-        return clientLogic.State is CampaignState campaignState
-            ? $"{campaignState.DebugJoinState} {GetPartyCounts()} " +
-              $"forcedInactiveParty={lastForcedPartyId}"
-            : $"state={clientLogic.State?.GetType().Name ?? "none"} {GetPartyCounts()} " +
-              $"forcedInactiveParty={lastForcedPartyId}";
     }
 
-    [CommandLineArgumentFunction("arm_inactive_party_deficit", "coop.debug.connection")]
-    public static string ArmInactivePartyDeficit(List<string> args)
+    public sealed class ArmInactivePartyDeficitCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.connection.arm_inactive_party_deficit <partyStringId>";
-        }
-        if (ModInformation.IsServer)
-        {
-            return "The inactive-party deficit fixture is client-only.";
-        }
+        public string Prefix => "coop.debug.connection";
 
-        desiredInactivePartyId = args[0];
-        lastForcedPartyId = "armed";
-        Interlocked.Exchange(ref forceNextInactivePartyDeficit, 1);
-        return $"The next complete join baseline will remove inactive party '{args[0]}' " +
-               "from the client campaign collection before validation.";
+        public string Name => "arm_inactive_party_deficit";
+
+        public string Description => "Arms the next client join baseline to omit an inactive party.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party_string_id", "The inactive party StringId."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+            {
+                return Failed("The inactive-party deficit fixture is client-only.");
+            }
+
+            desiredInactivePartyId = args[0];
+            lastForcedPartyId = "armed";
+            Interlocked.Exchange(ref forceNextInactivePartyDeficit, 1);
+            return Succeeded($"The next complete join baseline will remove inactive party '{args[0]}' " +
+                   "from the client campaign collection before validation.");
+        }
     }
 
-    [CommandLineArgumentFunction("stage_inactive_party", "coop.debug.connection")]
-    public static string StageInactiveParty(List<string> args)
+    public sealed class StageInactivePartyCoopCommand : ICoopCommand
     {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.connection.stage_inactive_party";
-        }
-        if (!ModInformation.IsServer)
-        {
-            return "stage_inactive_party must be run on the server.";
-        }
-        if (stagedInactiveParty != null)
-        {
-            return GetStagedPartyResult(stagedInactiveParty);
-        }
+        public string Prefix => "coop.debug.connection";
 
-        var parties = Campaign.Current?.CampaignObjectManager?.MobileParties;
-        stagedInactiveParty = parties?.FirstOrDefault(party =>
-                party?.IsActive == true &&
-                party.Ai != null &&
-                !party.IsPlayerParty() &&
-                party.Army == null &&
-                party.AttachedTo == null &&
-                party.MapEvent == null &&
-                party.CurrentSettlement == null &&
-                party.BesiegedSettlement == null &&
-                party.BesiegerCamp == null &&
-                !party.IsTransitionInProgress &&
-                !party.StartTransitionNextFrameToExitFromPort &&
-                !party.IsInRaftState &&
-                !IsReferencedByActiveParty(party, parties));
-        if (stagedInactiveParty == null)
-        {
-            return "No isolated active non-player field party was available for the fixture.";
-        }
+        public string Name => "stage_inactive_party";
 
-        stagedInactivePartyWasActive = stagedInactiveParty.IsActive;
-        stagedInactiveParty.IsActive = false;
-        return GetStagedPartyResult(stagedInactiveParty);
+        public string Description => "Stages an isolated server party as inactive for join testing.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsServer)
+            {
+                return Failed("stage_inactive_party must be run on the server.");
+            }
+            if (stagedInactiveParty != null)
+            {
+                return Succeeded(GetStagedPartyResult(stagedInactiveParty));
+            }
+
+            var parties = Campaign.Current?.CampaignObjectManager?.MobileParties;
+            stagedInactiveParty = parties?.FirstOrDefault(party =>
+                    party?.IsActive == true &&
+                    party.Ai != null &&
+                    !party.IsPlayerParty() &&
+                    party.Army == null &&
+                    party.AttachedTo == null &&
+                    party.MapEvent == null &&
+                    party.CurrentSettlement == null &&
+                    party.BesiegedSettlement == null &&
+                    party.BesiegerCamp == null &&
+                    !party.IsTransitionInProgress &&
+                    !party.StartTransitionNextFrameToExitFromPort &&
+                    !party.IsInRaftState &&
+                    !IsReferencedByActiveParty(party, parties));
+            if (stagedInactiveParty == null)
+            {
+                return Failed("No isolated active non-player field party was available for the fixture.");
+            }
+
+            stagedInactivePartyWasActive = stagedInactiveParty.IsActive;
+            stagedInactiveParty.IsActive = false;
+            return Succeeded(GetStagedPartyResult(stagedInactiveParty));
+        }
     }
 
-    [CommandLineArgumentFunction("restore_inactive_party", "coop.debug.connection")]
-    public static string RestoreInactiveParty(List<string> args)
+    public sealed class RestoreInactivePartyCoopCommand : ICoopCommand
     {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.connection.restore_inactive_party";
-        }
-        if (!ModInformation.IsServer)
-        {
-            return "restore_inactive_party must be run on the server.";
-        }
-        if (stagedInactiveParty == null)
-        {
-            return "No inactive-party fixture is staged.";
-        }
+        public string Prefix => "coop.debug.connection";
 
-        string partyId = stagedInactiveParty.StringId;
-        stagedInactiveParty.IsActive = stagedInactivePartyWasActive;
-        bool restoredActive = stagedInactiveParty.IsActive;
-        stagedInactiveParty = null;
-        stagedInactivePartyWasActive = false;
-        return $"restoredParty={partyId} active={restoredActive}";
+        public string Name => "restore_inactive_party";
+
+        public string Description => "Restores the staged inactive server party.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsServer)
+            {
+                return Failed("restore_inactive_party must be run on the server.");
+            }
+            if (stagedInactiveParty == null)
+            {
+                return Failed("No inactive-party fixture is staged.");
+            }
+
+            string partyId = stagedInactiveParty.StringId;
+            stagedInactiveParty.IsActive = stagedInactivePartyWasActive;
+            bool restoredActive = stagedInactiveParty.IsActive;
+            stagedInactiveParty = null;
+            stagedInactivePartyWasActive = false;
+            return Succeeded($"restoredParty={partyId} active={restoredActive}");
+        }
     }
 
-    [CommandLineArgumentFunction("disconnect", "coop.debug.connection")]
-    public static string Disconnect(List<string> args)
+    public sealed class DisconnectCoopCommand : ICoopCommand
     {
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.connection.disconnect";
-        }
-        if (ModInformation.IsServer)
-        {
-            return "disconnect must be run on a client.";
-        }
-        if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
-        {
-            return "No active client session was found.";
-        }
+        public string Prefix => "coop.debug.connection";
 
-        clientLogic.Disconnect();
-        return "Client session is returning to the main menu.";
+        public string Name => "disconnect";
+
+        public string Description => "Disconnects the active client session.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+            {
+                return Failed("disconnect must be run on a client.");
+            }
+            if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
+            {
+                return Failed("No active client session was found.");
+            }
+
+            clientLogic.Disconnect();
+            return Succeeded("Client session is returning to the main menu.");
+        }
     }
 
     [CommandLineArgumentFunction("reconnect", "coop.debug.connection")]
@@ -180,13 +221,31 @@ internal static class JoinDebugCommands
         {
             return "reconnect must be run on a client.";
         }
-        if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
+        if (ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
         {
-            return "No client session was found.";
+            clientLogic.Connect();
+            return "Client session is reconnecting to the configured server.";
         }
 
-        clientLogic.Connect();
-        return "Client session is reconnecting to the configured server.";
+        Func<bool> starter = Volatile.Read(ref startClientSession);
+        if (starter == null)
+            return "The process client-session starter is unavailable.";
+        if (!starter())
+            throw new InvalidOperationException("Client co-op connection start was refused.");
+
+        return "Client co-op session restarted after teardown.";
+    }
+
+    public static void ConfigureClientSessionStarter(Func<bool> starter)
+    {
+        if (starter == null) throw new ArgumentNullException(nameof(starter));
+
+        Volatile.Write(ref startClientSession, starter);
+    }
+
+    internal static void ResetClientSessionStarter()
+    {
+        Volatile.Write(ref startClientSession, null);
     }
 
     internal static void ForceArmedInactivePartyDeficit()

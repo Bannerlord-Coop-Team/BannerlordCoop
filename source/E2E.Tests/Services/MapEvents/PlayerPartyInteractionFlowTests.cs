@@ -6,6 +6,9 @@ using Coop.Core.Client.Services.SiegeEvents.Handlers;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
+using Common.PacketHandlers;
+using Common.Serialization;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.CoopSessionData;
@@ -286,11 +289,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             s.PartyId == initiatorPartyId &&
             s.Phase == PlayerPartyInteractionPhase.WaitingForResponse &&
             s.Proposal == PlayerPartyInteractionProposal.Trade);
-        Assert.Contains(proposalStates, s =>
+        var responderState = Assert.Single(proposalStates, s =>
             s.PartyId == responderPartyId &&
             s.Phase == PlayerPartyInteractionPhase.ProposalPending &&
             s.Proposal == PlayerPartyInteractionProposal.Trade &&
             s.Options.Contains(PlayerPartyInteractionOption.AcceptProposal));
+        client2.SimulateMessage(Server.NetPeer, responderState);
         client2.Call(() =>
         {
             Assert.Equal(sessionId, PlayerPartyInteractionDialogState.SessionId);
@@ -1808,6 +1812,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.DoesNotContain(PlayerPartyInteractionOption.AcceptProposal, responderState.Options);
         Assert.DoesNotContain(PlayerPartyInteractionOption.DeclineProposal, responderState.Options);
 
+        client2.SimulateMessage(Server.NetPeer, responderState);
         client2.Call(() =>
         {
             Assert.Equal(PlayerPartyInteractionPhase.HostileDemandPending, PlayerPartyInteractionDialogState.Phase);
@@ -2071,13 +2076,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         SetMockPlayerEncounter(client1);
         client1.NetworkSentMessages.Clear();
 
-        var disabledRouter = new[]
-        {
-            AccessTools.Method(
-                typeof(Environment.TestNetworkRouter),
-                nameof(Environment.TestNetworkRouter.SendAll),
-                new[] { typeof(NetPeer), typeof(IMessage) }),
-        };
+        var disabledRouter = new[] { GetNetworkRoutingMethod() };
         PublishConversationRequest(client1, initiatorPartyId, firstAiPartyId, disabledRouter);
         var request = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
         Server.Call(() =>
@@ -2154,6 +2153,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         var replacementRequest = Assert.Single(
             client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        using (new ReliableMessageDeliveryBlocker<NetworkConversationDenied>())
+            Server.SimulateMessage(client.NetPeer, replacementRequest);
         var denial = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
         Assert.Equal(replacementRequest.RequestId, denial.RequestId);
@@ -2306,7 +2307,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     secondRequestId),
                 markGameThread: false));
         Common.GameThread.Instance.MarkGameThread();
-        Assert.True(Common.GameThread.Instance.QueueLength > 0);
+        Assert.True(client.PendingGameThreadActionCount > 0);
 
         var getEncounterMenu = AccessTools.Method(
             typeof(DefaultEncounterGameMenuModel),
@@ -2634,34 +2635,37 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.NotNull(stagedLocationEncounter);
         });
 
-        Server.Call(
-            () =>
-            {
-                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                    playerMobilePartyId,
-                    out var playerParty));
-                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
-                    siege.SettlementId,
-                    out var settlement));
-                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(
-                    siege.LeaderPartyId,
-                    out var siegeLeaderParty));
+        using (new ReliableMessageDeliveryBlocker<NetworkBreakInContinuationApproved>())
+        {
+            Server.Call(
+                () =>
+                {
+                    Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                        playerMobilePartyId,
+                        out var playerParty));
+                    Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                        siege.SettlementId,
+                        out var settlement));
+                    Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(
+                        siege.LeaderPartyId,
+                        out var siegeLeaderParty));
 
-                VillageHostileFactionStanceHelper.ApplyWarStance(
-                    siegeLeaderParty.MapFaction,
-                    playerParty.MapFaction);
-                Assert.True(playerParty.IsActive);
-                Assert.Null(playerParty.CurrentSettlement);
-                Assert.Null(playerParty.BesiegerCamp);
-                Assert.Null(playerParty.Party.MapEventSide);
-                Assert.NotNull(settlement.SiegeEvent);
-                Assert.True(settlement.SiegeEvent.CanPartyJoinSide(
-                    playerParty.Party,
-                    BattleSideEnum.Defender));
+                    VillageHostileFactionStanceHelper.ApplyWarStance(
+                        siegeLeaderParty.MapFaction,
+                        playerParty.MapFaction);
+                    Assert.True(playerParty.IsActive);
+                    Assert.Null(playerParty.CurrentSettlement);
+                    Assert.Null(playerParty.BesiegerCamp);
+                    Assert.Null(playerParty.Party.MapEventSide);
+                    Assert.NotNull(settlement.SiegeEvent);
+                    Assert.True(settlement.SiegeEvent.CanPartyJoinSide(
+                        playerParty.Party,
+                        BattleSideEnum.Defender));
 
-                Server.SimulateMessage(client.NetPeer, breakInRequest);
-            },
-            MapEventDisabledMethods.Append(GetDirectNetworkRoutingMethod()));
+                    Server.SimulateMessage(client.NetPeer, breakInRequest);
+                },
+                MapEventDisabledMethods);
+        }
 
         var settlementEntry = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
@@ -4243,12 +4247,58 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
     }
 
+    private sealed class ReliableMessageDeliveryBlocker<TMessage> : IDisposable
+        where TMessage : IMessage
+    {
+        private static readonly MethodInfo DeliveryMethod = AccessTools.Method(
+            typeof(TestNetworkRouter),
+            nameof(TestNetworkRouter.SendReliablePayload),
+            new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) });
+
+        private readonly Harmony harmony = new($"reliable-message-blocker-{typeof(TMessage).Name}-{Guid.NewGuid()}");
+
+        public ReliableMessageDeliveryBlocker()
+        {
+            harmony.Patch(
+                DeliveryMethod,
+                prefix: new HarmonyMethod(typeof(ReliableMessageDeliveryBlocker<TMessage>), nameof(AllowDelivery)));
+        }
+
+        public void Dispose()
+        {
+            harmony.Unpatch(DeliveryMethod, HarmonyPatchType.Prefix, harmony.Id);
+        }
+
+        private static bool AllowDelivery(ref byte[] payload)
+        {
+            if (!GameInterface.ContainerProvider.TryResolve<ICommonSerializer>(out var serializer))
+                return true;
+
+            object received = serializer.Deserialize(payload);
+            if (received is IMessage message)
+                return message is not TMessage;
+            if (received is not AggregateMessagePacket aggregate || aggregate.Messages == null)
+                return true;
+
+            byte[][] deliverable = aggregate.Messages
+                .Where(inner => serializer.Deserialize<IMessage>(inner) is not TMessage)
+                .ToArray();
+            if (deliverable.Length == 0)
+                return false;
+
+            payload = deliverable.Length == 1
+                ? deliverable[0]
+                : serializer.Serialize(new AggregateMessagePacket(deliverable));
+            return true;
+        }
+    }
+
     private static MethodBase GetNetworkRoutingMethod()
     {
         var method = AccessTools.Method(
-            typeof(Environment.TestNetworkRouter),
-            nameof(Environment.TestNetworkRouter.SendAll),
-            new[] { typeof(NetPeer), typeof(IMessage) });
+            typeof(TestNetworkRouter),
+            nameof(TestNetworkRouter.SendReliablePayload),
+            new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) });
         Assert.NotNull(method);
         return method;
     }
@@ -4256,9 +4306,9 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     private static MethodBase GetDirectNetworkRoutingMethod()
     {
         var method = AccessTools.Method(
-            typeof(Environment.TestNetworkRouter),
-            nameof(Environment.TestNetworkRouter.Send),
-            new[] { typeof(NetPeer), typeof(NetPeer), typeof(IMessage) });
+            typeof(TestNetworkRouter),
+            nameof(TestNetworkRouter.SendReliablePayload),
+            new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) });
         Assert.NotNull(method);
         return method;
     }

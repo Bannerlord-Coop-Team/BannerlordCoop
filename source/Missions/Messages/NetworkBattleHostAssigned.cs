@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
 
@@ -19,15 +19,17 @@ public class NetworkBattleHostAssigned : IEvent
     [ProtoMember(2)]
     public readonly string HostControllerId;
     [ProtoMember(3)]
-    public readonly string[] SuccessorControllerIds = Array.Empty<string>();
+    private readonly string[] successorControllerIds;
     [ProtoMember(4)]
     public readonly int Epoch;
+
+    public string[] SuccessorControllerIds => successorControllerIds ?? Array.Empty<string>();
 
     public NetworkBattleHostAssigned(string mapEventId, string hostControllerId, string[] successorControllerIds, int epoch)
     {
         MapEventId = mapEventId;
         HostControllerId = hostControllerId;
-        SuccessorControllerIds = successorControllerIds;
+        this.successorControllerIds = successorControllerIds ?? Array.Empty<string>();
         Epoch = epoch;
     }
 }

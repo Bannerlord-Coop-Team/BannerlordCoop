@@ -313,6 +313,42 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
         return state;
     }
 
+    public CoopAgentInfo GetAgentInfo(SettlementClientFixture client, Agent agent)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        CoopAgentInfo info = null;
+        client.Instance.Call(() =>
+        {
+            if (!client.Instance.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(agent, out info))
+                throw new InvalidOperationException("The agent is not registered in this mission");
+        });
+        return info;
+    }
+
+    public CoopAgentInfo GetAgentInfo(SettlementClientFixture client, Guid agentId)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        CoopAgentInfo info = null;
+        client.Instance.Call(() =>
+        {
+            if (!client.Instance.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(agentId, out info))
+                throw new InvalidOperationException($"Agent {agentId} is not registered in this mission");
+        });
+        return info;
+    }
+
+    public void DespawnAgent(SettlementClientFixture owner, Agent agent)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        MirrorAgent state = GetAgentState(agent);
+        owner.Instance.Call(() =>
+        {
+            state.IsActive = false;
+            owner.Controller.OnAgentDeleted(agent);
+            owner.Mission.DeleteAgent(agent);
+        });
+    }
+
     public void MoveAgent(Agent agent, Vec3 position, Vec2 direction)
     {
         MirrorAgent state = GetAgentState(agent);

@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common.Commands;
+using Autofac;
 using Common;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -15,12 +16,16 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
 namespace GameInterface.Services.Template.Commands;
 
 internal class SettlementCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
 #if DEBUG
     private static CastleTeleportSnapshot castleTeleportSnapshot;
 
@@ -39,110 +44,141 @@ internal class SettlementCommands
     }
 #endif
 
-    [CommandLineArgumentFunction("enter_random_castle", "coop.debug.settlements")]
-    public static string EnterRandomCastle(List<string> strings)
+    public sealed class EnterRandomCastleCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
-        if (strings.Count > 1)
-            return "Usage: coop.debug.settlements.enter_random_castle [castleId]";
+        public string Prefix => "coop.debug.settlements";
 
-        var castles = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsCastle).ToArray();
-        var castle = strings.Count == 0
-            ? castles[new Random().Next(castles.Length)]
-            : castles.FirstOrDefault(settlement => settlement.StringId == strings[0]);
-        if (castle == null)
-            return $"Castle '{strings[0]}' was not found.";
+        public string Name => "enter_random_castle";
 
-        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, castle);
+        public string Description => "Enters random castle for co-op debugging.";
 
-        return $"Requested settlement encounter with {castle.Name} ({castle.StringId}).";
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("castleId", "The castle id.", isRequired: false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+
+            var castles = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsCastle).ToArray();
+            var castle = strings.Count == 0
+                ? castles[new Random().Next(castles.Length)]
+                : castles.FirstOrDefault(settlement => settlement.StringId == strings[0]);
+            if (castle == null)
+                return Failed($"Castle '{strings[0]}' was not found.");
+
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, castle);
+
+            return Succeeded($"Requested settlement encounter with {castle.Name} ({castle.StringId}).");
+
+        }
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("teleport_main_party_to_castle", "coop.debug.settlements")]
-    public static string TeleportMainPartyToCastle(List<string> strings)
+    public sealed class TeleportMainPartyToCastleCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
-        if (strings.Count != 1)
-            return "Usage: coop.debug.settlements.teleport_main_party_to_castle <castleId>";
+        public string Prefix => "coop.debug.settlements";
 
-        var castle = Campaign.Current.CampaignObjectManager.Settlements
-            .FirstOrDefault(settlement => settlement.IsCastle && settlement.StringId == strings[0]);
-        if (castle == null)
-            return $"Castle '{strings[0]}' was not found.";
+        public string Name => "teleport_main_party_to_castle";
 
-        var mainParty = MobileParty.MainParty;
-        if (mainParty == null)
-            return "Failed: no main party.";
-        if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
-            return "Leave the active settlement or map event before teleporting.";
-        if (TryGetCurrentCastleTeleportSnapshot(mainParty, out _))
-            return "Restore the previous castle teleport before starting another one.";
+        public string Description => "Runs main party to castle for co-op debugging.";
 
-        var originalPosition = mainParty.Position;
-        castleTeleportSnapshot = new CastleTeleportSnapshot(Campaign.Current, mainParty, originalPosition);
-        try
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            mainParty.Position = castle.GatePosition;
-            MessageBroker.Instance.Publish(
-                mainParty,
-                new PartyBehaviorChangeAttempted(
+            new ExpectedArgs("castleId", "The castle id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+
+            var castle = Campaign.Current.CampaignObjectManager.Settlements
+                .FirstOrDefault(settlement => settlement.IsCastle && settlement.StringId == strings[0]);
+            if (castle == null)
+                return Failed($"Castle '{strings[0]}' was not found.");
+
+            var mainParty = MobileParty.MainParty;
+            if (mainParty == null)
+                return Failed("Failed: no main party.");
+            if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
+                return Failed("Leave the active settlement or map event before teleporting.");
+            if (TryGetCurrentCastleTeleportSnapshot(mainParty, out _))
+                return Failed("Restore the previous castle teleport before starting another one.");
+
+            var originalPosition = mainParty.Position;
+            castleTeleportSnapshot = new CastleTeleportSnapshot(Campaign.Current, mainParty, originalPosition);
+            try
+            {
+                mainParty.Position = castle.GatePosition;
+                MessageBroker.Instance.Publish(
                     mainParty,
-                    forcePosition: true,
-                    isCurrentlyAtSea: false,
-                    resetMovementToHold: true));
-        }
-        finally
-        {
-            // The later forced-position echo proves the dedicated server applied the request.
-            mainParty.Position = originalPosition;
-        }
+                    new PartyBehaviorChangeAttempted(
+                        mainParty,
+                        forcePosition: true,
+                        isCurrentlyAtSea: false,
+                        resetMovementToHold: true));
+            }
+            finally
+            {
+                // The later forced-position echo proves the dedicated server applied the request.
+                mainParty.Position = originalPosition;
+            }
 
-        return
-            $"Requested authoritative teleport to {castle.Name} ({castle.StringId}) gate " +
-            $"at {castle.GatePosition.X:R},{castle.GatePosition.Y:R}.";
+            return Succeeded($"Requested authoritative teleport to {castle.Name} ({castle.StringId}) gate " +
+                $"at {castle.GatePosition.X:R},{castle.GatePosition.Y:R}.");
+
+        }
     }
 
-    [CommandLineArgumentFunction("restore_main_party_castle_teleport", "coop.debug.settlements")]
-    public static string RestoreMainPartyCastleTeleport(List<string> strings)
+    public sealed class RestoreMainPartyCastleTeleportCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
-        if (strings.Count != 0)
-            return "Usage: coop.debug.settlements.restore_main_party_castle_teleport";
+        public string Prefix => "coop.debug.settlements";
 
-        var mainParty = MobileParty.MainParty;
-        if (mainParty == null)
-            return "Failed: no main party.";
-        if (!TryGetCurrentCastleTeleportSnapshot(mainParty, out var snapshot))
-            return "No castle teleport is waiting to be restored.";
-        if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
-            return "Leave the active settlement or map event before restoring the teleport.";
+        public string Name => "restore_main_party_castle_teleport";
 
-        var currentPosition = mainParty.Position;
-        var restorePosition = snapshot.Position;
-        castleTeleportSnapshot = null;
-        try
+        public string Description => "Restores main party castle teleport for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            mainParty.Position = restorePosition;
-            MessageBroker.Instance.Publish(
-                mainParty,
-                new PartyBehaviorChangeAttempted(
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+
+            var mainParty = MobileParty.MainParty;
+            if (mainParty == null)
+                return Failed("Failed: no main party.");
+            if (!TryGetCurrentCastleTeleportSnapshot(mainParty, out var snapshot))
+                return Failed("No castle teleport is waiting to be restored.");
+            if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
+                return Failed("Leave the active settlement or map event before restoring the teleport.");
+
+            var currentPosition = mainParty.Position;
+            var restorePosition = snapshot.Position;
+            castleTeleportSnapshot = null;
+            try
+            {
+                mainParty.Position = restorePosition;
+                MessageBroker.Instance.Publish(
                     mainParty,
-                    forcePosition: true,
-                    isCurrentlyAtSea: restorePosition.IsOnLand == false,
-                    resetMovementToHold: true));
-        }
-        finally
-        {
-            mainParty.Position = currentPosition;
-        }
+                    new PartyBehaviorChangeAttempted(
+                        mainParty,
+                        forcePosition: true,
+                        isCurrentlyAtSea: restorePosition.IsOnLand == false,
+                        resetMovementToHold: true));
+            }
+            finally
+            {
+                mainParty.Position = currentPosition;
+            }
 
-        return
-            $"Requested authoritative castle-teleport restoration to " +
-            $"{restorePosition.X:R},{restorePosition.Y:R}.";
+            return Succeeded($"Requested authoritative castle-teleport restoration to " +
+                $"{restorePosition.X:R},{restorePosition.Y:R}.");
+
+        }
     }
 
     private static bool TryGetCurrentCastleTeleportSnapshot(
@@ -163,23 +199,36 @@ internal class SettlementCommands
     }
 #endif
 
-    [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
-    public static string GetTownName(List<string> strings)
+    public sealed class GetTownNameCoopCommand : ICoopCommand
     {
-        if (strings.Count != 1) return "Invalid usage, expected \"get_town_name <settlment id>\"";
+        public string Prefix => "coop.debug.settlements";
 
-        string settlementId = strings.Single();
+        public string Name => "get_town_name";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get town name";
+        public string Description => "Gets town name for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+        };
 
-        if (objectManager.Contains(settlementId) == false) return $"{settlementId} does not exist";
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
 
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"{settlementId} was in object manager but was not of type Settlement";
+            string settlementId = strings.Single();
 
-        return $"Settlement Name: {settlement.Name}";
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get town name");
+
+            var objectManager = container.Resolve<IObjectManager>();
+
+            if (objectManager.Contains(settlementId) == false) return Failed($"{settlementId} does not exist");
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"{settlementId} was in object manager but was not of type Settlement");
+
+            return Succeeded($"Settlement Name: {settlement.Name}");
+
+        }
     }
 
     // coop.debug.settlements.set_enemies_spotted town_ES3 45.4
@@ -188,31 +237,45 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlement and float value</param>
     /// <returns>info that is was succesfull</returns>
-    [CommandLineArgumentFunction("set_enemies_spotted", "coop.debug.settlements")]
-    public static string SetEnemiesSpotted(List<string> args)
+    public sealed class SetEnemiesSpottedCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_enemies_spotted <settlment id> <float_value>\"";
+        public string Name => "set_enemies_spotted";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Sets enemies spotted for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
-
-        string settlementId = args[0];
-
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
-
-
-        if (float.TryParse(args[1], out var num) == false)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Error setting the value: {args[1]} to a float.";
+            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("value", "The value."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
+
+
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
+
+            var objectManager = container.Resolve<IObjectManager>();
+
+            string settlementId = args[0];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+
+            if (float.TryParse(args[1], out var num) == false)
+            {
+                return Failed($"Error setting the value: {args[1]} to a float.");
+            }
+
+            settlement.NearbyLandThreatIntensity = num;
+
+            return Succeeded($"Successfully set the Settlement ({settlementId}) NumberOfEnemiesSpottedAround to '{args[1]}'");
+
         }
-
-        settlement.NearbyLandThreatIntensity = num;
-
-        return $"Successfully set the Settlement ({settlementId}) NumberOfEnemiesSpottedAround to '{args[1]}'";
     }
 
 
@@ -222,28 +285,42 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlement and float value</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_allies_spotted", "coop.debug.settlements")]
-    public static string SetAlliesSpotted(List<string> args)
+    public sealed class SetAlliesSpottedCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_enemies_spotted <settlment id> <float_value>\"";
+        public string Name => "set_allies_spotted";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Sets allies spotted for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("value", "The value."),
+        };
 
-        string settlementId = args[0];
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
 
-        if (float.TryParse(args[1], out var num) == false)
-            return $"Error setting the value: {args[1]} to a float.";
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
 
-        settlement.NearbyLandAllyIntensity = num;
+            var objectManager = container.Resolve<IObjectManager>();
 
-        return $"Successfully set the Settlement ({settlementId}) NumberOfAlliesSpottedAround to '{args[1]}'";
+            string settlementId = args[0];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+            if (float.TryParse(args[1], out var num) == false)
+                return Failed($"Error setting the value: {args[1]} to a float.");
+
+            settlement.NearbyLandAllyIntensity = num;
+
+            return Succeeded($"Successfully set the Settlement ({settlementId}) NumberOfAlliesSpottedAround to '{args[1]}'");
+
+        }
     }
 
 
@@ -253,28 +330,42 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlement and int value</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_bribe_paid", "coop.debug.settlements")]
-    public static string SetBribePaid(List<string> args)
+    public sealed class SetBribePaidCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_bribe_paid <settlment id> <int_value>\"";
+        public string Name => "set_bribe_paid";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Sets bribe paid for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("value", "The value."),
+        };
 
-        string settlementId = args[0];
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
 
-        if (int.TryParse(args[1], out var num) == false)
-            return $"Error setting the value: {args[1]} to a int.";
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
 
-        settlement.BribePaid = num;
+            var objectManager = container.Resolve<IObjectManager>();
 
-        return $"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'";
+            string settlementId = args[0];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+            if (int.TryParse(args[1], out var num) == false)
+                return Failed($"Error setting the value: {args[1]} to a int.");
+
+            settlement.BribePaid = num;
+
+            return Succeeded($"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'");
+
+        }
     }
 
 
@@ -284,28 +375,42 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlement and float value</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_hit_points", "coop.debug.settlements")]
-    public static string SetHitPoints(List<string> args)
+    public sealed class SetHitPointsCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_bribe_paid <settlment id> <int_value>\"";
+        public string Name => "set_hit_points";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Sets hit points for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("value", "The value."),
+        };
 
-        string settlementId = args[0];
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
 
-        if (float.TryParse(args[1], out var num) == false)
-            return $"Error setting the value: {args[1]} to a float.";
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
 
-        settlement.SettlementHitPoints = num;
+            var objectManager = container.Resolve<IObjectManager>();
 
-        return $"Successfully set the Settlement ({settlementId}) SettlementHitPoints to '{args[1]}'";
+            string settlementId = args[0];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+            if (float.TryParse(args[1], out var num) == false)
+                return Failed($"Error setting the value: {args[1]} to a float.");
+
+            settlement.SettlementHitPoints = num;
+
+            return Succeeded($"Successfully set the Settlement ({settlementId}) SettlementHitPoints to '{args[1]}'");
+
+        }
     }
 
     // coop.debug.settlements.last_attacker town_ES1 CoopParty
@@ -315,32 +420,46 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid and last_attacker</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("last_attacker", "coop.debug.settlements")]
-    public static string SetLastAttackerParty(List<string> args)
+    public sealed class SetLastAttackerPartyCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 2) return "Invalid usage, expected \"last_attacker <settlementId> <last_attacker_id>\"";
+        public string Name => "last_attacker";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Runs attacker for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("lastAttackerPartyId", "The last attacker party id."),
+        };
 
-        string settlementId = args[0];
-        string mobilePartyId = args[1];
-
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
-
-
-        if (objectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty) == false)
-            return $"Settlement: {mobilePartyId} was not found.";
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-        settlement.LastAttackerParty = mobileParty;
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
+
+            var objectManager = container.Resolve<IObjectManager>();
+
+            string settlementId = args[0];
+            string mobilePartyId = args[1];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
 
 
-        return $"Successfully set the Settlement ({settlementId}) MobileParty to '{mobileParty.StringId}'";
+            if (objectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty) == false)
+                return Failed($"Settlement: {mobilePartyId} was not found.");
+
+
+            settlement.LastAttackerParty = mobileParty;
+
+
+            return Succeeded($"Successfully set the Settlement ({settlementId}) MobileParty to '{mobileParty.StringId}'");
+
+        }
     }
 
     // coop.debug.settlements.list_siege_state
@@ -348,16 +467,27 @@ internal class SettlementCommands
     // Lists all the possible siege states
     /// </summary>
     /// <returns>all the siegeStates</returns>
-    [CommandLineArgumentFunction("list_siege_state", "coop.debug.settlements")]
-    public static string ListSiegeStates(List<string> args)
+    public sealed class ListSiegeStatesCoopCommand : ICoopCommand
     {
+        public string Prefix => "coop.debug.settlements";
 
-        StringBuilder sb = new();
+        public string Name => "list_siege_state";
 
-        foreach(int i in Enum.GetValues(typeof(Settlement.SiegeState))) {
-            sb.AppendLine($"{i}: {Enum.GetName(typeof(Settlement.SiegeState), i)}");
+        public string Description => "Lists siege state for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            StringBuilder sb = new();
+
+            foreach(int i in Enum.GetValues(typeof(Settlement.SiegeState))) {
+                sb.AppendLine($"{i}: {Enum.GetName(typeof(Settlement.SiegeState), i)}");
+            }
+            return Succeeded(sb.ToString());
+
         }
-        return sb.ToString();
     }
 
     // coop.debug.settlements.set_siege_state town_ES1 InTheLordsHall
@@ -366,31 +496,45 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid and SiegeState</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_siege_state", "coop.debug.settlements")]
-    public static string SetSiegeState(List<string> args)
+    public sealed class SetSiegeStateCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <siege_state>\"";
+        public string Name => "set_siege_state";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Sets siege state for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("siegeState", "The siege state."),
+        };
 
-        string settlementId = args[0];
-        string siegeState = args[1];
-
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
-
-        if (Enum.TryParse<SiegeState>(siegeState, true, out var state) == false)
-            return $"{siegeState} was not a valid enum in {nameof(SiegeState)}";
-
-
-        settlement.CurrentSiegeState = state;
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-        return $"Successfully set the Settlement ({settlementId}) SiegeState to '{siegeState}'";
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
+
+            var objectManager = container.Resolve<IObjectManager>();
+
+            string settlementId = args[0];
+            string siegeState = args[1];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+            if (Enum.TryParse<SiegeState>(siegeState, true, out var state) == false)
+                return Failed($"{siegeState} was not a valid enum in {nameof(SiegeState)}");
+
+
+            settlement.CurrentSiegeState = state;
+
+
+            return Succeeded($"Successfully set the Settlement ({settlementId}) SiegeState to '{siegeState}'");
+
+        }
     }
 
 
@@ -401,31 +545,45 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid and float of how many troops (negative or pos)</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_militia", "coop.debug.settlements")]
-    public static string SetMiltiia(List<string> args)
+    public sealed class SetMiltiiaCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <militia_float>\"";
+        public string Name => "set_militia";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Sets militia for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("militia", "The militia."),
+        };
 
-        string settlementId = args[0];
-        string militiaFloat = args[1];
-
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
-
-
-        if (float.TryParse(militiaFloat, out var militia) == false)
-            return $"Error setting the value: {militiaFloat} to a float.";
-
-        settlement.Militia = militia;
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-        return $"Successfully set the Settlement ({settlementId}) Militia to '{militia}'";
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
+
+            var objectManager = container.Resolve<IObjectManager>();
+
+            string settlementId = args[0];
+            string militiaFloat = args[1];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+
+            if (float.TryParse(militiaFloat, out var militia) == false)
+                return Failed($"Error setting the value: {militiaFloat} to a float.");
+
+            settlement.Militia = militia;
+
+
+            return Succeeded($"Successfully set the Settlement ({settlementId}) Militia to '{militia}'");
+
+        }
     }
 
 
@@ -435,31 +593,45 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid and float of how many troops (negative or pos)</param>
     /// <returns>info that is was succesful</returns>
-    [CommandLineArgumentFunction("set_garrison_pay_limit", "coop.debug.settlements")]
-    public static string SetGarrisonWageLimit(List<string> args)
+    public sealed class SetGarrisonWageLimitCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <militia_float>\"";
+        public string Name => "set_garrison_pay_limit";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Sets garrison pay limit for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("payLimit", "The pay limit."),
+        };
 
-        string settlementId = args[0];
-        string garrisonInt = args[1];
-
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
-
-
-        if (int.TryParse(garrisonInt, out var wageLimit) == false)
-            return $"Error setting the value: {garrisonInt} to an int.";
-
-        settlement.SetGarrisonWagePaymentLimit(wageLimit);
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-        return $"Successfully set the Settlement ({settlementId}) GarrisonWagePaymentLimit to '{wageLimit}'";
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
+
+            var objectManager = container.Resolve<IObjectManager>();
+
+            string settlementId = args[0];
+            string garrisonInt = args[1];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+
+            if (int.TryParse(garrisonInt, out var wageLimit) == false)
+                return Failed($"Error setting the value: {garrisonInt} to an int.");
+
+            settlement.SetGarrisonWagePaymentLimit(wageLimit);
+
+
+            return Succeeded($"Successfully set the Settlement ({settlementId}) GarrisonWagePaymentLimit to '{wageLimit}'");
+
+        }
     }
 
 
@@ -469,75 +641,101 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args">the settlementid </param>
     /// <returns>info that is was successful</returns>
-    [CommandLineArgumentFunction("collect_cache_notables", "coop.debug.settlements")]
-    public static string CollectCacheNotables(List<string> args)
+    public sealed class CollectCacheNotablesCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 1) return "Invalid usage, expected \"collect_cache_notables <settlementId>\"";
+        public string Name => "collect_cache_notables";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Collects cache notables for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+        };
 
-        string settlementId = args[0];
-
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
-
-
-        settlement.CollectNotablesToCache();
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-        return $"Successfully called settlement.CollectNotablesToCache() for {settlementId}.";
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
+
+            var objectManager = container.Resolve<IObjectManager>();
+
+            string settlementId = args[0];
+
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+
+            settlement.CollectNotablesToCache();
+
+
+            return Succeeded($"Successfully called settlement.CollectNotablesToCache() for {settlementId}.");
+
+        }
     }
 
 
 
     // Located in Modules\SandBox\ModuleData\settlements.xml
     // POROS EXAMPLE
-    // coop.debug.settlements.info town_ES3 
+    // coop.debug.settlements.info town_ES3
     /// <summary>
     /// Gives a bunch of information on a settlement.
     /// </summary>
     /// <param name="args">settlement name</param>
     /// <returns>info about the settlement</returns>
-    [CommandLineArgumentFunction("info", "coop.debug.settlements")]
-    public static string Info(List<string> args)
+    public sealed class InfoCoopCommand : ICoopCommand
     {
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count != 1) return "Invalid usage, expected \"info <settlment id>\"";
+        public string Name => "info";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+        public string Description => "Shows the relevant state for co-op debugging.";
 
-        var objectManager = container.Resolve<IObjectManager>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "The settlement id."),
+        };
 
-        string settlementId = args.Single();
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
 
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            return $"Settlement: {settlementId} was not found.";
 
-        StringBuilder sb = new();
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
 
-        string lastAttackerParty = settlement.LastAttackerParty?.ArmyName.ToString() ?? "None";
+            var objectManager = container.Resolve<IObjectManager>();
 
-        sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
-        sb.AppendLine($"NumberOfEnemiesSpottedAround: '{settlement.NearbyLandThreatIntensity}'");
-        sb.AppendLine($"NumberOfAlliesSpottedAround: '{settlement.NearbyLandAllyIntensity}'");
-        sb.AppendLine($"BribePaid: {settlement.BribePaid}");
-        sb.AppendLine($"SettlementHitPoints: '{settlement.SettlementHitPoints}'");
-        sb.AppendLine($"GarrisonWagePaymentLimit: '{settlement.GarrisonWagePaymentLimit}'");
-        sb.AppendLine($"LastAttackerParty: '{lastAttackerParty}'");
-        sb.AppendLine($"LastThreatTime:  '{settlement.LastThreatTime}'");
-        sb.AppendLine($"CurrentSiegeState:   '{settlement.CurrentSiegeState}'");
-        sb.AppendLine($"Militia :   '{settlement.Militia}'");
-        sb.AppendLine($"LastVisitTimeOfOwner  :   '{settlement.LastVisitTimeOfOwner}'");
-        //sb.AppendLine($"ClaimedBy   :   '{settlement.ClaimedBy}'");
-        //sb.AppendLine($"ClaimValue    :   '{settlement.ClaimValue}'");
-        //sb.AppendLine($"CanBeClaimed     :   '{Convert.ToBoolean(settlement.CanBeClaimed)}'");
-        sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
+            string settlementId = args.Single();
 
-        return sb.ToString();
+            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+                return Failed($"Settlement: {settlementId} was not found.");
+
+            StringBuilder sb = new();
+
+            string lastAttackerParty = settlement.LastAttackerParty?.ArmyName.ToString() ?? "None";
+
+            sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
+            sb.AppendLine($"NumberOfEnemiesSpottedAround: '{settlement.NearbyLandThreatIntensity}'");
+            sb.AppendLine($"NumberOfAlliesSpottedAround: '{settlement.NearbyLandAllyIntensity}'");
+            sb.AppendLine($"BribePaid: {settlement.BribePaid}");
+            sb.AppendLine($"SettlementHitPoints: '{settlement.SettlementHitPoints}'");
+            sb.AppendLine($"GarrisonWagePaymentLimit: '{settlement.GarrisonWagePaymentLimit}'");
+            sb.AppendLine($"LastAttackerParty: '{lastAttackerParty}'");
+            sb.AppendLine($"LastThreatTime:  '{settlement.LastThreatTime}'");
+            sb.AppendLine($"CurrentSiegeState:   '{settlement.CurrentSiegeState}'");
+            sb.AppendLine($"Militia :   '{settlement.Militia}'");
+            sb.AppendLine($"LastVisitTimeOfOwner  :   '{settlement.LastVisitTimeOfOwner}'");
+            //sb.AppendLine($"ClaimedBy   :   '{settlement.ClaimedBy}'");
+            //sb.AppendLine($"ClaimValue    :   '{settlement.ClaimValue}'");
+            //sb.AppendLine($"CanBeClaimed     :   '{Convert.ToBoolean(settlement.CanBeClaimed)}'");
+            sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
+
+            return Succeeded(sb.ToString());
+
+        }
     }
 
     // coop.debug.settlementcomponent.set_owner town_comp_ES3 lord_6_5_party_1
@@ -547,36 +745,50 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args"><see cref="SettlementComponent"/> id, <see cref="MobileParty"/> or <see cref="Settlement"/> id</param>
     /// <returns>info that is was successful</returns>
-    [CommandLineArgumentFunction("set_owner", "coop.debug.settlementComponent")]
-    public static string SetOwner(List<string> args)
+    public sealed class SetOwnerCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlement_component";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Mobile party id>\"";
+        public string Name => "set_owner";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
-        var objectManager = container.Resolve<IObjectManager>();
-        string settlementComponentId = args[0];
-        string partyBaseId = args[1];
-        PartyBase partyBase;
-        if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
-            return $"SettlementComponent: {settlementComponentId} was not found.";
-        if (objectManager.TryGetObject<Settlement>(partyBaseId, out var settlement))
+        public string Description => "Sets owner for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            partyBase = settlement.Party;
-        }
-        else if (objectManager.TryGetObject<MobileParty>(partyBaseId, out var mobileParty))
-        {
-            partyBase = mobileParty.Party;
-        }
-        else
-        {
-            return $"PartyBase: {partyBaseId} was not found.";
-        }
+            new ExpectedArgs("settlementComponentId", "The settlement component id."),
+            new ExpectedArgs("mobilePartyId", "The mobile party id."),
+        };
 
-        settlementComponent.Owner = partyBase;
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
-        return $"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'";
+
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get SettlementComponent");
+            var objectManager = container.Resolve<IObjectManager>();
+            string settlementComponentId = args[0];
+            string partyBaseId = args[1];
+            PartyBase partyBase;
+            if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
+                return Failed($"SettlementComponent: {settlementComponentId} was not found.");
+            if (objectManager.TryGetObject<Settlement>(partyBaseId, out var settlement))
+            {
+                partyBase = settlement.Party;
+            }
+            else if (objectManager.TryGetObject<MobileParty>(partyBaseId, out var mobileParty))
+            {
+                partyBase = mobileParty.Party;
+            }
+            else
+            {
+                return Failed($"PartyBase: {partyBaseId} was not found.");
+            }
+
+            settlementComponent.Owner = partyBase;
+
+            return Succeeded($"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'");
+
+        }
     }
 
     // coop.debug.settlements.capture_by_siege Danustica
@@ -587,68 +799,93 @@ internal class SettlementCommands
     // real siege. Server only. Settlement is resolved by name or id; the capturer (used as the new
     // owner and the garrison's destroyer) defaults to an enemy-kingdom clan leader with a party, so
     // the resulting fief owner is in a kingdom and the post-siege claimant decision is well-formed.
-    [CommandLineArgumentFunction("capture_by_siege", "coop.debug.settlements")]
-    public static string CaptureBySiege(List<string> args)
+    public sealed class CaptureBySiegeCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlements";
 
-        if (args.Count < 1)
-            return "Usage: coop.debug.settlements.capture_by_siege <Settlement name or id> [CapturerHero id]";
+        public string Name => "capture_by_siege";
 
-        var settlement = Campaign.Current.CampaignObjectManager.Settlements
-            .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
-        if (settlement == null)
-            return $"Settlement '{args[0]}' not found";
-        if (!settlement.IsFortification)
-            return $"'{args[0]}' is not a town or castle";
+        public string Description => "Captures by siege for co-op debugging.";
 
-        Hero capturer;
-        if (args.Count >= 2)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            capturer = Campaign.Current.CampaignObjectManager.Find<Hero>(args[1]);
-            if (capturer == null)
-                return $"Hero '{args[1]}' not found";
-        }
-        else
+            new ExpectedArgs("settlementNameOrId", "The exact settlement name or id; quote names containing spaces."),
+            new ExpectedArgs("capturerHeroId", "The capturer hero id.", isRequired: false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            // Pick an enemy-kingdom clan leader so the capture mirrors a real siege: the new owner's
-            // clan is in a kingdom, so the kingdom raises a well-formed SettlementClaimantDecision
-            // (a kingdomless owner would produce a malformed one). Prefer one already at war.
-            var candidates = Hero.AllAliveHeroes.Where(h =>
-                !h.IsHumanPlayerCharacter &&
-                h.PartyBelongedTo != null &&
-                h.Clan != null &&
-                h.Clan.Leader == h &&
-                h.Clan.Kingdom != null &&
-                h.Clan.Kingdom != settlement.MapFaction).ToList();
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
-            capturer = candidates.FirstOrDefault(h => h.MapFaction.IsAtWarWith(settlement.MapFaction))
-                       ?? candidates.FirstOrDefault();
-            if (capturer == null)
-                return "No eligible enemy-kingdom clan leader with a party found; pass a hero id as the 2nd arg";
+
+            var settlement = Campaign.Current.CampaignObjectManager.Settlements
+                .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
+            if (settlement == null)
+                return Failed($"Settlement '{args[0]}' not found");
+            if (!settlement.IsFortification)
+                return Failed($"'{args[0]}' is not a town or castle");
+
+            Hero capturer;
+            if (args.Count >= 2)
+            {
+                capturer = Campaign.Current.CampaignObjectManager.Find<Hero>(args[1]);
+                if (capturer == null)
+                    return Failed($"Hero '{args[1]}' not found");
+            }
+            else
+            {
+                // Pick an enemy-kingdom clan leader so the capture mirrors a real siege: the new owner's
+                // clan is in a kingdom, so the kingdom raises a well-formed SettlementClaimantDecision
+                // (a kingdomless owner would produce a malformed one). Prefer one already at war.
+                var candidates = Hero.AllAliveHeroes.Where(h =>
+                    !h.IsHumanPlayerCharacter &&
+                    h.PartyBelongedTo != null &&
+                    h.Clan != null &&
+                    h.Clan.Leader == h &&
+                    h.Clan.Kingdom != null &&
+                    h.Clan.Kingdom != settlement.MapFaction).ToList();
+
+                capturer = candidates.FirstOrDefault(h => h.MapFaction.IsAtWarWith(settlement.MapFaction))
+                           ?? candidates.FirstOrDefault();
+                if (capturer == null)
+                    return Failed("No eligible enemy-kingdom clan leader with a party found; pass a hero id as the 2nd arg");
+            }
+
+            if (capturer.PartyBelongedTo == null)
+                return Failed($"Capturer '{capturer.Name}' has no party; BySiege uses the capturer's party as the garrison destroyer");
+
+            ChangeOwnerOfSettlementAction.ApplyBySiege(capturer, capturer, settlement);
+
+            return Succeeded($"Captured {settlement.Name} by siege; new owner {capturer.Name} ({capturer.MapFaction?.Name})" +
+                   Environment.NewLine + FormatOwnerState(settlement));
+
         }
-
-        if (capturer.PartyBelongedTo == null)
-            return $"Capturer '{capturer.Name}' has no party; BySiege uses the capturer's party as the garrison destroyer";
-
-        ChangeOwnerOfSettlementAction.ApplyBySiege(capturer, capturer, settlement);
-
-        return $"Captured {settlement.Name} by siege; new owner {capturer.Name} ({capturer.MapFaction?.Name})" +
-               Environment.NewLine + FormatOwnerState(settlement);
     }
 
-    [CommandLineArgumentFunction("owner_state", "coop.debug.settlements")]
-    public static string OwnerState(List<string> args)
+    public sealed class OwnerStateCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
-            return "Usage: coop.debug.settlements.owner_state <Settlement name or id>";
+        public string Prefix => "coop.debug.settlements";
 
-        var settlement = Campaign.Current.CampaignObjectManager.Settlements
-            .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
-        if (settlement == null)
-            return $"Settlement '{args[0]}' not found";
+        public string Name => "owner_state";
 
-        return FormatOwnerState(settlement);
+        public string Description => "Shows state for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementNameOrId", "The exact settlement name or id; quote names containing spaces."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            var settlement = Campaign.Current.CampaignObjectManager.Settlements
+                .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
+            if (settlement == null)
+                return Failed($"Settlement '{args[0]}' not found");
+
+            return Succeeded(FormatOwnerState(settlement));
+
+        }
     }
 
     private static string FormatOwnerState(Settlement settlement)
@@ -675,26 +912,40 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args"><see cref="SettlementComponent"/> id, amount of gold</param>
     /// <returns>info that is was successful</returns>
-    [CommandLineArgumentFunction("set_gold", "coop.debug.settlementComponent")]
-    public static string SetGold(List<string> args)
+    public sealed class SetGoldCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlement_component";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Gold>\"";
+        public string Name => "set_gold";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
-        var objectManager = container.Resolve<IObjectManager>();
-        string settlementComponentId = args[0];
-        if (int.TryParse(args[1], out int gold) == false)
+        public string Description => "Sets gold for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Unable to parse gold amount";
+            new ExpectedArgs("settlementComponentId", "The settlement component id."),
+            new ExpectedArgs("gold", "The gold."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
+
+
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get SettlementComponent");
+            var objectManager = container.Resolve<IObjectManager>();
+            string settlementComponentId = args[0];
+            if (int.TryParse(args[1], out int gold) == false)
+            {
+                return Failed("Unable to parse gold amount");
+            }
+            if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
+                return Failed($"SettlementComponent: {settlementComponentId} was not found.");
+
+            settlementComponent.Gold = gold;
+
+            return Succeeded($"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'");
+
         }
-        if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
-            return $"SettlementComponent: {settlementComponentId} was not found.";
-
-        settlementComponent.Gold = gold;
-
-        return $"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'";
     }
 
     // coop.debug.settlementcomponent.set_is_owner_unassigned town_comp_ES3 true
@@ -704,59 +955,87 @@ internal class SettlementCommands
     /// </summary>
     /// <param name="args"><see cref="SettlementComponent"/> id, new <see cref="SettlementComponent.IsOwnerUnassigned"/> value></param>
     /// <returns>info that is was successful</returns>
-    [CommandLineArgumentFunction("set_is_owner_unassigned", "coop.debug.settlementComponent")]
-    public static string SetIsOwnerUnassigned(List<string> args)
+    public sealed class SetIsOwnerUnassignedCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        public string Prefix => "coop.debug.settlement_component";
 
-        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <boolean>\"";
+        public string Name => "set_is_owner_unassigned";
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
-        var objectManager = container.Resolve<IObjectManager>();
-        string settlementComponentId = args[0];
-        if (bool.TryParse(args[1], out bool value) == false)
+        public string Description => "Sets is owner unassigned for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Unable to parse IsOwnerUnassigned";
+            new ExpectedArgs("settlementComponentId", "The settlement component id."),
+            new ExpectedArgs("value", "The value."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This function can only be used by the server");
+
+
+            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get SettlementComponent");
+            var objectManager = container.Resolve<IObjectManager>();
+            string settlementComponentId = args[0];
+            if (bool.TryParse(args[1], out bool value) == false)
+            {
+                return Failed("Unable to parse IsOwnerUnassigned");
+            }
+            if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
+                return Failed($"SettlementComponent: {settlementComponentId} was not found.");
+
+
+            settlementComponent.IsOwnerUnassigned = value;
+
+
+            return Succeeded($"Successfully set the SettlementComponent ({settlementComponentId}) IsOwnerUnassigned to '{args[1]}'");
+
         }
-        if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
-            return $"SettlementComponent: {settlementComponentId} was not found.";
-
-
-        settlementComponent.IsOwnerUnassigned = value;
-
-
-        return $"Successfully set the SettlementComponent ({settlementComponentId}) IsOwnerUnassigned to '{args[1]}'";
     }
 
     /// <summary>
     /// Set OwnerClan of a settlement from Hero Id
     /// </summary>
-    [CommandLineArgumentFunction("set_ownerclan", "coop.debug.settlements")]
-    public static string SetOwnerClan(List<string> strings)
+    public sealed class SetOwnerClanCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        public string Prefix => "coop.debug.settlements";
 
-        if (strings.Count != 2) return "Invalid usage, expected \"set_ownerclan <settlementId|settlementName> <heroId>\"";
+        public string Name => "set_owner_clan";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var settlement in Settlement.All)
+        public string Description => "Sets owner clan for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (settlement.Name.ToString() == strings[0] || settlement.StringId == strings[0])
+            new ExpectedArgs("settlementNameOrId", "The exact settlement name or id; quote names containing spaces."),
+            new ExpectedArgs("heroId", "The hero id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var settlement in Settlement.All)
             {
-                var hero = Campaign.Current.CampaignObjectManager.Find<Hero>(strings[1]);
+                if (settlement.Name.ToString() == strings[0] || settlement.StringId == strings[0])
+                {
+                    var hero = Campaign.Current.CampaignObjectManager.Find<Hero>(strings[1]);
 
-                if (hero == null) return $"Unable to find hero by id: {strings[1]}";
+                    if (hero == null) return Failed($"Unable to find hero by id: {strings[1]}");
 
-                ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
-                stringBuilder.AppendLine($"{settlement.Name} ({settlement.StringId}) transferred to {hero.Name} ({hero.StringId}).");
+                    ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
+                    stringBuilder.AppendLine($"{settlement.Name} ({settlement.StringId}) transferred to {hero.Name} ({hero.StringId}).");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Settlement or hero not found.");
+
         }
-        return "Settlement or hero not found.";
     }
 }
