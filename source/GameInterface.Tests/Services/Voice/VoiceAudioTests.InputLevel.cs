@@ -68,7 +68,7 @@ public partial class VoiceAudioTests
         h.Callbacks.Last().data(Pcm(16384), 1920);
         Assert.True(h.Audio.IsTestingMicrophone);
         Assert.Equal(0.5f, h.Audio.InputLevel);
-        Wait(() => h.Played.Count > 0);
+        Wait(() => !h.Played.IsEmpty);
         Assert.Empty(h.Encoded);
         h.Audio.TestMicrophone(false);
         Assert.False(h.Audio.IsTestingMicrophone);

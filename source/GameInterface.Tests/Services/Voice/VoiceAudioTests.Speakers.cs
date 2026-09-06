@@ -33,7 +33,7 @@ public partial class VoiceAudioTests
         h.Start(); h.Frame(1);
         Wait(() => h.ReceivedCount == 1);
         h.Advance(1060);
-        Wait(() => h.Played.Count > 0);
+        Wait(() => !h.Played.IsEmpty);
         Assert.Empty(h.Audio.AudibleSpeakers);
     }
 
@@ -49,7 +49,7 @@ public partial class VoiceAudioTests
             Sequence = 1, Audio = encoded, Speaker = "platform:1", Gain = 1, StreamGeneration = 1
         });
         Wait(() => h.ReceivedCount == 1);
-        h.Advance(1060); Wait(() => h.Played.Count > 0);
+        h.Advance(1060); Wait(() => !h.Played.IsEmpty);
         Assert.Empty(h.Audio.AudibleSpeakers);
     }
 

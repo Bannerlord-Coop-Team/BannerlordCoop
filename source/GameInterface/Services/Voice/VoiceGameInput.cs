@@ -94,5 +94,4 @@ public sealed class VoiceGameInput : IVoiceGameInput
     {
         return isDown(settings.PushToTalkKey) || isDown(InputKey.ControllerLRight);
     }
-
 }

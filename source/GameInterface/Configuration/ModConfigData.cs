@@ -70,10 +70,6 @@ public sealed class ModOptionsData
 {
     public bool? VoiceEnabled { get; set; }
 
-
-
-
-
     public int? BattleSize { get; set; }
 
     public bool? FastForwardEnabled { get; set; }
