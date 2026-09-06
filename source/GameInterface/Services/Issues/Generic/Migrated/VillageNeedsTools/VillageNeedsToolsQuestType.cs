@@ -18,6 +18,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.VillageNeedsTools;
 
@@ -128,6 +129,11 @@ internal static class VillageNeedsToolsQuestType
             using (new Generic.Dispatch.IssueDispatchReplayGuard())
             {
                 Campaign.Current.IssueManager.StartIssueQuest(owner);
+
+                if (owner.Issue.IssueQuest is Quest quest && quest._numberOfToolsLog == null && MobileParty.MainParty != null)
+                {
+                    ReplayAcceptDialogConsequence(quest);
+                }
             }
         }
 
@@ -156,10 +162,41 @@ internal static class VillageNeedsToolsQuestType
 
                 NumberOfRequestedGoodField.SetValue(quest, fields.NumberOfRequestedGood);
                 RewardGoldField.SetValue(quest, fields.RewardGold);
+
+                EnsureAcceptedQuestLog(owner, quest);
             }
         }
 
+        private static void EnsureAcceptedQuestLog(Hero owner, Quest quest)
+        {
+            if (quest._numberOfToolsLog != null) return;
+
+            var isLocalPeerOwner = ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) &&
+                ownershipRegistry.IsLocalPeerOwner(owner);
+            if (isLocalPeerOwner && MobileParty.MainParty != null)
+            {
+                ReplayAcceptDialogConsequence(quest);
+                return;
+            }
+
+            quest._numberOfToolsLog = quest.AddDiscreteLog(quest.QuestStartedLog, CollectedToolsTaskName(quest), 0, quest._numberOfRequestedGood);
+        }
+
         public void RejectAcceptance(Hero owner) => RejectAcceptanceCore(owner);
+    }
+
+    private static TextObject CollectedToolsTaskName(Quest quest)
+    {
+        var taskName = new TextObject("{=M8PXWpyV}Collected {ITEM}");
+        taskName.SetTextVariable("ITEM", quest._requestedTradeGood.Name);
+        return taskName;
+    }
+
+    private static void ReplayAcceptDialogConsequence(Quest quest)
+    {
+        quest.StartQuest();
+        quest._numberOfToolsLog = quest.AddDiscreteLog(quest.QuestStartedLog, CollectedToolsTaskName(quest), 0, quest._numberOfRequestedGood);
+        quest.UpdateToolsAmount();
     }
 
     private static readonly IRaceArbitratedAcceptMirrorStrategy<VillageNeedsToolsAcceptFields> QuestSolutionAcceptMirror =
