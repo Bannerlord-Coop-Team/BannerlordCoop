@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.ObjectManager;
@@ -580,6 +580,10 @@ internal static class PlayerPartyTradeContext
                 return "Clan service proposal accepted.";
             case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:
                 return "Clan service proposal declined.";
+            case PlayerPartyInteractionOutcomeType.ClanLeft:
+                return GameTexts.FindText("str_coop_clan_player_left").ToString();
+            case PlayerPartyInteractionOutcomeType.ClanMemberRemoved:
+                return GameTexts.FindText("str_coop_clan_player_removed").ToString();
             case PlayerPartyInteractionOutcomeType.VassalAccepted:
                 return "Vassalage offer accepted.";
             case PlayerPartyInteractionOutcomeType.VassalDeclined:

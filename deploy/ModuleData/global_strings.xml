@@ -31,5 +31,9 @@
     <string id="str_coop_clan_join_vassal" text="{=str_coop_clan_join_vassal}You must leave your current kingdom before joining another clan." />
     <string id="str_coop_clan_join_owns_fiefs" text="{=str_coop_clan_join_owns_fiefs}You cannot join another clan while your clan owns any fiefs." />
     <string id="str_coop_clan_join_incompatible_wars" text="{=str_coop_clan_join_incompatible_wars}Your clan is at war with a faction that the other clan is not at war with. Make peace first." />
+    <string id="str_coop_clan_leave_dialogue" text="{=str_coop_clan_leave_dialogue}I am leaving the clan." />
+    <string id="str_coop_clan_remove_player_dialogue" text="{=str_coop_clan_remove_player_dialogue}You are no longer a member of this clan." />
+    <string id="str_coop_clan_player_left" text="{=str_coop_clan_player_left}The player has left the clan." />
+    <string id="str_coop_clan_player_removed" text="{=str_coop_clan_player_removed}The player has been removed from the clan." />
     <!-- Add other custom text here in the future-->
 </strings>

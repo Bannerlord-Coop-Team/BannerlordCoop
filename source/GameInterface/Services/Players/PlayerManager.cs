@@ -162,7 +162,7 @@ public class PlayerManager : IPlayerManager
         // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
         AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
         AddPlayerObject<Hero>(player.ControllerId, player.HeroId);
-        AddPlayerObject<Clan>(player.ControllerId, player.ClanId);
+        AddPlayerObject<Clan>(player.ControllerId, player.OriginalClanId ?? player.ClanId);
 
         return true;
     }
@@ -192,7 +192,9 @@ public class PlayerManager : IPlayerManager
 
         ReplacePlayerObject<MobileParty>(registeredPlayer.ControllerId, registeredPlayer.MobilePartyId, replacementPlayer.MobilePartyId);
         ReplacePlayerObject<Hero>(registeredPlayer.ControllerId, registeredPlayer.HeroId, replacementPlayer.HeroId);
-        ReplacePlayerObject<Clan>(registeredPlayer.ControllerId, registeredPlayer.ClanId, replacementPlayer.ClanId);
+        ReplacePlayerObject<Clan>(registeredPlayer.ControllerId,
+            registeredPlayer.OriginalClanId ?? registeredPlayer.ClanId,
+            replacementPlayer.OriginalClanId ?? replacementPlayer.ClanId);
         return true;
     }
 
@@ -340,7 +342,7 @@ public class PlayerManager : IPlayerManager
 
         RemovePlayerObject<MobileParty>(player.MobilePartyId);
         RemovePlayerObject<Hero>(player.HeroId);
-        RemovePlayerObject<Clan>(player.ClanId);
+        RemovePlayerObject<Clan>(player.OriginalClanId ?? player.ClanId);
 
         return true;
     }

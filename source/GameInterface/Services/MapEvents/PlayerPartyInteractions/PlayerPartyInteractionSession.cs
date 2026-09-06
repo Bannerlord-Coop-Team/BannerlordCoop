@@ -37,6 +37,7 @@ internal sealed class PlayerPartyInteractionSession
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
+    public PlayerPartyInteractionOption[] ResponderClanOptions { get; set; } = System.Array.Empty<PlayerPartyInteractionOption>();
 
     public PlayerPartyInteractionSession(
         string sessionId,

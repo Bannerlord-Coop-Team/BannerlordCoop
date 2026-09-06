@@ -90,12 +90,15 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(4, result.OtherPartyItems[0].Amount);
     }
 
-    [Fact]
-    public void SubmitOption_RoundTrip_PreservesFields()
+    [Theory]
+    [InlineData(PlayerPartyInteractionOption.TradeProposal)]
+    [InlineData(PlayerPartyInteractionOption.LeaveClan)]
+    [InlineData(PlayerPartyInteractionOption.RemoveFromClan)]
+    public void SubmitOption_RoundTrip_PreservesFields(PlayerPartyInteractionOption option)
     {
         var original = new NetworkSubmitPlayerPartyInteractionOption(
             "session-1",
-            PlayerPartyInteractionOption.TradeProposal,
+            option,
             "party-1");
 
         var result = RoundTrip(original);
@@ -105,14 +108,17 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.PartyId, result.PartyId);
     }
 
-    [Fact]
-    public void Ended_RoundTrip_PreservesFields()
+    [Theory]
+    [InlineData(PlayerPartyInteractionOutcomeType.TradeAccepted)]
+    [InlineData(PlayerPartyInteractionOutcomeType.ClanLeft)]
+    [InlineData(PlayerPartyInteractionOutcomeType.ClanMemberRemoved)]
+    public void Ended_RoundTrip_PreservesFields(PlayerPartyInteractionOutcomeType outcome)
     {
         var original = new NetworkPlayerPartyInteractionEnded(
             "session-1",
             "initiator-party",
             "responder-party",
-            PlayerPartyInteractionOutcomeType.TradeAccepted);
+            outcome);
 
         var result = RoundTrip(original);
 

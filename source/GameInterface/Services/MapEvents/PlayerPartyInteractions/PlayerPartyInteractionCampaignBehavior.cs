@@ -1,5 +1,6 @@
 ﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
@@ -25,6 +26,31 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
 
     private void AddDialogs(CampaignGameStarter starter)
     {
+        foreach (var token in new[] { InitialToken, ResponderToken })
+        {
+            starter.AddPlayerLine(
+                "coop_player_party_interaction_leave_clan_" + token,
+                token,
+                CloseToken,
+                GameTexts.FindText("str_coop_clan_leave_dialogue").ToString(),
+                () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.LeaveClan),
+                () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.LeaveClan),
+                PlayerPartyDialogPriority,
+                null,
+                null);
+
+            starter.AddPlayerLine(
+                "coop_player_party_interaction_remove_from_clan_" + token,
+                token,
+                CloseToken,
+                GameTexts.FindText("str_coop_clan_remove_player_dialogue").ToString(),
+                () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.RemoveFromClan),
+                () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.RemoveFromClan),
+                PlayerPartyDialogPriority,
+                null,
+                null);
+        }
+
         starter.AddDialogLine(
             "coop_player_party_interaction_initial_line",
             RootToken,

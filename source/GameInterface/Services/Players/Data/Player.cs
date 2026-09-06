@@ -15,13 +15,16 @@ public class Player
     public readonly string ClanId;
     [ProtoMember(5)]
     public readonly string CharacterObjectId;
+    [ProtoMember(6)]
+    public readonly string OriginalClanId;
 
-    public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId)
+    public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId, string originalClanId = null)
     {
         ControllerId = controllerId;
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
         ClanId = clanId;
         CharacterObjectId = characterObjectId;
+        OriginalClanId = originalClanId ?? clanId;
     }
 }

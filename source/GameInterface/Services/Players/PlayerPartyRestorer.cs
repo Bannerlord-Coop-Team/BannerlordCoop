@@ -126,7 +126,8 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
                 player.HeroId,
                 partyId,
                 clanId,
-                characterObjectId);
+                characterObjectId,
+                player.OriginalClanId ?? player.ClanId);
         }
 
         return true;

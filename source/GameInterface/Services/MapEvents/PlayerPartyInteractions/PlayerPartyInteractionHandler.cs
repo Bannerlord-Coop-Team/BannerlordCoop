@@ -56,6 +56,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly INetworkConfig configuration;
     private readonly IPlayerPartyHostileEncounterService hostileEncounterService;
     private readonly IClanJoinRules clanJoinRules;
+    private readonly IClanLeaveRules clanLeaveRules;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -75,7 +76,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         INetworkConfig configuration,
         IPlayerPartyHostileEncounterService hostileEncounterService,
         IKingdomMembershipState kingdomMembershipState,
-        IClanJoinRules clanJoinRules)
+        IClanJoinRules clanJoinRules,
+        IClanLeaveRules clanLeaveRules)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -84,6 +86,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.configuration = configuration;
         this.hostileEncounterService = hostileEncounterService;
         this.clanJoinRules = clanJoinRules;
+        this.clanLeaveRules = clanLeaveRules;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, messageBroker, kingdomMembershipState, clanJoinRules);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
@@ -264,6 +267,8 @@ internal class PlayerPartyInteractionHandler : IHandler
                 session.ResponderPartyId);
             return;
         }
+
+        if (TryHandleClanDepartureOption(session, partyId, message.Option)) return;
 
         if (partyId == session.InitiatorPartyId)
         {
@@ -489,6 +494,30 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (TryHandleInitiatorHostileDemandOption(session, option)) return;
 
         HandleInitiatorProposalOption(session, option);
+    }
+
+    private bool TryHandleClanDepartureOption(PlayerPartyInteractionSession session, string partyId, PlayerPartyInteractionOption option)
+    {
+        if (option != PlayerPartyInteractionOption.LeaveClan && option != PlayerPartyInteractionOption.RemoveFromClan)
+            return false;
+        if (!objectManager.TryGetObjectWithLogging(partyId, out PartyBase actorParty) ||
+            !objectManager.TryGetObjectWithLogging(session.GetOtherPartyId(partyId), out PartyBase otherParty)) return true;
+
+        var actor = actorParty.LeaderHero;
+        var other = otherParty.LeaderHero;
+        var allowed = actor?.Clan != null && actor.Clan == other?.Clan &&
+            (option == PlayerPartyInteractionOption.LeaveClan ? clanLeaveRules.CanLeave(actor) : clanLeaveRules.CanRemove(actor, other));
+        var memberParty = option == PlayerPartyInteractionOption.LeaveClan ? actorParty : otherParty;
+        if (!allowed || !clanLeaveRules.TryApply(memberParty.LeaderHero, memberParty.MobileParty))
+        {
+            EndSession(session, PlayerPartyInteractionOutcomeType.Rejected);
+            return true;
+        }
+
+        EndSession(session, option == PlayerPartyInteractionOption.LeaveClan
+            ? PlayerPartyInteractionOutcomeType.ClanLeft
+            : PlayerPartyInteractionOutcomeType.ClanMemberRemoved);
+        return true;
     }
 
     private bool TryHandleInitiatorLeaveOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
@@ -734,6 +763,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionOption[] options,
         PlayerPartyInteractionOption[] enabledOptions = null)
     {
+        if (phase == PlayerPartyInteractionPhase.WaitingForProposal || phase == PlayerPartyInteractionPhase.ProposalPending)
+        {
+            enabledOptions = (enabledOptions ?? options).Concat(session.ResponderClanOptions).ToArray();
+            options = options.Concat(session.ResponderClanOptions).ToArray();
+        }
+
         var partyItems = phase == PlayerPartyInteractionPhase.TradeActive
             ? ResolvePartyItemIds(session.ResponderPartyId)
             : Array.Empty<ItemRosterElementData>();
@@ -793,6 +828,10 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void AddInitialOptions(PlayerPartyInteractionSession session, PartyBase initiatorParty, PartyBase responderParty)
     {
+        foreach (var option in GetClanDepartureOptions(initiatorParty.LeaderHero, responderParty.LeaderHero))
+            AddInitiatorOption(session, option, enabled: true);
+        session.ResponderClanOptions = GetClanDepartureOptions(responderParty.LeaderHero, initiatorParty.LeaderHero).ToArray();
+
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
         AddInitiatorOption(session, PlayerPartyInteractionOption.HostileDemand, hostileEncounterService.CanStartHostileEncounter(initiatorParty, responderParty));
         session.ClanJoinUnavailableReason = clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero);
@@ -817,6 +856,13 @@ internal class PlayerPartyInteractionHandler : IHandler
             !objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty)) return false;
 
         return clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero) == ClanJoinUnavailableReason.None;
+    }
+
+    private IEnumerable<PlayerPartyInteractionOption> GetClanDepartureOptions(Hero actor, Hero other)
+    {
+        if (actor?.Clan == null || actor.Clan != other?.Clan) yield break;
+        if (clanLeaveRules.CanLeave(actor)) yield return PlayerPartyInteractionOption.LeaveClan;
+        if (clanLeaveRules.CanRemove(actor, other)) yield return PlayerPartyInteractionOption.RemoveFromClan;
     }
 
     private static void AddInitiatorOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option, bool enabled)

@@ -344,6 +344,34 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void ReplacePlayer_SharedClan_KeepsOriginalClanControlled()
+    {
+        var manager = CreatePlayerManager(out var objects);
+        var originalClan = ObjectHelper.SkipConstructor<Clan>();
+        var sharedClan = ObjectHelper.SkipConstructor<Clan>();
+        objects.Setup(value => value.TryGetObject("original-clan", out originalClan)).Returns(true);
+        objects.Setup(value => value.TryGetObjectWithLogging("original-clan", out originalClan)).Returns(true);
+        objects.Setup(value => value.TryGetObject("shared-clan", out sharedClan)).Returns(true);
+        objects.Setup(value => value.TryGetObjectWithLogging("shared-clan", out sharedClan)).Returns(true);
+        var registered = new Player(ControllerId, HeroId, PartyId, "original-clan", "character");
+        var restored = new Player(ControllerId, HeroId, PartyId, "shared-clan", "character", registered.OriginalClanId);
+        try
+        {
+            Assert.True(manager.AddPlayer(registered));
+            Assert.True(manager.ReplacePlayer(registered, restored));
+            Assert.True(manager.Contains(originalClan));
+            Assert.False(manager.Contains(sharedClan));
+            Assert.True(manager.RemovePlayer(restored));
+            Assert.False(manager.Contains(originalClan));
+        }
+        finally
+        {
+            manager.RemovePlayer(restored);
+            manager.RemovePlayer(registered);
+        }
+    }
+
+    [Fact]
     public void ReplacePlayer_SupersededRegistration_LeavesCurrentRegistrationIntact()
     {
         var playerManager = CreatePlayerManager(out _);

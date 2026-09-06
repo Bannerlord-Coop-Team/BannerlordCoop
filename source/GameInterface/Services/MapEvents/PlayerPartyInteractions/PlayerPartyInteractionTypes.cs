@@ -1,4 +1,4 @@
-namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
+﻿namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
 public enum PlayerPartyInteractionPhase
 {
@@ -27,7 +27,9 @@ public enum PlayerPartyInteractionOption
     ConfirmHostileDemand,
     CancelHostileDemand,
     RefuseHostileDemand,
-    YieldHostileDemand
+    YieldHostileDemand,
+    LeaveClan,
+    RemoveFromClan
 }
 
 public enum PlayerPartyInteractionVassalUnavailableReason
@@ -61,7 +63,9 @@ public enum PlayerPartyInteractionOutcomeType
     Rejected,
     Disconnected,
     HostileDemandAccepted,
-    HostileDemandYielded
+    HostileDemandYielded,
+    ClanLeft,
+    ClanMemberRemoved
 }
 
 public enum PlayerPartyInteractionDeniedReason
