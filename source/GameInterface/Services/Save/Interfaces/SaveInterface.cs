@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Serilog;
 using System;
+using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -14,6 +15,7 @@ public interface ISaveInterface : IGameAbstraction
     SaveResults SaveCurrentGame();
     SaveResults SaveCurrentGameToFile(string saveName);
     byte[] ReadSaveFile(string fileName);
+    void DeleteSaveFile(string fileName);
 }
 
 internal class SaveInterface : ISaveInterface
@@ -51,6 +53,18 @@ internal class SaveInterface : ISaveInterface
             throw new ArgumentException("File name cannot be empty.", nameof(fileName));
 
         return FileHelper.GetFileContent(FileDriver.GetSaveFilePath(fileName));
+    }
+
+    public void DeleteSaveFile(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            throw new ArgumentException("File name cannot be empty.", nameof(fileName));
+
+        var path = FileDriver.GetSaveFilePath(fileName);
+        FileHelper.DeleteFile(path);
+        // FileHelper discards the platform helper's deletion result.
+        if (FileHelper.FileExists(path))
+            throw new IOException("Save file could not be deleted: " + fileName);
     }
 
     private SaveResults SaveCurrentGame(string saveName, ISaveDriver saveDriver)

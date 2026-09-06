@@ -31,6 +31,9 @@ public class BugReportServerSaveProvider : IBugReportServerSaveProvider
         save = null;
         try
         {
+            var sidecarFileName = SaveName + ".json";
+            // GameSaved subscriber failures do not fail the campaign save, so discard the previous sidecar first.
+            saveInterface.DeleteSaveFile(sidecarFileName);
             var result = saveInterface.SaveCurrentGameToFile(SaveName);
             if (!result.Success || result.Data == null || result.Data.Length == 0)
             {
@@ -38,7 +41,6 @@ public class BugReportServerSaveProvider : IBugReportServerSaveProvider
                 return false;
             }
 
-            var sidecarFileName = SaveName + ".json";
             var sidecarData = ReadSidecar(sidecarFileName);
             save = new CollectedBugReportServerSave(
                 SaveName + ".sav",
