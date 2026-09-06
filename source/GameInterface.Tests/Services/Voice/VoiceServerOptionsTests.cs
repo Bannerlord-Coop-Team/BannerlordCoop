@@ -51,6 +51,47 @@ public class VoiceServerOptionsTests
     }
 
     [Fact]
+    public void VoiceCommandRetainsServerAndRequiredArgumentGuardsThroughRegistryAndDirectCalls()
+    {
+        bool server = ModInformation.IsServer;
+        var previous = ModConfigProvider.ModOptions;
+        try
+        {
+            var network = new Mock<INetwork>();
+            var broker = new Mock<IMessageBroker>();
+            var command = new ModOptionsCommands.VoiceEnabledCoopCommand(network.Object, broker.Object);
+            var registry = new CoopCommandRegistry(new[] { command }, Mock.Of<Serilog.ILogger>());
+            var args = new CoopCommandArgsFactory();
+            Assert.Equal(CoopCommandSide.Server, command.Side);
+            Assert.True(Assert.Single(command.ExpectedArgs).IsRequired);
+            ModInformation.IsServer = true;
+            ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData());
+            foreach (var values in new[] { System.Array.Empty<string>(), new[] { "false", "true" } })
+            {
+                Assert.False(command.ProcessCommand(args.FromValues(values)).Succeeded);
+                Assert.Equal("invalid_arguments", registry.ProcessCommand(
+                    "coop.debug.mod_config.voice_enabled", args.FromValues(values)).ErrorCode);
+            }
+            broker.VerifyNoOtherCalls();
+            network.VerifyNoOtherCalls();
+            Assert.True(registry.ProcessCommand("coop.debug.mod_config.voice_enabled",
+                args.FromValues(new[] { "false" })).Succeeded);
+            Assert.False(ModConfigProvider.ModOptions.VoiceEnabled);
+            ModInformation.IsServer = false;
+            Assert.Equal("command_wrong_side", registry.ProcessCommand(
+                "coop.debug.mod_config.voice_enabled", args.FromValues(new[] { "true" })).ErrorCode);
+            Assert.False(ModConfigProvider.ModOptions.VoiceEnabled);
+            broker.Verify(x => x.Publish(It.IsAny<object>(), It.Is<ModConfigApplied>(m => !m.ModOptions.VoiceEnabled)), Times.Once);
+            network.Verify(x => x.SendAll(It.Is<NetworkLoadModConfig>(m => !m.ModOptions.VoiceEnabled)), Times.Once);
+        }
+        finally
+        {
+            ModInformation.IsServer = server;
+            ModConfigProvider.ModOptions = previous;
+        }
+    }
+
+    [Fact]
     public void ServerCommandPublishesAndBroadcastsCurrentOptionButRejectsClientAndInvalidInput()
     {
         bool server = ModInformation.IsServer;

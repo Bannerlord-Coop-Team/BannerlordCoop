@@ -57,6 +57,35 @@ public class CoopOptionsKeybindingTests
         Assert.Contains(".CloseKeybinding();", source);
     }
 
+    [Fact]
+    public void HeadlessInputFixtureSupportsAnExistingModuleAndRestoresUninitializedInput()
+    {
+        using var restoreOriginalState = new VoiceKeybindingFixture();
+        var module = (TaleWorlds.MountAndBlade.Module)System.Runtime.Serialization.FormatterServices
+            .GetUninitializedObject(typeof(TaleWorlds.MountAndBlade.Module));
+        module.GlobalTextManager = new TaleWorlds.Core.GameTextManager();
+        TaleWorlds.MountAndBlade.Module.CurrentModule = module;
+        var managerField = typeof(Input).GetField("_inputManager",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        managerField.SetValue(null, null);
+        Assert.Null(Input.InputManager);
+        var previousInputState = Input.InputState;
+        var previousDebugInput = Input.DebugInput;
+
+        using (var fixture = new VoiceKeybindingFixture())
+        {
+            var key = new VoicePushToTalkKeyVM(InputKey.Q, _ => { });
+            Assert.Equal(InputKey.Q, key.CurrentKey.InputKey);
+            fixture.InputManager.Verify(input => input.GetVirtualKeyCode(InputKey.Q), Times.AtLeastOnce);
+            Assert.Same(module, TaleWorlds.MountAndBlade.Module.CurrentModule);
+        }
+
+        Assert.Null(Input.InputManager);
+        Assert.Same(previousInputState, Input.InputState);
+        Assert.Same(previousDebugInput, Input.DebugInput);
+        Assert.Same(module, TaleWorlds.MountAndBlade.Module.CurrentModule);
+    }
+
     private sealed class Popup : ICoopKeybindingPopup
     {
         public bool IsActive { get; private set; }

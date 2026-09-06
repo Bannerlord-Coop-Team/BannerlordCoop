@@ -1,9 +1,12 @@
-﻿using Common.Network.Messages;
+﻿using Common;
+using Common.Network.Messages;
 using Common.Voice;
 using Coop.Tests.Extensions;
 using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
+using System;
 using System.Linq;
+using System.Threading;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Voice;
@@ -37,15 +40,49 @@ public partial class ServerVoiceHandlerTests
     {
         var speaker = Add("platform:1"); var listener = Add("platform:2");
         Context(speaker.peer); Context(listener.peer); Frame(listener.peer, audio: false);
-        packets.HandleReceive(speaker.peer, new VoicePacket
+        using var entered = new ManualResetEventSlim();
+        using var packetQueued = new ManualResetEventSlim();
+        using var toggled = new ManualResetEventSlim();
+        GameThread.Run(() =>
         {
-            Position = new VoicePosition("campaign", 1, 0, 0, 0, true, true),
-            Audio = new byte[] { 1 }, Sequence = 1, StateSequence = 1, SentAt = now
+            entered.Set();
+            if (!packetQueued.Wait(TimeSpan.FromSeconds(5))) return;
+            broker.Publish(this, new ModConfigApplied(new ModOptions(new ModOptionsData { VoiceEnabled = false })));
+            broker.Publish(this, new ModConfigApplied(new ModOptions(new ModOptionsData { VoiceEnabled = true })));
+            toggled.Set();
         });
-        broker.Publish(this, new ModConfigApplied(new ModOptions(new ModOptionsData { VoiceEnabled = false })));
-        broker.Publish(this, new ModConfigApplied(new ModOptions(new ModOptionsData { VoiceEnabled = true })));
-        Drain();
+        try
+        {
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            packets.HandleReceive(speaker.peer, new VoicePacket
+            {
+                Position = new VoicePosition("campaign", 1, 0, 0, 0, true, true),
+                Audio = new byte[] { 1 }, Sequence = 1, StateSequence = 1, SentAt = now
+            });
+            Assert.Empty(network.ImmediateSends);
+        }
+        finally
+        {
+            packetQueued.Set();
+            Drain();
+        }
+        Assert.True(toggled.IsSet);
         Assert.Empty(network.ImmediateSends);
+    }
+
+    [Fact]
+    public void DisableDoesNotRetractSpeechAlreadyDeliveredBeforeTheToggle()
+    {
+        var speaker = Add("platform:1"); var listener = Add("platform:2");
+        Context(speaker.peer); Context(listener.peer); Frame(listener.peer, audio: false);
+        Frame(speaker.peer);
+        Assert.Single(network.ImmediateSends);
+        GameThread.Run(() =>
+        {
+            broker.Publish(this, new ModConfigApplied(new ModOptions(new ModOptionsData { VoiceEnabled = false })));
+            broker.Publish(this, new ModConfigApplied(new ModOptions(new ModOptionsData { VoiceEnabled = true })));
+        }, blocking: true);
+        Assert.Single(network.ImmediateSends);
     }
 
     [Fact]
