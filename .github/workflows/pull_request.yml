@@ -12,6 +12,8 @@ concurrency:
 env:
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
+# Use the event's merge commit in every job so scripts, sources, and build artifacts
+# match the workflow, even when the PR branch is behind development.
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,7 +27,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
 
       - name: Link Game Assemblies Folder
         run: ln -s /home/mb2 mb2
@@ -66,7 +68,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
 
       - name: Link Game Assemblies Folder
         run: ln -s /home/mb2 mb2
@@ -107,7 +109,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v5
@@ -143,7 +145,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
 
       - name: Link Game Assemblies Folder
         run: ln -s /home/mb2 mb2
