@@ -1,0 +1,147 @@
+<ListPanel WidthSizePolicy="Fixed" SuggestedWidth="800" HorizontalAlignment="Center" HeightSizePolicy="CoverChildren" LayoutImp.LayoutMethod="VerticalTopToBottom">
+    <Children>
+        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="40" Brush="Clan.TabControl.Text" Brush.FontSize="28" Brush.TextVerticalAlignment="Center" Text="@TitleText" />
+        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="32" Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.TextVerticalAlignment="Center" Text="@DescriptionText" />
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@EnabledText" />
+                <ButtonWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="40" SuggestedHeight="40" VerticalAlignment="Center" Brush="SPOptions.Checkbox.Empty.Button" ButtonType="Toggle" IsSelected="@Enabled" ToggleIndicator="ToggleIndicator" UpdateChildrenStates="true">
+                    <Children>
+                        <BrushWidget Id="ToggleIndicator" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="SPOptions.Checkbox.Full.Button" />
+                    </Children>
+                </ButtonWidget>
+            </Children>
+        </ListPanel>
+        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="36" Brush="Clan.TabControl.Text" Brush.FontSize="25" Brush.TextVerticalAlignment="Center" Text="@InputText" />
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight" IsEnabled="@Enabled">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@ActivationLabel" />
+                <Standard.DropdownWithHorizontalControl VerticalAlignment="Center" Parameter.SelectorDataSource="{ActivationSelector}" Parameter.IsCustomWidth="true" Parameter.CustomWidth="350" />
+            </Children>
+        </ListPanel>
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight" IsEnabled="@Enabled">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@MicrophoneLabel" />
+                <Standard.DropdownWithHorizontalControl VerticalAlignment="Center" Parameter.SelectorDataSource="{MicrophoneSelector}" Parameter.IsCustomWidth="true" Parameter.CustomWidth="350" />
+            </Children>
+        </ListPanel>
+        <Widget WidthSizePolicy="Fixed" SuggestedWidth="800" HeightSizePolicy="CoverChildren" HorizontalAlignment="Center" IsEnabled="@IsKeybindingEnabled">
+            <Children>
+                <OptionsKeyItemListPanel DataSource="{PushToTalkKey}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" MarginBottom="10" StackLayout.LayoutMethod="HorizontalLeftToRight" OptionTitle="@Name" OptionDescription="@Description" OptionExtraInformation="@ExtraInformationText">
+                    <Children>
+                        <RichTextWidget WidthSizePolicy="Fixed" SuggestedWidth="370" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Text="@Name" />
+                        <ButtonWidget Id="GameKeyButton" DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="338" SuggestedHeight="42" VerticalAlignment="Center" Command.Click="ExecuteKeybindRequest" UpdateChildrenStates="true">
+                            <Children>
+                                <BrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="362" SuggestedHeight="38" HorizontalAlignment="Center" VerticalAlignment="Center" Brush="SPOptions.GameKey.Button.Canvas" IsEnabled="false" />
+                                <BrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="400" SuggestedHeight="65" HorizontalAlignment="Center" VerticalAlignment="Center" Brush="SPOptions.GameKey.Button.Frame" IsEnabled="false" />
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="SPOptions.Dropdown.Center.Text" Text="@OptionValueText" />
+                            </Children>
+                        </ButtonWidget>
+                        <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="35" SuggestedHeight="35" VerticalAlignment="Center" MarginLeft="35" Brush="MPLobby.Armory.Reset.Button" IsVisible="@IsChanged" Command.Click="ExecuteRevert">
+                            <Children>
+                                <HintWidget DataSource="{RevertHint}" Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint" IsEnabled="false" />
+                            </Children>
+                        </ButtonWidget>
+                    </Children>
+                </OptionsKeyItemListPanel>
+            </Children>
+        </Widget>
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight" IsEnabled="@IsKeybindingEnabled">
+            <Children>
+                <Widget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" />
+                <ButtonWidget WidthSizePolicy="Fixed" SuggestedWidth="245" HeightSizePolicy="Fixed" SuggestedHeight="42" VerticalAlignment="Center" Brush="ButtonBrush1" Command.Click="ExecuteResetKey" MarginRight="12">
+                    <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center" Text="@ResetKeyText" />
+                    </Children>
+                </ButtonWidget>
+            </Children>
+        </ListPanel>
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight" IsEnabled="@Enabled">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@MuteLabel" />
+                <ButtonWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="40" SuggestedHeight="40" VerticalAlignment="Center" Brush="SPOptions.Checkbox.Empty.Button" ButtonType="Toggle" IsSelected="@Muted" ToggleIndicator="ToggleIndicator" UpdateChildrenStates="true">
+                    <Children>
+                        <BrushWidget Id="ToggleIndicator" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="SPOptions.Checkbox.Full.Button" />
+                    </Children>
+                </ButtonWidget>
+            </Children>
+        </ListPanel>
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight" IsEnabled="@Enabled">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@DeafenLabel" />
+                <ButtonWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="40" SuggestedHeight="40" VerticalAlignment="Center" Brush="SPOptions.Checkbox.Empty.Button" ButtonType="Toggle" IsSelected="@Deafened" ToggleIndicator="ToggleIndicator" UpdateChildrenStates="true">
+                    <Children>
+                        <BrushWidget Id="ToggleIndicator" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="SPOptions.Checkbox.Full.Button" />
+                    </Children>
+                </ButtonWidget>
+            </Children>
+        </ListPanel>
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight" IsEnabled="@IsVoiceActivation">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@SensitivityText" />
+                <Standard.Slider.Float WidthSizePolicy="Fixed" SuggestedWidth="290" HeightSizePolicy="Fixed" SuggestedHeight="36" VerticalAlignment="Center" Parameter.Value="@Sensitivity" Parameter.MinValue="0.001" Parameter.MaxValue="1" />
+                <FloatInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="110" HeightSizePolicy="Fixed" SuggestedHeight="38" MarginLeft="20" VerticalAlignment="Center" Brush="ScoreboardPanels_2" Brush.FontSize="22" Brush.TextHorizontalAlignment="Center" FloatText="@Sensitivity" MinFloat="0.001" MaxFloat="1" EnableClamp="true" MaxLength="6" />
+            </Children>
+        </ListPanel>
+        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="36" Brush="Clan.TabControl.Text" Brush.FontSize="25" Brush.TextVerticalAlignment="Center" Text="@PlaybackText" />
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight" IsEnabled="@Enabled">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@VolumeText" />
+                <Standard.Slider.Float WidthSizePolicy="Fixed" SuggestedWidth="290" HeightSizePolicy="Fixed" SuggestedHeight="36" VerticalAlignment="Center" Parameter.Value="@Volume" Parameter.MinValue="0" Parameter.MaxValue="1" />
+                <FloatInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="110" HeightSizePolicy="Fixed" SuggestedHeight="38" MarginLeft="20" VerticalAlignment="Center" Brush="ScoreboardPanels_2" Brush.FontSize="22" Brush.TextHorizontalAlignment="Center" FloatText="@Volume" MinFloat="0" MaxFloat="1" EnableClamp="true" MaxLength="6" />
+            </Children>
+        </ListPanel>
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" LayoutImp.LayoutMethod="HorizontalLeftToRight">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="350" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@ShowTalkingPlayersText" />
+                <ButtonWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="40" SuggestedHeight="40" VerticalAlignment="Center" Brush="SPOptions.Checkbox.Empty.Button" ButtonType="Toggle" IsSelected="@ShowTalkingPlayers" ToggleIndicator="ToggleIndicator" UpdateChildrenStates="true">
+                    <Children>
+                        <BrushWidget Id="ToggleIndicator" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="SPOptions.Checkbox.Full.Button" />
+                    </Children>
+                </ButtonWidget>
+            </Children>
+        </ListPanel>
+        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="36" Brush="Clan.TabControl.Text" Brush.FontSize="25" Brush.TextVerticalAlignment="Center" Text="@MicrophoneTestText" />
+        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="76" LayoutImp.LayoutMethod="HorizontalLeftToRight" IsEnabled="@Enabled">
+            <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="125" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.FontSize="20" Brush.TextVerticalAlignment="Center" Text="@InputLevelText" />
+                <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="24" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" LayoutImp.LayoutMethod="VerticalTopToBottom" MarginRight="8">
+                    <Children>
+                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="12" MarginBottom="2" Sprite="BlankWhiteSquare_9" Color="#262626FF">
+                            <Children>
+                                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#E33B36FF" IsVisible="@InputLevelPeak" />
+                            </Children>
+                        </Widget>
+                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="12" MarginBottom="2" Sprite="BlankWhiteSquare_9" Color="#262626FF">
+                            <Children>
+                                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#ED8435FF" IsVisible="@InputLevelVeryHigh" />
+                            </Children>
+                        </Widget>
+                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="12" MarginBottom="2" Sprite="BlankWhiteSquare_9" Color="#262626FF">
+                            <Children>
+                                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#E5C53AFF" IsVisible="@InputLevelHigh" />
+                            </Children>
+                        </Widget>
+                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="12" MarginBottom="2" Sprite="BlankWhiteSquare_9" Color="#262626FF">
+                            <Children>
+                                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#88C944FF" IsVisible="@InputLevelMedium" />
+                            </Children>
+                        </Widget>
+                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="12" MarginBottom="2" Sprite="BlankWhiteSquare_9" Color="#262626FF">
+                            <Children>
+                                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#3FBE64FF" IsVisible="@InputLevelLow" />
+                            </Children>
+                        </Widget>
+                    </Children>
+                </ListPanel>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="60" HeightSizePolicy="Fixed" SuggestedHeight="24" VerticalAlignment="Top" Brush="SPOptions.OptionName.Text" Brush.FontSize="16" Text="@InputPeakText" />
+                <ButtonWidget WidthSizePolicy="Fixed" SuggestedWidth="245" HeightSizePolicy="Fixed" SuggestedHeight="42" VerticalAlignment="Center" Brush="ButtonBrush1" Command.Click="ExecuteTest" MarginRight="12">
+                    <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center" Text="@TestText" />
+                    </Children>
+                </ButtonWidget>
+            </Children>
+        </ListPanel>
+        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="48" Brush="Clan.TabControl.Text" Brush.FontSize="20" Brush.TextVerticalAlignment="Center" Text="@StatusText" />
+    </Children>
+</ListPanel>
