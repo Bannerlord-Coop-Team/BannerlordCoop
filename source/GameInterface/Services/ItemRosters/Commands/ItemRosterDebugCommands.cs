@@ -32,6 +32,8 @@ namespace GameInterface.Services.ItemRosters.Commands
 
             public string Description => "Runs the add random item debug operation.";
 
+            public CoopCommandSide Side => CoopCommandSide.Both;
+
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
                 new ExpectedArgs("settlement_id", "The settlement StringId.", isRequired: true),
@@ -64,6 +66,8 @@ namespace GameInterface.Services.ItemRosters.Commands
             public string Name => "add_item_burst";
 
             public string Description => "Runs the add item burst debug operation.";
+
+            public CoopCommandSide Side => CoopCommandSide.Server;
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
@@ -116,6 +120,8 @@ namespace GameInterface.Services.ItemRosters.Commands
 
             public string Description => "Reports info.";
 
+            public CoopCommandSide Side => CoopCommandSide.Both;
+
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
                 new ExpectedArgs("party_or_settlement_id", "The party or settlement StringId.", isRequired: true),
@@ -143,6 +149,8 @@ namespace GameInterface.Services.ItemRosters.Commands
             public string Name => "export";
 
             public string Description => "Runs the export debug operation.";
+
+            public CoopCommandSide Side => CoopCommandSide.Both;
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {

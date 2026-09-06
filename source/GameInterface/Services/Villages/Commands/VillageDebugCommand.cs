@@ -43,6 +43,8 @@ internal class VillageDebugCommand
 
         public string Description => "Lists the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -77,6 +79,8 @@ internal class VillageDebugCommand
         public string Name => "info";
 
         public string Description => "Shows the relevant state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -123,6 +127,8 @@ internal class VillageDebugCommand
 
         public string Description => "Sets state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("villageId", "The village id."),
@@ -168,6 +174,8 @@ internal class VillageDebugCommand
         public string Name => "set_hearth";
 
         public string Description => "Sets hearth for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -217,6 +225,8 @@ internal class VillageDebugCommand
         public string Name => "set_trade_tax_acc";
 
         public string Description => "Sets trade tax acc for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -268,6 +278,8 @@ internal class VillageDebugCommand
         public string Name => "set_demand_time";
 
         public string Description => "Sets demand time for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

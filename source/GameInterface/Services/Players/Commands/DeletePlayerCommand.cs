@@ -34,6 +34,8 @@ public class DeletePlayerCommand
 
         public string Description => "Requests deletion of the local player from the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

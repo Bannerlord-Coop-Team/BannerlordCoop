@@ -51,6 +51,8 @@ public class TownDebugCommand
 
         public string Description => "Lists towns for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -85,6 +87,8 @@ public class TownDebugCommand
 
         public string Description => "Lists items for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -115,6 +119,8 @@ public class TownDebugCommand
         public string Name => "info";
 
         public string Description => "Shows the relevant state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -172,6 +178,8 @@ public class TownDebugCommand
 
         public string Description => "Runs backlink for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -202,6 +210,8 @@ public class TownDebugCommand
         public string Name => "focus_garrison";
 
         public string Description => "Focuses garrison for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -250,6 +260,8 @@ public class TownDebugCommand
         public string Name => "apply_garrison_lifecycle";
 
         public string Description => "Applies garrison lifecycle for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -352,6 +364,8 @@ public class TownDebugCommand
 
         public string Description => "Lists buildings for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -387,6 +401,8 @@ public class TownDebugCommand
 
         public string Description => "Lists workshops for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -419,6 +435,8 @@ public class TownDebugCommand
         public string Name => "set_food_stocks";
 
         public string Description => "Sets food stocks for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -469,6 +487,8 @@ public class TownDebugCommand
 
         public string Description => "Sets governor for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -517,6 +537,8 @@ public class TownDebugCommand
 
         public string Description => "Sets last captured by for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -564,6 +586,8 @@ public class TownDebugCommand
         public string Name => "add_item_to_sold_items";
 
         public string Description => "Adds item to sold items for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -639,6 +663,8 @@ public class TownDebugCommand
 
         public string Description => "Sets prosperity for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -686,6 +712,8 @@ public class TownDebugCommand
 
         public string Description => "Sets loyalty for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -732,6 +760,8 @@ public class TownDebugCommand
         public string Name => "set_security";
 
         public string Description => "Sets security for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -781,6 +811,8 @@ public class TownDebugCommand
 
         public string Description => "Sets in rebellious state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -822,6 +854,8 @@ public class TownDebugCommand
 
         public string Description => "Starts rebellion for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -859,6 +893,8 @@ public class TownDebugCommand
         public string Name => "set_garrison_auto_recruitment";
 
         public string Description => "Sets garrison auto recruitment for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -907,6 +943,8 @@ public class TownDebugCommand
 
         public string Description => "Sets trade tax acc for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -954,6 +992,8 @@ public class TownDebugCommand
 
         public string Description => "Changes current building for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -991,6 +1031,8 @@ public class TownDebugCommand
 
         public string Description => "Changes current building queue for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townId", "The town id."),
@@ -1024,6 +1066,8 @@ public class TownDebugCommand
         public string Name => "management_data";
 
         public string Description => "Runs data for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

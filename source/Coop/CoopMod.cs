@@ -613,6 +613,7 @@ namespace Coop
         protected override void OnSubModuleUnloaded()
         {
             CrashDiagnostics.SetPhase("module-unloading");
+            Coop?.Dispose();
 #if DEBUG
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
