@@ -14,7 +14,7 @@ namespace Missions.Agents.Packets
 
         [ProtoMember(1)]
         public string IdentityScopeId { get; }
-        [ProtoMember(2)]
+        [ProtoMember(2, IsPacked = true)]
         public ushort[] AgentIds { get; }
         [ProtoMember(3)]
         public Guid[] AgentGuids { get; }

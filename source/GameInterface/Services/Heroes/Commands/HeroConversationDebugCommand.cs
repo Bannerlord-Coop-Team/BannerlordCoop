@@ -1,4 +1,5 @@
 ﻿#if DEBUG
+using Common.Commands;
 using Common;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
@@ -8,100 +9,174 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Heroes.Commands;
 
 internal class HeroConversationDebugCommand
 {
-    [CommandLineArgumentFunction("open", "coop.debug.hero_conversation")]
-    public static string Open(List<string> args)
+
+    private static CoopCommandResult Succeeded(string output) =>
+
+        new CoopCommandResult(true, output);
+
+
+    private static CoopCommandResult Failed(string output) =>
+
+        new CoopCommandResult(false, output, "command_failed");
+
+
+    public sealed class HeroConversationOpenCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer) return "Run coop.debug.hero_conversation.open on a client.";
-        if (args.Count != 1) return "Usage: coop.debug.hero_conversation.open <heroId>";
-        if (!TryGetHero(args[0], out var hero, out var error)) return error;
-        if (Campaign.Current.ConversationManager.IsConversationInProgress)
-            return "A conversation is already active.";
-        if (PlayerEncounter.Current != null) return "A player encounter is already active.";
+        public string Prefix => "coop.debug.hero_conversation";
 
-        Campaign.Current.CurrentConversationContext = ConversationContext.Default;
-        CampaignMapConversation.OpenConversation(
-            new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true),
-            new ConversationCharacterData(
-                hero.CharacterObject,
-                hero.PartyBelongedTo?.Party,
-                noHorse: true));
+        public string Name => "open";
 
-        return GetState(hero);
-    }
+        public string Description => "Opens a conversation with a registered hero.";
 
-    [CommandLineArgumentFunction("state", "coop.debug.hero_conversation")]
-    public static string State(List<string> args)
-    {
-        if (ModInformation.IsServer) return "Run coop.debug.hero_conversation.state on a client.";
-        if (args.Count > 1) return "Usage: coop.debug.hero_conversation.state [heroId]";
-
-        Hero hero;
-        if (args.Count == 1)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (!TryGetHero(args[0], out hero, out var error)) return error;
-        }
-        else
+            new ExpectedArgs("hero_id", "The registered hero id to converse with."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            hero = Hero.OneToOneConversationHero;
-            if (hero == null) return "CONVERSATION_STATE active=false heroId=none";
+            if (ModInformation.IsServer) return Failed("Run coop.debug.hero_conversation.open on a client.");
+            if (!TryGetHero(args[0], out var hero, out var error)) return Failed(error);
+            if (Campaign.Current.ConversationManager.IsConversationInProgress)
+                return Failed("A conversation is already active.");
+            if (PlayerEncounter.Current != null) return Failed("A player encounter is already active.");
+
+            Campaign.Current.CurrentConversationContext = ConversationContext.Default;
+            CampaignMapConversation.OpenConversation(
+                new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true),
+                new ConversationCharacterData(
+                    hero.CharacterObject,
+                    hero.PartyBelongedTo?.Party,
+                    noHorse: true));
+
+            return Succeeded(GetState(hero));
+
         }
-
-        return GetState(hero);
     }
 
-    [CommandLineArgumentFunction("close", "coop.debug.hero_conversation")]
-    public static string Close(List<string> args)
+    public sealed class HeroConversationStateCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer) return "Run coop.debug.hero_conversation.close on a client.";
-        if (args.Count != 0) return "Usage: coop.debug.hero_conversation.close";
+        public string Prefix => "coop.debug.hero_conversation";
 
-        if (Campaign.Current.ConversationManager.IsConversationInProgress)
-            Campaign.Current.ConversationManager.EndConversation();
-        Campaign.Current.PlayerEncounter = null;
+        public string Name => "state";
 
-        return "CONVERSATION_CLOSED";
+        public string Description => "Reports the current hero conversation state.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_id", "The optional registered hero id to compare with the active conversation.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer) return Failed("Run coop.debug.hero_conversation.state on a client.");
+
+            Hero hero;
+            if (args.Count == 1)
+            {
+                if (!TryGetHero(args[0], out hero, out var error)) return Failed(error);
+            }
+            else
+            {
+                hero = Hero.OneToOneConversationHero;
+                if (hero == null) return Succeeded("CONVERSATION_STATE active=false heroId=none");
+            }
+
+            return Succeeded(GetState(hero));
+
+        }
     }
 
-    [CommandLineArgumentFunction("set_has_met", "coop.debug.hero_conversation")]
-    public static string SetHasMet(List<string> args)
+    public sealed class HeroConversationCloseCoopCommand : ICoopCommand
     {
-        if (args.Count != 2 || !bool.TryParse(args[1], out var hasMet))
-            return "Usage: coop.debug.hero_conversation.set_has_met <heroId> <true|false>";
-        if (!TryGetHero(args[0], out var hero, out var error)) return error;
+        public string Prefix => "coop.debug.hero_conversation";
 
-        if (hasMet)
-            hero.SetHasMet();
-        else
-            hero.HasMet = false;
+        public string Name => "close";
 
-        return $"HERO_HAS_MET side={(ModInformation.IsServer ? "server" : "client")} " +
-            $"heroId={args[0]} hasMet={hero.HasMet}";
+        public string Description => "Closes the active hero conversation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer) return Failed("Run coop.debug.hero_conversation.close on a client.");
+
+            if (Campaign.Current.ConversationManager.IsConversationInProgress)
+                Campaign.Current.ConversationManager.EndConversation();
+            Campaign.Current.PlayerEncounter = null;
+
+            return Succeeded("CONVERSATION_CLOSED");
+
+        }
     }
 
-    [CommandLineArgumentFunction("meeting_state", "coop.debug.hero_conversation")]
-    public static string MeetingState(List<string> args)
+    public sealed class HeroConversationSetHasMetCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Run coop.debug.hero_conversation.meeting_state on the server.";
-        if (args.Count != 2)
-            return "Usage: coop.debug.hero_conversation.meeting_state <playerHeroId> <metHeroId>";
-        if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var sessionProvider))
-            return $"Unable to get {nameof(ICoopSessionProvider)}";
+        public string Prefix => "coop.debug.hero_conversation";
 
-        long lastMeetingTicks = 0;
-        var playerLastMeetingTimes = sessionProvider.CoopSession?.HeroMeetingData?.PlayerLastMeetingTimes;
-        bool hasEntry = playerLastMeetingTimes != null &&
-            playerLastMeetingTimes.TryGetValue(args[0], out var meetingTimes) &&
-            meetingTimes != null &&
-            meetingTimes.TryGetValue(args[1], out lastMeetingTicks);
+        public string Name => "set_has_met";
 
-        return $"HERO_MEETING_DATA playerHeroId={args[0]} metHeroId={args[1]} " +
-            $"hasEntry={hasEntry} lastMeetingTicks={(hasEntry ? lastMeetingTicks.ToString(CultureInfo.InvariantCulture) : "none")}";
+        public string Description => "Sets whether the local player has met a hero.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("has_met", "True when the hero should be marked as met."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!bool.TryParse(args[1], out var hasMet))
+                return Failed($"Unable to parse {args[1]} as a boolean.");
+            if (!TryGetHero(args[0], out var hero, out var error)) return Failed(error);
+
+            if (hasMet)
+                hero.SetHasMet();
+            else
+                hero.HasMet = false;
+
+            return Succeeded($"HERO_HAS_MET side={(ModInformation.IsServer ? "server" : "client")} " +
+                $"heroId={args[0]} hasMet={hero.HasMet}");
+
+        }
+    }
+
+    public sealed class HeroConversationMeetingStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero_conversation";
+
+        public string Name => "meeting_state";
+
+        public string Description => "Reports cached meeting state for two heroes.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("player_hero_id", "The registered player hero id."),
+            new ExpectedArgs("met_hero_id", "The registered met hero id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Run coop.debug.hero_conversation.meeting_state on the server.");
+            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var sessionProvider))
+                return Failed($"Unable to get {nameof(ICoopSessionProvider)}");
+
+            long lastMeetingTicks = 0;
+            var playerLastMeetingTimes = sessionProvider.CoopSession?.HeroMeetingData?.PlayerLastMeetingTimes;
+            bool hasEntry = playerLastMeetingTimes != null &&
+                playerLastMeetingTimes.TryGetValue(args[0], out var meetingTimes) &&
+                meetingTimes != null &&
+                meetingTimes.TryGetValue(args[1], out lastMeetingTicks);
+
+            return Succeeded($"HERO_MEETING_DATA playerHeroId={args[0]} metHeroId={args[1]} " +
+                $"hasEntry={hasEntry} lastMeetingTicks={(hasEntry ? lastMeetingTicks.ToString(CultureInfo.InvariantCulture) : "none")}");
+
+        }
     }
 
     private static bool TryGetHero(string heroId, out Hero hero, out string error)
