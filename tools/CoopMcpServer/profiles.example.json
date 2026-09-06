@@ -1,0 +1,11 @@
+{
+  "artifactDirectory": "C:\\CoopMcpServer\\Runs",
+  "profiles": {
+    "local": {
+      "executable": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord\\bin\\Win64_Shipping_Client\\Bannerlord.exe",
+      "modules": ["Native", "SandBoxCore", "SandBox", "StoryMode", "Coop"],
+      "serverPlatformId": "testserver",
+      "clientPlatformIds": ["testclient1", "testclient2", "testclient3", "testclient4"]
+    }
+  }
+}

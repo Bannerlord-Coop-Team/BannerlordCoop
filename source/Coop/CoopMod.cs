@@ -327,7 +327,9 @@ namespace Coop
             bugReportConsent = new BugReportConsentCoordinator(
                 new CoopOptionsStore(),
                 exception => Logger.Warning(exception, "Diagnostic bug-report log-sharing preference could not be saved"));
+#if !DEBUG
             TryStartCrashReporter(role);
+#endif
         }
 
         private void TryStartCrashReporter(string role)
@@ -483,6 +485,11 @@ namespace Coop
                 CrashDiagnostics.SetPhase,
                 activeLogFilePath);
 
+#if DEBUG
+            global::Coop.Core.Common.Commands.JoinDebugCommands.ConfigureClientSessionStarter(
+                () => Coop.StartAsClient());
+#endif
+
             Updateables.Add(GameThread.Instance);
 
 #if DEBUG
@@ -606,6 +613,7 @@ namespace Coop
         protected override void OnSubModuleUnloaded()
         {
             CrashDiagnostics.SetPhase("module-unloading");
+            Coop?.Dispose();
 #if DEBUG
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;

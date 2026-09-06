@@ -9,8 +9,8 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 /// <summary>
 /// Vanilla holds menu_settlement_taken (the Devastate/Pillage/Mercy choice) open by pausing the campaign
 /// until the player picks. A co-op client can't pause — time is server-driven — so its settlement
-/// encounter keeps advancing and rolls the menu out to the town menu before the player chooses. While a
-/// capture choice is pending for a settlement, redirect the settlement-entry menu back to
+/// encounter keeps advancing and rolls the menu out to the fortification menu before the player chooses. While
+/// a capture choice is pending for a settlement, redirect the settlement-entry menu back to
 /// menu_settlement_taken, enforcing the same hold in a co-op-compatible way. Released when the player picks.
 /// </summary>
 [HarmonyPatch]
@@ -28,9 +28,13 @@ internal static class SiegeCaptureMenuHoldPatch
         if (settlement != null) pendingChoice.Remove(settlement);
     }
 
-    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_town_outside_on_init")]
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_town_outside_on_init))]
     [HarmonyPrefix]
     private static bool TownOutsideInitPrefix() => RedirectIfHeld();
+
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_castle_outside_on_init))]
+    [HarmonyPrefix]
+    private static bool CastleOutsideInitPrefix() => RedirectIfHeld();
 
     private static bool RedirectIfHeld()
     {
