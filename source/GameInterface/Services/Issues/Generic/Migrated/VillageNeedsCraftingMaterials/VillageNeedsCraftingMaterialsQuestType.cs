@@ -6,10 +6,14 @@ using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.CreationCapture;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
+using Helpers;
 using ProtoBuf;
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -162,6 +166,68 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         return party.ItemRoster.GetItemNumber(quest._requestedItem) >= quest._requestedItemAmount;
     }
 
+    internal const byte ProofFailTimeout = 1;
+    internal const byte ProofFailCoercion = 2;
+    internal const byte ProofFailWar = 3;
+
+    private static readonly ConditionalWeakTable<Quest, object> ObservedFailProof = new();
+
+    internal static void ObserveQuestFail(Quest quest, byte proof)
+    {
+        ObservedFailProof.Remove(quest);
+        ObservedFailProof.Add(quest, proof);
+    }
+
+    private static byte CaptureQuestFailProof(Issue issue)
+        => issue.IssueQuest is Quest quest && ObservedFailProof.TryGetValue(quest, out var proof) ? (byte)proof : (byte)0;
+
+    private static bool TryResolveRecordedOwner(Issue issue, out Hero ownerHero, out MobileParty ownerParty)
+    {
+        ownerHero = null;
+        ownerParty = null;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) ||
+            !ownershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var controllerId)) return false;
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPlayer(controllerId, out var player)) return false;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
+
+        objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out ownerHero);
+        objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
+        return ownerHero != null;
+    }
+
+    private static bool IsAtWarWithRecordedOwner(Issue issue)
+        => TryResolveRecordedOwner(issue, out var ownerHero, out _) &&
+           issue.IssueOwner.MapFaction is { } giverFaction &&
+           ownerHero.MapFaction is { } ownerFaction &&
+           giverFaction.IsAtWarWith(ownerFaction);
+
+    private static bool IsBeingCoercedByRecordedOwner(Issue issue)
+    {
+        if (!TryResolveRecordedOwner(issue, out _, out var ownerParty) || ownerParty == null) return false;
+
+        var mapEvent = issue.IssueOwner.CurrentSettlement?.Party?.MapEvent;
+        return mapEvent != null &&
+               (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) &&
+               mapEvent.AttackerSide.LeaderParty == ownerParty.Party;
+    }
+
+    private static bool ValidateQuestCancel(Issue issue)
+        => issue.IssueOwner.CurrentSettlement?.IsRaided == true || IsAtWarWithRecordedOwner(issue);
+
+    private static bool ValidateQuestFail(Issue issue)
+    {
+        if (issue.IssueQuest is not Quest quest) return false;
+
+        return QuestFailProofContext.Current switch
+        {
+            ProofFailTimeout => quest.QuestDueTime.IsPast,
+            ProofFailCoercion => IsBeingCoercedByRecordedOwner(issue),
+            ProofFailWar => IsAtWarWithRecordedOwner(issue),
+            _ => false,
+        };
+    }
+
     private static void ApplyQuestSuccessConsequence(Quest quest)
     {
         quest.AddLog(quest.QuestSuccessLogText, false);
@@ -184,14 +250,27 @@ internal static class VillageNeedsCraftingMaterialsQuestType
 
     private static void ApplyQuestFailConsequence(Quest quest)
     {
-        if (quest.QuestDueTime.IsPast)
+        switch (QuestFailProofContext.Current)
         {
-            quest.AddLog(quest.QuestFailedWithTimeOutLogText, false);
-            quest.QuestGiver.AddPower(-10f);
-            quest.RelationshipChangeWithQuestGiver = -5;
-            quest.QuestGiver.CurrentSettlement.Village.Hearth += -40f;
+            case ProofFailTimeout:
+                quest.AddLog(quest.QuestFailedWithTimeOutLogText, false);
+                quest.QuestGiver.AddPower(-10f);
+                quest.RelationshipChangeWithQuestGiver = -5;
+                quest.QuestGiver.CurrentSettlement.Village.Hearth += -40f;
+                quest.CompleteQuestWithFail();
+                return;
+            case ProofFailCoercion:
+                var accusedLog = new TextObject("{=tWZ4a8Ih}You are accused in {SETTLEMENT} of a crime and {QUEST_GIVER.LINK} no longer trusts you in this matter.");
+                accusedLog.SetTextVariable("SETTLEMENT", quest.QuestGiver.CurrentSettlement.EncyclopediaLinkWithName);
+                StringHelpers.SetCharacterProperties("QUEST_GIVER", quest.QuestGiver.CharacterObject, accusedLog);
+                quest.CompleteQuestWithFail(accusedLog);
+                ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, -5);
+                quest.QuestGiver.AddPower(-10f);
+                return;
+            default:
+                quest.CompleteQuestWithFail(quest.QuestCanceledWarDeclaredLogText);
+                return;
         }
-        quest.CompleteQuestWithFail();
     }
 
     static VillageNeedsCraftingMaterialsQuestType()
@@ -203,8 +282,9 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithQuestSuccessValidation(ValidateQuestSuccess)
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
             .WithQuestSuccessLocalOwnerConsequence(ApplyQuestSuccessLocalOwnerConsequence)
-            .WithQuestCancelValidation(issue => true)
-            .WithQuestFailValidation(issue => true)
+            .WithQuestCancelValidation(ValidateQuestCancel)
+            .WithQuestFailValidation(ValidateQuestFail)
+            .WithQuestFailProofCapture(CaptureQuestFailProof)
             .WithQuestFailConsequence(ApplyQuestFailConsequence)
             .Build();
 

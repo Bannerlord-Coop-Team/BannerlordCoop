@@ -1,13 +1,42 @@
 using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMaterials;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Patches;
+
+[HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest))]
+internal class VillageNeedsCraftingMaterialsQuestFailBranchObserverPatches
+{
+    [HarmonyPatch("OnTimedOut")]
+    [HarmonyPrefix]
+    private static void OnTimedOutPrefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance) =>
+        VillageNeedsCraftingMaterialsQuestType.ObserveQuestFail(__instance, VillageNeedsCraftingMaterialsQuestType.ProofFailTimeout);
+
+    [HarmonyPatch("OnMapEventStarted")]
+    [HarmonyPrefix]
+    private static void OnMapEventStartedPrefix(
+        VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance, MapEvent mapEvent, PartyBase attackerParty)
+    {
+        if (QuestHelper.CheckMinorMajorCoercion(__instance, mapEvent, attackerParty))
+        {
+            VillageNeedsCraftingMaterialsQuestType.ObserveQuestFail(__instance, VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion);
+        }
+    }
+
+    [HarmonyPatch("OnWarDeclared")]
+    [HarmonyPrefix]
+    private static void OnWarDeclaredPrefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance) =>
+        VillageNeedsCraftingMaterialsQuestType.ObserveQuestFail(__instance, VillageNeedsCraftingMaterialsQuestType.ProofFailWar);
+}
 
 [HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "CompleteQuestClickableConditions")]
 internal class VillageNeedsCraftingMaterialsQuestOwnershipGatePatch
