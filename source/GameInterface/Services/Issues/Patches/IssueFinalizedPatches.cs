@@ -79,11 +79,27 @@ internal class IssueExpiryFinalizeAuthorityPatch
         __state?.Dispose();
     }
 
-    private static IssueFinalizeAuthorityGuard OpenGuardIfAuthoritative()
+    internal static IssueFinalizeAuthorityGuard OpenGuardIfAuthoritative()
     {
         return CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer
             ? new IssueFinalizeAuthorityGuard()
             : null;
+    }
+}
+
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
+internal class QuestTimeoutFinalizeAuthorityPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(out IssueFinalizeAuthorityGuard __state)
+    {
+        __state = IssueExpiryFinalizeAuthorityPatch.OpenGuardIfAuthoritative();
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IssueFinalizeAuthorityGuard __state)
+    {
+        __state?.Dispose();
     }
 }
 
