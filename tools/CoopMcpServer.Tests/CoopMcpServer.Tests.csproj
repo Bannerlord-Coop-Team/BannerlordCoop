@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2" PrivateAssets="all" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <ProjectReference Include="../CoopMcpServer/CoopMcpServer.csproj" />
+    <Compile Include="../../source/Common/Commands/*.cs" Link="Commands/%(Filename)%(Extension)" />
+    <Compile Include="../../source/GameInterface/Services/LiveTesting/LiveTestCommandDispatcher.cs" Link="LiveTestCommandDispatcher.cs" />
+    <Compile Include="../../source/Common.Tests/LiveTesting/LiveTestProtocolTests.cs" Link="LiveTestProtocolTests.cs" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

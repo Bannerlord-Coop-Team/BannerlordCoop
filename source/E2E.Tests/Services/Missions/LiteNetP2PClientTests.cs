@@ -1,4 +1,7 @@
 ﻿using Common.Messaging;
+using Common.Logging;
+using Common.Util;
+using System.Net.Sockets;
 using Common.Network;
 using Common.Network.Data;
 using Common.Network.Session;
@@ -53,7 +56,7 @@ public class LiteNetP2PClientTests
             controllerIdProvider.Object,
             steamBridge.Object,
             new MovementPacketCompressor(serializer),
-            batcher);
+            batcher, () => new Common.Logging.ReceivePathDiagnostics());
         NetPeer peer = NetPeerExtensions.CreatePeer(97);
         GetPendingPeerControllers(client)[peer] = controllerId;
 
@@ -80,6 +83,40 @@ public class LiteNetP2PClientTests
         Assert.True(batcher.PromotionFlushAcquiredBuffer);
         Assert.Equal(new[] { "relay", "map" }, routeOrder);
         missionContext.Verify(context => context.MapPeer(controllerId, peer), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OnNetworkReceive_CountsMappingDecisionWithoutChangingDispatch(bool mapped)
+    {
+        var serializer = new Mock<ICommonSerializer>();
+        var packet = new Mock<IPacket>();
+        byte[] bytes = { 1, 2, 3 };
+        serializer.Setup(s => s.Deserialize(It.IsAny<byte[]>())).Returns(packet.Object);
+        var packetManager = new Mock<IPacketManager>();
+        var context = new Mock<IMissionContext>();
+        var diagnostics = new Mock<IReceivePathDiagnostics>();
+        using var client = new LiteNetP2PClient(
+            Mock.Of<INetworkConfig>(), Mock.Of<IRelayNetwork>(), context.Object,
+            serializer.Object, Mock.Of<IMessageBroker>(), packetManager.Object,
+            Mock.Of<IMessagePacketHandler>(), Mock.Of<IControllerIdProvider>(),
+            Mock.Of<ISteamMissionBridge>(), Mock.Of<IMovementPacketCompressor>(),
+            new ReliableMessageBatcher<string>(serializer.Object), () => diagnostics.Object);
+        NetPeer peer = NetPeerExtensions.CreatePeer(98);
+        GetPendingPeerControllers(client)[peer] = "receiving-peer";
+        if (mapped) client.OnPeerConnected(peer);
+        var reader = ObjectHelper.SkipConstructor<NetPacketReader>();
+        reader.SetSource(bytes);
+
+        client.OnNetworkReceive(peer, reader, 0, DeliveryMethod.ReliableOrdered);
+
+        diagnostics.Verify(d => d.Record(
+            mapped ? ReceivePathEvent.MappedReceive : ReceivePathEvent.UnmappedDrop,
+            3, SocketError.Success), Times.Once);
+        serializer.Verify(s => s.Deserialize(It.IsAny<byte[]>()), mapped ? Times.Once() : Times.Never());
+        packetManager.Verify(p => p.HandleReceive(peer, packet.Object), mapped ? Times.Once() : Times.Never());
+        Assert.Equal(mapped ? 0 : 3, reader.AvailableBytes);
     }
 
     private static Dictionary<NetPeer, string> GetPendingPeerControllers(LiteNetP2PClient client)

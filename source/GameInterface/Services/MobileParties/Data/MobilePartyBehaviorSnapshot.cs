@@ -29,7 +29,7 @@ public interface IMobilePartyBehaviorSnapshot
     bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply);
 }
 
-public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
+public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorSnapshot>();
 
@@ -296,9 +296,16 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             if (party?.IsActive == true) liveParties.Add(party);
         }
 
+        bool RejectMembership(string failure)
+        {
+            RejectJoinBaseline(failure);
+            LogJoinBaselineMembership(states, parties);
+            return false;
+        }
+
         if (states.Length != liveParties.Count)
         {
-            return RejectJoinBaseline(
+            return RejectMembership(
                 $"party count mismatch (baseline={states.Length}, client={liveParties.Count})");
         }
 
@@ -310,21 +317,21 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         {
             PartyBehaviorUpdateData behavior = states[i].Behavior;
             if (string.IsNullOrEmpty(behavior.MobilePartyId))
-                return RejectJoinBaseline($"state {i} has no mobile-party id");
+                return RejectMembership($"state {i} has no mobile-party id");
             if (!this.objectManager.TryGetObject(
                 behavior.MobilePartyId,
                 out MobileParty party))
             {
-                return RejectJoinBaseline(
+                return RejectMembership(
                     $"state {i} references missing mobile party '{behavior.MobilePartyId}'");
             }
             if (!liveParties.Contains(party))
             {
-                return RejectJoinBaseline(
+                return RejectMembership(
                     $"state {i} party '{behavior.MobilePartyId}' is not in the client campaign collection");
             }
             if (!seenParties.Add(party))
-                return RejectJoinBaseline($"state {i} duplicates party '{behavior.MobilePartyId}'");
+                return RejectMembership($"state {i} duplicates party '{behavior.MobilePartyId}'");
             if (!TryPrepare(
                 party,
                 behavior,
@@ -334,14 +341,14 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
                 out resolved[i],
                 out string failure))
             {
-                return RejectJoinBaseline(
+                return RejectMembership(
                     $"state {i} party '{behavior.MobilePartyId}' failed validation: {failure}");
             }
         }
 
         if (seenParties.Count != liveParties.Count)
         {
-            return RejectJoinBaseline(
+            return RejectMembership(
                 $"party coverage mismatch (baseline={seenParties.Count}, client={liveParties.Count})");
         }
 
@@ -359,6 +366,8 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 
             lastJoinBaselineFailure = null;
             loggedJoinBaselineFailures.Clear();
+            loggedJoinBaselineMembership.Clear();
+            LastJoinBaselineMembership = null;
             return true;
         }
         catch (Exception ex)
