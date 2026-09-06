@@ -22,13 +22,13 @@ public interface IBattlesFoughtUploader
     Task<ServerTelemetryUploadResult> RecordBattleStartedAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>Posts authenticated server statistics to the configured edge functions.</summary>
+/// <summary>Posts authenticated server statistics to the configured RPC functions.</summary>
 public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtUploader, IDisposable
 {
     public const string Endpoint =
-        "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/upsert-platform-statistics";
+        "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_statistics";
     public const string BattlesFoughtEndpoint =
-        "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/battles-fought-upsert";
+        "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/increment_battles_fought";
     internal const string PublishableKey = "sb_publishable_tseZMeJ-RYeSHI0KwU2p0g_PE4GVtN6";
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
@@ -38,6 +38,7 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
 
     private readonly HttpClient httpClient;
     private readonly string endpoint;
+    private readonly string battlesFoughtEndpoint;
     private readonly bool ownsClient;
 
     public bool IsConfigured => IsEndpointConfigured(endpoint);
@@ -52,14 +53,20 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
     internal ServerTelemetryUploader(
         HttpClient httpClient,
         string endpoint = Endpoint,
-        bool ownsClient = false)
+        bool ownsClient = false,
+        string battlesFoughtEndpoint = BattlesFoughtEndpoint)
     {
         if (httpClient == null) throw new ArgumentNullException(nameof(httpClient));
         if (string.IsNullOrWhiteSpace(endpoint))
             throw new ArgumentException("Endpoint cannot be empty.", nameof(endpoint));
+        if (string.IsNullOrWhiteSpace(battlesFoughtEndpoint))
+            throw new ArgumentException(
+                "Battles-fought endpoint cannot be empty.",
+                nameof(battlesFoughtEndpoint));
 
         this.httpClient = httpClient;
         this.endpoint = endpoint;
+        this.battlesFoughtEndpoint = battlesFoughtEndpoint;
         this.ownsClient = ownsClient;
     }
 
@@ -83,7 +90,7 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
     public async Task<ServerTelemetryUploadResult> RecordBattleStartedAsync(
         CancellationToken cancellationToken)
     {
-        if (!IsEndpointConfigured(BattlesFoughtEndpoint))
+        if (!IsEndpointConfigured(battlesFoughtEndpoint))
         {
             return new ServerTelemetryUploadResult(
                 false,
@@ -91,7 +98,7 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
                 "The battles-fought endpoint is not configured.");
         }
 
-        return await PostAsync(BattlesFoughtEndpoint, "{}", "battles-fought", cancellationToken)
+        return await PostAsync(battlesFoughtEndpoint, "{}", "battles-fought", cancellationToken)
             .ConfigureAwait(false);
     }
 

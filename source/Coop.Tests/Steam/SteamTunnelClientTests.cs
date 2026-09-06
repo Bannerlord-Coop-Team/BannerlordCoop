@@ -1,4 +1,7 @@
 ﻿using Coop.Steam;
+using Common.Logging;
+using Moq;
+using System.Reflection;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -16,7 +19,7 @@ namespace Coop.Tests.Steam
 
         public SteamTunnelClientTests()
         {
-            client = new SteamTunnelClient(transport);
+            client = new SteamTunnelClient(transport, new Common.Logging.ReceivePathDiagnostics());
         }
 
         public void Dispose() => client.Dispose();
@@ -113,6 +116,45 @@ namespace Coop.Tests.Steam
 
             // Drained without a destination: the pump has not learned the client endpoint yet.
             WaitUntil(() => transport.ReceiveDatagram(transport.NextConnection, new byte[16]) == 0);
+        }
+
+        [Fact]
+        public void FailedLocalUdpForward_RecordsSocketErrorAndConsumedSteamDatagram()
+        {
+            var diagnostics = new Mock<IReceivePathDiagnostics>();
+            int failures = 0;
+            diagnostics.Setup(d => d.Record(ReceivePathEvent.UdpForwardFailed, 3, It.IsAny<SocketError>()))
+                .Callback<ReceivePathEvent, int, SocketError>((_, _, error) =>
+                {
+                    Assert.NotEqual(SocketError.Success, error);
+                    Interlocked.Increment(ref failures);
+                });
+            using var failingClient = new SteamTunnelClient(transport, diagnostics.Object);
+            // Broadcast is disabled on the pump socket; exercise the real Socket.SendTo failure.
+            typeof(SteamTunnelClient).GetField("clientEndpoint", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(failingClient, new IPEndPoint(IPAddress.Broadcast, 4200));
+            failingClient.Start(76561198000000042);
+            transport.EnqueueReceive(transport.NextConnection, new byte[] { 1, 2, 3 });
+            WaitUntil(() => Volatile.Read(ref failures) == 1);
+            diagnostics.Verify(d => d.Record(ReceivePathEvent.SteamReceive, 3, SocketError.Success), Times.Once);
+            diagnostics.Verify(d => d.Record(ReceivePathEvent.UdpForwarded, It.IsAny<int>(), It.IsAny<SocketError>()), Times.Never);
+            failingClient.Dispose();
+            diagnostics.Verify(d => d.End("client-disposed"), Times.Once);
+        }
+
+        [Fact]
+        public void InboundWithoutEndpoint_RecordsDropWithoutForwarding()
+        {
+            var diagnostics = new Mock<IReceivePathDiagnostics>();
+            int drops = 0;
+            diagnostics.Setup(d => d.Record(ReceivePathEvent.NoEndpointDrop, 1, SocketError.Success))
+                .Callback(() => Interlocked.Increment(ref drops));
+            using var waitingClient = new SteamTunnelClient(transport, diagnostics.Object);
+            waitingClient.Start(76561198000000042);
+            transport.EnqueueReceive(transport.NextConnection, new byte[] { 5 });
+            WaitUntil(() => Volatile.Read(ref drops) == 1);
+            diagnostics.Verify(d => d.Record(ReceivePathEvent.SteamReceive, 1, SocketError.Success), Times.Once);
+            diagnostics.Verify(d => d.Record(ReceivePathEvent.UdpForwarded, It.IsAny<int>(), It.IsAny<SocketError>()), Times.Never);
         }
 
         [Fact]

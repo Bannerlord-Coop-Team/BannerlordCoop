@@ -6,6 +6,8 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -35,6 +37,7 @@ internal class SettlementPopulationTracker : IHandler
     private readonly IObjectManager objectManager;
     private readonly FixedTownNpcService fixedTownNpcService;
     private readonly ISettlementHeroSpawnPool heroSpawnPool;
+    private readonly IPlayerManager playerManager;
 
     // Keyed by Settlement.StringId; holds the settlement so cleanup never rescans the campaign.
     private readonly Dictionary<string, Settlement> populatedSettlements = new Dictionary<string, Settlement>();
@@ -45,20 +48,24 @@ internal class SettlementPopulationTracker : IHandler
         INetwork network,
         IObjectManager objectManager,
         FixedTownNpcService fixedTownNpcService,
-        ISettlementHeroSpawnPool heroSpawnPool)
+        ISettlementHeroSpawnPool heroSpawnPool,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.fixedTownNpcService = fixedTownNpcService;
         this.heroSpawnPool = heroSpawnPool;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
+        messageBroker.Subscribe<NetworkRequestLocationRosterSnapshot>(Handle_NetworkRequestLocationRosterSnapshot);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
+        messageBroker.Unsubscribe<NetworkRequestLocationRosterSnapshot>(Handle_NetworkRequestLocationRosterSnapshot);
     }
 
     /// <summary>
@@ -179,10 +186,11 @@ internal class SettlementPopulationTracker : IHandler
     {
         if (ModInformation.IsServer == false) return;
         if (settlement?.LocationComplex == null) return;
-        if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
+
             if (populatedSettlements.ContainsKey(settlement.StringId) == false)
             {
                 populatedSettlements.Add(settlement.StringId, settlement);
@@ -203,23 +211,17 @@ internal class SettlementPopulationTracker : IHandler
 
     private void PopulateSettlement(Settlement settlement)
     {
-        var behavior = Campaign.Current?.GetCampaignBehavior<HeroAgentSpawnCampaignBehavior>();
-        if (behavior == null)
+        if (!TryGetHeroAgentSpawnCampaignBehavior(out var behavior)) return;
+
+        foreach (var hero in heroSpawnPool.GetAmbientCandidates(settlement))
         {
-            Logger.Warning("HeroAgentSpawnCampaignBehavior not found; cannot populate {Settlement}", settlement.StringId);
-        }
-        else
-        {
-            foreach (var hero in heroSpawnPool.GetAmbientCandidates(settlement))
+            try
             {
-                try
-                {
-                    behavior.RefreshLocationOfHeroForSettlement(hero, settlement);
-                }
-                catch (Exception e)
-                {
-                    Logger.Warning(e, "Failed to place {Hero} in {Settlement}", hero.StringId, settlement.StringId);
-                }
+                behavior.RefreshLocationOfHeroForSettlement(hero, settlement);
+            }
+            catch (Exception e)
+            {
+                Logger.Warning(e, "Failed to place {Hero} in {Settlement}", hero.StringId, settlement.StringId);
             }
         }
 
@@ -228,8 +230,7 @@ internal class SettlementPopulationTracker : IHandler
 
     private void RefreshHeroPlacement(Hero hero, Settlement settlement)
     {
-        var behavior = Campaign.Current?.GetCampaignBehavior<HeroAgentSpawnCampaignBehavior>();
-        if (behavior == null) return;
+        if (!TryGetHeroAgentSpawnCampaignBehavior(out var behavior)) return;
 
         try
         {
@@ -291,5 +292,34 @@ internal class SettlementPopulationTracker : IHandler
         }
 
         network.SendAll(new NetworkLocationRosterSnapshot(settlementId, entries.ToArray()));
+    }
+
+    private void Handle_NetworkRequestLocationRosterSnapshot(MessagePayload<NetworkRequestLocationRosterSnapshot> obj)
+    {
+        if (ModInformation.IsClient || obj.Who is not NetPeer peer) return;
+
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetPlayer(peer, out var player)) return;
+
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SettlementId, out var settlement)) return;
+
+            if (party.CurrentSettlement != settlement) return;
+
+            // A loaded player party is already inside, run the settlement-entry event to restore the roster
+            OnPartyEnteredSettlement(settlement, party);
+        });
+    }
+
+    private bool TryGetHeroAgentSpawnCampaignBehavior(out HeroAgentSpawnCampaignBehavior heroAgentSpawnBehavior)
+    {
+        heroAgentSpawnBehavior = Campaign.Current?.GetCampaignBehavior<HeroAgentSpawnCampaignBehavior>();
+        if (heroAgentSpawnBehavior != null) return true;
+
+        Logger.Debug("Skipping hero agent spawn update because the campaign behavior is unavailable");
+        return false;
     }
 }

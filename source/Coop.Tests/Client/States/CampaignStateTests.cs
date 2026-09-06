@@ -174,6 +174,7 @@ public class CampaignStateTests
 
         loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Once);
         Assert.Single(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
+        Assert.Single(TestMessageBroker.GetMessagesFromType<ClientCampaignReady>());
         Assert.Equal(1, JoinSignalCount(JoinSyncSignal.CatchUpApplied));
     }
 
@@ -297,6 +298,7 @@ public class CampaignStateTests
     {
         loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Never);
         Assert.Empty(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
+        Assert.Empty(TestMessageBroker.GetMessagesFromType<ClientCampaignReady>());
         Assert.Equal(0, JoinSignalCount(JoinSyncSignal.CatchUpApplied));
     }
 

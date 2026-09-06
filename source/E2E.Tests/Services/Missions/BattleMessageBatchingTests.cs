@@ -65,7 +65,7 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
             controllerIdProvider.Object,
             steamBridge.Object,
             compressor,
-            new ReliableMessageBatcher<string>(serializer));
+            new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
         client.ConnectToInstance(instanceId);
 
         var logicalPayloads = new List<byte[]>(logicalMessageCount);
@@ -138,7 +138,7 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
             controllerIdProvider.Object,
             steamBridge.Object,
             new MovementPacketCompressor(serializer),
-            new ReliableMessageBatcher<string>(serializer));
+            new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
 
         client.Send(controllerId, CreateDeath(CreateGuid(10), 10));
         client.Send(controllerId, CreateDeath(CreateGuid(11), 11));
@@ -186,7 +186,7 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
             controllerIdProvider.Object,
             steamBridge.Object,
             new MovementPacketCompressor(serializer),
-            new ReliableMessageBatcher<string>(serializer));
+            new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
         NetPeer peer = NetPeerExtensions.CreatePeer(99);
         Guid first = CreateGuid(1);
         Guid second = CreateGuid(2);

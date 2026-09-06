@@ -1,7 +1,9 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
+using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.Donate;
 using GameInterface.Services.UI.Messages;
 using System;
@@ -9,6 +11,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json.Serialization;
+using Serilog;
 using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -28,14 +32,22 @@ public enum SteamLobbyPasswordFilter
 /// <summary>View model for direct connection and public standalone Steam-lobby discovery.</summary>
 public class CoopConnectMenuVM : ViewModel, IDisposable
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopConnectMenuVM>();
+
     public const string DirectTabId = "direct";
     public const string SteamLobbiesTabId = "steam_lobbies";
+    public const string OptionsTabId = "Connection";
+    public const string OptionsSectionId = "DirectConnection";
     public const int SteamLobbyPageSize = 4;
+
+    private const string DefaultServerAddress = "localhost";
+    private const int DefaultConnectionPort = 4200;
 
     public event Action SteamLobbiesTabActivated;
 
     private readonly ISteamLobbyBrowser steamLobbyBrowser;
     private readonly IMessageBroker messageBroker;
+    private readonly ICoopOptionsStore optionsStore;
     private readonly List<SteamLobbyListItemVM> discoveredSteamLobbies = new();
 
     private CoopConnectionTabVM selectedTab;
@@ -77,17 +89,12 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string ConnectedPlayersColumnText => "Connected Players";
     public string PasswordColumnText => "Access";
     public string CompatibilityColumnText => "Status";
-    public string IpText => "Server IP Address:";
-    public string PortText => "Port:";
+    public string IpText => "Server Address:";
     public string PasswordText => "Password:";
 
     [DataSourceProperty]
     public HintViewModel ServerAddressHint { get; } = new HintViewModel(new TextObject(
-        "The address of the co-op server to join. Keep localhost if you are the host; otherwise, type the address your friend shared to join their game."));
-
-    [DataSourceProperty]
-    public HintViewModel PortHint { get; } = new HintViewModel(new TextObject(
-        "The port the co-op server listens on. Leave 4200 unless the host changed it."));
+        "The co-op server's IP address or host name. Add a custom port after a colon, such as localhost:4300. Port 4200 is used when omitted."));
 
     [DataSourceProperty]
     public HintViewModel PasswordHint { get; } = new HintViewModel(new TextObject(
@@ -101,19 +108,28 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         _ => "Any Password",
     };
 
-    public string connectIP = "localhost";
-    public string connectPort = "4200";
+    public string connectIP = DefaultServerAddress;
     public string connectPassword = "";
 
     public CoopConnectMenuVM()
-        : this(SessionDiscovery.SteamLobbyBrowser, MessageBroker.Instance)
+        : this(SessionDiscovery.SteamLobbyBrowser, MessageBroker.Instance, new CoopOptionsStore())
     {
     }
 
     public CoopConnectMenuVM(ISteamLobbyBrowser steamLobbyBrowser, IMessageBroker messageBroker)
+        : this(steamLobbyBrowser, messageBroker, new CoopOptionsStore())
+    {
+    }
+
+    public CoopConnectMenuVM(
+        ISteamLobbyBrowser steamLobbyBrowser,
+        IMessageBroker messageBroker,
+        ICoopOptionsStore optionsStore)
     {
         this.steamLobbyBrowser = steamLobbyBrowser;
         this.messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
+        this.optionsStore = optionsStore ?? throw new ArgumentNullException(nameof(optionsStore));
+        connectIP = LoadLastServerAddress();
 
         Tabs = new MBBindingList<CoopConnectionTabVM>
         {
@@ -271,20 +287,6 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     }
 
     [DataSourceProperty]
-    public string Port
-    {
-        get => connectPort;
-        set
-        {
-            // TODO update config
-            if (value == connectPort) return;
-
-            connectPort = value;
-            OnPropertyChanged(nameof(Port));
-        }
-    }
-
-    [DataSourceProperty]
     public string Password
     {
         get => connectPassword;
@@ -362,9 +364,10 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     public void ActionConnect()
     {
-        if (!int.TryParse(connectPort, out var port) || port < IPEndPoint.MinPort || port > IPEndPoint.MaxPort)
+        if (!TryParseServerAddress(connectIP, out var host, out var port))
         {
-            InformationManager.DisplayMessage(new InformationMessage("ERROR: The connection port is invalid"));
+            InformationManager.DisplayMessage(new InformationMessage(
+                "ERROR: Enter a valid server address with an optional port"));
             return;
         }
 
@@ -377,17 +380,17 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         try
         {
-            bool steamInvites = SessionDiscovery.SteamAvailable && IsLoopbackAddress(connectIP);
+            bool steamInvites = SessionDiscovery.SteamAvailable && IsLoopbackAddress(host);
 
             IPAddress ip;
 
-            if (IPAddress.TryParse(connectIP, out var enteredIp))
+            if (IPAddress.TryParse(host, out var enteredIp))
             {
                 ip = enteredIp;
             }
             else
             {
-                var addresses = Dns.GetHostAddresses(connectIP);
+                var addresses = Dns.GetHostAddresses(host);
                 ip = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
 
                 if (ip == null)
@@ -398,6 +401,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             }
 
             messageBroker.Publish(this, new AttemptJoin(ip, port, connectPassword, steamInvites));
+            SaveLastServerAddress();
         }
         catch (Exception ex)
         {
@@ -570,9 +574,95 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         messageBroker.Publish(this, new JoinSteamLobby(lobbyId));
     }
 
+    private string LoadLastServerAddress()
+    {
+        try
+        {
+            var options = optionsStore.LoadOrDefault();
+            if (options.TryGetSection(
+                    OptionsTabId,
+                    OptionsSectionId,
+                    out DirectConnectionOptions saved) &&
+                TryParseServerAddress(saved.LastServerAddress, out _, out _))
+            {
+                return saved.LastServerAddress.Trim();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Last direct connection address could not be loaded");
+        }
+
+        return DefaultServerAddress;
+    }
+
+    private void SaveLastServerAddress()
+    {
+        try
+        {
+            var options = optionsStore.LoadOrDefault();
+            options.SetSection(
+                OptionsTabId,
+                OptionsSectionId,
+                new DirectConnectionOptions { LastServerAddress = connectIP.Trim() });
+            optionsStore.Save(options);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Last direct connection address could not be saved");
+        }
+    }
+
+    internal static bool TryParseServerAddress(string enteredAddress, out string host, out int port)
+    {
+        host = string.Empty;
+        port = DefaultConnectionPort;
+
+        if (string.IsNullOrWhiteSpace(enteredAddress)) return false;
+
+        string address = enteredAddress.Trim();
+        if (address[0] == '[')
+        {
+            int closingBracket = address.IndexOf(']');
+            if (closingBracket <= 1) return false;
+
+            host = address.Substring(1, closingBracket - 1);
+            string suffix = address.Substring(closingBracket + 1);
+            if (suffix.Length == 0) return true;
+
+            return suffix[0] == ':' && TryParsePort(suffix.Substring(1), out port);
+        }
+
+        int firstColon = address.IndexOf(':');
+        int lastColon = address.LastIndexOf(':');
+        if (firstColon >= 0 && firstColon == lastColon)
+        {
+            host = address.Substring(0, firstColon).Trim();
+            return host.Length > 0 && TryParsePort(address.Substring(firstColon + 1), out port);
+        }
+
+        if (firstColon >= 0 && !IPAddress.TryParse(address, out _)) return false;
+
+        host = address;
+        return true;
+    }
+
+    private static bool TryParsePort(string enteredPort, out int port)
+    {
+        return int.TryParse(enteredPort, out port) &&
+            port > IPEndPoint.MinPort && port <= IPEndPoint.MaxPort;
+    }
+
     private static bool IsLoopbackAddress(string address)
     {
         return string.Equals(address, "localhost", StringComparison.OrdinalIgnoreCase) ||
             (IPAddress.TryParse(address, out var ip) && IPAddress.IsLoopback(ip));
     }
+}
+
+/// <summary>Persisted address from the last direct connection attempt.</summary>
+public class DirectConnectionOptions
+{
+    [JsonPropertyName("lastServerAddress")]
+    public string LastServerAddress { get; set; }
 }
