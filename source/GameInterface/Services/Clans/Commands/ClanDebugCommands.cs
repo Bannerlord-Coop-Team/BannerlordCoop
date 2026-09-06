@@ -370,7 +370,6 @@ namespace GameInterface.Services.GameDebug.Commands
         /// </summary>
         /// <param name="args">actually none are being used..</param>
         /// <returns>strings of all the clans</returns>
-
             public sealed class ClanListCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.clan";
@@ -401,7 +400,6 @@ namespace GameInterface.Services.GameDebug.Commands
         /// Reflection-dumps every field of a Clan so a server screenshot and a client screenshot can be
         /// compared field-for-field to confirm Clan field syncs still replicate.
         /// </summary>
-
             public sealed class ClanFieldDumpCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.clan";
@@ -434,7 +432,6 @@ namespace GameInterface.Services.GameDebug.Commands
         /// Authoritatively changes a clan's influence by the given amount via ChangeClanInfluenceAction so
         /// the _influence scalar-field store replicates; verify on both sides with coop.debug.clan.info.
         /// </summary>
-
             public sealed class ClanAddInfluenceCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.clan";
@@ -715,7 +712,6 @@ namespace GameInterface.Services.GameDebug.Commands
         /// Read-only: prints a clan's battle-economy values (renown, influence, leader-party morale, and
         /// total troop xp). Run it on the host and on a client with the same clan id to compare the two.
         /// </summary>
-
             public sealed class ClanEconomyCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.clan";

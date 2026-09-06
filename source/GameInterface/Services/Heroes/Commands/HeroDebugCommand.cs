@@ -42,7 +42,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">Optional case-insensitive hero name prefix</param>
     /// <returns>Strings of the matching heroes</returns>
-
     public sealed class HeroListCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -587,7 +586,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">heroId and hitPoints value to set </param>
     /// <returns>information if it changed</returns>
-
     public sealed class HeroSetHitpointsCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -635,7 +633,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">heroId and BannerItem value to set </param>
     /// <returns>information if it changed</returns>
-
     public sealed class HeroSetBannerItemCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -683,7 +680,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">none are used</param>
     /// <returns>returns all banneritems </returns>
-
     public sealed class HeroListBannerItemsCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -712,7 +708,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">HeroId</param>
     /// <returns>returns banneritem info from hero </returns>
-
     public sealed class HeroGetBannerItemCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -747,7 +742,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">none are used</param>
     /// <returns>returns all issues available </returns>
-
     public sealed class HeroIssuesCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -783,7 +777,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">heroId and issue value to set </param>
     /// <returns>information if it changed</returns>
-
     public sealed class HeroSetIssueCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -833,7 +826,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">HeroId</param>
     /// <returns>returns Issue info from hero </returns>
-
     public sealed class HeroGetIssueCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -866,7 +858,6 @@ public class HeroDebugCommand
     /// <summary>
     /// View available volunteers for a target hero
     /// </summary>
-
     public sealed class HeroVolunteersCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -912,7 +903,6 @@ public class HeroDebugCommand
     /// <summary>
     /// Runs the authoritative volunteer refresh for one settlement.
     /// </summary>
-
     public sealed class HeroRefreshVolunteersCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
