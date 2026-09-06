@@ -199,6 +199,7 @@ public class CoopBattleController : CoopMissionController
 
     public override void Dispose()
     {
+        messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId));
         lifecycle.Dispose();
         replicator.Dispose();
         deathReporter.Dispose();

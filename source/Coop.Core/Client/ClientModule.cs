@@ -6,6 +6,7 @@ using Common.Network;
 using Common.Network.Session;
 using Common.PacketHandlers;
 using Coop.Core.Client.Policies;
+using Coop.Core.Client.Services.Discord;
 using Coop.Core.Client.Services.Kingdoms;
 using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Client.Services.Session;
@@ -41,6 +42,9 @@ public class ClientModule : CommonModule
         builder.RegisterType<JoinDebugCommands.DisconnectCoopCommand>().As<ICoopCommand>().InstancePerDependency();
 #endif
 
+        // The presence adapter owns connection disposal on its serialized worker queue.
+        builder.RegisterType<DiscordRpcConnection>().As<IDiscordRpcConnection>().InstancePerDependency().ExternallyOwned();
+        builder.RegisterType<DiscordPresenceClient>().As<IDiscordPresenceClient>().InstancePerLifetimeScope();
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();
