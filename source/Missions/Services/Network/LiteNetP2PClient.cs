@@ -68,6 +68,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private int pendingReliablePayloadCount;
     private readonly object relayPayloadBudgetGate = new();
     private readonly Dictionary<(string InstanceId, string ControllerId), int> relayPayloadBudgets = new();
+    private readonly Func<IReceivePathDiagnostics> diagnosticsFactory;
+    private readonly Dictionary<NetPeer, IReceivePathDiagnostics> receiveDiagnostics = new();
+    private readonly Dictionary<string, IReceivePathDiagnostics> routeDiagnostics = new();
     private bool disposed;
 
     private string instanceId = null;
@@ -109,8 +112,11 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         IControllerIdProvider controllerIdProvider,
         ISteamMissionBridge steamBridge,
         IMovementPacketCompressor movementPacketCompressor,
-        IReliableMessageBatcher<string> reliableMessageBatcher)
+        IReliableMessageBatcher<string> reliableMessageBatcher,
+        Func<IReceivePathDiagnostics> diagnosticsFactory)
     {
+        if (diagnosticsFactory == null) throw new ArgumentNullException(nameof(diagnosticsFactory));
+        this.diagnosticsFactory = diagnosticsFactory;
         Config = config;
         this.relayNetwork = relayNetwork;
         this.missionContext = missionContext;
@@ -191,6 +197,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         FlushReliableSends();
         lock (peerGate)
         {
+            EndDiagnostics("disconnect-all");
             instanceId = null;
             localPeerCredential = Guid.Empty;
             instanceGeneration++;
@@ -211,6 +218,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             connectedPendingPeers.Clear();
             rotatingPendingPeers.Clear();
             ClearPendingReliablePayloads();
+            EndDiagnostics("disconnect-complete");
         }
 
         lock (relayPayloadBudgetGate)
@@ -270,6 +278,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         // response arrives this instance may receive socket callbacks, but none can be mapped.
         lock (peerGate)
         {
+            EndDiagnostics("connect-instance");
             this.instanceId = instanceId;
             localPeerCredential = Guid.Empty;
             instanceGeneration++;
@@ -362,6 +371,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             {
                 pendingPeerControllers[peer] = connectionToken.ControllerId;
                 peerCredentials[peer] = connectionToken.PeerCredential;
+                LogPeerState(peer, "pending-connect");
             }
         }
     }
@@ -480,6 +490,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                     if (authenticated) peerSteamIds[peer] = authenticatedSteamId;
                     peerCredentials[peer] = connectionToken.PeerCredential;
                     if (credentialRotationPending) rotatingPendingPeers.Add(peer);
+                    LogPeerState(peer, "accepted-pending");
                 }
                 return;
             }
@@ -504,6 +515,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 if (!controllerPeerCredentials.TryGetValue(controllerId, out var expectedCredential))
                 {
                     connectedPendingPeers.Add(peer);
+                    LogPeerState(peer, "awaiting-membership");
                 }
                 else if (actualCredential != expectedCredential)
                 {
@@ -544,6 +556,12 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 "[LocationSync] P2P socket connected and is waiting for its server credential announcement: remote={Remote}",
                 peer);
         }
+
+        lock (peerGate)
+        {
+            // A connected socket does not prove mapping readiness or Steam's physical route.
+            LogPeerState(peer, rejectPeer ? "connected-rejected" : "transport-connected");
+        }
     }
 
     private void Handle_MissionPeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
@@ -569,6 +587,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             generation = instanceGeneration;
             controllerSteamIds[entered.ControllerId] = entered.SteamId;
             controllerPeerCredentials[entered.ControllerId] = entered.PeerCredential;
+            Logger.Information("[ReceivePath] utc={Utc:O} instance={Instance} generation={Generation} localController={LocalController} membershipController={Controller} expectedSteamId={SteamId}",
+                DateTime.UtcNow, instanceId, instanceGeneration, controllerIdProvider.ControllerId, entered.ControllerId, entered.SteamId);
 
             foreach (var pair in pendingPeerControllers
                 .Where(pair => pair.Value == entered.ControllerId)
@@ -671,6 +691,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                     pendingPeerControllers[peer] = entered.ControllerId;
                     peerSteamIds[peer] = entered.SteamId;
                     peerCredentials[peer] = entered.PeerCredential;
+                    LogPeerState(peer, "steam-pending-connect");
                 }
             }
         }
@@ -715,6 +736,11 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             controllerPeerCredentials.Remove(controllerId);
             RemoveDeferredNatIntroductions(controllerId);
             trackedPeers = RemoveTrackedPeers(controllerId);
+            if (routeDiagnostics.TryGetValue(controllerId, out var diagnostics))
+            {
+                diagnostics.End("controller-departed");
+                routeDiagnostics.Remove(controllerId);
+            }
         }
 
         reliableMessageBatcher.Remove(controllerId);
@@ -875,6 +901,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                     mappedPeerControllers[peer] = controllerId;
                     missionContext.MapPeer(controllerId, peer);
                     promoted = true;
+                    LogPeerState(peer, "promoted");
                 }
             });
         return promoted;
@@ -887,6 +914,12 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             mappedPeerControllers.TryGetValue(peer, out controllerId);
         }
 
+        LogPeerState(peer, "removing");
+        if (receiveDiagnostics.TryGetValue(peer, out var diagnostics))
+        {
+            diagnostics.End("peer-removed");
+            receiveDiagnostics.Remove(peer);
+        }
         pendingPeerControllers.Remove(peer);
         mappedPeerControllers.Remove(peer);
         peerSteamIds.Remove(peer);
@@ -955,6 +988,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                     pendingReliableBytes -= payload.Length;
                     pendingReliablePayloadCount--;
                     if (pending.Payloads.Count == 0) pendingReliablePayloads.Remove(peer);
+                    GetReceiveDiagnostics(peer).Record(ReceivePathEvent.MappedReceive, payload.Length);
                 }
                 HandleReceivedPayload(peer, payload, generation);
             }
@@ -1010,6 +1044,65 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
     }
 #endif
+
+    // Called under peerGate, including receive callbacks, so no per-packet context allocation.
+    private IReceivePathDiagnostics GetReceiveDiagnostics(NetPeer peer)
+    {
+        if (!receiveDiagnostics.TryGetValue(peer, out var diagnostics))
+        {
+            pendingPeerControllers.TryGetValue(peer, out var controller);
+            if (controller == null) mappedPeerControllers.TryGetValue(peer, out controller);
+            diagnostics = diagnosticsFactory();
+            diagnostics.Start(Logger, $"mission-receive instance={instanceId} generation={instanceGeneration} " +
+                $"localController={controllerIdProvider.ControllerId} remoteController={controller} " +
+                $"peer={peer} peerId={peer.Id} localPort={netManager.LocalPort}");
+            receiveDiagnostics[peer] = diagnostics;
+        }
+        return diagnostics;
+    }
+
+    private void RecordRoute(string controllerId, ReceivePathEvent route, int bytes)
+    {
+        lock (peerGate)
+        {
+            if (!routeDiagnostics.TryGetValue(controllerId, out var diagnostics))
+            {
+                diagnostics = diagnosticsFactory();
+                diagnostics.Start(Logger, $"mission-send-attempt instance={instanceId} generation={instanceGeneration} " +
+                    $"localController={controllerIdProvider.ControllerId} remoteController={controllerId}");
+                routeDiagnostics[controllerId] = diagnostics;
+            }
+            diagnostics.Record(route, bytes);
+        }
+    }
+
+    private void LogPeerState(NetPeer peer, string transition)
+    {
+        pendingPeerControllers.TryGetValue(peer, out var pendingController);
+        mappedPeerControllers.TryGetValue(peer, out var mappedController);
+        string controller = mappedController ?? pendingController;
+        if (controller != null) GetReceiveDiagnostics(peer);
+        ulong expectedSteamId = 0;
+        if (controller != null) controllerSteamIds.TryGetValue(controller, out expectedSteamId);
+        peerSteamIds.TryGetValue(peer, out var actualSteamId);
+        bool contextMapped = controller != null && missionContext.TryGetPeer(controller, out var contextPeer)
+            && ReferenceEquals(peer, contextPeer);
+        Logger.Information("[ReceivePath] utc={Utc:O} instance={Instance} generation={Generation} localController={LocalController} " +
+            "transition={Transition} peer={Peer} peerId={PeerId} localPort={LocalPort} pendingController={PendingController} " +
+            "mappedController={MappedController} contextMapped={ContextMapped} awaitingMembership={AwaitingMembership} " +
+            "expectedSteamId={ExpectedSteamId} trackedSteamId={ActualSteamId}",
+            DateTime.UtcNow, instanceId, instanceGeneration, controllerIdProvider.ControllerId, transition,
+            peer, peer.Id, netManager.LocalPort, pendingController, mappedController, contextMapped,
+            connectedPendingPeers.Contains(peer), expectedSteamId, actualSteamId);
+    }
+
+    private void EndDiagnostics(string reason)
+    {
+        foreach (var diagnostics in receiveDiagnostics.Values) diagnostics.End(reason);
+        foreach (var diagnostics in routeDiagnostics.Values) diagnostics.End(reason);
+        receiveDiagnostics.Clear();
+        routeDiagnostics.Clear();
+    }
 
     public void SendAll(IMessage message)
     {
@@ -1084,6 +1177,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
+            RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
             Send(peer, packet, data);
             return;
         }
@@ -1113,6 +1207,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             }
         }
 
+        RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
         relayNetwork.SendAll(new RelayPacket(
             packet.DeliveryMethod,
             relayInstanceId,
@@ -1124,6 +1219,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
+            RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
             peer.Send(data, DeliveryMethod.ReliableOrdered);
             return;
         }
@@ -1134,6 +1230,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             relayInstanceId = instanceId;
         }
 
+        RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
         relayNetwork.SendAll(new RelayPacket(
             DeliveryMethod.ReliableOrdered,
             relayInstanceId,
@@ -1305,18 +1402,33 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             if (instanceId == null) return;
             generation = instanceGeneration;
             mapped = mappedPeerControllers.ContainsKey(peer);
-            if (!mapped && !pendingPeerControllers.ContainsKey(peer)) return;
+            int bytes = reader.AvailableBytes;
+            if (!mapped && !pendingPeerControllers.ContainsKey(peer))
+            {
+                GetReceiveDiagnostics(peer).Record(ReceivePathEvent.UnmappedDrop, bytes);
+                return;
+            }
 
             bool reliable = deliveryMethod == DeliveryMethod.ReliableOrdered ||
                 deliveryMethod == DeliveryMethod.ReliableUnordered ||
                 deliveryMethod == DeliveryMethod.ReliableSequenced;
             if (reliable && (!mapped || pendingReliablePayloads.ContainsKey(peer)))
             {
-                if (TryBufferReliablePayload(peer, reader)) return;
+                if (TryBufferReliablePayload(peer, reader))
+                {
+                    GetReceiveDiagnostics(peer).Record(ReceivePathEvent.PendingReliableBuffered, bytes);
+                    return;
+                }
+                GetReceiveDiagnostics(peer).Record(ReceivePathEvent.UnmappedDrop, bytes);
                 RemovePeerTracking(peer, out _);
                 overflow = true;
             }
-            else if (!mapped) return;
+            else
+            {
+                GetReceiveDiagnostics(peer).Record(
+                    mapped ? ReceivePathEvent.MappedReceive : ReceivePathEvent.UnmappedDrop, bytes);
+                if (!mapped) return;
+            }
         }
 
         if (overflow)

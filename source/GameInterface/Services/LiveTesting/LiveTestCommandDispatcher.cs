@@ -21,7 +21,7 @@ public interface ILiveTestCommandDispatcher
 
 public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 {
-    private const string AllowedCommandPrefix = "coop.debug.";
+    private const string LegacyDebugCommandPrefix = "coop.debug.";
 
     private static bool functionsCollected;
 
@@ -87,8 +87,8 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
                     : commandRegistry.Commands.Select(command => command.FullName);
                 commandNames = allFunctions.Keys
                     .Cast<string>()
+                    .Where(command => command.StartsWith(LegacyDebugCommandPrefix, StringComparison.Ordinal))
                     .Concat(registeredCommands)
-                    .Where(command => command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal))
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(command => command, StringComparer.Ordinal)
                     .ToArray();
@@ -106,9 +106,10 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
     public LiveTestCommandResult Execute(string command, List<string> arguments)
     {
         if (string.IsNullOrEmpty(command) ||
-            command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal) == false)
+            (!(commandRegistry?.Contains(command) ?? false) &&
+             !command.StartsWith(LegacyDebugCommandPrefix, StringComparison.Ordinal)))
         {
-            return new LiveTestCommandResult(false, $"Only {AllowedCommandPrefix} commands may be run through live testing");
+            return new LiveTestCommandResult(false, "Only registered co-op commands and legacy coop.debug.* commands may be run through live testing");
         }
 
         if (arguments == null) throw new ArgumentNullException(nameof(arguments));

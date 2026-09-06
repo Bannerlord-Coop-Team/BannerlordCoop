@@ -28,6 +28,9 @@
     </SubModules>
     <Xmls>
         <XmlNode>
+            <XmlName id="GameText" path="global_strings" />
+        </XmlNode>
+        <XmlNode>
             <XmlName id="NPCCharacters" path="coop_fixed_town_npcs" />
             <IncludedGameTypes>
                 <GameType value="Campaign" />

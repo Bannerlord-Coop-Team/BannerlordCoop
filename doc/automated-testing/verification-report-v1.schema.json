@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bannerlordcoop.dev/schemas/verification-report-v1.schema.json",
+  "title": "BannerlordCoop verification plan and result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "source",
+    "decision",
+    "verdict",
+    "inputValid",
+    "highestRequiredTier",
+    "seed",
+    "planDigest",
+    "replayIdentity",
+    "startedAtUtc",
+    "completedAtUtc",
+    "artifactHashes",
+    "processExits",
+    "changedPaths",
+    "rejectedPaths",
+    "requiredTiers",
+    "requiredChecks",
+    "profiles",
+    "checks",
+    "reasons"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head", "syntheticTree"],
+      "properties": {
+        "head": { "$ref": "#/$defs/gitObjectId" },
+        "syntheticTree": { "$ref": "#/$defs/gitObjectId" }
+      }
+    },
+    "decision": { "enum": ["run", "blocked-invalid-input"] },
+    "verdict": { "$ref": "#/$defs/verdict" },
+    "inputValid": { "type": "boolean" },
+    "highestRequiredTier": { "$ref": "#/$defs/tier" },
+    "seed": { "type": "string", "pattern": "^0x[0-9a-f]{16}$" },
+    "planDigest": { "$ref": "#/$defs/sha256" },
+    "replayIdentity": { "type": "string", "minLength": 1 },
+    "startedAtUtc": { "$ref": "#/$defs/nullableTimestamp" },
+    "completedAtUtc": { "$ref": "#/$defs/nullableTimestamp" },
+    "artifactHashes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifactHash" }
+    },
+    "processExits": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/processExit" }
+    },
+    "changedPaths": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "rejectedPaths": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rejectedPath" }
+    },
+    "requiredTiers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tier" },
+      "uniqueItems": true
+    },
+    "requiredChecks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/checkId" },
+      "uniqueItems": true
+    },
+    "profiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/profile" },
+      "minItems": 6,
+      "maxItems": 6
+    },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" },
+      "minItems": 8,
+      "maxItems": 8
+    },
+    "reasons": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reason" }
+    }
+  },
+  "$defs": {
+    "gitObjectId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "tier": {
+      "enum": [
+        "unit",
+        "deterministic-peer",
+        "process-peer",
+        "dedicated-server-synthetic",
+        "rendered-smoke",
+        "full-live"
+      ]
+    },
+    "checkId": {
+      "enum": [
+        "unit",
+        "wire-copy-e2e",
+        "poller-game-thread",
+        "deterministic-peer",
+        "process-peer",
+        "dedicated-server-synthetic",
+        "rendered-smoke",
+        "full-live"
+      ]
+    },
+    "verdict": {
+      "enum": ["pending", "blocked", "not-required", "passed", "failed", "error"]
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        { "type": "string", "format": "date-time" },
+        { "type": "null" }
+      ]
+    },
+    "artifactHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "algorithm", "digest"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "algorithm": { "const": "sha256" },
+        "digest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "processExit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instanceId", "processId", "exitCode"],
+      "properties": {
+        "instanceId": { "type": "string", "minLength": 1 },
+        "processId": { "type": "integer", "minimum": 1 },
+        "exitCode": { "type": "integer" }
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serverCount", "clientCount", "processCount", "processIsolated"],
+      "properties": {
+        "serverCount": { "type": "integer", "minimum": 0 },
+        "clientCount": { "type": "integer", "minimum": 0 },
+        "processCount": { "type": "integer", "minimum": 1 },
+        "processIsolated": { "type": "boolean" }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "tier",
+        "ordinal",
+        "required",
+        "blocking",
+        "verdict",
+        "executor",
+        "action",
+        "arguments",
+        "scope"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/tier" },
+        "tier": { "$ref": "#/$defs/tier" },
+        "ordinal": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "required": { "type": "boolean" },
+        "blocking": { "const": true },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "executor": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "minLength": 1 },
+        "arguments": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scope": { "type": "string", "minLength": 1 }
+      }
+    },
+    "rejectedPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suppliedPath", "reason"],
+      "properties": {
+        "suppliedPath": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ]
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ruleId", "tier", "description", "paths"],
+      "properties": {
+        "ruleId": { "type": "string", "minLength": 1 },
+        "tier": { "$ref": "#/$defs/tier" },
+        "description": { "type": "string", "minLength": 1 },
+        "paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "profile",
+        "tier",
+        "required",
+        "blocking",
+        "verdict",
+        "topology",
+        "seed",
+        "stateDigest",
+        "replayIdentity",
+        "startedAtUtc",
+        "completedAtUtc",
+        "artifactHashes",
+        "processExits",
+        "evidenceProfile"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/checkId" },
+        "profile": { "$ref": "#/$defs/tier" },
+        "tier": { "$ref": "#/$defs/tier" },
+        "required": { "type": "boolean" },
+        "blocking": { "const": true },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "topology": { "$ref": "#/$defs/topology" },
+        "seed": { "type": "string", "pattern": "^0x[0-9a-f]{16}$" },
+        "stateDigest": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "replayIdentity": { "type": "string", "minLength": 1 },
+        "startedAtUtc": { "$ref": "#/$defs/nullableTimestamp" },
+        "completedAtUtc": { "$ref": "#/$defs/nullableTimestamp" },
+        "artifactHashes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactHash" }
+        },
+        "processExits": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/processExit" }
+        },
+        "evidenceProfile": {
+          "oneOf": [
+            { "enum": ["functional", "visual"] },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

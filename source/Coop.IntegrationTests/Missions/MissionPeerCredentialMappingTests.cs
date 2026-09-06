@@ -758,7 +758,8 @@ public class MissionPeerCredentialMappingTests
                 controllerIdProvider.Object,
                 SteamBridge.Object,
                 new Mock<IMovementPacketCompressor>().Object,
-                new ReliableMessageBatcher<string>(Serializer.Object));
+                new ReliableMessageBatcher<string>(Serializer.Object),
+                () => new Common.Logging.ReceivePathDiagnostics());
             Client.ConnectToInstance(InstanceId);
             if (startNetwork) Client.Start();
 
