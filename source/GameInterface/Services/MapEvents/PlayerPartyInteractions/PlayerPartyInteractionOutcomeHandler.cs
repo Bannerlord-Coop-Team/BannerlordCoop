@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Banners.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
@@ -65,15 +66,18 @@ internal class PlayerPartyInteractionOutcomeHandler
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IKingdomMembershipState kingdomMembershipState;
+    private readonly IClanJoinRules clanJoinRules;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
         IMessageBroker messageBroker,
-        IKingdomMembershipState kingdomMembershipState)
+        IKingdomMembershipState kingdomMembershipState,
+        IClanJoinRules clanJoinRules)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.kingdomMembershipState = kingdomMembershipState;
+        this.clanJoinRules = clanJoinRules;
     }
 
     public void Handle(PlayerPartyInteractionOutcome outcome)
@@ -213,6 +217,7 @@ internal class PlayerPartyInteractionOutcomeHandler
             return;
         }
 
+        clanJoinRules.Apply(initiatorHero, responderClan);
         initiatorHero.Clan = responderClan;
         if (initiatorParty.MobileParty != null)
             initiatorParty.MobileParty.ActualClan = responderClan;

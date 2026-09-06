@@ -2,7 +2,7 @@
 
 namespace GameInterface.Services.Clans;
 
-public interface IClanMembersPrefabEditor
+public interface IClanMembersPrefabEditor : IGameAbstraction
 {
     void AddMemberGroups(XmlNode root);
 }

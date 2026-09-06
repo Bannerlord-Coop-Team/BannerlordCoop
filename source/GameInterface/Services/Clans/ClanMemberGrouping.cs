@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans;
 
-public interface IClanMemberGrouping
+public interface IClanMemberGrouping : IGameAbstraction
 {
     ClanMemberGroup GetGroup(Hero member, Hero viewer);
 }

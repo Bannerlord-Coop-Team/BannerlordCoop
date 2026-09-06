@@ -15,7 +15,6 @@ using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
-using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Heroes;
@@ -107,10 +106,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
-        builder.RegisterType<ClanMemberGrouping>().As<IClanMemberGrouping>().InstancePerDependency();
-        builder.RegisterType<SharedClanPermissions>().As<ISharedClanPermissions>().InstancePerDependency();
-        builder.RegisterType<ClanMembersVMFactory>().As<IClanMembersVMFactory>().InstancePerDependency();
-        builder.RegisterType<ClanMembersPrefabEditor>().As<IClanMembersPrefabEditor>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().InstancePerLifetimeScope();
         builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();

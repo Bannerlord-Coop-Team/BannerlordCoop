@@ -1,6 +1,8 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Clans;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -8,6 +10,8 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -21,6 +25,7 @@ public static class PlayerPartyInteractionDialogState
 
     private static NetworkPlayerPartyInteractionState currentState;
     private static bool hasState;
+    private static string clanJoinConfirmationSessionId;
 
     public static string SessionId => hasState ? currentState.SessionId : null;
     public static string PartyId => hasState ? currentState.PartyId : null;
@@ -35,6 +40,10 @@ public static class PlayerPartyInteractionDialogState
 
     internal static void Apply(NetworkPlayerPartyInteractionState state)
     {
+        if (clanJoinConfirmationSessionId != null &&
+            (state.SessionId != SessionId || state.Phase != Phase || state.OtherPartyId != OtherPartyId))
+            ClearClanJoinConfirmation();
+
         currentState = state;
         hasState = true;
         RefreshConversation();
@@ -44,6 +53,7 @@ public static class PlayerPartyInteractionDialogState
     {
         if (sessionId != null && hasState && currentState.SessionId != sessionId) return;
 
+        ClearClanJoinConfirmation();
         hasState = false;
         currentState = default;
     }
@@ -123,6 +133,40 @@ public static class PlayerPartyInteractionDialogState
             default:
                 return "What would you like to discuss?";
         }
+    }
+
+    public static void ConfirmClanJoin()
+    {
+        if (!IsOptionEnabled(PlayerPartyInteractionOption.JoinClan) || clanJoinConfirmationSessionId != null) return;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !ContainerProvider.TryResolve<IClanJoinConfirmation>(out var confirmation)) return;
+        if (!objectManager.TryGetObjectWithLogging(OtherPartyId, out PartyBase otherParty)) return;
+
+        var hero = Hero.MainHero;
+        var targetClan = otherParty.LeaderHero?.Clan;
+        if (hero.Clan == null || targetClan?.Leader == null) return;
+
+        var sessionId = SessionId;
+        clanJoinConfirmationSessionId = sessionId;
+        InformationManager.ShowInquiry(confirmation.CreateInquiry(hero, targetClan,
+            () =>
+            {
+                if (clanJoinConfirmationSessionId != sessionId || SessionId != sessionId) return;
+                clanJoinConfirmationSessionId = null;
+                Submit(PlayerPartyInteractionOption.JoinClan);
+            },
+            () =>
+            {
+                if (clanJoinConfirmationSessionId == sessionId)
+                    clanJoinConfirmationSessionId = null;
+            }), false);
+    }
+
+    private static void ClearClanJoinConfirmation()
+    {
+        if (clanJoinConfirmationSessionId == null) return;
+        clanJoinConfirmationSessionId = null;
+        InformationManager.HideInquiry();
     }
 
     public static void Submit(PlayerPartyInteractionOption option)

@@ -1,4 +1,4 @@
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -121,10 +121,10 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
         starter.AddPlayerLine(
             "coop_player_party_interaction_join_clan",
             ServiceToken,
-            InitiatorWaitToken,
+            ServiceToken,
             "I wish to offer my services in your clan.",
             () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan),
-            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.JoinClan),
+            PlayerPartyInteractionDialogState.ConfirmClanJoin,
             PlayerPartyDialogPriority,
             IsJoinClanEnabled,
             null);

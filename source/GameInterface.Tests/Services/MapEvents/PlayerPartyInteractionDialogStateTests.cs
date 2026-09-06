@@ -1,10 +1,12 @@
-using GameInterface.Services.MapEvents.Messages.Conversation;
+﻿using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Tests.Services.SiegeEvents;
 using System;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
+[Collection(nameof(CampaignCurrentCollection))]
 public class PlayerPartyInteractionDialogStateTests
 {
     [Fact]

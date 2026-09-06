@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Clans;
 
-public interface ISharedClanPermissions
+public interface ISharedClanPermissions : IGameAbstraction
 {
     bool CanManageClan(Hero actor, Clan clan);
     bool CanManageParty(Hero actor, MobileParty party);

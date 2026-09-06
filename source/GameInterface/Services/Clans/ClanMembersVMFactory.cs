@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
 
 namespace GameInterface.Services.Clans;
 
-public interface IClanMembersVMFactory
+public interface IClanMembersVMFactory : IGameAbstraction
 {
     ClanMembersVM Create(Action onRefresh, Action<Hero> showHeroOnMap);
 }

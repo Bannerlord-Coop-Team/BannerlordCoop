@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -71,7 +72,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         ConversationPartyTracker conversationPartyTracker,
         INetworkConfig configuration,
         IPlayerPartyHostileEncounterService hostileEncounterService,
-        IKingdomMembershipState kingdomMembershipState)
+        IKingdomMembershipState kingdomMembershipState,
+        IClanJoinRules clanJoinRules)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -79,7 +81,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.conversationPartyTracker = conversationPartyTracker;
         this.configuration = configuration;
         this.hostileEncounterService = hostileEncounterService;
-        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, messageBroker, kingdomMembershipState);
+        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, messageBroker, kingdomMembershipState, clanJoinRules);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
