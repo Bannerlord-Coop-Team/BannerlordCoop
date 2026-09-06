@@ -61,6 +61,11 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly Dictionary<(string ControllerId, Guid PeerCredential), IPEndPoint> deferredNatIntroductions = new();
     private readonly HashSet<NetPeer> connectedPendingPeers = new();
     private readonly HashSet<NetPeer> rotatingPendingPeers = new();
+    private const int MaxPendingReliableBytesPerPeer = 16 * 1024 * 1024;
+    private const int MaxPendingReliablePayloadsPerPeer = 4096;
+    private readonly Dictionary<NetPeer, PendingReliablePayloads> pendingReliablePayloads = new();
+    private int pendingReliableBytes;
+    private int pendingReliablePayloadCount;
     private readonly object relayPayloadBudgetGate = new();
     private readonly Dictionary<(string InstanceId, string ControllerId), int> relayPayloadBudgets = new();
     private bool disposed;
@@ -68,6 +73,12 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private string instanceId = null;
     private Guid localPeerCredential;
     private int instanceGeneration;
+
+    private sealed class PendingReliablePayloads
+    {
+        public readonly Queue<byte[]> Payloads = new();
+        public int Bytes;
+    }
 
     /// <summary>
     /// Campaign controller identity used to map a mission peer to its player. Standalone mission flows
@@ -183,6 +194,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             instanceId = null;
             localPeerCredential = Guid.Empty;
             instanceGeneration++;
+            ClearPendingReliablePayloads();
         }
         netManager.DisconnectAll();
         steamBridge.Stop();
@@ -198,6 +210,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             deferredNatIntroductions.Clear();
             connectedPendingPeers.Clear();
             rotatingPendingPeers.Clear();
+            ClearPendingReliablePayloads();
         }
 
         lock (relayPayloadBudgetGate)
@@ -240,6 +253,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();
+        DrainPendingReliablePayloads();
         FlushPendingMessages();
     }
 
@@ -259,6 +273,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             this.instanceId = instanceId;
             localPeerCredential = Guid.Empty;
             instanceGeneration++;
+            ClearPendingReliablePayloads();
         }
         steamBridge.Start(netManager.LocalPort);
     }
@@ -878,6 +893,72 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         peerCredentials.Remove(peer);
         connectedPendingPeers.Remove(peer);
         rotatingPendingPeers.Remove(peer);
+        if (pendingReliablePayloads.TryGetValue(peer, out var pending))
+        {
+            pendingReliableBytes -= pending.Bytes;
+            pendingReliablePayloadCount -= pending.Payloads.Count;
+            pendingReliablePayloads.Remove(peer);
+        }
+    }
+
+    private void ClearPendingReliablePayloads()
+    {
+        pendingReliablePayloads.Clear();
+        pendingReliableBytes = 0;
+        pendingReliablePayloadCount = 0;
+    }
+
+    private bool TryBufferReliablePayload(NetPeer peer, NetPacketReader reader)
+    {
+        pendingReliablePayloads.TryGetValue(peer, out var pending);
+        int bytes = reader.AvailableBytes;
+        if (bytes > MaxPendingReliableBytesPerPeer - (pending?.Bytes ?? 0) ||
+            bytes > 4 * MaxPendingReliableBytesPerPeer - pendingReliableBytes ||
+            (pending?.Payloads.Count ?? 0) >= MaxPendingReliablePayloadsPerPeer ||
+            pendingReliablePayloadCount >= 4 * MaxPendingReliablePayloadsPerPeer)
+        {
+            return false;
+        }
+
+        if (pending == null)
+        {
+            pending = new PendingReliablePayloads();
+            pendingReliablePayloads.Add(peer, pending);
+        }
+        pending.Payloads.Enqueue(reader.GetRemainingBytes());
+        pending.Bytes += bytes;
+        pendingReliableBytes += bytes;
+        pendingReliablePayloadCount++;
+        return true;
+    }
+
+    private void DrainPendingReliablePayloads()
+    {
+        NetPeer[] peers;
+        lock (peerGate) peers = pendingReliablePayloads.Keys.ToArray();
+
+        // Drain on the receive poller, never the campaign announcement thread, to preserve delivery order.
+        foreach (var peer in peers)
+        {
+            while (true)
+            {
+                byte[] payload;
+                int generation;
+                lock (peerGate)
+                {
+                    if (!mappedPeerControllers.ContainsKey(peer) ||
+                        !pendingReliablePayloads.TryGetValue(peer, out var pending)) break;
+
+                    generation = instanceGeneration;
+                    payload = pending.Payloads.Dequeue();
+                    pending.Bytes -= payload.Length;
+                    pendingReliableBytes -= payload.Length;
+                    pendingReliablePayloadCount--;
+                    if (pending.Payloads.Count == 0) pendingReliablePayloads.Remove(peer);
+                }
+                HandleReceivedPayload(peer, payload, generation);
+            }
+        }
     }
 
 #if DEBUG
@@ -1216,17 +1297,53 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
+        int generation;
+        bool mapped;
+        bool overflow = false;
         lock (peerGate)
         {
-            if (!mappedPeerControllers.ContainsKey(peer)) return;
+            if (instanceId == null) return;
+            generation = instanceGeneration;
+            mapped = mappedPeerControllers.ContainsKey(peer);
+            if (!mapped && !pendingPeerControllers.ContainsKey(peer)) return;
+
+            bool reliable = deliveryMethod == DeliveryMethod.ReliableOrdered ||
+                deliveryMethod == DeliveryMethod.ReliableUnordered ||
+                deliveryMethod == DeliveryMethod.ReliableSequenced;
+            if (reliable && (!mapped || pendingReliablePayloads.ContainsKey(peer)))
+            {
+                if (TryBufferReliablePayload(peer, reader)) return;
+                RemovePeerTracking(peer, out _);
+                overflow = true;
+            }
+            else if (!mapped) return;
         }
 
-        HandleReceivedPayload(peer, reader.GetRemainingBytes());
+        if (overflow)
+        {
+            // A bounded rejection is recoverable; silently dropping acknowledged mission state is not.
+            Logger.Warning("Disconnecting mission peer {Peer}: pending reliable payload limit exceeded", peer);
+            if (mapped) missionContext.RemovePeer(peer);
+            netManager.DisconnectPeer(peer);
+            return;
+        }
+
+        HandleReceivedPayload(peer, reader.GetRemainingBytes(), generation);
     }
 
-    internal void HandleReceivedPayload(NetPeer peer, byte[] serializedPacket)
+    internal void HandleReceivedPayload(NetPeer peer, byte[] serializedPacket, int? generation = null)
     {
         object received = serializer.Deserialize(serializedPacket);
+        if (generation.HasValue)
+        {
+            lock (peerGate)
+            {
+                if (instanceId == null || generation.Value != instanceGeneration ||
+                    !mappedPeerControllers.ContainsKey(peer)) return;
+            }
+        }
+
+        // Handlers can block on the game thread, so never hold a teardown lock across dispatch.
         if (received is IPacket packet)
         {
 #if DEBUG

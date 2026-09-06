@@ -1,4 +1,5 @@
-﻿using Common.Network;
+﻿using Common.Messaging;
+using Common.Network;
 using Common.Network.Data;
 using Common.Network.Session;
 using Common.PacketHandlers;
@@ -10,12 +11,14 @@ using Missions.Messages;
 using Missions.Services.Network;
 using Moq;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Coop.IntegrationTests.Missions;
 
@@ -280,6 +283,185 @@ public class MissionPeerCredentialMappingTests
             Times.Once);
     }
 
+    [Theory]
+    [InlineData(DeliveryMethod.ReliableOrdered)]
+    [InlineData(DeliveryMethod.ReliableUnordered)]
+    [InlineData(DeliveryMethod.ReliableSequenced)]
+    public void ReliablePayloadBeforeAnnouncement_IsDeliveredOnlyAfterMapping(DeliveryMethod method)
+    {
+        using var fixture = new Fixture(startNetwork: true);
+        var credential = Guid.NewGuid();
+
+        fixture.ConnectFromRemote(
+            new ConnectionToken("direct-host", InstanceId, credential),
+            expectConnected: true,
+            beforeMapping: remotePeer =>
+            {
+                remotePeer.Send(new byte[] { 1 }, method);
+                fixture.WaitForBufferedPayloads(1);
+                remotePeer.Send(new byte[] { 2 }, method);
+                fixture.WaitForBufferedPayloads(2);
+                fixture.Serializer.Verify(value => value.Deserialize(It.IsAny<byte[]>()), Times.Never);
+                Assert.Empty(fixture.ReceivedPayloads);
+
+                fixture.Announce("direct-host", steamId: 0, credential);
+                remotePeer.Send(new byte[] { 3 }, method);
+            },
+            afterMapping: () =>
+            {
+                Assert.True(SpinWait.SpinUntil(
+                    () => fixture.ReceivedPayloads.Count == 3,
+                    TimeSpan.FromSeconds(5)), "Buffered reliable mission payloads were not delivered.");
+                Assert.Equal(new[] { 1, 2, 3 }, fixture.ReceivedPayloads.ToArray());
+                fixture.WaitForBufferedPayloads(0);
+            });
+    }
+
+    [Theory]
+    [InlineData("credential-mismatch")]
+    [InlineData("steam-mismatch")]
+    [InlineData("departure")]
+    [InlineData("disconnect")]
+    [InlineData("local-rotation")]
+    [InlineData("instance-change")]
+    [InlineData("mission-end")]
+    public void PendingReliablePayloads_AreDiscardedWhenRouteIsInvalidated(string reason)
+    {
+        using var fixture = new Fixture(startNetwork: true);
+        var credential = Guid.NewGuid();
+        fixture.SetLocalCredential(Guid.NewGuid());
+
+        fixture.ConnectFromRemote(
+            new ConnectionToken("direct-host", InstanceId, credential),
+            expectConnected: true,
+            expectedMapInvocations: 0,
+            beforeMapping: remotePeer =>
+            {
+                remotePeer.Send(new byte[] { 1 }, DeliveryMethod.ReliableOrdered);
+                fixture.WaitForBufferedPayloads(1);
+                switch (reason)
+                {
+                    case "credential-mismatch":
+                        fixture.Announce("direct-host", steamId: 0, Guid.NewGuid());
+                        break;
+                    case "steam-mismatch":
+                        fixture.Announce("direct-host", steamId: 9001, credential);
+                        break;
+                    case "departure":
+                        fixture.Depart("direct-host");
+                        break;
+                    case "disconnect":
+                        remotePeer.Disconnect();
+                        break;
+                    case "local-rotation":
+                        fixture.IssueLocalCredential(Guid.NewGuid());
+                        break;
+                    case "instance-change":
+                        fixture.Client.ConnectToInstance("another-instance");
+                        break;
+                    case "mission-end":
+                        fixture.Client.DisconnectPeers();
+                        break;
+                }
+                fixture.WaitForBufferedPayloads(0);
+                fixture.Serializer.Verify(value => value.Deserialize(It.IsAny<byte[]>()), Times.Never);
+                Assert.Empty(fixture.ReceivedPayloads);
+            });
+    }
+
+    [Fact]
+    public void PendingReliablePayloadLimit_DisconnectsInsteadOfDroppingAcknowledgedState()
+    {
+        using var fixture = new Fixture(startNetwork: true);
+        fixture.ConnectFromRemote(
+            new ConnectionToken("direct-host", InstanceId, Guid.NewGuid()),
+            expectConnected: true,
+            expectedMapInvocations: 0,
+            beforeMapping: remotePeer =>
+            {
+                for (int i = 0; i < 4096; i++)
+                    remotePeer.Send(new byte[] { 1 }, DeliveryMethod.ReliableOrdered);
+                fixture.WaitForBufferedPayloads(4096);
+                remotePeer.Send(new byte[] { 2 }, DeliveryMethod.ReliableOrdered);
+                fixture.WaitForBufferedPayloads(0);
+                Assert.True(SpinWait.SpinUntil(
+                    () => fixture.Client.ConnectedPeersCount == 0,
+                    TimeSpan.FromSeconds(5)), "The overflowing unauthenticated route remained connected.");
+                fixture.Serializer.Verify(value => value.Deserialize(It.IsAny<byte[]>()), Times.Never);
+            });
+    }
+
+    [Theory]
+    [InlineData("credential-rotation")]
+    [InlineData("departure")]
+    [InlineData("instance-change")]
+    [InlineData("mission-end")]
+    public void MappedBufferedPayload_InvalidatedDuringDeserializationIsNotPublished(string reason)
+    {
+        using var fixture = new Fixture(startNetwork: true);
+        using var deserializing = new ManualResetEventSlim();
+        using var allowDispatch = new ManualResetEventSlim();
+        using var invalidating = new ManualResetEventSlim();
+        using var deserialized = new ManualResetEventSlim();
+        var credential = Guid.NewGuid();
+        fixture.Serializer.Setup(value => value.Deserialize(It.IsAny<byte[]>()))
+            .Returns<byte[]>(data =>
+            {
+                deserializing.Set();
+                if (!allowDispatch.Wait(TimeSpan.FromSeconds(5)))
+                    throw new TimeoutException("The test did not release buffered dispatch.");
+                deserialized.Set();
+                return new ReceivedMessage(data[0]);
+            });
+
+        fixture.ConnectFromRemote(
+            new ConnectionToken("direct-host", InstanceId, credential),
+            expectConnected: true,
+            beforeMapping: remotePeer =>
+            {
+                remotePeer.Send(new byte[] { 1 }, DeliveryMethod.ReliableOrdered);
+                fixture.WaitForBufferedPayloads(1);
+                fixture.Announce("direct-host", steamId: 0, credential);
+                Task? invalidation = null;
+                try
+                {
+                    Assert.True(deserializing.Wait(TimeSpan.FromSeconds(5)));
+                    invalidation = Task.Run(() =>
+                    {
+                        invalidating.Set();
+                        switch (reason)
+                        {
+                            case "credential-rotation":
+                                fixture.Announce("direct-host", steamId: 0, Guid.NewGuid());
+                                break;
+                            case "departure":
+                                fixture.Depart("direct-host");
+                                break;
+                            case "instance-change":
+                                fixture.Client.ConnectToInstance("another-instance");
+                                break;
+                            case "mission-end":
+                                fixture.Client.DisconnectPeers();
+                                break;
+                        }
+                    });
+                    Assert.True(invalidating.Wait(TimeSpan.FromSeconds(5)));
+                    Assert.True(invalidation.Wait(TimeSpan.FromSeconds(5)),
+                        "Route invalidation blocked behind a receive handler.");
+                }
+                finally
+                {
+                    allowDispatch.Set();
+                    if (invalidation != null)
+                        Assert.True(invalidation.Wait(TimeSpan.FromSeconds(5)));
+                }
+                Assert.True(deserialized.Wait(TimeSpan.FromSeconds(5)));
+                fixture.WaitForReceiveTick();
+                Assert.Empty(fixture.ReceivedPayloads);
+                fixture.WaitForBufferedPayloads(0);
+            });
+    }
+
     [Fact]
     public void LocalCredentialRotation_ClearsOldRouteBeforeAcceptingReplacementConnection()
     {
@@ -531,6 +713,8 @@ public class MissionPeerCredentialMappingTests
 
         public Mock<IMissionContext> MissionContext { get; } = new();
         public Mock<ISteamMissionBridge> SteamBridge { get; } = new();
+        public Mock<ICommonSerializer> Serializer { get; } = new();
+        public ConcurrentQueue<int> ReceivedPayloads { get; } = new();
         public LiteNetP2PClient Client { get; }
         public Dictionary<NetPeer, string> PendingPeers { get; }
         public Dictionary<NetPeer, string> MappedPeers { get; }
@@ -554,20 +738,27 @@ public class MissionPeerCredentialMappingTests
                     .Returns(true);
             }
 
-            var serializer = new Mock<ICommonSerializer>();
+            Serializer.Setup(value => value.Deserialize(It.IsAny<byte[]>()))
+                .Returns<byte[]>(data => new ReceivedMessage(data[0]));
+            var messageHandler = new Mock<IMessagePacketHandler>();
+            messageHandler.Setup(value => value.PublishEvent(It.IsAny<NetPeer>(), It.IsAny<IMessage>()))
+                .Callback<NetPeer, IMessage>((peer, message) =>
+                {
+                    ReceivedPayloads.Enqueue(((ReceivedMessage)message).Value);
+                });
 
             Client = new LiteNetP2PClient(
                 config.Object,
                 new Mock<IRelayNetwork>().Object,
                 MissionContext.Object,
-                serializer.Object,
+                Serializer.Object,
                 messageBroker,
                 new Mock<IPacketManager>().Object,
-                new Mock<IMessagePacketHandler>().Object,
+                messageHandler.Object,
                 controllerIdProvider.Object,
                 SteamBridge.Object,
                 new Mock<IMovementPacketCompressor>().Object,
-                new ReliableMessageBatcher<string>(serializer.Object));
+                new ReliableMessageBatcher<string>(Serializer.Object));
             Client.ConnectToInstance(InstanceId);
             if (startNetwork) Client.Start();
 
@@ -625,7 +816,9 @@ public class MissionPeerCredentialMappingTests
             ConnectionToken token,
             bool expectConnected,
             Action? afterConnected = null,
-            int expectedMapInvocations = 1)
+            int expectedMapInvocations = 1,
+            Action<NetPeer>? beforeMapping = null,
+            Action? afterMapping = null)
         {
             var listener = new EventBasedNetListener();
             bool connected = false;
@@ -636,7 +829,7 @@ public class MissionPeerCredentialMappingTests
             try
             {
                 Assert.True(remote.Start());
-                remote.Connect(
+                var remotePeer = remote.Connect(
                     new IPEndPoint(IPAddress.Loopback, netManager.LocalPort),
                     (string)token);
 
@@ -651,6 +844,7 @@ public class MissionPeerCredentialMappingTests
                 if (expectConnected)
                 {
                     Assert.True(connected, "The matching connection request was not accepted.");
+                    beforeMapping?.Invoke(remotePeer);
                     afterConnected?.Invoke();
                     Assert.True(
                         SpinWait.SpinUntil(
@@ -660,6 +854,7 @@ public class MissionPeerCredentialMappingTests
                                 expectedMapInvocations,
                             TimeSpan.FromSeconds(5)),
                         "The accepted connection was not mapped to its controller.");
+                    afterMapping?.Invoke();
                 }
                 else
                     Assert.True(disconnected, "The invalid connection request was not rejected.");
@@ -672,6 +867,29 @@ public class MissionPeerCredentialMappingTests
 
         public void Dispose() => Client.Dispose();
 
+        public void WaitForBufferedPayloads(int expected)
+        {
+            var gate = typeof(LiteNetP2PClient)
+                .GetField("peerGate", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(Client)!;
+            var count = typeof(LiteNetP2PClient)
+                .GetField("pendingReliablePayloadCount", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                lock (gate) return (int)count.GetValue(Client)! == expected;
+            }, TimeSpan.FromSeconds(5)), $"Expected {expected} buffered reliable payloads.");
+        }
+
+        public void WaitForReceiveTick()
+        {
+            // Stop only the poller; another route cleanup here would mask a missing generation check.
+            var poller = (Common.Util.Poller)typeof(LiteNetP2PClient)
+                .GetField("poller", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(Client)!;
+            Assert.True(poller.StopAndWait(TimeSpan.FromSeconds(5)),
+                "The receive poller did not finish its tick.");
+        }
+
         private Dictionary<TKey, TValue> GetDictionary<TKey, TValue>(string fieldName)
             where TKey : notnull
         {
@@ -680,4 +898,6 @@ public class MissionPeerCredentialMappingTests
                 .GetValue(Client)!;
         }
     }
+
+    private sealed record ReceivedMessage(int Value) : IMessage;
 }
