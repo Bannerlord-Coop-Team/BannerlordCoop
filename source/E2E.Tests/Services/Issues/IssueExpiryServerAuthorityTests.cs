@@ -30,7 +30,9 @@ public class IssueExpiryServerAuthorityTests : IDisposable
         TestEnvironment.Dispose();
     }
 
-    private string CreateOwnedIssueOnServer()
+    private record OwnedIssue(string HeroId, string SettlementId);
+
+    private OwnedIssue CreateOwnedIssueOnServer()
     {
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var villageId = TestEnvironment.CreateRegisteredObject<Village>();
@@ -68,40 +70,59 @@ public class IssueExpiryServerAuthorityTests : IDisposable
             }
         });
 
-        return heroId;
+        return new OwnedIssue(heroId, settlementId);
     }
 
     [Fact]
-    public void StayAliveConditionsFailedOnServer_GenuinelyRemovesTheIssue_NotJustTellsClientsItWasRemoved()
+    public void DailyTickOnServer_StayAliveConditionsFailed_GenuinelyRemovesTheIssue_NotJustTellsClientsItWasRemoved()
     {
-        var heroId = CreateOwnedIssueOnServer();
+        var issue = CreateOwnedIssueOnServer();
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(issue.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(issue.SettlementId, out var settlement));
             Assert.True(owner.Issue.IsOngoingWithoutQuest);
+            Assert.True(owner.Issue.IssueStayAliveConditions());
 
-            owner.Issue.CompleteIssueWithStayAliveConditionsFailed();
+            using (new AllowedThread())
+            {
+                settlement.Village.VillageState = Village.VillageStates.Looted;
+            }
+            Assert.False(owner.Issue.IssueStayAliveConditions());
+
+            Campaign.Current.IssueManager.DailyTick();
 
             Assert.Null(owner.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
     }
 
     [Fact]
-    public void TimedOutOnServer_GenuinelyRemovesTheIssue_NotJustTellsClientsItWasRemoved()
+    public void DailyTickOnServer_PastDueUnacceptedIssue_GenuinelyRemovesTheIssue_NotJustTellsClientsItWasRemoved()
     {
-        var heroId = CreateOwnedIssueOnServer();
+        var issue = CreateOwnedIssueOnServer();
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(issue.HeroId, out var owner));
             Assert.True(owner.Issue.IsOngoingWithoutQuest);
 
-            owner.Issue.CompleteIssueWithTimedOut();
+            using (new AllowedThread())
+            {
+                owner.Issue.IssueDueTime = default;
+            }
+            Assert.True(owner.Issue.IssueDueTime.IsPast);
+
+            for (var day = 0; day < 200 && owner.Issue != null; day++)
+            {
+                Campaign.Current.IssueManager.DailyTick();
+            }
 
             Assert.Null(owner.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
