@@ -31,6 +31,8 @@ internal class PlayerDebugCommands
 
         public string Description => "Lists registered co-op players.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -76,6 +78,8 @@ internal class PlayerDebugCommands
         public string Name => "party_state";
 
         public string Description => "Reports replicated party state for a player.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

@@ -35,6 +35,8 @@ internal class HeroDeveloperCommands
 
         public string Description => "Runs the add skill xp debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name_or_id", "The hero display name or StringId.", isRequired: true),
@@ -81,6 +83,8 @@ internal class HeroDeveloperCommands
 
         public string Description => "Runs the add attribute points debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name_or_id", "The hero display name or StringId.", isRequired: true),
@@ -124,6 +128,8 @@ internal class HeroDeveloperCommands
 
         public string Description => "Runs the add focus points debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name_or_id", "The hero display name or StringId.", isRequired: true),
@@ -166,6 +172,8 @@ internal class HeroDeveloperCommands
         public string Name => "reset_skills";
 
         public string Description => "Runs the reset skills debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

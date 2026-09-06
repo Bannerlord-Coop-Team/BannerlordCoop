@@ -32,6 +32,8 @@ internal class CampaignOptionsCommands
 
         public string Description => "Reports list.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -64,6 +66,8 @@ internal class CampaignOptionsCommands
 
         public string Description => "Runs the auto allocate clan member perks debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("value", "The option value.", isRequired: false),
@@ -86,6 +90,8 @@ internal class CampaignOptionsCommands
         public string Name => "player_troops_received_damage";
 
         public string Description => "Runs the player troops received damage debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -110,6 +116,8 @@ internal class CampaignOptionsCommands
 
         public string Description => "Runs the recruitment difficulty debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("value", "The option value.", isRequired: false),
@@ -132,6 +140,8 @@ internal class CampaignOptionsCommands
         public string Name => "player_map_movement_speed";
 
         public string Description => "Runs the player map movement speed debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -156,6 +166,8 @@ internal class CampaignOptionsCommands
 
         public string Description => "Runs the stealth and disguise difficulty debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("value", "The option value.", isRequired: false),
@@ -178,6 +190,8 @@ internal class CampaignOptionsCommands
         public string Name => "combat_ai_difficulty";
 
         public string Description => "Runs the combat ai difficulty debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -202,6 +216,8 @@ internal class CampaignOptionsCommands
 
         public string Description => "Runs the is life death cycle disabled debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("value", "The option value.", isRequired: false),
@@ -224,6 +240,8 @@ internal class CampaignOptionsCommands
         public string Name => "persuasion_success_chance";
 
         public string Description => "Runs the persuasion success chance debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -248,6 +266,8 @@ internal class CampaignOptionsCommands
 
         public string Description => "Runs the clan member death chance debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("value", "The option value.", isRequired: false),
@@ -270,6 +290,8 @@ internal class CampaignOptionsCommands
         public string Name => "is_ironman_mode";
 
         public string Description => "Runs the is ironman mode debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -296,6 +318,8 @@ internal class CampaignOptionsCommands
 
         public string Description => "Runs the battle death debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("value", "The option value.", isRequired: false),
@@ -318,6 +342,8 @@ internal class CampaignOptionsCommands
         public string Name => "player_received_damage_difficulty";
 
         public string Description => "Runs the player received damage difficulty debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

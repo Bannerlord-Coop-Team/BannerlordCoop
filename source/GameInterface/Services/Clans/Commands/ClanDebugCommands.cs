@@ -49,6 +49,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Opens the clan screen on a client.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -73,6 +75,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Closes the clan screen on a client.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -93,6 +97,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "screen_state";
 
         public string Description => "Reports clan screen state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -117,6 +123,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Selects the parties tab on the clan screen.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -138,6 +146,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "wage_state";
 
         public string Description => "Reports clan party wage state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -249,6 +259,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Sends repeated party role refresh messages.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_id", "The registered mobile party id."),
@@ -290,6 +302,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Lists campaign clans.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -320,6 +334,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "field_dump";
 
         public string Description => "Dumps every field of a registered clan.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -354,6 +370,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Adds influence to a registered clan.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
@@ -381,6 +399,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "change_clan_leader";
 
         public string Description => "Changes the leader of a registered clan.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -425,6 +445,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Moves a registered clan to a kingdom.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
@@ -468,6 +490,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Destroys a registered clan.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
@@ -503,6 +527,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "add_companion";
 
         public string Description => "Adds a registered companion to a clan.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -547,6 +573,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Removes a registered companion from a clan.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered companion hero id."),
@@ -585,6 +613,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "add_renown";
 
         public string Description => "Adds renown to a registered clan.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -634,6 +664,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "economy";
 
         public string Description => "Reports battle-economy values for a clan.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -708,6 +740,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Joins a registered clan to a kingdom.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
@@ -743,6 +777,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "leave_kingdom";
 
         public string Description => "Removes a registered clan from its kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -794,6 +830,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Reports kingdom membership for a clan.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
@@ -827,6 +865,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "give_influence";
 
         public string Description => "Gives influence to a registered clan.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -863,6 +903,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public string Description => "Reports a curated summary for a registered clan.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
@@ -897,6 +939,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public string Name => "daily_gold_change";
 
         public string Description => "Reports predicted daily gold changes for a clan.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

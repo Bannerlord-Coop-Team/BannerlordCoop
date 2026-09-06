@@ -24,6 +24,8 @@ public class RaidDebugCommands
 
         public string Description => "Controls raid ai intervention for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("mode", "The mode."),

@@ -132,17 +132,26 @@ public class SystemDeveloperDirectCommandTests
     [Fact]
     public void Registry_RejectsInvalidArgumentCountBeforeCommandLogic()
     {
-        ICoopCommand command = Assert.Single(
-            CreateCommands(),
-            candidate => candidate.Name == "add_attribute_points");
-        var registry = new CoopCommandRegistry(new[] { command }, new LoggerConfiguration().CreateLogger());
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Name == "add_attribute_points");
+            var registry = new CoopCommandRegistry(new[] { command }, new LoggerConfiguration().CreateLogger());
 
-        CoopCommandResult result = registry.ProcessCommand(
-            $"{command.Prefix}.{command.Name}",
-            new TestArgs(new[] { "Hero", "With", "Spaces", "2" }));
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(new[] { "Hero", "With", "Spaces", "2" }));
 
-        Assert.False(result.Succeeded);
-        Assert.Equal("invalid_arguments", result.ErrorCode);
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
     }
 
     [Fact]

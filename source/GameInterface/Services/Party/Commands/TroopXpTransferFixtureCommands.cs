@@ -49,6 +49,8 @@ internal static class TroopXpTransferFixtureCommands
 
         public string Description => "Runs the clan party xp fixture capture debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
@@ -94,6 +96,8 @@ internal static class TroopXpTransferFixtureCommands
         public string Name => "clan_party_xp_fixture_setup";
 
         public string Description => "Runs the clan party xp fixture setup debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -227,6 +231,8 @@ internal static class TroopXpTransferFixtureCommands
 
         public string Description => "Reports clan party xp fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("player_party_id", "The player party id.", true),
@@ -276,6 +282,8 @@ internal static class TroopXpTransferFixtureCommands
 
         public string Description => "Runs the open clan party transfer debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_party_id", "The clan party id.", true),
@@ -305,6 +313,8 @@ internal static class TroopXpTransferFixtureCommands
         public string Name => "stage_clan_party_transfer";
 
         public string Description => "Runs the stage clan party transfer debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -343,6 +353,8 @@ internal static class TroopXpTransferFixtureCommands
         public string Name => "clan_party_transfer_screen_state";
 
         public string Description => "Reports clan party transfer screen state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -410,6 +422,8 @@ internal static class TroopXpTransferFixtureCommands
 
         public string Description => "Runs the commit clan party transfer debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -437,6 +451,8 @@ internal static class TroopXpTransferFixtureCommands
         public string Name => "clan_party_xp_fixture_restore";
 
         public string Description => "Restores or clears clan party xp fixture restore.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -527,6 +543,8 @@ internal static class TroopXpTransferFixtureCommands
         public string Name => "clan_party_xp_fixture_verify_restore";
 
         public string Description => "Restores or clears clan party xp fixture verify restore.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
