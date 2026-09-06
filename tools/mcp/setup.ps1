@@ -30,7 +30,7 @@ try {
         if (!(Test-Path -LiteralPath $executable -PathType Leaf)) {
             throw "Bannerlord.exe not found at $executable. Run runmefirst.cmd or supply -GameDirectory."
         }
-        $profile = [ordered]@{
+        $profileSettings = [ordered]@{
             artifactDirectory = Join-Path $RuntimeDirectory 'runs'
             profiles = @{ local = @{
                 executable = $executable
@@ -50,7 +50,7 @@ try {
         throw 'MCP publish did not produce CoopMcpServer.exe.'
     }
     if (!(Test-Path -LiteralPath $profilePath)) {
-        $json = $profile | ConvertTo-Json -Depth 6
+        $json = $profileSettings | ConvertTo-Json -Depth 6
         # CreateNew also preserves settings created by another setup invocation.
         $stream = [IO.File]::Open($profilePath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
         try {

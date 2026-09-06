@@ -156,7 +156,7 @@ public sealed class RunOrchestrator : IRunOrchestrator
             var run = FindRun(runId);
             string name = "client" + clientIndex;
             var profile = settings.Profiles[run.Profile];
-            if (clientIndex < 1) throw new ArgumentOutOfRangeException(nameof(clientIndex));
+            ArgumentOutOfRangeException.ThrowIfLessThan(clientIndex, 1);
             profile.Validate(clientIndex);
             if (run.ClientAttempts.TryGetValue(clientIndex, out string attempt))
             {

@@ -234,6 +234,19 @@ public sealed class RunOrchestratorTests : IDisposable
         Assert.Empty(launcher.Processes);
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    public async Task InvalidStagedClientIndexRejectsBeforeLaunchAndReleasesLifecycle(int clientIndex)
+    {
+        var run = await runs.StartAsync("test", 0, default);
+        var error = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => runs.StartClientAsync(run.RunId, clientIndex, default));
+        Assert.Equal("clientIndex", error.ParamName);
+        Assert.Single(launcher.Processes);
+        Assert.Equal(new[] { 1 }, preflight.Counts);
+        Assert.Equal("launched", (await runs.StartClientAsync(run.RunId, 1, default)).Outcome);
+    }
+
     [Fact]
     public async Task StagedLaunchUsesIncrementalBudgetAndReservesEachSlotOnce()
     {

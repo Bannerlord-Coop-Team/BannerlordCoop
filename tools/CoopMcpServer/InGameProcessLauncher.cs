@@ -43,5 +43,4 @@ public sealed class InGameProcessLauncher : IGameProcessLauncher
         info.ArgumentList.Add("_MODULES_*" + string.Join("*", profile.Modules) + "*_MODULES_");
         return info;
     }
-
 }

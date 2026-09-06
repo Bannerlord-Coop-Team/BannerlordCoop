@@ -95,7 +95,7 @@ public sealed class DebugTools : IDebugTools
     [McpServerTool(Name = "ui_inspect", ReadOnly = true, UseStructuredContent = true), Description("DEBUG client Gauntlet widget tree. Omit snapshot for fresh references (expire after 30s). Pages contain up to 128 elements: repeat with snapshot and nextOffset until nextOffset == total. Discover by widget id/type/text and parent index (eN); password fields are redacted. No automatic waits. A new snapshot or any action invalidates previous references. Use screenshot for visual verification. Truncated trees are inspection-only.")]
     public Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0)
     {
-        if (offset < 0 || offset > 16384 || snapshot == null && offset != 0 || snapshot?.Length > 64)
+        if (offset < 0 || offset > 16384 || (snapshot == null && offset != 0) || snapshot?.Length > 64)
             throw new ArgumentException("Invalid snapshot page.");
         return runs.RequestAsync(run_id, instance, "ui-inspect", new { snapshot, offset }, false, cancellationToken);
     }
@@ -104,7 +104,7 @@ public sealed class DebugTools : IDebugTools
     public Task<LiveTestResponse> UiAction(string run_id, string instance, string snapshot, string element, string action, CancellationToken cancellationToken, string text = null, double? value = null)
     {
         if (string.IsNullOrEmpty(snapshot) || snapshot.Length > 64 || string.IsNullOrEmpty(element) || element.Length > 16 ||
-            text?.Length > 512 || value.HasValue && !double.IsFinite(value.Value))
+            text?.Length > 512 || (value.HasValue && !double.IsFinite(value.Value)))
             throw new ArgumentException("Invalid UI action parameters.");
         if (action != "click" && action != "toggle" && action != "text" && action != "slider" && action != "scroll_vertical" && action != "scroll_horizontal")
             throw new ArgumentException("Unsupported UI action.", nameof(action));
