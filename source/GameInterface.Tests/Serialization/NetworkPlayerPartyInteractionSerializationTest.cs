@@ -94,6 +94,10 @@ public class NetworkPlayerPartyInteractionSerializationTest
     [InlineData(PlayerPartyInteractionOption.TradeProposal)]
     [InlineData(PlayerPartyInteractionOption.LeaveClan)]
     [InlineData(PlayerPartyInteractionOption.RemoveFromClan)]
+    [InlineData(PlayerPartyInteractionOption.ProposeMarriage)]
+    [InlineData(PlayerPartyInteractionOption.PatrilinealMarriage)]
+    [InlineData(PlayerPartyInteractionOption.MatrilinealMarriage)]
+    [InlineData(PlayerPartyInteractionOption.CancelMarriage)]
     public void SubmitOption_RoundTrip_PreservesFields(PlayerPartyInteractionOption option)
     {
         var original = new NetworkSubmitPlayerPartyInteractionOption(
@@ -112,6 +116,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
     [InlineData(PlayerPartyInteractionOutcomeType.TradeAccepted)]
     [InlineData(PlayerPartyInteractionOutcomeType.ClanLeft)]
     [InlineData(PlayerPartyInteractionOutcomeType.ClanMemberRemoved)]
+    [InlineData(PlayerPartyInteractionOutcomeType.MarriageAccepted)]
+    [InlineData(PlayerPartyInteractionOutcomeType.MarriageDeclined)]
     public void Ended_RoundTrip_PreservesFields(PlayerPartyInteractionOutcomeType outcome)
     {
         var original = new NetworkPlayerPartyInteractionEnded(

@@ -580,6 +580,10 @@ internal static class PlayerPartyTradeContext
                 return "Clan service proposal accepted.";
             case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:
                 return "Clan service proposal declined.";
+            case PlayerPartyInteractionOutcomeType.MarriageAccepted:
+                return GameTexts.FindText("str_coop_marriage_accepted").ToString();
+            case PlayerPartyInteractionOutcomeType.MarriageDeclined:
+                return GameTexts.FindText("str_coop_marriage_declined").ToString();
             case PlayerPartyInteractionOutcomeType.ClanLeft:
                 return GameTexts.FindText("str_coop_clan_player_left").ToString();
             case PlayerPartyInteractionOutcomeType.ClanMemberRemoved:

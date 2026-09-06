@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.Banners.Messages;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
@@ -218,12 +217,6 @@ internal class PlayerPartyInteractionOutcomeHandler
         }
 
         clanJoinRules.Apply(initiatorHero, responderClan);
-        initiatorHero.Clan = responderClan;
-        if (initiatorParty.MobileParty != null)
-            initiatorParty.MobileParty.ActualClan = responderClan;
-
-        // Refresh client map flags and nameplates after the clan membership updates.
-        messageBroker.Publish(this, new PlayerBannerChanged(responderClan));
     }
 
     private void ApplyAcceptedTrade(PlayerPartyInteractionOutcome outcome)

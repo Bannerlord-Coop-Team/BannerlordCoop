@@ -9,6 +9,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
     private const string RootToken = "start";
     private const string InitialToken = "coop_player_party_interaction_initial";
     private const string ServiceToken = "coop_player_party_interaction_services";
+    private const string MarriageToken = "coop_player_party_interaction_marriage";
     private const string ResponderToken = "coop_player_party_interaction_responder";
     private const string HostileConfirmToken = "coop_player_party_interaction_hostile_confirm";
     private const string InitiatorWaitToken = "coop_player_party_interaction_initiator_wait";
@@ -122,6 +123,8 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             IsTradeProposalEnabled,
             null);
 
+        AddMarriageDialogs(starter);
+
         starter.AddPlayerLine(
             "coop_player_party_interaction_services",
             InitialToken,
@@ -193,7 +196,8 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             ResponderToken,
             InitiatorWaitToken,
             "I accept.",
-            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.AcceptProposal),
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.AcceptProposal) &&
+                !PlayerPartyInteractionDialogState.IsMarriageProposal,
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.AcceptProposal),
             PlayerPartyDialogPriority,
             null,
@@ -268,6 +272,63 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
 
     private static bool IsTradeProposalEnabled(out TextObject explanation)
         => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.TradeProposal, out explanation);
+
+    private static void AddMarriageDialogs(CampaignGameStarter starter)
+    {
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_marriage", InitialToken, MarriageToken,
+            GameTexts.FindText("str_coop_marriage_propose").ToString(),
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.ProposeMarriage),
+            PlayerPartyInteractionDialogState.ShowMarriageOptions,
+            PlayerPartyDialogPriority, IsMarriageEnabled);
+
+        starter.AddDialogLine(
+            "coop_player_party_interaction_marriage_choices", MarriageToken, MarriageToken,
+            "{=!}{COOP_PLAYER_PARTY_INTERACTION_TEXT}",
+            () => IsPhase(PlayerPartyInteractionPhase.MarriageOptions, PlayerPartyInteractionPhase.WaitingForResponse), null, PlayerPartyDialogPriority);
+
+        starter.AddDialogLine(
+            "coop_player_party_interaction_marriage_response", ResponderToken, ResponderToken,
+            "{=!}{COOP_PLAYER_PARTY_INTERACTION_TEXT}",
+            () => PlayerPartyInteractionDialogState.IsMarriageProposal, null, PlayerPartyDialogPriority);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_marriage_accept", ResponderToken, ResponderToken,
+            GameTexts.FindText("str_coop_marriage_accept").ToString(),
+            () => PlayerPartyInteractionDialogState.IsMarriageProposal &&
+                PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.AcceptProposal),
+            PlayerPartyInteractionDialogState.AcceptProposal, PlayerPartyDialogPriority);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_patrilineal", MarriageToken, MarriageToken,
+            GameTexts.FindText("str_coop_marriage_patrilineal").ToString(),
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.PatrilinealMarriage),
+            () => PlayerPartyInteractionDialogState.ProposeMarriage(matrilineal: false),
+            PlayerPartyDialogPriority, IsPatrilinealMarriageEnabled);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_matrilineal", MarriageToken, MarriageToken,
+            GameTexts.FindText("str_coop_marriage_matrilineal").ToString(),
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.MatrilinealMarriage),
+            () => PlayerPartyInteractionDialogState.ProposeMarriage(matrilineal: true),
+            PlayerPartyDialogPriority, IsMatrilinealMarriageEnabled);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_marriage_cancel", MarriageToken, RootToken,
+            GameTexts.FindText("str_cancel").ToString(),
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.CancelMarriage),
+            PlayerPartyInteractionDialogState.CancelMarriageOptions,
+            PlayerPartyDialogPriority);
+    }
+
+    private static bool IsMarriageEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.ProposeMarriage, out explanation);
+
+    private static bool IsPatrilinealMarriageEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.PatrilinealMarriage, out explanation);
+
+    private static bool IsMatrilinealMarriageEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.MatrilinealMarriage, out explanation);
 
     private static bool IsOfferServicesEnabled(out TextObject explanation)
         => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.OfferServices, out explanation);

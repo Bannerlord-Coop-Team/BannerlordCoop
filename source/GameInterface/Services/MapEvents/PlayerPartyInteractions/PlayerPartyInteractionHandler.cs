@@ -57,6 +57,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerPartyHostileEncounterService hostileEncounterService;
     private readonly IClanJoinRules clanJoinRules;
     private readonly IClanLeaveRules clanLeaveRules;
+    private readonly IPlayerMarriageRules playerMarriageRules;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -77,7 +78,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerPartyHostileEncounterService hostileEncounterService,
         IKingdomMembershipState kingdomMembershipState,
         IClanJoinRules clanJoinRules,
-        IClanLeaveRules clanLeaveRules)
+        IClanLeaveRules clanLeaveRules,
+        IPlayerMarriageRules playerMarriageRules)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -87,6 +89,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.hostileEncounterService = hostileEncounterService;
         this.clanJoinRules = clanJoinRules;
         this.clanLeaveRules = clanLeaveRules;
+        this.playerMarriageRules = playerMarriageRules;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, messageBroker, kingdomMembershipState, clanJoinRules);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
@@ -594,9 +597,16 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void HandleInitiatorProposalOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
+        if (session.Proposal != PlayerPartyInteractionProposal.None) return;
         var proposal = ToProposal(option);
         if (proposal == PlayerPartyInteractionProposal.None) return;
         if (!session.InitiatorEnabledOptions.Contains(option)) return;
+
+        if (IsMarriageProposal(proposal) && !CanProposeMarriage(session, proposal))
+        {
+            EndSession(session, PlayerPartyInteractionOutcomeType.Rejected);
+            return;
+        }
 
         if (proposal == PlayerPartyInteractionProposal.JoinClan && !CanJoinClan(session))
         {
@@ -655,6 +665,16 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         if (option != PlayerPartyInteractionOption.AcceptProposal) return;
 
+        if (IsMarriageProposal(session.Proposal))
+        {
+            var married = objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) &&
+                objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty) &&
+                !session.IsHostile && playerMarriageRules.TryApply(initiatorParty.LeaderHero, responderParty.LeaderHero,
+                    session.Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage);
+            EndSession(session, married ? PlayerPartyInteractionOutcomeType.MarriageAccepted : PlayerPartyInteractionOutcomeType.Rejected);
+            return;
+        }
+
         if (session.Proposal == PlayerPartyInteractionProposal.JoinClan && !CanJoinClan(session))
         {
             EndSession(session, PlayerPartyInteractionOutcomeType.Rejected);
@@ -687,6 +707,21 @@ internal class PlayerPartyInteractionHandler : IHandler
             PlayerPartyInteractionProposal.None,
             new[] { PlayerPartyInteractionOption.Leave });
     }
+
+    private bool CanProposeMarriage(PlayerPartyInteractionSession session, PlayerPartyInteractionProposal proposal)
+    {
+        if (session.IsHostile ||
+            !objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) ||
+            !objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty)) return false;
+
+        return playerMarriageRules.CanMarry(initiatorParty.LeaderHero, responderParty.LeaderHero) &&
+            playerMarriageRules.GetClanJoinUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero,
+                proposal == PlayerPartyInteractionProposal.MatrilinealMarriage) == ClanJoinUnavailableReason.None;
+    }
+
+    private static bool IsMarriageProposal(PlayerPartyInteractionProposal proposal)
+        => proposal == PlayerPartyInteractionProposal.PatrilinealMarriage ||
+           proposal == PlayerPartyInteractionProposal.MatrilinealMarriage;
 
     private void SendTradeStates(PlayerPartyInteractionSession session)
         => SendTradeStates(session, true);
@@ -833,6 +868,14 @@ internal class PlayerPartyInteractionHandler : IHandler
         session.ResponderClanOptions = GetClanDepartureOptions(responderParty.LeaderHero, initiatorParty.LeaderHero).ToArray();
 
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
+        if (playerMarriageRules.CanMarry(initiatorParty.LeaderHero, responderParty.LeaderHero))
+        {
+            AddInitiatorOption(session, PlayerPartyInteractionOption.ProposeMarriage, !session.IsHostile);
+            AddInitiatorOption(session, PlayerPartyInteractionOption.PatrilinealMarriage,
+                CanProposeMarriage(session, PlayerPartyInteractionProposal.PatrilinealMarriage));
+            AddInitiatorOption(session, PlayerPartyInteractionOption.MatrilinealMarriage,
+                CanProposeMarriage(session, PlayerPartyInteractionProposal.MatrilinealMarriage));
+        }
         AddInitiatorOption(session, PlayerPartyInteractionOption.HostileDemand, hostileEncounterService.CanStartHostileEncounter(initiatorParty, responderParty));
         session.ClanJoinUnavailableReason = clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero);
         if (session.ClanJoinUnavailableReason != ClanJoinUnavailableReason.MissingClan &&
@@ -921,6 +964,10 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionProposal.Vassal;
             case PlayerPartyInteractionOption.HostileDemand:
                 return PlayerPartyInteractionProposal.HostileDemand;
+            case PlayerPartyInteractionOption.PatrilinealMarriage:
+                return PlayerPartyInteractionProposal.PatrilinealMarriage;
+            case PlayerPartyInteractionOption.MatrilinealMarriage:
+                return PlayerPartyInteractionProposal.MatrilinealMarriage;
             default:
                 return PlayerPartyInteractionProposal.None;
         }
@@ -949,6 +996,9 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionOutcomeType.ClanJoinDeclined;
             case PlayerPartyInteractionProposal.Vassal:
                 return PlayerPartyInteractionOutcomeType.VassalDeclined;
+            case PlayerPartyInteractionProposal.PatrilinealMarriage:
+            case PlayerPartyInteractionProposal.MatrilinealMarriage:
+                return PlayerPartyInteractionOutcomeType.MarriageDeclined;
             default:
                 return PlayerPartyInteractionOutcomeType.None;
         }

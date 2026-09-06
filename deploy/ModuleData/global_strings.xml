@@ -21,7 +21,7 @@
     <string id="str_coop_clan_join_parties" text="{=str_coop_clan_join_parties}NPC clan parties: {COUNT}" />
     <string id="str_coop_clan_join_alleys" text="{=str_coop_clan_join_alleys}Alleys: {COUNT}" />
     <string id="str_coop_clan_join_supporters" text="{=str_coop_clan_join_supporters}Supporters: {COUNT}" />
-    <string id="str_coop_clan_join_forfeit_warning" text="{=str_coop_clan_join_forfeit_warning}If your request is accepted, you give up ownership and control of the companions, assets and supporters listed above to the new clan leader. They will not be returned to you if you leave the clan later." />
+    <string id="str_coop_clan_join_forfeit_warning" text="{=str_coop_clan_join_forfeit_warning}On joining the clan, you give up ownership and control of the companions, assets and supporters listed above to the new clan leader. They will not be returned to you if you leave the clan later." />
     <string id="str_coop_clan_join_confirm" text="{=str_coop_clan_join_confirm}Send join request" />
     <string id="str_coop_clan_offer_services_shared_leader" text="{=str_coop_clan_offer_services_shared_leader}You cannot offer services while leading a clan with other players." />
     <string id="str_coop_clan_join_other_players" text="{=str_coop_clan_join_other_players}You cannot join another clan while other players belong to your clan." />
@@ -35,5 +35,23 @@
     <string id="str_coop_clan_remove_player_dialogue" text="{=str_coop_clan_remove_player_dialogue}You are no longer a member of this clan." />
     <string id="str_coop_clan_player_left" text="{=str_coop_clan_player_left}The player has left the clan." />
     <string id="str_coop_clan_player_removed" text="{=str_coop_clan_player_removed}The player has been removed from the clan." />
+    <string id="str_coop_marriage_propose" text="{=str_coop_marriage_propose}I would like to propose marriage." />
+    <string id="str_coop_marriage_choose" text="{=str_coop_marriage_choose}What kind of marriage do you propose?" />
+    <string id="str_coop_marriage_patrilineal" text="{=str_coop_marriage_patrilineal}Patrilineal: the husband leads and the wife joins his clan." />
+    <string id="str_coop_marriage_matrilineal" text="{=str_coop_marriage_matrilineal}Matrilineal: the wife leads and the husband joins her clan." />
+    <string id="str_coop_marriage_patrilineal_request" text="{=str_coop_marriage_patrilineal_request}I propose a patrilineal marriage. (The wife joins the husband's clan, and he remains its leader)" />
+    <string id="str_coop_marriage_matrilineal_request" text="{=str_coop_marriage_matrilineal_request}I propose a matrilineal marriage. (The husband joins the wife's clan, and she remains its leader)" />
+    <string id="str_coop_marriage_ineligible" text="{=str_coop_marriage_ineligible}These heroes are not currently eligible for marriage. Both must be unmarried, of marriageable age, of opposite sexes and not close relatives." />
+    <string id="str_coop_marriage_hostile" text="{=str_coop_marriage_hostile}You cannot propose marriage while hostile." />
+    <string id="str_coop_marriage_clan_unavailable" text="{=str_coop_marriage_clan_unavailable}The designated leader must already lead their clan, and the joining spouse must meet the clan-joining requirements. Both heroes must remain eligible for marriage." />
+    <string id="str_coop_marriage_send" text="{=str_coop_marriage_send}Propose" />
+    <string id="str_coop_marriage_accept" text="{=str_coop_marriage_accept}Accept proposal" />
+    <string id="str_coop_marriage_accepted" text="{=str_coop_marriage_accepted}Marriage proposal accepted." />
+    <string id="str_coop_marriage_declined" text="{=str_coop_marriage_declined}Marriage proposal declined." />
+    <string id="str_coop_marriage_proposal_title" text="{=str_coop_marriage_proposal_title}Propose marriage to {LEADER_NAME}?" />
+    <string id="str_coop_marriage_proposal_description" text="{=str_coop_marriage_proposal_description}You are proposing marriage to {LEADER_NAME}. If they accept, you will join {CLAN_NAME}. They will remain clan leader and manage its shared assets." />
+    <string id="str_coop_marriage_acceptance_title" text="{=str_coop_marriage_acceptance_title}Accept marriage proposal?" />
+    <string id="str_coop_marriage_acceptance_description" text="{=str_coop_marriage_acceptance_description}If you accept {LEADER_NAME}'s marriage proposal, you will marry them and join {CLAN_NAME}. They will remain clan leader and manage its shared assets." />
+    <string id="str_coop_marriage_clan_commitment" text="{=str_coop_marriage_clan_commitment}While married to another player, you cannot leave the clan or be removed from it." />
     <!-- Add other custom text here in the future-->
 </strings>

@@ -10,7 +10,8 @@ public enum PlayerPartyInteractionPhase
     ProposalPending,
     TradeActive,
     HostileDemandConfirm,
-    HostileDemandPending
+    HostileDemandPending,
+    MarriageOptions
 }
 
 public enum PlayerPartyInteractionOption
@@ -29,7 +30,11 @@ public enum PlayerPartyInteractionOption
     RefuseHostileDemand,
     YieldHostileDemand,
     LeaveClan,
-    RemoveFromClan
+    RemoveFromClan,
+    ProposeMarriage,
+    PatrilinealMarriage,
+    MatrilinealMarriage,
+    CancelMarriage
 }
 
 public enum PlayerPartyInteractionVassalUnavailableReason
@@ -47,7 +52,9 @@ public enum PlayerPartyInteractionProposal
     Trade,
     JoinClan,
     Vassal,
-    HostileDemand
+    HostileDemand,
+    PatrilinealMarriage,
+    MatrilinealMarriage
 }
 
 public enum PlayerPartyInteractionOutcomeType
@@ -65,7 +72,9 @@ public enum PlayerPartyInteractionOutcomeType
     HostileDemandAccepted,
     HostileDemandYielded,
     ClanLeft,
-    ClanMemberRemoved
+    ClanMemberRemoved,
+    MarriageAccepted,
+    MarriageDeclined
 }
 
 public enum PlayerPartyInteractionDeniedReason

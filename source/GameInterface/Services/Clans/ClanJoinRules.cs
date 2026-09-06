@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Clans.Data;
+﻿using Common.Messaging;
+using GameInterface.Services.Banners.Messages;
+using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Players;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,10 +21,12 @@ public interface IClanJoinRules : IGameAbstraction
 public class ClanJoinRules : IClanJoinRules
 {
     private readonly IPlayerManager playerManager;
+    private readonly IMessageBroker messageBroker;
 
-    public ClanJoinRules(IPlayerManager playerManager)
+    public ClanJoinRules(IPlayerManager playerManager, IMessageBroker messageBroker)
     {
         this.playerManager = playerManager;
+        this.messageBroker = messageBroker;
     }
 
     public bool CanOfferServices(Hero joiningHero, Clan targetClan)
@@ -71,6 +75,11 @@ public class ClanJoinRules : IClanJoinRules
     public void Apply(Hero joiningHero, Clan targetClan)
     {
         // TODO: Apply asset and family rules on the server before changing the hero's clan.
+        joiningHero.Clan = targetClan;
+        if (joiningHero.PartyBelongedTo != null)
+            joiningHero.PartyBelongedTo.ActualClan = targetClan;
+
+        messageBroker.Publish(this, new PlayerBannerChanged(targetClan));
     }
 
     private void AddWarning(List<TextObject> warnings, string textId, int count)
