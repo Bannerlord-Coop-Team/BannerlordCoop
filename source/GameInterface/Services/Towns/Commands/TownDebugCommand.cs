@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common.Commands;
+using Autofac;
 using Common;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Patches;
@@ -13,12 +14,16 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
 namespace GameInterface.Services.Villages.Commands;
 
 public class TownDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     /// <summary>
     /// Attempts to get the ObjectManager
     /// </summary>
@@ -38,21 +43,32 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the towns</returns>
-    [CommandLineArgumentFunction("list_towns", "coop.debug.town")]
-    public static string ListTowns(List<string> args)
+    public sealed class ListTownsCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
+        public string Prefix => "coop.debug.town";
 
-        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
-            .Where(settlement => settlement.IsTown).ToList();
+        public string Name => "list_towns";
 
-        settlements.ForEach((settlement) =>
+        public string Description => "Lists towns for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            Town t = settlement.Town;
-            stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", t.StringId, t.Name));
-        });
+            StringBuilder stringBuilder = new StringBuilder();
 
-        return stringBuilder.ToString();
+            List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
+                .Where(settlement => settlement.IsTown).ToList();
+
+            settlements.ForEach((settlement) =>
+            {
+                Town t = settlement.Town;
+                stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", t.StringId, t.Name));
+            });
+
+            return Succeeded(stringBuilder.ToString());
+
+        }
     }
 
     // coop.debug.town.list
@@ -61,19 +77,30 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the items</returns>
-    [CommandLineArgumentFunction("list_items", "coop.debug.town")]
-    public static string ListItems(List<string> args)
+    public sealed class ListItemsCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
+        public string Prefix => "coop.debug.town";
 
-        List<ItemCategory> items = Campaign.Current.ObjectManager.GetObjectTypeList<ItemCategory>().ToList();
+        public string Name => "list_items";
 
-        items.ForEach((item) =>
+        public string Description => "Lists items for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            stringBuilder.Append(string.Format("ID: '{0}'\n", item.StringId));
-        });
+            StringBuilder stringBuilder = new StringBuilder();
 
-        return stringBuilder.ToString();
+            List<ItemCategory> items = Campaign.Current.ObjectManager.GetObjectTypeList<ItemCategory>().ToList();
+
+            items.ForEach((item) =>
+            {
+                stringBuilder.Append(string.Format("ID: '{0}'\n", item.StringId));
+            });
+
+            return Succeeded(stringBuilder.ToString());
+
+        }
     }
 
     /// <summary>
@@ -81,78 +108,214 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">town ID to lookup</param>
     /// <returns>Information regarding the town.</returns>
-    [CommandLineArgumentFunction("info", "coop.debug.town")]
-    public static string Info(List<string> args)
+    public sealed class InfoCoopCommand : ICoopCommand
     {
-        if (args.Count < 1)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "info";
+
+        public string Description => "Shows the relevant state for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.info <townId>";
-        }
+            new ExpectedArgs("townId", "The town id."),
+        };
 
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
-        {
-            return $"ID: '{args[0]}' not found";
-        }
-
-        Fief fief = town.Settlement.SettlementComponent as Fief;
-
-        StringBuilder sb = new();
-
-        sb.AppendFormat("ID: '{0}'\n", args[0]);
-        sb.AppendFormat("Name: '{0}'\n", town.Name);
-        sb.AppendFormat("Governor: '{0}'\n", (town.Governor != null) ? town.Governor.Name : "null");
-        sb.AppendFormat("LastCapturedBy: '{0}'\n", (town.LastCapturedBy != null) ? town.LastCapturedBy.Name : "null");
-        sb.AppendFormat("Prosperity: '{0}'\n", town.Prosperity);
-        sb.AppendFormat("Loyalty: '{0}'\n", town.Loyalty);
-        sb.AppendFormat("Security: '{0}'\n", town.Security);
-        sb.AppendFormat("InRebelliousState: '{0}'\n", town.InRebelliousState);
-        sb.AppendFormat("GarrisonAutoRecruitmentIsEnabled: '{0}'\n", town.GarrisonAutoRecruitmentIsEnabled);
-        sb.AppendFormat("Food stock '{0}' : \n", fief.FoodStocks);
-        sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", town.TradeTaxAccumulated);
-        sb.AppendFormat("_tradeTax: '{0}'\n", town._tradeTax);
-        sb.AppendFormat("Sold Items: \n");
-        Town.SellLog[] logList = town._soldItems;
-        if (logList != null)
-        {
-            foreach (Town.SellLog log in logList)
+            if (TryGetObjectManager(out var objectManager) == false)
             {
-                sb.AppendFormat("SellLog: {0} {1}\n", log.Category.StringId, log.Number);
+                return Failed("Unable to resolve ObjectManager");
             }
+
+            if (objectManager.TryGetObject(args[0], out Town town) == false)
+            {
+                return Failed($"ID: '{args[0]}' not found");
+            }
+
+            Fief fief = town.Settlement.SettlementComponent as Fief;
+
+            StringBuilder sb = new();
+
+            sb.AppendFormat("ID: '{0}'\n", args[0]);
+            sb.AppendFormat("Name: '{0}'\n", town.Name);
+            sb.AppendFormat("Governor: '{0}'\n", (town.Governor != null) ? town.Governor.Name : "null");
+            sb.AppendFormat("LastCapturedBy: '{0}'\n", (town.LastCapturedBy != null) ? town.LastCapturedBy.Name : "null");
+            sb.AppendFormat("Prosperity: '{0}'\n", town.Prosperity);
+            sb.AppendFormat("Loyalty: '{0}'\n", town.Loyalty);
+            sb.AppendFormat("Security: '{0}'\n", town.Security);
+            sb.AppendFormat("InRebelliousState: '{0}'\n", town.InRebelliousState);
+            sb.AppendFormat("GarrisonAutoRecruitmentIsEnabled: '{0}'\n", town.GarrisonAutoRecruitmentIsEnabled);
+            sb.AppendFormat("Food stock '{0}' : \n", fief.FoodStocks);
+            sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", town.TradeTaxAccumulated);
+            sb.AppendFormat("_tradeTax: '{0}'\n", town._tradeTax);
+            sb.AppendFormat("Sold Items: \n");
+            Town.SellLog[] logList = town._soldItems;
+            if (logList != null)
+            {
+                foreach (Town.SellLog log in logList)
+                {
+                    sb.AppendFormat("SellLog: {0} {1}\n", log.Category.StringId, log.Number);
+                }
+            }
+            return Succeeded(sb.ToString());
+
         }
-        return sb.ToString();
     }
 
-    [CommandLineArgumentFunction("garrison_backlink", "coop.debug.town")]
-    public static string GarrisonBacklink(List<string> args)
+    public sealed class GarrisonBacklinkCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.town.garrison_backlink <townId>";
-        }
+        public string Prefix => "coop.debug.town";
 
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            return "Unable to resolve ObjectManager";
-        }
+        public string Name => "garrison_backlink";
 
-        if (!objectManager.TryGetObject(args[0], out Town town))
-        {
-            return $"ID: '{args[0]}' not found";
-        }
+        public string Description => "Runs backlink for co-op debugging.";
 
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("townId", "The town id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            if (!TryGetObjectManager(out var objectManager))
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (!objectManager.TryGetObject(args[0], out Town town))
+            {
+                return Failed($"ID: '{args[0]}' not found");
+            }
+
+            return Succeeded(FormatGarrisonBacklink(objectManager, town, args[0]));
+
+        }
+    }
+
+    public sealed class FocusGarrisonCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "focus_garrison";
+
+        public string Description => "Focuses garrison for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("townId", "The town id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            if (!TryGetObjectManager(out var objectManager))
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (!objectManager.TryGetObject(args[0], out Town town))
+            {
+                return Failed($"ID: '{args[0]}' not found");
+            }
+
+            var activeGarrisons = GetActiveGarrisons(town);
+            if (activeGarrisons.Count != 1)
+            {
+                return Failed($"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}");
+            }
+
+            MapScreen mapScreen = MapScreen.Instance;
+            if (mapScreen?.MapCameraView == null)
+            {
+                return Failed("Campaign map camera is unavailable");
+            }
+
+            MobileParty garrison = activeGarrisons[0];
+            var targetPosition = garrison.MapEvent?.Position ?? garrison.Position;
+            garrison.Party.SetAsCameraFollowParty();
+            mapScreen.MapCameraView.FastMoveCameraToPosition(targetPosition, mapScreen.IsInMenu);
+            mapScreen.MapCameraView.SetCameraMode(MapCameraView.CameraFollowMode.FollowParty);
+            return Succeeded($"Following {garrison.StringId} at {town.Name} on the campaign map");
+
+        }
+    }
+
+    public sealed class ApplyGarrisonLifecycleCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "apply_garrison_lifecycle";
+
+        public string Description => "Applies garrison lifecycle for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("operation", "The operation."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+            {
+                return Failed("This function can only be used by the server");
+            }
+
+
+            if (!TryGetObjectManager(out var objectManager))
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (!objectManager.TryGetObject(args[0], out Town town))
+            {
+                return Failed($"ID: '{args[0]}' not found");
+            }
+
+            var activeGarrisons = GetActiveGarrisons(town);
+            if (activeGarrisons.Count != 1)
+            {
+                return Failed($"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}");
+            }
+
+            var garrison = (GarrisonPartyComponent)activeGarrisons[0].PartyComponent;
+            switch (args[1].ToLowerInvariant())
+            {
+                case "finalize":
+                    if (!ReferenceEquals(town.GarrisonPartyComponent, garrison))
+                    {
+                        return Failed($"Refusing to finalize: {town.Name} does not point at its active garrison");
+                    }
+                    garrison.OnFinalize();
+                    break;
+                case "initialize":
+                    if (town.GarrisonPartyComponent != null &&
+                        !ReferenceEquals(town.GarrisonPartyComponent, garrison))
+                    {
+                        return Failed($"Refusing to initialize: {town.Name} points at a different garrison");
+                    }
+                    garrison.OnInitialize();
+                    break;
+                default:
+                    return Failed($"Unknown lifecycle action '{args[1]}'; expected initialize or finalize");
+            }
+
+            return Succeeded($"Applied {args[1].ToLowerInvariant()} to {activeGarrisons[0].StringId}; " +
+                   FormatGarrisonBacklink(objectManager, town, args[0]));
+
+        }
+    }
+
+    private static string FormatGarrisonBacklink(IObjectManager objectManager, Town town, string townId)
+    {
         var activeGarrisons = GetActiveGarrisons(town);
         var backlink = town.GarrisonPartyComponent;
-        string backlinkId = "null";
-        if (backlink != null)
-        {
-            backlinkId = objectManager.TryGetId(backlink, out string id) ? id : "unregistered";
-        }
-
+        string backlinkId = backlink == null
+            ? "null"
+            : objectManager.TryGetId(backlink, out string id) ? id : "unregistered";
         string activeParties = activeGarrisons.Count == 0
             ? "none"
             : string.Join(",", activeGarrisons.Select(party => party.StringId));
@@ -160,103 +323,10 @@ public class TownDebugCommand
                                      ReferenceEquals(activeGarrisons[0].PartyComponent, backlink);
 
         return $"{(ModInformation.IsServer ? "SERVER" : "CLIENT")} " +
-               $"town={args[0]} settlement={town.Settlement.StringId} " +
+               $"town={townId} settlement={town.Settlement.StringId} " +
                $"backlinkComponent={backlinkId} backlinkParty={backlink?.MobileParty?.StringId ?? "null"} " +
                $"activeGarrisonCount={activeGarrisons.Count} activeGarrisonParties={activeParties} " +
                $"backlinkMatchesActive={backlinkMatchesActive}";
-    }
-
-    [CommandLineArgumentFunction("focus_garrison", "coop.debug.town")]
-    public static string FocusGarrison(List<string> args)
-    {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.town.focus_garrison <townId>";
-        }
-
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (!objectManager.TryGetObject(args[0], out Town town))
-        {
-            return $"ID: '{args[0]}' not found";
-        }
-
-        var activeGarrisons = GetActiveGarrisons(town);
-        if (activeGarrisons.Count != 1)
-        {
-            return $"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}";
-        }
-
-        MapScreen mapScreen = MapScreen.Instance;
-        if (mapScreen?.MapCameraView == null)
-        {
-            return "Campaign map camera is unavailable";
-        }
-
-        MobileParty garrison = activeGarrisons[0];
-        var targetPosition = garrison.MapEvent?.Position ?? garrison.Position;
-        garrison.Party.SetAsCameraFollowParty();
-        mapScreen.MapCameraView.FastMoveCameraToPosition(targetPosition, mapScreen.IsInMenu);
-        mapScreen.MapCameraView.SetCameraMode(MapCameraView.CameraFollowMode.FollowParty);
-        return $"Following {garrison.StringId} at {town.Name} on the campaign map";
-    }
-
-    [CommandLineArgumentFunction("apply_garrison_lifecycle", "coop.debug.town")]
-    public static string ApplyGarrisonLifecycle(List<string> args)
-    {
-        if (ModInformation.IsClient)
-        {
-            return "This function can only be used by the server";
-        }
-
-        if (args.Count != 2)
-        {
-            return "Usage: coop.debug.town.apply_garrison_lifecycle <townId> <initialize|finalize>";
-        }
-
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (!objectManager.TryGetObject(args[0], out Town town))
-        {
-            return $"ID: '{args[0]}' not found";
-        }
-
-        var activeGarrisons = GetActiveGarrisons(town);
-        if (activeGarrisons.Count != 1)
-        {
-            return $"Expected exactly one active garrison for {town.Name}, found {activeGarrisons.Count}";
-        }
-
-        var garrison = (GarrisonPartyComponent)activeGarrisons[0].PartyComponent;
-        switch (args[1].ToLowerInvariant())
-        {
-            case "finalize":
-                if (!ReferenceEquals(town.GarrisonPartyComponent, garrison))
-                {
-                    return $"Refusing to finalize: {town.Name} does not point at its active garrison";
-                }
-                garrison.OnFinalize();
-                break;
-            case "initialize":
-                if (town.GarrisonPartyComponent != null &&
-                    !ReferenceEquals(town.GarrisonPartyComponent, garrison))
-                {
-                    return $"Refusing to initialize: {town.Name} points at a different garrison";
-                }
-                garrison.OnInitialize();
-                break;
-            default:
-                return $"Unknown lifecycle action '{args[1]}'; expected initialize or finalize";
-        }
-
-        return $"Applied {args[1].ToLowerInvariant()} to {activeGarrisons[0].StringId}; " +
-               GarrisonBacklink(new List<string> { args[0] });
     }
 
     private static List<MobileParty> GetActiveGarrisons(Town town)
@@ -274,21 +344,34 @@ public class TownDebugCommand
     /// building's level/progress, so server and client screenshots can be compared to confirm the building
     /// collection still replicates.
     /// </summary>
-    [CommandLineArgumentFunction("list_buildings", "coop.debug.town")]
-    public static string ListBuildings(List<string> args)
+    public sealed class ListBuildingsCoopCommand : ICoopCommand
     {
-        if (args.Count != 1) return "Usage: coop.debug.town.list_buildings <townId>";
-        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
-        if (objectManager.TryGetObject(args[0], out Town town) == false) return $"ID: '{args[0]}' not found";
+        public string Prefix => "coop.debug.town";
 
-        StringBuilder sb = new();
-        sb.AppendFormat("Buildings for '{0}' ({1}):\n", town.Name, town.Buildings.Count);
-        foreach (var building in town.Buildings)
-            sb.AppendFormat("  {0} level={1} progress={2}\n", building.BuildingType?.StringId, building.CurrentLevel, building.BuildingProgress);
-        sb.AppendFormat("BuildingsInProgress queue ({0}):\n", town.BuildingsInProgress.Count);
-        foreach (var building in town.BuildingsInProgress)
-            sb.AppendFormat("  {0} level={1}\n", building.BuildingType?.StringId, building.CurrentLevel);
-        return sb.ToString();
+        public string Name => "list_buildings";
+
+        public string Description => "Lists buildings for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("townId", "The town id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager");
+            if (objectManager.TryGetObject(args[0], out Town town) == false) return Failed($"ID: '{args[0]}' not found");
+
+            StringBuilder sb = new();
+            sb.AppendFormat("Buildings for '{0}' ({1}):\n", town.Name, town.Buildings.Count);
+            foreach (var building in town.Buildings)
+                sb.AppendFormat("  {0} level={1} progress={2}\n", building.BuildingType?.StringId, building.CurrentLevel, building.BuildingProgress);
+            sb.AppendFormat("BuildingsInProgress queue ({0}):\n", town.BuildingsInProgress.Count);
+            foreach (var building in town.BuildingsInProgress)
+                sb.AppendFormat("  {0} level={1}\n", building.BuildingType?.StringId, building.CurrentLevel);
+            return Succeeded(sb.ToString());
+
+        }
     }
 
     // coop.debug.town.list_workshops <townId>
@@ -296,18 +379,31 @@ public class TownDebugCommand
     /// Lists a town's Workshops (the synced collection-PROPERTY array) with each workshop's type and owner,
     /// so server and client screenshots can be compared to confirm the workshop collection still replicates.
     /// </summary>
-    [CommandLineArgumentFunction("list_workshops", "coop.debug.town")]
-    public static string ListWorkshops(List<string> args)
+    public sealed class ListWorkshopsCoopCommand : ICoopCommand
     {
-        if (args.Count != 1) return "Usage: coop.debug.town.list_workshops <townId>";
-        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
-        if (objectManager.TryGetObject(args[0], out Town town) == false) return $"ID: '{args[0]}' not found";
+        public string Prefix => "coop.debug.town";
 
-        StringBuilder sb = new();
-        sb.AppendFormat("Workshops for '{0}' ({1}):\n", town.Name, town.Workshops.Length);
-        foreach (var workshop in town.Workshops)
-            sb.AppendFormat("  {0} owner={1}\n", workshop.WorkshopType?.StringId, workshop.Owner?.Name);
-        return sb.ToString();
+        public string Name => "list_workshops";
+
+        public string Description => "Lists workshops for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("townId", "The town id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager");
+            if (objectManager.TryGetObject(args[0], out Town town) == false) return Failed($"ID: '{args[0]}' not found");
+
+            StringBuilder sb = new();
+            sb.AppendFormat("Workshops for '{0}' ({1}):\n", town.Name, town.Workshops.Length);
+            foreach (var workshop in town.Workshops)
+                sb.AppendFormat("  {0} owner={1}\n", workshop.WorkshopType?.StringId, workshop.Owner?.Name);
+            return Succeeded(sb.ToString());
+
+        }
     }
 
     // coop.debug.town.set_foodStocks
@@ -316,36 +412,47 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">first arg : townId ; second arg : stock value</param>
     /// <returns></returns>
-    [CommandLineArgumentFunction("set_foodStocks", "coop.debug.town")]
-    public static string SetFoodStocks(List<string> args)
+    public sealed class SetFoodStocksCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_food_stocks";
+
+        public string Description => "Sets food stocks for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_foodStocks <townId> <foodStocks> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("foodStocks", "The food stocks."),
+        };
 
-        string townId = args[0];
-        string foodStocksString = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"Town with ID: '{townId}' not found";
-        }
-        
-        Fief fief = town.Settlement.SettlementComponent as Fief;
 
-        if (float.TryParse(foodStocksString, out float foodStocks) == false)
-        {
-            return $"Argument2: {foodStocksString} is not a float.";
+            string townId = args[0];
+            string foodStocksString = args[1];
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"Town with ID: '{townId}' not found");
+            }
+
+            Fief fief = town.Settlement.SettlementComponent as Fief;
+
+            if (float.TryParse(foodStocksString, out float foodStocks) == false)
+            {
+                return Failed($"Argument2: {foodStocksString} is not a float.");
+            }
+
+            fief.FoodStocks = foodStocks;
+
+            return Succeeded($"Town food stocks has changed to: {fief.FoodStocks}");
+
         }
-
-        fief.FoodStocks = foodStocks;
-
-        return $"Town food stocks has changed to: {fief.FoodStocks}";
     }
 
     // coop.debug.town.set_governor town_comp_V1 lord_1_1
@@ -354,35 +461,46 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the heroID to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_governor", "coop.debug.town")]
-    public static string SetTownGovernor(List<string> args)
+    public sealed class SetTownGovernorCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_governor";
+
+        public string Description => "Sets governor for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_governor <townId> <heroId> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("heroId", "The hero id."),
+        };
 
-        string townId = args[0];
-        string heroId = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+
+            string townId = args[0];
+            string heroId = args[1];
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"Town with ID: '{townId}' not found");
+            }
+
+            if (objectManager.TryGetObject(heroId, out Hero hero) == false)
+            {
+                return Failed($"Hero with ID: '{heroId}' not found");
+            }
+
+            town.Governor = hero;
+
+            return Succeeded($"Town governor has changed to: {town.Governor?.Name} hero with ID: {town.Governor?.StringId}");
+
         }
-
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"Town with ID: '{townId}' not found";
-        }
-
-        if (objectManager.TryGetObject(heroId, out Hero hero) == false)
-        {
-            return $"Hero with ID: '{heroId}' not found";
-        }
-
-        town.Governor = hero;
-
-        return $"Town governor has changed to: {town.Governor?.Name} hero with ID: {town.Governor?.StringId}";
     }
 
     // coop.debug.town.set_last_captured_by town_comp_V1 clan_sturgia_2
@@ -391,35 +509,46 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the clanID to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_last_captured_by", "coop.debug.town")]
-    public static string SetTownLastCapturedBy(List<string> args)
+    public sealed class SetTownLastCapturedByCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_last_captured_by";
+
+        public string Description => "Sets last captured by for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_last_captured_by <townId> <clanId> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("clanId", "The clan id."),
+        };
 
-        string townId = args[0];
-        string clanId = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+
+            string townId = args[0];
+            string clanId = args[1];
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+
+            if (objectManager.TryGetObject(clanId, out Clan clan) == false)
+            {
+                return Failed($"{nameof(Clan)} with ID: '{clanId}' not found");
+            }
+
+            town.LastCapturedBy = clan;
+
+            return Succeeded($"{nameof(Town.LastCapturedBy)} has changed to: {town.LastCapturedBy.Name} clan with ID: {town.LastCapturedBy.StringId}");
+
         }
-
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
-        }
-
-        if (objectManager.TryGetObject(clanId, out Clan clan) == false)
-        {
-            return $"{nameof(Clan)} with ID: '{clanId}' not found";
-        }
-
-        town.LastCapturedBy = clan;
-
-        return $"{nameof(Town.LastCapturedBy)} has changed to: {town.LastCapturedBy.Name} clan with ID: {town.LastCapturedBy.StringId}";
     }
 
     // coop.debug.town.add_item_to_sold_items town_comp_V1 noble_horse 100
@@ -428,60 +557,72 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the itemID to add and a number to add.</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("add_item_to_sold_items", "coop.debug.town")]
-    public static string AddToTownSoldItems(List<string> args)
+    public sealed class AddToTownSoldItemsCoopCommand : ICoopCommand
     {
-        if (args.Count != 3)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "add_item_to_sold_items";
+
+        public string Description => "Adds item to sold items for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.add_item_to_sold_items <townId> <itemId> <numberOfItems>";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("itemId", "The item id."),
+            new ExpectedArgs("numberOfItems", "The number of items."),
+        };
 
-        string townId = args[0];
-        string itemId = args[1];
-        string count = args[2];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+
+            string townId = args[0];
+            string itemId = args[1];
+            string count = args[2];
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+
+            if (objectManager.TryGetObject(itemId, out ItemCategory item) == false)
+            {
+                return Failed($"{nameof(ItemCategory)} with ID: '{itemId}' not found");
+            }
+
+            if (int.TryParse(count, out int numberOfItems) == false)
+            {
+                return Failed($"Argument3: {count} is not an integer.");
+            }
+
+
+            List<Town.SellLog> newSoldItems = new List<Town.SellLog>(town._soldItems);
+            int idx = newSoldItems.FindIndex(log => log.Category == item);
+            if (idx != -1)
+            {
+                newSoldItems[idx] = new Town.SellLog(item, newSoldItems[idx].Number + numberOfItems);
+            }
+            else
+            {
+                newSoldItems.Add(new Town.SellLog(item, numberOfItems));
+            }
+            town.SetSoldItems(newSoldItems);
+
+            // Check if item was added
+            if (town.SoldItems.Count(soldItem => soldItem.Category == item) <= 0)
+            {
+                return Failed($"Unable to find {item} in {nameof(Town.SoldItems)}");
+            }
+
+            var newItem = town.SoldItems.First(soldItem => soldItem.Category == item);
+
+            return Succeeded($"Added {newItem.Number} number of {newItem.Category.StringId} to Town SoldItems");
+
         }
-
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
-        }
-
-        if (objectManager.TryGetObject(itemId, out ItemCategory item) == false)
-        {
-            return $"{nameof(ItemCategory)} with ID: '{itemId}' not found";
-        }
-
-        if (int.TryParse(count, out int numberOfItems) == false)
-        {
-            return $"Argument3: {count} is not an integer.";
-        }
-
-
-        List<Town.SellLog> newSoldItems = new List<Town.SellLog>(town._soldItems);
-        int idx = newSoldItems.FindIndex(log => log.Category == item);
-        if (idx != -1)
-        {
-            newSoldItems[idx] = new Town.SellLog(item, newSoldItems[idx].Number + numberOfItems);
-        }
-        else
-        {
-            newSoldItems.Add(new Town.SellLog(item, numberOfItems));
-        }
-        town.SetSoldItems(newSoldItems);
-
-        // Check if item was added
-        if (town.SoldItems.Count(soldItem => soldItem.Category == item) <= 0)
-        {
-            return $"Unable to find {item} in {nameof(Town.SoldItems)}";
-        }
-
-        var newItem = town.SoldItems.First(soldItem => soldItem.Category == item);
-
-        return $"Added {newItem.Number} number of {newItem.Category.StringId} to Town SoldItems";
     }
 
     // coop.debug.town.set_prosperity town_comp_V1 100
@@ -490,34 +631,45 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the prosperity to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_prosperity", "coop.debug.town")]
-    public static string SetTownProsperity(List<string> args)
+    public sealed class SetTownProsperityCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_prosperity";
+
+        public string Description => "Sets prosperity for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_prosperity <townId> <prosperity> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("prosperity", "The prosperity."),
+        };
 
-        string townId = args[0];
-        string prosperityValue = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
 
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
-        }
+            string townId = args[0];
+            string prosperityValue = args[1];
 
-        if (int.TryParse(prosperityValue, out int prosperity) == false)
-        {
-            return $"Argument2: {prosperityValue} is not an integer.";
-        }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
 
-        town.Prosperity = prosperity;
-        return $"Town Prosperity has changed to: {town.Prosperity}.";
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+
+            if (int.TryParse(prosperityValue, out int prosperity) == false)
+            {
+                return Failed($"Argument2: {prosperityValue} is not an integer.");
+            }
+
+            town.Prosperity = prosperity;
+            return Succeeded($"Town Prosperity has changed to: {town.Prosperity}.");
+
+        }
     }
 
     // coop.debug.town.set_loyalty town_comp_V1 100
@@ -526,34 +678,45 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the loyalty to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_loyalty", "coop.debug.town")]
-    public static string SetTownLoyalty(List<string> args)
+    public sealed class SetTownLoyaltyCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_loyalty";
+
+        public string Description => "Sets loyalty for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_loyalty <townId> <loyalty> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("loyalty", "The loyalty."),
+        };
 
-        string townId = args[0];
-        string loyaltyValue = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
 
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
-        }
+            string townId = args[0];
+            string loyaltyValue = args[1];
 
-        if (float.TryParse(loyaltyValue, out float loyalty) == false)
-        {
-            return $"Argument2: {loyaltyValue} is not a float.";
-        }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
 
-        town.Loyalty = loyalty;
-        return $"Town Loyalty has changed to: {town.Loyalty}.";
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+
+            if (float.TryParse(loyaltyValue, out float loyalty) == false)
+            {
+                return Failed($"Argument2: {loyaltyValue} is not a float.");
+            }
+
+            town.Loyalty = loyalty;
+            return Succeeded($"Town Loyalty has changed to: {town.Loyalty}.");
+
+        }
     }
 
     // coop.debug.town.set_security town_comp_V1 100
@@ -562,34 +725,45 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the security to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_security", "coop.debug.town")]
-    public static string SetTownSecurity(List<string> args)
+    public sealed class SetTownSecurityCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_security";
+
+        public string Description => "Sets security for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_loyalty <townId> <security> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("security", "The security."),
+        };
 
-        string townId = args[0];
-        string securityValue = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
 
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
-        }
+            string townId = args[0];
+            string securityValue = args[1];
 
-        if (float.TryParse(securityValue, out float security) == false)
-        {
-            return $"Argument2: {securityValue} is not a float.";
-        }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
 
-        town.Security = security;
-        return $"Town Security has changed to: {town.Security}.";
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+
+            if (float.TryParse(securityValue, out float security) == false)
+            {
+                return Failed($"Argument2: {securityValue} is not a float.");
+            }
+
+            town.Security = security;
+            return Succeeded($"Town Security has changed to: {town.Security}.");
+
+        }
     }
 
 
@@ -599,53 +773,77 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the rebellious state to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_in_rebellious_state", "coop.debug.town")]
-    public static string SetTownInRebelliousState(List<string> args)
+    public sealed class SetTownInRebelliousStateCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_in_rebellious_state";
+
+        public string Description => "Sets in rebellious state for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_in_rebellious_state <townId> <in_rebellious_state> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("inRebelliousState", "The in rebellious state."),
+        };
 
-        string townId = args[0];
-        string rebellionStateValue = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
 
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
-        }
+            string townId = args[0];
+            string rebellionStateValue = args[1];
 
-        if (bool.TryParse(rebellionStateValue, out bool inRebelliousState) == false)
-        {
-            return $"Argument2: {rebellionStateValue} is not a boolean.";
-        }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
 
-        RebellionsCampaignBehaviorPatches.PublishTownInRebelliousStateChanged(town, inRebelliousState);
-        return $"Town InRebelliousState has changed to: {town.InRebelliousState}.";
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+
+            if (bool.TryParse(rebellionStateValue, out bool inRebelliousState) == false)
+            {
+                return Failed($"Argument2: {rebellionStateValue} is not a boolean.");
+            }
+
+            RebellionsCampaignBehaviorPatches.PublishTownInRebelliousStateChanged(town, inRebelliousState);
+            return Succeeded($"Town InRebelliousState has changed to: {town.InRebelliousState}.");
+
+        }
     }
 
-    [CommandLineArgumentFunction("start_rebellion", "coop.debug.town")]
-    public static string StartRebellion(List<string> args)
+    public sealed class StartRebellionCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Run coop.debug.town.start_rebellion on the server.";
-        if (args.Count != 1) return "Usage: coop.debug.town.start_rebellion <townId>";
-        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
-        if (town.OwnerClan.IsRebelClan) return $"{town.Name} is already owned by a rebel clan.";
-        if (town.Settlement.Party.MapEvent != null) return $"{town.Name} is in a map event.";
-        if (town.Settlement.Party.SiegeEvent != null) return $"{town.Name} is under siege.";
+        public string Prefix => "coop.debug.town";
 
-        RebellionsCampaignBehavior behavior = Campaign.Current.GetCampaignBehavior<RebellionsCampaignBehavior>();
-        if (behavior == null) return "Unable to resolve RebellionsCampaignBehavior";
+        public string Name => "start_rebellion";
 
-        behavior.StartRebellionEvent(town.Settlement);
-        return $"Started the vanilla rebellion in {town.Name}. New owner: {town.OwnerClan.Name} (rebel={town.OwnerClan.IsRebelClan}).";
+        public string Description => "Starts rebellion for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("townId", "The town id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Run coop.debug.town.start_rebellion on the server.");
+            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager");
+            if (objectManager.TryGetObject(args[0], out Town town) == false)
+                return Failed($"{nameof(Town)} with ID: '{args[0]}' not found");
+            if (town.OwnerClan.IsRebelClan) return Failed($"{town.Name} is already owned by a rebel clan.");
+            if (town.Settlement.Party.MapEvent != null) return Failed($"{town.Name} is in a map event.");
+            if (town.Settlement.Party.SiegeEvent != null) return Failed($"{town.Name} is under siege.");
+
+            RebellionsCampaignBehavior behavior = Campaign.Current.GetCampaignBehavior<RebellionsCampaignBehavior>();
+            if (behavior == null) return Failed("Unable to resolve RebellionsCampaignBehavior");
+
+            behavior.StartRebellionEvent(town.Settlement);
+            return Succeeded($"Started the vanilla rebellion in {town.Name}. New owner: {town.OwnerClan.Name} (rebel={town.OwnerClan.IsRebelClan}).");
+
+        }
     }
 
     // coop.debug.town.set_garrison_auto_recruitment town_comp_V1 false
@@ -654,34 +852,45 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the GarrisonAutoRecruitmentIsEnabled property value to set</param>
     /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_garrison_auto_recruitment", "coop.debug.town")]
-    public static string SetTownGarrisonAutoRecruitmentIsEnabled(List<string> args)
+    public sealed class SetTownGarrisonAutoRecruitmentIsEnabledCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_garrison_auto_recruitment";
+
+        public string Description => "Sets garrison auto recruitment for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_garrison_auto_recruitment <townId> <garrison_auto_recruitment_enabled> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("enabled", "The enabled."),
+        };
 
-        string townId = args[0];
-        string garrisonRecruitmentValue = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
 
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
-        }
+            string townId = args[0];
+            string garrisonRecruitmentValue = args[1];
 
-        if (bool.TryParse(garrisonRecruitmentValue, out bool garrisonAutoRecruitmentIsEnabled) == false)
-        {
-            return $"Argument2: {garrisonRecruitmentValue} is not a boolean.";
-        }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
 
-        UpdateClanSettlementAutoRecruitmentPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, garrisonAutoRecruitmentIsEnabled);
-        return $"Town GarrisonAutoRecruitmentIsEnabled has changed to: {town.GarrisonAutoRecruitmentIsEnabled}.";
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+
+            if (bool.TryParse(garrisonRecruitmentValue, out bool garrisonAutoRecruitmentIsEnabled) == false)
+            {
+                return Failed($"Argument2: {garrisonRecruitmentValue} is not a boolean.");
+            }
+
+            UpdateClanSettlementAutoRecruitmentPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, garrisonAutoRecruitmentIsEnabled);
+            return Succeeded($"Town GarrisonAutoRecruitmentIsEnabled has changed to: {town.GarrisonAutoRecruitmentIsEnabled}.");
+
+        }
     }
 
     // coop.debug.town.set_trade_tax_acc town_comp_V1 100
@@ -690,34 +899,45 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">the town and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("set_trade_tax_acc", "coop.debug.town")]
-    public static string SetTradeTaxAccumulated(List<string> args)
+    public sealed class SetTradeTaxAccumulatedCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.town";
+
+        public string Name => "set_trade_tax_acc";
+
+        public string Description => "Sets trade tax acc for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.town.set_trade_tax_acc <townId> <0.0> ";
-        }
+            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("tradeTax", "The trade tax."),
+        };
 
-        string townId = args[0];
-        string tradeTaxAccumulatedValue = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
 
-        if (objectManager.TryGetObject(townId, out Town town) == false)
-        {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
-        }
+            string townId = args[0];
+            string tradeTaxAccumulatedValue = args[1];
 
-        if (int.TryParse(tradeTaxAccumulatedValue, out int tradeTaxAccumulated) == false)
-        {
-            return $"Argument2: {tradeTaxAccumulatedValue} is not an integer.";
-        }
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
 
-        town.TradeTaxAccumulated = tradeTaxAccumulated;
-        return $"Town TradeTaxAccumulated has changed to: {town.TradeTaxAccumulated}.";
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+
+            if (int.TryParse(tradeTaxAccumulatedValue, out int tradeTaxAccumulated) == false)
+            {
+                return Failed($"Argument2: {tradeTaxAccumulatedValue} is not an integer.");
+            }
+
+            town.TradeTaxAccumulated = tradeTaxAccumulated;
+            return Succeeded($"Town TradeTaxAccumulated has changed to: {town.TradeTaxAccumulated}.");
+
+        }
     }
 
     // coop.debug.town.set_trade_tax_acc town_comp_V1 100
@@ -726,25 +946,35 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">the town and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("change_current_building", "coop.debug.town")]
-    public static string ChangeCurrentBuilding(List<string> args)
+    public sealed class ChangeCurrentBuildingCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.town.change_current_building <townId>";
-        }
-        string townId = args[0];
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
+        public string Prefix => "coop.debug.town";
 
-        if (objectManager.TryGetObject(townId, out Town town) == false)
+        public string Name => "change_current_building";
+
+        public string Description => "Changes current building for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
+            new ExpectedArgs("townId", "The town id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string townId = args[0];
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+            //BuildingHelper.ChangeCurrentBuilding(town.Buildings.Last().BuildingType, town);
+            return Succeeded("success");
+
         }
-        //BuildingHelper.ChangeCurrentBuilding(town.Buildings.Last().BuildingType, town);
-        return "success";
     }
 
     // coop.debug.town.set_trade_tax_acc town_comp_V1 100
@@ -753,57 +983,80 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">the town and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
-    [CommandLineArgumentFunction("change_current_building_queue", "coop.debug.town")]
-    public static string ChangeCurrentBuildingQueue(List<string> args)
+    public sealed class ChangeCurrentBuildingQueueCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.town.change_current_building_queue <townId>";
-        }
-        string townId = args[0];
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
+        public string Prefix => "coop.debug.town";
 
-        if (objectManager.TryGetObject(townId, out Town town) == false)
+        public string Name => "change_current_building_queue";
+
+        public string Description => "Changes current building queue for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"{nameof(Town)} with ID: '{townId}' not found";
+            new ExpectedArgs("townId", "The town id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string townId = args[0];
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(townId, out Town town) == false)
+            {
+                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+            }
+            BuildingHelper.ChangeCurrentBuildingQueue(town.Buildings, town);
+            return Succeeded("success");
+
         }
-        BuildingHelper.ChangeCurrentBuildingQueue(town.Buildings, town);
-        return "success";
     }
 
     /// <summary>
     /// View town management data of a specified town
     /// </summary>
-    [CommandLineArgumentFunction("managementdata", "coop.debug.town")]
-    public static string ViewManagementData(List<string> strings)
+    public sealed class ViewManagementDataCoopCommand : ICoopCommand
     {
-        if (strings.Count == 0) return "Town name argument required.";
+        public string Prefix => "coop.debug.town";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var town in Town.AllTowns)
+        public string Name => "management_data";
+
+        public string Description => "Runs data for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (town.Name.ToString() == strings[0])
+            new ExpectedArgs("townName", "The exact town name; quote values containing spaces."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var town in Town.AllTowns)
             {
-                stringBuilder.AppendLine(town.Name.ToString() + ":");
-                stringBuilder.AppendLine("Reserves: " + town.BoostBuildingProcess.ToString());
-                stringBuilder.AppendLine("Governor Name: " + town.Governor?.Name?.ToString());
-                stringBuilder.AppendLine("Current default building: " + town.CurrentDefaultBuilding?.Name?.ToString());
-                stringBuilder.AppendLine("Current building queue:");
-                foreach (var building in town.BuildingsInProgress)
+                if (town.Name.ToString() == strings[0])
                 {
-                    stringBuilder.AppendLine(building.Name.ToString());
+                    stringBuilder.AppendLine(town.Name.ToString() + ":");
+                    stringBuilder.AppendLine("Reserves: " + town.BoostBuildingProcess.ToString());
+                    stringBuilder.AppendLine("Governor Name: " + town.Governor?.Name?.ToString());
+                    stringBuilder.AppendLine("Current default building: " + town.CurrentDefaultBuilding?.Name?.ToString());
+                    stringBuilder.AppendLine("Current building queue:");
+                    foreach (var building in town.BuildingsInProgress)
+                    {
+                        stringBuilder.AppendLine(building.Name.ToString());
+                    }
                 }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Town not found.");
+
         }
-        return "Town not found.";
     }
 }

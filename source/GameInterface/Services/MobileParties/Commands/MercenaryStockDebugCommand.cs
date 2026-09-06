@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using Common;
 using Common.Network;
 using GameInterface.Services.MobileParties.Handlers;
@@ -13,106 +14,116 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
 namespace GameInterface.Services.MobileParties.Commands;
 
 internal class MercenaryStockDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private const string RefreshCommand = "coop.debug.town.refresh_mercenary_stocks";
     private const string RequestCommand = "coop.debug.town.request_mercenary_stock";
-    private const string RefreshUsage = "Usage: coop.debug.town.refresh_mercenary_stocks <townName|ALL>";
-    private const string RequestUsage = "Usage: coop.debug.town.request_mercenary_stock <townName>";
     private const string AllTowns = "ALL";
 
     private static readonly MethodInfo UpdateCurrentMercenaryTroopAndCount =
         AccessTools.Method(typeof(RecruitmentCampaignBehavior), "UpdateCurrentMercenaryTroopAndCount", new[] { typeof(Town), typeof(bool) });
 
-    [CommandLineArgumentFunction("refresh_mercenary_stocks", "coop.debug.town")]
-    public static string RefreshMercenaryStocks(List<string> args)
+    public sealed class RefreshMercenaryStocksCoopCommand : ICoopCommand
     {
-        var context = new CommandContext(RefreshCommand, RefreshUsage, args);
-        if (!context.RequireServer(out var error)) return error;
-        if (!TryGetTownName(context, out var townName, out error)) return error;
+        public string Prefix => "coop.debug.town";
 
-        var behavior = Campaign.Current?.GetCampaignBehavior<RecruitmentCampaignBehavior>();
-        if (behavior == null)
+        public string Name => "refresh_mercenary_stocks";
+
+        public string Description => "Refreshes mercenary stocks for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Unable to find {nameof(RecruitmentCampaignBehavior)}.";
-        }
+            new ExpectedArgs("townName", "The exact town name; quote values containing spaces."),
+        };
 
-        if (UpdateCurrentMercenaryTroopAndCount == null)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to find RecruitmentCampaignBehavior.UpdateCurrentMercenaryTroopAndCount.";
-        }
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
-        var allTowns = string.Equals(townName, AllTowns, StringComparison.OrdinalIgnoreCase);
-        var towns = allTowns ? GetTowns().ToList() : new List<Town>();
-        if (!allTowns)
-        {
-            if (!TryGetTownByName(townName, out var town, out error)) return error;
-
-            towns.Add(town);
-        }
-
-        var refreshed = 0;
-        GameThread.RunSafe(() =>
-        {
-            foreach (var town in towns)
+            string townName = args[0];
+            var behavior = Campaign.Current?.GetCampaignBehavior<RecruitmentCampaignBehavior>();
+            if (behavior == null)
             {
-                UpdateCurrentMercenaryTroopAndCount.Invoke(behavior, new object[] { town, true });
-                RecruitmentCampaignBehaviorPatch.PublishMercenaryStock(behavior, town);
-                refreshed++;
+                return Failed($"Unable to find {nameof(RecruitmentCampaignBehavior)}.");
             }
-        }, blocking: true, context: RefreshCommand);
 
-        if (allTowns) return $"Refreshed mercenary stocks for {refreshed} towns.";
+            if (UpdateCurrentMercenaryTroopAndCount == null)
+            {
+                return Failed("Unable to find RecruitmentCampaignBehavior.UpdateCurrentMercenaryTroopAndCount.");
+            }
 
-        return $"Refreshed mercenary stock for {towns[0].Name}.";
+            var allTowns = string.Equals(townName, AllTowns, StringComparison.OrdinalIgnoreCase);
+            var towns = allTowns ? GetTowns().ToList() : new List<Town>();
+            if (!allTowns)
+            {
+                if (!TryGetTownByName(townName, out var town, out string error)) return Failed(error);
+
+                towns.Add(town);
+            }
+
+            var refreshed = 0;
+            GameThread.RunSafe(() =>
+            {
+                foreach (var town in towns)
+                {
+                    UpdateCurrentMercenaryTroopAndCount.Invoke(behavior, new object[] { town, true });
+                    RecruitmentCampaignBehaviorPatch.PublishMercenaryStock(behavior, town);
+                    refreshed++;
+                }
+            }, blocking: true, context: RefreshCommand);
+
+            if (allTowns) return Succeeded($"Refreshed mercenary stocks for {refreshed} towns.");
+
+            return Succeeded($"Refreshed mercenary stock for {towns[0].Name}.");
+
+        }
     }
 
-    [CommandLineArgumentFunction("request_mercenary_stock", "coop.debug.town")]
-    public static string RequestMercenaryStock(List<string> args)
+    public sealed class RequestMercenaryStockCoopCommand : ICoopCommand
     {
-        var context = new CommandContext(RequestCommand, RequestUsage, args);
-        if (!context.RequireServer(out var error)) return error;
-        if (!TryGetTownName(context, out var townName, out error)) return error;
+        public string Prefix => "coop.debug.town";
 
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return error;
-        if (!TryGetTownByName(townName, out var town, out error)) return error;
+        public string Name => "request_mercenary_stock";
 
-        if (!objectManager.TryGetIdWithLogging(town, out var resolvedTownId))
+        public string Description => "Requests mercenary stock for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Unable to resolve network id for {nameof(Town)} '{townName}'.";
-        }
+            new ExpectedArgs("townName", "The exact town name; quote values containing spaces."),
+        };
 
-        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Unable to get {nameof(INetwork)}.";
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            string townName = args[0];
+            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out string error)) return Failed(error);
+            if (!TryGetTownByName(townName, out var town, out error)) return Failed(error);
+
+            if (!objectManager.TryGetIdWithLogging(town, out var resolvedTownId))
+            {
+                return Failed($"Unable to resolve network id for {nameof(Town)} '{townName}'.");
+            }
+
+            if (!ContainerProvider.TryResolve<INetwork>(out var network))
+            {
+                return Failed($"Unable to get {nameof(INetwork)}.");
+            }
+
+            network.SendAll(new NetworkRequestMercenaryStockAudit(resolvedTownId));
+
+            var serverStock = FormatServerStock(town, objectManager);
+            return Succeeded($"Requested mercenary stock from all clients for {town.Name} ({resolvedTownId}). Server shows {serverStock}. Check the server log for client responses.");
+
         }
-
-        network.SendAll(new NetworkRequestMercenaryStockAudit(resolvedTownId));
-
-        var serverStock = FormatServerStock(town, objectManager);
-        return $"Requested mercenary stock from all clients for {town.Name} ({resolvedTownId}). Server shows {serverStock}. Check the server log for client responses.";
-    }
-
-    private static bool TryGetTownName(CommandContext context, out string townName, out string error)
-    {
-        townName = null;
-        error = null;
-
-        if (context.Args == null || context.Args.Count == 0)
-        {
-            error = context.Usage;
-            return false;
-        }
-
-        townName = string.Join(" ", context.Args);
-        if (!string.IsNullOrWhiteSpace(townName)) return true;
-
-        error = $"Missing required argument: townName.\n\n{context.Usage}";
-        return false;
     }
 
     private static string FormatServerStock(Town town, IObjectManager objectManager)

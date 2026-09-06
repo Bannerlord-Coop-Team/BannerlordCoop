@@ -1,4 +1,6 @@
-﻿using Common.Messaging;
+﻿using System;
+using Common.Commands;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
@@ -16,6 +18,12 @@ namespace GameInterface.Services.UI.Commands;
 /// </summary>
 public class SteamDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     [CommandLineArgumentFunction("status", "coop.debug.steam")]
     public static string Status(List<string> args)
     {
@@ -32,36 +40,57 @@ public class SteamDebugCommand
         return $"Steam integration active; advertising={advertiser.IsAdvertising}";
     }
 
-    [CommandLineArgumentFunction("host_lobby", "coop.debug.steam")]
-    public static string HostLobby(List<string> args)
+    public sealed class SteamHostLobbyCoopCommand : ICoopCommand
     {
-        if (!SessionDiscovery.SteamAvailable) return "Steam integration inactive";
-        if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return "No session advertiser; join a session first";
-        if (!ContainerProvider.TryResolve<ISessionJoinInfoSource>(out var joinInfoSource)) return "No join info source; join a session first";
-        if (!ContainerProvider.TryResolve<INetworkConfig>(out var networkConfig)) return "No network config; join a session first";
-        if (!ContainerProvider.TryResolve<ISessionTunnelHost>(out var tunnelHost)) return "No session tunnel host; join a session first";
+        public string Prefix => "coop.debug.steam";
 
-        // Only the host's own client (connected over loopback) may advertise the session; a
-        // tunneled joiner's loopback address is its own join pump, not a local server.
-        if (networkConfig.IsTunneled || !TunnelAdvertisement.IsLoopbackAddress(networkConfig.Address))
-            return "Run coop.debug.steam.host_lobby on the host's own client (connected to localhost)";
+        public string Name => "host_lobby";
 
-        var info = joinInfoSource.Get();
-        TunnelAdvertisement.StartAndStamp(tunnelHost, networkConfig, info);
+        public string Description => "Runs the host lobby debug operation.";
 
-        advertiser.Advertise(info);
-        return $"Advertising session (address='{info.Address}', port={info.Port}, version={info.Version})";
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!SessionDiscovery.SteamAvailable) return Failed("Steam integration inactive");
+            if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return Failed("No session advertiser; join a session first");
+            if (!ContainerProvider.TryResolve<ISessionJoinInfoSource>(out var joinInfoSource)) return Failed("No join info source; join a session first");
+            if (!ContainerProvider.TryResolve<INetworkConfig>(out var networkConfig)) return Failed("No network config; join a session first");
+            if (!ContainerProvider.TryResolve<ISessionTunnelHost>(out var tunnelHost)) return Failed("No session tunnel host; join a session first");
+
+            // Only the host's own client (connected over loopback) may advertise the session; a
+            // tunneled joiner's loopback address is its own join pump, not a local server.
+            if (networkConfig.IsTunneled || !TunnelAdvertisement.IsLoopbackAddress(networkConfig.Address))
+                return Failed("Run coop.debug.steam.host_lobby on the host's own client (connected to localhost)");
+
+            var info = joinInfoSource.Get();
+            TunnelAdvertisement.StartAndStamp(tunnelHost, networkConfig, info);
+
+            advertiser.Advertise(info);
+            return Succeeded($"Advertising session (address='{info.Address}', port={info.Port}, version={info.Version})");
+        }
     }
 
-    [CommandLineArgumentFunction("invite", "coop.debug.steam")]
-    public static string Invite(List<string> args)
+    public sealed class SteamInviteCoopCommand : ICoopCommand
     {
-        if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return "No session advertiser; join a session first";
-        if (!advertiser.IsAdvertising) return "Not advertising; run coop.debug.steam.host_lobby first or enable Steam invites when connecting";
+        public string Prefix => "coop.debug.steam";
 
-        return advertiser.InviteFriends()
-            ? "Invite dialog opened"
-            : SessionInviteText.OverlayUnavailableHint;
+        public string Name => "invite";
+
+        public string Description => "Runs the invite debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return Failed("No session advertiser; join a session first");
+            if (!advertiser.IsAdvertising) return Failed("Not advertising; run coop.debug.steam.host_lobby first or enable Steam invites when connecting");
+
+            if (!advertiser.InviteFriends())
+                return Failed(SessionInviteText.OverlayUnavailableHint);
+
+            return Succeeded("Invite dialog opened");
+        }
     }
 
     [CommandLineArgumentFunction("join", "coop.debug.steam")]

@@ -1,4 +1,6 @@
-﻿using Common;
+﻿using System;
+using Common.Commands;
+using Common;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -9,40 +11,67 @@ namespace GameInterface.Services.Save.Commands
 {
     public class SaveDebugCommand
     {
+        private static CoopCommandResult Succeeded(string output) =>
+            new CoopCommandResult(true, output);
+
+        private static CoopCommandResult Failed(string output) =>
+            new CoopCommandResult(false, output, "command_failed");
+
         private static readonly Regex SafeSaveName = new("^[A-Za-z0-9_-]{1,64}$");
 
 #if DEBUG
         private static int evidenceHoldMilliseconds;
 #endif
 
-        [CommandLineArgumentFunction("save_as", "coop.debug.save")]
-        public static string SaveAs(List<string> args)
+        public sealed class SaveSaveAsCoopCommand : ICoopCommand
         {
-            if (!ModInformation.IsServer)
-                return "Command can only be run on the server.";
-            if (args.Count != 1 || !SafeSaveName.IsMatch(args[0]))
-                return "Usage: coop.debug.save.save_as <1-64 letters, digits, underscores, or hyphens>";
+            public string Prefix => "coop.debug.save";
 
-            SaveHandler saveHandler = Campaign.Current?.SaveHandler;
-            if (saveHandler == null)
-                return "No active campaign / SaveHandler.";
-            if (saveHandler.IsSaving)
-                return "A save is already queued.";
+            public string Name => "save_as";
 
-            saveHandler.SaveAs(args[0]);
-            return $"Enqueued save as {args[0]} on the server.";
+            public string Description => "Runs the save as debug operation.";
+
+            public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+            {
+                new ExpectedArgs("save_name", "A save name using 1 through 64 letters, digits, underscores, or hyphens.", isRequired: true),
+            };
+
+            public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+            {
+                if (!ModInformation.IsServer)
+                    return Failed("Command can only be run on the server.");
+                if (!SafeSaveName.IsMatch(args[0]))
+                    return Failed("Save name must contain 1 through 64 letters, digits, underscores, or hyphens.");
+
+                SaveHandler saveHandler = Campaign.Current?.SaveHandler;
+                if (saveHandler == null)
+                    return Failed("No active campaign / SaveHandler.");
+                if (saveHandler.IsSaving)
+                    return Failed("A save is already queued.");
+
+                saveHandler.SaveAs(args[0]);
+                return Succeeded($"Enqueued save as {args[0]} on the server.");
+            }
         }
 
-        [CommandLineArgumentFunction("state", "coop.debug.save")]
-        public static string State(List<string> args)
+        public sealed class SaveStateCoopCommand : ICoopCommand
         {
-            if (args.Count != 0)
-                return "Usage: coop.debug.save.state";
+            public string Prefix => "coop.debug.save";
 
-            SaveHandler saveHandler = Campaign.Current?.SaveHandler;
-            return saveHandler == null
-                ? "saveHandler=unavailable"
-                : $"saveHandler=ready|isSaving={saveHandler.IsSaving}";
+            public string Name => "state";
+
+            public string Description => "Reports state.";
+
+            public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+            public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+            {
+
+                SaveHandler saveHandler = Campaign.Current?.SaveHandler;
+                return Succeeded(saveHandler == null
+                    ? "saveHandler=unavailable"
+                    : $"saveHandler=ready|isSaving={saveHandler.IsSaving}");
+            }
         }
 
         /// <summary>
@@ -50,57 +79,69 @@ namespace GameInterface.Services.Save.Commands
         /// client save block can be exercised on demand. On a client SetSaveArgs is blocked, so
         /// nothing is enqueued and no file is written; on the host a save file appears.
         /// </summary>
-        [CommandLineArgumentFunction("force_autosave", "coop.debug.save")]
-        public static string ForceAutoSave(List<string> args)
+        public sealed class SaveForceAutosaveCoopCommand : ICoopCommand
         {
-            if (Campaign.Current?.SaveHandler == null) return "No active campaign / SaveHandler.";
+            public string Prefix => "coop.debug.save";
 
-            int holdMilliseconds = 0;
-            if (args.Count > 1 ||
-                (args.Count == 1 &&
-                 (int.TryParse(args[0], out holdMilliseconds) == false ||
-                  holdMilliseconds < 1 ||
-                  holdMilliseconds > 5000)))
+            public string Name => "force_autosave";
+
+            public string Description => "Runs the force autosave debug operation.";
+
+            public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                return "Usage: coop.debug.save.force_autosave [evidence hold milliseconds from 1 to 5000]";
-            }
+                new ExpectedArgs("evidence_hold_milliseconds", "The optional evidence hold from 1 through 5000 milliseconds.", isRequired: false),
+            };
 
-#if DEBUG
-            if (args.Count == 1)
+            public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
             {
-                if (ModInformation.IsClient)
-                {
-                    return "The evidence hold is server-only.";
-                }
+                            if (Campaign.Current?.SaveHandler == null) return Failed("No active campaign / SaveHandler.");
 
-                if (Campaign.Current.SaveHandler.IsSaving)
-                {
-                    return "Cannot add an evidence hold while a save is already queued.";
-                }
+                            int holdMilliseconds = 0;
+                            if (args.Count == 1 &&
+                                (int.TryParse(args[0], out holdMilliseconds) == false ||
+                                 holdMilliseconds < 1 ||
+                                 holdMilliseconds > 5000))
+                            {
+                                return Failed("Evidence hold must be an integer from 1 through 5000 milliseconds.");
+                            }
+
+                #if DEBUG
+                            if (args.Count == 1)
+                            {
+                                if (ModInformation.IsClient)
+                                {
+                                    return Failed("The evidence hold is server-only.");
+                                }
+
+                                if (Campaign.Current.SaveHandler.IsSaving)
+                                {
+                                    return Failed("Cannot add an evidence hold while a save is already queued.");
+                                }
+                            }
+                #else
+                            if (args.Count == 1)
+                            {
+                                return Failed("The evidence hold is only available in DEBUG builds.");
+                            }
+                #endif
+
+                            Campaign.Current.SaveHandler.ForceAutoSave();
+
+                #if DEBUG
+                            if (args.Count == 1)
+                            {
+                                if (Campaign.Current.SaveHandler.IsSaving == false)
+                                {
+                                    return Failed("Autosaves are disabled; no save was enqueued.");
+                                }
+
+                                Interlocked.Exchange(ref evidenceHoldMilliseconds, holdMilliseconds);
+                            }
+                #endif
+
+                            string side = ModInformation.IsClient ? "client (save should be BLOCKED)" : "host (save should succeed)";
+                            return Succeeded($"Enqueued autosave on {side}. Check the Saves folder.");
             }
-#else
-            if (args.Count == 1)
-            {
-                return "The evidence hold is only available in DEBUG builds.";
-            }
-#endif
-
-            Campaign.Current.SaveHandler.ForceAutoSave();
-
-#if DEBUG
-            if (args.Count == 1)
-            {
-                if (Campaign.Current.SaveHandler.IsSaving == false)
-                {
-                    return "Autosaves are disabled; no save was enqueued.";
-                }
-
-                Interlocked.Exchange(ref evidenceHoldMilliseconds, holdMilliseconds);
-            }
-#endif
-
-            string side = ModInformation.IsClient ? "client (save should be BLOCKED)" : "host (save should succeed)";
-            return $"Enqueued autosave on {side}. Check the Saves folder.";
         }
 
         internal static void HoldForEvidenceIfRequested()

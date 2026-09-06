@@ -21,7 +21,10 @@ public class CoopCommandLineRegistrarTests
             Mock.Of<ILogger>());
         var argsFactory = new CoopCommandArgsFactory();
 
-        using (var registrar = new CoopCommandLineRegistrar(registry, argsFactory))
+        using (var registrar = new CoopCommandLineRegistrar(
+                   registry,
+                   argsFactory,
+                   Mock.Of<IRglCommandLineRegistry>()))
         {
             string output = CommandLineFunctionality.CallFunction(
                 FullName,
@@ -37,14 +40,35 @@ public class CoopCommandLineRegistrarTests
     }
 
     [Fact]
+    public void Registration_AdvertisesCommandToRglCommandLine()
+    {
+        var registry = new CoopCommandRegistry(
+            new[] { new CaptureCommand() },
+            Mock.Of<ILogger>());
+        var argsFactory = new CoopCommandArgsFactory();
+        var rglCommandLineRegistry = new Mock<IRglCommandLineRegistry>();
+
+        using (var registrar = new CoopCommandLineRegistrar(
+                   registry,
+                   argsFactory,
+                   rglCommandLineRegistry.Object))
+        {
+            rglCommandLineRegistry.Verify(
+                commandLineRegistry => commandLineRegistry.RegisterCommand(FullName),
+                Times.Once);
+        }
+    }
+
+    [Fact]
     public void Registration_WhenFrameworkRegistrationAlreadyExists_ReplacesItForNewLifetime()
     {
         var registry = new CoopCommandRegistry(
             new[] { new CaptureCommand() },
             Mock.Of<ILogger>());
         var argsFactory = new CoopCommandArgsFactory();
-        var first = new CoopCommandLineRegistrar(registry, argsFactory);
-        var second = new CoopCommandLineRegistrar(registry, argsFactory);
+        IRglCommandLineRegistry rglCommandLineRegistry = Mock.Of<IRglCommandLineRegistry>();
+        var first = new CoopCommandLineRegistrar(registry, argsFactory, rglCommandLineRegistry);
+        var second = new CoopCommandLineRegistrar(registry, argsFactory, rglCommandLineRegistry);
 
         try
         {
@@ -118,9 +142,10 @@ public class CoopCommandLineRegistrarTests
         var thirdRegistry = new CoopCommandRegistry(
             new[] { new CaptureCommand() },
             Mock.Of<ILogger>());
-        var firstRegistrar = new CoopCommandLineRegistrar(firstRegistry, argsFactory);
-        var secondRegistrar = new CoopCommandLineRegistrar(secondRegistry, argsFactory);
-        var thirdRegistrar = new CoopCommandLineRegistrar(thirdRegistry, argsFactory);
+        IRglCommandLineRegistry rglCommandLineRegistry = Mock.Of<IRglCommandLineRegistry>();
+        var firstRegistrar = new CoopCommandLineRegistrar(firstRegistry, argsFactory, rglCommandLineRegistry);
+        var secondRegistrar = new CoopCommandLineRegistrar(secondRegistry, argsFactory, rglCommandLineRegistry);
+        var thirdRegistrar = new CoopCommandLineRegistrar(thirdRegistry, argsFactory, rglCommandLineRegistry);
 
         var firstRegistrarReference = new WeakReference(firstRegistrar);
         var firstRegistryReference = new WeakReference(firstRegistry);

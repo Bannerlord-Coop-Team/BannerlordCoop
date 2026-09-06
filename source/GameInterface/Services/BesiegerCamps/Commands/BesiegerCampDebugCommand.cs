@@ -1,16 +1,21 @@
-﻿using Autofac;
+﻿using Common.Commands;
+using Autofac;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
 namespace GameInterface.Services.Villages.Commands;
 
 public class BesiegerCampDebugCommand
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     /// <summary>
     /// Attempts to get the ObjectManager
     /// </summary>
@@ -30,35 +35,46 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">first arg : besiegerCampId ; second arg : value</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("set_number_of_troops_killed_on_side", "coop.debug.besiegercamp")]
-    public static string SetBesiegerCampNumberOfTroopsKilledOnSide(List<string> args)
+    public sealed class SetBesiegerCampNumberOfTroopsKilledOnSideCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.besiegercamp";
+
+        public string Name => "set_number_of_troops_killed_on_side";
+
+        public string Description => "Sets number of troops killed on side for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.besiegercamp.set_number_of_troops_killed_on_side <besiegerCampId> <value> ";
-        }
+            new ExpectedArgs("besiegerCampId", "The besieger camp id."),
+            new ExpectedArgs("value", "The value."),
+        };
 
-        string besiegerCampId = args[0];
-        string troopsValueString = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+
+            string besiegerCampId = args[0];
+            string troopsValueString = args[1];
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp besiegerCamp) == false)
+            {
+                return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
+            }
+
+            if (int.TryParse(troopsValueString, out int troopsValue) == false)
+            {
+                return Failed($"Argument2: {troopsValueString} is not a int.");
+            }
+
+            besiegerCamp.NumberOfTroopsKilledOnSide = troopsValue;
+
+            return Succeeded($"BesiegerCamp NumberOfTroopsKilledOnSide has changed to: {besiegerCamp.NumberOfTroopsKilledOnSide}");
+
         }
-
-        if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp besiegerCamp) == false)
-        {
-            return $"BesiegerCamp with ID: '{besiegerCampId}' not found";
-        }
-
-        if (int.TryParse(troopsValueString, out int troopsValue) == false)
-        {
-            return $"Argument2: {troopsValueString} is not a int.";
-        }
-
-        besiegerCamp.NumberOfTroopsKilledOnSide = troopsValue;
-
-        return $"BesiegerCamp NumberOfTroopsKilledOnSide has changed to: {besiegerCamp.NumberOfTroopsKilledOnSide}";
     }
 
     // coop.debug.besiegercamp.set_progress
@@ -67,35 +83,46 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">first arg : besiegerCampId ; second arg : value</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("coop.debug.besiegercamp.set_progress", "coop.debug.besiegercamp")]
-    public static string SetBesiegerCampPreparationsProgress(List<string> args)
+    public sealed class SetBesiegerCampPreparationsProgressCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.besiegercamp";
+
+        public string Name => "set_progress";
+
+        public string Description => "Sets progress for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.besiegercamp.set_progress <besiegerCampId> <progress> ";
-        }
+            new ExpectedArgs("besiegerCampId", "The besieger camp id."),
+            new ExpectedArgs("progress", "The progress."),
+        };
 
-        string besiegerCampId = args[0];
-        string percentageValueString = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+
+            string besiegerCampId = args[0];
+            string percentageValueString = args[1];
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp besiegerCamp) == false)
+            {
+                return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
+            }
+
+            if (float.TryParse(percentageValueString, out float progressPercentage) == false)
+            {
+                return Failed($"Argument2: {percentageValueString} is not a int.");
+            }
+
+            besiegerCamp.SiegeEngines.SiegePreparations.SetProgress(progressPercentage);
+
+            return Succeeded($"BesiegerCamp preparations progress has changed to: {besiegerCamp.SiegeEngines.SiegePreparations.Progress}");
+
         }
-
-        if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp besiegerCamp) == false)
-        {
-            return $"BesiegerCamp with ID: '{besiegerCampId}' not found";
-        }
-
-        if (float.TryParse(percentageValueString, out float progressPercentage) == false)
-        {
-            return $"Argument2: {percentageValueString} is not a int.";
-        }
-
-        besiegerCamp.SiegeEngines.SiegePreparations.SetProgress(progressPercentage);
-
-        return $"BesiegerCamp preparations progress has changed to: {besiegerCamp.SiegeEngines.SiegePreparations.Progress}";
     }
 
     // coop.debug.besiegercamp.set_siege_strategy
@@ -104,41 +131,52 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">first arg: besiegerCampId; second arg: strategyId</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("set_siege_strategy", "coop.debug.besiegercamp")]
-    public static string SetBesiegerCampSiegeStrategy(List<string> args)
+    public sealed class SetBesiegerCampSiegeStrategyCoopCommand : ICoopCommand
     {
-        string getPossibleStragegyIds() => string.Join(Environment.NewLine, SiegeStrategy.All.Select(x => x.StringId));
-        string idTipMsg = $"{Environment.NewLine}SiegeStrategy Id must be one of the following:{getPossibleStragegyIds()}";
+        public string Prefix => "coop.debug.besiegercamp";
 
-        if (args.Count != 2)
+        public string Name => "set_siege_strategy";
+
+        public string Description => "Sets siege strategy for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.besiegercamp.set_siege_strategy <besiegerCampId> <strategyId>" + idTipMsg;
-        }
+            new ExpectedArgs("besiegerCampId", "The besieger camp id."),
+            new ExpectedArgs("strategyId", "The strategy id."),
+        };
 
-        string besiegerCampId = args[0];
-        string strategyId = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+            string getPossibleStragegyIds() => string.Join(Environment.NewLine, SiegeStrategy.All.Select(x => x.StringId));
+            string idTipMsg = $"{Environment.NewLine}SiegeStrategy Id must be one of the following:{getPossibleStragegyIds()}";
+
+
+            string besiegerCampId = args[0];
+            string strategyId = args[1];
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp) == false)
+            {
+                return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
+            }
+
+            // Attempt to create or retrieve the SiegeStrategy based on the strategyId
+            SiegeStrategy siegeStrategy = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, strategyId, StringComparison.OrdinalIgnoreCase));
+            if (siegeStrategy == null)
+            {
+                return Failed($"Invalid SiegeStrategy ID :'{strategyId}'{idTipMsg}");
+            }
+
+            // Assign the strategy to the besieger camp
+            besiegerCamp.SiegeStrategy = siegeStrategy;
+
+            return Succeeded($"SiegeStrategy for BesiegerCamp {besiegerCampId} has been set to: {siegeStrategy.StringId}");
+
         }
-
-        if (objectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp) == false)
-        {
-            return $"BesiegerCamp with ID: '{besiegerCampId}' not found";
-        }
-
-        // Attempt to create or retrieve the SiegeStrategy based on the strategyId
-        SiegeStrategy siegeStrategy = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, strategyId, StringComparison.OrdinalIgnoreCase));
-        if (siegeStrategy == null)
-        {
-            return $"Invalid SiegeStrategy ID :'{strategyId}'{idTipMsg}";
-        }
-
-        // Assign the strategy to the besieger camp
-        besiegerCamp.SiegeStrategy = siegeStrategy;
-
-        return $"SiegeStrategy for BesiegerCamp {besiegerCampId} has been set to: {siegeStrategy.StringId}";
     }
 
     // coop.debug.besiegerCamp.set_leader_party
@@ -147,35 +185,46 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">besiegerCampId and the partyId to set</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("set_leader_party", "coop.debug.besiegercamp")]
-    public static string SetBesiegerCampLeaderParty(List<string> args)
+    public sealed class SetBesiegerCampLeaderPartyCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.besiegercamp";
+
+        public string Name => "set_leader_party";
+
+        public string Description => "Sets leader party for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.besiegercamp.set_leader_party <besiegerCampId> <partyId> ";
-        }
+            new ExpectedArgs("besiegerCampId", "The besieger camp id."),
+            new ExpectedArgs("partyId", "The party id."),
+        };
 
-        string besiegerCampId = args[0];
-        string partyId = args[1];
-
-        if (TryGetObjectManager(out var objectManager) == false)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+
+            string besiegerCampId = args[0];
+            string partyId = args[1];
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp besiegerCamp) == false)
+            {
+                return Failed($"{nameof(BesiegerCamp)} with ID: '{besiegerCampId}' not found");
+            }
+
+            if (objectManager.TryGetObject(partyId, out MobileParty party) == false)
+            {
+                return Failed($"{nameof(MobileParty)} with ID: '{partyId}' not found");
+            }
+
+            besiegerCamp._leaderParty = party;
+
+            return Succeeded($"{nameof(BesiegerCamp._leaderParty)} has changed to: {besiegerCamp._leaderParty.Name} party with ID: {besiegerCamp._leaderParty.StringId}");
+
         }
-
-        if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp besiegerCamp) == false)
-        {
-            return $"{nameof(BesiegerCamp)} with ID: '{besiegerCampId}' not found";
-        }
-
-        if (objectManager.TryGetObject(partyId, out MobileParty party) == false)
-        {
-            return $"{nameof(MobileParty)} with ID: '{partyId}' not found";
-        }
-
-        besiegerCamp._leaderParty = party;
-
-        return $"{nameof(BesiegerCamp._leaderParty)} has changed to: {besiegerCamp._leaderParty.Name} party with ID: {besiegerCamp._leaderParty.StringId}";
     }
 
     // coop.debug.besiegercamp.add_party
@@ -184,35 +233,46 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">besiegerCampId and the partyId to add</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("add_besiegerparty", "coop.debug.besiegercamp")]
-    public static string AddPartyToBesiegerCamp(List<string> args)
+    public sealed class AddPartyToBesiegerCampCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.besiegercamp";
+
+        public string Name => "add_besieger_party";
+
+        public string Description => "Adds besieger party for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.besiegercamp.add_party <besiegerCampId> <partyId>";
-        }
+            new ExpectedArgs("besiegerCampId", "The besieger camp id."),
+            new ExpectedArgs("partyId", "The party id."),
+        };
 
-        string besiegerCampId = args[0];
-        string partyId = args[1];
-
-        if (!TryGetObjectManager(out var objectManager))
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
+
+            string besiegerCampId = args[0];
+            string partyId = args[1];
+
+            if (!TryGetObjectManager(out var objectManager))
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (!objectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp))
+            {
+                return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
+            }
+
+            if (!objectManager.TryGetObject<MobileParty>(partyId, out var mobileParty))
+            {
+                return Failed($"MobileParty with ID: '{partyId}' not found");
+            }
+
+            besiegerCamp._besiegerParties.Add(mobileParty);
+
+            return Succeeded($"MobileParty {partyId} added to BesiegerCamp {besiegerCampId}");
+
         }
-
-        if (!objectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp))
-        {
-            return $"BesiegerCamp with ID: '{besiegerCampId}' not found";
-        }
-
-        if (!objectManager.TryGetObject<MobileParty>(partyId, out var mobileParty))
-        {
-            return $"MobileParty with ID: '{partyId}' not found";
-        }
-
-        besiegerCamp._besiegerParties.Add(mobileParty);
-
-        return $"MobileParty {partyId} added to BesiegerCamp {besiegerCampId}";
     }
 
     // coop.debug.besiegercamp.remove_party
@@ -221,37 +281,48 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">besiegerCampId and the partyId to remove</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("remove_party", "coop.debug.besiegercamp")]
-    public static string RemovePartyFromBesiegerCamp(List<string> args)
+    public sealed class RemovePartyFromBesiegerCampCoopCommand : ICoopCommand
     {
-        if (args.Count != 2)
+        public string Prefix => "coop.debug.besiegercamp";
+
+        public string Name => "remove_party";
+
+        public string Description => "Removes party for co-op debugging.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.besiegercamp.remove_party <besiegerCampId> <partyId>";
-        }
+            new ExpectedArgs("besiegerCampId", "The besieger camp id."),
+            new ExpectedArgs("partyId", "The party id."),
+        };
 
-        string besiegerCampId = args[0];
-        string partyId = args[1];
-
-        if (!TryGetObjectManager(out var objectManager))
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Unable to resolve ObjectManager";
-        }
 
-        if (!objectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp))
-        {
-            return $"BesiegerCamp with ID: '{besiegerCampId}' not found";
-        }
+            string besiegerCampId = args[0];
+            string partyId = args[1];
 
-        if (!objectManager.TryGetObject<MobileParty>(partyId, out var mobileParty))
-        {
-            return $"MobileParty with ID: '{partyId}' not found";
-        }
+            if (!TryGetObjectManager(out var objectManager))
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
 
-        if (!besiegerCamp._besiegerParties.Remove(mobileParty))
-        {
-            return $"MobileParty {partyId} not found in BesiegerCamp {besiegerCampId}";
-        }
+            if (!objectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp))
+            {
+                return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
+            }
 
-        return $"MobileParty {partyId} removed from BesiegerCamp {besiegerCampId}";
+            if (!objectManager.TryGetObject<MobileParty>(partyId, out var mobileParty))
+            {
+                return Failed($"MobileParty with ID: '{partyId}' not found");
+            }
+
+            if (!besiegerCamp._besiegerParties.Remove(mobileParty))
+            {
+                return Failed($"MobileParty {partyId} not found in BesiegerCamp {besiegerCampId}");
+            }
+
+            return Succeeded($"MobileParty {partyId} removed from BesiegerCamp {besiegerCampId}");
+
+        }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using Autofac;
 using Common.Network;
+using Common.PacketHandlers;
+using Common.Serialization;
 using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
@@ -208,8 +210,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var disabledMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(
                 typeof(E2E.Tests.Environment.TestNetworkRouter),
-                nameof(E2E.Tests.Environment.TestNetworkRouter.SendAll),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }))
+                nameof(E2E.Tests.Environment.TestNetworkRouter.SendReliablePayload),
+                new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
         using var menuSwitchRecorder = new GameMenuSwitchRecorder();
@@ -360,8 +362,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var disabledMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(
                 typeof(E2E.Tests.Environment.TestNetworkRouter),
-                nameof(E2E.Tests.Environment.TestNetworkRouter.SendAll),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }))
+                nameof(E2E.Tests.Environment.TestNetworkRouter.SendReliablePayload),
+                new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
         using var menuActivationRecorder = new GameMenuActivationRecorder();
@@ -755,34 +757,48 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
     private sealed class NetworkDeliveryBlocker : IDisposable
     {
-        private static readonly MethodInfo[] DeliveryMethods =
-        {
-            AccessTools.Method(
-                typeof(E2E.Tests.Environment.TestNetworkRouter),
-                nameof(E2E.Tests.Environment.TestNetworkRouter.Send),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(IMessage) }),
-            AccessTools.Method(
-                typeof(E2E.Tests.Environment.TestNetworkRouter),
-                nameof(E2E.Tests.Environment.TestNetworkRouter.SendAll),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }),
-        };
+        private static readonly MethodInfo DeliveryMethod = AccessTools.Method(
+            typeof(E2E.Tests.Environment.TestNetworkRouter),
+            nameof(E2E.Tests.Environment.TestNetworkRouter.SendReliablePayload),
+            new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) });
 
         private readonly Harmony harmony = new($"siege-join-network-blocker-{Guid.NewGuid()}");
 
         public NetworkDeliveryBlocker()
         {
             var prefix = new HarmonyMethod(typeof(NetworkDeliveryBlocker), nameof(Block));
-            foreach (var method in DeliveryMethods)
-                harmony.Patch(method, prefix: prefix);
+            harmony.Patch(DeliveryMethod, prefix: prefix);
         }
 
         public void Dispose()
         {
-            foreach (var method in DeliveryMethods)
-                harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
+            harmony.Unpatch(DeliveryMethod, HarmonyPatchType.Prefix, harmony.Id);
         }
 
-        private static bool Block(IMessage message) =>
+        private static bool Block(ref byte[] payload)
+        {
+            if (!GameInterface.ContainerProvider.TryResolve<ICommonSerializer>(out var serializer))
+                return true;
+
+            object received = serializer.Deserialize(payload);
+            if (received is IMessage message)
+                return ShouldDeliver(message);
+            if (received is not AggregateMessagePacket aggregate || aggregate.Messages == null)
+                return true;
+
+            byte[][] deliverable = aggregate.Messages
+                .Where(inner => ShouldDeliver(serializer.Deserialize<IMessage>(inner)))
+                .ToArray();
+            if (deliverable.Length == 0)
+                return false;
+
+            payload = deliverable.Length == 1
+                ? deliverable[0]
+                : serializer.Serialize(new AggregateMessagePacket(deliverable));
+            return true;
+        }
+
+        private static bool ShouldDeliver(IMessage message) =>
             message is not NetworkAddInvolvedParties &&
             message is not NetworkJoinBattleReply;
     }
