@@ -126,7 +126,7 @@ public static class PlayerPartyInteractionDialogState
                 explanation = new TextObject("{=coop_player_party_interaction_mercenary_requires_no_settlement}Clans that own a settlement are not considered as mercenaries.");
                     return true;
             case PlayerPartyInteractionMercenaryUnavailableReason.NotEnoughRelation:
-                explanation = new TextObject("{=coop_player_party_interaction_mercenary_requires_relation}You need {relation} relation with player");
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_requires_relation}You need {RELATION} relation with player");
                     explanation.SetTextVariable("RELATION", Campaign.Current.Models.DiplomacyModel.MinimumRelationWithConversationCharacterToJoinKingdom);
                     return true;
             case PlayerPartyInteractionMercenaryUnavailableReason.ClanIsInKingdom:
