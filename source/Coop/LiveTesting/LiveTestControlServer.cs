@@ -8,6 +8,7 @@ using Coop.Core.Common.Commands;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.Services.LiveTesting;
+using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.Players;
 using Serilog;
 using System;
@@ -28,6 +29,8 @@ namespace Coop.LiveTesting
 {
     internal sealed class LiveTestControlServer : IDisposable
     {
+        private CoopOptionsUI optionsMenu;
+
         private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
         private const int MaximumScreenshotObservations = 120;
         private static readonly TimeSpan ScreenshotCaptureTimeout = TimeSpan.FromMinutes(1);
@@ -154,6 +157,8 @@ namespace Coop.LiveTesting
                     return HandleRenderStatus(request);
                 case "render-toggle":
                     return HandleRenderToggle(request);
+                case "options-menu":
+                    return HandleOptionsMenu(request);
                 case "join":
                     return HandleDeferredClientJoin(request);
                 case "shutdown":
@@ -165,6 +170,56 @@ namespace Coop.LiveTesting
                         $"Unknown live-test method '{request.Method}'.",
                         false);
             }
+        }
+
+        private LiveTestResponse HandleOptionsMenu(LiveTestRequest request)
+        {
+            if (!request.Parameters.TryGetProperty("action", out var actionValue) || actionValue.ValueKind != JsonValueKind.String)
+                return Failure(request.Id, "invalid_parameters", "Expected action: open, select, inspect, or close.", false);
+            string action = actionValue.GetString();
+            if (action != "open" && action != "select" && action != "inspect" && action != "close")
+                return Failure(request.Id, "invalid_parameters", "Expected action: open, select, inspect, or close.", false);
+            string tab = null;
+            if (request.Parameters.TryGetProperty("tab", out var tabValue) && tabValue.ValueKind == JsonValueKind.String)
+                tab = tabValue.GetString();
+            if ((action == "select" && string.IsNullOrEmpty(tab)) || (tab != null && tab.Length > 64))
+                return Failure(request.Id, "invalid_parameters", "Expected a co-op options tab id (maximum 64 characters).", false);
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (processInfo.Role != "client")
+                    return Failure(request.Id, "client_only", "Options navigation is client-only.", false);
+                bool active = optionsMenu != null && ScreenManager.TopScreen == optionsMenu;
+                if (action == "inspect")
+                    return Success(request.Id, active ? optionsMenu.InspectDebugMenu() : new { open = false });
+                bool opened = false;
+                if (action == "open" && !active)
+                {
+                    if (Campaign.Current == null || !(ScreenManager.TopScreen is SandBox.View.Map.MapScreen))
+                        return Failure(request.Id, "not_ready", "Open options from the campaign map only.", false);
+                    optionsMenu = new CoopOptionsUI();
+                    ScreenManager.PushScreen(optionsMenu);
+                    active = opened = true;
+                }
+                if (!active)
+                    return Failure(request.Id, "menu_not_active", "The MCP-opened options screen is not on top; no screen was closed or selected.", false);
+                if (action == "close")
+                {
+                    ScreenManager.PopScreen();
+                    optionsMenu = null;
+                    return Success(request.Id, new { open = false, applied = false });
+                }
+                if (!string.IsNullOrEmpty(tab) && !optionsMenu.TrySelectDebugTab(tab))
+                {
+                    if (opened)
+                    {
+                        ScreenManager.PopScreen();
+                        optionsMenu = null;
+                    }
+                    return Failure(request.Id, "unknown_tab", "Unknown co-op options tab; no tab was selected.", false);
+                }
+                return Success(request.Id, optionsMenu.InspectDebugMenu());
+            }, action != "inspect");
         }
 
         private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)

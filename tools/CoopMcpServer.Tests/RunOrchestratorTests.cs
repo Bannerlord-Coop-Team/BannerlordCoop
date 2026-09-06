@@ -24,6 +24,33 @@ public sealed class RunOrchestratorTests : IDisposable
         runs = new RunOrchestrator(settings, launcher, pipe, new IncrementalLogReader());
     }
 
+    [Theory]
+    [InlineData("open", true)]
+    [InlineData("select", true)]
+    [InlineData("inspect", false)]
+    [InlineData("close", true)]
+    public async Task OptionsMenuUsesBoundedProtocolAndPreservesMutationClassification(string action, bool mutation)
+    {
+        var run = await runs.StartAsync("test", 1, default);
+        var tools = new DebugTools(runs);
+        await tools.OptionsMenu(run.RunId, "client1", action, default, "ChatTab");
+        Assert.Equal("options-menu", Assert.Single(pipe.Methods));
+        Assert.Equal(mutation, pipe.LastMutation);
+        var parameters = JsonSerializer.SerializeToElement(pipe.LastParameters);
+        Assert.Equal(action, parameters.GetProperty("action").GetString());
+        Assert.Equal("ChatTab", parameters.GetProperty("tab").GetString());
+    }
+
+    [Theory]
+    [InlineData("apply", "VoiceTab")]
+    [InlineData("click", "VoiceTab")]
+    [InlineData("select", "")]
+    public async Task OptionsMenuRejectsUnboundedActionsBeforeRequest(string action, string tab)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => new DebugTools(runs).OptionsMenu("missing", "client1", action, default, tab));
+        Assert.Empty(pipe.Methods);
+    }
+
     [Fact]
     public async Task StartLaunchesDistinctOwnedInstancesWithoutImplyingReadinessOrJoining()
     {
@@ -193,10 +220,14 @@ public sealed class RunOrchestratorTests : IDisposable
         public int Delay;
         public int MaxConcurrent;
         private int concurrent;
+        public bool LastMutation;
+        public object LastParameters;
         public object Status = new { readyForCampaignTests = false };
         public async Task<LiveTestResponse> SendAsync(InstanceIdentity identity, string method, object parameters, bool mutation, CancellationToken cancellationToken)
         {
             Methods.Enqueue(method);
+            LastMutation = mutation;
+            LastParameters = parameters;
             int count = Interlocked.Increment(ref concurrent);
             MaxConcurrent = Math.Max(MaxConcurrent, count);
             try
