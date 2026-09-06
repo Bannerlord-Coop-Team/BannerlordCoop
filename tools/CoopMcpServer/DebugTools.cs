@@ -15,6 +15,7 @@ public interface IDebugTools
     Task<LogChunk> ReadLogs(string run_id, string instance, CancellationToken cancellationToken, string cursor = null, int max_bytes = 16384);
     Task<LiveTestResponse> Screenshot(string run_id, string instance, CancellationToken cancellationToken);
     Task<LiveTestResponse> ScreenshotStatus(string run_id, string instance, string capture_id, CancellationToken cancellationToken);
+    Task<LiveTestResponse> OptionsMenu(string run_id, string instance, string action, CancellationToken cancellationToken, string tab = null);
     Task<RunView> StopRun(string run_id);
 }
 
@@ -58,6 +59,16 @@ public sealed class DebugTools : IDebugTools
     [McpServerTool(Name = "screenshot_status", ReadOnly = true, UseStructuredContent = true), Description("Check an existing screenshot captureId; complete=true means the bridge observed a stable BMP file. Returns a local artifact path, not image bytes.")]
     public Task<LiveTestResponse> ScreenshotStatus(string run_id, string instance, string capture_id, CancellationToken cancellationToken) =>
         runs.RequestAsync(run_id, instance, "screenshot-status", new { captureId = capture_id }, false, cancellationToken);
+
+    [McpServerTool(Name = "options_menu", UseStructuredContent = true), Description("Client-only co-op options navigation: open from campaign map, select tab id, inspect, or close WITHOUT applying. Omit tab on open to select the first available tab. Only controls its own topmost options screen; never clicks arbitrary UI or edits settings. Inspect ok/error; do not retry uncertain mutations. Use screenshot and screenshot_status to view the rendered menu.")]
+    public Task<LiveTestResponse> OptionsMenu(string run_id, string instance, string action, CancellationToken cancellationToken, string tab = null)
+    {
+        if (action != "open" && action != "select" && action != "inspect" && action != "close")
+            throw new ArgumentException("action must be open, select, inspect, or close", nameof(action));
+        if ((action == "select" && string.IsNullOrEmpty(tab)) || (tab != null && tab.Length > 64))
+            throw new ArgumentException("tab must contain 1..64 characters", nameof(tab));
+        return runs.RequestAsync(run_id, instance, "options-menu", new { action, tab }, action != "inspect", cancellationToken);
+    }
 
     [McpServerTool(Name = "stop_run", UseStructuredContent = true), Description("Shutdown only owned processes, then force-stop those still alive after bounded grace. Archive endpoint-reported logs and retain all run artifacts. Idempotent; cleanup failures remain inspectable and can be retried.")]
     public Task<RunView> StopRun(string run_id) => runs.StopAsync(run_id);

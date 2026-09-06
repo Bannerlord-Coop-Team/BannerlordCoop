@@ -10,6 +10,27 @@ public class CoopOptionsUI : ScreenBase
     private GauntletLayer _gauntletLayer;
     private GauntletMovieIdentifier _gauntletMovie;
 
+#if DEBUG
+    public bool TrySelectDebugTab(string tabId)
+    {
+        foreach (var tab in _dataSource.Tabs)
+        {
+            if (tab.Id != tabId) continue;
+            tab.ExecuteSelection();
+            return true;
+        }
+        return false;
+    }
+
+    public object InspectDebugMenu() => new
+    {
+        open = true,
+        selectedTab = _dataSource.SelectedTab?.Id,
+        tabs = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_dataSource.Tabs, tab => new { tab.Id, tab.Name })),
+        appliesChanges = false,
+    };
+#endif
+
     protected override void OnInitialize()
     {
         base.OnInitialize();
