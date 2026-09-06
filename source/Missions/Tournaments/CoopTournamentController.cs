@@ -77,12 +77,24 @@ public class CoopTournamentController : CoopMissionController
     private NetworkTournamentRuntimeState latestRuntimeState;
     private bool applyingRuntimeState;
     private NetworkApplyTournamentDamage activeDamageMessage;
-    private WeaponComponentData activeDamageAttackerWeapon;
+    private TournamentHitWeaponIdentity? activeDamageWeaponIdentity;
     private float? activeDamageShotDifficulty;
     private bool activeDamageFatal;
     private float resultReadyElapsed;
     private readonly Dictionary<Agent, TournamentAgentSpawnData> manifestAgentData = new();
     private readonly Dictionary<Guid, Agent> manifestAgentInstances = new();
+
+    private readonly struct TournamentHitWeaponIdentity
+    {
+        public string ItemId { get; }
+        public int UsageIndex { get; }
+
+        public TournamentHitWeaponIdentity(string itemId, int usageIndex)
+        {
+            ItemId = itemId;
+            UsageIndex = usageIndex;
+        }
+    }
 
     private sealed class PendingLocalTournamentDamage
     {
@@ -93,7 +105,7 @@ public class CoopTournamentController : CoopMissionController
         public Guid AttackerId { get; }
         public Blow Blow { get; }
         public AttackCollisionData CollisionData { get; }
-        public WeaponComponentData AttackerWeapon { get; }
+        public TournamentHitWeaponIdentity? WeaponIdentity { get; }
         public float? ShotDifficulty { get; }
         public long ReadyEpoch { get; }
         public long GuardCandidateId { get; }
@@ -106,7 +118,7 @@ public class CoopTournamentController : CoopMissionController
             Guid attackerId,
             Blow blow,
             AttackCollisionData collisionData,
-            WeaponComponentData attackerWeapon,
+            TournamentHitWeaponIdentity? weaponIdentity,
             float? shotDifficulty,
             long readyEpoch,
             long guardCandidateId)
@@ -118,7 +130,7 @@ public class CoopTournamentController : CoopMissionController
             AttackerId = attackerId;
             Blow = blow;
             CollisionData = collisionData;
-            AttackerWeapon = attackerWeapon;
+            WeaponIdentity = weaponIdentity;
             ShotDifficulty = shotDifficulty;
             ReadyEpoch = readyEpoch;
             GuardCandidateId = guardCandidateId;
@@ -465,7 +477,7 @@ public class CoopTournamentController : CoopMissionController
                 victim,
                 attacker,
                 in blow,
-                out WeaponComponentData attackerWeapon,
+                out TournamentHitWeaponIdentity? weaponIdentity,
                 out float? shotDifficulty);
 
             long guardCandidateId =
@@ -483,7 +495,7 @@ public class CoopTournamentController : CoopMissionController
                 attackerId,
                 blow,
                 collisionData,
-                attackerWeapon,
+                weaponIdentity,
                 shotDifficulty,
                 guardedHitWindow.Epoch + 1,
                 guardCandidateId));
@@ -495,16 +507,30 @@ public class CoopTournamentController : CoopMissionController
         Agent victim,
         Agent attacker,
         in Blow blow,
-        out WeaponComponentData attackerWeapon,
+        out TournamentHitWeaponIdentity? weaponIdentity,
         out float? shotDifficulty)
     {
-        attackerWeapon = null;
+        weaponIdentity = null;
         shotDifficulty = null;
         if (!blow.IsMissile || attacker == null) return;
 
         int missileIndex = blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
         if (Mission.Current._missilesDictionary.TryGetValue(missileIndex, out var missile))
-            attackerWeapon = missile.Weapon.CurrentUsageItem;
+        {
+            if (missile.Weapon.Item != null &&
+                objectManager.TryGetId(missile.Weapon.Item, out string weaponItemId))
+            {
+                weaponIdentity = new TournamentHitWeaponIdentity(
+                    weaponItemId,
+                    missile.Weapon.CurrentUsageIndex);
+            }
+            else
+            {
+                Logger.Error(
+                    "Failed to resolve tournament missile weapon item at source index {MissileIndex}",
+                    missileIndex);
+            }
+        }
         else
             Logger.Error(
                 "Failed to resolve tournament missile weapon at source index {MissileIndex}",
@@ -527,7 +553,7 @@ public class CoopTournamentController : CoopMissionController
 
     private void ApplyTournamentDamageWithProgression(
         NetworkApplyTournamentDamage message,
-        WeaponComponentData originAttackerWeapon,
+        TournamentHitWeaponIdentity? originWeaponIdentity,
         float? originShotDifficulty)
     {
         var registry = coopMissionComponent.AgentRegistry;
@@ -559,13 +585,13 @@ public class CoopTournamentController : CoopMissionController
 
         applyingDamage.Add(message.VictimAgentId);
         NetworkApplyTournamentDamage previousDamageMessage = activeDamageMessage;
-        WeaponComponentData previousDamageAttackerWeapon = activeDamageAttackerWeapon;
+        TournamentHitWeaponIdentity? previousDamageWeaponIdentity = activeDamageWeaponIdentity;
         float? previousDamageShotDifficulty = activeDamageShotDifficulty;
         bool previousDamageFatal = activeDamageFatal;
         activeDamageMessage = message;
-        activeDamageAttackerWeapon = originAttackerWeapon;
+        activeDamageWeaponIdentity = originWeaponIdentity;
         activeDamageShotDifficulty = originShotDifficulty;
-        activeDamageFatal = blow.InflictedDamage >= victim.Health;
+        activeDamageFatal = victim.Health - blow.InflictedDamage < 1f;
         try
         {
             RegisterBlowPatch.RunOriginalRegisterBlow(victim, blow, collisionData);
@@ -573,7 +599,7 @@ public class CoopTournamentController : CoopMissionController
         finally
         {
             activeDamageMessage = previousDamageMessage;
-            activeDamageAttackerWeapon = previousDamageAttackerWeapon;
+            activeDamageWeaponIdentity = previousDamageWeaponIdentity;
             activeDamageShotDifficulty = previousDamageShotDifficulty;
             activeDamageFatal = previousDamageFatal;
             applyingDamage.Remove(message.VictimAgentId);
@@ -597,10 +623,28 @@ public class CoopTournamentController : CoopMissionController
         if (damage == null || damage.OriginControllerId != session.OwnControllerId)
             return;
 
+        string weaponItemId;
+        int weaponUsageIndex;
+        if (activeDamageWeaponIdentity.HasValue)
+        {
+            TournamentHitWeaponIdentity weaponIdentity = activeDamageWeaponIdentity.Value;
+            weaponItemId = weaponIdentity.ItemId;
+            weaponUsageIndex = weaponIdentity.UsageIndex;
+        }
+        else if (!TryResolveHitWeapon(
+                     affectorAgent,
+                     attackerWeapon,
+                     out weaponItemId,
+                     out weaponUsageIndex))
+        {
+            return;
+        }
+
         SubmitHitProgression(
             affectedAgent,
             affectorAgent,
-            activeDamageAttackerWeapon ?? attackerWeapon,
+            weaponItemId,
+            weaponUsageIndex,
             in blow,
             in collisionData,
             activeDamageShotDifficulty ?? shotDifficulty,
@@ -617,7 +661,8 @@ public class CoopTournamentController : CoopMissionController
     private void SubmitHitProgression(
         Agent affectedAgent,
         Agent affectorAgent,
-        WeaponComponentData attackerWeapon,
+        string weaponItemId,
+        int weaponUsageIndex,
         in Blow blow,
         in AttackCollisionData collisionData,
         float shotDifficulty,
@@ -638,11 +683,6 @@ public class CoopTournamentController : CoopMissionController
 
         float damageAmount = Math.Min(blow.InflictedDamage, affectedAgent.HealthLimit);
         if (damageAmount <= 0 || affectedAgent.HealthLimit <= 0) return;
-        if (!TryResolveHitWeapon(
-                affectorAgent,
-                attackerWeapon,
-                out string weaponItemId,
-                out int weaponUsageIndex)) return;
 
         var progression = new TournamentHitProgressionData(
             snapshot.SessionId,
@@ -1194,7 +1234,7 @@ public class CoopTournamentController : CoopMissionController
             network.SendAll(message);
             ApplyTournamentDamageWithProgression(
                 message,
-                pending.AttackerWeapon,
+                pending.WeaponIdentity,
                 pending.ShotDifficulty);
         }
     }

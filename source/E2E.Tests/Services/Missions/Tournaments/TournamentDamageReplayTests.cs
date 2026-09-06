@@ -244,7 +244,8 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             Agent attacker = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
             AccessTools.Property(typeof(Agent), nameof(Agent.HealthLimit))
-                .SetValue(victim, 100f);
+                .SetValue(victim, 100.5f);
+            victim.Health = 100.5f;
             Guid victimId = Guid.NewGuid();
             Guid attackerId = Guid.NewGuid();
             Assert.True(registry.TryRegisterAgent("victim-owner", victimId, victim));
@@ -287,6 +288,14 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             {
                 _collisionResult = (int)CombatCollisionResult.StrikeAgent
             };
+            mock.RegisteredBlow = (_, registeredBlow) =>
+                InvokeCaptureHitProgression(
+                    controller,
+                    victim,
+                    attacker,
+                    registeredBlow,
+                    collisionData,
+                    shotDifficulty: -1f);
             Assert.False(controller.InterceptBlow(victim, blow, collisionData));
             component.AgentActionHandler.ObserveBlockedHit(
                 victim,
@@ -308,18 +317,8 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                 return;
             }
 
-            NetworkApplyTournamentDamage acceptedDamage = Assert.Single(
+            Assert.Single(
                 battleNetwork.NetworkSentMessages.GetMessages<NetworkApplyTournamentDamage>());
-            SetField(controller, "activeDamageMessage", acceptedDamage);
-            SetField(controller, "activeDamageFatal", true);
-            InvokeCaptureHitProgression(
-                controller,
-                victim,
-                attacker,
-                blow,
-                collisionData,
-                shotDifficulty: -1f);
-            SetField(controller, "activeDamageMessage", null);
 
             NetworkSubmitTournamentHitProgression request = Assert.Single(
                 network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
@@ -381,68 +380,6 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void OriginMissileReplay_ExposesCapturedProgressionMetadata()
-    {
-        using var fixture = new MissionEngineFixture();
-        var client = Clients.First();
-        SetControllerId(client, "origin");
-
-        client.Call(() =>
-        {
-            var mock = fixture.CreateMission(client);
-            var controller = client.Resolve<CoopTournamentController>();
-            var registry = client.Resolve<INetworkAgentRegistry>();
-            Agent victim = mock.SpawnAgent(
-                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
-            Agent attacker = mock.SpawnAgent(
-                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
-            Guid victimId = Guid.NewGuid();
-            Guid attackerId = Guid.NewGuid();
-            Assert.True(registry.TryRegisterAgent("victim-owner", victimId, victim));
-            Assert.True(registry.TryRegisterAgent("origin", attackerId, attacker));
-            SetField(controller, "snapshot", CreateLiveSnapshot());
-
-            const int missileIndex = 99;
-            var blow = new Blow(attacker.Index) { InflictedDamage = 10 };
-            blow.WeaponRecord._isMissile = true;
-            blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = missileIndex;
-            var message = new NetworkApplyTournamentDamage(
-                "session",
-                "match",
-                1,
-                "origin",
-                1,
-                victimId,
-                attackerId,
-                blow,
-                default);
-            var attackerWeapon = new WeaponComponentData(null, WeaponClass.Arrow, default);
-            const float shotDifficulty = 7.5f;
-            bool observedMetadata = false;
-            mock.RegisteredBlow = (_, _) =>
-            {
-                Assert.Same(
-                    attackerWeapon,
-                    GetField<WeaponComponentData>(controller, "activeDamageAttackerWeapon"));
-                Assert.Equal(
-                    shotDifficulty,
-                    GetField<float?>(controller, "activeDamageShotDifficulty"));
-                observedMetadata = true;
-            };
-
-            InvokeApplyTournamentDamageWithProgression(
-                controller,
-                message,
-                attackerWeapon,
-                shotDifficulty);
-
-            Assert.True(observedMetadata);
-            Assert.False(mock.LastRegisteredBlow.IsMissile);
-            Assert.Equal(-1, mock.LastRegisteredBlow.WeaponRecord.AffectorWeaponSlotOrMissileIndex);
-        });
-    }
-
-    [Fact]
     public void QueuedMissileHit_AppliesDamageAndProgressionAfterSourceMissileRemoved()
     {
         using var fixture = new MissionEngineFixture();
@@ -498,8 +435,7 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                         CreateSpawnData(victimId, "victim-slot", "victim", null)
                     }));
 
-            (MissionWeapon missileWeapon, WeaponComponentData attackerWeapon) =
-                CreateRangedWeapon();
+            MissionWeapon missileWeapon = CreateRangedWeapon();
             Assert.True(client.ObjectManager.AddExisting("queued-test-arrow", missileWeapon.Item));
             var equipment = new MissionEquipment();
             var weaponSlots = new MissionWeapon[(int)EquipmentIndex.NumAllWeaponSlots];
@@ -529,6 +465,7 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                     shotDifficulty: -1f);
 
             Assert.False(controller.InterceptBlow(victim, blow, collisionData));
+            attackerMirror.Equipment = null;
             mock.RemoveMissile(missileIndex);
             Assert.False(mock.HasMissile(missileIndex));
             Assert.False(mock.Shell._missilesDictionary.ContainsKey(missileIndex));
@@ -546,7 +483,6 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             Assert.Equal("queued-test-arrow", request.Data.WeaponItemId);
             Assert.Equal(0, request.Data.WeaponUsageIndex);
             Assert.Equal(mock.ShootDifficulty, request.Data.ShotDifficulty);
-            Assert.Same(attackerWeapon, missileWeapon.CurrentUsageItem);
         });
     }
 
@@ -803,24 +739,6 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             true);
     }
 
-    private static void InvokeApplyTournamentDamageWithProgression(
-        CoopTournamentController controller,
-        NetworkApplyTournamentDamage message,
-        WeaponComponentData attackerWeapon,
-        float shotDifficulty)
-    {
-        MethodInfo applyTournamentDamage =
-            typeof(CoopTournamentController).GetMethod(
-                "ApplyTournamentDamageWithProgression",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(applyTournamentDamage);
-        GameThread.Run(
-            () => applyTournamentDamage.Invoke(
-                controller,
-                new object[] { message, attackerWeapon, shotDifficulty }),
-            true);
-    }
-
     private static void InvokeCaptureHitProgression(
         CoopTournamentController controller,
         Agent victim,
@@ -863,15 +781,14 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             Array.Empty<EquipmentElement>(),
             0f);
 
-    private static (MissionWeapon MissileWeapon, WeaponComponentData AttackerWeapon)
-        CreateRangedWeapon()
+    private static MissionWeapon CreateRangedWeapon()
     {
         var item = new ItemObject();
         var weaponComponent = new WeaponComponent(item);
         var attackerWeapon = new WeaponComponentData(item, WeaponClass.Arrow, default);
         weaponComponent._weaponList.Add(attackerWeapon);
         item.ItemComponent = weaponComponent;
-        return (new MissionWeapon(item, null, null), attackerWeapon);
+        return new MissionWeapon(item, null, null);
     }
 
     private static void SetField(
@@ -884,15 +801,6 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         field.SetValue(target, value);
-    }
-
-    private static T GetField<T>(object target, string name)
-    {
-        FieldInfo field = target.GetType().GetField(
-            name,
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        return (T)field.GetValue(target);
     }
 
     private static ICoopMissionComponent GetTournamentComponent(
