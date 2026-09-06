@@ -24,6 +24,8 @@ internal class ModOptionsCommands
 
         public string Description => "Reports list.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)

@@ -8,6 +8,8 @@ public interface ICoopCommand
 
     string Description { get; }
 
+    CoopCommandSide Side { get; }
+
     IExpectedArgs[] ExpectedArgs { get; }
 
     CoopCommandResult ProcessCommand(ICoopCommandArgs args);

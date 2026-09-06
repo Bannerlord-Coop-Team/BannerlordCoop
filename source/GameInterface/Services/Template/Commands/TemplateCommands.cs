@@ -27,6 +27,9 @@ internal class TemplateCommands
 
         public string Description => "Runs the template debug operation.";
 
+        /// Use Both unless the command is truly server-only or client-only.
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)

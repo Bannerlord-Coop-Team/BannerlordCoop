@@ -122,6 +122,8 @@ public class LiveTestCommandDispatcherTests
 
         public string Description => "Captures structured live-test arguments.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs => new IExpectedArgs[]
         {
             new ExpectedArgs("first", "The first value to capture."),

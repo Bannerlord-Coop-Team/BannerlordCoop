@@ -44,6 +44,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public string Description => "Runs the observe ai lord pair debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("prisoner_hero_id", "The registered prisoner hero id.", isRequired: true),
@@ -99,6 +101,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public string Description => "Runs the focus hero party debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered hero id.", isRequired: true),
@@ -131,6 +135,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public string Description => "Runs the snapshot ai lord diplomacy fixture debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("prisoner_hero_id", "The registered prisoner hero id.", isRequired: true),
@@ -161,6 +167,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public string Description => "Runs the restore ai lord diplomacy fixture debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -188,6 +196,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
         public string Name => "capture_ai_lord_fixture";
 
         public string Description => "Runs the capture ai lord fixture debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -301,6 +311,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public string Description => "Runs the observe ai lord fixture debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -320,6 +332,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
         public string Name => "focus_party";
 
         public string Description => "Runs the focus party debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -349,6 +363,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
         public string Name => "restore_ai_lord_fixture";
 
         public string Description => "Runs the restore ai lord fixture debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
