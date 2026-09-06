@@ -85,6 +85,7 @@ namespace Coop.LiveTesting
             processInfo = new LiveTestProcessInfo
             {
                 Pid = processId,
+                ProcessStartedUtc = processStartedUtc,
                 Role = isServer ? "server" : "client",
                 PlatformId = ReadArgument(arguments, "/platformId"),
                 RunToken = NormalizeRunToken(ReadArgument(arguments, "/cooptestrun")),
@@ -187,15 +188,6 @@ namespace Coop.LiveTesting
             if (!TryReadCommand(request.Parameters, out var command, out var arguments, out var error))
             {
                 return Failure(request.Id, "invalid_parameters", error, false);
-            }
-
-            if (!command.StartsWith("coop.debug.", StringComparison.Ordinal))
-            {
-                return Failure(
-                    request.Id,
-                    "command_not_allowed",
-                    "Only coop.debug.* commands may be run through live testing.",
-                    false);
             }
 
             return ExecuteOnGameThread(request, () =>
@@ -770,6 +762,9 @@ namespace Coop.LiveTesting
                 registeredControllerIds,
                 connectedControllerIds,
                 deferredClientJoinEnabled,
+                readyForClientJoin = !isServer && deferredClientJoinEnabled &&
+                    Volatile.Read(ref deferredClientJoinAttempted) == 0 &&
+                    GameStateManager.Current?.ActiveState is InitialState && !campaignLoaded,
                 deferredClientJoinAttempted = Volatile.Read(ref deferredClientJoinAttempted) != 0,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
@@ -894,6 +889,7 @@ namespace Coop.LiveTesting
             return new LiveTestProcessInfo
             {
                 Pid = processInfo.Pid,
+                ProcessStartedUtc = processStartedUtc,
                 Role = processInfo.Role,
                 PlatformId = processInfo.PlatformId,
                 RunToken = processInfo.RunToken,

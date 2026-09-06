@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Commands;
+using Common.Logging;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
@@ -41,6 +42,7 @@ public class MissionModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         base.Load(builder);
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
