@@ -16,6 +16,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// <summary>
 /// Patches for lifecycle of <see cref="MobileParty"/> objects.
 /// </summary>
+#if DEBUG
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyLifetimePatches
 {
@@ -28,6 +29,7 @@ internal class PartyLifetimePatches
         Logger.Debug("MobileParty created: {StringId}", __instance.StringId);
     }
 }
+#endif
 
 [HarmonyPatch(typeof(DestroyPartyAction))]
 internal class DestroyPartyActionPatch

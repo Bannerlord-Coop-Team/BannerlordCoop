@@ -1,0 +1,100 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+            IsVisible="@IsPresentationVisible" DoNotAcceptEvents="true">
+      <Children>
+        <Standard.Button Id="CoopBugReportButton" WidthSizePolicy="Fixed" SuggestedWidth="280"
+                         HeightSizePolicy="Fixed" SuggestedHeight="54" HorizontalAlignment="Right"
+                         VerticalAlignment="Top" MarginRight="24" MarginTop="82"
+                         IsVisible="@IsButtonVisible" Command.Click="ActionOpen"
+                         Parameter.Text="@ButtonText"/>
+
+        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                IsVisible="@IsFormVisible">
+          <Children>
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                    Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.72"/>
+
+            <Widget WidthSizePolicy="Fixed" SuggestedWidth="760" HeightSizePolicy="Fixed"
+                    SuggestedHeight="670" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Children>
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                        Sprite="BlankWhiteSquare_9" Color="#211A14FF" AlphaFactor="0.98"/>
+
+                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                           MarginLeft="30" MarginRight="30" MarginTop="24" MarginBottom="24"
+                           StackLayout.LayoutMethod="VerticalTopToBottom">
+                  <Children>
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                SuggestedHeight="54" Brush="Clan.TabControl.Text" Brush.FontSize="32"
+                                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                Text="@TitleText"/>
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                SuggestedHeight="76" Brush="Clan.TabControl.Text" Brush.FontSize="18"
+                                Brush.FontColor="#B9AB9BFF" Brush.TextHorizontalAlignment="Center"
+                                Brush.TextVerticalAlignment="Center" Text="@DisclosureText"/>
+
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                SuggestedHeight="32" MarginTop="8" Brush="Clan.TabControl.Text"
+                                Brush.FontSize="21" Brush.TextHorizontalAlignment="Left"
+                                Brush.TextVerticalAlignment="Center" Text="@SummaryLabel"/>
+                    <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                 SuggestedHeight="58" Brush="SaveLoad.Search.Button"
+                                 UpdateChildrenStates="true">
+                      <Children>
+                        <EditableTextWidget Id="CoopBugReportSummaryInput" UpdateChildrenStates="true"
+                                            WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                            MarginLeft="12" MarginRight="12" MarginTop="7" MarginBottom="7"
+                                            Brush="SaveLoad.Search.InputText" Brush.FontSize="21"
+                                            Text="@Summary" MaxLength="@MaximumSummaryLength"
+                                            KeyboardInfoText="@SummaryLabel"/>
+                      </Children>
+                    </BrushWidget>
+
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                SuggestedHeight="32" MarginTop="12" Brush="Clan.TabControl.Text"
+                                Brush.FontSize="21" Brush.TextHorizontalAlignment="Left"
+                                Brush.TextVerticalAlignment="Center" Text="@DescriptionLabel"/>
+                    <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                 SuggestedHeight="210" Brush="SaveLoad.Search.Button"
+                                 UpdateChildrenStates="true">
+                      <Children>
+                        <EditableTextWidget Id="CoopBugReportDescriptionInput" UpdateChildrenStates="true"
+                                            WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                            MarginLeft="12" MarginRight="12" MarginTop="10" MarginBottom="10"
+                                            Brush="SaveLoad.Search.InputText" Brush.FontSize="20"
+                                            Brush.TextVerticalAlignment="Top" Text="@Description"
+                                            MaxLength="@MaximumDescriptionLength"
+                                            KeyboardInfoText="@DescriptionLabel"/>
+                      </Children>
+                    </BrushWidget>
+
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                SuggestedHeight="34" MarginTop="5" IsVisible="@HasValidationMessage"
+                                Brush="Clan.TabControl.Text" Brush.FontSize="19"
+                                Brush.FontColor="#E35D4FFF" Brush.TextHorizontalAlignment="Left"
+                                Brush.TextVerticalAlignment="Center" Text="@ValidationMessage"/>
+
+                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                            SuggestedHeight="62" MarginTop="10">
+                      <Children>
+                        <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="150"
+                                         HeightSizePolicy="Fixed" SuggestedHeight="56"
+                                         HorizontalAlignment="Right" MarginRight="166"
+                                         Command.Click="ActionClose" Parameter.Text="@CancelButtonText"/>
+                        <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="150"
+                                         HeightSizePolicy="Fixed" SuggestedHeight="56"
+                                         HorizontalAlignment="Right" Command.Click="ActionSubmit"
+                                         Parameter.Text="@SubmitButtonText"/>
+                      </Children>
+                    </Widget>
+                  </Children>
+                </ListPanel>
+              </Children>
+            </Widget>
+          </Children>
+        </Widget>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

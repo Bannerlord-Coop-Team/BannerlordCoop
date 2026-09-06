@@ -7,7 +7,6 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using Helpers;
@@ -31,20 +30,17 @@ internal class TradeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly ITroopRosterInterface troopRosterInterface;
 
     public TradeHandler(
         IInventoryLogicInterface inventoryLogicInterface,
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        ITroopRosterInterface troopRosterInterface)
+        INetwork network)
     {
         this.inventoryLogicInterface = inventoryLogicInterface;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.troopRosterInterface = troopRosterInterface;
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
@@ -74,7 +70,6 @@ internal class TradeHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
         if (!objectManager.TryGetIdWithLogging(what.OwnerParty, out var ownerPartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.TroopRoster, out var troopRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
 
         // CurrentMobileParty can be already destroyed when this logic runs. Attempt to get an id without logging
@@ -93,8 +88,6 @@ internal class TradeHandler : IHandler
         }
 
         var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.OwnerParty, what.InitialCharacterEquipment);
-
-        var troopRosterData = troopRosterInterface.PackTroopRosterData(what.TroopRoster);
 
         var message = new CompleteTrade(
             fromRosterId,
@@ -115,9 +108,7 @@ internal class TradeHandler : IHandler
             currentSettlementComponentId is null,
             currentSettlementComponentId,
             boughtItems,
-            soldItems,
-            troopRosterId,
-            troopRosterData
+            soldItems
         );
 
         network.SendAll(message);
@@ -136,7 +127,6 @@ internal class TradeHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
-            if (!objectManager.TryGetObjectWithLogging<TroopRoster>(message.TroopRosterId, out var troopRoster)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
 
             SettlementComponent currentSettlementComponent = null;
@@ -158,23 +148,7 @@ internal class TradeHandler : IHandler
             // When looting, taken items are treated as bought items. Don't need to manage changed rosters in these cases
             if (fromRoster != null)
             {
-                foreach (var boughtItem in boughtItems)
-                {
-                    int difference = fromRoster.GetItemNumber(boughtItem.Item1.EquipmentElement.Item) - boughtItem.Item1.Amount;
-
-                    if (difference < 0)
-                    {
-                        int fromRosterDataIndex = fromItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                        if (fromRosterDataIndex >= 0) fromItemRosterData[fromRosterDataIndex].Amount -= difference;
-                        else fromItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
-
-                        int toRosterDataIndex = toItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                        if (toRosterDataIndex >= 0) toItemRosterData[toRosterDataIndex].Amount += difference;
-                        else toItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
-
-                        totalAmount -= boughtItem.Item2;
-                    }
-                }
+                totalAmount = ReconcilePurchases(fromRoster, fromItemRosterData, toItemRosterData, boughtItems, totalAmount);
             }
 
             // Update rosters with new data
@@ -189,9 +163,6 @@ internal class TradeHandler : IHandler
             // Update hero equipment with new data
             inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
             network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
-
-            // Update troop roster for if items were donated
-            troopRosterInterface.UpdateWithData(troopRoster, message.TroopRosterData, hero);
 
             inventoryLogicInterface.ApplyDoneLogic(
                 fromRoster,
@@ -222,6 +193,41 @@ internal class TradeHandler : IHandler
                 inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
             }
         });
+    }
+
+    /// <summary>
+    /// Removes any purchased quantity the merchant can no longer supply from the party roster data and
+    /// refunds the prorated cost.
+    /// </summary>
+    internal static int ReconcilePurchases(
+        ItemRoster merchantRoster,
+        ItemRosterElement[] merchantRosterData,
+        ItemRosterElement[] partyRosterData,
+        List<(ItemRosterElement, int)> boughtItems,
+        int totalAmount)
+    {
+        foreach (var boughtItem in boughtItems)
+        {
+            int amount = boughtItem.Item1.Amount;
+            int elementIndex = merchantRoster.FindIndexOfElement(boughtItem.Item1.EquipmentElement);
+            int available = elementIndex >= 0 ? merchantRoster.GetElementNumber(elementIndex) : 0;
+            int difference = available - amount;
+
+            if (difference < 0)
+            {
+                int fromRosterDataIndex = merchantRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
+                if (fromRosterDataIndex >= 0) merchantRosterData[fromRosterDataIndex].Amount -= difference;
+                else merchantRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
+
+                int toRosterDataIndex = partyRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
+                if (toRosterDataIndex >= 0) partyRosterData[toRosterDataIndex].Amount += difference;
+                else partyRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
+
+                totalAmount -= amount > 0 ? (boughtItem.Item2 * -difference) / amount : boughtItem.Item2;
+            }
+        }
+
+        return totalAmount;
     }
 
     private (ItemRosterElementData, int)[] ResolveTradeItemIds(

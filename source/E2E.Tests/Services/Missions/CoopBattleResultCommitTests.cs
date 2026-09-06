@@ -44,6 +44,34 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void SiegeAmbushCompletion_ReportsDefenderPullBackSignal()
+    {
+        using var fixture = new MissionEngineFixture();
+        var host = Clients.First();
+        SetControllerId(host, "host");
+
+        host.Call(() =>
+        {
+            var mock = fixture.CreateMission(host);
+            mock.Shell.MissionResult = new MissionResult(
+                BattleState.DefenderPullBack,
+                playerVictory: true,
+                playerDefeated: false,
+                enemyRetreated: false);
+
+            var controller = host.Resolve<CoopBattleController>();
+            controller.Session.TryBegin("ambush");
+            host.NetworkSentMessages.Clear();
+            controller.ResultCommitter.ReportResolvedResult(mock.Shell.MissionResult);
+
+            GC.KeepAlive(controller);
+        });
+
+        var report = Assert.Single(host.NetworkSentMessages.GetMessages<NetworkBattleResultReady>());
+        Assert.Equal(BattleState.DefenderPullBack, report.BattleState);
+    }
+
+    [Fact]
     public void UnresolvedMissionExit_DoesNotReportResult()
     {
         using var fixture = new MissionEngineFixture();

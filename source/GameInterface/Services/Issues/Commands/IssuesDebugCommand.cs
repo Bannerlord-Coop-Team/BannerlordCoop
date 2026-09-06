@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Utils.Commands;
 using System;
@@ -12,54 +13,71 @@ namespace GameInterface.Services.Issues.Commands;
 
 public static class IssuesDebugCommand
 {
-    [CommandLineArgumentFunction("give", "coop.debug.issues")]
-    public static string Give(List<string> args)
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class IssuesGiveCoopCommand : ICoopCommand
     {
-        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.issues.give")) return error;
+        public string Prefix => "coop.debug.issues";
 
-        const string usage = "Usage: coop.debug.issues.give <heroId> <questTypeKey> (see coop.debug.issues.list_types)";
+        public string Name => "give";
 
-        if (!CommandHelpers.HasArgCount(args, 2, usage, out error)) return error;
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return error;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error)) return error;
+        public string Description => "Runs the give debug operation.";
 
-        var key = args[1];
-        if (!IssueGiveCatalog.TryGet(key, out var entry))
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return $"Unknown quest type key '{key}'. Use coop.debug.issues.list_types to see all valid keys.";
-        }
+            new ExpectedArgs("hero_id", "The registered hero id.", isRequired: true),
+            new ExpectedArgs("quest_type_key", "The issue type key.", isRequired: true),
+        };
 
-        if (entry.Resolve == null)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Quest type '{key}' is a known vanilla Issue type but is not wired for give: {entry.NotWiredReason}";
-        }
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.issues.give")) return Failed(error);
 
-        if (hero.Issue != null)
-        {
-            return $"Hero '{hero.Name}' (StringId '{hero.StringId}') already has an active issue " +
-                $"({hero.Issue.GetType().Name}, StringId '{hero.Issue.StringId}'). Complete or clear it first.";
-        }
+            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return Failed(error);
+            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error)) return Failed(error);
 
-        (PotentialIssueData.StartIssueDelegate factory, string resolveError) = entry.Resolve(hero);
-        if (factory == null)
-        {
-            return $"Could not give '{key}' to hero '{hero.Name}': {resolveError}";
-        }
+            var key = args[1];
+            if (!IssueGiveCatalog.TryGet(key, out var entry))
+            {
+                return Failed($"Unknown quest type key '{key}'. Use coop.debug.issues.list_types to see all valid keys.");
+            }
 
-        try
-        {
-            var pid = new PotentialIssueData(factory, entry.IssueType, IssueBase.IssueFrequency.Common);
-            Campaign.Current.IssueManager.CreateNewIssue(in pid, hero);
-        }
-        catch (Exception ex)
-        {
-            return CommandHelpers.FormatException($"coop.debug.issues.give ({key}): CreateNewIssue", ex);
-        }
+            if (entry.Resolve == null)
+            {
+                return Failed($"Quest type '{key}' is a known vanilla Issue type but is not wired for give: {entry.NotWiredReason}");
+            }
 
-        return StartQuestOrRollback(hero, key);
+            if (hero.Issue != null)
+            {
+                return Failed($"Hero '{hero.Name}' (StringId '{hero.StringId}') already has an active issue " +
+                    $"({hero.Issue.GetType().Name}, StringId '{hero.Issue.StringId}'). Complete or clear it first.");
+            }
+
+            (PotentialIssueData.StartIssueDelegate factory, string resolveError) = entry.Resolve(hero);
+            if (factory == null)
+            {
+                return Failed($"Could not give '{key}' to hero '{hero.Name}': {resolveError}");
+            }
+
+            try
+            {
+                var pid = new PotentialIssueData(factory, entry.IssueType, IssueBase.IssueFrequency.Common);
+                Campaign.Current.IssueManager.CreateNewIssue(in pid, hero);
+            }
+            catch (Exception ex)
+            {
+                return Failed(CommandHelpers.FormatException($"coop.debug.issues.give ({key}): CreateNewIssue", ex));
+            }
+
+            return StartQuestOrRollback(hero, key);
+        }
     }
 
-    private static string StartQuestOrRollback(Hero hero, string key)
+    private static CoopCommandResult StartQuestOrRollback(Hero hero, string key)
     {
         bool started;
         try
@@ -80,104 +98,121 @@ public static class IssuesDebugCommand
                 }
                 catch (Exception cleanupEx)
                 {
-                    return CommandHelpers.FormatException(
+                    return Failed(CommandHelpers.FormatException(
                         $"coop.debug.issues.give ({key}): StartIssueQuest threw ({ex.GetType().Name}: {ex.Message}), " +
                         $"then the DeactivateIssue rollback ALSO threw - hero '{hero.Name}' (StringId '{hero.StringId}') " +
-                        "may still have a stuck issue attached", cleanupEx);
+                        "may still have a stuck issue attached", cleanupEx));
                 }
             }
 
-            return CommandHelpers.FormatException(
+            return Failed(CommandHelpers.FormatException(
                 $"coop.debug.issues.give ({key}): StartIssueQuest threw during quest construction. The issue has " +
                 $"been rolled back via DeactivateIssue - hero '{hero.Name}' (StringId '{hero.StringId}') has no " +
-                "issue attached and is safe to retry give with any quest type", ex);
+                "issue attached and is safe to retry give with any quest type", ex));
         }
 
         if (!started)
         {
-            return $"Issue '{key}' was created for hero '{hero.Name}' but StartIssueQuest returned false " +
-                "(its IssueStayAliveConditions failed immediately) - the game has already cleaned the issue up.";
+            return Failed($"Issue '{key}' was created for hero '{hero.Name}' but StartIssueQuest returned false " +
+                "(its IssueStayAliveConditions failed immediately) - the game has already cleaned the issue up.");
         }
 
-        return $"Gave quest type '{key}' to hero '{hero.Name}' (StringId '{hero.StringId}'). " +
-            $"Issue StringId: '{hero.Issue?.StringId}'. Quest StringId: '{hero.Issue?.IssueQuest?.StringId ?? "none"}'.";
+        return Succeeded($"Gave quest type '{key}' to hero '{hero.Name}' (StringId '{hero.StringId}'). " +
+            $"Issue StringId: '{hero.Issue?.StringId}'. Quest StringId: '{hero.Issue?.IssueQuest?.StringId ?? "none"}'.");
     }
 
-    [CommandLineArgumentFunction("complete", "coop.debug.issues")]
-    public static string Complete(List<string> args)
+    public sealed class IssuesCompleteCoopCommand : ICoopCommand
     {
-        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.issues.complete")) return error;
+        public string Prefix => "coop.debug.issues";
 
-        const string usage = "Usage: coop.debug.issues.complete <heroId> [success|cancel|fail|timeout|betrayal]";
+        public string Name => "complete";
 
-        if (args == null || args.Count < 1 || args.Count > 2)
+        public string Description => "Runs the complete debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return usage;
-        }
+            new ExpectedArgs("hero_id", "The registered issue owner hero id.", isRequired: true),
+            new ExpectedArgs("outcome", "success, cancel, fail, timeout, or betrayal.", isRequired: false),
+        };
 
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return error;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error)) return error;
-
-        if (hero.Issue == null)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"Hero '{hero.Name}' (StringId '{hero.StringId}') has no active issue.";
-        }
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.issues.complete")) return Failed(error);
 
-        var quest = hero.Issue.IssueQuest;
-        if (quest == null)
-        {
-            return $"Hero '{hero.Name}' has an active issue ({hero.Issue.GetType().Name}) but no live quest yet. " +
-                "Use coop.debug.issues.give (or the natural accept flow) to start the quest before completing it.";
-        }
+            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return Failed(error);
+            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error)) return Failed(error);
 
-        var outcome = args.Count == 2 ? args[1].Trim().ToLowerInvariant() : "success";
-
-        try
-        {
-            using (new IssueFinalizeAuthorityGuard())
+            if (hero.Issue == null)
             {
-                switch (outcome)
+                return Failed($"Hero '{hero.Name}' (StringId '{hero.StringId}') has no active issue.");
+            }
+
+            var quest = hero.Issue.IssueQuest;
+            if (quest == null)
+            {
+                return Failed($"Hero '{hero.Name}' has an active issue ({hero.Issue.GetType().Name}) but no live quest yet. " +
+                    "Use coop.debug.issues.give (or the natural accept flow) to start the quest before completing it.");
+            }
+
+            var outcome = args.Count == 2 ? args[1].Trim().ToLowerInvariant() : "success";
+
+            try
+            {
+                using (new IssueFinalizeAuthorityGuard())
                 {
-                    case "success":
-                        quest.CompleteQuestWithSuccess();
-                        break;
-                    case "cancel":
-                        quest.CompleteQuestWithCancel();
-                        break;
-                    case "fail":
-                        quest.CompleteQuestWithFail();
-                        break;
-                    case "timeout":
-                        quest.CompleteQuestWithTimeOut();
-                        break;
-                    case "betrayal":
-                        quest.CompleteQuestWithBetrayal();
-                        break;
-                    default:
-                        return $"Unknown outcome '{outcome}'. {usage}";
+                    switch (outcome)
+                    {
+                        case "success":
+                            quest.CompleteQuestWithSuccess();
+                            break;
+                        case "cancel":
+                            quest.CompleteQuestWithCancel();
+                            break;
+                        case "fail":
+                            quest.CompleteQuestWithFail();
+                            break;
+                        case "timeout":
+                            quest.CompleteQuestWithTimeOut();
+                            break;
+                        case "betrayal":
+                            quest.CompleteQuestWithBetrayal();
+                            break;
+                        default:
+                            return Failed($"Unknown outcome '{outcome}'. Expected success, cancel, fail, timeout, or betrayal.");
+                    }
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            return CommandHelpers.FormatException($"coop.debug.issues.complete ({outcome})", ex);
-        }
+            catch (Exception ex)
+            {
+                return Failed(CommandHelpers.FormatException($"coop.debug.issues.complete ({outcome})", ex));
+            }
 
-        return $"Completed quest for hero '{hero.Name}' (StringId '{hero.StringId}') with outcome '{outcome}'.";
+            return Succeeded($"Completed quest for hero '{hero.Name}' (StringId '{hero.StringId}') with outcome '{outcome}'.");
+        }
     }
 
-    [CommandLineArgumentFunction("list_types", "coop.debug.issues")]
-    public static string ListTypes(List<string> args)
+    public sealed class IssuesListTypesCoopCommand : ICoopCommand
     {
-        var sb = new StringBuilder();
+        public string Prefix => "coop.debug.issues";
 
-        foreach (var entry in IssueGiveCatalog.Entries.Values.OrderBy(e => e.Key, StringComparer.Ordinal))
+        public string Name => "list_types";
+
+        public string Description => "Reports list types.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            sb.AppendLine(entry.Resolve != null
-                ? $"{entry.Key} [wired]"
-                : $"{entry.Key} [not wired: {entry.NotWiredReason}]");
-        }
+            var sb = new StringBuilder();
 
-        return sb.ToString();
+            foreach (var entry in IssueGiveCatalog.Entries.Values.OrderBy(e => e.Key, StringComparer.Ordinal))
+            {
+                sb.AppendLine(entry.Resolve != null
+                    ? $"{entry.Key} [wired]"
+                    : $"{entry.Key} [not wired: {entry.NotWiredReason}]");
+            }
+
+            return Succeeded(sb.ToString());
+        }
     }
 }

@@ -23,8 +23,14 @@ public class CoopNetworkBaseTests
         config.SetupGet(value => value.NetworkPollInterval).Returns(TimeSpan.FromMilliseconds(25));
         config.SetupGet(value => value.UpdateTime).Returns(TimeSpan.FromMilliseconds(15));
 
+        ICommonSerializer serializer = Mock.Of<ICommonSerializer>();
+        var reliableMessageBatcher = new ReliableMessageBatcher<NetPeer>(serializer);
         using var sessionCancellation = new CancellationTokenSource();
-        using var network = new TestNetwork(config.Object, Mock.Of<ICommonSerializer>(), sessionCancellation);
+        using var network = new TestNetwork(
+            config.Object,
+            serializer,
+            reliableMessageBatcher,
+            sessionCancellation);
 
         Assert.Equal(60_000, network.AppliedDisconnectTimeout);
     }
@@ -34,8 +40,9 @@ public class CoopNetworkBaseTests
         public TestNetwork(
             INetworkConfig config,
             ICommonSerializer serializer,
+            IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
             CancellationTokenSource sessionCancellation)
-            : base(config, serializer, sessionCancellation)
+            : base(config, serializer, reliableMessageBatcher, sessionCancellation)
         {
         }
 

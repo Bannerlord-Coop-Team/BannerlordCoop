@@ -8,6 +8,8 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -44,6 +46,7 @@ internal class BattleMissionStartHandler : IHandler
     // Exclusive upper bound for the terrain seed, preserving the range of the original
     // client-side MBRandom.RandomInt(10000) roll this replaces.
     private const int MaxTerrainSeed = 10000;
+    private const int SiegeMissionOpenRetrySeconds = 30;
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -51,6 +54,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
+    private readonly IBattleTroopReserveBuilder reserveBuilder;
     private static long attackMissionStartSequence;
 
     // Server-side: the complete mission initializer chosen once per map event and reused for late entrants.
@@ -69,7 +73,8 @@ internal class BattleMissionStartHandler : IHandler
         IPlayerManager playerManager,
         INetwork network,
         IMapEventLogger mapEventLogger,
-        IBattleMissionInitializerResolver missionInitializerResolver)
+        IBattleMissionInitializerResolver missionInitializerResolver,
+        IBattleTroopReserveBuilder reserveBuilder)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -77,6 +82,7 @@ internal class BattleMissionStartHandler : IHandler
         this.network = network;
         this.mapEventLogger = mapEventLogger;
         this.missionInitializerResolver = missionInitializerResolver;
+        this.reserveBuilder = reserveBuilder;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
@@ -151,6 +157,14 @@ internal class BattleMissionStartHandler : IHandler
                     return;
                 }
 
+                operation = "validate naval battle";
+                if (mapEvent.IsNavalMapEvent)
+                {
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles are disabled", payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 // The lords-hall stage is not supported: CurrentSiegeState never advances past OnTheWalls in
                 // co-op (SiegeMissionEndPatches), so this only trips on a save that carried the state in.
                 // Rejected before the arbiter claim so the event stays open for auto-resolve.
@@ -196,13 +210,10 @@ internal class BattleMissionStartHandler : IHandler
                 }
 
                 operation = "make map event sides mission-ready";
-                foreach (var side in mapEvent._sides)
-                {
-                    side.MakeReadyForMission(null);
-                }
+                reserveBuilder.PrepareMissionReserves(mapEvent, attackerMobileParty);
 
                 IMessage missionStartMessage;
-                if (mapEvent.IsSiegeAssault)
+                if (mapEvent.IsSiegeAssault || mapEvent.IsSiegeAmbush)
                 {
                     operation = "build siege mission snapshot";
                     var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
@@ -213,7 +224,9 @@ internal class BattleMissionStartHandler : IHandler
                         snapshot.WallHitPointRatios,
                         snapshot.AttackerEngines,
                         snapshot.DefenderEngines,
-                        payload.What.AttackerPartyId);
+                        payload.What.AttackerPartyId,
+                        snapshot.SettlementId,
+                        snapshot.IsSallyOut);
                 }
                 else
                 {
@@ -290,12 +303,20 @@ internal class BattleMissionStartHandler : IHandler
         {
             if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
                 !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
-                mapEvent.FindMapEventParty(party.Party) == null)
+                mapEvent.FindMapEventParty(party.Party, out var side) is not MapEventParty mapEventParty ||
+                !objectManager.TryGetIdWithLogging(side, out var sideId) ||
+                !objectManager.TryGetIdWithLogging(mapEventParty, out var mapEventPartyId) ||
+                !objectManager.TryGetIdWithLogging(party.Party, out var partyId))
             {
                 continue;
             }
 
-            participants.Add(new MissionParticipant(player.ControllerId, peer));
+            participants.Add(new MissionParticipant(
+                player.ControllerId,
+                peer,
+                sideId,
+                mapEventPartyId,
+                partyId));
         }
 
         return participants;
@@ -322,18 +343,37 @@ internal class BattleMissionStartHandler : IHandler
         }
 
         foreach (var participant in participants)
+        {
+            // Replay the recipient's authoritative membership first. The ordered channel and
+            // idempotent client attachment make it present before the mission-start guard runs.
+            network.Send(participant.Peer, new NetworkAddBattleParty(
+                participant.MapEventSideId,
+                participant.MapEventPartyId,
+                participant.PartyId));
             network.Send(participant.Peer, message);
+        }
     }
 
     private sealed class MissionParticipant
     {
         public string ControllerId { get; }
         public NetPeer Peer { get; }
+        public string MapEventSideId { get; }
+        public string MapEventPartyId { get; }
+        public string PartyId { get; }
 
-        public MissionParticipant(string controllerId, NetPeer peer)
+        public MissionParticipant(
+            string controllerId,
+            NetPeer peer,
+            string mapEventSideId,
+            string mapEventPartyId,
+            string partyId)
         {
             ControllerId = controllerId;
             Peer = peer;
+            MapEventSideId = mapEventSideId;
+            MapEventPartyId = mapEventPartyId;
+            PartyId = partyId;
         }
     }
 
@@ -466,9 +506,14 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     /// <summary>[Server] Snapshot the mission-defining siege inputs for one map event.</summary>
-    private static NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent)
+    private NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent)
     {
         var settlement = mapEvent.MapEventSettlement;
+        if (settlement == null || settlement.SiegeEvent == null)
+            throw new InvalidOperationException($"Siege map event {mapEventId} has no active settlement siege");
+        if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId))
+            throw new InvalidOperationException($"Siege settlement for {mapEventId} is not registered");
+
         var siegeEvent = settlement.SiegeEvent;
         int wallLevel = settlement.Town.GetWallLevel();
 
@@ -477,16 +522,18 @@ internal class BattleMissionStartHandler : IHandler
 
         return new NetworkStartSiegeMission(mapEventId, wallLevel,
             settlement.SettlementWallSectionHitPointsRatioList.ToArray(), attackerEngines, defenderEngines,
-            initiatingPartyId: null);
+            initiatingPartyId: null, settlementId: settlementId, isSallyOut: mapEvent.IsSiegeAmbush);
     }
 
     private void Handle_NetworkStartSiegeMission(MessagePayload<NetworkStartSiegeMission> payload)
     {
         var message = payload.What;
-        GameThread.Run(() => OpenSiegeMission(message));
+        var retryDeadline = DateTime.UtcNow.AddSeconds(SiegeMissionOpenRetrySeconds);
+        GameThread.RunSafe(() => OpenSiegeMission(message, retryDeadline),
+            context: nameof(Handle_NetworkStartSiegeMission));
     }
 
-    private void OpenSiegeMission(NetworkStartSiegeMission payload)
+    private void OpenSiegeMission(NetworkStartSiegeMission payload, DateTime retryDeadline)
     {
         bool spawnGateEngaged = false;
         try
@@ -502,12 +549,22 @@ internal class BattleMissionStartHandler : IHandler
                 return;
             }
 
-            var settlement = battle.MapEventSettlement;
-            if (settlement == null)
+            var settlementResolution = ResolveMissionSettlement(battle, payload.SettlementId, out var settlement);
+            if (settlementResolution == MissionSettlementResolution.Retry)
             {
-                Logger.Warning("Received {Message} but the battle has no settlement, not opening siege mission", nameof(NetworkStartSiegeMission));
+                if (DateTime.UtcNow >= retryDeadline)
+                {
+                    Logger.Error("Timed out waiting for settlement {SettlementId} for siege map event {MapEventId}",
+                        payload.SettlementId, payload.MapEventId);
+                    return;
+                }
+
+                GameThread.EnqueueSafe(() => OpenSiegeMission(payload, retryDeadline),
+                    context: nameof(Handle_NetworkStartSiegeMission));
                 return;
             }
+            if (settlementResolution == MissionSettlementResolution.Rejected)
+                return;
 
             // The scene is the fixed settlement scene keyed by wall level — no terrain seed on the siege
             // path. Mirrors vanilla CreateSandBoxMissionInitializerRecord; atmosphere is client-local,
@@ -538,7 +595,8 @@ internal class BattleMissionStartHandler : IHandler
             // counts and never attach the coop behaviors, so a missing launcher is a hard error.
             if (ContainerProvider.TryResolve(out ICoopSiegeBattleLauncher siegeLauncher))
             {
-                var mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios, attackerWeapons, defenderWeapons);
+                var mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios,
+                    attackerWeapons, defenderWeapons, payload.IsSallyOut);
                 if (mission != null)
                     spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
                 else
@@ -559,6 +617,50 @@ internal class BattleMissionStartHandler : IHandler
         {
             UnwindSpawnGateAfterFailedOpen(spawnGateEngaged);
         }
+    }
+
+    private MissionSettlementResolution ResolveMissionSettlement(
+        MapEvent battle,
+        string settlementId,
+        out Settlement settlement)
+    {
+        settlement = battle.MapEventSettlement;
+        if (settlement != null)
+        {
+            if (string.IsNullOrEmpty(settlementId))
+                return MissionSettlementResolution.Resolved;
+
+            if (!objectManager.TryGetId(settlement, out var currentSettlementId) ||
+                !string.Equals(currentSettlementId, settlementId, StringComparison.Ordinal))
+            {
+                Logger.Error("Received {Message} for settlement {SettlementId}, but the map event is bound to a different settlement",
+                    nameof(NetworkStartSiegeMission), settlementId);
+                return MissionSettlementResolution.Rejected;
+            }
+
+            return MissionSettlementResolution.Resolved;
+        }
+
+        if (string.IsNullOrEmpty(settlementId))
+        {
+            Logger.Error("Received {Message} without a settlement id while the battle settlement is missing",
+                nameof(NetworkStartSiegeMission));
+            return MissionSettlementResolution.Rejected;
+        }
+
+        if (!objectManager.TryGetObject(settlementId, out settlement))
+            return MissionSettlementResolution.Retry;
+
+        using (new AllowedThread())
+            battle.MapEventSettlement = settlement;
+        return MissionSettlementResolution.Resolved;
+    }
+
+    private enum MissionSettlementResolution
+    {
+        Resolved,
+        Retry,
+        Rejected,
     }
 
     /// <summary>[Client] Re-validates everything a mission open depends on: the battle can end (or
@@ -619,6 +721,12 @@ internal class BattleMissionStartHandler : IHandler
             if (!TryGetValidBattle(nameof(NetworkStartAttackMission), mapEventId, out var battle))
             {
                 LogAttackMissionLifecycle("rejected at open", sequence, mapEventId);
+                return;
+            }
+
+            if (battle.IsNavalMapEvent)
+            {
+                Logger.Warning("Received {Message} for naval map event {MapEventId}, but naval battles are disabled", nameof(NetworkStartAttackMission), mapEventId);
                 return;
             }
 

@@ -32,8 +32,8 @@ internal class HeroSpawnCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(HeroSpawnCampaignBehavior.OnNonBanditClanDailyTick))]
     [HarmonyPrefix]
-    public static bool OnNonBanditClanDailyTickPrefix() => 
-        ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();
+    public static bool OnNonBanditClanDailyTickPrefix(Clan clan) =>
+        CallOriginalPolicy.IsOriginalAllowed() || (ModInformation.IsServer && !clan.IsPlayerClan());
 
     [HarmonyPatch(nameof(HeroSpawnCampaignBehavior.OnHeroComesOfAge))]
     [HarmonyPrefix]

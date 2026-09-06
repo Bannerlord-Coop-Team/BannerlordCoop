@@ -43,6 +43,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private readonly ILocationPopulationDirector populationDirector;
     private readonly ILocationAuthorityMigrator authorityMigrator;
     private readonly ILocationPartyAgentMap partyAgentMap;
+    private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly ILocationConversationAgentGuard conversationAgentGuard;
     private readonly ILocationPartyPuppetRegistrar partyPuppetRegistrar;
     //private readonly BoardGameManager boardGameManager;
@@ -62,6 +63,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         ILocationPartyPuppetRegistrar partyPuppetRegistrar,
         ILocationControllerWithdrawalState withdrawalState,
         IMissionContext missionContext,
+        IMissionWeaponDataMapper missionWeaponDataMapper,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent)
@@ -75,6 +77,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;
         this.hostRegistry = hostRegistry;
+        this.missionWeaponDataMapper = missionWeaponDataMapper;
         this.conversationAgentGuard = conversationAgentGuard;
         this.partyPuppetRegistrar = partyPuppetRegistrar;
         //this.boardGameManager = boardGameManager;
@@ -681,15 +684,14 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
              index < EquipmentIndex.NumAllWeaponSlots;
              index++)
         {
-            MissionWeapon weapon = equipment[index];
-            objectManager.TryGetId(weapon.Item, out string itemId);
-            weaponSlots.Add(new MissionWeaponData(
-                itemId,
-                weapon.ItemModifier,
-                weapon.Banner,
-                weapon.RawDataForNetwork,
-                weapon.ReloadPhase,
-                null));
+            if (!missionWeaponDataMapper.TryPack(
+                    equipment[index],
+                    out MissionWeaponData weapon))
+            {
+                return null;
+            }
+
+            weaponSlots.Add(weapon);
         }
         return new MissionEquipmentData(weaponSlots);
     }
@@ -709,14 +711,14 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         {
             MissionWeaponData weapon = data.WeaponSlots[(int)index];
             if (weapon == null) continue;
-            objectManager.TryGetObject(weapon.ItemObjectId, out ItemObject item);
-            equipment._weaponSlots[(int)index] = new MissionWeapon(
-                item,
-                weapon.ItemModifier,
-                weapon.Banner,
-                weapon.DataValue,
-                weapon.ReloadPhase,
-                null);
+            if (!missionWeaponDataMapper.TryResolve(
+                    weapon,
+                    out MissionWeapon resolvedWeapon))
+            {
+                return null;
+            }
+
+            equipment._weaponSlots[(int)index] = resolvedWeapon;
         }
         return equipment;
     }

@@ -188,6 +188,262 @@ public class CoopTournamentVMStateTests
         Assert.Equal(0, summary.ExpectedPayout);
     }
 
+    [Fact]
+    public void GetAdvanceChoice_ContestantInNextMatch_ReturnsJoin()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            true,
+            0,
+            0,
+            1);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(TournamentPlayerChoice.Join, CoopTournamentVM.GetAdvanceChoice(state));
+    }
+
+    [Fact]
+    public void GetAdvanceChoice_SpectatorWithSkipAllowed_ReturnsSkip()
+    {
+        var snapshot = CreateSnapshot(
+            Array.Empty<TournamentContestantData>(),
+            new[] { "player-a" },
+            Array.Empty<TournamentPlayerChoiceData>(),
+            true,
+            0,
+            0,
+            1);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(TournamentPlayerChoice.Skip, CoopTournamentVM.GetAdvanceChoice(state));
+    }
+
+    [Fact]
+    public void GetAdvanceChoice_SpectatorWithoutSkipAllowed_ReturnsWatch()
+    {
+        var snapshot = CreateSnapshot(
+            Array.Empty<TournamentContestantData>(),
+            new[] { "player-a" },
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(TournamentPlayerChoice.Watch, CoopTournamentVM.GetAdvanceChoice(state));
+    }
+
+    [Fact]
+    public void GetAdvanceChoice_NoEligibleChoice_ReturnsNull()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            true,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.Preparation);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Null(CoopTournamentVM.GetAdvanceChoice(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_LiveMatchSpectator_ReturnsTrue()
+    {
+        var snapshot = CreateSnapshot(
+            Array.Empty<TournamentContestantData>(),
+            new[] { "player-a" },
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.True(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_LiveMatchContestantFighting_ReturnsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_LiveMatchRestingContestant_ReturnsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateRestingContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_LiveMatchEliminatedContestant_ReturnsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateEliminatedContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_AwaitingChoices_ReturnsFalse()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            true,
+            0,
+            0,
+            1);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void ShouldOpenLeaveMenu_NoSnapshot_ReturnsFalse()
+    {
+        var state = CoopTournamentVM.CalculateUIState(null, "player-a", true);
+
+        Assert.False(CoopTournamentVM.ShouldOpenLeaveMenu(state));
+    }
+
+    [Fact]
+    public void LocalRole_ContestantInCurrentMatch_IsFighter()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateHumanContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.Fighter, state.Role);
+    }
+
+    [Fact]
+    public void LocalRole_RestingContestant_IsResting()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateRestingContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.Resting, state.Role);
+    }
+
+    [Fact]
+    public void LocalRole_EliminatedContestant_IsEliminated()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateEliminatedContestant() },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.Eliminated, state.Role);
+    }
+
+    [Fact]
+    public void LocalRole_PureSpectator_IsSpectator()
+    {
+        var snapshot = CreateSnapshot(
+            Array.Empty<TournamentContestantData>(),
+            new[] { "player-a" },
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.Spectator, state.Role);
+    }
+
+    [Fact]
+    public void LocalRole_NoLocalPlayer_IsNone()
+    {
+        var snapshot = CreateSnapshot(
+            new[] { CreateContestant("slot-a", "player-b") },
+            Array.Empty<string>(),
+            Array.Empty<TournamentPlayerChoiceData>(),
+            false,
+            0,
+            0,
+            1,
+            phase: TournamentSessionPhase.LiveMatch);
+
+        var state = CoopTournamentVM.CalculateUIState(snapshot, "player-a", true);
+
+        Assert.Equal(CoopTournamentVM.UIState.PlayerRole.None, state.Role);
+    }
+
     private static NetworkTournamentBetResult CreateBetResult(
         TournamentSessionSnapshot snapshot,
         long revision,
@@ -218,6 +474,24 @@ public class CoopTournamentVMStateTests
             true,
             "npc-a");
 
+    private static TournamentContestantData CreateRestingContestant()
+        => CreateContestant("slot-b", "player-a");
+
+    private static TournamentContestantData CreateEliminatedContestant()
+        => CreateContestant("slot-c", "player-a");
+
+    private static TournamentContestantData CreateContestant(string slotId, string controllerId)
+        => new(
+            slotId,
+            "character-b",
+            1,
+            controllerId,
+            "Player B",
+            true,
+            false,
+            true,
+            "npc-b");
+
     private static TournamentSessionSnapshot CreateSnapshot(
         TournamentContestantData[] contestants,
         string[] spectators,
@@ -229,7 +503,7 @@ public class CoopTournamentVMStateTests
         long revision = 1,
         TournamentSessionPhase phase = TournamentSessionPhase.AwaitingChoices)
     {
-        var match = new TournamentMatchData(
+        var currentMatch = new TournamentMatchData(
             "match-a",
             "round-a",
             0,
@@ -246,6 +520,23 @@ public class CoopTournamentVMStateTests
                     null)
             },
             Array.Empty<string>());
+        var pendingMatch = new TournamentMatchData(
+            "match-b",
+            "round-a",
+            0,
+            1,
+            1,
+            new[]
+            {
+                new TournamentTeamData(
+                    "team-b",
+                    new[] { "slot-b" },
+                    0,
+                    false,
+                    0,
+                    null)
+            },
+            Array.Empty<string>());
 
         return new TournamentSessionSnapshot(
             "session-a",
@@ -256,13 +547,13 @@ public class CoopTournamentVMStateTests
             phase,
             revision,
             1,
-            match.MatchId,
+            currentMatch.MatchId,
             "host-a",
             Array.Empty<string>(),
             contestants,
             spectators,
             choices,
-            new[] { new TournamentRoundData("round-a", 0, 0, new[] { match }) },
+            new[] { new TournamentRoundData("round-a", 0, 0, new[] { currentMatch, pendingMatch }) },
             readyCount,
             skipCount,
             voterCount,

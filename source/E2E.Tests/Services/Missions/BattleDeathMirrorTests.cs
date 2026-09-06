@@ -28,6 +28,7 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var victimId = Guid.NewGuid();
         var affectorId = Guid.NewGuid();
         Agent ownerVictim = null!, ownerAffector = null!, peerVictim = null!, peerAffector = null!;
@@ -35,7 +36,7 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
             peerController = peer.Resolve<CoopBattleController>();
             var registry = peer.Resolve<INetworkAgentRegistry>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
@@ -47,7 +48,7 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
@@ -132,6 +133,52 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
         Assert.False(victimMirror.IsActive);
         Assert.False(victimMirror.WasKilled);
         Assert.Equal(222, victimMirror.DeathAction);
+
+        GC.KeepAlive(peerController);
+    }
+
+    [Fact]
+    public void DeathWithMountAffector_AppliesWithoutReplayingAMissingWeaponSlot()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        var victimId = Guid.NewGuid();
+        var affectorId = Guid.NewGuid();
+        Agent peerVictim = null!;
+        Agent peerMount = null!;
+        CoopBattleController peerController = null!;
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            peerController = peer.Resolve<CoopBattleController>();
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            peerVictim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            peerMount = mock.SpawnMount();
+            Assert.True(registry.TryRegisterAgent("owner", victimId, peerVictim));
+            Assert.True(registry.TryRegisterAgent("owner", affectorId, peerMount));
+
+            peer.Resolve<IMessageBroker>().Publish(this,
+                new NetworkBattleAgentDied(
+                    victimId,
+                    wounded: true,
+                    affectorId,
+                    inflictedDamage: 100,
+                    victimBodyPart: BoneBodyPartType.Chest,
+                    deathAction: 3587));
+
+            Assert.False(registry.TryGetAgentInfo(victimId, out _));
+            Assert.True(registry.TryGetAgentInfo(affectorId, out var affectorInfo));
+            Assert.Same(peerMount, affectorInfo.Agent);
+        });
+
+        Assert.True(AgentMirror.TryGet(peerVictim, out var victimMirror));
+        Assert.False(victimMirror.IsActive);
+        Assert.False(victimMirror.WasKilled);
+        Assert.Equal(3587, victimMirror.DeathAction);
 
         GC.KeepAlive(peerController);
     }

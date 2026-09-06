@@ -38,6 +38,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     public NetPeer PeerServer { get; private set; }
 
     private readonly IPacketManager packetManager;
+    private readonly IMessagePacketHandler messagePacketHandler;
 
     private readonly NetManager netManager;
     private readonly IRelayNetwork relayNetwork;
@@ -47,6 +48,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ISteamMissionBridge steamBridge;
     private readonly IMovementPacketCompressor movementPacketCompressor;
+    private readonly IReliableMessageBatcher<string> reliableMessageBatcher;
     private readonly Poller poller;
 
     private readonly object peerGate = new();
@@ -57,6 +59,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly HashSet<NetPeer> connectedPendingPeers = new();
     private readonly object relayPayloadBudgetGate = new();
     private readonly Dictionary<(string InstanceId, string ControllerId), int> relayPayloadBudgets = new();
+    private readonly Func<IReceivePathDiagnostics> diagnosticsFactory;
+    private readonly Dictionary<NetPeer, IReceivePathDiagnostics> receiveDiagnostics = new();
+    private readonly Dictionary<string, IReceivePathDiagnostics> routeDiagnostics = new();
     private bool disposed;
 
     private string instanceId = null;
@@ -87,19 +92,29 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         ICommonSerializer serializer,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
+        IMessagePacketHandler messagePacketHandler,
         IControllerIdProvider controllerIdProvider,
         ISteamMissionBridge steamBridge,
-        IMovementPacketCompressor movementPacketCompressor)
+        IMovementPacketCompressor movementPacketCompressor,
+        IReliableMessageBatcher<string> reliableMessageBatcher,
+        Func<IReceivePathDiagnostics> diagnosticsFactory)
     {
+        if (diagnosticsFactory == null) throw new ArgumentNullException(nameof(diagnosticsFactory));
+        this.diagnosticsFactory = diagnosticsFactory;
         Config = config;
         this.relayNetwork = relayNetwork;
         this.missionContext = missionContext;
+        if (reliableMessageBatcher == null)
+            throw new ArgumentNullException(nameof(reliableMessageBatcher));
+
         this.packetManager = packetManager;
+        this.messagePacketHandler = messagePacketHandler;
         this.serializer = serializer;
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.steamBridge = steamBridge;
         this.movementPacketCompressor = movementPacketCompressor;
+        this.reliableMessageBatcher = reliableMessageBatcher;
 
         netManager = new NetManager(this)
         {
@@ -158,15 +173,16 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     public void DisconnectPeers()
     {
         Logger.Debug("Disconnecting P2P peers (keeping socket alive)");
-        lock (peerGate)
-        {
-            instanceId = null;
-            instanceGeneration++;
-        }
         // Flush queued reliable sends (notably the NetworkLeaveMission broadcast on OnEndMission)
         // before dropping the connections, so a graceful leave reliably reaches peers instead of being
         // cut off by DisconnectAll. The disconnect/timeout path stays the fallback for ungraceful exits.
         FlushReliableSends();
+        lock (peerGate)
+        {
+            EndDiagnostics("disconnect-all");
+            instanceId = null;
+            instanceGeneration++;
+        }
         netManager.DisconnectAll();
         steamBridge.Stop();
 
@@ -177,12 +193,15 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             mappedPeerControllers.Clear();
             peerSteamIds.Clear();
             connectedPendingPeers.Clear();
+            EndDiagnostics("disconnect-complete");
         }
 
         lock (relayPayloadBudgetGate)
         {
             relayPayloadBudgets.Clear();
         }
+
+        reliableMessageBatcher.Clear();
     }
 
     // LiteNetLib 1.3.1 has no synchronous flush, so nudge the logic thread and wait (bounded) for each
@@ -191,6 +210,10 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     // the cap keeps an unresponsive peer from hitching it for more than a frame or two.
     private void FlushReliableSends()
     {
+        reliableMessageBatcher.FlushAll(
+            _ => true,
+            SendReliableMessagePayload);
+
         const int maxWaitMs = 100;
         var stopwatch = Stopwatch.StartNew();
         while (stopwatch.ElapsedMilliseconds < maxWaitMs)
@@ -213,6 +236,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();
+        FlushPendingMessages();
+    }
+
+    internal void FlushPendingMessages()
+    {
+        reliableMessageBatcher.FlushAll(
+            IsControllerConnected,
+            SendReliableMessagePayload);
     }
 
     public void ConnectToInstance(string instanceId)
@@ -221,6 +252,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         // when the punch below is skipped.
         lock (peerGate)
         {
+            EndDiagnostics("connect-instance");
             this.instanceId = instanceId;
             instanceGeneration++;
         }
@@ -264,6 +296,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             if (peer != null)
             {
                 pendingPeerControllers[peer] = connectionToken.ControllerId;
+                LogPeerState(peer, "pending-connect");
             }
         }
     }
@@ -289,6 +322,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         missionContext.RemovePeer(peer);
+        if (controllerId != null)
+            reliableMessageBatcher.Flush(controllerId, SendReliableMessagePayload);
         if (remoteSteamId != 0) steamBridge.Disconnect(remoteSteamId);
     }
 
@@ -345,6 +380,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 {
                     pendingPeerControllers[peer] = connectionToken.ControllerId;
                     if (authenticated) peerSteamIds[peer] = authenticatedSteamId;
+                    LogPeerState(peer, "accepted-pending");
                 }
                 return;
             }
@@ -357,6 +393,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     public void OnPeerConnected(NetPeer peer)
     {
         bool rejectPeer = false;
+        string controllerIdToPromote = null;
         lock (peerGate)
         {
             if (pendingPeerControllers.TryGetValue(peer, out var controllerId))
@@ -367,6 +404,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 if (expectedSteamId == 0 && actualSteamId != 0)
                 {
                     connectedPendingPeers.Add(peer);
+                    LogPeerState(peer, "awaiting-membership");
                 }
                 else if (expectedSteamId != 0 && expectedSteamId != actualSteamId)
                 {
@@ -375,19 +413,19 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 }
                 else
                 {
-                    PromotePeer(peer, controllerId);
+                    controllerIdToPromote = controllerId;
                 }
             }
         }
 
+        if (controllerIdToPromote != null) PromotePeer(peer, controllerIdToPromote);
         if (rejectPeer) netManager.DisconnectPeer(peer);
 
-        // Proof-of-P2P diagnostic: the remote endpoint here is the OTHER CLIENT's socket, reached
-        // directly. Compare its port against the rendezvous (server) port — if they differ, this is
-        // a direct client-to-client link, not server-relayed.
-        Logger.Information("[LocationSync] P2P link established: remote(other client)={Remote} | myP2PPort={LocalPort} | rendezvous(server)={Server}:{ServerPort}. " +
-            "remote != rendezvous => DIRECT P2P (not server-relayed).",
-            peer, netManager.LocalPort, Config.LanAddress, Config.LanPort);
+        lock (peerGate)
+        {
+            // A connected socket does not prove mapping readiness or Steam's physical route.
+            LogPeerState(peer, rejectPeer ? "connected-rejected" : "transport-connected");
+        }
     }
 
     private void Handle_MissionPeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
@@ -396,6 +434,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (entered.SteamId == 0) return;
 
         var invalidPeers = new List<NetPeer>();
+        var peersToPromote = new List<NetPeer>();
         bool alreadyTracked;
         int generation;
         lock (peerGate)
@@ -403,6 +442,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             if (entered.InstanceId != instanceId) return;
             generation = instanceGeneration;
             controllerSteamIds[entered.ControllerId] = entered.SteamId;
+            Logger.Information("[ReceivePath] utc={Utc:O} instance={Instance} generation={Generation} localController={LocalController} membershipController={Controller} expectedSteamId={SteamId}",
+                DateTime.UtcNow, instanceId, instanceGeneration, controllerIdProvider.ControllerId, entered.ControllerId, entered.SteamId);
 
             foreach (var pair in pendingPeerControllers
                 .Where(pair => pair.Value == entered.ControllerId)
@@ -416,7 +457,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 }
                 else if (connectedPendingPeers.Contains(pair.Key))
                 {
-                    PromotePeer(pair.Key, entered.ControllerId);
+                    peersToPromote.Add(pair.Key);
                 }
             }
 
@@ -435,6 +476,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             alreadyTracked = HasTrackedPeer(entered.ControllerId);
         }
 
+        foreach (var peerToPromote in peersToPromote) PromotePeer(peerToPromote, entered.ControllerId);
         foreach (var invalidPeer in invalidPeers) netManager.DisconnectPeer(invalidPeer);
         if (alreadyTracked) return;
 
@@ -454,6 +496,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 {
                     pendingPeerControllers[peer] = entered.ControllerId;
                     peerSteamIds[peer] = entered.SteamId;
+                    LogPeerState(peer, "steam-pending-connect");
                 }
             }
         }
@@ -484,7 +527,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 controllerSteamIds.Remove(controllerId);
             }
             trackedPeer = RemoveTrackedPeer(controllerId);
+            if (routeDiagnostics.TryGetValue(controllerId, out var diagnostics))
+            {
+                diagnostics.End("controller-departed");
+                routeDiagnostics.Remove(controllerId);
+            }
         }
+
+        reliableMessageBatcher.Remove(controllerId);
 
         if (trackedPeer != null)
         {
@@ -516,6 +566,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (trackedPeer == null) return;
 
         missionContext.RemovePeer(trackedPeer);
+        reliableMessageBatcher.Flush(controllerId, SendReliableMessagePayload);
         netManager.DisconnectPeer(trackedPeer);
     }
 
@@ -546,10 +597,27 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     private void PromotePeer(NetPeer peer, string controllerId)
     {
-        pendingPeerControllers.Remove(peer);
-        connectedPendingPeers.Remove(peer);
-        mappedPeerControllers[peer] = controllerId;
-        missionContext.MapPeer(controllerId, peer);
+        // Submit earlier relay traffic before switching this controller to the direct route.
+        reliableMessageBatcher.FlushThen(
+            controllerId,
+            SendReliableMessagePayload,
+            () =>
+            {
+                lock (peerGate)
+                {
+                    if (!pendingPeerControllers.TryGetValue(peer, out string pendingControllerId) ||
+                        pendingControllerId != controllerId)
+                    {
+                        return;
+                    }
+
+                    pendingPeerControllers.Remove(peer);
+                    connectedPendingPeers.Remove(peer);
+                    mappedPeerControllers[peer] = controllerId;
+                    missionContext.MapPeer(controllerId, peer);
+                    LogPeerState(peer, "promoted");
+                }
+            });
     }
 
     private void RemovePeerTracking(NetPeer peer, out string controllerId)
@@ -559,10 +627,75 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             mappedPeerControllers.TryGetValue(peer, out controllerId);
         }
 
+        LogPeerState(peer, "removing");
+        if (receiveDiagnostics.TryGetValue(peer, out var diagnostics))
+        {
+            diagnostics.End("peer-removed");
+            receiveDiagnostics.Remove(peer);
+        }
         pendingPeerControllers.Remove(peer);
         mappedPeerControllers.Remove(peer);
         peerSteamIds.Remove(peer);
         connectedPendingPeers.Remove(peer);
+    }
+
+    // Called under peerGate, including receive callbacks, so no per-packet context allocation.
+    private IReceivePathDiagnostics GetReceiveDiagnostics(NetPeer peer)
+    {
+        if (!receiveDiagnostics.TryGetValue(peer, out var diagnostics))
+        {
+            pendingPeerControllers.TryGetValue(peer, out var controller);
+            if (controller == null) mappedPeerControllers.TryGetValue(peer, out controller);
+            diagnostics = diagnosticsFactory();
+            diagnostics.Start(Logger, $"mission-receive instance={instanceId} generation={instanceGeneration} " +
+                $"localController={controllerIdProvider.ControllerId} remoteController={controller} " +
+                $"peer={peer} peerId={peer.Id} localPort={netManager.LocalPort}");
+            receiveDiagnostics[peer] = diagnostics;
+        }
+        return diagnostics;
+    }
+
+    private void RecordRoute(string controllerId, ReceivePathEvent route, int bytes)
+    {
+        lock (peerGate)
+        {
+            if (!routeDiagnostics.TryGetValue(controllerId, out var diagnostics))
+            {
+                diagnostics = diagnosticsFactory();
+                diagnostics.Start(Logger, $"mission-send-attempt instance={instanceId} generation={instanceGeneration} " +
+                    $"localController={controllerIdProvider.ControllerId} remoteController={controllerId}");
+                routeDiagnostics[controllerId] = diagnostics;
+            }
+            diagnostics.Record(route, bytes);
+        }
+    }
+
+    private void LogPeerState(NetPeer peer, string transition)
+    {
+        pendingPeerControllers.TryGetValue(peer, out var pendingController);
+        mappedPeerControllers.TryGetValue(peer, out var mappedController);
+        string controller = mappedController ?? pendingController;
+        if (controller != null) GetReceiveDiagnostics(peer);
+        ulong expectedSteamId = 0;
+        if (controller != null) controllerSteamIds.TryGetValue(controller, out expectedSteamId);
+        peerSteamIds.TryGetValue(peer, out var actualSteamId);
+        bool contextMapped = controller != null && missionContext.TryGetPeer(controller, out var contextPeer)
+            && ReferenceEquals(peer, contextPeer);
+        Logger.Information("[ReceivePath] utc={Utc:O} instance={Instance} generation={Generation} localController={LocalController} " +
+            "transition={Transition} peer={Peer} peerId={PeerId} localPort={LocalPort} pendingController={PendingController} " +
+            "mappedController={MappedController} contextMapped={ContextMapped} awaitingMembership={AwaitingMembership} " +
+            "expectedSteamId={ExpectedSteamId} trackedSteamId={ActualSteamId}",
+            DateTime.UtcNow, instanceId, instanceGeneration, controllerIdProvider.ControllerId, transition,
+            peer, peer.Id, netManager.LocalPort, pendingController, mappedController, contextMapped,
+            connectedPendingPeers.Contains(peer), expectedSteamId, actualSteamId);
+    }
+
+    private void EndDiagnostics(string reason)
+    {
+        foreach (var diagnostics in receiveDiagnostics.Values) diagnostics.End(reason);
+        foreach (var diagnostics in routeDiagnostics.Values) diagnostics.End(reason);
+        receiveDiagnostics.Clear();
+        routeDiagnostics.Clear();
     }
 
     public void SendAll(IMessage message)
@@ -612,14 +745,37 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void Send(string controllerId, IPacket packet, byte[] data)
     {
-        // Send directly to direct peer
-        if (missionContext.TryGetPeer(controllerId, out var peer))
+        if (packet is MessagePacket messagePacket)
         {
+            reliableMessageBatcher.Send(
+                controllerId,
+                messagePacket.Data,
+                SendReliableMessagePayload);
+            return;
+        }
+
+        if (packet.DeliveryMethod == DeliveryMethod.ReliableOrdered ||
+            packet.DeliveryMethod == DeliveryMethod.ReliableUnordered)
+        {
+            reliableMessageBatcher.FlushThen(
+                controllerId,
+                SendReliableMessagePayload,
+                () => SendPacketToController(controllerId, packet, data));
+            return;
+        }
+
+        SendPacketToController(controllerId, packet, data);
+    }
+
+    private void SendPacketToController(string controllerId, IPacket packet, byte[] data)
+    {
+        if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
+        {
+            RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
             Send(peer, packet, data);
             return;
         }
 
-        // Otherwise send relay packet to the server
         string relayInstanceId;
         lock (peerGate)
         {
@@ -628,8 +784,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
         if (IsMovementPacket(packet))
         {
-            int maxRelayPayloadBytes =
-                GetMaxRelayPayloadBytes(relayInstanceId, controllerId);
+            int maxRelayPayloadBytes = GetMaxRelayPayloadBytes(relayInstanceId, controllerId);
             if (data.Length > maxRelayPayloadBytes)
             {
                 if (maxRelayPayloadBytes > 0)
@@ -646,11 +801,40 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             }
         }
 
+        RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
         relayNetwork.SendAll(new RelayPacket(
             packet.DeliveryMethod,
             relayInstanceId,
             controllerId,
             data));
+    }
+
+    private void SendReliableMessagePayload(string controllerId, byte[] data)
+    {
+        if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
+        {
+            RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
+            peer.Send(data, DeliveryMethod.ReliableOrdered);
+            return;
+        }
+
+        string relayInstanceId;
+        lock (peerGate)
+        {
+            relayInstanceId = instanceId;
+        }
+
+        RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
+        relayNetwork.SendAll(new RelayPacket(
+            DeliveryMethod.ReliableOrdered,
+            relayInstanceId,
+            controllerId,
+            data));
+    }
+
+    private bool IsControllerConnected(string controllerId)
+    {
+        return missionContext.ControllersInMission.Contains(controllerId);
     }
 
     // Peer-reported MTUs can be optimistic, so cap nonfragmentable sends at a conservative ceiling.
@@ -806,21 +990,40 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         lock (peerGate)
         {
-            if (!mappedPeerControllers.ContainsKey(peer)) return;
+            bool mapped = mappedPeerControllers.ContainsKey(peer);
+            GetReceiveDiagnostics(peer).Record(
+                mapped ? ReceivePathEvent.MappedReceive : ReceivePathEvent.UnmappedDrop,
+                reader.AvailableBytes);
+            if (!mapped) return;
         }
 
-#if DEBUG
-        byte[] serializedPacket = reader.GetRemainingBytes();
-        var packet = serializer.Deserialize<IPacket>(serializedPacket);
-        if (packet is AgentActionPacket actionPacket)
+        HandleReceivedPayload(peer, reader.GetRemainingBytes());
+    }
+
+    internal void HandleReceivedPayload(NetPeer peer, byte[] serializedPacket)
+    {
+        object received = serializer.Deserialize(serializedPacket);
+        if (received is IPacket packet)
         {
-            MissionActionDiagnostics.RecordActionPacketReceived(
-                actionPacket,
-                serializedPacket.Length);
-        }
-#else
-        var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
+#if DEBUG
+            if (packet is AgentActionPacket actionPacket)
+            {
+                MissionActionDiagnostics.RecordActionPacketReceived(
+                    actionPacket,
+                    serializedPacket.Length);
+            }
 #endif
-        packetManager.HandleReceive(peer, packet);
+            packetManager.HandleReceive(peer, packet);
+        }
+        else if (received is IMessage message)
+        {
+            messagePacketHandler.PublishEvent(peer, message);
+        }
+        else
+        {
+            Logger.Error(
+                "Received mission payload deserialized to neither IPacket nor IMessage: {Type}",
+                received?.GetType());
+        }
     }
 }

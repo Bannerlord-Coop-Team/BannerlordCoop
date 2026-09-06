@@ -48,8 +48,6 @@ public class ModConfigTests : IDisposable
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.False(config.Difficulty.BirthAndDeath);
-        Assert.Equal(1d, config.Network.MovementOutgoingMiBPerSecond);
-        Assert.Equal(1d, config.Network.MovementIncomingMiBPerSecond);
     }
 
     [Fact]
@@ -73,25 +71,24 @@ public class ModConfigTests : IDisposable
         Assert.Equal(1000, config.ModOptions.BattleSize);
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
-        Assert.True(config.Network.UnknownKeys == null || config.Network.UnknownKeys.Count == 0);
         Assert.True(config.ModOptions.UnknownKeys == null || config.ModOptions.UnknownKeys.Count == 0);
     }
 
     [Fact]
-    public void ConfiguredNetworkValuesBind()
+    public void LegacyNetworkBlock_IsIgnoredWithoutBreakingOtherSettings()
     {
         File.WriteAllText(ConfigPath, @"{
   ""network"": {
-    ""movementOutgoingMiBPerSecond"": 0.5,
-    ""movementIncomingMiBPerSecond"": 2.0,
+    ""movementOutgoingMiBPerSecond"": 1.0,
+    ""movementIncomingMiBPerSecond"": 1.0,
   },
+  ""modOptions"": { ""autoPauseEnabled"": false },
 }");
 
         var config = NewModConfig().Data;
 
-        Assert.Equal(0.5d, config.Network.MovementOutgoingMiBPerSecond);
-        Assert.Equal(2d, config.Network.MovementIncomingMiBPerSecond);
-        Assert.True(config.Network.UnknownKeys == null || config.Network.UnknownKeys.Count == 0);
+        Assert.False(config.ModOptions.AutoPauseEnabled);
+        Assert.True(config.UnknownKeys.ContainsKey("network"));
     }
 
     [Fact]

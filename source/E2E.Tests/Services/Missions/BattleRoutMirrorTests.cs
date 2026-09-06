@@ -106,9 +106,12 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(observer, "observer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
+        observer.Call(() => CreateConnectedMission(fixture, observer, missionInstanceId));
+
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             var controller = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
 

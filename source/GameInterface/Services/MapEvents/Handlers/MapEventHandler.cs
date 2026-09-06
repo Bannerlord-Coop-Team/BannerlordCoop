@@ -136,6 +136,11 @@ internal class MapEventHandler : IHandler
                     return;
                 }
 
+                // CampaignMissionComponent sets this on an attacker client before its result-ready report. The
+                // server keeps the map event unresolved until the coop completion barrier finalizes the ambush.
+                if (ModInformation.IsServer && battleState == BattleState.DefenderPullBack && mapEvent.IsSiegeAmbush)
+                    return;
+
                 // Only the elected battle host's conclusion is authoritative: a non-host's local mission can
                 // conclude a victory the shared battle never reached (its enemies arrive as another client's
                 // puppets). Applying it would run the full capture/finalize on a battle still being fought.

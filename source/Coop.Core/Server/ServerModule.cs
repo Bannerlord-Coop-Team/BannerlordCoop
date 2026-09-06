@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -9,6 +10,9 @@ using Coop.Core.Client.Services.Kingdoms;
 using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
+#if DEBUG
+using Coop.Core.Common.Commands;
+#endif
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
@@ -18,6 +22,7 @@ using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Settlements;
+using Coop.Core.Server.Services.Telemetry;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
 using Coop.Steam;
@@ -39,6 +44,12 @@ public class ServerModule : CommonModule
         base.Load(builder);
 
         builder.RegisterModule<ConnectionModule>();
+
+#if DEBUG
+        builder.RegisterType<JoinDebugCommands.JoinStateCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.StageInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.RestoreInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+#endif
 
         // The mission/P2P stack is composed into the server container too (it is also in ClientModule) so the
         // server-authoritative battle classes — notably BattleHostHandler, which elects the battle host — run
@@ -82,6 +93,19 @@ public class ServerModule : CommonModule
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
+
+        builder.RegisterType<ServerTelemetryUploader>()
+            .As<IServerTelemetryUploader>()
+            .As<IBattlesFoughtUploader>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<ServerTelemetryReporter>()
+            .As<IServerTelemetryReporter>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
+        builder.RegisterType<BattlesFoughtReporter>()
+            .As<IBattlesFoughtReporter>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
 
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

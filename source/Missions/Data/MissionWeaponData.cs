@@ -10,7 +10,7 @@ public class MissionWeaponData
     public readonly string ItemObjectId;
 
     [ProtoMember(2)]
-    public readonly ItemModifier ItemModifier;
+    public readonly string ItemModifierId;
 
     [ProtoMember(3)]
     public readonly Banner Banner;
@@ -26,14 +26,14 @@ public class MissionWeaponData
 
     public MissionWeaponData(
         string itemObjectId,
-        ItemModifier itemModifier,
+        string itemModifierId,
         Banner banner,
         short dataValue,
         short reloadPhase,
         MissionSubWeaponData ammoWeaponData)
     {
         ItemObjectId = itemObjectId;
-        ItemModifier = itemModifier;
+        ItemModifierId = itemModifierId;
         Banner = banner;
         DataValue = dataValue;
         ReloadPhase = reloadPhase;

@@ -76,7 +76,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 client.Resolve<IPlayerManager>(),
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
-                missionInitializerResolver);
+                missionInitializerResolver,
+                null!);
 
             try
             {
@@ -189,7 +190,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     client.Resolve<IPlayerManager>(),
                     client.Resolve<INetwork>(),
                     client.Resolve<IMapEventLogger>(),
-                    missionInitializerResolver);
+                    missionInitializerResolver,
+                    null!);
 
                 messageBroker.Publish(this, new NetworkStartAttackMission(
                     mapEvent.MapEventId,

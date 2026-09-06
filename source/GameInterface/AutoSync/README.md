@@ -1,7 +1,7 @@
 # Dynamic Sync
 
 1. [Collects]() all classes that inherit [IAutoSync]()
-2. Each field/propery/collection added from the IAutoSync class is stored in the [AutoSyncRegistry]()
+2. Each field/property/collection added from the IAutoSync class is stored in the [AutoSyncRegistry]()
 
 
 There are 4 different types of data

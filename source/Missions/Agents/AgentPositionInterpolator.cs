@@ -317,9 +317,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             pair.Value.AgentState.Apply(agent);
         }
 
-        if (staleTargets > 0)
-            LogStaleTargets(staleTargets, trackedBefore, oldestStaleAge, oldestStaleAgent, oldestStaleTarget);
-
         if (_evict.Count > 0)
         {
             foreach (Agent agent in _evict)
@@ -328,6 +325,18 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 _mountedGuardProcessedSequences.Remove(agent);
             }
             _evict.Clear();
+        }
+
+        if (staleTargets > 0)
+        {
+            try
+            {
+                LogStaleTargets(staleTargets, trackedBefore, oldestStaleAge, oldestStaleAgent, oldestStaleTarget);
+            }
+            catch (OutOfMemoryException)
+            {
+                // Stale targets are already released; optional diagnostics must not stop the mission tick.
+            }
         }
     }
 

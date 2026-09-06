@@ -27,6 +27,8 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
     private CoopTournamentVM dataSource;
     private bool viewModeResolved;
     private bool isCoopView;
+    private bool forceShowUi;
+    private bool isPhotoMode;
 
     public CoopTournamentMissionView()
     {
@@ -71,6 +73,8 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
         dataSource = new CoopTournamentVM(DisableUi, behavior, initialSnapshot, controller);
         gauntletLayer = new GauntletLayer("MissionCoopTournament", ViewOrderPriority);
         gauntletLayer.Input.RegisterHotKeyCategory(HotKeyManager.GetCategory("GenericPanelGameKeyCategory"));
+        // Focused layers exclusively receive game keys; register Leave so Tab works while this layer holds focus
+        gauntletLayer.Input.RegisterHotKeyCategory(HotKeyManager.GetCategory("Generic"));
         gauntletLayer.InputRestrictions.SetInputRestrictions();
         gauntletLayer.IsFocusLayer = true;
         ScreenManager.TrySetFocus(gauntletLayer);
@@ -133,17 +137,38 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
 
         dataSource.RefreshPendingBracket();
         UpdateBetInput();
+        UpdateTabInput();
+        UpdateUiVisibility();
+        UpdateCombatUi();
+    }
 
-        if (dataSource.ShouldShowUI && !viewEnabled)
+    private void UpdateTabInput()
+    {
+        if (isPhotoMode || dataSource.IsBetWindowEnabled) return;
+
+        bool advancePressed = Mission.InputManager?.IsGameKeyPressed((int)GameKeyDefinition.Leave) == true ||
+            gauntletLayer.Input.IsGameKeyPressed((int)GameKeyDefinition.Leave);
+        if (advancePressed)
+            HandleTabPressed();
+    }
+
+    private void UpdateUiVisibility()
+    {
+        bool uiShouldShow = dataSource.ShouldShowUI || forceShowUi;
+        if (uiShouldShow && !viewEnabled)
         {
             dataSource.Refresh();
             ShowUi();
         }
-        else if (!dataSource.ShouldShowUI && viewEnabled)
+        else if (!uiShouldShow && viewEnabled)
         {
             DisableUi();
         }
-        UpdateCombatUi();
+        if (dataSource.ShouldShowUI)
+        {
+            forceShowUi = false;
+            dataSource.IsLeaveMenuOpen = false;
+        }
     }
 
     public override bool IsOpeningEscapeMenuOnFocusChangeAllowed()
@@ -172,6 +197,7 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
             return;
         }
 
+        isPhotoMode = true;
         if (gauntletLayer != null) gauntletLayer.UIContext.ContextAlpha = 0f;
     }
 
@@ -183,8 +209,34 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
             return;
         }
 
+        isPhotoMode = false;
         if (gauntletLayer != null) gauntletLayer.UIContext.ContextAlpha = viewEnabled ? 1f : 0f;
         UpdateCombatUi();
+    }
+
+    private void HandleTabPressed()
+    {
+        if (dataSource.ShouldShowUI)
+        {
+            TournamentPlayerChoice? advanceChoice = dataSource.GetAdvanceChoice();
+            if (advanceChoice == TournamentPlayerChoice.Join)
+                dataSource.ExecuteJoin();
+            else if (advanceChoice == TournamentPlayerChoice.Skip)
+                dataSource.ExecuteSkip();
+            else if (advanceChoice == TournamentPlayerChoice.Watch)
+                dataSource.ExecuteWatch();
+            return;
+        }
+
+        if (forceShowUi || dataSource.ShouldOpenLeaveMenu())
+        {
+            forceShowUi = !forceShowUi;
+            dataSource.IsLeaveMenuOpen = forceShowUi;
+            if (forceShowUi)
+                ShowUi();
+            else
+                DisableUi();
+        }
     }
 
     private void UpdateBetInput()

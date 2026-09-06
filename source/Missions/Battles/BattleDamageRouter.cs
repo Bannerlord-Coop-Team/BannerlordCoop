@@ -40,6 +40,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IGuardedHitWindow guardedHitWindow;
     private readonly IAgentNativeMountState agentNativeMountState;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
+    private readonly IBattleDamageDataMapper battleDamageDataMapper;
     private readonly Func<Agent, bool?> mountAuthorityProbe;
     private readonly object inboundDamageGate = new();
     private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
@@ -134,7 +135,8 @@ public class BattleDamageRouter : IBattleDamageRouter
         ICoopMissionComponent coopMissionComponent, IBattleSession session,
         IGuardedHitWindow guardedHitWindow,
         IAgentNativeMountState agentNativeMountState,
-        IPuppetMountStateRepairer puppetMountStateRepairer)
+        IPuppetMountStateRepairer puppetMountStateRepairer,
+        IBattleDamageDataMapper battleDamageDataMapper)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -143,6 +145,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         this.guardedHitWindow = guardedHitWindow;
         this.agentNativeMountState = agentNativeMountState;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
+        this.battleDamageDataMapper = battleDamageDataMapper;
 
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
@@ -353,13 +356,10 @@ public class BattleDamageRouter : IBattleDamageRouter
                     hit.Blow.IsMissile,
                     pending.ShotSequence);
             }
-            network.SendAll(new NetworkApplyBattleDamage(
+            network.SendAll(CreateNetworkDamage(
                 victimInfo.AgentId,
-                pending.AttackerId,
-                hit.Blow,
-                hit.CollisionData,
-                missileShotSequence: pending.ShotSequence,
-                attackerWeapon: pending.AttackerWeapon));
+                pending,
+                isMount: false));
             return;
         }
 
@@ -385,14 +385,10 @@ public class BattleDamageRouter : IBattleDamageRouter
                     hit.Blow.IsMissile,
                     pending.ShotSequence);
             }
-            network.SendAll(new NetworkApplyBattleDamage(
+            network.SendAll(CreateNetworkDamage(
                 riderInfo.AgentId,
-                pending.AttackerId,
-                hit.Blow,
-                hit.CollisionData,
-                isMount: true,
-                missileShotSequence: pending.ShotSequence,
-                attackerWeapon: pending.AttackerWeapon));
+                pending,
+                isMount: true));
             return;
         }
 
@@ -408,9 +404,40 @@ public class BattleDamageRouter : IBattleDamageRouter
             hit.Victim?.IsMount ?? hit.IsMount,
             hit.Blow.IsMissile);
     }
+
+    private NetworkApplyBattleDamage CreateNetworkDamage(
+        Guid victimId,
+        PendingLocalDamage pending,
+        bool isMount)
+    {
+        Blow blow = pending.Hit.Blow;
+        AttackCollisionData collisionData = pending.Hit.CollisionData;
+        BattleDamageData damageData = battleDamageDataMapper.Pack(in blow, in collisionData);
+        return new NetworkApplyBattleDamage(
+            victimId,
+            pending.AttackerId,
+            damageData,
+            blow.IsMissile,
+            isMount,
+            pending.ShotSequence,
+            pending.AttackerWeapon);
+    }
+
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
     {
         NetworkApplyBattleDamage damage = payload.What;
+        if (!battleDamageDataMapper.TryResolve(
+                damage.DamageData,
+                out Blow blow,
+                out AttackCollisionData collisionData))
+        {
+            Logger.Error(
+                "[BattleDamage] Dropping routed blow with invalid compact data: victimId={VictimId}",
+                damage.VictimAgentId);
+            return;
+        }
+        damage.AttachDecodedData(blow, collisionData);
+
         if (IsMissileDamage(damage) && damage.MissileShotSequence != 0)
         {
             Vec3 impactVelocity = damage.Blow.WeaponRecord.Velocity;

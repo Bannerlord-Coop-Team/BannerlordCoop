@@ -1,6 +1,7 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -52,5 +53,23 @@ internal class CoopEncounterLeaveConditionNullMapEventPatch
 
         __result = true; // concluded coop battle (no map event) → the leave option is safe to show
         return false;    // skip the original, which would NRE on MainParty.MapEvent.IsSallyOut
+    }
+}
+
+[HarmonyPatch(typeof(EncounterGameMenuBehavior),
+    nameof(EncounterGameMenuBehavior.game_menu_encounter_abandon_army_on_condition))]
+internal class CoopEncounterAbandonArmyConditionNullMapEventPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(MenuCallbackArgs args, ref bool __result)
+    {
+        if (MobileParty.MainParty?.MapEvent != null)
+            return true;
+
+        if (args != null)
+            args.optionLeaveType = GameMenuOption.LeaveType.Leave;
+
+        __result = false;
+        return false;
     }
 }

@@ -27,7 +27,15 @@ namespace E2E.Tests.Services.Missions;
 /// </summary>
 public class BattleMeshRoutingTests : MissionTestEnvironment
 {
-    public BattleMeshRoutingTests(ITestOutputHelper output) : base(output) { }
+    public BattleMeshRoutingTests(ITestOutputHelper output) : base(output)
+    {
+        foreach (var client in Clients)
+        {
+            var mesh = Assert.IsType<MockBattleNetwork>(client.Resolve<IBattleNetwork>());
+            mesh.Start();
+            mesh.ConnectToInstance("battle-mesh-routing");
+        }
+    }
 
     [Fact]
     public void PuppetHit_RoutesOverMesh_AndOnlyTheOwnerAppliesDamage()

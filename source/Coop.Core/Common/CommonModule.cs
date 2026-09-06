@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
@@ -20,7 +21,9 @@ public abstract class CommonModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<TaleWorldsModuleInfoProvider>().As<IModuleInfoProvider>().SingleInstance();
+        builder.RegisterInstance(new CoopLogFile(null)).As<ICoopLogFile>().SingleInstance();
 
         #region Serialization
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
@@ -29,6 +32,9 @@ public abstract class CommonModule : Module
 
         #region Network
         builder.RegisterType<NetworkConfig>().As<INetworkConfig>().InstancePerLifetimeScope();
+        builder.RegisterGeneric(typeof(ReliableMessageBatcher<>))
+            .As(typeof(IReliableMessageBatcher<>))
+            .InstancePerDependency();
         #endregion
 
         #region Communication

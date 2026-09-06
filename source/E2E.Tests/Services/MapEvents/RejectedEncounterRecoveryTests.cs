@@ -274,8 +274,8 @@ public class RejectedEncounterRecoveryTests : MapEventTestBase
         var disabledMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(
                 typeof(TestNetworkRouter),
-                nameof(TestNetworkRouter.SendAll),
-                new[] { typeof(NetPeer), typeof(IMessage) }))
+                nameof(TestNetworkRouter.SendReliablePayload),
+                new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
             .ToList();
 
         client.Call(() =>

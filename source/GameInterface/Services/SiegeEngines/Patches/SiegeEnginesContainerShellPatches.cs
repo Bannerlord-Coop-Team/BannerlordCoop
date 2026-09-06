@@ -51,7 +51,7 @@ internal class SiegeEnginesContainerShellPatches
         }
     }
 
-    private static void InitializeShell(SiegeEnginesContainer container, BattleSideEnum side)
+    internal static void InitializeShell(SiegeEnginesContainer container, BattleSideEnum side)
     {
         // Server containers are constructor-built; only an unfilled client shell has a null list.
         if (container == null || container._deployedSiegeEngines != null) return;

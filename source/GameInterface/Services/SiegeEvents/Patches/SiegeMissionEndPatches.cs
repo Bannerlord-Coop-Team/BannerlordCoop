@@ -1,12 +1,15 @@
 ﻿using Common;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using SandBox.Missions.MissionLogics;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.SiegeEvents.Patches;
 
@@ -22,6 +25,42 @@ internal class SiegeMissionEndPatches
     [HarmonyPatch(typeof(Settlement), nameof(Settlement.SetNextSiegeState))]
     [HarmonyPrefix]
     private static bool SetNextSiegeStatePrefix() => false;
+
+    // A completed ambush always means the defenders returned to the castle, regardless of which side the local
+    // player controls. SallyOutEndLogic derives success from PlayerTeam and would split the completion barrier.
+    [HarmonyPatch(typeof(SallyOutEndLogic), nameof(SallyOutEndLogic.MissionEnded))]
+    [HarmonyPostfix]
+    private static void SallyOutMissionEndedPostfix(SallyOutEndLogic __instance,
+        ref MissionResult missionResult, bool __result)
+    {
+        if (!__result || !BattleConclusionGate.IsInCoopBattleMission) return;
+        if (PlayerEncounter.Battle?.IsSiegeAmbush != true || __instance.Mission?.PlayerTeam == null) return;
+
+        missionResult = CreateSiegeAmbushResult(__instance.Mission.PlayerTeam.Side);
+    }
+
+    // DefenderPullBack is the completion-barrier signal; it is never applied to the campaign MapEvent.
+    internal static MissionResult CreateSiegeAmbushResult(BattleSideEnum playerSide)
+    {
+        bool playerVictory = playerSide == BattleSideEnum.Defender;
+        return new MissionResult(BattleState.DefenderPullBack, playerVictory, !playerVictory, enemyRetreated: false);
+    }
+
+    // Defer the ambush map-event teardown to the coop result-ready barrier. Keep vanilla's local ambush-flag
+    // cleanup, but do not let the elected host finalize before every current mission member reports.
+    [HarmonyPatch(typeof(SiegeAmbushCampaignBehavior), "OnMissionEnded")]
+    [HarmonyPrefix]
+    private static bool SiegeAmbushOnMissionEndedPrefix()
+    {
+        if (ModInformation.IsClient && BattleConclusionGate.IsInCoopBattleMission
+            && PlayerEncounter.Battle?.IsSiegeAmbush == true)
+        {
+            PlayerEncounter.Current?.SetIsSallyOutAmbush(false);
+            return false;
+        }
+
+        return true;
+    }
 
     // Every client's CampaignMissionComponent fires this when its local mission ends; the surviving
     // engine states are reported once by the mission host and applied here on the server with patches

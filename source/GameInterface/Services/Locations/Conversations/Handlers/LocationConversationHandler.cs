@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -36,7 +36,8 @@ internal class LocationConversationHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly LocationConversationTracker tracker;
+    private readonly ILocationConversationTracker tracker;
+    private readonly ILocationConversationClientState clientState;
     private readonly IPlayerManager playerManager;
     private readonly ConcurrentDictionary<NetPeer, string> waitingPartyByInitiator = new ConcurrentDictionary<NetPeer, string>();
 
@@ -45,12 +46,14 @@ internal class LocationConversationHandler : IHandler
     public LocationConversationHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        LocationConversationTracker tracker,
+        ILocationConversationTracker tracker,
+        ILocationConversationClientState clientState,
         IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.tracker = tracker;
+        this.clientState = clientState;
         this.playerManager = playerManager;
 
         messageBroker.Subscribe<LocationConversationRequested>(Handle_LocationConversationRequested);
@@ -109,8 +112,10 @@ internal class LocationConversationHandler : IHandler
         var engagerNpcKey = LocationConversationTracker.ComposeKey(request.LocationId, player.CharacterObjectId);
         var targetNpcKey = LocationConversationTracker.ComposeKey(request.LocationId, request.CharacterId);
 
-        // Reserve both participants so crossed requests cannot approve two conversations at once.
-        if (tracker.TryBeginEngagement(peer, engagerNpcKey, targetNpcKey))
+        // Reserve both logical characters and, for player targets, both connected peers. Either player
+        // leaving or disconnecting can then release the same session.
+        NetPeer responderPeer = TryGetPlayerPeer(request.CharacterId);
+        if (tracker.TryBeginEngagement(peer, responderPeer, engagerNpcKey, targetNpcKey))
         {
             network.Send(peer, new NetworkAllowLocationConversation(request.Generation));
             StartPlayerWaitingInteraction(peer, request.CharacterId);
@@ -131,7 +136,7 @@ internal class LocationConversationHandler : IHandler
         if (ModInformation.IsServer) return;
 
         var generation = payload.What.Generation;
-        GameThread.Run(() => LocationConversationPatches.StartApprovedConversation(generation));
+        GameThread.Run(() => LocationConversationPatches.StartApprovedConversation(clientState, generation));
     }
 
     /// <summary>[Client] Server denied: drop the pending request and tell the player why.</summary>
@@ -144,7 +149,7 @@ internal class LocationConversationHandler : IHandler
         {
             // Only explain the refusal if this denial still matches our current pending request; a stale denial
             // (the player left and started another) neither clears the new pending nor pops a message.
-            if (LocationConversationPatches.CancelPending(generation))
+            if (LocationConversationPatches.CancelPending(clientState, generation))
             {
                 ShowInteractionBlockedMessage();
             }
@@ -171,9 +176,15 @@ internal class LocationConversationHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (tracker.TryEndEngagement(peer, out var npcKey))
+            if (tracker.TryEndEngagement(peer, out var npcKey, out var engagerKey))
+            {
                 BroadcastNpcRelease(npcKey);
-            EndPlayerWaitingInteraction(peer);
+                EndPlayerWaitingInteraction(engagerKey as NetPeer);
+            }
+            else
+            {
+                EndPlayerWaitingInteraction(peer);
+            }
         }, context: nameof(NetworkLocationConversationEnded));
     }
 
@@ -182,9 +193,19 @@ internal class LocationConversationHandler : IHandler
     {
         if (!ModInformation.IsServer) return;
 
-        if (tracker.TryEndEngagement(payload.What.PlayerId, out var npcKey))
-            BroadcastNpcRelease(npcKey);
-        EndPlayerWaitingInteraction(payload.What.PlayerId);
+        var peer = payload.What.PlayerId;
+        GameThread.RunSafe(() =>
+        {
+            if (tracker.TryEndEngagement(peer, out var npcKey, out var engagerKey))
+            {
+                BroadcastNpcRelease(npcKey);
+                EndPlayerWaitingInteraction(engagerKey as NetPeer);
+            }
+            else
+            {
+                EndPlayerWaitingInteraction(peer);
+            }
+        }, context: nameof(PlayerDisconnected));
     }
 
     // SR-040: undo the hold the grant broadcast. The engagement key is ComposeKey's
@@ -199,6 +220,19 @@ internal class LocationConversationHandler : IHandler
         network.SendAll(new NetworkLocationNpcReleased(
             npcKey.Substring(0, separatorIndex),
             npcKey.Substring(separatorIndex + 1)));
+    }
+
+    private NetPeer TryGetPlayerPeer(string characterId)
+    {
+        if (string.IsNullOrEmpty(characterId)) return null;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (player.CharacterObjectId != characterId) continue;
+            return playerManager.TryGetPeer(player.ControllerId, out var peer) ? peer : null;
+        }
+
+        return null;
     }
 
     private void StartPlayerWaitingInteraction(NetPeer initiatorPeer, string characterId)

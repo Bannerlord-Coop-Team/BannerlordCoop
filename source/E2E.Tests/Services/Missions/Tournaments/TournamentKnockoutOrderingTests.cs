@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Tournaments.Data;
 using Missions;
@@ -34,7 +34,7 @@ public class TournamentKnockoutOrderingTests : MissionTestEnvironment
 
         host.Call(() =>
         {
-            var mock = fixture.CreateMission(host);
+            var mock = CreateConnectedMission(fixture, host, "mission");
             hostController = host.Resolve<CoopTournamentController>();
             Configure(hostController, manifest);
             var registry = host.Resolve<INetworkAgentRegistry>();
@@ -49,7 +49,7 @@ public class TournamentKnockoutOrderingTests : MissionTestEnvironment
 
         victimOwner.Call(() =>
         {
-            var mock = fixture.CreateMission(victimOwner);
+            var mock = CreateConnectedMission(fixture, victimOwner, "mission");
             var controller = victimOwner.Resolve<CoopTournamentController>();
             Configure(controller, manifest);
             var registry = victimOwner.Resolve<INetworkAgentRegistry>();

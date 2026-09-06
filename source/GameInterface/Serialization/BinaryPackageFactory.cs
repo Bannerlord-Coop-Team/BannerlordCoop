@@ -33,6 +33,7 @@ namespace GameInterface.Serialization
         }
 
         private readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
+        private int packageGraphDepth;
 
         private static void CollectBinaryPackageTypes()
         {
@@ -79,26 +80,40 @@ namespace GameInterface.Serialization
         [MethodImpl(MethodImplOptions.Synchronized)]
         public IBinaryPackage GetBinaryPackage(object obj)
         {
-            if (obj == null) return new NullBinaryPackage();
+            bool isRootPackage = packageGraphDepth == 0;
+            packageGraphDepth++;
 
-            Type type = obj.GetType();
-
-            if (type.IsEnum) return new EnumBinaryPackage(obj);
-            if (PrimitiveBinaryPackage.IsSupported(type)) return new PrimitiveBinaryPackage(obj);
-
-            ObjectAndType wrappedObj = new ObjectAndType(type.AssemblyQualifiedName, obj);
-
-            if (InstantiatedPackages.TryGetValue(wrappedObj, out IBinaryPackage serializer))
+            try
             {
-                return serializer;
+                if (obj == null) return new NullBinaryPackage();
+
+                Type type = obj.GetType();
+
+                if (type.IsEnum) return new EnumBinaryPackage(obj);
+                if (PrimitiveBinaryPackage.IsSupported(type)) return new PrimitiveBinaryPackage(obj);
+
+                ObjectAndType wrappedObj = new ObjectAndType(type.AssemblyQualifiedName, obj);
+
+                if (InstantiatedPackages.TryGetValue(wrappedObj, out IBinaryPackage serializer))
+                {
+                    return serializer;
+                }
+
+                IBinaryPackage package = CreateBinaryPackage(obj);
+                Register(wrappedObj, package);
+
+                package.Pack();
+
+                return package;
             }
-
-            IBinaryPackage package = CreateBinaryPackage(obj);
-            Register(wrappedObj, package);
-
-            package.Pack();
-
-            return package;
+            finally
+            {
+                packageGraphDepth--;
+                if (isRootPackage)
+                {
+                    InstantiatedPackages.Clear();
+                }
+            }
         }
 
         private IBinaryPackage CreateBinaryPackage(object obj)

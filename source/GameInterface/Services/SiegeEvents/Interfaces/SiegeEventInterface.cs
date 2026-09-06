@@ -753,6 +753,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         var mapEvent = settlement.Party?.MapEvent;
         if (mapEvent == null || !mapEvent.IsSiegeAssault) return;
         if (MobileParty.MainParty.MapEvent == null) return;
+        if (PlayerEncounter.Battle == mapEvent) return;
 
         using (new AllowedThread())
         {

@@ -556,15 +556,16 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
     public void RejoiningOldHost_CatchupKeepsMigratedNpcUnderCurrentSuccessor()
     {
         using var fixture = new MissionEngineFixture();
-        SetupCoopBattle("A", "B");
+        var (mapEventId, _) = SetupCoopBattle("A", "B");
         var returner = Clients.First();
         var successor = Clients.Skip(1).First();
         var npcTroopId = Guid.NewGuid();
         var characterId = CreateRegisteredObject<CharacterObject>();
 
+        returner.Call(() => CreateConnectedMission(fixture, returner, mapEventId));
         successor.Call(() =>
         {
-            var mock = fixture.CreateMission(successor);
+            var mock = CreateConnectedMission(fixture, successor, mapEventId);
             var controller = successor.Resolve<CoopBattleController>();
             var registry = successor.Resolve<INetworkAgentRegistry>();
 
@@ -576,7 +577,9 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
             successor.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("A", null));
 
-            var record = returner.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Last().Agents.Single();
+            NetworkSpawnBattleAgents message = returner.InternalMessages
+                .GetMessages<NetworkSpawnBattleAgents>().Last();
+            BattleAgentSpawnData record = DecodeSpawnBatch(returner, message).Single();
             Assert.Equal(npcTroopId, record.AgentId);
             Assert.Equal("B", record.OwnerControllerId);
 

@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using Common.Logging;
 using GameInterface.Utils.Commands;
 using Serilog;
@@ -5,53 +6,53 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
 
 internal class KillPlayerAgentCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     public static readonly ILogger Logger = LogManager.GetLogger<KillPlayerAgentCommands>();
 
-    private const string KillPlayerAgentUsage =
-@"Usage:
-  coop.debug.mapevent.kms
-
-Kills the main agent (the player) in the current battle mission.
-Useful for testing player captivity without waiting to die.";
-
-    [CommandLineArgumentFunction("kms", "coop.debug.mapevent")]
-    public static string KillPlayerAgent(List<string> args)
+    public sealed class KmsCoopCommand : ICoopCommand
     {
-        var ctx = new CommandContext(
-            "kill_player_agent",
-            KillPlayerAgentUsage,
-            args);
+        public string Prefix => "coop.debug.map_event";
 
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
+        public string Name => "kms";
 
-        if (Mission.Current is null)
-            return "Failed to kill player agent: no active mission.";
+        public string Description => "Runs the kms debug operation.";
 
-        var agent = Agent.Main;
-        if (agent is null)
-            return "Failed to kill player agent: Agent.Main is null (player has no agent in this mission).";
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
-        if (!agent.IsActive())
-            return "Failed to kill player agent: main agent is not active (already dead or removed).";
-
-        try
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            var blow = CreateFatalBlow(agent);
-            agent.Die(blow, Agent.KillInfo.Invalid);
-        }
-        catch (Exception ex)
-        {
-            return CommandHelpers.FormatException("Kill player agent", ex);
-        }
+            if (Mission.Current is null)
+                return Failed("Failed to kill player agent: no active mission.");
 
-        return $"Killed player agent: {agent.Name}";
+            var agent = Agent.Main;
+            if (agent is null)
+                return Failed("Failed to kill player agent: Agent.Main is null (player has no agent in this mission).");
+
+            if (!agent.IsActive())
+                return Failed("Failed to kill player agent: main agent is not active (already dead or removed).");
+
+            try
+            {
+                var blow = CreateFatalBlow(agent);
+                agent.Die(blow, Agent.KillInfo.Invalid);
+            }
+            catch (Exception ex)
+            {
+                return Failed(CommandHelpers.FormatException("Kill player agent", ex));
+            }
+
+            return Succeeded($"Killed player agent: {agent.Name}");
+        }
     }
 
     private static Blow CreateFatalBlow(Agent agent)

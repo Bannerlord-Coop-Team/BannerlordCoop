@@ -25,7 +25,6 @@ public readonly struct TradeAttempted : IEvent
     public readonly SettlementComponent CurrentSettlementComponent;
     public readonly List<(ItemRosterElement, int)> BoughtItems;
     public readonly List<(ItemRosterElement, int)> SoldItems;
-    public readonly TroopRoster TroopRoster;
 
     public TradeAttempted(
         ItemRoster fromRoster,
@@ -41,8 +40,7 @@ public readonly struct TradeAttempted : IEvent
         MobileParty currentMobileParty,
         SettlementComponent currentSettlementComponent,
         List<(ItemRosterElement, int)> boughtItems,
-        List<(ItemRosterElement, int)> soldItems,
-        TroopRoster troopRoster)
+        List<(ItemRosterElement, int)> soldItems)
     {
         FromRoster = fromRoster;
         ToRoster = toRoster;
@@ -58,6 +56,5 @@ public readonly struct TradeAttempted : IEvent
         CurrentSettlementComponent = currentSettlementComponent;
         BoughtItems = boughtItems;
         SoldItems = soldItems;
-        TroopRoster = troopRoster;
     }
 }

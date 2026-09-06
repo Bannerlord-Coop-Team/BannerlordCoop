@@ -42,7 +42,18 @@ public readonly struct AuthoritativeBattleConclusionRequested : IEvent
     }
 }
 
-/// <summary>[Local] Reports whether a received battle-state change reached the authoritative map event.</summary>
+/// <summary>[Local] Requests no-victory finalization after every siege-ambush mission member completes.</summary>
+public readonly struct AuthoritativeSiegeAmbushCompletionRequested : IEvent
+{
+    public readonly string MapEventId;
+
+    public AuthoritativeSiegeAmbushCompletionRequested(string mapEventId)
+    {
+        MapEventId = mapEventId;
+    }
+}
+
+/// <summary>[Local] Reports whether an authoritative battle conclusion reached the map event.</summary>
 public readonly struct BattleStateChangeProcessed : IEvent
 {
     public readonly string MapEventId;

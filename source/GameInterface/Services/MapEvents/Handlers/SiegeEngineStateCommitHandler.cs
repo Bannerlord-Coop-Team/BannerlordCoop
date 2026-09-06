@@ -6,9 +6,13 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -59,10 +63,66 @@ internal class SiegeEngineStateCommitHandler : IHandler
                 return;
             }
 
-            siegeEvent.SetSiegeEngineStatesAfterSiegeMission(
-                SiegeEngineStateConverter.ToMissionWeapons(obj.AttackerEngines),
-                SiegeEngineStateConverter.ToMissionWeapons(obj.DefenderEngines));
+            var attackerWeapons = SiegeEngineStateConverter.ToMissionWeapons(obj.AttackerEngines);
+            var defenderWeapons = SiegeEngineStateConverter.ToMissionWeapons(obj.DefenderEngines);
+            if (mapEvent.IsSiegeAmbush)
+            {
+                SetAmbushEngineStatesForSide(siegeEvent, siegeEvent.BesiegerCamp, attackerWeapons);
+                SetAmbushEngineStatesForSide(siegeEvent, siegeEvent.BesiegedSettlement, defenderWeapons);
+            }
+            else
+            {
+                siegeEvent.SetSiegeEngineStatesAfterSiegeMission(attackerWeapons, defenderWeapons);
+            }
         });
+    }
+
+    internal static void SetAmbushEngineStatesForSide(
+        SiegeEvent siegeEvent,
+        ISiegeEventSide side,
+        IEnumerable<IMissionSiegeWeapon> missionSiegeEngineData)
+    {
+        var missionWeapons = missionSiegeEngineData?.ToList();
+        if (missionWeapons == null || missionWeapons.Count == 0)
+            return;
+
+        var deployedEngines = side.SiegeEngines.DeployedSiegeEngines.ToList();
+        foreach (var missionWeapon in missionWeapons)
+        {
+            int engineIndex = missionWeapon.Index;
+            if (engineIndex < 0 || engineIndex >= deployedEngines.Count)
+            {
+                Logger.Warning("Skipped ambush siege engine state at invalid deployed index {Index}", engineIndex);
+                continue;
+            }
+
+            var engine = deployedEngines[engineIndex];
+            if (!engine.IsActive || engine.SiegeEngine != missionWeapon.Type)
+            {
+                Logger.Warning("Skipped ambush siege engine state at index {Index}: campaign engine does not match mission type {EngineType}",
+                    engineIndex, missionWeapon.Type?.StringId);
+                continue;
+            }
+
+            if (missionWeapon.Health > 0f)
+            {
+                engine.SetHitpoints(missionWeapon.Health);
+                continue;
+            }
+
+            int deploymentIndex = side.SiegeEngines.FindDeploymentIndexOfDeployedEngine(engine);
+            if (deploymentIndex < 0)
+            {
+                Logger.Warning("Skipped destroyed ambush siege engine at index {Index}: its deployment slot is missing", engineIndex);
+                continue;
+            }
+
+            side.SiegeEngines.RemoveDeployedSiegeEngine(
+                deploymentIndex,
+                engine.SiegeEngine.IsRanged,
+                moveToReserve: false);
+            siegeEvent.BesiegedSettlement?.Party?.SetVisualAsDirty();
+        }
     }
 
     public void Dispose()

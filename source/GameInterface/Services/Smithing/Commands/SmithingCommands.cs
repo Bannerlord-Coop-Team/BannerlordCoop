@@ -1,4 +1,6 @@
-﻿using Autofac;
+﻿using System;
+using Common.Commands;
+using Autofac;
 using Common;
 using Common.Logging;
 using GameInterface.Configuration;
@@ -18,6 +20,12 @@ namespace GameInterface.Services.Smithing.Commands;
 
 internal class SmithingCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
     private static readonly ILogger Logger = LogManager.GetLogger<SmithingCommands>();
 
     /// <summary>
@@ -34,337 +42,429 @@ internal class SmithingCommands
     /// <summary>
     /// Give debug crafting materials to heroes with a given name
     /// </summary>
-    [CommandLineArgumentFunction("givesupplies", "coop.debug.crafting")]
-    public static string SmithingSuppliesCommand(List<string> strings)
+    public sealed class CraftingGiveSuppliesCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        public string Prefix => "coop.debug.crafting";
 
-        if (strings.Count == 0)
-        {
-            return "Hero name argument required.";
-        }
+        public string Name => "give_supplies";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager.";
-        }
+        public string Description => "Runs the give supplies debug operation.";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (hero.Name.ToString() == strings[0])
+            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            if (TryGetObjectManager(out var objectManager) == false)
             {
-                var itemsToAdd = new Dictionary<string, int>()
-                {
-                    { "hardwood", 100 },
-                    { "iron", 50 },
-                    { "charcoal", 100 },
-                    { "ironIngot1", 50 },
-                    { "ironIngot2", 50 },
-                    { "ironIngot3", 50 },
-                    { "ironIngot4", 50 },
-                    { "ironIngot5", 50 },
-                    { "ironIngot6", 50 },
-                    { "empire_sword_4_t4", 3 }
-                };
-
-                foreach (var itemId in itemsToAdd.Keys)
-                {
-                    if (!objectManager.TryGetObject(itemId, out ItemObject itemObject)) 
-                    {
-                        stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
-                    }
-                    else
-                    {
-                        hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
-                    }
-                }
-
-                stringBuilder.AppendLine(strings[0] + " was given smithing supplies.");
+                return Failed("Unable to resolve ObjectManager.");
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
+            {
+                if (hero.Name.ToString() == strings[0])
+                {
+                    var itemsToAdd = new Dictionary<string, int>()
+                    {
+                        { "hardwood", 100 },
+                        { "iron", 50 },
+                        { "charcoal", 100 },
+                        { "ironIngot1", 50 },
+                        { "ironIngot2", 50 },
+                        { "ironIngot3", 50 },
+                        { "ironIngot4", 50 },
+                        { "ironIngot5", 50 },
+                        { "ironIngot6", 50 },
+                        { "empire_sword_4_t4", 3 }
+                    };
+
+                    foreach (var itemId in itemsToAdd.Keys)
+                    {
+                        if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
+                        {
+                            stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
+                        }
+                        else
+                        {
+                            hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
+                        }
+                    }
+
+                    stringBuilder.AppendLine(strings[0] + " was given smithing supplies.");
+                }
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Hero not found.");
         }
-        return "Hero not found.";
     }
 
     /// <summary>
     /// Unlock all crafting pieces on a client
     /// OpenPart is patched to already update CoopSession and persist across sessions
     /// </summary>
-    [CommandLineArgumentFunction("unlockallcraftingpieces", "coop.debug.crafting")]
-    public static string UnlockAllCraftingPiecesCommand(List<string> strings)
+    public sealed class CraftingUnlockAllCraftingPiecesCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsServer)
-            return "Command can only be run on a client.";
+        public string Prefix => "coop.debug.crafting";
 
-        if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
-            return "Cheats are currently disabled on clients. Enable in mod-config.";
+        public string Name => "unlock_all_crafting_pieces";
 
-        var craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
-        if (craftingCampaignBehavior == null)
-            return "Unable to get crafting campaign behavior.";
+        public string Description => "Runs the unlock all crafting pieces debug operation.";
 
-        foreach (var craftingTemplate in CraftingTemplate.All)
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            foreach (var craftingPiece in craftingTemplate.Pieces)
-            {
-                // Turn off notification, otherwise unlocking client gets hundreds of notifications
-                craftingCampaignBehavior.OpenPart(craftingPiece, craftingTemplate, false);
-            }
-        }
+            if (ModInformation.IsServer)
+                return Failed("Command can only be run on a client.");
 
-        return "All crafting pieces unlocked.";
+            if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
+                return Failed("Cheats are currently disabled on clients. Enable in mod-config.");
+
+            var craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+            if (craftingCampaignBehavior == null)
+                return Failed("Unable to get crafting campaign behavior.");
+
+            foreach (var craftingTemplate in CraftingTemplate.All)
+            {
+                foreach (var craftingPiece in craftingTemplate.Pieces)
+                {
+                    // Turn off notification, otherwise unlocking client gets hundreds of notifications
+                    craftingCampaignBehavior.OpenPart(craftingPiece, craftingTemplate, false);
+                }
+            }
+
+            return Succeeded("All crafting pieces unlocked.");
+        }
     }
 
     /// <summary>
     /// View town orders for a specified town
     /// </summary>
-    [CommandLineArgumentFunction("townorders", "coop.debug.crafting")]
-    public static string ViewTownOrdersCommand(List<string> strings)
+    public sealed class CraftingTownOrdersCoopCommand : ICoopCommand
     {
-        if (strings.Count == 0) return "Town name argument required.";
+        public string Prefix => "coop.debug.crafting";
 
-        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+        public string Name => "town_orders";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var town in Town.AllTowns)
+        public string Description => "Runs the town orders debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (town.Name.ToString() == strings[0])
+            new ExpectedArgs("town_name", "The exact town display name.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+
+            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var town in Town.AllTowns)
             {
-                stringBuilder.AppendLine("Target town " + town.Name.ToString() + " has orders:");
-                CraftingOrder[] slots = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftingOrders[town].Slots;
-                foreach (CraftingOrder order in slots)
+                if (town.Name.ToString() == strings[0])
                 {
-                    stringBuilder.AppendLine("Order slot: " + order?.OrderDifficulty + " for hero: " + order?.OrderOwner);
+                    stringBuilder.AppendLine("Target town " + town.Name.ToString() + " has orders:");
+                    CraftingOrder[] slots = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftingOrders[town].Slots;
+                    foreach (CraftingOrder order in slots)
+                    {
+                        stringBuilder.AppendLine("Order slot: " + order?.OrderDifficulty + " for hero: " + order?.OrderOwner);
+                    }
                 }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Town not found.");
         }
-        return "Town not found.";
     }
 
     /// <summary>
     /// Add orders to a town by a hero in that town
     /// </summary>
-    [CommandLineArgumentFunction("addtownorder", "coop.debug.crafting")]
-    public static string AddTestingTownOrderCommand(List<string> strings)
+    public sealed class CraftingAddTownOrderCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        public string Prefix => "coop.debug.crafting";
 
-        if (strings.Count == 0) return "Hero name argument required.";
+        public string Name => "add_town_order";
 
-        var heroName = strings[0]; // Example hero name: "Vaminesa the Minter"
+        public string Description => "Runs the add town order debug operation.";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (hero.Name.ToString() == heroName)
+            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            var heroName = strings[0]; // Example hero name: "Vaminesa the Minter"
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
             {
-                for (int i = 0; i < 6; i++)
+                if (hero.Name.ToString() == heroName)
                 {
-                    Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>().CreateTownOrder(hero, i);
+                    for (int i = 0; i < 6; i++)
+                    {
+                        Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>().CreateTownOrder(hero, i);
+                    }
+
+                    stringBuilder.AppendLine("Orders have been added for " + heroName + " in " + hero.CurrentSettlement.Town.Name.ToString());
                 }
-
-                stringBuilder.AppendLine("Orders have been added for " + heroName + " in " + hero.CurrentSettlement.Town.Name.ToString());
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Town not found.");
         }
-        return "Town not found.";
     }
 
     /// <summary>
     /// Add all existing crafted items to a given hero
     /// </summary>
-    [CommandLineArgumentFunction("addcrafteditems", "coop.debug.crafting")]
-    public static string AddCraftedItemCommand(List<string> strings)
+    public sealed class CraftingAddCraftedItemsCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        public string Prefix => "coop.debug.crafting";
 
-        if (strings.Count == 0) return "Hero name argument required.";
+        public string Name => "add_crafted_items";
 
-        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+        public string Description => "Runs the add crafted items debug operation.";
 
-        var craftedItemPrefix = "crafted_item_";
-
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            if (hero.Name.ToString() == strings[0])
+            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
+
+            var craftedItemPrefix = "crafted_item_";
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
             {
-                int craftedItemCount = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftedItemCount;
-                for (int i = 0; i < craftedItemCount; i++)
+                if (hero.Name.ToString() == strings[0])
                 {
-                    string craftedItemId = craftedItemPrefix + i.ToString();
-                    if (!objectManager.TryGetObject(craftedItemId, out ItemObject itemObject))
+                    int craftedItemCount = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftedItemCount;
+                    for (int i = 0; i < craftedItemCount; i++)
                     {
-                        stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + craftedItemId);
+                        string craftedItemId = craftedItemPrefix + i.ToString();
+                        if (!objectManager.TryGetObject(craftedItemId, out ItemObject itemObject))
+                        {
+                            stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + craftedItemId);
+                        }
+                        else
+                        {
+                            hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, 1);
+                        }
                     }
-                    else
-                    {
-                        hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, 1);
-                    }
+
+                    stringBuilder.AppendLine(strings[0] + " was given all crafted items.");
                 }
-
-                stringBuilder.AppendLine(strings[0] + " was given all crafted items.");
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Town not found.");
         }
-        return "Town not found.";
     }
 
     /// <summary>
     /// View crafting stamina of all heroes in party on client and all heroes on server
     /// </summary>
-    [CommandLineArgumentFunction("stamina", "coop.debug.crafting")]
-    public static string ViewCraftingStaminaCommand(List<string> strings)
+    public sealed class CraftingStaminaCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+        public string Prefix => "coop.debug.crafting";
 
-        foreach (var heroCraftingRecord in craftingCampaignBehavior._heroCraftingRecords)
+        public string Name => "stamina";
+
+        public string Description => "Runs the stamina debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (ModInformation.IsServer || heroCraftingRecord.Key.PartyBelongedTo == Hero.MainHero.PartyBelongedTo)
+            StringBuilder stringBuilder = new StringBuilder();
+            CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+
+            foreach (var heroCraftingRecord in craftingCampaignBehavior._heroCraftingRecords)
             {
-                stringBuilder.AppendLine($"{heroCraftingRecord.Key.Name} ({heroCraftingRecord.Key.StringId}): {heroCraftingRecord.Value.CraftingStamina}");
+                if (ModInformation.IsServer || heroCraftingRecord.Key.PartyBelongedTo == Hero.MainHero.PartyBelongedTo)
+                {
+                    stringBuilder.AppendLine($"{heroCraftingRecord.Key.Name} ({heroCraftingRecord.Key.StringId}): {heroCraftingRecord.Value.CraftingStamina}");
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("No hero crafting stamina data was found.");
         }
-        return "No hero crafting stamina data was found.";
     }
 
     /// <summary>
     /// View crafted item history, showing all players on server and current player on client
     /// </summary>
-    [CommandLineArgumentFunction("crafteditemhistory", "coop.debug.crafting")]
-    public static string ViewCraftedItemHistoryCommand(List<string> strings)
+    public sealed class CraftingCraftedItemHistoryCoopCommand : ICoopCommand
     {
-        if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
+        public string Prefix => "coop.debug.crafting";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Name => "crafted_item_history";
+
+        public string Description => "Runs the crafted item history debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            foreach (KeyValuePair<string, List<string>> craftedItemHistory in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerCraftedItemsHistory)
+            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                stringBuilder.AppendLine(craftedItemHistory.Key);
-                foreach (string craftedItemId in craftedItemHistory.Value)
+                foreach (KeyValuePair<string, List<string>> craftedItemHistory in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerCraftedItemsHistory)
                 {
-                    stringBuilder.AppendLine(craftedItemId);
+                    stringBuilder.AppendLine(craftedItemHistory.Key);
+                    foreach (string craftedItemId in craftedItemHistory.Value)
+                    {
+                        stringBuilder.AppendLine(craftedItemId);
+                    }
                 }
             }
-        }
-        else
-        {
-            CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
-            foreach (ItemObject item in craftingCampaignBehavior._cratingItemsHistory)
+            else
             {
-                stringBuilder.AppendLine(item.StringId);
+                CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+                foreach (ItemObject item in craftingCampaignBehavior._cratingItemsHistory)
+                {
+                    stringBuilder.AppendLine(item.StringId);
+                }
             }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Error finding crafting player data or no crafted item history");
         }
-        return "Error finding crafting player data or no crafted item history";
     }
 
     /// <summary>
     /// View crafted pieces xp, showing all players on server and current player on client
     /// </summary>
-    [CommandLineArgumentFunction("craftingpiecesxp", "coop.debug.crafting")]
-    public static string ViewPartsXpCommand(List<string> strings)
+    public sealed class CraftingCraftingPiecesXpCoopCommand : ICoopCommand
     {
-        if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
+        public string Prefix => "coop.debug.crafting";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Name => "crafting_pieces_xp";
+
+        public string Description => "Runs the crafting pieces xp debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            foreach (KeyValuePair<string, Dictionary<string, float>> playerPartXp in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerOpenNewPartXpDictionary)
+            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                stringBuilder.AppendLine(playerPartXp.Key);
-                foreach (KeyValuePair<string, float> partXp in playerPartXp.Value)
+                foreach (KeyValuePair<string, Dictionary<string, float>> playerPartXp in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerOpenNewPartXpDictionary)
+                {
+                    stringBuilder.AppendLine(playerPartXp.Key);
+                    foreach (KeyValuePair<string, float> partXp in playerPartXp.Value)
+                    {
+                        stringBuilder.AppendLine(partXp.Key + ": " + partXp.Value);
+                    }
+                }
+            }
+            else
+            {
+                CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+                foreach (KeyValuePair<CraftingTemplate, float> partXp in craftingCampaignBehavior._openNewPartXpDictionary)
                 {
                     stringBuilder.AppendLine(partXp.Key + ": " + partXp.Value);
                 }
             }
-        }
-        else
-        {
-            CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
-            foreach (KeyValuePair<CraftingTemplate, float> partXp in craftingCampaignBehavior._openNewPartXpDictionary)
-            {
-                stringBuilder.AppendLine(partXp.Key + ": " + partXp.Value);
-            }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Error finding crafting player data or no parts xp data");
         }
-        return "Error finding crafting player data or no parts xp data";
     }
 
     /// <summary>
     /// View unlocked crafted pieces, showing all players on server and current player on client
     /// </summary>
-    [CommandLineArgumentFunction("unlockedcraftingpieces", "coop.debug.crafting")]
-    public static string ViewUnlockedCraftingPieces(List<string> strings)
+    public sealed class CraftingUnlockedCraftingPiecesCoopCommand : ICoopCommand
     {
-        if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
+        public string Prefix => "coop.debug.crafting";
 
-        StringBuilder stringBuilder = new StringBuilder();
-        if (ModInformation.IsServer)
+        public string Name => "unlocked_crafting_pieces";
+
+        public string Description => "Runs the unlocked crafting pieces debug operation.";
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            foreach (KeyValuePair<string, Dictionary<string, List<string>>> playerUnlockedPieces in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerOpenedPartsDictionary)
+            if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return Failed("Unable to resolve CoopSessionProvider");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
             {
-                stringBuilder.AppendLine(playerUnlockedPieces.Key);
-                foreach (KeyValuePair<string, List<string>> templateUnlockedPieces in playerUnlockedPieces.Value)
+                foreach (KeyValuePair<string, Dictionary<string, List<string>>> playerUnlockedPieces in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerOpenedPartsDictionary)
+                {
+                    stringBuilder.AppendLine(playerUnlockedPieces.Key);
+                    foreach (KeyValuePair<string, List<string>> templateUnlockedPieces in playerUnlockedPieces.Value)
+                    {
+                        stringBuilder.AppendLine(templateUnlockedPieces.Key + ": " + templateUnlockedPieces.Value.Count);
+                    }
+                }
+            }
+            else
+            {
+                CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+                foreach (KeyValuePair<CraftingTemplate, List<CraftingPiece>> templateUnlockedPieces in craftingCampaignBehavior._openedPartsDictionary)
                 {
                     stringBuilder.AppendLine(templateUnlockedPieces.Key + ": " + templateUnlockedPieces.Value.Count);
                 }
             }
-        }
-        else
-        {
-            CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
-            foreach (KeyValuePair<CraftingTemplate, List<CraftingPiece>> templateUnlockedPieces in craftingCampaignBehavior._openedPartsDictionary)
-            {
-                stringBuilder.AppendLine(templateUnlockedPieces.Key + ": " + templateUnlockedPieces.Value.Count);
-            }
-        }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
-        {
-            return result;
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("Error finding crafting player data or no unlocked parts");
         }
-        return "Error finding crafting player data or no unlocked parts";
     }
 }

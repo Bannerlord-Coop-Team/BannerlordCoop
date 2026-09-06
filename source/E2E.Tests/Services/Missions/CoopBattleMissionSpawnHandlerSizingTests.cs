@@ -135,6 +135,20 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     }
 
     [Fact]
+    public void SallyOutSpawnSettings_PreserveNativeReinforcementConfiguration()
+    {
+        var settings = CoopBattleMissionSpawnHandler.CreateSallyOutSpawnSettings();
+        Assert.Equal(MissionSpawnSettings.InitialSpawnMethod.FreeAllocation,
+            settings.InitialTroopsSpawnMethod);
+        Assert.Equal(MissionSpawnSettings.ReinforcementTimingMethod.CustomTimer,
+            settings.ReinforcementTroopsTimingMethod);
+        Assert.Equal(MissionSpawnSettings.ReinforcementSpawnMethod.Fixed,
+            settings.ReinforcementTroopsSpawnMethod);
+        Assert.Equal(0.01f, settings.DefenderReinforcementBatchPercentage);
+        Assert.Equal(0.1f, settings.AttackerReinforcementBatchPercentage);
+    }
+
+    [Fact]
     public void ConsecutiveRefreshes_DoNotReconcileAMixedSidePair()
     {
         Assert.Equal(0, CoopBattleMissionSpawnHandler.MatchingAllocationRevision(2, 1));
@@ -155,6 +169,20 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         Assert.Equal(0, CoopBattleMissionSpawnHandler.ResolveBattleSize(
             defenderPopulated: true, defenderBattleSize: 600,
             attackerPopulated: true, attackerBattleSize: 200));
+    }
+
+    [Fact]
+    public void SallyOutSizing_UsesAuthoritativeBattleSizeCaps()
+    {
+        var sizing = CoopBattleMissionSpawnHandler.CalculateSallyOutSizingFromBattleSize(
+            defenderTotal: 500,
+            attackerTotal: 500,
+            battleSize: 200);
+
+        Assert.Equal(50, sizing.DefenderTotal);
+        Assert.Equal(150, sizing.AttackerTotal);
+        Assert.Equal(20, sizing.DefenderInitial);
+        Assert.Equal(20, sizing.AttackerInitial);
     }
 
     [Fact]

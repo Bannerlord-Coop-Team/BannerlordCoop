@@ -2,6 +2,7 @@
 using SandBox.Tournaments.MissionLogics;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Tournaments;
@@ -25,6 +26,7 @@ public delegate void TournamentGuardReactionRecorder(
 public class CoopTournamentFightMissionController : TournamentFightMissionController
 {
     private Func<bool> shouldProcessAgentRemoval = () => true;
+    private Func<bool> leaveAllowedProvider = () => false;
     private TournamentHitProgressionRecorder hitProgressionRecorder;
     private TournamentGuardReactionRecorder guardReactionRecorder;
 
@@ -36,6 +38,11 @@ public class CoopTournamentFightMissionController : TournamentFightMissionContro
     public void SetAgentRemovalProvider(Func<bool> provider)
     {
         shouldProcessAgentRemoval = provider ?? (() => true);
+    }
+
+    public void SetLeaveAllowedProvider(Func<bool> provider)
+    {
+        leaveAllowedProvider = provider ?? (() => false);
     }
 
     public void SetHitProgressionRecorder(TournamentHitProgressionRecorder recorder)
@@ -86,5 +93,11 @@ public class CoopTournamentFightMissionController : TournamentFightMissionContro
             in blow,
             in collisionData,
             shotDifficulty);
+    }
+
+    public override InquiryData OnEndMissionRequest(out bool canPlayerLeave)
+    {
+        canPlayerLeave = leaveAllowedProvider?.Invoke() ?? false;
+        return null;
     }
 }

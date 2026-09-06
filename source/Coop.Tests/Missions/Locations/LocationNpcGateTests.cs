@@ -1,124 +1,111 @@
-using GameInterface.Services.Locations;
-using System;
+﻿using GameInterface.Services.Locations;
 using Xunit;
 
 namespace Coop.Tests.Missions.Locations;
 
-/// <summary>
-/// Truth table for the process-global <see cref="LocationNpcGate"/>. The gate is static state, so every
-/// test resets it (see <see cref="Dispose"/>) — no other suite touches it concurrently.
-/// </summary>
-public class LocationNpcGateTests : IDisposable
+public class LocationNpcGateTests
 {
-    public LocationNpcGateTests()
-    {
-        LocationNpcGate.EndMission();
-    }
-
-    public void Dispose()
-    {
-        LocationNpcGate.EndMission();
-        LocationNpcGate.SuppressCapture = false;
-    }
+    private readonly LocationNpcGateState gate = new LocationNpcGateState();
 
     [Fact]
     public void Inactive_NothingSuppressed()
     {
-        Assert.False(LocationNpcGate.IsCoopLocationMissionActive);
-        Assert.Null(LocationNpcGate.ActiveInstanceId);
-        Assert.False(LocationNpcGate.IsLocalHostConfirmed);
-        Assert.False(LocationNpcGate.ShouldSuppressNativeSpawns);
+        Assert.False(gate.IsCoopLocationMissionActive);
+        Assert.Null(gate.ActiveInstanceId);
+        Assert.False(gate.IsLocalHostConfirmed);
+        Assert.False(gate.ShouldSuppressNativeSpawns);
     }
 
     [Fact]
     [Trait("Requirement", "SR-013")]
     public void BeginMission_SuppressesUntilHostConfirmed()
     {
-        LocationNpcGate.BeginMission("settlement1|loc_tavern");
+        gate.BeginMission("settlement1|loc_tavern");
 
-        Assert.True(LocationNpcGate.IsCoopLocationMissionActive);
-        Assert.Equal("settlement1|loc_tavern", LocationNpcGate.ActiveInstanceId);
-        Assert.False(LocationNpcGate.IsLocalHostConfirmed);
-        Assert.True(LocationNpcGate.ShouldSuppressNativeSpawns);
+        Assert.True(gate.IsCoopLocationMissionActive);
+        Assert.Equal("settlement1|loc_tavern", gate.ActiveInstanceId);
+        Assert.False(gate.IsLocalHostConfirmed);
+        Assert.True(gate.ShouldSuppressNativeSpawns);
     }
 
     [Fact]
     [Trait("Requirement", "SR-011")]
     public void ConfirmedHost_LiftsSuppression()
     {
-        LocationNpcGate.BeginMission("settlement1|loc_tavern");
-        LocationNpcGate.SetLocalHost("settlement1|loc_tavern", isLocalHost: true);
+        gate.BeginMission("settlement1|loc_tavern");
+        gate.SetLocalHost("settlement1|loc_tavern", isLocalHost: true);
 
-        Assert.True(LocationNpcGate.IsLocalHostConfirmed);
-        Assert.False(LocationNpcGate.ShouldSuppressNativeSpawns);
+        Assert.True(gate.IsLocalHostConfirmed);
+        Assert.False(gate.ShouldSuppressNativeSpawns);
     }
 
     [Fact]
     [Trait("Requirement", "SR-012")]
     public void ConfirmedNonHost_StaysSuppressed()
     {
-        LocationNpcGate.BeginMission("settlement1|loc_tavern");
-        LocationNpcGate.SetLocalHost("settlement1|loc_tavern", isLocalHost: false);
+        gate.BeginMission("settlement1|loc_tavern");
+        gate.SetLocalHost("settlement1|loc_tavern", isLocalHost: false);
 
-        Assert.False(LocationNpcGate.IsLocalHostConfirmed);
-        Assert.True(LocationNpcGate.ShouldSuppressNativeSpawns);
+        Assert.False(gate.IsLocalHostConfirmed);
+        Assert.True(gate.ShouldSuppressNativeSpawns);
     }
 
     [Fact]
     public void SetLocalHost_ForAnotherInstance_IsIgnored()
     {
-        LocationNpcGate.BeginMission("settlement1|loc_tavern");
+        gate.BeginMission("settlement1|loc_tavern");
+        gate.SetLocalHost("settlement9|loc_center", isLocalHost: true);
 
-        // A stale assignment from a previous settlement visit must not flip the gate of the newer mission.
-        LocationNpcGate.SetLocalHost("settlement9|loc_center", isLocalHost: true);
-
-        Assert.False(LocationNpcGate.IsLocalHostConfirmed);
-        Assert.True(LocationNpcGate.ShouldSuppressNativeSpawns);
+        Assert.False(gate.IsLocalHostConfirmed);
+        Assert.True(gate.ShouldSuppressNativeSpawns);
     }
 
     [Fact]
     public void SetLocalHost_WhileInactive_IsIgnored()
     {
-        LocationNpcGate.SetLocalHost("settlement1|loc_tavern", isLocalHost: true);
+        gate.SetLocalHost("settlement1|loc_tavern", isLocalHost: true);
 
-        Assert.False(LocationNpcGate.IsLocalHostConfirmed);
-        Assert.False(LocationNpcGate.ShouldSuppressNativeSpawns);
+        Assert.False(gate.IsLocalHostConfirmed);
+        Assert.False(gate.ShouldSuppressNativeSpawns);
     }
 
     [Fact]
     public void EndMission_ResetsEverything()
     {
-        LocationNpcGate.BeginMission("settlement1|loc_tavern");
-        LocationNpcGate.SetLocalHost("settlement1|loc_tavern", isLocalHost: true);
+        gate.BeginMission("settlement1|loc_tavern");
+        gate.SetLocalHost("settlement1|loc_tavern", isLocalHost: true);
+        gate.SuppressCapture = true;
 
-        LocationNpcGate.EndMission();
+        gate.EndMission();
 
-        Assert.False(LocationNpcGate.IsCoopLocationMissionActive);
-        Assert.Null(LocationNpcGate.ActiveInstanceId);
-        Assert.False(LocationNpcGate.IsLocalHostConfirmed);
-        Assert.False(LocationNpcGate.ShouldSuppressNativeSpawns);
+        Assert.False(gate.IsCoopLocationMissionActive);
+        Assert.Null(gate.ActiveInstanceId);
+        Assert.False(gate.IsLocalHostConfirmed);
+        Assert.False(gate.ShouldSuppressNativeSpawns);
+        Assert.False(gate.SuppressCapture);
     }
 
     [Fact]
     public void BeginMission_ResetsHostConfirmationOfThePreviousMission()
     {
-        LocationNpcGate.BeginMission("settlement1|loc_tavern");
-        LocationNpcGate.SetLocalHost("settlement1|loc_tavern", isLocalHost: true);
+        gate.BeginMission("settlement1|loc_tavern");
+        gate.SetLocalHost("settlement1|loc_tavern", isLocalHost: true);
+        gate.SuppressCapture = true;
 
-        // A new mission (e.g. tavern -> town centre) starts unconfirmed even without an EndMission between.
-        LocationNpcGate.BeginMission("settlement1|loc_center");
+        gate.BeginMission("settlement1|loc_center");
 
-        Assert.False(LocationNpcGate.IsLocalHostConfirmed);
-        Assert.True(LocationNpcGate.ShouldSuppressNativeSpawns);
+        Assert.False(gate.IsLocalHostConfirmed);
+        Assert.True(gate.ShouldSuppressNativeSpawns);
+        Assert.False(gate.SuppressCapture);
     }
 
     [Fact]
     public void SuppressCapture_RoundTrips()
     {
-        Assert.False(LocationNpcGate.SuppressCapture);
-        LocationNpcGate.SuppressCapture = true;
-        Assert.True(LocationNpcGate.SuppressCapture);
-        LocationNpcGate.SuppressCapture = false;
-        Assert.False(LocationNpcGate.SuppressCapture);
+        Assert.False(gate.SuppressCapture);
+        gate.SuppressCapture = true;
+        Assert.True(gate.SuppressCapture);
+        gate.SuppressCapture = false;
+        Assert.False(gate.SuppressCapture);
     }
 }

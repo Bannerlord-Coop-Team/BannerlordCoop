@@ -378,13 +378,19 @@ internal sealed class ModConfig : IModConfig
         if (data.UnknownKeys != null) WarnUnknownKeys(data.UnknownKeys);
         if (data.Difficulty?.UnknownKeys != null) WarnUnknownKeys(data.Difficulty.UnknownKeys, "difficulty ");
         if (data.ModOptions?.UnknownKeys != null) WarnUnknownKeys(data.ModOptions.UnknownKeys, "mod option ");
-        if (data.Network?.UnknownKeys != null) WarnUnknownKeys(data.Network.UnknownKeys, "network ");
     }
 
     private static void WarnUnknownKeys(IDictionary<string, JToken> unknownKeys, string keyType = "")
     {
         foreach (var key in unknownKeys.Keys)
         {
+            // Existing configs may retain the retired local movement settings block.
+            if (string.IsNullOrEmpty(keyType) &&
+                string.Equals(key, "network", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             Logger.Warning("mod-config.json: unknown {keyType}key '{Key}' ignored", keyType, key);
         }
     }

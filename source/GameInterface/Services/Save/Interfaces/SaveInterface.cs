@@ -12,6 +12,7 @@ namespace GameInterface.Services.Heroes.Interfaces;
 public interface ISaveInterface : IGameAbstraction
 {
     SaveResults SaveCurrentGame();
+    SaveResults SaveCurrentGameToFile(string saveName);
 }
 
 internal class SaveInterface : ISaveInterface
@@ -20,24 +21,48 @@ internal class SaveInterface : ISaveInterface
 
     public SaveResults SaveCurrentGame()
     {
-        // Validation
+        var saveDriver = new CoopInMemSaveDriver();
+        var result = SaveCurrentGame("TransferSave", saveDriver);
+        return new SaveResults(
+            result.Success,
+            result.Success ? saveDriver.Data : Array.Empty<byte>(),
+            result.CampaignId);
+    }
+
+    public SaveResults SaveCurrentGameToFile(string saveName)
+    {
+        if (string.IsNullOrWhiteSpace(saveName))
+            throw new ArgumentException("Save name cannot be empty.", nameof(saveName));
+
+        var saveDriver = new FileDriver();
+        var result = SaveCurrentGame(saveName, saveDriver);
+        if (!result.Success) return result;
+
+        var data = FileHelper.GetFileContent(FileDriver.GetSaveFilePath(saveName + ".sav"));
+        if (data == null || data.Length == 0) return ReportSaveFailure("saved game file");
+
+        return new SaveResults(true, data, result.CampaignId);
+    }
+
+    private SaveResults SaveCurrentGame(string saveName, ISaveDriver saveDriver)
+    {
         if (Game.Current == null) return ReportSaveFailure(nameof(Game.Current));
         if (Campaign.Current == null) return ReportSaveFailure(nameof(Campaign.Current));
         if (Campaign.Current.SaveHandler == null) return ReportSaveFailure(nameof(Campaign.Current.SaveHandler));
 
-        // Logic
         var saveHandler = Campaign.Current.SaveHandler;
         var dataArgs = saveHandler.GetSaveMetaData();
         var metaData = MBSaveLoad.GetSaveMetaData(dataArgs);
         EnsureUsableGameVersion(metaData);
 
-        // Required to properly transfer campaign behaviors
         CampaignEventDispatcher.Instance.OnBeforeSave();
 
-        var saveDriver = new CoopInMemSaveDriver();
-        Game.Current.Save(metaData, "TransferSave", saveDriver, (SaveResult) => { });
-
-        return new SaveResults(true, saveDriver.Data, Campaign.Current?.UniqueGameId);
+        var saveResult = SaveResult.GeneralFailure;
+        Game.Current.Save(metaData, saveName, saveDriver, result => saveResult = result);
+        return new SaveResults(
+            saveResult == SaveResult.Success,
+            Array.Empty<byte>(),
+            Campaign.Current?.UniqueGameId);
     }
 
     /// <summary>

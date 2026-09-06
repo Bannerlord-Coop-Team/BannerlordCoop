@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Tests;
 using System;
@@ -24,7 +25,7 @@ public class GameThreadDebugCommandTests : IDisposable
 
         Assert.Equal(
             "gamethread.stall must be run on the server",
-            GameThreadDebugCommand.Stall(new List<string> { "1" }));
+            Stall(new List<string> { "1" }));
     }
 
     [Theory]
@@ -36,8 +37,8 @@ public class GameThreadDebugCommandTests : IDisposable
         ModInformation.IsServer = true;
 
         Assert.StartsWith(
-            "Usage:",
-            GameThreadDebugCommand.Stall(new List<string> { duration }));
+            "Stall duration must be",
+            Stall(new List<string> { duration }));
     }
 
     [Fact]
@@ -47,6 +48,11 @@ public class GameThreadDebugCommandTests : IDisposable
 
         Assert.Equal(
             "Stalled the server game thread for 1 ms",
-            GameThreadDebugCommand.Stall(new List<string> { "1" }));
+            Stall(new List<string> { "1" }));
+    }
+    private static string Stall(List<string> args)
+    {
+        var command = new GameThreadDebugCommand.GameThreadStallCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
     }
 }

@@ -396,4 +396,33 @@ public class TournamentMissionRulesTests
             collisionData.CollisionResult,
             recordedCollision);
     }
+
+    [Fact]
+    public void OnEndMissionRequest_BlocksVanillaProgressionWhileActive()
+    {
+        var controller =
+            ObjectHelper.SkipConstructor<
+                CoopTournamentFightMissionController>();
+
+        Assert.Null(controller.OnEndMissionRequest(out var defaultCanLeave));
+        Assert.False(defaultCanLeave);
+
+        controller.SetLeaveAllowedProvider(() => false);
+        Assert.Null(controller.OnEndMissionRequest(out var activeCanLeave));
+        Assert.False(activeCanLeave);
+    }
+
+    [Fact]
+    public void OnEndMissionRequest_AllowsLeaveOnceCompleted()
+    {
+        var controller =
+            ObjectHelper.SkipConstructor<
+                CoopTournamentFightMissionController>();
+        controller.SetLeaveAllowedProvider(() => true);
+
+        InquiryData inquiry = controller.OnEndMissionRequest(out var canLeave);
+
+        Assert.Null(inquiry);
+        Assert.True(canLeave);
+    }
 }
