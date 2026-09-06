@@ -26,6 +26,9 @@ public sealed class MobilePartyRegistryCoalescingTests
     private const string ItemRosterId = "ItemRoster_destroy-me";
     private const string MemberRosterId = "TroopRoster_destroy-me-members";
     private const string PrisonRosterId = "TroopRoster_destroy-me-prisoners";
+    private const string CompactItemRosterId = "destroy-me";
+    private const string CompactMemberRosterId = "destroy-me-members";
+    private const string CompactPrisonRosterId = "destroy-me-prisoners";
 
     [Fact]
     public void Destroy_DropsPendingBehaviorBeforeNetworkDestroy_AndFlushHasNoLateUpdate()
@@ -80,7 +83,7 @@ public sealed class MobilePartyRegistryCoalescingTests
     }
 
     [Fact]
-    public void Destroy_RemovesRosterIdsOnServerAndClient()
+    public void Destroy_RemovesRosterIdsOnServerAndClient_AndFlushHasNoLateRosterUpdates()
     {
         var serverParty = CreateParty();
         var clientParty = CreateParty();
@@ -92,6 +95,10 @@ public sealed class MobilePartyRegistryCoalescingTests
 
         var serverBroker = new MessageBroker();
         var clientBroker = new MessageBroker();
+        var coalescer = new SendCoalescer();
+        EnqueueRosterUpdate(coalescer, CompactItemRosterId);
+        EnqueueRosterUpdate(coalescer, CompactMemberRosterId);
+        EnqueueRosterUpdate(coalescer, CompactPrisonRosterId);
         using var serverNetwork = new TestNetwork();
         var clientPeer = serverNetwork.CreatePeer();
         var clientNetwork = Mock.Of<INetwork>();
@@ -99,7 +106,8 @@ public sealed class MobilePartyRegistryCoalescingTests
         var factory = Mock.Of<IAutoRegistryFactory>();
 
         using var serverMobilePartyHandler = new AutoRegistryHandler<MobileParty>(
-            new MobilePartyRegistry(Mock.Of<IControllerIdProvider>(), serverBroker, logger, factory, serverObjectManager),
+            new MobilePartyRegistry(Mock.Of<IControllerIdProvider>(), serverBroker, logger, factory,
+                serverObjectManager, coalescer),
             serverBroker, serverNetwork, serverObjectManager);
         using var serverItemRosterHandler = new AutoRegistryHandler<ItemRoster>(
             new ItemRosterRegistry(logger, factory, serverObjectManager),
@@ -115,6 +123,7 @@ public sealed class MobilePartyRegistryCoalescingTests
             clientBroker, clientNetwork, clientObjectManager);
 
         serverBroker.Publish(this, new InstanceDestroyed<MobileParty>(serverParty));
+        coalescer.Flush(serverNetwork);
 
         foreach (var message in serverNetwork.GetPeerMessagesFromType<NetworkDestroyInstance<ItemRoster>>(clientPeer))
             clientBroker.Publish(this, message);
@@ -124,6 +133,8 @@ public sealed class MobilePartyRegistryCoalescingTests
 
         AssertRostersRemoved(serverObjectManager);
         AssertRostersRemoved(clientObjectManager);
+        Assert.DoesNotContain(serverNetwork.GetPeerMessages(clientPeer),
+            message => message is PendingRosterUpdate);
     }
 
     private static MobileParty CreateParty()
@@ -151,7 +162,24 @@ public sealed class MobilePartyRegistryCoalescingTests
         Assert.False(objectManager.Contains(PrisonRosterId));
     }
 
+    private static void EnqueueRosterUpdate(SendCoalescer coalescer, string rosterId)
+    {
+        coalescer.Enqueue(
+            new CoalesceKey("roster-update", rosterId),
+            new LatestWinsPayload(new PendingRosterUpdate(rosterId)));
+    }
+
     private readonly struct PendingBehaviorUpdate : ICommand
     {
+    }
+
+    private readonly struct PendingRosterUpdate : ICommand
+    {
+        public readonly string RosterId;
+
+        public PendingRosterUpdate(string rosterId)
+        {
+            RosterId = rosterId;
+        }
     }
 }
