@@ -1,12 +1,17 @@
-﻿using Common.LiveTesting;
+using Common.LiveTesting;
 using ModelContextProtocol.Server;
+using ModelContextProtocol.Protocol;
 using System.ComponentModel;
 
 namespace CoopMcpServer;
 
 public interface IDebugTools
 {
-    Task<RunView> StartRun(string profile, int client_count, CancellationToken cancellationToken);
+    Task<RunView> StartRun(string profile, int client_count, CancellationToken cancellationToken, string save_name = null);
+    PreflightReport PreflightRun(string profile, int client_count);
+    SavePage ListSaves(string profile, int offset = 0);
+    Task<ClientLaunchView> StartClient(string run_id, int client_index, CancellationToken cancellationToken);
+    Task<CallToolResult> CaptureScreenshot(string run_id, string instance, int timeout_seconds, CancellationToken cancellationToken);
     Task<RunView> GetRun(string run_id, CancellationToken cancellationToken);
     Task<object> WaitForState(string run_id, string instance, string state, int timeout_seconds, CancellationToken cancellationToken);
     Task<LiveTestResponse> ListCommands(string run_id, string instance, CancellationToken cancellationToken);
@@ -16,6 +21,8 @@ public interface IDebugTools
     Task<LiveTestResponse> Screenshot(string run_id, string instance, CancellationToken cancellationToken);
     Task<LiveTestResponse> ScreenshotStatus(string run_id, string instance, string capture_id, CancellationToken cancellationToken);
     Task<LiveTestResponse> OptionsMenu(string run_id, string instance, string action, CancellationToken cancellationToken, string tab = null);
+    Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0);
+    Task<LiveTestResponse> UiAction(string run_id, string instance, string snapshot, string element, string action, CancellationToken cancellationToken, string text = null, double? value = null);
     Task<RunView> StopRun(string run_id);
 }
 
@@ -23,11 +30,26 @@ public interface IDebugTools
 public sealed class DebugTools : IDebugTools
 {
     private readonly IRunOrchestrator runs;
-    public DebugTools(IRunOrchestrator runs) { this.runs = runs; }
+    private readonly IScreenshotCapture screenshots;
+    public DebugTools(IRunOrchestrator runs, IScreenshotCapture screenshots) { this.runs = runs; this.screenshots = screenshots; }
 
-    [McpServerTool(Name = "start_run", UseStructuredContent = true), Description("Launch a configured in-game server and 0..16 deferred clients. Returns booting, NOT connected or ready. Next wait for server readyForCampaignTests, each client readyToJoin, join_client each, then wait each client readyForCampaignTests. Only one active run per MCP session.")]
-    public Task<RunView> StartRun(string profile, int client_count, CancellationToken cancellationToken) =>
-        runs.StartAsync(profile, client_count, cancellationToken);
+    [McpServerTool(Name = "list_saves", ReadOnly = true, UseStructuredContent = true), Description("List local graphical Bannerlord save basenames for a configured profile, from the redirected Windows Documents save folder. Metadata only, 64 per page and 512 catalog entries maximum. Pass nextOffset until unchanged. Use an exact name as start_run save_name; no save parsing/copy/delete/write, no hotload. Missing co-op .json sidecar is reported, not created.")]
+    public SavePage ListSaves(string profile, int offset = 0) => runs.ListSaves(profile, offset);
+
+    [McpServerTool(Name = "preflight_run", ReadOnly = true, UseStructuredContent = true), Description("Read-only system commit headroom and deployed DEBUG bridge metadata check for a server plus client_count new clients. No launch, deployment, allocation, or configuration changes. Budgets are configurable estimates, not guarantees.")]
+    public PreflightReport PreflightRun(string profile, int client_count) => runs.Preflight(profile, client_count);
+
+    [McpServerTool(Name = "start_client", UseStructuredContent = true), Description("Add one deferred client to an existing owned run using a configured client_index (1..16). Prefer start_run with client_count=0, wait for server, then add clients as needed. Slot is reserved once: repeated calls report existing_running/existing_exited/launch_failed/outcome_unknown, never relaunch. Preflight rejection has no launch side effect. Launching is not joining; wait readyToJoin, join_client, then wait readyForCampaignTests.")]
+    public Task<ClientLaunchView> StartClient(string run_id, int client_index, CancellationToken cancellationToken) =>
+        runs.StartClientAsync(run_id, client_index, cancellationToken);
+
+    [McpServerTool(Name = "capture_screenshot"), Description("Wait 1..120 seconds for advancing engine/render observations, request one screenshot, await stable bridge BMP evidence, and return completed PNG image content plus artifact metadata. Bounded to 64MiB BMP, 16M pixels, 8MiB PNG. Does not prove the intended screen visually; inspect the returned image. Failure preserves captureId/path and bridge diagnostics; never blindly retry uncertain capture. Legacy screenshot/status remain asynchronous.")]
+    public Task<CallToolResult> CaptureScreenshot(string run_id, string instance, int timeout_seconds, CancellationToken cancellationToken) =>
+        screenshots.CaptureAsync(run_id, instance, timeout_seconds, cancellationToken);
+
+    [McpServerTool(Name = "start_run", UseStructuredContent = true), Description("Launch a configured in-game server and 0..16 deferred clients. Returns booting, NOT connected or ready. Next wait for server readyForCampaignTests, each client readyToJoin, join_client each, then wait each client readyForCampaignTests. Only one active run per MCP session. Optional save_name must be an exact list_saves basename; server uses /coopsave without default fallback. Omit to retain normal startup. MCP never modifies save bytes; normal game autosaves are not disabled.")]
+    public Task<RunView> StartRun(string profile, int client_count, CancellationToken cancellationToken, string save_name = null) =>
+        runs.StartAsync(profile, client_count, cancellationToken, save_name);
 
     [McpServerTool(Name = "get_run", ReadOnly = true, UseStructuredContent = true), Description("Refresh owned instances: process alive is distinct from endpoint readiness, campaign readiness and mission readiness. Includes endpoint status and diagnostic errors.")]
     public Task<RunView> GetRun(string run_id, CancellationToken cancellationToken) => runs.GetAsync(run_id, cancellationToken);
@@ -68,6 +90,25 @@ public sealed class DebugTools : IDebugTools
         if ((action == "select" && string.IsNullOrEmpty(tab)) || (tab != null && tab.Length > 64))
             throw new ArgumentException("tab must contain 1..64 characters", nameof(tab));
         return runs.RequestAsync(run_id, instance, "options-menu", new { action, tab }, action != "inspect", cancellationToken);
+    }
+
+    [McpServerTool(Name = "ui_inspect", ReadOnly = true, UseStructuredContent = true), Description("DEBUG client Gauntlet widget tree. Omit snapshot for fresh references (expire after 30s). Pages contain up to 128 elements: repeat with snapshot and nextOffset until nextOffset == total. Discover by widget id/type/text and parent index (eN); password fields are redacted. No automatic waits. A new snapshot or any action invalidates previous references. Use screenshot for visual verification. Truncated trees are inspection-only.")]
+    public Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0)
+    {
+        if (offset < 0 || offset > 16384 || snapshot == null && offset != 0 || snapshot?.Length > 64)
+            throw new ArgumentException("Invalid snapshot page.");
+        return runs.RequestAsync(run_id, instance, "ui-inspect", new { snapshot, offset }, false, cancellationToken);
+    }
+
+    [McpServerTool(Name = "ui_action", UseStructuredContent = true), Description("DEBUG client UI action on a ui_inspect snapshot/element reference. Allowed: click (native button), toggle (value 0/1), text (replace ordinary non-password text), slider (native numeric value), scroll_vertical/scroll_horizontal (value fraction 0..1). Dropdowns: click opener, inspect again, click visible item. Targets must be visible/enabled/uncovered. All references consumed after dispatch, inspect again and wait for animations. This changes real UI/settings; Apply is a separate button. No gameplay keys/OS input/arbitrary code. Never retry outcomeUncertain mutations.")]
+    public Task<LiveTestResponse> UiAction(string run_id, string instance, string snapshot, string element, string action, CancellationToken cancellationToken, string text = null, double? value = null)
+    {
+        if (string.IsNullOrEmpty(snapshot) || snapshot.Length > 64 || string.IsNullOrEmpty(element) || element.Length > 16 ||
+            text?.Length > 512 || value.HasValue && !double.IsFinite(value.Value))
+            throw new ArgumentException("Invalid UI action parameters.");
+        if (action != "click" && action != "toggle" && action != "text" && action != "slider" && action != "scroll_vertical" && action != "scroll_horizontal")
+            throw new ArgumentException("Unsupported UI action.", nameof(action));
+        return runs.RequestAsync(run_id, instance, "ui-action", new { snapshot, element, action, text, value }, true, cancellationToken);
     }
 
     [McpServerTool(Name = "stop_run", UseStructuredContent = true), Description("Shutdown only owned processes, then force-stop those still alive after bounded grace. Archive endpoint-reported logs and retain all run artifacts. Idempotent; cleanup failures remain inspectable and can be retried.")]
