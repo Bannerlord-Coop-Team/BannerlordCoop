@@ -117,6 +117,7 @@ public class VoiceOptionsTests
         Assert.Equal("F11", h.Section.PushToTalkKey.OptionValueText);
         h.Section.PushToTalkKey.Set(InputKey.F12);
         Assert.Equal(InputKey.F12, h.Settings.PushToTalkKey);
+        Assert.Equal("F12", h.Section.PushToTalkKey.OptionValueText);
         Assert.False(h.Section.PushToTalkKey.IsChanged);
         Assert.Equal(InputKey.F11, original.PushToTalkKey);
         h.Section.PushToTalkKey.ExecuteRevert();

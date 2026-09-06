@@ -86,6 +86,35 @@ public class CoopOptionsKeybindingTests
         Assert.Same(module, TaleWorlds.MountAndBlade.Module.CurrentModule);
     }
 
+    [Fact]
+    public void HeadlessInputFixtureSuppliesNativeKeyLabelsAndRestoresAnEmptyTextManager()
+    {
+        using var restoreOriginalState = new VoiceKeybindingFixture();
+        var module = (TaleWorlds.MountAndBlade.Module)System.Runtime.Serialization.FormatterServices
+            .GetUninitializedObject(typeof(TaleWorlds.MountAndBlade.Module));
+        var originalTexts = new TaleWorlds.Core.GameTextManager();
+        module.GlobalTextManager = originalTexts;
+        TaleWorlds.MountAndBlade.Module.CurrentModule = module;
+
+        using (var fixture = new VoiceKeybindingFixture())
+        {
+            var key = new VoicePushToTalkKeyVM(InputKey.F11, _ => { });
+            Assert.Equal("F11", key.OptionValueText);
+            module.GlobalTextManager.GetGameText("str_game_key_text").SetVariationWithId("f11",
+                new TaleWorlds.Localization.TextObject("{=!}Function eleven"),
+                new System.Collections.Generic.List<TaleWorlds.Core.GameTextManager.ChoiceTag>());
+            key.RefreshValues();
+            Assert.Equal("Function eleven", key.OptionValueText);
+            key.Set(InputKey.F12);
+            Assert.Equal(InputKey.F12, key.CurrentKey.InputKey);
+            Assert.Equal("F12", key.OptionValueText);
+        }
+
+        Assert.Same(originalTexts, module.GlobalTextManager);
+        Assert.Null(originalTexts.GetGameText("str_game_key_text"));
+        Assert.Same(module, TaleWorlds.MountAndBlade.Module.CurrentModule);
+    }
+
     private sealed class Popup : ICoopKeybindingPopup
     {
         public bool IsActive { get; private set; }
