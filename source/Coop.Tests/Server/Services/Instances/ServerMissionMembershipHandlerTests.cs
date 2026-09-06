@@ -282,6 +282,45 @@ public class ServerMissionMembershipHandlerTests
         Assert.False(missionManager.TryGetRelayTarget(peer, InstanceId, "current", out _));
     }
 
+    [Fact]
+    public void IntroductionRequestAuthorizesOnlyTheRequestingCampaignPeer()
+    {
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 53001), 1);
+        var unknownPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 53002), 2);
+        var playerManager = CreatePlayerManager(peer, "current");
+        var missionManager = new MissionManager(playerManager.Object);
+        var broker = new TestMessageBroker();
+        var network = new TestNetwork();
+        using var handler = new ServerMissionMembershipHandler(broker, missionManager, network, playerManager.Object);
+        var request = new NetworkRequestMissionIntroduction(InstanceId, Guid.NewGuid());
+
+        broker.Publish(unknownPeer, request);
+        Assert.Empty(network.SentNetworkMessages);
+        broker.Publish(peer, request);
+
+        var reply = Assert.Single(network.GetPeerMessagesFromType<NetworkMissionIntroductionAuthorized>(peer));
+        Assert.Equal(request.InstanceId, reply.InstanceId);
+        Assert.Equal(request.RequestId, reply.RequestId);
+        Assert.True(Guid.TryParseExact(reply.Token, "N", out var token));
+        Assert.NotEqual(Guid.Empty, token);
+    }
+
+    [Fact]
+    public void IntroductionRequestAfterDisconnectCleanupCannotReauthorizeRetiredPeer()
+    {
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 53001), 1);
+        var playerManager = CreatePlayerManager(peer, "current");
+        var missionManager = new MissionManager(playerManager.Object);
+        var broker = new TestMessageBroker();
+        var network = new TestNetwork();
+        using var handler = new ServerMissionMembershipHandler(broker, missionManager, network, playerManager.Object);
+        missionManager.HandleDisconnect(peer);
+
+        broker.Publish(peer, new NetworkRequestMissionIntroduction(InstanceId, Guid.NewGuid()));
+
+        Assert.Empty(network.SentNetworkMessages);
+    }
+
     private static TestNetwork PublishEntry(
         NetPeer newcomer,
         string newcomerControllerId,

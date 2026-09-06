@@ -63,6 +63,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     private string instanceId = null;
     private int instanceGeneration;
+    private Guid introductionRequestId;
 
     /// <summary>
     /// Campaign controller identity used to map a mission peer to its player. Standalone mission flows
@@ -121,6 +122,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         poller = new Poller(Update, TimeSpan.FromMilliseconds(1000 / 120));
         netManager.NatPunchModule.Init(this);
 
+        messageBroker.Subscribe<NetworkMissionIntroductionAuthorized>(Handle_IntroductionAuthorized);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
@@ -132,6 +134,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (disposed) return;
         disposed = true;
 
+        messageBroker.Unsubscribe<NetworkMissionIntroductionAuthorized>(Handle_IntroductionAuthorized);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
@@ -174,6 +177,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         lock (peerGate)
         {
             instanceId = null;
+            introductionRequestId = Guid.Empty;
             instanceGeneration++;
         }
         netManager.DisconnectAll();
@@ -240,12 +244,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void ConnectToInstance(string instanceId)
     {
+        var requestId = Guid.NewGuid();
         // The relay send and the connection-accept check both read this, so it is set even
         // when the punch below is skipped.
         lock (peerGate)
         {
             this.instanceId = instanceId;
             instanceGeneration++;
+            introductionRequestId = Config.IsTunneled ? Guid.Empty : requestId;
         }
         steamBridge.Start(netManager.LocalPort);
 
@@ -253,11 +259,22 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         // endpoints, so mission traffic stays on the per-send server relay fallback.
         if (Config.IsTunneled) return;
 
-        Logger.Verbose("Attempting NAT Punch");
+        relayNetwork.SendAll(new NetworkRequestMissionIntroduction(instanceId, requestId));
+    }
 
-        ConnectionToken token = new ConnectionToken(ControllerId, instanceId);
+    private void Handle_IntroductionAuthorized(MessagePayload<NetworkMissionIntroductionAuthorized> payload)
+    {
+        var authorization = payload.What;
+        lock (peerGate)
+        {
+            // A request id distinguishes even a leave and re-entry into the same location.
+            if (introductionRequestId == Guid.Empty || authorization.RequestId != introductionRequestId ||
+                authorization.InstanceId != instanceId)
+                return;
 
-        netManager.NatPunchModule.SendNatIntroduceRequest(relayNetwork.ServerEndpoint, token);
+            introductionRequestId = Guid.Empty;
+            netManager.NatPunchModule.SendNatIntroduceRequest(relayNetwork.ServerEndpoint, authorization.Token);
+        }
     }
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)

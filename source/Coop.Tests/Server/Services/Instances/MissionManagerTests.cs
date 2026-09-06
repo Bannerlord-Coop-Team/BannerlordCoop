@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Instances;
@@ -53,7 +55,7 @@ public class MissionManagerTests
         var local = new IPEndPoint(IPAddress.Loopback, 53001);
         var remote = new IPEndPoint(IPAddress.Loopback, 53002);
 
-        manager.HandleIntroductionRequest(netManager.NatPunchModule, local, remote, "late%battle");
+        manager.HandleIntroductionRequest(netManager.NatPunchModule, local, remote, Authorize(manager, peer, "late", "battle"));
 
         Assert.False(manager.TryGetControllers("battle", out _));
         Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
@@ -70,7 +72,7 @@ public class MissionManagerTests
         var local = new IPEndPoint(IPAddress.Loopback, 53003);
         var remote = new IPEndPoint(IPAddress.Loopback, 53004);
 
-        manager.HandleIntroductionRequest(netManager.NatPunchModule, local, remote, "late%battle");
+        manager.HandleIntroductionRequest(netManager.NatPunchModule, local, remote, Authorize(manager, peer, "late", "battle"));
 
         Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
         manager.CompleteInstanceConclusion("battle", succeeded: false);
@@ -92,14 +94,14 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             oldInternal,
             oldExternal,
-            "moving%old-instance");
+            Authorize(manager, peer, "moving", "old-instance"));
         Assert.True(manager.TryBeginEmptyInstanceConclusion("old-instance"));
 
         manager.HandleIntroductionRequest(
             netManager.NatPunchModule,
             replacementInternal,
             replacementExternal,
-            "moving%new-instance");
+            Authorize(manager, peer, "moving", "new-instance"));
         Assert.True(manager.CompleteInstanceConclusion("old-instance", succeeded: false));
 
         Assert.Empty(GetInstance(manager, "old-instance").PunchEndpoints);
@@ -123,14 +125,14 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             oldInternal,
             sharedExternal,
-            "old%old-instance");
+            Authorize(manager, oldPeer, "old", "old-instance"));
         Assert.True(manager.TryBeginEmptyInstanceConclusion("old-instance"));
 
         manager.HandleIntroductionRequest(
             netManager.NatPunchModule,
             replacementInternal,
             sharedExternal,
-            "replacement%new-instance");
+            Authorize(manager, replacementPeer, "replacement", "new-instance"));
         Assert.True(manager.CompleteInstanceConclusion("old-instance", succeeded: false));
 
         Assert.Empty(GetInstance(manager, "old-instance").PunchEndpoints);
@@ -153,7 +155,7 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             internalEndpoint,
             externalEndpoint,
-            "departing%battle");
+            Authorize(manager, departingPeer, "departing", "battle"));
         Assert.True(manager.TryEnterMission(departingPeer, "departing", "battle", out _));
         Assert.True(manager.TryEnterMission(survivorPeer, "survivor", "battle", out _));
 
@@ -178,7 +180,7 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             internalEndpoint,
             externalEndpoint,
-            "moving%new-instance");
+            Authorize(manager, peer, "moving", "new-instance"));
 
         MissionDeparture departure = Assert.Single(manager.HandleDisconnect(peer));
 
@@ -200,7 +202,7 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             internalEndpoint,
             externalEndpoint,
-            "moving%new-instance");
+            Authorize(manager, peer, "moving", "new-instance"));
 
         Assert.True(manager.TryEnterMission(peer, "moving", "new-instance", out var entry));
 
@@ -226,7 +228,7 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             internalEndpoint,
             externalEndpoint,
-            "moving%new-instance");
+            Authorize(manager, peer, "moving", "new-instance"));
 
         Assert.True(manager.TryLeaveMission(peer, "moving", "old-instance", out _));
 
@@ -252,7 +254,7 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             internalEndpoint,
             externalEndpoint,
-            "moving%new-instance");
+            Authorize(manager, replacementPeer, "moving", "new-instance"));
 
         Assert.Single(manager.HandleDisconnect(oldPeer));
 
@@ -277,7 +279,7 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             internalEndpoint,
             externalEndpoint,
-            "moving%new-instance");
+            Authorize(manager, peer, "moving", "new-instance"));
         Assert.True(manager.TryLeaveMission(peer, "moving", "old-instance", out _));
 
         Assert.Empty(manager.HandleDisconnect(peer));
@@ -300,7 +302,7 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             internalEndpoint,
             externalEndpoint,
-            "entering%battle");
+            Authorize(manager, enteringPeer, "entering", "battle"));
 
         Assert.Single(manager.HandleDisconnect(departingPeer));
 
@@ -338,12 +340,12 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             oldInternal,
             oldExternal,
-            "host%battle");
+            Authorize(manager, peer, "host", "battle"));
         manager.HandleIntroductionRequest(
             netManager.NatPunchModule,
             replacementInternal,
             replacementExternal,
-            "host%battle");
+            Authorize(manager, peer, "host", "battle"));
 
         MissionInstance.Endpoints endpoint = Assert.Single(GetInstance(manager, "battle").PunchEndpoints);
         Assert.Equal("host", endpoint.ControllerId);
@@ -366,12 +368,12 @@ public class MissionManagerTests
             netManager.NatPunchModule,
             firstInternal,
             sharedExternal,
-            "first%first-battle");
+            Authorize(manager, firstPeer, "first", "first-battle"));
         manager.HandleIntroductionRequest(
             netManager.NatPunchModule,
             replacementInternal,
             sharedExternal,
-            "replacement%replacement-battle");
+            Authorize(manager, replacementPeer, "replacement", "replacement-battle"));
 
         Assert.Empty(GetInstance(manager, "first-battle").PunchEndpoints);
         MissionInstance.Endpoints endpoint = Assert.Single(
@@ -595,6 +597,194 @@ public class MissionManagerTests
 
         Assert.True(manager.TryGetRelayTarget(observerPeer, "battle", "host", out var resolved));
         Assert.Same(replacementPeer, resolved);
+    }
+
+    [Fact]
+    public async Task DisconnectCompletesBeforeBlockedPunchCanInsert()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        var token = Authorize(manager, peer, "moving", "battle");
+        var nat = new NetManager(null).NatPunchModule;
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+        var gate = typeof(MissionManager).GetField("gate", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(manager)!;
+        using var started = new ManualResetEventSlim();
+        Task punch;
+
+        lock (gate)
+        {
+            punch = Task.Run(() =>
+            {
+                started.Set();
+                manager.HandleIntroductionRequest(nat, endpoint, endpoint, token);
+            });
+            Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+            Assert.Empty(manager.HandleDisconnect(peer));
+        }
+
+        await punch.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(HasInstance(manager, "battle"));
+        // The player registry may still expose this peer after mission cleanup has completed.
+        Assert.False(manager.TryAuthorizeIntroduction(peer, "moving", "battle", Guid.NewGuid(), out _));
+    }
+
+    [Fact]
+    public void IntroductionResolvesCurrentPeerInsideTheDisconnectGate()
+    {
+        var peer = CreatePeer(1);
+        var playerManager = new Mock<IPlayerManager>();
+        var manager = new MissionManager(playerManager.Object);
+        var gate = typeof(MissionManager).GetField("gate", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(manager)!;
+        playerManager.Setup(p => p.TryGetPeer("moving", out It.Ref<NetPeer>.IsAny))
+            .Returns((string _, out NetPeer currentPeer) =>
+            {
+                Assert.True(Monitor.IsEntered(gate));
+                currentPeer = peer;
+                return true;
+            });
+        var token = Authorize(manager, peer, "moving", "battle");
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+
+        manager.HandleIntroductionRequest(new NetManager(null).NatPunchModule, endpoint, endpoint, token);
+
+        Assert.Single(GetInstance(manager, "battle").PunchEndpoints);
+        manager.HandleDisconnect(peer);
+        Assert.Empty(GetInstance(manager, "battle").PunchEndpoints);
+    }
+
+    [Fact]
+    public void DelayedOldSessionPunchCannotOverwriteReplacementEndpoint()
+    {
+        var oldPeer = CreatePeer(1);
+        var replacementPeer = CreatePeer(2);
+        var playerManager = new Mock<IPlayerManager>();
+        var currentPeer = oldPeer;
+        playerManager.Setup(p => p.TryGetPeer("moving", out It.Ref<NetPeer>.IsAny))
+            .Returns((string _, out NetPeer peer) => { peer = currentPeer; return true; });
+        var manager = new MissionManager(playerManager.Object);
+        var oldToken = Authorize(manager, oldPeer, "moving", "battle");
+        currentPeer = replacementPeer;
+        var replacementToken = Authorize(manager, replacementPeer, "moving", "battle");
+        var nat = new NetManager(null).NatPunchModule;
+        var oldEndpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+        var replacementEndpoint = new IPEndPoint(IPAddress.Loopback, 53002);
+
+        manager.HandleIntroductionRequest(nat, replacementEndpoint, replacementEndpoint, replacementToken);
+        manager.HandleDisconnect(oldPeer);
+        manager.HandleIntroductionRequest(nat, oldEndpoint, oldEndpoint, oldToken);
+
+        var endpoint = Assert.Single(GetInstance(manager, "battle").PunchEndpoints);
+        Assert.Same(replacementPeer, endpoint.CampaignPeer);
+        Assert.Equal(replacementEndpoint, endpoint.External);
+        Assert.False(manager.TryAuthorizeIntroduction(oldPeer, "moving", "battle", Guid.NewGuid(), out _));
+    }
+
+    [Fact]
+    public void ReplacementRegistrationRejectsOldPunchBeforeReplacementAuthorization()
+    {
+        var oldPeer = CreatePeer(1);
+        var replacementPeer = CreatePeer(2);
+        var playerManager = new Mock<IPlayerManager>();
+        var currentPeer = oldPeer;
+        playerManager.Setup(p => p.TryGetPeer("moving", out It.Ref<NetPeer>.IsAny))
+            .Returns((string _, out NetPeer peer) => { peer = currentPeer; return true; });
+        var manager = new MissionManager(playerManager.Object);
+        var token = Authorize(manager, oldPeer, "moving", "battle");
+        currentPeer = replacementPeer;
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+
+        manager.HandleIntroductionRequest(new NetManager(null).NatPunchModule, endpoint, endpoint, token);
+
+        Assert.False(HasInstance(manager, "battle"));
+        Assert.False(manager.TryAuthorizeIntroduction(oldPeer, "moving", "battle", Guid.NewGuid(), out _));
+    }
+
+    [Fact]
+    public void DuplicateRequestAndPunchRetainTheFirstAcceptedEndpoint()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        var requestId = Guid.NewGuid();
+        Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", "battle", requestId, out var token));
+        var nat = new NetManager(null).NatPunchModule;
+        var firstEndpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+        var delayedEndpoint = new IPEndPoint(IPAddress.Loopback, 53002);
+        manager.HandleIntroductionRequest(nat, firstEndpoint, firstEndpoint, token);
+
+        Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", "battle", requestId, out var duplicateToken));
+        Assert.Equal(token, duplicateToken);
+        manager.HandleIntroductionRequest(nat, delayedEndpoint, delayedEndpoint, duplicateToken);
+
+        Assert.Equal(firstEndpoint, Assert.Single(GetInstance(manager, "battle").PunchEndpoints).External);
+    }
+
+    [Fact]
+    public void SupersededRequestCannotInsertAnEndpoint()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        var oldToken = Authorize(manager, peer, "moving", "old-instance");
+        var newToken = Authorize(manager, peer, "moving", "new-instance");
+        var nat = new NetManager(null).NatPunchModule;
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+
+        manager.HandleIntroductionRequest(nat, endpoint, endpoint, oldToken);
+        manager.HandleIntroductionRequest(nat, endpoint, endpoint, newToken);
+
+        Assert.False(HasInstance(manager, "old-instance"));
+        Assert.Single(GetInstance(manager, "new-instance").PunchEndpoints);
+    }
+
+    [Fact]
+    public void GracefulLeaveInvalidatesUnconsumedAuthorizationForDepartedInstance()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        var token = Authorize(manager, peer, "moving", "battle");
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out _));
+        Assert.True(manager.TryLeaveMission(peer, "moving", "battle", out _));
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+
+        manager.HandleIntroductionRequest(new NetManager(null).NatPunchModule, endpoint, endpoint, token);
+
+        Assert.False(HasInstance(manager, "battle"));
+    }
+
+    [Theory]
+    [InlineData("moving%battle")]
+    [InlineData("invalid")]
+    [InlineData("00000000000000000000000000000000")]
+    [InlineData("0123456789abcdef0123456789abcdef")]
+    public void UnissuedTokenCannotCreateNatShell(string token)
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+
+        manager.HandleIntroductionRequest(new NetManager(null).NatPunchModule, endpoint, endpoint, token);
+
+        Assert.False(HasInstance(manager, "battle"));
+    }
+
+    [Fact]
+    public void AuthorizationHonorsLiteNetLibDiscoveryTokenLengthLimit()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        string longestInstance = new string('x', NatPunchModule.MaxTokenLength - "moving%".Length);
+
+        Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", longestInstance, Guid.NewGuid(), out var token));
+        Assert.True(Guid.TryParseExact(token, "N", out _));
+        Assert.False(manager.TryAuthorizeIntroduction(peer, "moving", longestInstance + "x", Guid.NewGuid(), out _));
+    }
+
+    private static string Authorize(MissionManager manager, NetPeer peer, string controllerId, string instanceId)
+    {
+        Assert.True(manager.TryAuthorizeIntroduction(peer, controllerId, instanceId, Guid.NewGuid(), out var token));
+        return token;
     }
 
     private static MissionManager CreateManager(params (string controllerId, NetPeer peer)[] peers)

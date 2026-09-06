@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Server.Services.Instances;
 
@@ -21,10 +22,13 @@ public interface IMissionManager
 {
     /// <summary>
     /// Handle a NAT-introduction request: introduce the requesting peer to every other peer already
-    /// punched into the same instance. The request's <see cref="ConnectionToken"/> supplies the controller
-    /// and client-derived instance id; the controller must map to a current campaign connection.
+    /// punched into the same instance. The opaque token was issued on the requesting campaign session;
+    /// the discovery response supplies a separate controller/instance <see cref="ConnectionToken"/>.
     /// </summary>
     void HandleIntroductionRequest(NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token);
+
+    /// <summary>Authorize one NAT punch on the requesting campaign session.</summary>
+    bool TryAuthorizeIntroduction(NetPeer peer, string controllerId, string instanceId, Guid requestId, out string token);
 
     /// <summary>Resolve a relay target only when source and target are current members of the named instance.</summary>
     bool TryGetRelayTarget(NetPeer sourcePeer, string instanceId, string controllerId, out NetPeer peer);
@@ -144,6 +148,27 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private readonly Dictionary<string, MissionInstance> pendingEmptyInstances = new Dictionary<string, MissionInstance>();
     private readonly HashSet<string> concludingInstances = new HashSet<string>();
     private readonly HashSet<string> concludedInstances = new HashSet<string>();
+    private readonly Dictionary<string, IntroductionAuthorization> introductionAuthorizations = new();
+    // Retired peers cannot authorize again, without retaining every disconnected socket for the session.
+    private readonly ConditionalWeakTable<NetPeer, object> disconnectedPeers = new();
+
+    /// <summary>Latest mission punch authorization for one controller's campaign session.</summary>
+    private sealed class IntroductionAuthorization
+    {
+        public NetPeer Peer { get; }
+        public Guid RequestId { get; }
+        public string Token { get; }
+        public ConnectionToken DiscoveryToken { get; }
+        public bool Punched { get; set; }
+
+        public IntroductionAuthorization(NetPeer peer, Guid requestId, ConnectionToken discoveryToken)
+        {
+            Peer = peer;
+            RequestId = requestId;
+            Token = Guid.NewGuid().ToString("N");
+            DiscoveryToken = discoveryToken;
+        }
+    }
 
     public MissionManager(IPlayerManager playerManager)
     {
@@ -151,35 +176,73 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         this.playerManager = playerManager;
     }
 
+    public bool TryAuthorizeIntroduction(
+        NetPeer peer, string controllerId, string instanceId, Guid requestId, out string token)
+    {
+        token = null;
+        if (peer == null || string.IsNullOrEmpty(controllerId) || string.IsNullOrEmpty(instanceId) ||
+            requestId == Guid.Empty)
+            return false;
+
+        if (controllerId.Length + instanceId.Length + 1 > NatPunchModule.MaxTokenLength ||
+            controllerId.Contains("%") || instanceId.Contains("%"))
+        {
+            Logger.Warning("Cannot authorize mission discovery whose identity exceeds the NAT token format");
+            return false;
+        }
+
+        lock (gate)
+        {
+            if (disconnectedPeers.TryGetValue(peer, out _) || IsConclusionFenced(instanceId) ||
+                !playerManager.TryGetPeer(controllerId, out var currentPeer) ||
+                !ReferenceEquals(currentPeer, peer))
+                return false;
+
+            if (!introductionAuthorizations.TryGetValue(controllerId, out var authorization) ||
+                !ReferenceEquals(authorization.Peer, peer) || authorization.RequestId != requestId ||
+                authorization.DiscoveryToken.InstanceId != instanceId)
+            {
+                authorization = new IntroductionAuthorization(peer, requestId,
+                    new ConnectionToken(controllerId, instanceId));
+                introductionAuthorizations[controllerId] = authorization;
+            }
+
+            token = authorization.Token;
+            return true;
+        }
+    }
+
     public void HandleIntroductionRequest(
         NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
     {
-        if (ConnectionToken.TryParse(token, out var connectionToken) == false)
+        if (!Guid.TryParseExact(token, "N", out _))
         {
             Logger.Warning("Discarding NAT introduction with unparseable token from {Endpoint}", remoteEndPoint);
             return;
         }
 
-        if (!playerManager.TryGetPeer(connectionToken.ControllerId, out var campaignPeer))
-        {
-            Logger.Warning("Ignoring NAT introduction for controller {Controller} without a current campaign peer",
-                connectionToken.ControllerId);
-            return;
-        }
-
-        string instanceId = connectionToken.InstanceId;
-
         lock (gate)
         {
+            // Validation and insertion share the disconnect gate; a retired session cannot repunch.
+            var authorization = introductionAuthorizations.Values.FirstOrDefault(candidate => candidate.Token == token);
+            if (authorization == null || authorization.Punched ||
+                disconnectedPeers.TryGetValue(authorization.Peer, out _) ||
+                !playerManager.TryGetPeer(authorization.DiscoveryToken.ControllerId, out var campaignPeer) ||
+                !ReferenceEquals(campaignPeer, authorization.Peer))
+            {
+                Logger.Debug("Ignoring NAT introduction without a current campaign authorization");
+                return;
+            }
+
+            var connectionToken = authorization.DiscoveryToken;
+            string instanceId = connectionToken.InstanceId;
             if (IsConclusionFenced(instanceId))
             {
                 Logger.Information("Ignoring NAT introduction for concluded instance {Instance}", instanceId);
                 return;
             }
 
-            // Instance ids are derived client-side from (settlement, location), so co-located clients
-            // independently arrive at the same id. The first punch for an id creates the instance; the
-            // rest are introduced into it. No separate server-assignment round-trip is needed.
+            // Instance identity stays client-derived; authorization only binds its punch to a campaign session.
             if (byInstanceId.TryGetValue(instanceId, out var instance) == false)
             {
                 instance = new MissionInstance(instanceId);
@@ -201,9 +264,10 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 natPunchModule.NatIntroduce(
                     existing.Internal, existing.External, // host side
                     localEndPoint, remoteEndPoint,        // newcomer side
-                    token);
+                    connectionToken);
             }
 
+            authorization.Punched = true;
             instance.PunchEndpoints.Add(new MissionInstance.Endpoints(
                 connectionToken.ControllerId,
                 campaignPeer,
@@ -383,6 +447,13 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            disconnectedPeers.GetValue(peer, _ => new object());
+            foreach (var controllerId in introductionAuthorizations
+                .Where(pair => ReferenceEquals(pair.Value.Peer, peer)).Select(pair => pair.Key).ToArray())
+            {
+                introductionAuthorizations.Remove(controllerId);
+            }
+
             var staleMemberships = byInstanceId.Values
                 .SelectMany(instance => instance.Memberships)
                 .Where(membership => ReferenceEquals(membership.Peer, peer))
@@ -554,6 +625,12 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private MissionDeparture RemoveMembership(MissionMembership membership)
     {
         membership.Instance.Memberships.Remove(membership);
+        if (introductionAuthorizations.TryGetValue(membership.ControllerId, out var authorization) &&
+            ReferenceEquals(authorization.Peer, membership.Peer) &&
+            authorization.DiscoveryToken.InstanceId == membership.Instance.Id)
+        {
+            introductionAuthorizations.Remove(membership.ControllerId);
+        }
         membership.Instance.PunchEndpoints.RemoveAll(e =>
             e.ControllerId == membership.ControllerId && ReferenceEquals(e.CampaignPeer, membership.Peer));
 

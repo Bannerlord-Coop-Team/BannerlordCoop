@@ -50,6 +50,7 @@ public class ServerMissionMembershipHandler : IHandler
         this.playerManager = playerManager;
         this.tunnelIdentityResolver = tunnelIdentityResolver;
 
+        messageBroker.Subscribe<NetworkRequestMissionIntroduction>(Handle_RequestMissionIntroduction);
         messageBroker.Subscribe<NetworkMissionEntered>(Handle_MissionEntered);
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_MissionLeft);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -57,9 +58,20 @@ public class ServerMissionMembershipHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<NetworkRequestMissionIntroduction>(Handle_RequestMissionIntroduction);
         messageBroker.Unsubscribe<NetworkMissionEntered>(Handle_MissionEntered);
         messageBroker.Unsubscribe<NetworkMissionLeft>(Handle_MissionLeft);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+    }
+
+    private void Handle_RequestMissionIntroduction(MessagePayload<NetworkRequestMissionIntroduction> payload)
+    {
+        var request = payload.What;
+        if (payload.Who is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
+            missionManager.TryAuthorizeIntroduction(peer, controllerId, request.InstanceId, request.RequestId, out var token))
+        {
+            network.Send(peer, new NetworkMissionIntroductionAuthorized(request.InstanceId, request.RequestId, token));
+        }
     }
 
     private void Handle_MissionEntered(MessagePayload<NetworkMissionEntered> payload)

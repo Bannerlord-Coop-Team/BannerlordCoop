@@ -36,7 +36,8 @@ public class SettlementMissionReconnectTests
         IPEndPoint hostInternal,
         IPEndPoint hostExternal,
         IPEndPoint clientInternal,
-        IPEndPoint clientExternal)> CapturedIntroductions = new();
+        IPEndPoint clientExternal,
+        string discoveryToken)> CapturedIntroductions = new();
 
     [Fact]
     public void CrashedMember_ReconnectsOnReplacementPeerWithoutOldNatEndpoint()
@@ -77,9 +78,9 @@ public class SettlementMissionReconnectTests
         CapturedIntroductions.Clear();
         try
         {
-            Punch(missionManager, natPunchModule, oldAInternal, oldAExternal, "A");
+            Punch(missionManager, natPunchModule, oldAInternal, oldAExternal, oldAPeer, "A");
             messageBroker.Publish(oldAPeer, new NetworkMissionEntered("A", InstanceId));
-            Punch(missionManager, natPunchModule, bInternal, bExternal, "B");
+            Punch(missionManager, natPunchModule, bInternal, bExternal, bPeer, "B");
             messageBroker.Publish(bPeer, new NetworkMissionEntered("B", InstanceId));
             DrainGameThread();
 
@@ -102,6 +103,7 @@ public class SettlementMissionReconnectTests
                 natPunchModule,
                 replacementAInternal,
                 replacementAExternal,
+                replacementAPeer,
                 "A");
             DrainGameThread();
 
@@ -114,12 +116,16 @@ public class SettlementMissionReconnectTests
             var replacementIntroduction = Assert.Single(CapturedIntroductions);
             Assert.Equal(bExternal, replacementIntroduction.hostExternal);
             Assert.Equal(replacementAExternal, replacementIntroduction.clientExternal);
+            Assert.True(ConnectionToken.TryParse(replacementIntroduction.discoveryToken, out var discovery));
+            Assert.Equal("A", discovery.ControllerId);
+            Assert.Equal(InstanceId, discovery.InstanceId);
+            Assert.True(replacementIntroduction.discoveryToken.Length <= NatPunchModule.MaxTokenLength);
             Assert.DoesNotContain(
                 CapturedIntroductions,
                 candidate => candidate.hostExternal.Equals(oldAExternal));
 
             CapturedIntroductions.Clear();
-            Punch(missionManager, natPunchModule, bInternal, bExternal, "B");
+            Punch(missionManager, natPunchModule, bInternal, bExternal, bPeer, "B");
             var survivorRepunch = Assert.Single(CapturedIntroductions);
             Assert.Equal(replacementAExternal, survivorRepunch.hostExternal);
             Assert.Equal(bExternal, survivorRepunch.clientExternal);
@@ -154,14 +160,16 @@ public class SettlementMissionReconnectTests
         IPEndPoint hostInternal,
         IPEndPoint hostExternal,
         IPEndPoint clientInternal,
-        IPEndPoint clientExternal)
+        IPEndPoint clientExternal,
+        string additionalInfo)
     {
         if (!ReferenceEquals(__instance, capturedNatPunchModule)) return true;
         CapturedIntroductions.Add((
             hostInternal,
             hostExternal,
             clientInternal,
-            clientExternal));
+            clientExternal,
+            additionalInfo));
         return false;
     }
 
@@ -191,9 +199,11 @@ public class SettlementMissionReconnectTests
         NatPunchModule natPunchModule,
         IPEndPoint internalEndpoint,
         IPEndPoint externalEndpoint,
+        NetPeer peer,
         string controllerId)
     {
-        string token = new ConnectionToken(controllerId, InstanceId);
+        Assert.True(missionManager.TryAuthorizeIntroduction(
+            peer, controllerId, InstanceId, Guid.NewGuid(), out var token));
         missionManager.HandleIntroductionRequest(
             natPunchModule,
             internalEndpoint,

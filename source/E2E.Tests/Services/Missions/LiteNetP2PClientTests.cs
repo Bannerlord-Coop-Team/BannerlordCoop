@@ -4,8 +4,10 @@ using Common.Network.Data;
 using Common.Network.Session;
 using Common.PacketHandlers;
 using Common.Serialization;
+using Common.Tests.Utils;
 using E2E.Tests.Environment.Extensions;
 using GameInterface.Services.Entity;
+using HarmonyLib;
 using LiteNetLib;
 using Missions.Agents.Handlers;
 using Missions.Messages;
@@ -13,6 +15,7 @@ using Missions.Services.Network;
 using Moq;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Net;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -21,6 +24,85 @@ namespace E2E.Tests.Services.Missions;
 
 public class LiteNetP2PClientTests
 {
+    private static NatPunchModule? capturedNatModule;
+    private static readonly List<string> CapturedPunchTokens = new();
+
+    [Fact]
+    public void IntroductionAuthorizationIgnoresStaleReplyAfterSameInstanceReentry()
+    {
+        var config = new Mock<INetworkConfig>();
+        var relayNetwork = new Mock<IRelayNetwork>();
+        relayNetwork.SetupGet(network => network.ServerEndpoint)
+            .Returns(new IPEndPoint(IPAddress.Loopback, 53001));
+        var requests = new List<NetworkRequestMissionIntroduction>();
+        relayNetwork.Setup(network => network.SendAll(It.IsAny<IMessage>()))
+            .Callback<IMessage>(message => requests.Add(Assert.IsType<NetworkRequestMissionIntroduction>(message)));
+        var broker = new TestMessageBroker();
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        using var client = new LiteNetP2PClient(
+            config.Object,
+            relayNetwork.Object,
+            Mock.Of<IMissionContext>(),
+            serializer,
+            broker,
+            Mock.Of<IPacketManager>(),
+            Mock.Of<IMessagePacketHandler>(),
+            Mock.Of<IControllerIdProvider>(),
+            Mock.Of<ISteamMissionBridge>(),
+            new MovementPacketCompressor(serializer),
+            Mock.Of<IReliableMessageBatcher<string>>());
+        var requestField = typeof(LiteNetP2PClient).GetField(
+            "introductionRequestId", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var netManager = (NetManager)typeof(LiteNetP2PClient)
+            .GetField("netManager", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(client)!;
+        var sendRequest = AccessTools.Method(typeof(NatPunchModule), nameof(NatPunchModule.SendNatIntroduceRequest),
+            new[] { typeof(IPEndPoint), typeof(string) });
+        var harmony = new Harmony($"coop.tests.mission-authorization.{Guid.NewGuid():N}");
+        harmony.Patch(sendRequest, prefix: new HarmonyMethod(typeof(LiteNetP2PClientTests), nameof(CapturePunch)));
+        capturedNatModule = netManager.NatPunchModule;
+        CapturedPunchTokens.Clear();
+        try
+        {
+            client.ConnectToInstance("town_ES1|tavern");
+            var firstRequest = Assert.Single(requests);
+            client.DisconnectPeers();
+            broker.Publish(this, new NetworkMissionIntroductionAuthorized(
+                firstRequest.InstanceId, firstRequest.RequestId, "unused"));
+            Assert.Equal(Guid.Empty, requestField.GetValue(client));
+
+            client.ConnectToInstance(firstRequest.InstanceId);
+            Assert.Equal(2, requests.Count);
+            var currentRequest = requests[1];
+            Assert.NotEqual(firstRequest.RequestId, currentRequest.RequestId);
+            broker.Publish(this, new NetworkMissionIntroductionAuthorized(
+                firstRequest.InstanceId, firstRequest.RequestId, "unused"));
+            Assert.Equal(currentRequest.RequestId, requestField.GetValue(client));
+            Assert.Empty(CapturedPunchTokens);
+
+            string token = Guid.NewGuid().ToString("N");
+            var reply = new NetworkMissionIntroductionAuthorized(currentRequest.InstanceId, currentRequest.RequestId, token);
+            broker.Publish(this, reply);
+            Assert.Equal(Guid.Empty, requestField.GetValue(client));
+            broker.Publish(this, reply);
+            Assert.Equal(Guid.Empty, requestField.GetValue(client));
+            Assert.Equal(token, Assert.Single(CapturedPunchTokens));
+        }
+        finally
+        {
+            capturedNatModule = null;
+            CapturedPunchTokens.Clear();
+            harmony.Unpatch(sendRequest, HarmonyPatchType.Prefix, harmony.Id);
+        }
+    }
+
+    private static bool CapturePunch(NatPunchModule __instance, string additionalInfo)
+    {
+        if (!ReferenceEquals(__instance, capturedNatModule)) return true;
+        CapturedPunchTokens.Add(additionalInfo);
+        return false;
+    }
+
     [Fact]
     public async Task PeerPromotion_ConcurrentReliableSend_DoesNotInvertLocks()
     {
