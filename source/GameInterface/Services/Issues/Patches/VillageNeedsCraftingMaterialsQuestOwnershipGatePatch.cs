@@ -29,6 +29,14 @@ internal class VillageNeedsCraftingMaterialsQuestOwnershipGatePatch
     }
 }
 
+[HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "QuestAcceptedConsequences")]
+internal class VillageNeedsCraftingMaterialsQuestAcceptedConsequencesOncePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance) =>
+        __instance._playerAcceptedQuestLog == null;
+}
+
 [HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "Success")]
 internal class VillageNeedsCraftingMaterialsQuestSuccessGatePatch
 {

@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMaterials;
 
@@ -29,11 +30,14 @@ internal readonly struct VillageNeedsCraftingMaterialsAcceptFields
     public readonly int RequestedItemAmount;
     [ProtoMember(2)]
     public readonly int RewardGold;
+    [ProtoMember(3)]
+    public readonly int CurrentProgress;
 
-    public VillageNeedsCraftingMaterialsAcceptFields(int requestedItemAmount, int rewardGold)
+    public VillageNeedsCraftingMaterialsAcceptFields(int requestedItemAmount, int rewardGold, int currentProgress)
     {
         RequestedItemAmount = requestedItemAmount;
         RewardGold = rewardGold;
+        CurrentProgress = currentProgress;
     }
 }
 
@@ -68,6 +72,11 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             using (new Generic.Dispatch.IssueDispatchReplayGuard())
             {
                 Campaign.Current.IssueManager.StartIssueQuest(owner);
+
+                if (owner.Issue.IssueQuest is Quest quest && quest._playerAcceptedQuestLog == null && MobileParty.MainParty != null)
+                {
+                    quest.QuestAcceptedConsequences();
+                }
             }
         }
 
@@ -76,7 +85,8 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             fields = default;
             if (owner?.Issue?.IssueQuest is not Quest quest) return false;
 
-            fields = new VillageNeedsCraftingMaterialsAcceptFields(quest._requestedItemAmount, quest.RewardGold);
+            fields = new VillageNeedsCraftingMaterialsAcceptFields(
+                quest._requestedItemAmount, quest.RewardGold, quest._playerAcceptedQuestLog?.CurrentProgress ?? 0);
             return true;
         }
 
@@ -97,14 +107,32 @@ internal static class VillageNeedsCraftingMaterialsQuestType
                 RequestedItemAmountField.SetValue(quest, fields.RequestedItemAmount);
                 RewardGoldField.SetValue(quest, fields.RewardGold);
 
+                EnsureAcceptedQuestLog(owner, quest, fields);
+
                 if (quest._playerAcceptedQuestLog is JournalLog log)
                 {
                     JournalLogRangeField.SetValue(log, fields.RequestedItemAmount);
-
-                    var ownedCount = owner.PartyBelongedTo?.ItemRoster.GetItemNumber(quest._requestedItem) ?? 0;
-                    log.UpdateCurrentProgress(Math.Min(ownedCount, fields.RequestedItemAmount));
+                    log.UpdateCurrentProgress(fields.CurrentProgress);
                 }
             }
+        }
+
+        private static void EnsureAcceptedQuestLog(Hero owner, Quest quest, VillageNeedsCraftingMaterialsAcceptFields fields)
+        {
+            if (quest._playerAcceptedQuestLog != null) return;
+
+            var isLocalPeerOwner = ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) &&
+                ownershipRegistry.IsLocalPeerOwner(owner);
+            if (isLocalPeerOwner && MobileParty.MainParty != null)
+            {
+                quest.QuestAcceptedConsequences();
+                return;
+            }
+
+            var taskName = new TextObject("{=nAEhfGJk}Collect {ITEM}");
+            taskName.SetTextVariable("ITEM", quest._requestedItem.Name);
+            quest._playerAcceptedQuestLog = quest.AddDiscreteLog(
+                quest.QuestStartedLogText, taskName, fields.CurrentProgress, fields.RequestedItemAmount);
         }
 
         public void RejectAcceptance(Hero owner) => RejectAcceptanceCore(owner);
