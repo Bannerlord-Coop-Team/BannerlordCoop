@@ -14,6 +14,7 @@
     <string id="str_coop_clan_player_party_wages_disabled" text="{=str_coop_clan_player_party_wages_disabled}Wage limits cannot be set for player parties." />
     <string id="str_coop_clan_identity_leader_only" text="{=str_coop_clan_identity_leader_only}Only the clan leader can change the clan's name or banner." />
     <string id="str_coop_clan_join_title" text="{=str_coop_clan_join_title}Join {CLAN_NAME}?" />
+    <string id="str_coop_clan_experimental_warning" text="{=str_coop_clan_experimental_warning}EXPERIMENTAL: Use of this feature may cause unexpected issues." />
     <string id="str_coop_clan_join_description" text="{=str_coop_clan_join_description}You are asking to join {CLAN_NAME}, led by {LEADER_NAME}. The clan leader will manage the shared clan and its assets." />
 	<string id="str_coop_clan_join_companions" text="{=str_coop_clan_join_companions}Companions: {COUNT}" />
     <string id="str_coop_clan_join_workshops" text="{=str_coop_clan_join_workshops}Workshops: {COUNT}" />
@@ -53,5 +54,6 @@
     <string id="str_coop_marriage_acceptance_title" text="{=str_coop_marriage_acceptance_title}Accept marriage proposal?" />
     <string id="str_coop_marriage_acceptance_description" text="{=str_coop_marriage_acceptance_description}If you accept {LEADER_NAME}'s marriage proposal, you will marry them and join {CLAN_NAME}. They will remain clan leader and manage its shared assets." />
     <string id="str_coop_marriage_clan_commitment" text="{=str_coop_marriage_clan_commitment}While married to another player, you cannot leave the clan or be removed from it." />
+    <string id="str_coop_marriage_forfeit_warning" text="{=str_coop_marriage_forfeit_warning}On joining the clan through marriage, you permanently give up ownership and control of the companions, assets and supporters listed above to the clan leader. You cannot leave the clan or be removed while married to another player." />
     <!-- Add other custom text here in the future-->
 </strings>

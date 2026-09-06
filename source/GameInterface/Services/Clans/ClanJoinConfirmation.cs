@@ -36,18 +36,21 @@ public class ClanJoinConfirmation : IClanJoinConfirmation
         };
         var paragraphs = new List<string>
         {
+            GameTexts.FindText("str_coop_clan_experimental_warning").ToString(),
             GameTexts.FindText(descriptionTextId)
                 .SetTextVariable("CLAN_NAME", targetClan.Name)
                 .SetTextVariable("LEADER_NAME", targetClan.Leader.Name).ToString(),
         };
-        if (context != ClanJoinConfirmationContext.JoinRequest)
-            paragraphs.Add(GameTexts.FindText("str_coop_marriage_clan_commitment").ToString());
-
         var warnings = rules.GetWarnings(joiningHero, targetClan);
         if (warnings.Count > 0)
         {
             paragraphs.Add(string.Join("\n", warnings.Select(warning => warning.ToString())));
-            paragraphs.Add(GameTexts.FindText("str_coop_clan_join_forfeit_warning").ToString());
+            paragraphs.Add(GameTexts.FindText(context == ClanJoinConfirmationContext.JoinRequest
+                ? "str_coop_clan_join_forfeit_warning" : "str_coop_marriage_forfeit_warning").ToString());
+        }
+        else if (context != ClanJoinConfirmationContext.JoinRequest)
+        {
+            paragraphs.Add(GameTexts.FindText("str_coop_marriage_clan_commitment").ToString());
         }
 
         return new InquiryData(
