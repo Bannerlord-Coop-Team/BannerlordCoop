@@ -1,10 +1,11 @@
-using GameInterface.Services.Inventory.Data;
+﻿using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf.Meta;
 using System.IO;
 using Xunit;
+using GameInterface.Services.Clans.Data;
 
 namespace GameInterface.Tests.Serialization;
 
@@ -63,7 +64,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
             partyItems: new[] { new ItemRosterElementData(new ItemObjectData("party-item", null, itemModifierNull: true), 3) },
             otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) },
             enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal },
-            isHostile: true);
+            isHostile: true,
+            clanJoinUnavailableReason: ClanJoinUnavailableReason.IncompatibleWars);
 
         var result = RoundTrip(original);
 
@@ -79,6 +81,7 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.InitiatorAcceptedTrade, result.InitiatorAcceptedTrade);
         Assert.Equal(original.ResponderAcceptedTrade, result.ResponderAcceptedTrade);
         Assert.Equal(original.IsHostile, result.IsHostile);
+        Assert.Equal(original.ClanJoinUnavailableReason, result.ClanJoinUnavailableReason);
         Assert.Single(result.PartyItems);
         Assert.Equal("party-item", result.PartyItems[0].ItemObjectData.ItemObjectId);
         Assert.Equal(3, result.PartyItems[0].Amount);

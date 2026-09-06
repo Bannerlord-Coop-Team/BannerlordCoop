@@ -1,3 +1,4 @@
+﻿using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.TroopRosters.Data;
 using LiteNetLib;
@@ -16,6 +17,7 @@ internal sealed class PlayerPartyInteractionSession
     public NetPeer ResponderPeer { get; set; }
     public bool IsHostile { get; }
     public PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason { get; set; }
+    public ClanJoinUnavailableReason ClanJoinUnavailableReason { get; set; }
     public PlayerPartyInteractionProposal Proposal { get; set; }
     public bool HostileDemandConfirmed { get; set; }
     public bool InitiatorAcceptedTrade { get; set; }

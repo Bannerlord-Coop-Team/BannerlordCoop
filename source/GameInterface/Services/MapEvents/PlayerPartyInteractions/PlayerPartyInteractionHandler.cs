@@ -39,6 +39,7 @@ using TaleWorlds.Core;
 using TaleWorlds.ScreenSystem;
 using Helpers;
 using TaleWorlds.Library;
+using GameInterface.Services.Clans.Data;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
@@ -54,6 +55,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly INetworkConfig configuration;
     private readonly IPlayerPartyHostileEncounterService hostileEncounterService;
+    private readonly IClanJoinRules clanJoinRules;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -81,6 +83,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.conversationPartyTracker = conversationPartyTracker;
         this.configuration = configuration;
         this.hostileEncounterService = hostileEncounterService;
+        this.clanJoinRules = clanJoinRules;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, messageBroker, kingdomMembershipState, clanJoinRules);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
@@ -566,6 +569,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (proposal == PlayerPartyInteractionProposal.None) return;
         if (!session.InitiatorEnabledOptions.Contains(option)) return;
 
+        if (proposal == PlayerPartyInteractionProposal.JoinClan && !CanJoinClan(session))
+        {
+            EndSession(session, PlayerPartyInteractionOutcomeType.Rejected);
+            return;
+        }
+
         session.Proposal = proposal;
         SendInitiatorState(session, PlayerPartyInteractionPhase.WaitingForResponse, proposal, Array.Empty<PlayerPartyInteractionOption>());
         SendResponderState(
@@ -616,6 +625,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         if (option != PlayerPartyInteractionOption.AcceptProposal) return;
+
+        if (session.Proposal == PlayerPartyInteractionProposal.JoinClan && !CanJoinClan(session))
+        {
+            EndSession(session, PlayerPartyInteractionOutcomeType.Rejected);
+            return;
+        }
 
         if (session.Proposal == PlayerPartyInteractionProposal.Trade)
         {
@@ -708,7 +723,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             otherPartyItems,
             enabledOptions,
             session.IsHostile,
-            session.VassalUnavailableReason));
+            session.VassalUnavailableReason,
+            session.ClanJoinUnavailableReason));
     }
 
     private void SendResponderState(
@@ -740,7 +756,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             otherPartyItems,
             enabledOptions,
             session.IsHostile,
-            session.VassalUnavailableReason));
+            session.VassalUnavailableReason,
+            session.ClanJoinUnavailableReason));
     }
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
@@ -777,16 +794,29 @@ internal class PlayerPartyInteractionHandler : IHandler
     private void AddInitialOptions(PlayerPartyInteractionSession session, PartyBase initiatorParty, PartyBase responderParty)
     {
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
-        AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, enabled: !session.IsHostile);
         AddInitiatorOption(session, PlayerPartyInteractionOption.HostileDemand, hostileEncounterService.CanStartHostileEncounter(initiatorParty, responderParty));
-        AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan, enabled: true);
-        var vassalAvailable = IsVassalServiceAvailable(initiatorParty, responderParty, out var vassalUnavailableReason);
-        session.VassalUnavailableReason = vassalUnavailableReason;
-        AddInitiatorOption(
-            session,
-            PlayerPartyInteractionOption.Vassal,
-            vassalAvailable);
+        session.ClanJoinUnavailableReason = clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero);
+        if (session.ClanJoinUnavailableReason != ClanJoinUnavailableReason.MissingClan &&
+            session.ClanJoinUnavailableReason != ClanJoinUnavailableReason.SameClan)
+        {
+            var servicesAvailable = !session.IsHostile &&
+                clanJoinRules.CanOfferServices(initiatorParty.LeaderHero, responderParty.LeaderHero.Clan);
+            AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, servicesAvailable);
+            AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan,
+                servicesAvailable && session.ClanJoinUnavailableReason == ClanJoinUnavailableReason.None);
+            var vassalAvailable = IsVassalServiceAvailable(initiatorParty, responderParty, out var vassalUnavailableReason);
+            session.VassalUnavailableReason = vassalUnavailableReason;
+            AddInitiatorOption(session, PlayerPartyInteractionOption.Vassal, servicesAvailable && vassalAvailable);
+        }
         AddInitiatorOption(session, PlayerPartyInteractionOption.Leave, enabled: true);
+    }
+
+    private bool CanJoinClan(PlayerPartyInteractionSession session)
+    {
+        if (!objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) ||
+            !objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty)) return false;
+
+        return clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero) == ClanJoinUnavailableReason.None;
     }
 
     private static void AddInitiatorOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option, bool enabled)

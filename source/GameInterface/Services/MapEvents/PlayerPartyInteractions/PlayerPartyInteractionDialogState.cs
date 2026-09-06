@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Clans;
+using GameInterface.Services.Clans.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -11,6 +12,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -83,7 +85,17 @@ public static class PlayerPartyInteractionDialogState
             return false;
         }
 
+        if (option == PlayerPartyInteractionOption.OfferServices &&
+            currentState.ClanJoinUnavailableReason == ClanJoinUnavailableReason.OtherPlayersInClan)
+        {
+            explanation = GameTexts.FindText("str_coop_clan_offer_services_shared_leader");
+            return false;
+        }
+
         if (option == PlayerPartyInteractionOption.Vassal && TryGetVassalUnavailableExplanation(out explanation))
+            return false;
+
+        if (option == PlayerPartyInteractionOption.JoinClan && TryGetClanJoinUnavailableExplanation(out explanation))
             return false;
 
         explanation = new TextObject("{=coop_player_party_interaction_disabled}This option is not available.");
@@ -110,6 +122,23 @@ public static class PlayerPartyInteractionDialogState
                 explanation = null;
                 return false;
         }
+    }
+
+    private static bool TryGetClanJoinUnavailableExplanation(out TextObject explanation)
+    {
+        var textId = currentState.ClanJoinUnavailableReason switch
+        {
+            ClanJoinUnavailableReason.OtherPlayersInClan => "str_coop_clan_join_other_players",
+            ClanJoinUnavailableReason.TargetIsNotClanLeader => "str_coop_clan_join_target_not_leader",
+            ClanJoinUnavailableReason.RulesKingdom => "str_coop_clan_join_rules_kingdom",
+            ClanJoinUnavailableReason.Mercenary => "str_coop_clan_join_mercenary",
+            ClanJoinUnavailableReason.Vassal => "str_coop_clan_join_vassal",
+            ClanJoinUnavailableReason.OwnsFiefs => "str_coop_clan_join_owns_fiefs",
+            ClanJoinUnavailableReason.IncompatibleWars => "str_coop_clan_join_incompatible_wars",
+            _ => null
+        };
+        explanation = textId == null ? null : GameTexts.FindText(textId);
+        return explanation != null;
     }
 
     public static string GetDialogText()
@@ -223,7 +252,8 @@ public static class PlayerPartyInteractionDialogState
             currentState.OtherPartyItems,
             GetLocalServiceEnabledOptions(),
             currentState.IsHostile,
-            currentState.VassalUnavailableReason);
+            currentState.VassalUnavailableReason,
+            currentState.ClanJoinUnavailableReason);
 
         RefreshConversation();
     }

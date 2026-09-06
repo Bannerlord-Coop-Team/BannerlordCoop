@@ -1,4 +1,5 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using ProtoBuf;
@@ -38,6 +39,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
     public readonly bool IsHostile;
     [ProtoMember(15)]
     public readonly PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason;
+    [ProtoMember(16)]
+    public readonly ClanJoinUnavailableReason ClanJoinUnavailableReason;
 
     public NetworkPlayerPartyInteractionState(
         string sessionId,
@@ -54,7 +57,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         ItemRosterElementData[] otherPartyItems = null,
         PlayerPartyInteractionOption[] enabledOptions = null,
         bool isHostile = false,
-        PlayerPartyInteractionVassalUnavailableReason vassalUnavailableReason = PlayerPartyInteractionVassalUnavailableReason.None)
+        PlayerPartyInteractionVassalUnavailableReason vassalUnavailableReason = PlayerPartyInteractionVassalUnavailableReason.None,
+        ClanJoinUnavailableReason clanJoinUnavailableReason = ClanJoinUnavailableReason.None)
     {
         SessionId = sessionId;
         PartyId = partyId;
@@ -71,5 +75,6 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         EnabledOptions = enabledOptions ?? Options;
         IsHostile = isHostile;
         VassalUnavailableReason = vassalUnavailableReason;
+        ClanJoinUnavailableReason = clanJoinUnavailableReason;
     }
 }
