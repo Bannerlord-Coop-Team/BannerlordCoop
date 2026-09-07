@@ -311,6 +311,14 @@ internal class AlleyManagementHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (!behaviorInterface.ClientAlleyData.TryGetValue(data.AlleyId, out var stored))
+            {
+                stored = new AlleyManagementData(data.OverseerId, data.Garrison);
+                behaviorInterface.ClientAlleyData[data.AlleyId] = stored;
+            }
+            stored.OverseerId = data.OverseerId;
+            stored.Garrison = data.Garrison;
+            stored.LastRecruitTimeTicks = data.LastRecruitTimeTicks;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
 
             // Only the owning client keeps the behavior-side management data. A client that no longer
@@ -352,6 +360,7 @@ internal class AlleyManagementHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
+            behaviorInterface.ClientAlleyData.Remove(data.AlleyId);
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             behaviorInterface.RemovePlayerAlleyData(alley);
         });

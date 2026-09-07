@@ -2,13 +2,32 @@
 
 namespace GameInterface.Services.Clans;
 
-public interface IClanMembersPrefabEditor : IGameAbstraction
+public interface IClanPrefabEditor : IGameAbstraction
 {
     void AddMemberGroups(XmlNode root);
+    void ApplyIncomePermissions(XmlNode root);
 }
 
-public class ClanMembersPrefabEditor : IClanMembersPrefabEditor
+public class ClanPrefabEditor : IClanPrefabEditor
 {
+    public void ApplyIncomePermissions(XmlNode root)
+    {
+        foreach (XmlElement button in root.SelectNodes(".//*[@Id='ManageWorkshopButton' or @Id='ManageAlleyButton']"))
+            button.SetAttribute("IsEnabled", "@CanManageAsset");
+
+        if (root.SelectSingleNode(".//*[@Id='ManageWorkshopButton']") == null) return;
+
+        // Warehouse contents are private to the owning client.
+        foreach (var text in new[] { "UseWarehouseAsInputText", "StoreOutputPercentageText", "WarehouseCapacityText" })
+        {
+            var row = root.SelectSingleNode($".//*[@Text='@{text}']/../..") as XmlElement;
+            row?.SetAttribute("IsVisible", "@CanManageAsset");
+        }
+        foreach (XmlElement widget in root.SelectNodes(
+            ".//*[@IntText='@WarehouseInputAmount' or @IntText='@WarehouseOutputAmount' or @Sprite='SPGeneral\\GameMenu\\warehouse_icon']"))
+            widget.SetAttribute("IsVisible", "@CanManageAsset");
+    }
+
     public void AddMemberGroups(XmlNode root)
     {
         if (root.Attributes?["Id"]?.Value != "ClanMembersWidget" ||

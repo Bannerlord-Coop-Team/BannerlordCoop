@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
@@ -97,4 +99,61 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPatch("OnNewGameCreated")]
     [HarmonyPrefix]
     private static bool OnNewGameCreatedPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(AlleyCampaignBehavior.GetAssignedClanMemberOfAlley))]
+    [HarmonyPrefix]
+    public static bool GetAssignedClanMemberPrefix(Alley alley, ref Hero __result)
+    {
+        if (!TryGetSharedAlleyData(alley, out var data, out var objectManager)) return true;
+        __result = data?.OverseerId != null && objectManager.TryGetObject<Hero>(data.OverseerId, out var overseer)
+            ? overseer : alley.Owner;
+        return false;
+    }
+
+    [HarmonyPatch(nameof(AlleyCampaignBehavior.GetPlayerOwnedAlleyTroopCount))]
+    [HarmonyPrefix]
+    public static bool GetTroopCountPrefix(Alley alley, ref int __result)
+    {
+        if (!TryGetSharedAlleyData(alley, out var data, out var objectManager)) return true;
+        __result = 0;
+        if (data?.Garrison == null) return false;
+        foreach (var troop in data.Garrison)
+        {
+            if (objectManager.TryGetObject<CharacterObject>(troop.CharacterId, out var character) && !character.IsHero)
+                __result += troop.Number;
+        }
+        return false;
+    }
+
+    [HarmonyPatch(nameof(AlleyCampaignBehavior.GetIsPlayerAlleyUnderAttack))]
+    [HarmonyPrefix]
+    public static bool GetIsUnderAttackPrefix(Alley alley, ref bool __result)
+    {
+        if (!TryGetSharedAlleyData(alley, out var data, out _)) return true;
+        __result = data?.UnderAttackByAlleyId != null;
+        return false;
+    }
+
+    [HarmonyPatch(nameof(AlleyCampaignBehavior.GetResponseTimeLeftForAttackInDays))]
+    [HarmonyPrefix]
+    public static bool GetResponseTimePrefix(Alley alley, ref int __result)
+    {
+        if (!TryGetSharedAlleyData(alley, out var data, out _)) return true;
+        __result = data == null ? 0 : (int)data.AttackResponseDueDate.RemainingDaysFromNow;
+        return false;
+    }
+
+    private static bool TryGetSharedAlleyData(Alley alley, out AlleyManagementData data, out IObjectManager objectManager)
+    {
+        data = null;
+        objectManager = null;
+        if (ModInformation.IsServer || alley.Owner == Hero.MainHero ||
+            Hero.MainHero?.Clan == null || alley.Owner?.Clan != Hero.MainHero.Clan) return false;
+        if (!ContainerProvider.TryResolve<IAlleyCampaignBehaviorInterface>(out var behavior) ||
+            !ContainerProvider.TryResolve(out objectManager)) return false;
+
+        if (objectManager.TryGetId(alley, out var alleyId))
+            behavior.ClientAlleyData.TryGetValue(alleyId, out data);
+        return true;
+    }
 }

@@ -14,7 +14,7 @@ public class ClanMembersPrefabEditorTests
     {
         var document = LoadPrefab();
         var root = document.SelectSingleNode("/Prefab/Window/*")!;
-        var editor = new ClanMembersPrefabEditor();
+        var editor = new ClanPrefabEditor();
         editor.AddMemberGroups(root);
 
         string[] groups = { "Players", "Family", "OtherFamilies", "Companions" };
@@ -64,7 +64,7 @@ public class ClanMembersPrefabEditorTests
         var root = document.DocumentElement!;
         var original = root.OuterXml;
 
-        new ClanMembersPrefabEditor().AddMemberGroups(root);
+        new ClanPrefabEditor().AddMemberGroups(root);
 
         Assert.Equal(original, root.OuterXml);
     }

@@ -491,6 +491,11 @@ internal class AlleyHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (behaviorInterface.ClientAlleyData.TryGetValue(data.AlleyId, out var stored))
+            {
+                stored.UnderAttackByAlleyId = data.AttackerAlleyId;
+                stored.AttackResponseDueDate = data.DueDate;
+            }
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
 
             // Only the owning client tracks this alley's under-attack state; its confront menu keys off it.
