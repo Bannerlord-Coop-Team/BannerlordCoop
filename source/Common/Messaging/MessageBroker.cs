@@ -76,6 +76,7 @@ public class MessageBroker : IMessageBroker
     {
         var delegates = subscribers.ContainsKey(typeof(T)) ?
                         subscribers[typeof(T)] : new List<WeakDelegate>();
+        RemoveDeadSubscribers(delegates);
         if (!delegates.Contains(subscription))
         {
             delegates.Add(subscription);
@@ -90,8 +91,15 @@ public class MessageBroker : IMessageBroker
         var delegates = subscribers[typeof(T)];
         if (delegates.Contains(new WeakDelegate(subscription)))
             delegates.Remove(subscription);
+        RemoveDeadSubscribers(delegates);
         if (delegates.Count == 0)
             subscribers.Remove(typeof(T));
+    }
+
+    // Entries whose target was collected otherwise sit here until this message type is published again
+    private static void RemoveDeadSubscribers(List<WeakDelegate> delegates)
+    {
+        delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
     }
 
     public virtual void Dispose()
