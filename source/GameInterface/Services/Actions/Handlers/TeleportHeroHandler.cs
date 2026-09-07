@@ -60,26 +60,20 @@ internal class TeleportHeroHandler : IHandler
     {
         var data = obj.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
 
-                Settlement targetSettlement = null;
-                if (data.TargetSettlementId != null && !objectManager.TryGetObjectWithLogging(data.TargetSettlementId, out targetSettlement)) return;
+            Settlement targetSettlement = null;
+            if (data.TargetSettlementId != null && !objectManager.TryGetObjectWithLogging(data.TargetSettlementId, out targetSettlement)) return;
 
-                MobileParty targetParty = null;
-                if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
+            MobileParty targetParty = null;
+            if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
 
-                TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, data.Detail);
+            TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, data.Detail);
 
-                network.Send(obj.Who as NetPeer, new RefreshClanMembersList());
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply {Message}", nameof(TeleportHero));
-            }
+            if (!objectManager.TryGetIdWithLogging(hero.Clan, out var clanId)) return;
+            network.SendAll(new NetworkRefreshClanMembersList(clanId));
         });
     }
 }

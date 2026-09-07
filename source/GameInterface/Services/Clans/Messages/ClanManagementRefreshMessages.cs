@@ -4,21 +4,48 @@ using ProtoBuf;
 namespace GameInterface.Services.Clans.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RefreshPartiesList : ICommand {}
+internal readonly struct NetworkRefreshPartiesList : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string ClanId;
+
+    public NetworkRefreshPartiesList(string clanId)
+    {
+        ClanId = clanId;
+    }
+}
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RefreshWorkshopsList : ICommand { }
+internal readonly struct NetworkRefreshWorkshopsList : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string ClanId;
+
+    public NetworkRefreshWorkshopsList(string clanId)
+    {
+        ClanId = clanId;
+    }
+}
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RefreshClanMembersList : ICommand { }
+internal readonly struct NetworkRefreshClanMembersList : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string ClanId;
+
+    public NetworkRefreshClanMembersList(string clanId)
+    {
+        ClanId = clanId;
+    }
+}
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RefreshAfterRoleAssignment : ICommand
+internal readonly struct NetworkRefreshAfterRoleAssignment : ICommand
 {
     [ProtoMember(1)]
     public readonly string MobilePartyId;
 
-    public RefreshAfterRoleAssignment(string mobilePartyId)
+    public NetworkRefreshAfterRoleAssignment(string mobilePartyId)
     {
         MobilePartyId = mobilePartyId;
     }

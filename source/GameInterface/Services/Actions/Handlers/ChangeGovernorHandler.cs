@@ -5,9 +5,7 @@ using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
-using LiteNetLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -58,21 +56,15 @@ internal class ChangeGovernorHandler : IHandler
     {
         var data = obj.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Town>(data.FortificationId, out var fortification)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.GovernorId, out var governor)) return;
+            if (!objectManager.TryGetObjectWithLogging<Town>(data.FortificationId, out var fortification)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.GovernorId, out var governor)) return;
 
-                ChangeGovernorAction.ApplyInternal(fortification, governor);
+            ChangeGovernorAction.ApplyInternal(fortification, governor);
 
-                network.Send(obj.Who as NetPeer, new RefreshClanMembersList());
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply {Message}", nameof(ChangeGovernor));
-            }
+            if (!objectManager.TryGetIdWithLogging(governor.Clan, out var clanId)) return;
+            network.SendAll(new NetworkRefreshClanMembersList(clanId));
         });
     }
 
@@ -88,20 +80,14 @@ internal class ChangeGovernorHandler : IHandler
     {
         var data = obj.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.GovernorId, out var governor)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.GovernorId, out var governor)) return;
 
-                ChangeGovernorAction.ApplyGiveUpInternal(governor);
+            ChangeGovernorAction.ApplyGiveUpInternal(governor);
 
-                network.Send(obj.Who as NetPeer, new RefreshClanMembersList());
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply {Message}", nameof(RemoveGovernor));
-            }
+            if (!objectManager.TryGetIdWithLogging(governor.Clan, out var clanId)) return;
+            network.SendAll(new NetworkRefreshClanMembersList(clanId));
         });
     }
 }

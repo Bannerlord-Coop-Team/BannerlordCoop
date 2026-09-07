@@ -80,7 +80,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
         }
 
         AssertClanWorkshopDataReadyForClanMenu(client, state);
-        Assert.Single(Server.NetworkSentMessages.GetMessages<RefreshWorkshopsList>());
+        AssertWorkshopRefreshesFor(state.SellerId, state.BuyerId);
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
             AssertWorkshopOwnedByBuyer(environmentClient, state, expectedBuyerGold: 600, expectedSellerGold: 400);
         }
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<RefreshWorkshopsList>());
+        AssertWorkshopRefreshesFor(state.BuyerId);
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
             AssertHeroGold(environmentClient, secondBuyerId, 1000);
         }
 
-        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<RefreshWorkshopsList>().Count());
+        AssertWorkshopRefreshesFor(state.SellerId, state.BuyerId, state.BuyerId, secondBuyerId);
     }
 
     [Fact]
@@ -400,6 +400,23 @@ public class WorkshopPurchaseConversationTests : IDisposable
                 EnsureOwnedWorkshops(buyer);
             });
         }
+    }
+
+    private void AssertWorkshopRefreshesFor(params string[] heroIds)
+    {
+        Server.Call(() =>
+        {
+            var expectedClanIds = heroIds.Select(heroId =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.True(Server.ObjectManager.TryGetId(hero.Clan, out var clanId));
+                return clanId;
+            }).OrderBy(id => id).ToArray();
+            var actualClanIds = Server.NetworkSentMessages.GetMessages<NetworkRefreshWorkshopsList>()
+                .Select(message => message.ClanId).OrderBy(id => id).ToArray();
+
+            Assert.Equal(expectedClanIds, actualClanIds);
+        });
     }
 
     private void AssertHeroGold(EnvironmentInstance instance, string heroId, int expectedGold)

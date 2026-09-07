@@ -316,6 +316,6 @@ internal class PartyRolesHandler : IHandler
 
     private void UpdateClientVM(string mobilePartyId)
     {
-        network.SendAll(new RefreshAfterRoleAssignment(mobilePartyId));
+        network.SendAll(new NetworkRefreshAfterRoleAssignment(mobilePartyId));
     }
 }

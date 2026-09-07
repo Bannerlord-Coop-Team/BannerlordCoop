@@ -274,7 +274,7 @@ namespace GameInterface.Services.GameDebug.Commands
 
                 for (int i = 0; i < count; i++)
                 {
-                    network.SendAll(new RefreshAfterRoleAssignment(args[0]));
+                    network.SendAll(new NetworkRefreshAfterRoleAssignment(args[0]));
                 }
 
                 return Succeeded($"REFRESH_BURST_SENT party={args[0]} count={count}");

@@ -54,6 +54,7 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
 
         ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType, obj.What.IgnoreCost);
 
-        network.Send(obj.Who as NetPeer, new RefreshWorkshopsList());
+        if (!objectManager.TryGetIdWithLogging(workshop.Owner?.Clan, out var clanId)) return;
+        network.SendAll(new NetworkRefreshWorkshopsList(clanId));
     }
 }
